@@ -1,0 +1,32 @@
+services:
+  lunva-db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_DATABASE: lunva
+      MARIADB_USER: lunva
+      MARIADB_PASSWORD: lunva
+      MARIADB_ROOT_PASSWORD: lunva-root
+    ports:
+      - "3306:3306"
+    volumes:
+      - lunva-db:/var/lib/mysql
+
+  lunva:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ${LUNVA_BUILD_TARGET:-runtime-jvm}
+    container_name: lunva
+    environment:
+      DB_URL: jdbc:mariadb://lunva-db:3306/lunva
+      DB_USER: lunva
+      DB_PASSWORD: lunva
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_TTL_MINUTES: "720"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - lunva-db
+
+volumes:
+  lunva-db:

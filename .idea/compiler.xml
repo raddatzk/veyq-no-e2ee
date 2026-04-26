@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="backend-api.integrationTest" target="21" />
+      <module name="backend-api.main" target="21" />
+      <module name="backend-api.native-test" target="21" />
+      <module name="backend-api.quarkus-generated-sources" target="21" />
+      <module name="backend-api.quarkus-test-generated-sources" target="21" />
+      <module name="backend-api.test" target="21" />
+      <module name="backend.integrationTest" target="21" />
+      <module name="backend.main" target="21" />
+      <module name="backend.native-test" target="21" />
+      <module name="backend.quarkus-generated-sources" target="21" />
+      <module name="backend.quarkus-test-generated-sources" target="21" />
+      <module name="backend.test" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+</project>

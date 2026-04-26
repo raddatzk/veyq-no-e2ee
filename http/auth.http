@@ -1,0 +1,17 @@
+### Login (stores cookie in IntelliJ HTTP Client global variable)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+### Current user (requires cookie)
+GET {{baseUrl}}/api/users/me
+
+### Logout (requires cookie)
+POST {{baseUrl}}/api/auth/logout
+
+### Refresh the current session
+POST {{baseUrl}}/api/auth/refresh
