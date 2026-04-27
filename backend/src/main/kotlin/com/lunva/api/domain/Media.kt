@@ -139,6 +139,9 @@ class MediaRepo : PanacheRepository<Media> {
 
     fun findByTenantAndId(tenant: Tenant, mediaId: Long): Media? =
         find("tenant = ?1 and id = ?2", tenant, mediaId).firstResult()
+
+    fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Media? =
+        find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
 }
 
 @ApplicationScoped

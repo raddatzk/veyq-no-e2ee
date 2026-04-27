@@ -21,6 +21,7 @@ import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.TenantRole
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
+import com.lunva.api.setup.SetupFilter
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
@@ -46,6 +47,7 @@ class MultiTenantResourceTest {
     @Inject lateinit var tenantGroupMemberRepo: TenantGroupMemberRepo
     @Inject lateinit var mediaRepo: MediaRepo
     @Inject lateinit var passwordService: PasswordService
+    @Inject lateinit var setupFilter: SetupFilter
     @Inject lateinit var transaction: UserTransaction
 
     private lateinit var runId: String
@@ -263,6 +265,8 @@ class MultiTenantResourceTest {
                 it.role = role
                 userRepo.persist(it)
             }
+        }.also {
+            setupFilter.markSetupCompleted()
         }
 
     private fun addTenantMember(tenantName: String, userName: String) {
