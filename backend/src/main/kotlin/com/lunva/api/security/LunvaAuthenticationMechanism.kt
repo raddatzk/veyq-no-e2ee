@@ -25,7 +25,7 @@ class LunvaAuthenticationMechanism @Inject constructor(
         val optional = path == "api/bootstrap"
 
         val requiredToken = if (useRefreshToken) refreshToken else accessToken
-        if (requiredToken.isNullOrBlank()) {
+        if (requiredToken.isNullOrBlank() && !optional) {
             return Uni.createFrom().nullItem()
         }
 

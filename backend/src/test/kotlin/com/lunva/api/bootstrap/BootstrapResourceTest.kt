@@ -5,6 +5,7 @@ import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantRole
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
+import com.lunva.api.setup.SetupFilter
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
@@ -25,6 +26,7 @@ class BootstrapResourceTest {
     @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var userRepo: UserRepo
+    @Inject lateinit var setupFilter: SetupFilter
     @Inject lateinit var transaction: UserTransaction
 
     private lateinit var runId: String
@@ -51,31 +53,26 @@ class BootstrapResourceTest {
             }
             entityManager.createNativeQuery("set referential_integrity true").executeUpdate()
         }
+        setupFilter.refreshSetupStatus()
     }
 
     @Test
-    fun `bootstrap reports setup required on empty instance`() {
+    fun `api requests report setup required on empty instance`() {
         given()
-            .`when`().get("/api/bootstrap")
+            .`when`().get("/api/tenants")
             .then()
-            .statusCode(200)
-            .body("adminRequired", equalTo(true))
-            .body("tenantAvailable", equalTo(false))
-            .body("user", equalTo(null))
-            .body("tenants", hasSize<Any>(0))
+            .statusCode(503)
+            .body("error", equalTo("Setup required"))
     }
 
     @Test
-    fun `bootstrap is anonymous after setup without cookie`() {
+    fun `bootstrap requires authentication after setup without cookie`() {
         createOwner()
 
         given()
             .`when`().get("/api/bootstrap")
             .then()
-            .statusCode(200)
-            .body("adminRequired", equalTo(false))
-            .body("user", equalTo(null))
-            .body("tenants", hasSize<Any>(0))
+            .statusCode(401)
     }
 
     @Test
@@ -105,17 +102,14 @@ class BootstrapResourceTest {
     }
 
     @Test
-    fun `bootstrap ignores invalid cookie`() {
+    fun `bootstrap rejects invalid cookie after setup`() {
         createOwner()
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", "not-a-valid-token")
             .`when`().get("/api/bootstrap")
             .then()
-            .statusCode(200)
-            .body("adminRequired", equalTo(false))
-            .body("user", equalTo(null))
-            .body("tenants", hasSize<Any>(0))
+            .statusCode(401)
     }
 
     @Test
@@ -156,6 +150,7 @@ class BootstrapResourceTest {
                 userRepo.persist(it)
             }
         }
+        setupFilter.markSetupCompleted()
         return email
     }
 

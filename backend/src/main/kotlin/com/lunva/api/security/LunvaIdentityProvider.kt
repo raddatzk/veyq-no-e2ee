@@ -57,6 +57,7 @@ class LunvaIdentityProvider @Inject constructor(
             return null
         }
         return QuarkusSecurityIdentity.builder()
+            .setPrincipal(QuarkusPrincipal("anonymous"))
             .setAnonymous(true)
             .build()
     }

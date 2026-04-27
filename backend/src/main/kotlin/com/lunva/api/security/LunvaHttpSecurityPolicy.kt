@@ -1,5 +1,6 @@
 package com.lunva.api.security
 
+import com.lunva.api.setup.SetupFilter
 import io.quarkus.security.identity.SecurityIdentity
 import io.quarkus.vertx.http.runtime.security.HttpSecurityPolicy
 import io.smallrye.mutiny.Uni
@@ -7,14 +8,21 @@ import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
 
 @ApplicationScoped
-class LunvaHttpSecurityPolicy : HttpSecurityPolicy {
+class LunvaHttpSecurityPolicy(
+    private val setupFilter: SetupFilter,
+) : HttpSecurityPolicy {
     override fun checkPermission(
         routingContext: RoutingContext,
         identity: Uni<SecurityIdentity>,
         requestContext: HttpSecurityPolicy.AuthorizationRequestContext,
     ): Uni<HttpSecurityPolicy.CheckResult> {
         val path = routingContext.normalizedPath()
+
         if (isPublic(path) || !path.startsWith("/api/")) {
+            return HttpSecurityPolicy.CheckResult.permit()
+        }
+
+        if (!setupFilter.isSetupCompleted()) {
             return HttpSecurityPolicy.CheckResult.permit()
         }
 
@@ -29,7 +37,6 @@ class LunvaHttpSecurityPolicy : HttpSecurityPolicy {
 
     private fun isPublic(path: String): Boolean {
         return path == "/api/auth/login" ||
-            path == "/api/bootstrap" ||
             path == "/api/setup" ||
             path == "/api/setup/admin" ||
             path == "/q/health"

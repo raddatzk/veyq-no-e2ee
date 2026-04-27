@@ -1,24 +1,31 @@
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
+let refreshRequest: Promise<void> | null = null
+
+export class SetupRequiredError extends Error {
+  constructor() {
+    super('Setup required')
+    this.name = 'SetupRequiredError'
+  }
+}
+
 export async function callApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const httpCall = async () => await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
+  let response = await request(path, options)
+
+  if (response.status === 401 && shouldTryRefresh(path)) {
+    try {
+      await refreshLogin()
+      response = await request(path, options)
+    } catch {
+      // Keep the original 401 semantics for callers when refresh is not possible.
     }
-  })
-
-  const response = await httpCall()
-
-  if (response.status === 401) {
-    await refreshLogin()
-    response = await httpCall()
   }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: 'Request failed' }))
+    if (response.status === 503 && body.error === 'Setup required') {
+      throw new SetupRequiredError()
+    }
     throw new Error(body.error || 'Request failed')
   }
 
@@ -26,8 +33,8 @@ export async function callApi<T>(path: string, options: RequestInit = {}): Promi
   return response.json()
 }
 
-async function doCallApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+async function request(path: string, options: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     ...options,
     headers: {
@@ -35,16 +42,27 @@ async function doCallApi<T>(path: string, options: RequestInit = {}): Promise<T>
       ...(options.headers || {})
     }
   })
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(body.error || 'Request failed')
-  }
-
-  if (response.status === 204) return null as T
-  return response.json()
 }
 
 async function refreshLogin(): Promise<void> {
-  await callApi('/api/auth/refresh', { method: 'POST' })
+  refreshRequest ||= request('/api/auth/refresh', { method: 'POST' })
+    .then(async (response) => {
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ error: 'Request failed' }))
+        throw new Error(body.error || 'Request failed')
+      }
+    })
+    .finally(() => {
+      refreshRequest = null
+    })
+
+  return refreshRequest
+}
+
+function shouldTryRefresh(path: string): boolean {
+  return path !== '/api/auth/login' &&
+    path !== '/api/auth/logout' &&
+    path !== '/api/auth/refresh' &&
+    path !== '/api/setup' &&
+    path !== '/api/setup/admin'
 }

@@ -16,6 +16,7 @@ class SetupService @Inject constructor(
     private val userRepo: UserRepo,
     private val tenantRepo: TenantRepo,
     private val passwordService: PasswordService,
+    private val setupFilter: SetupFilter,
 ) {
     fun status(): SetupStatusResponse =
         SetupStatusResponse(
@@ -38,6 +39,7 @@ class SetupService @Inject constructor(
             userRepo.persist(it)
         }
         userRepo.flush()
+        setupFilter.markSetupCompleted()
 
         return UserSummary(
             user.id,
