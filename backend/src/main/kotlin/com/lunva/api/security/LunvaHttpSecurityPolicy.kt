@@ -29,6 +29,7 @@ class LunvaHttpSecurityPolicy : HttpSecurityPolicy {
 
     private fun isPublic(path: String): Boolean {
         return path == "/api/auth/login" ||
+            path == "/api/bootstrap" ||
             path == "/api/setup" ||
             path == "/api/setup/admin" ||
             path == "/q/health"

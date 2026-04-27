@@ -1,6 +1,5 @@
 package com.lunva.api.setup
 
-import com.lunva.api.user.UserResource
 import com.lunva.api.user.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

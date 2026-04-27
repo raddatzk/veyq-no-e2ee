@@ -1,6 +1,7 @@
 package com.lunva.api.tenant
 
 import com.lunva.api.domain.ServerRole
+import com.lunva.api.domain.TenantRole
 import com.lunva.api.security.ServerRolesRequired
 import com.lunva.api.user.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
@@ -15,7 +16,13 @@ data class CreateTenantRequest(
     @field:NotBlank(message = "displayName must not be blank") val displayName: String?,
 )
 
-data class TenantSummary(val id: Long, val name: String, val displayName: String, val admins: List<UserSummary>)
+data class TenantSummary(
+    val id: Long,
+    val name: String,
+    val displayName: String,
+    val role: TenantRole,
+    val admins: List<UserSummary>,
+)
 
 data class TenantsSummary(val tenants: List<TenantSummary>)
 

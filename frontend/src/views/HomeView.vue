@@ -1,23 +1,30 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import Card from 'primevue/card'
+import Message from 'primevue/message'
 import { authState } from '../authState'
+
+function roleLabel(role: string) {
+  return role === 'TENANT_OWNER' ? 'Owner' : 'Member'
+}
 </script>
 
 <template>
-  <section class="card">
-    <h1>Home</h1>
-    <p v-if="authState.loading">Lade Sessionstatus...</p>
+  <Card>
+    <template #title>Home</template>
+    <template #content>
+    <Message v-if="authState.loading" severity="info" :closable="false">Lade Sessionstatus...</Message>
     <template v-else-if="authState.isAuthenticated">
       <p>Eingeloggt als {{ authState.userLabel }}.</p>
       <div v-if="authState.tenants.length" class="tenant-list">
         <RouterLink
           v-for="tenant in authState.tenants"
           :key="tenant.id"
-          :to="`/${tenant.slug}`"
+          :to="`/${tenant.name}`"
           class="tenant-row"
         >
-          <span>{{ tenant.name }}</span>
-          <small>{{ tenant.role }}</small>
+          <span>{{ tenant.displayName }}</span>
+          <small>{{ roleLabel(tenant.role) }}</small>
         </RouterLink>
       </div>
     </template>
@@ -25,5 +32,6 @@ import { authState } from '../authState'
       Du bist nicht eingeloggt.
       <RouterLink to="/login">Zur Loginseite</RouterLink>
     </p>
-  </section>
+    </template>
+  </Card>
 </template>

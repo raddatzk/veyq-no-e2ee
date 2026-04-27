@@ -75,7 +75,7 @@ class AuthService @Inject constructor(
         val accessCookie = cookieService.createAccessCookie(accessToken)
         val refreshCookie = cookieService.createRefreshCookie(refreshToken)
 
-        val response = LoginResponse(user.id, user.email, user.displayName)
+        val response = LoginResponse(user.id, user.email, user.displayName, user.role)
 
         return LoginContext(response, accessCookie, refreshCookie)
     }

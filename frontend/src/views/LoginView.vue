@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import Password from 'primevue/password'
 import { authState } from '../authState'
-import { login, tenants } from '../api/authClient'
+import { login } from '../api/authClient'
+import { tenants } from '../api/tenantClient'
 
 const router = useRouter()
 const email = ref('')
@@ -15,6 +21,12 @@ async function submit() {
     const user = await login(email.value, password.value)
     authState.isAuthenticated = true
     authState.userLabel = user.displayName || user.email
+    authState.user = {
+      userId: user.userId,
+      email: user.email,
+      displayName: user.displayName,
+      serverRole: user.serverRole
+    }
     authState.tenants = await tenants()
     await router.push('/')
   } catch (e: any) {
@@ -30,19 +42,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="card login-card">
-    <h1>Login</h1>
+  <Card class="login-card">
+    <template #title>Login</template>
+    <template #content>
     <form class="form" @submit.prevent="submit">
       <label>
         E-Mail
-        <input v-model="email" type="email" autocomplete="email" required />
+        <InputText v-model="email" type="email" autocomplete="email" required />
       </label>
       <label>
         Passwort
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <Password v-model="password" autocomplete="current-password" required :feedback="false" toggle-mask fluid />
       </label>
-      <button type="submit">Einloggen</button>
+      <Button type="submit" label="Einloggen" icon="pi pi-sign-in" />
     </form>
-    <p v-if="error" class="error">{{ error }}</p>
-  </section>
+    <Message v-if="error" severity="error" :closable="false" class="form-message">{{ error }}</Message>
+    </template>
+  </Card>
 </template>

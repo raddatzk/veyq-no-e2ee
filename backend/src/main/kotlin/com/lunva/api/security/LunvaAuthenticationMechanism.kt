@@ -22,6 +22,7 @@ class LunvaAuthenticationMechanism @Inject constructor(
         val refreshToken = context.request().getCookie(cookieConfig.refreshTokenName)?.value
         val accessToken = context.request().getCookie(cookieConfig.accessTokenName)?.value
         val useRefreshToken = path == "api/auth/refresh"
+        val optional = path == "api/bootstrap"
 
         val requiredToken = if (useRefreshToken) refreshToken else accessToken
         if (requiredToken.isNullOrBlank()) {
@@ -31,6 +32,7 @@ class LunvaAuthenticationMechanism @Inject constructor(
         val request = AuthenticationRequest(
             TokenCredentials(accessToken, refreshToken),
             useRefreshToken,
+            optional,
         )
         return identityProviderManager.authenticate(request)
     }

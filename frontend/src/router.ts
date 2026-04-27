@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { authState } from './authState'
 import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
@@ -6,12 +6,12 @@ import SetupView from './views/SetupView.vue'
 import TenantView from './views/TenantView.vue'
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: [
     { path: '/', name: 'home', component: HomeView },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/:tenantName', name: 'tenant', component: TenantView }
+    { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantView }
   ]
 })
 

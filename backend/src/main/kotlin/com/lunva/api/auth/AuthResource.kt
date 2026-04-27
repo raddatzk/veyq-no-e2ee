@@ -2,6 +2,7 @@ package com.lunva.api.auth
 
 import com.lunva.api.auth.cookie.CookieService
 import com.lunva.api.auth.token.TokenService
+import com.lunva.api.domain.ServerRole
 import com.lunva.api.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -17,10 +18,7 @@ import jakarta.ws.rs.core.Response
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 class AuthResource @Inject constructor(
-    private val tokenService: TokenService,
     private val authService: AuthService,
-    private val cookieService: CookieService,
-    private val userService: UserService,
 ) {
     data class LoginRequest(
         @field:NotBlank(message = "email must not be blank")
@@ -29,7 +27,7 @@ class AuthResource @Inject constructor(
         @field:NotBlank(message = "password must not be blank") val password: String?
     )
 
-    data class LoginResponse(val userId: Long, val email: String, val displayName: String)
+    data class LoginResponse(val userId: Long, val email: String, val displayName: String, val serverRole: ServerRole)
 
     @POST
     @Path("/login")

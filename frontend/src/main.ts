@@ -1,30 +1,42 @@
 import { createApp } from 'vue'
+import PrimeVue from 'primevue/config'
+import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import router from './router'
 import { authState } from './authState'
-import { me, setupStatus, tenants } from './api/authClient'
+import { bootstrap as bootstrapSession } from './api/bootstrapClient'
 import './style.css'
+import 'primeicons/primeicons.css'
 
 async function bootstrap() {
   try {
-    const setup = await setupStatus()
-    authState.setupRequired = setup.adminRequired
+    const session = await bootstrapSession()
+    authState.setupRequired = session.adminRequired
 
-    if (!setup.adminRequired) {
-      const current = await me()
-      authState.isAuthenticated = true
-      authState.userLabel = current.displayName || current.email
-      authState.tenants = await tenants()
-    }
+    authState.user = session.user
+    authState.isAuthenticated = session.user !== null
+    authState.userLabel = session.user?.displayName || session.user?.email || ''
+    authState.tenants = session.tenants
   } catch {
     authState.isAuthenticated = false
     authState.userLabel = ''
+    authState.user = null
     authState.tenants = []
   } finally {
     authState.loading = false
   }
 
-  createApp(App).use(router).mount('#app')
+  createApp(App)
+    .use(PrimeVue, {
+      theme: {
+        preset: Aura,
+        options: {
+          darkModeSelector: false
+        }
+      }
+    })
+    .use(router)
+    .mount('#app')
 }
 
 void bootstrap()

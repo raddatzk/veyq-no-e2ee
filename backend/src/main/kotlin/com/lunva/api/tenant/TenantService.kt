@@ -24,7 +24,7 @@ class TenantService @Inject constructor(
         val user = requestContext.user!!
         val tenant = createTenant(request.name!!, request.displayName!!, user)
 
-        return TenantSummary(tenant.id, tenant.name, tenant.displayName, listOf(UserService.toUserSummary(user)))
+        return TenantSummary(tenant.id, tenant.name, tenant.displayName, TenantRole.TENANT_OWNER, listOf(UserService.toUserSummary(user)))
     }
 
     fun listMyTenants(): TenantsSummary {
@@ -33,7 +33,7 @@ class TenantService @Inject constructor(
             .sortedBy { it.tenant.name }
             .map {
                 val tenantOwners = findUsersWithRole(it.tenant, TenantRole.TENANT_OWNER).map { UserService.toUserSummary(it) }
-                TenantSummary(it.tenant.id, it.tenant.name, it.tenant.displayName, tenantOwners)
+                TenantSummary(it.tenant.id, it.tenant.name, it.tenant.displayName, it.role, tenantOwners)
             }
         )
     }

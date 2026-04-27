@@ -1,10 +1,7 @@
 :root {
-  --bg: #f5f7fb;
-  --card: #ffffff;
-  --text: #12202f;
-  --line: #d7deea;
-  --brand: #1457d7;
-  --error: #b42318;
+  --app-bg: #f6f7fb;
+  --app-text: #111827;
+  --app-line: #d9dee8;
 }
 
 * {
@@ -13,78 +10,139 @@
 
 body {
   margin: 0;
-  font-family: 'Avenir Next', 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  min-width: 320px;
+  font-family: Inter, 'Avenir Next', 'Segoe UI', sans-serif;
+  background: var(--app-bg);
+  color: var(--app-text);
 }
 
-.topbar {
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+}
+
+.tenant-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--line);
+  gap: 0.75rem;
+  padding: 1rem 0.65rem;
+  border-right: 1px solid var(--app-line);
   background: #fff;
 }
 
-.brand {
-  color: var(--text);
+.brand-mark,
+.tenant-dot,
+.tenant-action,
+.profile-button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.menu {
+.brand-mark {
+  margin-bottom: 0.5rem;
+  background: #111827;
+  color: #fff;
+}
+
+.tenant-dot {
+  background: #eef4ff;
+  color: #1f3f78;
+}
+
+.tenant-dot.router-link-active {
+  background: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
+}
+
+.tenant-action {
+  border: 1px dashed var(--app-line);
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.tenant-action:hover {
+  border-color: var(--p-primary-color);
+  color: var(--p-primary-color);
+}
+
+.profile-button {
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.workspace {
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
+  min-height: 72px;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--app-line);
+  background: #fff;
 }
 
-.nav-link {
-  color: var(--brand);
-  text-decoration: none;
+.app-breadcrumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .content {
-  max-width: 720px;
-  margin: 2rem auto;
-  padding: 0 4.5rem 0 1rem;
+  max-width: 1040px;
+  margin: 1.5rem auto;
+  padding: 0 1.25rem;
 }
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 1rem;
+.login-card {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.tenant-dialog {
+  width: min(420px, calc(100vw - 2rem));
 }
 
 .form {
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 label {
   display: grid;
-  gap: 0.3rem;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  padding: 0.55rem 0.7rem;
-}
-
-button {
-  cursor: pointer;
-  background: var(--brand);
-  border: none;
-  color: #fff;
-}
-
-.secondary-button {
-  background: #eef2f7;
-  color: var(--text);
-  border: 1px solid var(--line);
+  gap: 0.4rem;
+  font-weight: 600;
 }
 
 .button-row {
@@ -93,69 +151,8 @@ button {
   flex-wrap: wrap;
 }
 
-.avatar-wrap {
-  position: relative;
-}
-
-.avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  font-weight: 700;
-  background: #e3ecff;
-  color: #12356f;
-}
-
-.dropdown {
-  position: absolute;
-  right: 0;
-  top: 40px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  min-width: 110px;
-  padding: 0.35rem;
-}
-
-.dropdown-item {
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  text-align: left;
-}
-
-.error {
-  color: var(--error);
-}
-
-.tenant-rail {
-  position: fixed;
-  right: 1rem;
-  top: 5rem;
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.4rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-}
-
-.tenant-dot {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #edf3ff;
-  color: #12356f;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.tenant-dot.router-link-active {
-  background: var(--brand);
-  color: #fff;
+.form-message {
+  margin-top: 1rem;
 }
 
 .tenant-list {
@@ -169,16 +166,16 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
+  padding: 0.8rem;
+  border: 1px solid var(--app-line);
   border-radius: 8px;
-  color: var(--text);
+  color: var(--app-text);
   text-decoration: none;
   background: #fff;
 }
 
 .tenant-row small {
-  color: #5d6b7c;
+  color: #64748b;
 }
 
 .tenant-stats {
@@ -192,36 +189,66 @@ button {
   display: grid;
   gap: 0.2rem;
   padding: 0.85rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--app-line);
   border-radius: 8px;
   background: #fff;
 }
 
 .tenant-stats strong {
-  font-size: 1.4rem;
+  font-size: 1.45rem;
 }
 
 .tenant-stats span {
-  color: #5d6b7c;
+  color: #64748b;
 }
 
 .inline-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 0.5rem;
   margin-top: 1rem;
 }
 
 @media (max-width: 720px) {
-  .content {
-    padding: 0 1rem 4.5rem;
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
-  .tenant-rail {
-    inset: auto 1rem 1rem 1rem;
-    grid-auto-flow: column;
-    grid-auto-columns: 38px;
+  .tenant-sidebar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    height: 72px;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--app-line);
+    border-right: 0;
     overflow-x: auto;
-    border-radius: 999px;
+  }
+
+  .brand-mark {
+    margin-bottom: 0;
+  }
+
+  .profile-button {
+    margin-top: 0;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .workspace-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 0.85rem 1rem;
+  }
+
+  .content {
+    padding: 0 1rem 5.5rem;
+  }
+
+  .inline-form {
+    grid-template-columns: 1fr;
   }
 }

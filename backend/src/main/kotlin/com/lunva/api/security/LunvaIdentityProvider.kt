@@ -22,6 +22,7 @@ object LunvaSecurityAttributes {
 class AuthenticationRequest(
     val credentials: TokenCredentials,
     val useRefreshToken: Boolean,
+    val optional: Boolean = false,
 ) : BaseAuthenticationRequest()
 
 data class TokenCredentials(val accessToken: String?, val refreshToken: String?) : Credential
@@ -38,7 +39,7 @@ class LunvaIdentityProvider @Inject constructor(
         context: AuthenticationRequestContext,
     ): Uni<SecurityIdentity?> {
         return context.runBlocking {
-            val user = findUser(request) ?: return@runBlocking null
+            val user = findUser(request) ?: return@runBlocking optionalIdentity(request)
 
             QuarkusSecurityIdentity.builder()
                 .setPrincipal(QuarkusPrincipal(user.email))
@@ -49,6 +50,15 @@ class LunvaIdentityProvider @Inject constructor(
                 .addAttribute(LunvaSecurityAttributes.ROLE, user.role)
                 .build()
         }
+    }
+
+    private fun optionalIdentity(request: AuthenticationRequest): SecurityIdentity? {
+        if (!request.optional) {
+            return null
+        }
+        return QuarkusSecurityIdentity.builder()
+            .setAnonymous(true)
+            .build()
     }
 
     private fun findUser(request: AuthenticationRequest): User? {

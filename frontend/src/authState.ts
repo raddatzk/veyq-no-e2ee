@@ -2,9 +2,17 @@ import { reactive } from 'vue'
 
 export type TenantSummary = {
   id: number
-  slug: string
   name: string
-  role: 'owner' | 'member'
+  displayName: string
+  role: 'TENANT_OWNER' | 'TENANT_MEMBER'
+  admins: UserSummary[]
+}
+
+export type UserSummary = {
+  userId: number
+  email: string
+  displayName: string
+  serverRole: 'SERVER_OWNER' | 'SERVER_MEMBER'
 }
 
 export const authState = reactive({
@@ -12,5 +20,6 @@ export const authState = reactive({
   setupRequired: false,
   isAuthenticated: false,
   userLabel: '',
+  user: null as UserSummary | null,
   tenants: [] as TenantSummary[]
 })

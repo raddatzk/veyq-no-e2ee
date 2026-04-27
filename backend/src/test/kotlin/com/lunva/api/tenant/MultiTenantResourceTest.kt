@@ -106,6 +106,7 @@ class MultiTenantResourceTest {
             .statusCode(200)
             .body("tenants.name", hasItem("friends-$runId"))
             .body("tenants.displayName", hasItem("Friends"))
+            .body("tenants.role", hasItem(TenantRole.TENANT_OWNER.name))
             .body("tenants.admins.email.flatten()", hasItem(ownerEmail))
 
         createUser("outside-$runId", "member123", ServerRole.SERVER_MEMBER)
