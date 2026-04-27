@@ -3,7 +3,7 @@ package com.lunva.api.auth.token
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithName
 
-@ConfigMapping(prefix = "app.auth.token")
+@ConfigMapping(prefix = "lunva.auth.token")
 interface TokenConfig {
 
     @get:WithName("access-token-ttl-minutes")

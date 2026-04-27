@@ -1,26 +1,10 @@
 create table lunva_user
 (
     id            bigint       not null auto_increment primary key,
-    username      varchar(120) not null unique,
     password_hash varchar(255) not null,
     display_name  varchar(255) not null,
-    email         varchar(255) not null,
-    created_at    timestamp    not null default current_timestamp
-);
-
-create table lunva_role
-(
-    id        bigint       not null auto_increment primary key,
-    role_name varchar(120) not null unique
-);
-
-create table lunva_user_role
-(
-    user_id bigint not null,
-    role_id bigint not null,
-    primary key (user_id, role_id),
-    constraint fk_lunva_user_role_user foreign key (user_id) references lunva_user (id) on delete cascade,
-    constraint fk_lunva_user_role_role foreign key (role_id) references lunva_role (id) on delete cascade
+    email         varchar(255) not null unique,
+    role          varchar(40)  not null
 );
 
 create table lunva_refresh_token
@@ -36,6 +20,10 @@ create table lunva_refresh_token
     constraint fk_lunva_refresh_token_user foreign key (user_id) references lunva_user (id) on delete cascade,
     constraint fk_lunva_refresh_token_rotated_to foreign key (rotated_to) references lunva_refresh_token (id)
 );
+
+create index idx_lunva_refresh_token_user_id on lunva_refresh_token (user_id);
+create index idx_lunva_refresh_token_expires_at on lunva_refresh_token (expires_at);
+create index idx_lunva_refresh_token_revoked_at on lunva_refresh_token (revoked_at);
 
 create table lunva_access_token
 (
@@ -54,27 +42,92 @@ create table lunva_access_token
 create index idx_lunva_access_token_user_id on lunva_access_token (user_id);
 create index idx_lunva_access_token_expires_at on lunva_access_token (expires_at);
 create index idx_lunva_access_token_revoked_at on lunva_access_token (revoked_at);
-create index idx_lunva_refresh_token_user_id on lunva_refresh_token (user_id);
-create index idx_lunva_refresh_token_expires_at on lunva_refresh_token (expires_at);
-create index idx_lunva_refresh_token_revoked_at on lunva_refresh_token (revoked_at);
 
 create table lunva_config
 (
     id           bigint       not null auto_increment primary key,
     config_key   varchar(120) not null unique,
-    config_value varchar(255) not null,
-    created_at   timestamp    not null default current_timestamp,
-    updated_at   timestamp    not null default current_timestamp on update current_timestamp
+    config_value varchar(255) not null
 );
 
-insert into lunva_user(username, password_hash, display_name, email)
-values ('admin', '$2y$12$RoRZriBg6xL4yVHugf345eDuNiPNnpe0EOHzAEk4c8k0PyzVC.80O', 'Administrator', 'kevin@raddatz.me');
+create table lunva_tenant
+(
+    id          bigint       not null auto_increment primary key,
+    name        varchar(120) not null unique,
+    displayName varchar(255) not null
+);
 
-insert into lunva_role(role_name)
-values ('admin');
+create table lunva_tenant_member
+(
+    tenant_id bigint      not null,
+    user_id   bigint      not null,
+    role      varchar(40) not null,
+    primary key (tenant_id, user_id),
+    constraint fk_lunva_tenant_member_tenant foreign key (tenant_id) references lunva_tenant (id) on delete cascade,
+    constraint fk_lunva_tenant_member_user foreign key (user_id) references lunva_user (id) on delete cascade
+);
 
-insert into lunva_user_role(user_id, role_id)
-select u.id, r.id
-from lunva_user u
-         join lunva_role r on r.role_name = 'admin'
-where u.username = 'admin';
+create index idx_lunva_tenant_member_user_id on lunva_tenant_member (user_id);
+
+create table lunva_tenant_group
+(
+    id          bigint       not null auto_increment primary key,
+    tenant_id   bigint       not null,
+    name        varchar(255) not null,
+    displayName varchar(255) not null,
+    constraint fk_lunva_tenant_group_tenant foreign key (tenant_id) references lunva_tenant (id) on delete cascade,
+    constraint uq_lunva_tenant_group_name unique (tenant_id, name)
+);
+
+create index idx_lunva_tenant_group_tenant_id on lunva_tenant_group (tenant_id);
+
+create table lunva_tenant_group_member
+(
+    group_id bigint      not null,
+    user_id  bigint      not null,
+    role     varchar(40) not null,
+    primary key (group_id, user_id),
+    constraint fk_lunva_tenant_group_member_group foreign key (group_id) references lunva_tenant_group (id) on delete cascade,
+    constraint fk_lunva_tenant_group_member_user foreign key (user_id) references lunva_user (id) on delete cascade
+);
+
+create index idx_lunva_tenant_group_member_user_id on lunva_tenant_group_member (user_id);
+
+create table lunva_media
+(
+    id            bigint       not null auto_increment primary key,
+    public_id varchar(16) not null unique,
+    tenant_id     bigint       not null,
+    owner_user_id bigint       not null,
+    title         varchar(255) not null,
+    created_at    timestamp    not null default current_timestamp,
+    constraint fk_lunva_media_tenant foreign key (tenant_id) references lunva_tenant (id) on delete cascade,
+    constraint fk_lunva_media_owner foreign key (owner_user_id) references lunva_user (id) on delete cascade
+);
+
+create index idx_lunva_media_tenant_id on lunva_media (tenant_id);
+create index idx_lunva_media_owner_user_id on lunva_media (owner_user_id);
+
+create table lunva_media_user_share
+(
+    media_id   bigint    not null,
+    user_id    bigint    not null,
+    created_at timestamp not null default current_timestamp,
+    primary key (media_id, user_id),
+    constraint fk_lunva_media_user_share_media foreign key (media_id) references lunva_media (id) on delete cascade,
+    constraint fk_lunva_media_user_share_user foreign key (user_id) references lunva_user (id) on delete cascade
+);
+
+create index idx_lunva_media_user_share_user_id on lunva_media_user_share (user_id);
+
+create table lunva_media_group_share
+(
+    media_id   bigint    not null,
+    group_id   bigint    not null,
+    created_at timestamp not null default current_timestamp,
+    primary key (media_id, group_id),
+    constraint fk_lunva_media_group_share_media foreign key (media_id) references lunva_media (id) on delete cascade,
+    constraint fk_lunva_media_group_share_group foreign key (group_id) references lunva_tenant_group (id) on delete cascade
+);
+
+create index idx_lunva_media_group_share_group_id on lunva_media_group_share (group_id);

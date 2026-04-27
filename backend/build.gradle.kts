@@ -5,6 +5,9 @@ plugins {
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://jitpack.io")
+    }
 }
 
 java {
@@ -27,6 +30,7 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-security-jpa")
     implementation("io.quarkus:quarkus-scheduler")
+    implementation("com.github.wosherco:jnanoid-enhanced:9819c115e7")
 
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")

@@ -1,12 +1,25 @@
+import type { TenantSummary } from '../authState'
+
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export type LoginResponse = {
   userId: number
-  username: string
+  email: string
   displayName: string
 }
 
 export type MeResponse = LoginResponse
+
+export type SetupStatusResponse = {
+  adminRequired: boolean
+  tenantAvailable: boolean
+}
+
+export type AdminSetupRequest = {
+  password: string
+  displayName: string
+  email: string
+}
 
 async function call(path: string, options: RequestInit = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -27,15 +40,37 @@ async function call(path: string, options: RequestInit = {}) {
   return response.json()
 }
 
-export async function login(username: string, password: string): Promise<LoginResponse> {
+export async function login(email: string, password: string): Promise<LoginResponse> {
   return call('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ email, password })
   })
 }
 
 export async function me(): Promise<MeResponse> {
-  return call('/api/auth/me')
+  return call('/api/me')
+}
+
+export async function setupStatus(): Promise<SetupStatusResponse> {
+  return call('/api/setup')
+}
+
+export async function setupAdmin(request: AdminSetupRequest): Promise<void> {
+  await call('/api/setup/admin', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  })
+}
+
+export async function tenants(): Promise<TenantSummary[]> {
+  return call('/api/tenants')
+}
+
+export async function createTenant(slug: string, name: string): Promise<TenantSummary> {
+  return call('/api/tenants', {
+    method: 'POST',
+    body: JSON.stringify({ slug, name })
+  })
 }
 
 export async function logout(): Promise<void> {

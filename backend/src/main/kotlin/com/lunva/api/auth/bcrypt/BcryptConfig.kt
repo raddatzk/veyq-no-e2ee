@@ -3,7 +3,7 @@ package com.lunva.api.auth.bcrypt
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithName
 
-@ConfigMapping(prefix = "app.auth.bcrypt")
+@ConfigMapping(prefix = "lunva.auth.bcrypt")
 interface BcryptConfig {
     @get:WithName("target-ms")
     val targetMs: Long

@@ -1,19 +1,14 @@
-# Lunva (Auth-Only)
+# Lunva
 
-Aktueller Stand ist bewusst auf Auth reduziert. Album-/Asset-/Share-Funktionalität ist derzeit nicht Bestandteil des aktiven Codes.
-
-## Scope
-
-- Backend: Quarkus API mit Username/Passwort-Login, Access-/Refresh-Token als Cookies
-- Frontend: minimale Shell mit Navigation und Login-Seite
-- Datenbank: MariaDB mit Flyway-Migrationen
+Lunva ist eine Quarkus/Vue-Anwendung mit globalen User-Accounts, cookie-basierter Authentifizierung und tenant-scoped Bereichen. Tenants werden aktuell über einen technischen `name` im Pfad adressiert, z. B. `/friends` im Frontend und `/api/friends/groups` im Backend. Domains und TLS liegen bewusst vor Lunva beim Admin-Proxy.
 
 ## Projektstruktur
 
-- `backend`: Quarkus 3, Kotlin, Gradle Wrapper
+- `backend`: Quarkus 3, Kotlin, Gradle Wrapper, Flyway, Hibernate ORM Panache
 - `frontend`: Vue 3 + TypeScript
 - `infra`: Docker Compose für lokale Umgebung
-- `Dockerfile` im Root: Multi-Stage Build für Frontend + Backend in einem Container
+- `http`: IntelliJ HTTP Client Requests
+- `docs`: Architektur- und Designnotizen
 
 ## Start mit Docker Compose
 
@@ -27,16 +22,6 @@ Danach:
 - App: `http://localhost:8080`
 - Health: `http://localhost:8080/q/health`
 - MariaDB: `localhost:3306`
-
-Build-Targets:
-
-- Default: `runtime-jvm` (schneller für Entwicklung/E2E)
-- Native (Production): `runtime-native`
-
-```bash
-cd infra
-LUNVA_BUILD_TARGET=runtime-native docker compose up --build
-```
 
 ## Lokale Entwicklung
 
@@ -62,36 +47,60 @@ cd backend
 ./gradlew test
 ```
 
-## Seed-Daten
+## Setup
 
-Der Initial-Seed wird über Flyway angelegt:
+Eine frische Instanz startet ohne Seed-User. Der Setup-Flow ist zweistufig:
 
-- Username: `admin`
-- Passwort: `admin123`
+1. `POST /api/setup/admin` erstellt den ersten User mit `SERVER_OWNER`.
+2. Der eingeloggte Server-Owner kann optional mit `POST /api/tenants` den ersten Tenant erstellen.
 
-## API (aktuell)
+Sobald ein User existiert, ist Admin-Setup gesperrt. Neue Tenants dürfen nur User mit globaler Rolle `SERVER_OWNER` erstellen.
 
+## API
+
+Globale Endpunkte:
+
+- `GET /api/setup`
+- `POST /api/setup/admin`
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
-- `GET /api/users/me`
+- `GET /api/me`
+- `GET /api/tenants`
+- `POST /api/tenants`
 
-Passende IntelliJ-HTTP-Requests liegen unter [http/auth.http](/Users/kevin.raddatz/IdeaProjects/lunva/http/auth.http).
+Tenant-Endpunkte:
+
+- `GET /api/{tenantName}/groups`
+- `POST /api/{tenantName}/groups`
+- `GET /api/{tenantName}/groups/{groupName}`
+- `POST /api/{tenantName}/groups/{groupName}`
+- `GET /api/{tenantName}/media`
+
+Passende IntelliJ-HTTP-Requests liegen unter [http](/Users/kevin.raddatz/IdeaProjects/lunva/http).
 
 ## Auth- und Security-Modell
 
-- Cookie-basierte Auth mit zwei Tokens:
-  - Access Token Cookie (`Path=/api`)
-  - Refresh Token Cookie (`Path=/api/auth`)
-- Cookies sind `HttpOnly`, `SameSite=Strict`, `Secure` konfigurierbar über `app.auth.cookie.secure`
-- Zugriff auf geschützte Endpunkte läuft über `AuthFilter` + `SecurityIdentity`
-- Passwörter werden mit `bcrypt` gehasht
-- Beim ersten Start wird die bcrypt-Cost gegen ein Zielbudget benchmarked und in `lunva_config` gespeichert
-- Rehash-on-login bei zu niedriger Cost
+- Auth läuft über `LunvaAuthenticationMechanism` und `LunvaIdentityProvider`.
+- Access- und Refresh-Tokens werden als `HttpOnly` Cookies gesetzt.
+- `LunvaHttpSecurityPolicy` erlaubt nur explizit öffentliche API-Pfade ohne Login.
+- `SERVER_OWNER` ist eine globale Server-Rolle am User.
+- Tenant-Membership wird im `TenantMembershipFilter` für alle Routen mit `{tenantName}` geprüft.
+- `TenantOwnerRequired` und `GroupOwnerRequired` sind Marker-Annotationen für stärkere Owner-Rechte.
+- Tenant- und Gruppenrollen werden nicht in globale `SecurityIdentity`-Roles gemischt.
 
-## Wichtige Konfigurationen (Backend)
+## Medienzugriff
 
-Beispiele aus `backend/src/main/resources/application.properties`:
+Medien haben eine interne `Long`-ID und eine öffentliche `publicId` mit 16 Zeichen. Die API gibt die `publicId` als `id` nach außen zurück.
+
+Die Media-Liste wird repository-seitig gefiltert:
+
+- Owner sieht eigene Medien.
+- Direkt freigegebene User sehen Medien.
+- Mitglieder freigegebener Gruppen sehen Medien.
+- Server-Owner und Tenant-Owner bekommen keinen automatischen Medienzugriff.
+
+## Wichtige Konfigurationen
 
 - Datenbank:
   - `DB_URL`
@@ -114,13 +123,8 @@ Beispiele aus `backend/src/main/resources/application.properties`:
   - `BCRYPT_MAX_COST`
   - `BCRYPT_BENCHMARK_SAMPLES`
 
-## Aktueller Testumfang (Backend)
+## Aktueller Testumfang
 
-- Unit:
-  - `PasswordServiceTest`
-  - `CookieServiceTest`
-- Integration (Quarkus + DB + Flyway):
-  - `AuthResourceTest`
-  - `TokenServiceTest`
-  - `TokenCleanupTest`
-  - `BcryptCostServiceTest`
+- Passwort-, Cookie-, Token- und Token-Cleanup-Tests
+- Auth-Resource-Tests für Login/Logout/Refresh
+- Multi-Tenant-Resource-Tests für Setup, Tenant-Erstellung, Tenant-Membership-Filter, Gruppen und Media-Sichtbarkeit

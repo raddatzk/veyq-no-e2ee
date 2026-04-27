@@ -41,8 +41,6 @@ class BcryptCostService @Inject constructor(
             AppConfig().also {
                 it.configKey = KEY
                 it.configValue = benchmarked.toString()
-                it.createdAt = now
-                it.updatedAt = now
                 appConfigRepo.persist(it)
             }
             log.infov("Initialized bcrypt cost={0} (target={1}ms)", benchmarked, bcryptConfig.targetMs)

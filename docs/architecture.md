@@ -1,135 +1,105 @@
-# Lunva Architektur (aktueller Stand)
+# Lunva Architektur
 
-## Zielbild derzeit
+## Zielbild
 
-Die Anwendung ist bewusst auf einen stabilen Auth-Kern reduziert:
+Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
 
-- Username/Passwort-Login
-- Access-/Refresh-Token als Cookies
-- Rollen am User
-- saubere Token-Rotation und Revocation-Grundlagen
+## Laufzeit
 
-Fachmodule wie Alben, Assets und Public Shares sind aktuell nicht Teil des aktiven Backends.
+- Quarkus Backend liefert API und eingebautes Vue-Frontend aus.
+- MariaDB ist die produktive Datenbank.
+- Flyway verwaltet das Schema über eine Initial-Migration.
+- Docker Compose startet App und Datenbank lokal.
 
-## Laufzeit-Architektur
-
-- Ein Container für App-Auslieferung:
-  - Quarkus Backend
-  - statisch eingebautes Vue-Frontend (`META-INF/resources`)
-- Ein separater MariaDB-Container
-- Orchestrierung lokal über Docker Compose
-
-Build/Runtime:
-
-- `runtime-jvm` als Standard für Entwicklung und schnellere Iterationen
-- `runtime-native` (GraalVM) explizit für Production-Builds
-
-## Backend-Stack
-
-- Quarkus 3.34.x
-- Kotlin + Gradle Wrapper
-- Hibernate ORM Panache (Kotlin)
-- Flyway Migrationen
-- Quarkus Security Identity + eigener `AuthFilter`
-- Scheduler (Token-Cleanup vorbereitet)
-
-## Domänenmodell (Auth-relevant)
+## Domänenmodell
 
 - `lunva_user`
-  - Benutzerstammdaten inkl. `password_hash`
-- `lunva_role`
-  - Rollenstammdaten
-- `lunva_user_role`
-  - N:M User zu Rolle
-- `lunva_access_token`
-  - gehashter Access-Token, Laufzeitdaten, FK auf User und Refresh-Token
-- `lunva_refresh_token`
-  - gehashter Refresh-Token, Laufzeitdaten, optionaler Verweis auf Nachfolger (`rotated_to`)
+  - globale User inkl. `email`, `password_hash`, `display_name`, `role`
+- `lunva_refresh_token` / `lunva_access_token`
+  - gehashte Tokens, Ablaufdaten, Revocation und Refresh-Rotation
+- `lunva_tenant`
+  - tenant-scoped Bereich mit eindeutigem `name`
+- `lunva_tenant_member`
+  - User-Mitgliedschaft pro Tenant mit `TENANT_OWNER` oder `TENANT_MEMBER`
+- `lunva_tenant_group`
+  - Gruppen innerhalb eines Tenants
+- `lunva_tenant_group_member`
+  - Gruppenmitgliedschaft mit `GROUP_OWNER` oder `GROUP_MEMBER`
+- `lunva_media`
+  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant und Owner
+- `lunva_media_user_share`
+  - direkte Medienfreigaben an User
+- `lunva_media_group_share`
+  - Medienfreigaben an Gruppen
 - `lunva_config`
-  - technische App-Konfiguration (z. B. ermittelte bcrypt-Cost)
+  - technische App-Konfiguration wie bcrypt-Cost
 
 ## Auth-Flow
 
 1. `POST /api/auth/login`
-- validiert Credentials
-- optionales Passwort-Rehash bei veralteter Cost
-- erzeugt Access- und Refresh-Token
-- setzt beide Cookies
+   - validiert E-Mail/Passwort
+   - erzeugt Access- und Refresh-Token
+   - setzt beide Tokens als Cookies
 
 2. Geschützte API-Aufrufe
-- `AuthFilter` liest Access-Cookie
-- User-Auflösung über aktiven Access-Token
-- setzt `SecurityIdentity` inkl. Rollen
+   - `LunvaAuthenticationMechanism` liest das passende Cookie
+   - `LunvaIdentityProvider` validiert Token und baut die `SecurityIdentity`
+   - `RequestContextFilter` befüllt den request-scoped `RequestContext`
+   - `LunvaHttpSecurityPolicy` blockt anonyme Requests auf geschützte `/api/**` Pfade
 
 3. `POST /api/auth/refresh`
-- liest primär Refresh-Cookie
-- invaldiert alte Token gemäß aktuellem Flow
-- erzeugt neues Token-Paar
-- setzt neue Cookies
+   - liest Refresh-Cookie
+   - rotiert Token
+   - setzt ein neues Cookie-Paar
 
 4. `POST /api/auth/logout`
-- invaldiert aktuelle Token
-- setzt beide Cookies auf `Max-Age=0`
-
-## Passwort-Strategie
-
-- Hashing mit `bcrypt`
-- Ziel: konfigurierbare Hashzeit (`app.auth.bcrypt.target-ms`)
-- Beim ersten Start:
-  - Benchmark innerhalb `min-cost..max-cost`
-  - Persistenz in `lunva_config` (`auth.bcrypt.cost`)
-- Rehash-on-login:
-  - falls gespeicherter Hash-Cost kleiner ist als aktuelle Ziel-Cost
-
-## Cookie-Strategie
-
-- Access Cookie:
-  - Name konfigurierbar (`app.auth.cookie.access-token-name`)
-  - Path `/api`
-  - TTL über `app.auth.token.access-token-ttl-minutes`
-- Refresh Cookie:
-  - Name konfigurierbar (`app.auth.cookie.refresh-token-name`)
-  - Path `/api/auth`
-  - TTL über `app.auth.token.refresh-token-ttl-minutes`
-- Beide:
-  - `HttpOnly`
-  - `SameSite=Strict`
-  - `Secure` über `app.auth.cookie.secure`
-
-## Token-Rotation und Revocation
-
-- Beim Refresh wird ein neues Token-Paar erzeugt.
-- Refresh-Tokens können über `rotated_to` verkettet werden.
-- Revocation-Logik:
-  - Access-Token wird direkt revoked.
-  - Refresh-Token-Revocation kann rekursiv auf Nachfolger wirken.
-  - Zugehörige Access-Tokens werden über `refresh_token_id` mit revoked.
-
-Hinweis:
-- Reuse-Detection und vollständiges Family-Handling sind konzeptionell vorgesehen und können auf Basis der bestehenden Verkettung weiter ausgebaut werden.
+   - invalidiert aktuelle Token
+   - löscht beide Cookies
 
 ## Berechtigungen
 
-- Rollen sind am User über N:M modelliert.
-- Rollen werden im `AuthFilter` in die `SecurityIdentity` geladen.
-- Method-Level Authorisierung (z. B. `@RolesAllowed`) kann darauf aufsetzen.
+Globale Rechte:
 
-## Testing-Strategie
+- `ServerRole.SERVER_OWNER`
+- `ServerRole.SERVER_MEMBER`
+- `@ServerRolesRequired(...)` schützt serverweite Aktionen wie `POST /api/tenants`.
 
-Backend-Tests laufen mit Quarkus-Test + H2 (Flyway-Migrationen beim Teststart):
+Tenant-Rechte:
 
-- Unit:
-  - Passwortlogik
-  - Cookie-Erzeugung
-- Integration:
-  - Login/Logout/Refresh-Endpunkte
-  - Token-Erzeugung und Revocation-Verhalten
-  - Token-Cleanup
-  - bcrypt-Cost-Initialisierung
+- `TenantMembershipFilter` greift automatisch auf Routen mit `@PathParam("tenantName")`.
+- Unbekannter Tenant ergibt `404`.
+- Anonymer Request ergibt `401`.
+- Eingeloggter User ohne Tenant-Membership ergibt `403`.
+- `@TenantOwnerRequired` ist nur für Owner-only Tenant-Aktionen gedacht.
 
-## Nächste sinnvolle Ausbaustufen
+Gruppenrechte:
 
-1. CSRF-Schutz finalisieren (Origin/Referer und/oder Double-Submit Token)
-2. Refresh-Reuse-Detection mit klarer Family-Invalidierung
-3. Device-/Session-Management (aktive Sessions, Logout-all)
-4. Multi-Tenant-Erweiterung auf Basis globaler User-Identity
+- Wer eine Gruppe erstellt, wird `GROUP_OWNER`.
+- `@GroupOwnerRequired` schützt Gruppenverwaltung.
+- Normale Gruppenmitgliedschaft ist getrennt von Tenant-Mitgliedschaft.
+
+## Medienzugriff
+
+Medienzugriff wird in Repository-Queries abgebildet:
+
+- `owner = currentUser`
+- oder direkte Freigabe in `lunva_media_user_share`
+- oder Gruppenfreigabe über `lunva_media_group_share` und `lunva_tenant_group_member`
+
+Tenant-Membership ist Voraussetzung für jede Tenant-API, aber kein Recht auf alle Medien. Server-Owner und Tenant-Owner sehen fremde Medien nicht automatisch.
+
+## Testing
+
+Backend-Tests laufen mit Quarkus-Test, H2 im MySQL-Modus und Flyway Clean/Migrate pro Testlauf.
+
+Abgedeckt sind:
+
+- Passwort-Hashing und bcrypt-Cost
+- Cookie-Erzeugung
+- Token-Rotation, Revocation und Cleanup
+- Auth-Endpunkte
+- Setup-Flow
+- Server-Owner Tenant-Erstellung
+- Tenant-Membership-Filter
+- Gruppen-Scoping und Gruppen-Owner
+- Media-Sichtbarkeit und `publicId`

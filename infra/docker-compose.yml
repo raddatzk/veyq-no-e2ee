@@ -21,8 +21,7 @@ services:
       DB_URL: jdbc:mariadb://lunva-db:3306/lunva
       DB_USER: lunva
       DB_PASSWORD: lunva
-      SESSION_COOKIE_SECURE: "false"
-      SESSION_TTL_MINUTES: "720"
+      COOKIE_SECURE: "false"
     ports:
       - "8080:8080"
     depends_on:

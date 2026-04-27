@@ -47,7 +47,7 @@ body {
 .content {
   max-width: 720px;
   margin: 2rem auto;
-  padding: 0 1rem;
+  padding: 0 4.5rem 0 1rem;
 }
 
 .card {
@@ -79,6 +79,18 @@ button {
   background: var(--brand);
   border: none;
   color: #fff;
+}
+
+.secondary-button {
+  background: #eef2f7;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .avatar-wrap {
@@ -115,4 +127,101 @@ button {
 
 .error {
   color: var(--error);
+}
+
+.tenant-rail {
+  position: fixed;
+  right: 1rem;
+  top: 5rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.tenant-dot {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #edf3ff;
+  color: #12356f;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tenant-dot.router-link-active {
+  background: var(--brand);
+  color: #fff;
+}
+
+.tenant-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.tenant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  background: #fff;
+}
+
+.tenant-row small {
+  color: #5d6b7c;
+}
+
+.tenant-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.tenant-stats div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.tenant-stats strong {
+  font-size: 1.4rem;
+}
+
+.tenant-stats span {
+  color: #5d6b7c;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 720px) {
+  .content {
+    padding: 0 1rem 4.5rem;
+  }
+
+  .tenant-rail {
+    inset: auto 1rem 1rem 1rem;
+    grid-auto-flow: column;
+    grid-auto-columns: 38px;
+    overflow-x: auto;
+    border-radius: 999px;
+  }
 }

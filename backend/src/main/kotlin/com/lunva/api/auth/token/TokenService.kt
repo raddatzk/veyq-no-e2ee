@@ -1,7 +1,7 @@
 package com.lunva.api.auth.token
 
 import com.lunva.api.auth.UnauthorizedException
-import com.lunva.api.common.TokenCredentials
+import com.lunva.api.security.TokenCredentials
 import com.lunva.api.domain.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -66,7 +66,7 @@ class TokenService @Inject constructor(
         invalidateRefreshToken(token.refreshToken, revokedAt)
     }
 
-    private fun invalidateAccessToken(token: String?, revokedAt: Instant = Instant.now()) {
+    fun invalidateAccessToken(token: String?, revokedAt: Instant = Instant.now()) {
         if (token != null) {
             accessTokenRepo.findByTokenHash(hash(token))?.also { token ->
                 token.revokedAt = revokedAt
@@ -100,14 +100,17 @@ class TokenService @Inject constructor(
         }
     }
 
+    @Transactional
     fun findUserByAccessToken(accessToken: String): User? {
         return accessTokenRepo.findActiveByTokenHash(hash(accessToken))?.user
     }
 
+    @Transactional
     fun findUserByRefreshToken(refreshToken: String): User? {
         return refreshTokenRepo.findActiveByTokenHash(hash(refreshToken))?.user
     }
 
+    @Transactional
     fun findRefreshToken(refreshToken: String): RefreshToken? {
         return refreshTokenRepo.findByTokenHash(hash(refreshToken))
     }

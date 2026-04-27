@@ -18,12 +18,6 @@ class AppConfig : PanacheEntityBase {
 
     @Column(name = "config_value", nullable = false)
     lateinit var configValue: String
-
-    @Column(name = "created_at", nullable = false)
-    lateinit var createdAt: Instant
-
-    @Column(name = "updated_at", nullable = false)
-    lateinit var updatedAt: Instant
 }
 
 @ApplicationScoped
