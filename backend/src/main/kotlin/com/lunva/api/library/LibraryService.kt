@@ -17,6 +17,7 @@ import com.lunva.api.domain.TenantGroupMemberRepo
 import com.lunva.api.domain.User
 import com.lunva.api.library.explorer.AlbumSummary
 import com.lunva.api.library.explorer.ExplorerBreadcrumb
+import com.lunva.api.library.explorer.ExplorerBreadcrumbType
 import com.lunva.api.library.explorer.ExplorerContext
 import com.lunva.api.library.explorer.FolderSummary
 import com.lunva.api.security.RequestContext
@@ -38,12 +39,15 @@ abstract class LibraryService (
 
     fun breadcrumbs(folder: TenantFolder): List<ExplorerBreadcrumb> {
         val folders = generateSequence(folder) { it.parentFolder }.toList().asReversed()
-        return folders.map { ExplorerBreadcrumb("folder", it.name, it.displayName, it.path()) }
+        return folders.map { ExplorerBreadcrumb(ExplorerBreadcrumbType.Folder, it.name, it.displayName, it.path()) }
     }
 
     fun breadcrumbs(album: TenantAlbum): List<ExplorerBreadcrumb> =
         album.parentFolder?.let { breadcrumbs(it) }.orEmpty() +
-                ExplorerBreadcrumb("album", album.name, album.displayName, album.path())
+                ExplorerBreadcrumb(ExplorerBreadcrumbType.Album, album.name, album.displayName, album.path())
+
+    fun Tenant.path(): String =
+        "/$name"
 
     fun TenantFolder.path(): String =
         (parentFolder?.path()?.trimEnd('/') ?: "") + "/" + name

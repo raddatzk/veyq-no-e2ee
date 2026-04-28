@@ -25,13 +25,13 @@ export function useBreadcrumbs() {
     }
     return { label: 'Home', to: '/' }
   })
-  const breadcrumbItems = computed(() =>
-    contentPathSegments.value.map((segment, index) => ({
+  const breadcrumbItems = computed(() => [
+    // {label: formatSegment(activeTenant.value.displayName), to: `/${activeTenant.value.name}`},
+    ...contentPathSegments.value.map((segment, index) => ({
       label: formatSegment(segment),
       to: `/${[activeTenantName.value, ...contentPathSegments.value.slice(0, index + 1)].filter(Boolean).join('/')}`
     }))
-  )
-
+  ])
   return {
     activeTenant,
     breadcrumbHome,

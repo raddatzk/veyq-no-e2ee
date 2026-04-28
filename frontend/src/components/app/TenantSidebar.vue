@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { authState } from '../../authState'
 import ProfileMenu from './ProfileMenu.vue'
 
+const route = useRoute()
 const emit = defineEmits<{
   createTenant: []
 }>()
 const canCreateTenant = computed(() => authState.user?.serverRole === 'ServerOwner')
+const activeTenantName = computed(() => String(route.params.tenantName || ''))
 </script>
 
 <template>
@@ -17,7 +19,7 @@ const canCreateTenant = computed(() => authState.user?.serverRole === 'ServerOwn
       v-for="tenant in authState.tenants"
       :key="tenant.id"
       :to="`/${tenant.name}`"
-      class="tenant-dot"
+      :class="['tenant-dot', { 'tenant-dot-active': activeTenantName === tenant.name }]"
       :title="tenant.displayName"
     >
       {{ tenant.displayName.charAt(0).toUpperCase() }}

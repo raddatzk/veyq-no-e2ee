@@ -63,7 +63,8 @@ a {
   color: #1f3f78;
 }
 
-.tenant-dot.router-link-active {
+.tenant-dot.router-link-active,
+.tenant-dot-active {
   background: var(--p-primary-color);
   color: var(--p-primary-contrast-color);
 }

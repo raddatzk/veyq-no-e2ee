@@ -25,7 +25,7 @@ data class ExplorerContextSummary(
 )
 
 data class ExplorerBreadcrumb(
-    val type: String,
+    val type: ExplorerBreadcrumbType,
     val name: String,
     val displayName: String,
     val path: String

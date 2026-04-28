@@ -6,13 +6,15 @@ import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
 import { explorerToolbar } from '../../composables/useExplorerToolbar'
 
 const { activeTenant, breadcrumbHome, breadcrumbItems } = useBreadcrumbs()
+// console.log(breadcrumbHome.value)
 const items = computed(() => explorerToolbar.active ? explorerToolbar.breadcrumbs : breadcrumbItems.value)
+// console.log(breadcrumbItems.value)
 const actions = computed(() => explorerToolbar.active ? explorerToolbar.actions : [])
 </script>
 
 <template>
   <header class="workspace-topbar">
-    <Breadcrumb :home="breadcrumbHome" :model="items" class="app-breadcrumb" />
+    <Breadcrumb :model="items" class="app-breadcrumb" />
     <div class="workspace-actions">
       <template v-if="explorerToolbar.active">
         <Button
@@ -27,10 +29,10 @@ const actions = computed(() => explorerToolbar.active ? explorerToolbar.actions 
           @click="action.command"
         />
       </template>
-      <template v-else-if="activeTenant">
-        <Button icon="pi pi-upload" label="Upload" size="small" />
-        <Button icon="pi pi-pencil" label="Bearbeiten" severity="secondary" outlined size="small" />
-      </template>
+<!--      <template v-else-if="activeTenant">-->
+<!--        <Button icon="pi pi-upload" label="Upload" size="small" />-->
+<!--        <Button icon="pi pi-pencil" label="Bearbeiten" severity="secondary" outlined size="small" />-->
+<!--      </template>-->
     </div>
   </header>
 </template>

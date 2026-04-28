@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import {computed, onBeforeUnmount, ref, watch} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import {
-  getExplorer,
-  streamExplorerMedia,
   type ExplorerAlbum,
   type ExplorerContext,
   type ExplorerFolder,
   type ExplorerMedia,
   type ExplorerResponse,
-  type LibraryItemType
+  getExplorer,
+  type LibraryItemType,
+  streamExplorerMedia
 } from '../api/explorerClient'
-import { authState } from '../authState'
+import {authState} from '../authState'
 import AlbumCoverDialog from '../components/explorer/AlbumCoverDialog.vue'
 import CreateLibraryItemDialog from '../components/explorer/CreateLibraryItemDialog.vue'
 import DeleteExplorerItemDialog from '../components/explorer/DeleteExplorerItemDialog.vue'
@@ -26,7 +26,7 @@ import ExplorerMediaGrid from '../components/explorer/ExplorerMediaGrid.vue'
 import MoveExplorerItemDialog from '../components/explorer/MoveExplorerItemDialog.vue'
 import ShareExplorerItemDialog from '../components/explorer/ShareExplorerItemDialog.vue'
 import UploadMediaDialog from '../components/explorer/UploadMediaDialog.vue'
-import { clearExplorerToolbar, setExplorerToolbar } from '../composables/useExplorerToolbar'
+import {clearExplorerToolbar, setExplorerToolbar} from '../composables/useExplorerToolbar'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,8 +49,8 @@ let loadSequence = 0
 type ExplorerViewMode = 'structure' | 'media'
 const viewMode = ref<ExplorerViewMode>('structure')
 const viewOptions = [
-  { label: 'Ordner und Alben', value: 'structure', icon: 'pi pi-folder' },
-  { label: 'Alle Medien', value: 'media', icon: 'pi pi-images' }
+  {label: 'Ordner und Alben', value: 'structure', icon: 'pi pi-folder'},
+  {label: 'Alle Medien', value: 'media', icon: 'pi pi-images'}
 ]
 
 const createType = ref<LibraryItemType>('folder')
@@ -73,9 +73,9 @@ const activeView = computed<ExplorerViewMode>(() => isAlbumContext.value ? 'medi
 watch([tenantName, explorerPath], () => {
   viewMode.value = 'structure'
   void loadExplorer()
-}, { immediate: true })
+}, {immediate: true})
 
-watch(explorer, updateToolbar, { immediate: true })
+watch(explorer, updateToolbar, {immediate: true})
 watch(activeView, updateMediaStreaming)
 
 onBeforeUnmount(() => {
@@ -116,12 +116,12 @@ function startMediaStream(sequence: number) {
   streaming.value = true
 
   streamExplorerMedia(
-    tenantName.value,
-    explorerPath.value,
-    (item) => {
-      if (sequence === loadSequence) media.value = [...media.value, item]
-    },
-    { signal: controller.signal }
+      tenantName.value,
+      explorerPath.value,
+      (item) => {
+        if (sequence === loadSequence) media.value = [...media.value, item]
+      },
+      {signal: controller.signal}
   ).catch((e: any) => {
     if (controller.signal.aborted || sequence !== loadSequence) return
     mediaError.value = e.message || 'Medien konnten nicht geladen werden'
@@ -154,10 +154,13 @@ function updateToolbar() {
     return
   }
 
-  const breadcrumbs = explorer.value.breadcrumbs.map((breadcrumb) => ({
-    label: breadcrumb.displayName,
-    command: () => navigateToPath(breadcrumb.path)
-  }))
+  const breadcrumbs = [
+    {label: tenantTitle.value, command: () => navigateToPath('/')},
+    ...explorer.value.breadcrumbs.map((breadcrumb) => ({
+      label: breadcrumb.displayName,
+      command: () => navigateToPath(breadcrumb.path)
+    }))
+  ]
 
   setExplorerToolbar(breadcrumbs, [
     {
@@ -240,9 +243,9 @@ function openContextSettings() {
 function itemFromContext(context: ExplorerContext, type: LibraryItemType): ExplorerFolder | ExplorerAlbum {
   const name = context.path.split('/').filter(Boolean).at(-1) || ''
   if (type === 'album') {
-    return { id: context.path, name, displayName: context.displayName, path: context.path, coverMediaId: null }
+    return {id: context.path, name, displayName: context.displayName, path: context.path, coverMediaId: null}
   }
-  return { id: context.path, name, displayName: context.displayName, path: context.path }
+  return {id: context.path, name, displayName: context.displayName, path: context.path}
 }
 
 function navigateToPath(path: string) {
@@ -263,96 +266,97 @@ function routePathToExplorerPath(value: string | string[] | undefined): string {
       <div>
         <h1>{{ explorer?.context.displayName || tenantTitle }}</h1>
       </div>
-      <Tag v-if="tenant" :value="roleLabel" severity="info" />
+      <Tag v-if="tenant" :value="roleLabel" severity="info"/>
     </div>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="mediaError" severity="warn" :closable="false">{{ mediaError }}</Message>
 
     <div v-if="loading" class="explorer-loading">
-      <ProgressSpinner class="small-spinner" />
+      <ProgressSpinner class="small-spinner"/>
       <span>Explorer wird geladen...</span>
     </div>
 
     <template v-else-if="explorer">
       <div v-if="canSwitchViews" class="explorer-view-switch">
-        <SelectButton v-model="viewMode" :options="viewOptions" option-label="label" option-value="value" :allow-empty="false">
+        <SelectButton v-model="viewMode" :options="viewOptions" option-label="label" option-value="value"
+                      :allow-empty="false">
           <template #option="{ option }">
-            <span :class="option.icon" />
+            <span :class="option.icon"/>
             <span>{{ option.label }}</span>
           </template>
         </SelectButton>
       </div>
 
       <ExplorerGrid
-        v-if="activeView === 'structure'"
-        :folders="explorer.folders"
-        :albums="explorer.albums"
-        @open-folder="navigateToPath($event.path)"
-        @open-album="navigateToPath($event.path)"
-        @edit-folder="openEdit('folder', $event)"
-        @edit-album="openEdit('album', $event)"
-        @move-folder="openMove('folder', $event)"
-        @move-album="openMove('album', $event)"
-        @share-folder="openShare('folder', $event)"
-        @share-album="openShare('album', $event)"
-        @cover-album="openCover"
-        @delete-folder="openDelete('folder', $event)"
-        @delete-album="openDelete('album', $event)"
+          v-if="activeView === 'structure'"
+          :folders="explorer.folders"
+          :albums="explorer.albums"
+          @open-folder="navigateToPath($event.path)"
+          @open-album="navigateToPath($event.path)"
+          @edit-folder="openEdit('folder', $event)"
+          @edit-album="openEdit('album', $event)"
+          @move-folder="openMove('folder', $event)"
+          @move-album="openMove('album', $event)"
+          @share-folder="openShare('folder', $event)"
+          @share-album="openShare('album', $event)"
+          @cover-album="openCover"
+          @delete-folder="openDelete('folder', $event)"
+          @delete-album="openDelete('album', $event)"
       />
 
-      <ExplorerMediaGrid v-else :media="media" :streaming="streaming" />
+      <ExplorerMediaGrid v-else :media="media" :streaming="streaming"/>
     </template>
 
     <div v-if="explorer" class="explorer-refresh">
-      <Button label="Aktualisieren" icon="pi pi-refresh" severity="secondary" outlined @click="loadExplorer" />
+      <Button label="Aktualisieren" icon="pi pi-refresh" severity="secondary" outlined @click="loadExplorer"/>
     </div>
 
     <CreateLibraryItemDialog
-      v-model:visible="createOpen"
-      :type="createType"
-      :tenant-name="tenantName"
-      :parent-path="explorerPath"
-      @saved="loadExplorer"
+        v-model:visible="createOpen"
+        :type="createType"
+        :tenant-name="tenantName"
+        :parent-path="explorerPath"
+        @saved="loadExplorer"
     />
     <UploadMediaDialog
-      v-model:visible="uploadOpen"
-      :tenant-name="tenantName"
-      :album-path="explorerPath"
-      @saved="loadExplorer"
+        v-model:visible="uploadOpen"
+        :tenant-name="tenantName"
+        :album-path="explorerPath"
+        @saved="loadExplorer"
     />
     <EditExplorerItemDialog
-      v-model:visible="editOpen"
-      :tenant-name="tenantName"
-      :type="selectedType"
-      :item="selectedItem"
-      @saved="loadExplorer"
+        v-model:visible="editOpen"
+        :tenant-name="tenantName"
+        :type="selectedType"
+        :item="selectedItem"
+        @saved="loadExplorer"
     />
     <MoveExplorerItemDialog
-      v-model:visible="moveOpen"
-      :tenant-name="tenantName"
-      :type="selectedType"
-      :item="selectedItem"
-      @saved="loadExplorer"
+        v-model:visible="moveOpen"
+        :tenant-name="tenantName"
+        :type="selectedType"
+        :item="selectedItem"
+        @saved="loadExplorer"
     />
     <ShareExplorerItemDialog
-      v-model:visible="shareOpen"
-      :tenant-name="tenantName"
-      :type="selectedType"
-      :item="selectedItem"
+        v-model:visible="shareOpen"
+        :tenant-name="tenantName"
+        :type="selectedType"
+        :item="selectedItem"
     />
     <DeleteExplorerItemDialog
-      v-model:visible="deleteOpen"
-      :tenant-name="tenantName"
-      :type="selectedType"
-      :item="selectedItem"
-      @deleted="loadExplorer"
+        v-model:visible="deleteOpen"
+        :tenant-name="tenantName"
+        :type="selectedType"
+        :item="selectedItem"
+        @deleted="loadExplorer"
     />
     <AlbumCoverDialog
-      v-model:visible="coverOpen"
-      :tenant-name="tenantName"
-      :album="selectedAlbum"
-      @saved="loadExplorer"
+        v-model:visible="coverOpen"
+        :tenant-name="tenantName"
+        :album="selectedAlbum"
+        @saved="loadExplorer"
     />
   </div>
 </template>
