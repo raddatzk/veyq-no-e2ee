@@ -25,6 +25,7 @@ import ExplorerGrid from '../components/explorer/ExplorerGrid.vue'
 import ExplorerMediaGrid from '../components/explorer/ExplorerMediaGrid.vue'
 import MoveExplorerItemDialog from '../components/explorer/MoveExplorerItemDialog.vue'
 import ShareExplorerItemDialog from '../components/explorer/ShareExplorerItemDialog.vue'
+import UploadMediaDialog from '../components/explorer/UploadMediaDialog.vue'
 import { clearExplorerToolbar, setExplorerToolbar } from '../composables/useExplorerToolbar'
 
 const route = useRoute()
@@ -59,6 +60,7 @@ const moveOpen = ref(false)
 const shareOpen = ref(false)
 const deleteOpen = ref(false)
 const coverOpen = ref(false)
+const uploadOpen = ref(false)
 const selectedType = ref<LibraryItemType>('folder')
 const selectedItem = ref<ExplorerFolder | ExplorerAlbum | null>(null)
 const selectedAlbum = computed(() => selectedType.value === 'album' ? selectedItem.value as ExplorerAlbum | null : null)
@@ -176,8 +178,10 @@ function updateToolbar() {
       key: 'upload',
       label: 'Hochladen',
       icon: 'pi pi-upload',
-      disabled: true,
-      command: () => undefined
+      disabled: !isAlbumContext.value,
+      command: () => {
+        uploadOpen.value = true
+      }
     },
     {
       key: 'settings',
@@ -309,6 +313,12 @@ function routePathToExplorerPath(value: string | string[] | undefined): string {
       :type="createType"
       :tenant-name="tenantName"
       :parent-path="explorerPath"
+      @saved="loadExplorer"
+    />
+    <UploadMediaDialog
+      v-model:visible="uploadOpen"
+      :tenant-name="tenantName"
+      :album-path="explorerPath"
       @saved="loadExplorer"
     />
     <EditExplorerItemDialog

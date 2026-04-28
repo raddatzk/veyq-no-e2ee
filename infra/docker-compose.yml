@@ -22,10 +22,14 @@ services:
       DB_USER: lunva
       DB_PASSWORD: lunva
       COOKIE_SECURE: "false"
+      MEDIA_STORAGE_DIR: /data/lunva-media
     ports:
       - "8080:8080"
+    volumes:
+      - lunva-media:/data/lunva-media
     depends_on:
       - lunva-db
 
 volumes:
   lunva-db:
+  lunva-media:

@@ -28,6 +28,18 @@ class Media : PanacheEntityBase {
     @Column(nullable = false)
     lateinit var title: String
 
+    @Column(name = "mime_type", nullable = false)
+    lateinit var mimeType: String
+
+    @Column(name = "size_bytes", nullable = false)
+    var sizeBytes: Long = 0
+
+    @Column(name = "storage_key", nullable = false, length = 512)
+    lateinit var storageKey: String
+
+    @Column(name = "original_filename")
+    var originalFilename: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
@@ -35,6 +47,9 @@ class Media : PanacheEntityBase {
     fun assignPublicId() {
         if (!::publicId.isInitialized) {
             publicId = NanoIdUtils.randomNanoId(16)
+        }
+        if (!::createdAt.isInitialized) {
+            createdAt = Instant.now()
         }
     }
 }

@@ -40,13 +40,17 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
 }
 
 async function request(path: string, options: RequestInit = {}): Promise<Response> {
+  const headers = options.body instanceof FormData
+    ? { ...(options.headers || {}) }
+    : {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+
   return fetch(`${API_BASE}${path}`, {
     credentials: 'include',
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
+    headers
   })
 }
 

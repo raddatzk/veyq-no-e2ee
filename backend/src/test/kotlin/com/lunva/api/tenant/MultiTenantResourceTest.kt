@@ -297,6 +297,10 @@ class MultiTenantResourceTest {
                 it.tenant = tenant
                 it.owner = owner
                 it.title = title
+                it.mimeType = "image/jpeg"
+                it.sizeBytes = 12
+                it.storageKey = "tenant-${tenant.id}/test-${title.lowercase().replace(" ", "-")}/original"
+                it.originalFilename = "$title.jpg"
                 it.createdAt = Instant.now()
                 mediaRepo.persist(it)
             }

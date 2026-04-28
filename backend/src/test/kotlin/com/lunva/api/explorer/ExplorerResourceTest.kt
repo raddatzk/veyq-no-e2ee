@@ -30,6 +30,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 
@@ -197,6 +198,99 @@ class ExplorerResourceTest {
         assertThat(inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), media.publicId) }).isNotNull
     }
 
+    @Test
+    fun `uploads image into album and serves content`() {
+        createAlbum(ownerCookie, null, "photos", "Photos")
+        val file = File.createTempFile("lunva-upload-", ".jpg").also {
+            it.writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte()))
+        }
+
+        val mediaId = given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/photos")
+            .multiPart("title", "Uploaded Photo")
+            .multiPart("file", file, "image/jpeg")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(200)
+            .body("title", equalTo("Uploaded Photo"))
+            .body("albumPath", equalTo("/photos"))
+            .body("mimeType", equalTo("image/jpeg"))
+            .extract().path<String>("id")
+
+        val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), mediaId) }
+        assertThat(stored?.storageKey).isEqualTo("tenant-${tenant().id}/$mediaId/original")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(200)
+            .contentType("image/jpeg")
+            .header("Content-Disposition", containsString("inline"))
+
+        createUser("viewer-$runId", "member123", ServerRole.ServerMember)
+        addTenantMember("viewer-$runId")
+        val viewerCookie = login("viewer-$runId@example.com", "member123")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
+    fun `uploads video into album`() {
+        createAlbum(ownerCookie, null, "videos", "Videos")
+        val file = File.createTempFile("lunva-upload-", ".mp4").also {
+            it.writeBytes(byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112))
+        }
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/videos")
+            .multiPart("file", file, "video/mp4")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(200)
+            .body("mimeType", equalTo("video/mp4"))
+    }
+
+    @Test
+    fun `rejects invalid upload targets and media types`() {
+        val file = File.createTempFile("lunva-upload-", ".txt").also {
+            it.writeText("plain text")
+        }
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/missing")
+            .multiPart("file", file, "image/jpeg")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(404)
+
+        createAlbum(ownerCookie, null, "photos", "Photos")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/photos")
+            .multiPart("file", file, "text/plain")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(400)
+
+        val empty = File.createTempFile("lunva-upload-empty-", ".jpg")
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/photos")
+            .multiPart("file", empty, "image/jpeg")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(400)
+    }
+
     private fun createTenant(cookie: String, name: String, displayName: String) {
         given()
             .contentType("application/json")
@@ -307,6 +401,10 @@ class ExplorerResourceTest {
                 it.tenant = tenant()
                 it.owner = owner
                 it.title = title
+                it.mimeType = "image/jpeg"
+                it.sizeBytes = 12
+                it.storageKey = "tenant-${tenant().id}/test-${title.lowercase().replace(" ", "-")}/original"
+                it.originalFilename = "$title.jpg"
                 it.createdAt = Instant.now()
                 mediaRepo.persist(it)
             }

@@ -37,6 +37,9 @@ export type ExplorerMedia = {
   albumPath: string | null
   ownerUserId: number
   createdAt: string
+  mimeType: string
+  sizeBytes: number
+  contentUrl: string
 }
 
 export type ExplorerResponse = {
@@ -83,6 +86,12 @@ export type MoveLibraryItemRequest = {
 
 export type StreamMediaOptions = {
   signal?: AbortSignal
+}
+
+export type UploadMediaRequest = {
+  albumPath: string
+  file: File
+  title?: string
 }
 
 function explorerPath(tenantName: string, suffix = ''): string {
@@ -245,6 +254,18 @@ export function setAlbumCover(
   return callApi(libraryPath(tenantName, 'albums', '/cover'), {
     method: 'POST',
     body: JSON.stringify({ albumPath, mediaId, hidden })
+  })
+}
+
+export function uploadMedia(tenantName: string, request: UploadMediaRequest): Promise<ExplorerMedia> {
+  const body = new FormData()
+  body.append('albumPath', request.albumPath)
+  body.append('file', request.file)
+  if (request.title?.trim()) body.append('title', request.title.trim())
+
+  return callApi(libraryPath(tenantName, 'media'), {
+    method: 'POST',
+    body
   })
 }
 

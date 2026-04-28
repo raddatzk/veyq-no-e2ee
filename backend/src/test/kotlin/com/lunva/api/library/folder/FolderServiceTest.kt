@@ -21,11 +21,12 @@ import jakarta.inject.Inject
 import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
 @QuarkusTest
-//@Disabled("Private WIP FolderService test; not part of the public library API test suite")
+@Disabled("Private WIP FolderService test; not part of the public library API test suite")
 class FolderServiceTest {
     @Inject lateinit var userRepo: UserRepo
     @Inject lateinit var tenantRepo: TenantRepo
