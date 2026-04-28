@@ -1,50 +1,50 @@
-import {createApp} from 'vue'
+import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import router from './router'
-import {authState} from './authState'
-import {serverState} from './serverState'
-import {bootstrap as bootstrapClient} from './api/entrypointClient'
-import {SetupRequiredError} from './api/httpClient'
+import { bootstrap as bootstrapClient } from './api/entrypointClient'
+import { SetupRequiredError } from './shared/api/httpClient'
+import { useAuthState } from './shared/state/useAuthState'
+import { useServerState } from './shared/state/useServerState'
 import './style.css'
 import 'primeicons/primeicons.css'
 
 async function bootstrap() {
-    try {
-        const entrypoint = await bootstrapClient()
+  const { finishLoading, setAnonymous, setAuthenticated } = useAuthState()
+  const { setSetupCompleted } = useServerState()
 
-        authState.isAuthenticated = entrypoint.user !== null
-        authState.user = entrypoint.user
-        authState.userLabel = entrypoint.user?.displayName || entrypoint.user?.email || ''
-        authState.tenants = entrypoint.tenants
+  try {
+    const entrypoint = await bootstrapClient()
 
-        serverState.setupCompleted = true
-    } catch (e) {
-        authState.isAuthenticated = false
-        authState.userLabel = ''
-        authState.user = null
-        authState.tenants = []
-
-        serverState.setupCompleted = !(e instanceof SetupRequiredError)
-    } finally {
-        authState.loading = false
+    if (entrypoint.user) {
+      setAuthenticated(entrypoint.user, entrypoint.tenants)
+    } else {
+      setAnonymous()
     }
 
-    const app = createApp(App)
-        .use(PrimeVue, {
-            theme: {
-                preset: Aura,
-                options: {
-                    darkModeSelector: false
-                }
-            }
-        })
-        .use(router)
+    setSetupCompleted(true)
+  } catch (error) {
+    setAnonymous()
+    setSetupCompleted(!(error instanceof SetupRequiredError))
+  } finally {
+    finishLoading()
+  }
 
-    router.isReady().then(() => {
-        app.mount('#app')
+  const app = createApp(App)
+    .use(PrimeVue, {
+      theme: {
+        preset: Aura,
+        options: {
+          darkModeSelector: false
+        }
+      }
     })
+    .use(router)
+
+  router.isReady().then(() => {
+    app.mount('#app')
+  })
 }
 
 void bootstrap()

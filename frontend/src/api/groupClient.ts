@@ -15,7 +15,11 @@ export async function groups(tenantName: string): Promise<TenantGroup[]> {
   return response.groups
 }
 
-export async function createGroup(tenantName: string, name: string, displayName: string): Promise<TenantGroup> {
+export async function createGroup(
+  tenantName: string,
+  name: string,
+  displayName: string
+): Promise<TenantGroup> {
   return callApi(`/api/${tenantName}/groups`, {
     method: 'POST',
     body: JSON.stringify({ name, displayName })

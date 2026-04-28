@@ -3,7 +3,13 @@ import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
-import { deleteLibraryItem, type ExplorerAlbum, type ExplorerFolder, type LibraryItemType } from '../../api/explorerClient'
+import {
+  deleteLibraryItem,
+  type ExplorerAlbum,
+  type ExplorerFolder,
+  type LibraryItemType
+} from '../../api/explorerClient'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -31,8 +37,8 @@ async function submit() {
     await deleteLibraryItem(props.tenantName, props.type, props.item.path)
     visible.value = false
     emit('deleted')
-  } catch (e: any) {
-    error.value = e.message || 'Eintrag konnte nicht gelöscht werden'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Eintrag konnte nicht gelöscht werden')
   } finally {
     loading.value = false
   }
@@ -47,7 +53,13 @@ async function submit() {
       </p>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
-        <Button label="Löschen" icon="pi pi-trash" severity="danger" :loading="loading" @click="submit" />
+        <Button
+          label="Löschen"
+          icon="pi pi-trash"
+          severity="danger"
+          :loading="loading"
+          @click="submit"
+        />
         <Button label="Abbrechen" severity="secondary" outlined @click="visible = false" />
       </div>
     </div>

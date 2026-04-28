@@ -5,11 +5,12 @@ import Breadcrumb from 'primevue/breadcrumb'
 import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
 import { explorerToolbar } from '../../composables/useExplorerToolbar'
 
-const { activeTenant, breadcrumbHome, breadcrumbItems } = useBreadcrumbs()
-// console.log(breadcrumbHome.value)
-const items = computed(() => explorerToolbar.active ? explorerToolbar.breadcrumbs : breadcrumbItems.value)
-// console.log(breadcrumbItems.value)
-const actions = computed(() => explorerToolbar.active ? explorerToolbar.actions : [])
+const { breadcrumbHome, breadcrumbItems } = useBreadcrumbs()
+const fallbackBreadcrumbs = computed(() => [breadcrumbHome.value, ...breadcrumbItems.value])
+const items = computed(() =>
+  explorerToolbar.active ? explorerToolbar.breadcrumbs : fallbackBreadcrumbs.value
+)
+const actions = computed(() => (explorerToolbar.active ? explorerToolbar.actions : []))
 </script>
 
 <template>
@@ -29,10 +30,6 @@ const actions = computed(() => explorerToolbar.active ? explorerToolbar.actions 
           @click="action.command"
         />
       </template>
-<!--      <template v-else-if="activeTenant">-->
-<!--        <Button icon="pi pi-upload" label="Upload" size="small" />-->
-<!--        <Button icon="pi pi-pencil" label="Bearbeiten" severity="secondary" outlined size="small" />-->
-<!--      </template>-->
     </div>
   </header>
 </template>

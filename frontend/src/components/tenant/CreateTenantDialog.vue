@@ -5,12 +5,14 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { authState } from '../../authState'
 import { createTenant, tenants } from '../../api/tenantClient'
 import { toPermalink } from '../../composables/usePermalink'
+import { useAuthState } from '../../shared/state/useAuthState'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const router = useRouter()
+const { setTenants } = useAuthState()
 const name = ref('')
 const displayName = ref('')
 const permalinkTouched = ref(false)
@@ -46,11 +48,11 @@ async function submit() {
   loading.value = true
   try {
     const tenant = await createTenant(tenantName, tenantDisplayName)
-    authState.tenants = await tenants()
+    setTenants(await tenants())
     visible.value = false
     await router.push(`/${tenant.name}`)
-  } catch (e: any) {
-    error.value = e.message || 'Tenant konnte nicht erstellt werden'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Tenant konnte nicht erstellt werden')
   } finally {
     loading.value = false
   }
@@ -66,12 +68,23 @@ async function submit() {
       </label>
       <label>
         Permalink
-        <InputText :model-value="name" autocomplete="off" required @update:model-value="updatePermalink" />
+        <InputText
+          :model-value="name"
+          autocomplete="off"
+          required
+          @update:model-value="updatePermalink"
+        />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button type="submit" label="Erstellen" icon="pi pi-plus" :loading="loading" />
-        <Button type="button" label="Abbrechen" severity="secondary" outlined @click="visible = false" />
+        <Button
+          type="button"
+          label="Abbrechen"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
       </div>
     </form>
   </Dialog>

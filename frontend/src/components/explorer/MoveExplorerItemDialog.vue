@@ -4,8 +4,14 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import { moveLibraryItem, type ExplorerAlbum, type ExplorerFolder, type LibraryItemType } from '../../api/explorerClient'
+import {
+  moveLibraryItem,
+  type ExplorerAlbum,
+  type ExplorerFolder,
+  type LibraryItemType
+} from '../../api/explorerClient'
 import { toPermalink } from '../../composables/usePermalink'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -41,8 +47,8 @@ async function submit() {
     })
     visible.value = false
     emit('saved')
-  } catch (e: any) {
-    error.value = e.message || 'Eintrag konnte nicht verschoben werden'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Eintrag konnte nicht verschoben werden')
   } finally {
     loading.value = false
   }
@@ -74,8 +80,19 @@ function normalizePath(path: string): string {
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
-        <Button type="submit" label="Verschieben" icon="pi pi-arrow-right-arrow-left" :loading="loading" />
-        <Button type="button" label="Abbrechen" severity="secondary" outlined @click="visible = false" />
+        <Button
+          type="submit"
+          label="Verschieben"
+          icon="pi pi-arrow-right-arrow-left"
+          :loading="loading"
+        />
+        <Button
+          type="button"
+          label="Abbrechen"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
       </div>
     </form>
   </Dialog>

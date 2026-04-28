@@ -27,10 +27,38 @@ defineEmits<{
         </span>
       </button>
       <div class="explorer-card-actions">
-        <Button icon="pi pi-pencil" text rounded severity="secondary" aria-label="Ordner bearbeiten" @click="$emit('edit', folder)" />
-        <Button icon="pi pi-arrow-right-arrow-left" text rounded severity="secondary" aria-label="Ordner verschieben" @click="$emit('move', folder)" />
-        <Button icon="pi pi-share-alt" text rounded severity="secondary" aria-label="Ordner freigeben" @click="$emit('share', folder)" />
-        <Button icon="pi pi-trash" text rounded severity="danger" aria-label="Ordner löschen" @click="$emit('delete', folder)" />
+        <Button
+          icon="pi pi-pencil"
+          text
+          rounded
+          severity="secondary"
+          aria-label="Ordner bearbeiten"
+          @click="$emit('edit', folder)"
+        />
+        <Button
+          icon="pi pi-arrow-right-arrow-left"
+          text
+          rounded
+          severity="secondary"
+          aria-label="Ordner verschieben"
+          @click="$emit('move', folder)"
+        />
+        <Button
+          icon="pi pi-share-alt"
+          text
+          rounded
+          severity="secondary"
+          aria-label="Ordner freigeben"
+          @click="$emit('share', folder)"
+        />
+        <Button
+          icon="pi pi-trash"
+          text
+          rounded
+          severity="danger"
+          aria-label="Ordner löschen"
+          @click="$emit('delete', folder)"
+        />
       </div>
     </template>
   </Card>

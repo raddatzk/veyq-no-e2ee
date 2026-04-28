@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { authState } from '../../authState'
+import { useAuthState } from '../../shared/state/useAuthState'
 import ProfileMenu from './ProfileMenu.vue'
 
 const route = useRoute()
+const { authState } = useAuthState()
 const emit = defineEmits<{
   createTenant: []
 }>()

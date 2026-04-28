@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { createAlbum, createFolder, type LibraryItemType } from '../../api/explorerClient'
 import { toPermalink } from '../../composables/usePermalink'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -22,7 +23,7 @@ const name = ref('')
 const permalinkTouched = ref(false)
 const error = ref('')
 const loading = ref(false)
-const title = computed(() => props.type === 'folder' ? 'Ordner erstellen' : 'Album erstellen')
+const title = computed(() => (props.type === 'folder' ? 'Ordner erstellen' : 'Album erstellen'))
 
 watch(displayName, (value) => {
   if (!permalinkTouched.value) name.value = toPermalink(value)
@@ -59,8 +60,8 @@ async function submit() {
     }
     visible.value = false
     emit('saved')
-  } catch (e: any) {
-    error.value = e.message || 'Eintrag konnte nicht erstellt werden'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Eintrag konnte nicht erstellt werden')
   } finally {
     loading.value = false
   }
@@ -76,12 +77,23 @@ async function submit() {
       </label>
       <label>
         Permalink
-        <InputText :model-value="name" autocomplete="off" required @update:model-value="updatePermalink" />
+        <InputText
+          :model-value="name"
+          autocomplete="off"
+          required
+          @update:model-value="updatePermalink"
+        />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button type="submit" label="Erstellen" icon="pi pi-plus" :loading="loading" />
-        <Button type="button" label="Abbrechen" severity="secondary" outlined @click="visible = false" />
+        <Button
+          type="button"
+          label="Abbrechen"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
       </div>
     </form>
   </Dialog>

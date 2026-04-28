@@ -6,6 +6,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { setAlbumCover, type ExplorerAlbum } from '../../api/explorerClient'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -36,8 +37,8 @@ async function submit() {
     await setAlbumCover(props.tenantName, props.album.path, mediaId.value.trim(), hidden.value)
     visible.value = false
     emit('saved')
-  } catch (e: any) {
-    error.value = e.message || 'Cover konnte nicht gesetzt werden'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Cover konnte nicht gesetzt werden')
   } finally {
     loading.value = false
   }
@@ -58,7 +59,13 @@ async function submit() {
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button type="submit" label="Cover setzen" icon="pi pi-image" :loading="loading" />
-        <Button type="button" label="Abbrechen" severity="secondary" outlined @click="visible = false" />
+        <Button
+          type="button"
+          label="Abbrechen"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
       </div>
     </form>
   </Dialog>

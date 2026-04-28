@@ -21,22 +21,43 @@ const title = computed(() => props.media.title || props.media.id)
 const downloadName = computed(() => safeFilename(title.value))
 
 function safeFilename(value: string): string {
-  return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ') || props.media.id
+  return (
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, ' ') || props.media.id
+  )
 }
 </script>
 
 <template>
-  <div class="media-lightbox" role="dialog" aria-modal="true" :aria-label="title" @click.self="$emit('close')">
+  <div
+    class="media-lightbox"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="title"
+    @click.self="$emit('close')"
+  >
     <div class="media-lightbox-topbar">
       <div class="media-lightbox-title">
         <strong>{{ title }}</strong>
         <small>{{ media.mimeType }}</small>
       </div>
       <div class="media-lightbox-actions">
-        <a class="lightbox-icon-button" :href="mediaUrl" :download="downloadName" aria-label="Medium herunterladen">
+        <a
+          class="lightbox-icon-button"
+          :href="mediaUrl"
+          :download="downloadName"
+          aria-label="Medium herunterladen"
+        >
           <span class="pi pi-download" />
         </a>
-        <button class="lightbox-icon-button" type="button" aria-label="Lightbox schließen" @click="$emit('close')">
+        <button
+          class="lightbox-icon-button"
+          type="button"
+          aria-label="Lightbox schließen"
+          @click="$emit('close')"
+        >
           <span class="pi pi-times" />
         </button>
       </div>

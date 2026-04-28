@@ -3,11 +3,12 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Menu from 'primevue/menu'
-import { authState } from '../../authState'
 import { logout } from '../../api/authClient'
+import { useAuthState } from '../../shared/state/useAuthState'
 
 const userMenu = ref()
 const router = useRouter()
+const { authState, setAnonymous } = useAuthState()
 const profileLabel = computed(() => authState.userLabel.charAt(0).toUpperCase() || 'A')
 const menuItems = computed(() => {
   if (!authState.isAuthenticated) {
@@ -42,10 +43,7 @@ const menuItems = computed(() => {
 
 async function doLogout() {
   await logout()
-  authState.isAuthenticated = false
-  authState.userLabel = ''
-  authState.user = null
-  authState.tenants = []
+  setAnonymous()
   await router.push('/')
 }
 </script>

@@ -11,10 +11,14 @@ const props = defineProps<{
 }>()
 
 const selectedIndex = ref<number | null>(null)
-const selectedMedia = computed(() => selectedIndex.value === null ? null : props.media[selectedIndex.value] || null)
+const selectedMedia = computed(() =>
+  selectedIndex.value === null ? null : props.media[selectedIndex.value] || null
+)
 const isLightboxOpen = computed(() => selectedMedia.value !== null)
 const canShowPrevious = computed(() => selectedIndex.value !== null && selectedIndex.value > 0)
-const canShowNext = computed(() => selectedIndex.value !== null && selectedIndex.value < props.media.length - 1)
+const canShowNext = computed(
+  () => selectedIndex.value !== null && selectedIndex.value < props.media.length - 1
+)
 
 watch(isLightboxOpen, (isOpen) => {
   if (isOpen) {
@@ -24,9 +28,12 @@ watch(isLightboxOpen, (isOpen) => {
   }
 })
 
-watch(() => props.media.length, (length) => {
-  if (selectedIndex.value !== null && selectedIndex.value >= length) closeLightbox()
-})
+watch(
+  () => props.media.length,
+  (length) => {
+    if (selectedIndex.value !== null && selectedIndex.value >= length) closeLightbox()
+  }
+)
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
@@ -68,7 +75,12 @@ function handleKeydown(event: KeyboardEvent) {
       <span>{{ media.length }}</span>
     </div>
     <div v-if="media.length" class="media-grid">
-      <ExplorerMediaCard v-for="(item, index) in media" :key="item.id" :media="item" @open="openLightbox(index)" />
+      <ExplorerMediaCard
+        v-for="(item, index) in media"
+        :key="item.id"
+        :media="item"
+        @open="openLightbox(index)"
+      />
     </div>
     <div v-else-if="streaming" class="explorer-loading">
       <ProgressSpinner class="small-spinner" />
