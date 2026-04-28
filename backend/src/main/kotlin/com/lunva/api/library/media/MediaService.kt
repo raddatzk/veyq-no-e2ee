@@ -10,7 +10,9 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.Response
+import jakarta.ws.rs.core.StreamingOutput
 import org.jboss.resteasy.reactive.multipart.FileUpload
+import java.io.InputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -31,6 +33,10 @@ class MediaService @Inject constructor(
     groupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext
 ) : LibraryService(folderRepo, albumRepo, folderUserShareRepo, folderGroupShareRepo, albumUserShareRepo, albumGroupShareRepo, groupMemberRepo, requestContext) {
+
+    private data class ContentRange(val start: Long, val end: Long) {
+        val length: Long = end - start + 1
+    }
 
     fun streamMedia(path: String?): Sequence<StreamMediaSummary> {
         val context = resolveVisibleContext(path)
@@ -57,7 +63,6 @@ class MediaService @Inject constructor(
         val uploadPath = upload.uploadedFile()
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty")
-        if (size > mediaConfig.maxUploadBytes) throw BadRequestException("file is too large")
         val mimeType = upload.contentType() ?: Files.probeContentType(uploadPath) ?: ""
         if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
             throw BadRequestException("Only image and video uploads are supported")
@@ -85,7 +90,7 @@ class MediaService @Inject constructor(
         return media.toUploadSummary(album)
     }
 
-    fun mediaContent(publicId: String): Response {
+    fun mediaContent(publicId: String, rangeHeader: String?): Response {
         val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
             ?: throw NotFoundException("Media not found")
         if (!isMediaAccessible(media)) throw NotFoundException("Media not found")
@@ -93,7 +98,29 @@ class MediaService @Inject constructor(
         val path = storagePath(media.storageKey)
         if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
         val filename = media.originalFilename?.takeIf { it.isNotBlank() } ?: "${media.publicId}.bin"
+        val size = Files.size(path)
+        val range = parseRange(rangeHeader, size)
+
+        if (rangeHeader != null && range == null) {
+            return Response.status(Response.Status.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header("Accept-Ranges", "bytes")
+                .header("Content-Range", "bytes */$size")
+                .build()
+        }
+
+        if (range != null) {
+            return Response.status(Response.Status.PARTIAL_CONTENT)
+                .type(media.mimeType)
+                .entity(streamRange(path, range))
+                .header("Accept-Ranges", "bytes")
+                .header("Content-Length", range.length)
+                .header("Content-Range", "bytes ${range.start}-${range.end}/$size")
+                .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
+                .build()
+        }
+
         return Response.ok(path.toFile(), media.mimeType)
+            .header("Accept-Ranges", "bytes")
             .header("Content-Length", media.sizeBytes)
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
             .build()
@@ -151,6 +178,54 @@ class MediaService @Inject constructor(
         val path = root.resolve(storageKey).normalize()
         if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
         return path
+    }
+
+    private fun parseRange(rangeHeader: String?, size: Long): ContentRange? {
+        if (rangeHeader == null) return null
+        if (!rangeHeader.startsWith("bytes=") || size <= 0) return null
+        val range = rangeHeader.removePrefix("bytes=").substringBefore(',')
+        val startText = range.substringBefore('-', "")
+        val endText = range.substringAfter('-', "")
+        if (startText.isBlank() && endText.isBlank()) return null
+
+        val start: Long
+        val end: Long
+        if (startText.isBlank()) {
+            val suffixLength = endText.toLongOrNull() ?: return null
+            if (suffixLength <= 0) return null
+            start = (size - suffixLength).coerceAtLeast(0)
+            end = size - 1
+        } else {
+            start = startText.toLongOrNull() ?: return null
+            end = if (endText.isBlank()) size - 1 else endText.toLongOrNull() ?: return null
+        }
+
+        if (start < 0 || end < start || start >= size) return null
+        return ContentRange(start, end.coerceAtMost(size - 1))
+    }
+
+    private fun streamRange(path: Path, range: ContentRange): StreamingOutput =
+        StreamingOutput { output ->
+            Files.newInputStream(path).use { input ->
+                skipFully(input, range.start)
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var remaining = range.length
+                while (remaining > 0) {
+                    val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                    if (read == -1) break
+                    output.write(buffer, 0, read)
+                    remaining -= read
+                }
+            }
+        }
+
+    private fun skipFully(input: InputStream, bytes: Long) {
+        var remaining = bytes
+        while (remaining > 0) {
+            val skipped = input.skip(remaining)
+            if (skipped <= 0 && input.read() == -1) break
+            remaining -= if (skipped > 0) skipped else 1
+        }
     }
 
     private fun Media.toStreamSummary(album: TenantAlbum?): StreamMediaSummary =

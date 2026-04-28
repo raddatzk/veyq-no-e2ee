@@ -65,6 +65,6 @@ class MediaResource @Inject constructor(
 
     @GET
     @Path("/{mediaId}/content")
-    fun content(@PathParam("mediaId") mediaId: String): Response =
-        mediaService.mediaContent(mediaId)
+    fun content(@PathParam("mediaId") mediaId: String, @HeaderParam("Range") range: String?): Response =
+        mediaService.mediaContent(mediaId, range)
 }

@@ -8,7 +8,4 @@ import java.nio.file.Path
 interface MediaConfig {
     @get:WithName("storage-dir")
     val storageDir: Path
-
-    @get:WithName("max-upload-bytes")
-    val maxUploadBytes: Long
 }

@@ -247,7 +247,7 @@ class ExplorerResourceTest {
             it.writeBytes(byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112))
         }
 
-        given()
+        val mediaId = given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .multiPart("albumPath", "/videos")
             .multiPart("file", file, "video/mp4")
@@ -255,6 +255,26 @@ class ExplorerResourceTest {
             .then()
             .statusCode(200)
             .body("mimeType", equalTo("video/mp4"))
+            .extract().path<String>("id")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .header("Range", "bytes=0-3")
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(206)
+            .contentType("video/mp4")
+            .header("Accept-Ranges", equalTo("bytes"))
+            .header("Content-Range", equalTo("bytes 0-3/8"))
+            .header("Content-Length", equalTo("4"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .header("Range", "bytes=100-200")
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(416)
+            .header("Content-Range", equalTo("bytes */8"))
     }
 
     @Test
