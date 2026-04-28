@@ -28,7 +28,7 @@ class TenantRolesAllowedInterceptor @Inject constructor(
         val membership = requestContext.tenant!!.members.firstOrNull { it.user == user }
             ?: throw ForbiddenException("User ${user.displayName} is not member in tenant ")
 
-        if (membership.role != TenantRole.TENANT_OWNER) {
+        if (membership.role != TenantRole.TenantOwner) {
             throw ForbiddenException("User ${user.displayName} has insufficient role in tenant ${requestContext.tenant!!.name}")
         }
 

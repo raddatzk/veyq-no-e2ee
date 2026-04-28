@@ -1,6 +1,6 @@
 package com.lunva.api.setup
 
-import com.lunva.api.user.UserSummary
+import com.lunva.api.usermgmt.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.validation.Valid
@@ -10,9 +10,8 @@ import jakarta.validation.constraints.Size
 import jakarta.ws.rs.*
 import jakarta.ws.rs.core.MediaType
 
-data class SetupStatusResponse(
-    val adminRequired: Boolean,
-    val tenantAvailable: Boolean,
+data class SetupStatusSummary(
+    val setupRequired: Boolean
 )
 
 data class AdminSetupRequest(
@@ -37,7 +36,7 @@ class SetupResource @Inject constructor(
 ) {
 
     @GET
-    fun status(): SetupStatusResponse =
+    fun status(): SetupStatusSummary =
         setupService.status()
 
     @POST

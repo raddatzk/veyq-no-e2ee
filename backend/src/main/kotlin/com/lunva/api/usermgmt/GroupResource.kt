@@ -1,9 +1,8 @@
-package com.lunva.api.group
+package com.lunva.api.usermgmt
 
 import com.lunva.api.domain.GroupRole
 import com.lunva.api.security.GroupOwnerRequired
 import com.lunva.api.tenant.TenantService
-import com.lunva.api.user.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.validation.Valid

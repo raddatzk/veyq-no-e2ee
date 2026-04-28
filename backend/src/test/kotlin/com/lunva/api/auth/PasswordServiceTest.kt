@@ -2,9 +2,8 @@ package com.lunva.api.auth
 
 import com.lunva.api.auth.bcrypt.BcryptCostProvider
 import io.quarkus.elytron.security.common.BcryptUtil
+import org.assertj.core.api.Assertions.assertThat
 import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class PasswordServiceTest {
     private val costProvider = object : BcryptCostProvider {
@@ -17,20 +16,20 @@ class PasswordServiceTest {
     fun `hash and matches are consistent`() {
         val hash = service.hash("secret123")
 
-        assertTrue(service.matches("secret123", hash))
-        assertFalse(service.matches("wrong", hash))
+        assertThat(service.matches("secret123", hash)).isTrue()
+        assertThat(service.matches("wrong", hash)).isFalse()
     }
 
     @Test
     fun `non-bcrypt hash is rejected and needs rehash`() {
-        assertFalse(service.matches("pw", "plain:pw"))
-        assertTrue(service.needsRehash("plain:pw"))
-        assertTrue(service.needsRehash(null))
+        assertThat(service.matches("pw", "plain:pw")).isFalse()
+        assertThat(service.needsRehash("plain:pw")).isTrue()
+        assertThat(service.needsRehash(null)).isTrue()
     }
 
     @Test
     fun `bcrypt hash with lower cost requires rehash`() {
         val weakerHash = BcryptUtil.bcryptHash("secret123", 4)
-        assertTrue(service.needsRehash(weakerHash))
+        assertThat(service.needsRehash(weakerHash)).isTrue()
     }
 }

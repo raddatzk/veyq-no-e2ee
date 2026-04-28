@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
 
 enum class GroupRole {
-    GROUP_OWNER,
-    GROUP_MEMBER
+    GroupOwner,
+    GroupMember
 }
 
 @Entity

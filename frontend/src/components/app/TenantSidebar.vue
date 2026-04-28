@@ -7,7 +7,7 @@ import ProfileMenu from './ProfileMenu.vue'
 const emit = defineEmits<{
   createTenant: []
 }>()
-const canCreateTenant = computed(() => authState.user?.serverRole === 'SERVER_OWNER')
+const canCreateTenant = computed(() => authState.user?.serverRole === 'ServerOwner')
 </script>
 
 <template>

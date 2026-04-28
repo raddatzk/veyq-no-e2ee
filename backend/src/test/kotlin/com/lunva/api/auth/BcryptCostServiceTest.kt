@@ -5,10 +5,8 @@ import com.lunva.api.domain.AppConfigRepo
 import io.quarkus.test.TestTransaction
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
+import org.assertj.core.api.Assertions.assertThat
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @QuarkusTest
 class BcryptCostServiceTest {
@@ -21,10 +19,10 @@ class BcryptCostServiceTest {
     @TestTransaction
     fun `current cost is initialized and persisted in config`() {
         val cost = bcryptCostService.currentCost()
-        assertTrue(cost > 0)
+        assertThat(cost).isPositive()
 
         val row = appConfigRepo.findByKey(BcryptCostService.KEY)
-        assertNotNull(row)
-        assertEquals(cost.toString(), row.configValue)
+        assertThat(row).isNotNull
+        assertThat(row!!.configValue).isEqualTo(cost.toString())
     }
 }

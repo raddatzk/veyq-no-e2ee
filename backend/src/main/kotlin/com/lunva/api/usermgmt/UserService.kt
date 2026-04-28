@@ -1,11 +1,9 @@
-package com.lunva.api.user
+package com.lunva.api.usermgmt
 
 import com.lunva.api.auth.NotFoundException
-import com.lunva.api.auth.UnauthorizedException
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.security.RequestContext
-import io.quarkus.security.identity.SecurityIdentity
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 

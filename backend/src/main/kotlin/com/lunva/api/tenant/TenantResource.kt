@@ -3,7 +3,7 @@ package com.lunva.api.tenant
 import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantRole
 import com.lunva.api.security.ServerRolesRequired
-import com.lunva.api.user.UserSummary
+import com.lunva.api.usermgmt.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.validation.Valid
@@ -41,7 +41,7 @@ class TenantResource @Inject constructor(
 
     @POST
     @Path("/tenants")
-    @ServerRolesRequired(ServerRole.SERVER_OWNER)
+    @ServerRolesRequired(ServerRole.ServerOwner)
     fun createTenant(@Valid request: CreateTenantRequest): TenantSummary =
         tenantService.createTenantForCurrentUser(request)
 }

@@ -6,7 +6,7 @@ import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
-import com.lunva.api.user.UserSummary
+import com.lunva.api.usermgmt.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -18,10 +18,9 @@ class SetupService @Inject constructor(
     private val passwordService: PasswordService,
     private val setupFilter: SetupFilter,
 ) {
-    fun status(): SetupStatusResponse =
-        SetupStatusResponse(
-            adminRequired = userRepo.count() == 0L,
-            tenantAvailable = tenantRepo.count() > 0L,
+    fun status(): SetupStatusSummary =
+        SetupStatusSummary(
+            setupRequired = userRepo.count() == 0L,
         )
 
     @Transactional
@@ -35,7 +34,7 @@ class SetupService @Inject constructor(
             it.passwordHash = passwordService.hash(request.password!!)
             it.displayName = request.displayName!!.trim()
             it.email = email
-            it.role = ServerRole.SERVER_OWNER
+            it.role = ServerRole.ServerOwner
             userRepo.persist(it)
         }
         userRepo.flush()

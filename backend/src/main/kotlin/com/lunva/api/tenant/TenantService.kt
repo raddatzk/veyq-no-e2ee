@@ -6,7 +6,7 @@ import com.lunva.api.auth.ForbiddenException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.security.RequestContext
-import com.lunva.api.user.UserService
+import com.lunva.api.usermgmt.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -24,7 +24,7 @@ class TenantService @Inject constructor(
         val user = requestContext.user!!
         val tenant = createTenant(request.name!!, request.displayName!!, user)
 
-        return TenantSummary(tenant.id, tenant.name, tenant.displayName, TenantRole.TENANT_OWNER, listOf(UserService.toUserSummary(user)))
+        return TenantSummary(tenant.id, tenant.name, tenant.displayName, TenantRole.TenantOwner, listOf(UserService.toUserSummary(user)))
     }
 
     fun listMyTenants(): TenantsSummary {
@@ -32,7 +32,7 @@ class TenantService @Inject constructor(
             requestContext.user!!.tenantMemberships
             .sortedBy { it.tenant.name }
             .map {
-                val tenantOwners = findUsersWithRole(it.tenant, TenantRole.TENANT_OWNER).map { UserService.toUserSummary(it) }
+                val tenantOwners = findUsersWithRole(it.tenant, TenantRole.TenantOwner).map { UserService.toUserSummary(it) }
                 TenantSummary(it.tenant.id, it.tenant.name, it.tenant.displayName, it.role, tenantOwners)
             }
         )
@@ -62,7 +62,7 @@ class TenantService @Inject constructor(
             it.id = TenantMemberId(tenant.id, owner.id)
             it.tenant = tenant
             it.user = owner
-            it.role = TenantRole.TENANT_OWNER
+            it.role = TenantRole.TenantOwner
             tenantMemberRepo.persist(it)
         }
 

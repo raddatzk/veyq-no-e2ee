@@ -4,9 +4,8 @@ import com.lunva.api.auth.cookie.CookieConfig
 import com.lunva.api.auth.cookie.CookieService
 import com.lunva.api.auth.token.TokenConfig
 import jakarta.ws.rs.core.NewCookie
+import org.assertj.core.api.Assertions.assertThat
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class CookieServiceTest {
 
@@ -30,26 +29,26 @@ class CookieServiceTest {
     fun `createAccessCookie sets expected flags and values`() {
         val cookie = cookieService.createAccessCookie("access-token")
 
-        assertEquals("LUNVA_ACCESS_TOKEN", cookie.name)
-        assertEquals("access-token", cookie.value)
-        assertEquals("/api", cookie.path)
-        assertEquals(15 * 60, cookie.maxAge)
-        assertTrue(cookie.isHttpOnly)
-        assertTrue(cookie.isSecure)
-        assertEquals(NewCookie.SameSite.STRICT, cookie.sameSite)
+        assertThat(cookie.name).isEqualTo("LUNVA_ACCESS_TOKEN")
+        assertThat(cookie.value).isEqualTo("access-token")
+        assertThat(cookie.path).isEqualTo("/api")
+        assertThat(cookie.maxAge).isEqualTo(15 * 60)
+        assertThat(cookie.isHttpOnly).isTrue()
+        assertThat(cookie.isSecure).isTrue()
+        assertThat(cookie.sameSite).isEqualTo(NewCookie.SameSite.STRICT)
     }
 
     @Test
     fun `createRefreshCookie sets expected flags and values`() {
         val cookie = cookieService.createRefreshCookie("refresh-token")
 
-        assertEquals("LUNVA_REFRESH_TOKEN", cookie.name)
-        assertEquals("refresh-token", cookie.value)
-        assertEquals("/api/auth", cookie.path)
-        assertEquals(60 * 60, cookie.maxAge)
-        assertTrue(cookie.isHttpOnly)
-        assertTrue(cookie.isSecure)
-        assertEquals(NewCookie.SameSite.STRICT, cookie.sameSite)
+        assertThat(cookie.name).isEqualTo("LUNVA_REFRESH_TOKEN")
+        assertThat(cookie.value).isEqualTo("refresh-token")
+        assertThat(cookie.path).isEqualTo("/api/auth")
+        assertThat(cookie.maxAge).isEqualTo(60 * 60)
+        assertThat(cookie.isHttpOnly).isTrue()
+        assertThat(cookie.isSecure).isTrue()
+        assertThat(cookie.sameSite).isEqualTo(NewCookie.SameSite.STRICT)
     }
 
     @Test
@@ -57,15 +56,14 @@ class CookieServiceTest {
         val access = cookieService.deleteAccessCookie()
         val refresh = cookieService.deleteRefreshCookie()
 
-        assertEquals("LUNVA_ACCESS_TOKEN", access.name)
-        assertEquals("", access.value)
-        assertEquals(0, access.maxAge)
-        assertEquals("/api", access.path)
+        assertThat(access.name).isEqualTo("LUNVA_ACCESS_TOKEN")
+        assertThat(access.value).isEqualTo("")
+        assertThat(access.maxAge).isEqualTo(0)
+        assertThat(access.path).isEqualTo("/api")
 
-        assertEquals("LUNVA_REFRESH_TOKEN", refresh.name)
-        assertEquals("", refresh.value)
-        assertEquals(0, refresh.maxAge)
-        assertEquals("/api/auth", refresh.path)
+        assertThat(refresh.name).isEqualTo("LUNVA_REFRESH_TOKEN")
+        assertThat(refresh.value).isEqualTo("")
+        assertThat(refresh.maxAge).isEqualTo(0)
+        assertThat(refresh.path).isEqualTo("/api/auth")
     }
 }
-

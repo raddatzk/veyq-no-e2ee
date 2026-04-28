@@ -1,4 +1,4 @@
-package com.lunva.api.user
+package com.lunva.api.usermgmt
 
 import com.lunva.api.domain.ServerRole
 import jakarta.enterprise.context.ApplicationScoped

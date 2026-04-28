@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+export const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 let refreshRequest: Promise<void> | null = null
 
@@ -10,16 +10,7 @@ export class SetupRequiredError extends Error {
 }
 
 export async function callApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let response = await request(path, options)
-
-  if (response.status === 401 && shouldTryRefresh(path)) {
-    try {
-      await refreshLogin()
-      response = await request(path, options)
-    } catch {
-      // Keep the original 401 semantics for callers when refresh is not possible.
-    }
-  }
+  const response = await apiFetch(path, options)
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: 'Request failed' }))
@@ -31,6 +22,21 @@ export async function callApi<T>(path: string, options: RequestInit = {}): Promi
 
   if (response.status === 204) return null as T
   return response.json()
+}
+
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  let response = await request(path, options)
+
+  if (response.status === 401 && shouldTryRefresh(path)) {
+    try {
+      await refreshLogin()
+      response = await request(path, options)
+    } catch {
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  }
+
+  return response
 }
 
 async function request(path: string, options: RequestInit = {}): Promise<Response> {

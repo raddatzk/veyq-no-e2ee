@@ -35,7 +35,7 @@ class GroupRolesRequiredInterceptor @Inject constructor(
         val membership = group.members.firstOrNull { it.user == user }
             ?: throw ForbiddenException("User ${user.id} is not member in group $groupName")
 
-        if (membership.role != GroupRole.GROUP_OWNER) {
+        if (membership.role != GroupRole.GroupOwner) {
             throw ForbiddenException("User ${user.id} has insufficient role in group $groupName")
         }
 

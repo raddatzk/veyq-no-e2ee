@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
 
 enum class TenantRole {
-    TENANT_OWNER,
-    TENANT_MEMBER
+    TenantOwner,
+    TenantMember
 }
 
 @Entity

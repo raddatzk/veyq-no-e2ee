@@ -1,10 +1,9 @@
-package com.lunva.api.group
+package com.lunva.api.usermgmt
 
 import com.lunva.api.auth.ConflictException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.security.RequestContext
-import com.lunva.api.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -59,11 +58,11 @@ class GroupService @Inject constructor(
             it.id = TenantGroupMemberId(group.id, user.id)
             it.group = group
             it.user = user
-            it.role = GroupRole.GROUP_OWNER
+            it.role = GroupRole.GroupOwner
             groupMemberRepo.persist(it)
         }
 
-        val members = listOf(GroupMemberSummary(UserService.toUserSummary(user), GroupRole.GROUP_OWNER))
+        val members = listOf(GroupMemberSummary(UserService.toUserSummary(user), GroupRole.GroupOwner))
 
         return GroupSummary(group.id, group.name, group.displayName, members)
     }

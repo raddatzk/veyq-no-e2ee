@@ -20,11 +20,11 @@ import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
 import jakarta.transaction.UserTransaction
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.UUID
-import kotlin.test.assertFalse
 
 @QuarkusTest
 class SecurityPipelineTest {
@@ -46,15 +46,15 @@ class SecurityPipelineTest {
     @BeforeEach
     fun setupFixture() {
         runId = UUID.randomUUID().toString().take(8)
-        owner = createUser("sec-owner-$runId", ServerRole.SERVER_OWNER)
-        member = createUser("sec-member-$runId", ServerRole.SERVER_MEMBER)
-        outsider = createUser("sec-outsider-$runId", ServerRole.SERVER_MEMBER)
+        owner = createUser("sec-owner-$runId", ServerRole.ServerOwner)
+        member = createUser("sec-member-$runId", ServerRole.ServerMember)
+        outsider = createUser("sec-outsider-$runId", ServerRole.ServerMember)
         tenant = createTenant("sec-$runId", "Security $runId")
-        addTenantMember(tenant, owner, TenantRole.TENANT_OWNER)
-        addTenantMember(tenant, member, TenantRole.TENANT_MEMBER)
+        addTenantMember(tenant, owner, TenantRole.TenantOwner)
+        addTenantMember(tenant, member, TenantRole.TenantMember)
         group = createGroup(tenant, "crew-$runId")
-        addGroupMember(group, owner, GroupRole.GROUP_OWNER)
-        addGroupMember(group, member, GroupRole.GROUP_MEMBER)
+        addGroupMember(group, owner, GroupRole.GroupOwner)
+        addGroupMember(group, member, GroupRole.GroupMember)
     }
 
     @Test
@@ -156,7 +156,9 @@ class SecurityPipelineTest {
             .extract()
             .cookie("LUNVA_ACCESS_TOKEN")
 
-        assertFalse(accessCookie.isNullOrBlank(), "Login did not return an access cookie")
+        assertThat(accessCookie)
+            .describedAs("Login did not return an access cookie")
+            .isNotBlank()
         return accessCookie
     }
 

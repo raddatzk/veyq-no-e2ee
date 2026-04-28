@@ -1,9 +1,6 @@
 package com.lunva.api.auth
 
-import com.lunva.api.auth.cookie.CookieService
-import com.lunva.api.auth.token.TokenService
 import com.lunva.api.domain.ServerRole
-import com.lunva.api.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.validation.Valid

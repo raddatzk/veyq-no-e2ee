@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { authState } from '../authState'
+import { serverState } from '../serverState'
 import { login } from '../api/authClient'
 import { setupAdmin } from '../api/setupClient'
 import { createTenant, tenants } from '../api/tenantClient'
@@ -42,7 +43,6 @@ async function submitAdmin() {
       email: email.value
     })
     const user = await login(email.value, password.value)
-    authState.setupRequired = false
     authState.isAuthenticated = true
     authState.userLabel = user.displayName || user.email
     authState.user = {
@@ -52,6 +52,7 @@ async function submitAdmin() {
       serverRole: user.serverRole
     }
     authState.tenants = await tenants()
+    serverState.setupCompleted = true
     step.value = 'tenant'
   } catch (e: any) {
     error.value = e.message || 'Admin konnte nicht erstellt werden'

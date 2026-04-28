@@ -11,11 +11,11 @@ import com.lunva.api.domain.UserRepo
 import io.quarkus.test.TestTransaction
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
+import org.assertj.core.api.Assertions.assertThat
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 @QuarkusTest
 class TokenCleanupTest {
@@ -73,8 +73,12 @@ class TokenCleanupTest {
 
         tokenCleanup.cleanup()
 
-        assertEquals(1, refreshTokenRepo.count("user", user), "Expected only active refresh token to remain")
-        assertEquals(1, accessTokenRepo.count("user", user), "Expected only active access token to remain")
+        assertThat(refreshTokenRepo.count("user", user))
+            .describedAs("Expected only active refresh token to remain")
+            .isEqualTo(1)
+        assertThat(accessTokenRepo.count("user", user))
+            .describedAs("Expected only active access token to remain")
+            .isEqualTo(1)
     }
 
     private fun createUser(): User {
@@ -83,7 +87,7 @@ class TokenCleanupTest {
             it.passwordHash = "\$2y\$10\$2bNfOGM2k9b8CKi85z9LqekdJp5EJk4j7n4JrTxf2j2Ff0cRImwR6"
             it.displayName = "Cleanup User $unique"
             it.email = "cleanup-$unique@example.com"
-            it.role = ServerRole.SERVER_OWNER
+            it.role = ServerRole.ServerOwner
             userRepo.persist(it)
         }
     }

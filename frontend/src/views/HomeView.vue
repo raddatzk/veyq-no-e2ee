@@ -5,7 +5,7 @@ import Message from 'primevue/message'
 import { authState } from '../authState'
 
 function roleLabel(role: string) {
-  return role === 'TENANT_OWNER' ? 'Owner' : 'Member'
+  return role === 'TenantOwner' ? 'Owner' : 'Member'
 }
 </script>
 

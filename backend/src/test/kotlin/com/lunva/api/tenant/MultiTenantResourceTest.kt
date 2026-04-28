@@ -26,6 +26,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
 import jakarta.transaction.UserTransaction
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.everyItem
 import org.hamcrest.Matchers.hasItem
@@ -33,10 +34,10 @@ import org.hamcrest.Matchers.hasSize
 import org.hamcrest.Matchers.matchesPattern
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
-import kotlin.test.assertFalse
 
 @QuarkusTest
 class MultiTenantResourceTest {
@@ -59,7 +60,7 @@ class MultiTenantResourceTest {
         runId = UUID.randomUUID().toString().take(8)
         ownerEmail = "owner-$runId@example.com"
         ownerPassword = "admin123"
-        createUser("owner-$runId", ownerPassword, ServerRole.SERVER_OWNER)
+        createUser("owner-$runId", ownerPassword, ServerRole.ServerOwner)
     }
 
     @Test
@@ -84,7 +85,7 @@ class MultiTenantResourceTest {
             .then()
             .statusCode(400)
 
-        createUser("plain-$runId", "member123", ServerRole.SERVER_MEMBER)
+        createUser("plain-$runId", "member123", ServerRole.ServerMember)
         val memberCookie = login("plain-$runId@example.com", "member123")
 
         given()
@@ -108,10 +109,10 @@ class MultiTenantResourceTest {
             .statusCode(200)
             .body("tenants.name", hasItem("friends-$runId"))
             .body("tenants.displayName", hasItem("Friends"))
-            .body("tenants.role", hasItem(TenantRole.TENANT_OWNER.name))
+            .body("tenants.role", hasItem(TenantRole.TenantOwner.name))
             .body("tenants.admins.email.flatten()", hasItem(ownerEmail))
 
-        createUser("outside-$runId", "member123", ServerRole.SERVER_MEMBER)
+        createUser("outside-$runId", "member123", ServerRole.ServerMember)
         val outsideCookie = login("outside-$runId@example.com", "member123")
 
         given()
@@ -126,7 +127,7 @@ class MultiTenantResourceTest {
     fun `tenant filter protects tenant routes`() {
         val ownerCookie = login(ownerEmail, ownerPassword)
         ensureTenant(ownerCookie, "friends-$runId", "Friends")
-        createUser("outside-$runId", "member123", ServerRole.SERVER_MEMBER)
+        createUser("outside-$runId", "member123", ServerRole.ServerMember)
         val outsideCookie = login("outside-$runId@example.com", "member123")
 
         given()
@@ -162,7 +163,7 @@ class MultiTenantResourceTest {
             .statusCode(200)
             .body("name", equalTo("trip"))
             .body("displayName", equalTo("Trip"))
-            .body("members.role", hasItem(GroupRole.GROUP_OWNER.name))
+            .body("members.role", hasItem(GroupRole.GroupOwner.name))
 
         given()
             .contentType("application/json")
@@ -182,13 +183,14 @@ class MultiTenantResourceTest {
     }
 
     @Test
+    @Disabled("Obsolete compatibility test for the old JSON media endpoint; /media now streams library album media")
     fun `media list returns only owner direct share and group share access with public ids`() {
         val ownerCookie = login(ownerEmail, ownerPassword)
         ensureTenant(ownerCookie, "friends-$runId", "Friends")
-        createUser("media-owner-$runId", "member123", ServerRole.SERVER_MEMBER)
-        createUser("direct-viewer-$runId", "member123", ServerRole.SERVER_MEMBER)
-        createUser("group-viewer-$runId", "member123", ServerRole.SERVER_MEMBER)
-        createUser("unshared-viewer-$runId", "member123", ServerRole.SERVER_MEMBER)
+        createUser("media-owner-$runId", "member123", ServerRole.ServerMember)
+        createUser("direct-viewer-$runId", "member123", ServerRole.ServerMember)
+        createUser("group-viewer-$runId", "member123", ServerRole.ServerMember)
+        createUser("unshared-viewer-$runId", "member123", ServerRole.ServerMember)
         addTenantMember("friends-$runId", "media-owner-$runId")
         addTenantMember("friends-$runId", "direct-viewer-$runId")
         addTenantMember("friends-$runId", "group-viewer-$runId")
@@ -252,7 +254,9 @@ class MultiTenantResourceTest {
             .extract()
             .cookie("LUNVA_ACCESS_TOKEN")
 
-        assertFalse(accessCookie.isNullOrBlank(), "Login did not return an access cookie")
+        assertThat(accessCookie)
+            .describedAs("Login did not return an access cookie")
+            .isNotBlank()
         return accessCookie
     }
 
@@ -278,7 +282,7 @@ class MultiTenantResourceTest {
                     it.id = TenantMemberId(tenant.id, user.id)
                     it.tenant = tenant
                     it.user = user
-                    it.role = TenantRole.TENANT_MEMBER
+                    it.role = TenantRole.TenantMember
                     tenantMemberRepo.persist(it)
                 }
             }
@@ -327,7 +331,7 @@ class MultiTenantResourceTest {
                 it.id = TenantGroupMemberId(group.id, user.id)
                 it.group = group
                 it.user = user
-                it.role = GroupRole.GROUP_MEMBER
+                it.role = GroupRole.GroupMember
                 tenantGroupMemberRepo.persist(it)
             }
             group

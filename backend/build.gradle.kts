@@ -32,6 +32,7 @@ dependencies {
     implementation("io.quarkus:quarkus-scheduler")
     implementation("com.github.wosherco:jnanoid-enhanced:9819c115e7")
 
+    testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("io.quarkus:quarkus-jdbc-h2")

@@ -4,7 +4,7 @@ export type LoginResponse = {
   userId: number
   email: string
   displayName: string
-  serverRole: 'SERVER_OWNER' | 'SERVER_MEMBER'
+  serverRole: 'ServerOwner' | 'ServerMember'
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {

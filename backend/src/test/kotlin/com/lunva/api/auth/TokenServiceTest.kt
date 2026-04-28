@@ -10,12 +10,10 @@ import io.quarkus.test.TestTransaction
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
+import org.assertj.core.api.Assertions.assertThat
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 
 @QuarkusTest
 class TokenServiceTest {
@@ -36,13 +34,13 @@ class TokenServiceTest {
         val user = createUser()
         val (_, firstRefreshToken) = tokenService.createToken(user, null)
         val firstRefreshEntity = tokenService.findRefreshToken(firstRefreshToken)
-        assertNotNull(firstRefreshEntity)
+        assertThat(firstRefreshEntity).isNotNull
 
         val (_, secondRefreshToken) = tokenService.createToken(user, firstRefreshEntity)
         val secondRefreshEntity = tokenService.findRefreshToken(secondRefreshToken)
-        assertNotNull(secondRefreshEntity)
+        assertThat(secondRefreshEntity).isNotNull
 
-        assertEquals(secondRefreshEntity.id, firstRefreshEntity.rotatedTo?.id)
+        assertThat(firstRefreshEntity!!.rotatedTo?.id).isEqualTo(secondRefreshEntity!!.id)
     }
 
     @Test
@@ -52,19 +50,23 @@ class TokenServiceTest {
 
         val (firstAccessToken, firstRefreshToken) = tokenService.createToken(user, null)
         val firstRefreshEntity = tokenService.findRefreshToken(firstRefreshToken)
-        assertNotNull(firstRefreshEntity)
+        assertThat(firstRefreshEntity).isNotNull
 
         tokenService.createToken(user, firstRefreshEntity)
-        assertNotNull(tokenService.findUserByRefreshToken(firstRefreshToken))
-        assertNotNull(tokenService.findUserByAccessToken(firstAccessToken))
+        assertThat(tokenService.findUserByRefreshToken(firstRefreshToken)).isNotNull
+        assertThat(tokenService.findUserByAccessToken(firstAccessToken)).isNotNull
 
         tokenService.invalidateRefreshToken(firstRefreshToken)
         refreshTokenRepo.flush()
         accessTokenRepo.flush()
         entityManager.clear()
 
-        assertNull(tokenService.findUserByRefreshToken(firstRefreshToken), "Expected refresh token to be inactive after revoke")
-        assertNull(tokenService.findUserByAccessToken(firstAccessToken), "Expected access token to be inactive after refresh-token revoke")
+        assertThat(tokenService.findUserByRefreshToken(firstRefreshToken))
+            .describedAs("Expected refresh token to be inactive after revoke")
+            .isNull()
+        assertThat(tokenService.findUserByAccessToken(firstAccessToken))
+            .describedAs("Expected access token to be inactive after refresh-token revoke")
+            .isNull()
     }
 
     @Test
@@ -74,12 +76,12 @@ class TokenServiceTest {
         val (accessToken, _) = tokenService.createToken(user, null)
 
         val beforeRevoke = tokenService.findUserByAccessToken(accessToken)
-        assertNotNull(beforeRevoke)
-        assertEquals(user.id, beforeRevoke.id)
+        assertThat(beforeRevoke).isNotNull
+        assertThat(beforeRevoke!!.id).isEqualTo(user.id)
 
         tokenService.invalidateAccessToken(accessToken, Instant.now())
         val afterRevoke = tokenService.findUserByAccessToken(accessToken)
-        assertNull(afterRevoke)
+        assertThat(afterRevoke).isNull()
     }
 
     private fun createUser(): User {
@@ -88,7 +90,7 @@ class TokenServiceTest {
             it.passwordHash = "\$2y\$10\$2bNfOGM2k9b8CKi85z9LqekdJp5EJk4j7n4JrTxf2j2Ff0cRImwR6"
             it.displayName = "Token User $unique"
             it.email = "token-$unique@example.com"
-            it.role = ServerRole.SERVER_OWNER
+            it.role = ServerRole.ServerOwner
             userRepo.persist(it)
         }
     }

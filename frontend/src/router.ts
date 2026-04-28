@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authState } from './authState'
+import { serverState } from './serverState'
 import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
 import SetupView from './views/SetupView.vue'
@@ -17,8 +18,8 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (authState.loading) return true
-  if (authState.setupRequired && to.name !== 'setup') return { name: 'setup' }
-  if (!authState.setupRequired && to.name === 'setup') return { name: 'home' }
+  if (!serverState.setupCompleted && to.name !== 'setup') return { name: 'setup' }
+  if (serverState.setupCompleted && to.name === 'setup') return { name: 'home' }
   if (!authState.isAuthenticated && to.name === 'tenant') return { name: 'login' }
   return true
 })

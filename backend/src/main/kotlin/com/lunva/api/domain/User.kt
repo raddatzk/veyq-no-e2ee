@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
 
 enum class ServerRole {
-    SERVER_OWNER,
-    SERVER_MEMBER,
+    ServerOwner,
+    ServerMember,
 }
 
 @Entity

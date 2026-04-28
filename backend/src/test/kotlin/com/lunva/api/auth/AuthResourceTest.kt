@@ -7,11 +7,9 @@ import io.restassured.RestAssured.given
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.notNullValue
 import jakarta.inject.Inject
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 
 @QuarkusTest
 class AuthResourceTest {
@@ -46,7 +44,9 @@ class AuthResourceTest {
             .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
             .`when`().post("/api/auth/login")
 
-        assertEquals(200, response.statusCode, "Login failed with body: ${response.body.asString()}")
+        assertThat(response.statusCode)
+            .describedAs("Login failed with body: ${response.body.asString()}")
+            .isEqualTo(200)
 
         response
             .then()
@@ -82,13 +82,17 @@ class AuthResourceTest {
             .then().statusCode(200)
             .extract()
             .cookie("LUNVA_ACCESS_TOKEN")
-        assertFalse(accessCookie.isNullOrBlank(), "Login did not return an access cookie")
+        assertThat(accessCookie)
+            .describedAs("Login did not return an access cookie")
+            .isNotBlank()
 
         val meResponse = given()
             .cookie("LUNVA_ACCESS_TOKEN", accessCookie)
             .`when`().get("/api/me")
 
-        assertEquals(200, meResponse.statusCode, "GET /api/me failed with body: ${meResponse.body.asString()}")
+        assertThat(meResponse.statusCode)
+            .describedAs("GET /api/me failed with body: ${meResponse.body.asString()}")
+            .isEqualTo(200)
 
         meResponse
             .then()
@@ -106,26 +110,38 @@ class AuthResourceTest {
             .extract()
 
         val oldRefreshCookie = login.cookie("LUNVA_REFRESH_TOKEN")
-        assertFalse(oldRefreshCookie.isNullOrBlank(), "Login did not return a refresh cookie")
+        assertThat(oldRefreshCookie)
+            .describedAs("Login did not return a refresh cookie")
+            .isNotBlank()
 
         val refreshResponse = given()
             .contentType("application/json")
             .cookie("LUNVA_REFRESH_TOKEN", oldRefreshCookie)
             .`when`().post("/api/auth/refresh")
 
-        assertEquals(200, refreshResponse.statusCode, "POST /api/auth/refresh failed with body: ${refreshResponse.body.asString()}")
+        assertThat(refreshResponse.statusCode)
+            .describedAs("POST /api/auth/refresh failed with body: ${refreshResponse.body.asString()}")
+            .isEqualTo(200)
 
         val newRefreshCookie = refreshResponse.getCookie("LUNVA_REFRESH_TOKEN")
         val newAccessCookie = refreshResponse.getCookie("LUNVA_ACCESS_TOKEN")
-        assertFalse(newRefreshCookie.isNullOrBlank(), "Refresh did not return new refresh cookie")
-        assertFalse(newAccessCookie.isNullOrBlank(), "Refresh did not return new access cookie")
-        assertFalse(oldRefreshCookie == newRefreshCookie, "Refresh token should be rotated")
+        assertThat(newRefreshCookie)
+            .describedAs("Refresh did not return new refresh cookie")
+            .isNotBlank()
+        assertThat(newAccessCookie)
+            .describedAs("Refresh did not return new access cookie")
+            .isNotBlank()
+        assertThat(newRefreshCookie)
+            .describedAs("Refresh token should be rotated")
+            .isNotEqualTo(oldRefreshCookie)
 
         val oldRefreshTokenEntity = refreshTokenRepo.findByTokenHash(hash(oldRefreshCookie))
         val newRefreshTokenEntity = refreshTokenRepo.findByTokenHash(hash(newRefreshCookie))
-        assertNotNull(oldRefreshTokenEntity)
-        assertNotNull(newRefreshTokenEntity)
-        assertEquals(newRefreshTokenEntity.id, oldRefreshTokenEntity.rotatedTo?.id, "Old refresh token must point to successor")
+        assertThat(oldRefreshTokenEntity).isNotNull
+        assertThat(newRefreshTokenEntity).isNotNull
+        assertThat(oldRefreshTokenEntity!!.rotatedTo?.id)
+            .describedAs("Old refresh token must point to successor")
+            .isEqualTo(newRefreshTokenEntity!!.id)
     }
 
     @Test
@@ -140,8 +156,12 @@ class AuthResourceTest {
 
         val accessCookie = login.cookie("LUNVA_ACCESS_TOKEN")
         val refreshCookie = login.cookie("LUNVA_REFRESH_TOKEN")
-        assertFalse(accessCookie.isNullOrBlank(), "Login did not return an access cookie")
-        assertFalse(refreshCookie.isNullOrBlank(), "Login did not return a refresh cookie")
+        assertThat(accessCookie)
+            .describedAs("Login did not return an access cookie")
+            .isNotBlank()
+        assertThat(refreshCookie)
+            .describedAs("Login did not return a refresh cookie")
+            .isNotBlank()
 
         given()
             .contentType("application/json")
