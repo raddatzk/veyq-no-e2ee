@@ -8,4 +8,7 @@ import java.nio.file.Path
 interface MediaConfig {
     @get:WithName("storage-dir")
     val storageDir: Path
+
+    @get:WithName("chunk-size-bytes")
+    val chunkSizeBytes: Long
 }

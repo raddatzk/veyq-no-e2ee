@@ -11,13 +11,18 @@ import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.core.StreamingOutput
+import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.multipart.FileUpload
+import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.Properties
+import java.util.UUID
 
 @Singleton
 class MediaService @Inject constructor(
@@ -33,10 +38,22 @@ class MediaService @Inject constructor(
     groupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext
 ) : LibraryService(folderRepo, albumRepo, folderUserShareRepo, folderGroupShareRepo, albumUserShareRepo, albumGroupShareRepo, groupMemberRepo, requestContext) {
+    private val log: Logger = Logger.getLogger(MediaService::class.java)
 
     private data class ContentRange(val start: Long, val end: Long) {
         val length: Long = end - start + 1
     }
+
+    private data class UploadSession(
+        val uploadId: String,
+        val tenantId: Long,
+        val ownerUserId: Long,
+        val albumPath: String,
+        val filename: String,
+        val mimeType: String,
+        val sizeBytes: Long,
+        val title: String?,
+    )
 
     fun streamMedia(path: String?): Sequence<StreamMediaSummary> {
         val context = resolveVisibleContext(path)
@@ -86,6 +103,83 @@ class MediaService @Inject constructor(
         writeMediaFile(uploadPath, storageKey)
         media.storageKey = storageKey
         linkMedia(album, media)
+
+        return media.toUploadSummary(album)
+    }
+
+    fun createUpload(request: CreateMediaUploadRequest): MediaUploadSessionSummary {
+        val album = resolveAlbum(request.albumPath)
+        requireVisible(album)
+        val filename = request.filename?.trim()?.takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("filename is required")
+        val mimeType = request.mimeType?.trim()?.takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("mimeType is required")
+        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
+            throw BadRequestException("Only image and video uploads are supported")
+        }
+        val sizeBytes = request.sizeBytes ?: throw BadRequestException("sizeBytes is required")
+        if (sizeBytes <= 0) throw BadRequestException("file must not be empty")
+        val uploadId = UUID.randomUUID().toString()
+        val session = UploadSession(
+            uploadId = uploadId,
+            tenantId = tenant().id,
+            ownerUserId = user().id,
+            albumPath = album.path(),
+            filename = filename,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            title = request.title?.trim()?.takeIf { it.isNotBlank() },
+        )
+        val directory = uploadDirectory(uploadId)
+        Files.createDirectories(directory.resolve("chunks"))
+        saveUploadSession(session)
+        return MediaUploadSessionSummary(uploadId, mediaConfig.chunkSizeBytes)
+    }
+
+    fun uploadChunk(uploadId: String, chunkIndex: Int, chunk: InputStream) {
+        if (chunkIndex < 0) throw BadRequestException("chunkIndex must not be negative")
+        val session = loadUploadSession(uploadId)
+        requireCurrentUploadOwner(session)
+        val chunks = uploadDirectory(uploadId).resolve("chunks")
+        Files.createDirectories(chunks)
+        val target = chunks.resolve("$chunkIndex.part")
+        val temp = Files.createTempFile(chunks, "$chunkIndex-", ".tmp")
+        try {
+            chunk.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            val chunkSize = Files.size(temp)
+            if (chunkSize <= 0) throw BadRequestException("chunk must not be empty")
+            if (chunkSize > mediaConfig.chunkSizeBytes) throw BadRequestException("chunk is too large")
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+    }
+
+    @Transactional
+    fun completeUpload(uploadId: String): UploadMediaSummary {
+        val session = loadUploadSession(uploadId)
+        requireCurrentUploadOwner(session)
+        val album = resolveAlbum(session.albumPath)
+        requireVisible(album)
+        val chunkCount = ((session.sizeBytes + mediaConfig.chunkSizeBytes - 1) / mediaConfig.chunkSizeBytes).toInt()
+        val media = Media().also {
+            it.tenant = tenant()
+            it.owner = user()
+            it.title = session.title ?: session.filename.substringBeforeLast('.').takeIf { value -> value.isNotBlank() } ?: "Upload"
+            it.mimeType = session.mimeType
+            it.sizeBytes = session.sizeBytes
+            it.storageKey = ""
+            it.originalFilename = session.filename
+            mediaRepo.persist(it)
+        }
+        mediaRepo.flush()
+
+        val storageKey = "tenant-${tenant().id}/${media.publicId}/original"
+        assembleChunks(uploadId, chunkCount, session.sizeBytes, storageKey)
+        media.storageKey = storageKey
+        linkMedia(album, media)
+        deleteRecursively(uploadDirectory(uploadId))
 
         return media.toUploadSummary(album)
     }
@@ -173,11 +267,88 @@ class MediaService @Inject constructor(
         }
     }
 
+    private fun assembleChunks(uploadId: String, chunkCount: Int, expectedSize: Long, storageKey: String) {
+        val target = storagePath(storageKey)
+        Files.createDirectories(target.parent)
+        val temp = Files.createTempFile(target.parent, "upload-", ".tmp")
+        try {
+            Files.newOutputStream(temp).use { output ->
+                for (index in 0 until chunkCount) {
+                    val chunk = uploadDirectory(uploadId).resolve("chunks").resolve("$index.part")
+                    if (!Files.isRegularFile(chunk)) throw BadRequestException("Missing upload chunk $index")
+                    Files.newInputStream(chunk).use { input -> copy(input, output) }
+                }
+            }
+            if (Files.size(temp) != expectedSize) throw BadRequestException("Upload size mismatch")
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+    }
+
+    private fun saveUploadSession(session: UploadSession) {
+        val properties = Properties().also {
+            it["uploadId"] = session.uploadId
+            it["tenantId"] = session.tenantId.toString()
+            it["ownerUserId"] = session.ownerUserId.toString()
+            it["albumPath"] = session.albumPath
+            it["filename"] = session.filename
+            it["mimeType"] = session.mimeType
+            it["sizeBytes"] = session.sizeBytes.toString()
+            session.title?.let { title -> it["title"] = title }
+        }
+        Files.newOutputStream(uploadDirectory(session.uploadId).resolve("session.properties")).use { output ->
+            properties.store(output, null)
+        }
+    }
+
+    private fun loadUploadSession(uploadId: String): UploadSession {
+        if (!uploadId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw NotFoundException("Upload not found")
+        val path = uploadDirectory(uploadId).resolve("session.properties")
+        if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
+        val properties = Properties()
+        Files.newInputStream(path).use { input -> properties.load(input) }
+        return UploadSession(
+            uploadId = properties.getProperty("uploadId"),
+            tenantId = properties.getProperty("tenantId").toLong(),
+            ownerUserId = properties.getProperty("ownerUserId").toLong(),
+            albumPath = properties.getProperty("albumPath"),
+            filename = properties.getProperty("filename"),
+            mimeType = properties.getProperty("mimeType"),
+            sizeBytes = properties.getProperty("sizeBytes").toLong(),
+            title = properties.getProperty("title"),
+        )
+    }
+
+    private fun requireCurrentUploadOwner(session: UploadSession) {
+        if (session.tenantId != tenant().id || session.ownerUserId != user().id) throw NotFoundException("Upload not found")
+    }
+
+    private fun uploadDirectory(uploadId: String): Path =
+        storagePath("_uploads/$uploadId")
+
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()
         val path = root.resolve(storageKey).normalize()
         if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
         return path
+    }
+
+    private fun copy(input: InputStream, output: OutputStream) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read == -1) break
+            output.write(buffer, 0, read)
+        }
+    }
+
+    private fun deleteRecursively(path: Path) {
+        if (!Files.exists(path)) return
+        Files.walk(path).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        }
     }
 
     private fun parseRange(rangeHeader: String?, size: Long): ContentRange? {
@@ -206,18 +377,36 @@ class MediaService @Inject constructor(
 
     private fun streamRange(path: Path, range: ContentRange): StreamingOutput =
         StreamingOutput { output ->
-            Files.newInputStream(path).use { input ->
-                skipFully(input, range.start)
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var remaining = range.length
-                while (remaining > 0) {
-                    val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
-                    if (read == -1) break
-                    output.write(buffer, 0, read)
-                    remaining -= read
+            try {
+                Files.newInputStream(path).use { input ->
+                    skipFully(input, range.start)
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var remaining = range.length
+                    while (remaining > 0) {
+                        val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                        if (read == -1) break
+                        output.write(buffer, 0, read)
+                        remaining -= read
+                    }
                 }
+            } catch (e: IOException) {
+                if (isClientAbort(e)) {
+                    log.debug("Media range stream ended because the client closed the connection")
+                    return@StreamingOutput
+                }
+                throw e
             }
         }
+
+    private fun isClientAbort(exception: IOException): Boolean =
+        generateSequence(exception as Throwable?) { it.cause }
+            .mapNotNull { it.message }
+            .any {
+                it.contains("Failed to write", ignoreCase = true) ||
+                        it.contains("Broken pipe", ignoreCase = true) ||
+                        it.contains("Connection reset", ignoreCase = true) ||
+                        it.contains("Stream is closed", ignoreCase = true)
+            }
 
     private fun skipFully(input: InputStream, bytes: Long) {
         var remaining = bytes

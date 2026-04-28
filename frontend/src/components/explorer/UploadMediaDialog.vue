@@ -11,6 +11,7 @@ type UploadItem = {
   file: File
   status: 'pending' | 'uploading' | 'done' | 'error'
   error: string
+  progress: number
 }
 
 const visible = defineModel<boolean>('visible', { required: true })
@@ -44,7 +45,8 @@ function selectFiles(event: Event) {
     id: `${file.name}-${file.size}-${file.lastModified}`,
     file,
     status: isSupported(file) ? 'pending' : 'error',
-    error: isSupported(file) ? '' : 'Nur Bilder und Videos werden unterstützt'
+    error: isSupported(file) ? '' : 'Nur Bilder und Videos werden unterstützt',
+    progress: 0
   }))
   input.value = ''
 }
@@ -61,8 +63,15 @@ async function submit() {
   for (const item of pending) {
     item.status = 'uploading'
     try {
-      await uploadMedia(props.tenantName, { albumPath: props.albumPath, file: item.file })
+      await uploadMedia(props.tenantName, {
+        albumPath: props.albumPath,
+        file: item.file,
+        onProgress: (uploadedBytes, totalBytes) => {
+          item.progress = Math.round((uploadedBytes / totalBytes) * 100)
+        }
+      })
       item.status = 'done'
+      item.progress = 100
       item.error = ''
     } catch (e: any) {
       item.status = 'error'
@@ -104,7 +113,7 @@ function formatBytes(value: number): string {
           ]" />
           <div>
             <strong>{{ item.file.name }}</strong>
-            <small>{{ formatBytes(item.file.size) }}</small>
+            <small>{{ formatBytes(item.file.size) }}<template v-if="item.status === 'uploading'"> · {{ item.progress }}%</template></small>
             <small v-if="item.error" class="upload-error">{{ item.error }}</small>
           </div>
         </div>

@@ -92,6 +92,12 @@ export type UploadMediaRequest = {
   albumPath: string
   file: File
   title?: string
+  onProgress?: (uploadedBytes: number, totalBytes: number) => void
+}
+
+type MediaUploadSession = {
+  uploadId: string
+  chunkSizeBytes: number
 }
 
 function explorerPath(tenantName: string, suffix = ''): string {
@@ -257,15 +263,43 @@ export function setAlbumCover(
   })
 }
 
-export function uploadMedia(tenantName: string, request: UploadMediaRequest): Promise<ExplorerMedia> {
-  const body = new FormData()
-  body.append('albumPath', request.albumPath)
-  body.append('file', request.file)
-  if (request.title?.trim()) body.append('title', request.title.trim())
-
-  return callApi(libraryPath(tenantName, 'media'), {
+export async function uploadMedia(tenantName: string, request: UploadMediaRequest): Promise<ExplorerMedia> {
+  const session = await callApi<MediaUploadSession>(libraryPath(tenantName, 'media', '/uploads'), {
     method: 'POST',
-    body
+    body: JSON.stringify({
+      albumPath: request.albumPath,
+      filename: request.file.name,
+      mimeType: request.file.type,
+      sizeBytes: request.file.size,
+      title: request.title
+    })
+  })
+
+  const chunkSize = session.chunkSizeBytes
+  let uploadedBytes = 0
+  for (let start = 0, index = 0; start < request.file.size; start += chunkSize, index += 1) {
+    const end = Math.min(start + chunkSize, request.file.size)
+    const response = await apiFetch(libraryPath(
+      tenantName,
+      'media',
+      `/uploads/${encodeURIComponent(session.uploadId)}/chunks/${index}`
+    ), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: request.file.slice(start, end)
+    })
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'Chunk konnte nicht hochgeladen werden' }))
+      throw new Error(body.error || 'Chunk konnte nicht hochgeladen werden')
+    }
+
+    uploadedBytes = end
+    request.onProgress?.(uploadedBytes, request.file.size)
+  }
+
+  return callApi(libraryPath(tenantName, 'media', `/uploads/${encodeURIComponent(session.uploadId)}/complete`), {
+    method: 'POST',
   })
 }
 

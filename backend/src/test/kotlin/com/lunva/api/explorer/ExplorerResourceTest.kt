@@ -278,6 +278,56 @@ class ExplorerResourceTest {
     }
 
     @Test
+    fun `uploads media through chunk session`() {
+        createAlbum(ownerCookie, null, "chunks", "Chunks")
+
+        val uploadId = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"albumPath":"/chunks","filename":"chunked.mp4","mimeType":"video/mp4","sizeBytes":8}""")
+            .`when`().post("/api/$tenantName/media/uploads")
+            .then()
+            .statusCode(200)
+            .body("chunkSizeBytes", equalTo(4))
+            .extract().path<String>("uploadId")
+
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(byteArrayOf(0, 0, 0, 24))
+            .`when`().put("/api/$tenantName/media/uploads/$uploadId/chunks/0")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(byteArrayOf(102, 116, 121, 112))
+            .`when`().put("/api/$tenantName/media/uploads/$uploadId/chunks/1")
+            .then()
+            .statusCode(204)
+
+        val mediaId = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/$tenantName/media/uploads/$uploadId/complete")
+            .then()
+            .statusCode(200)
+            .body("title", equalTo("chunked"))
+            .body("mimeType", equalTo("video/mp4"))
+            .body("sizeBytes", equalTo(8))
+            .extract().path<String>("id")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .header("Range", "bytes=4-7")
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(206)
+            .header("Content-Range", equalTo("bytes 4-7/8"))
+    }
+
+    @Test
     fun `rejects invalid upload targets and media types`() {
         val file = File.createTempFile("lunva-upload-", ".txt").also {
             it.writeText("plain text")
