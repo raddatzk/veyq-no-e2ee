@@ -1,6 +1,7 @@
 package com.lunva.api.auth
 
 import com.lunva.api.auth.bcrypt.BcryptCostService
+import com.lunva.api.domain.AppConfig
 import com.lunva.api.domain.AppConfigRepo
 import io.quarkus.test.TestTransaction
 import io.quarkus.test.junit.QuarkusTest
@@ -21,7 +22,7 @@ class BcryptCostServiceTest {
         val cost = bcryptCostService.currentCost()
         assertThat(cost).isPositive()
 
-        val row = appConfigRepo.findByKey(BcryptCostService.KEY)
+        val row = appConfigRepo.findByKey(AppConfig.BCRYPT_COST)
         assertThat(row).isNotNull
         assertThat(row!!.configValue).isEqualTo(cost.toString())
     }

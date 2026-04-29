@@ -4,7 +4,6 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
-import java.time.Instant
 
 @Entity
 @Table(name = "lunva_config")
@@ -18,6 +17,11 @@ class AppConfig : PanacheEntityBase {
 
     @Column(name = "config_value", nullable = false)
     lateinit var configValue: String
+
+    companion object {
+        const val BCRYPT_COST = "auth.bcrypt.cost"
+        const val SERVER_ID = "server.id"
+    }
 }
 
 @ApplicationScoped

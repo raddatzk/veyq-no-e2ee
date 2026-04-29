@@ -1,7 +1,6 @@
 package com.lunva.api.security
 
 import com.lunva.api.setup.ServerState
-import com.lunva.api.setup.SetupFilter
 import io.quarkus.security.identity.SecurityIdentity
 import io.quarkus.vertx.http.runtime.security.HttpSecurityPolicy
 import io.smallrye.mutiny.Uni
@@ -38,8 +37,8 @@ class LunvaHttpSecurityPolicy(
 
     private fun isPublic(path: String): Boolean {
         return path == "/api/auth/login" ||
-            path == "/api/setup" ||
-            path == "/api/setup/admin" ||
-            path == "/q/health"
+                path == "/api/setup" ||
+                (path == "/api/setup/admin" && !serverState.setupCompleted) ||
+                path == "/q/health"
     }
 }

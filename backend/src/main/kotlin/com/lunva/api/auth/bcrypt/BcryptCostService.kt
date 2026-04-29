@@ -9,7 +9,6 @@ import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import org.jboss.logging.Logger
-import java.time.Instant
 
 @ApplicationScoped
 class BcryptCostService @Inject constructor(
@@ -30,23 +29,22 @@ class BcryptCostService @Inject constructor(
         ?: throw IllegalStateException("bcrypt cost is not initialized yet")
 
     private fun initializeOrLoadCost(): Int {
-        val existing = appConfigRepo.findByKey(KEY)
+        val existing = appConfigRepo.findByKey(AppConfig.BCRYPT_COST)
         if (existing != null) {
             return existing.configValue.toInt()
         }
 
         val benchmarked = benchmarkCost()
-        val now = Instant.now()
         try {
             AppConfig().also {
-                it.configKey = KEY
+                it.configKey = AppConfig.BCRYPT_COST
                 it.configValue = benchmarked.toString()
                 appConfigRepo.persist(it)
             }
             log.infov("Initialized bcrypt cost={0} (target={1}ms)", benchmarked, bcryptConfig.targetMs)
             return benchmarked
         } catch (_: Exception) {
-            val row = appConfigRepo.findByKey(KEY)
+            val row = appConfigRepo.findByKey(AppConfig.BCRYPT_COST)
                 ?: throw IllegalStateException("Could not initialize bcrypt cost")
             return row.configValue.toInt()
         }
@@ -71,9 +69,5 @@ class BcryptCostService @Inject constructor(
             }
         }
         return best
-    }
-
-    companion object {
-        const val KEY = "auth.bcrypt.cost"
     }
 }

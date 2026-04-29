@@ -22,7 +22,6 @@ object LunvaSecurityAttributes {
 class AuthenticationRequest(
     val credentials: TokenCredentials,
     val useRefreshToken: Boolean,
-    val optional: Boolean = false,
 ) : BaseAuthenticationRequest()
 
 data class TokenCredentials(val accessToken: String?, val refreshToken: String?) : Credential
@@ -53,9 +52,6 @@ class LunvaIdentityProvider @Inject constructor(
     }
 
     private fun optionalIdentity(request: AuthenticationRequest): SecurityIdentity? {
-        if (!request.optional) {
-            return null
-        }
         return QuarkusSecurityIdentity.builder()
             .setPrincipal(QuarkusPrincipal("anonymous"))
             .setAnonymous(true)
