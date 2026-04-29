@@ -51,7 +51,7 @@ class MediaService @Inject constructor(
         val length: Long = end - start + 1
     }
 
-    private data class UploadSession(
+    data class UploadSession(
         val uploadId: String,
         val tenantId: Long,
         val tenantName: String,
@@ -189,20 +189,6 @@ class MediaService @Inject constructor(
         val session = loadUploadSession(uploadId)
         requireCurrentUploadOwner(session)
         deleteRecursively(uploadDirectory(uploadId))
-    }
-
-    @Scheduled(cron = "{lunva.media.upload-session-cleanup-cron}")
-    fun cleanupUploadSessions() {
-        val expiresBefore = Instant.now().minus(mediaConfig.uploadSessionTtlHours, ChronoUnit.HOURS)
-        uploadSessions()
-            .filter { it.updatedAt.isBefore(expiresBefore) }
-            .forEach { session ->
-                try {
-                    deleteRecursively(uploadDirectory(session.uploadId))
-                } catch (e: Exception) {
-                    log.warn("Failed to cleanup upload session ${session.uploadId}", e)
-                }
-            }
     }
 
     @Transactional
