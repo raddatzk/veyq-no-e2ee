@@ -1,5 +1,7 @@
 package com.lunva.api.security
 
+import com.lunva.api.auth.filterchain.GroupOwnerRequired
+import com.lunva.api.auth.filterchain.TenantOwnerRequired
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.GET
 import jakarta.ws.rs.Path

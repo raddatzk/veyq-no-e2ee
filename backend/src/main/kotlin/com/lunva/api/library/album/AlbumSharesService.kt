@@ -7,7 +7,7 @@ import com.lunva.api.library.ShareGroupRequest
 import com.lunva.api.library.ShareUserRequest
 import com.lunva.api.library.SharesService
 import com.lunva.api.library.explorer.ExplorerContext
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional

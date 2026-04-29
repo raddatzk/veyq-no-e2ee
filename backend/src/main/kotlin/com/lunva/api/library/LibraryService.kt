@@ -20,7 +20,7 @@ import com.lunva.api.library.explorer.ExplorerBreadcrumb
 import com.lunva.api.library.explorer.ExplorerBreadcrumbType
 import com.lunva.api.library.explorer.ExplorerContext
 import com.lunva.api.library.explorer.FolderSummary
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 
 abstract class LibraryService (
     private val folderRepo: TenantFolderRepo,

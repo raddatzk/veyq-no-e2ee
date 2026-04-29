@@ -1,7 +1,7 @@
 package com.lunva.api.auth.token
 
 import com.lunva.api.auth.UnauthorizedException
-import com.lunva.api.security.TokenCredentials
+import com.lunva.api.auth.filterchain.TokenCredentials
 import com.lunva.api.domain.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

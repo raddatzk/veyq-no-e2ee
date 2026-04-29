@@ -1,4 +1,4 @@
-package com.lunva.api.security
+package com.lunva.api.auth.filterchain
 
 import com.lunva.api.auth.cookie.CookieConfig
 import io.quarkus.security.identity.IdentityProviderManager

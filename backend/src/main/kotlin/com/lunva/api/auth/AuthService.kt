@@ -6,7 +6,7 @@ import com.lunva.api.auth.token.TokenService
 import com.lunva.api.domain.RefreshToken
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional

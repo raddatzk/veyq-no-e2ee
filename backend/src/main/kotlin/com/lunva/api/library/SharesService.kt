@@ -2,7 +2,7 @@ package com.lunva.api.library
 
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.domain.*
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 
 abstract class SharesService(
     private val folderUserShareRepo: TenantFolderUserShareRepo,

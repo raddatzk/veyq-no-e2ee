@@ -30,9 +30,8 @@ import com.lunva.api.library.explorer.ExplorerService
 import com.lunva.api.library.folder.FolderService
 import com.lunva.api.library.folder.FolderSharesService
 import com.lunva.api.library.media.MediaService
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.setup.ServerState
-import com.lunva.api.setup.SetupFilter
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import jakarta.transaction.UserTransaction

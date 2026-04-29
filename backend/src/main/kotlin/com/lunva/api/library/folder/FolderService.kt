@@ -9,7 +9,7 @@ import com.lunva.api.library.MoveLibraryItemRequest
 import com.lunva.api.library.UpdateLibraryItemRequest
 import com.lunva.api.library.explorer.ExplorerContext
 import com.lunva.api.library.explorer.FolderSummary
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional

@@ -3,7 +3,7 @@ package com.lunva.api.usermgmt
 import com.lunva.api.auth.ConflictException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
-import com.lunva.api.security.RequestContext
+import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
