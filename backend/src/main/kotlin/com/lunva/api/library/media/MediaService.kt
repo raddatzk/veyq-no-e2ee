@@ -1,6 +1,7 @@
 package com.lunva.api.library.media
 
 import com.lunva.api.auth.BadRequestException
+import com.lunva.api.auth.ForbiddenException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.library.LibraryService
@@ -13,6 +14,7 @@ import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.core.StreamingOutput
 import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.multipart.FileUpload
+import io.quarkus.scheduler.Scheduled
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -21,6 +23,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.Comparator
 import java.util.Properties
 import java.util.UUID
 
@@ -30,6 +35,8 @@ class MediaService @Inject constructor(
     private val albumRepo: TenantAlbumRepo,
     private val mediaRepo: MediaRepo,
     private val mediaConfig: MediaConfig,
+    private val tenantRepo: TenantRepo,
+    private val tenantMemberRepo: TenantMemberRepo,
     folderRepo: TenantFolderRepo,
     folderUserShareRepo: TenantFolderUserShareRepo,
     folderGroupShareRepo: TenantFolderGroupShareRepo,
@@ -47,12 +54,15 @@ class MediaService @Inject constructor(
     private data class UploadSession(
         val uploadId: String,
         val tenantId: Long,
+        val tenantName: String,
         val ownerUserId: Long,
         val albumPath: String,
         val filename: String,
         val mimeType: String,
         val sizeBytes: Long,
         val title: String?,
+        val createdAt: Instant,
+        val updatedAt: Instant,
     )
 
     fun streamMedia(path: String?): Sequence<StreamMediaSummary> {
@@ -108,6 +118,8 @@ class MediaService @Inject constructor(
     }
 
     fun createUpload(request: CreateMediaUploadRequest): MediaUploadSessionSummary {
+        val targetTenant = resolveUploadTenant(request.tenantName)
+        requestContext.tenant = targetTenant
         val album = resolveAlbum(request.albumPath)
         requireVisible(album)
         val filename = request.filename?.trim()?.takeIf { it.isNotBlank() }
@@ -120,15 +132,19 @@ class MediaService @Inject constructor(
         val sizeBytes = request.sizeBytes ?: throw BadRequestException("sizeBytes is required")
         if (sizeBytes <= 0) throw BadRequestException("file must not be empty")
         val uploadId = UUID.randomUUID().toString()
+        val now = Instant.now()
         val session = UploadSession(
             uploadId = uploadId,
-            tenantId = tenant().id,
+            tenantId = targetTenant.id,
+            tenantName = targetTenant.name,
             ownerUserId = user().id,
             albumPath = album.path(),
             filename = filename,
             mimeType = mimeType,
             sizeBytes = sizeBytes,
             title = request.title?.trim()?.takeIf { it.isNotBlank() },
+            createdAt = now,
+            updatedAt = now,
         )
         val directory = uploadDirectory(uploadId)
         Files.createDirectories(directory.resolve("chunks"))
@@ -150,16 +166,50 @@ class MediaService @Inject constructor(
             if (chunkSize <= 0) throw BadRequestException("chunk must not be empty")
             if (chunkSize > mediaConfig.chunkSizeBytes) throw BadRequestException("chunk is too large")
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            updateUploadSessionTimestamp(session.uploadId)
         } catch (e: Exception) {
             Files.deleteIfExists(temp)
             throw e
         }
     }
 
+    fun listUploads(): List<PendingMediaUploadSummary> =
+        uploadSessions()
+            .filter { it.ownerUserId == user().id }
+            .sortedByDescending { it.updatedAt }
+            .map { it.toPendingSummary() }
+
+    fun uploadStatus(uploadId: String): PendingMediaUploadSummary {
+        val session = loadUploadSession(uploadId)
+        requireCurrentUploadOwner(session)
+        return session.toPendingSummary()
+    }
+
+    fun abortUpload(uploadId: String) {
+        val session = loadUploadSession(uploadId)
+        requireCurrentUploadOwner(session)
+        deleteRecursively(uploadDirectory(uploadId))
+    }
+
+    @Scheduled(cron = "{lunva.media.upload-session-cleanup-cron}")
+    fun cleanupUploadSessions() {
+        val expiresBefore = Instant.now().minus(mediaConfig.uploadSessionTtlHours, ChronoUnit.HOURS)
+        uploadSessions()
+            .filter { it.updatedAt.isBefore(expiresBefore) }
+            .forEach { session ->
+                try {
+                    deleteRecursively(uploadDirectory(session.uploadId))
+                } catch (e: Exception) {
+                    log.warn("Failed to cleanup upload session ${session.uploadId}", e)
+                }
+            }
+    }
+
     @Transactional
     fun completeUpload(uploadId: String): UploadMediaSummary {
         val session = loadUploadSession(uploadId)
         requireCurrentUploadOwner(session)
+        requestContext.tenant = loadUploadTenant(session)
         val album = resolveAlbum(session.albumPath)
         requireVisible(album)
         val chunkCount = ((session.sizeBytes + mediaConfig.chunkSizeBytes - 1) / mediaConfig.chunkSizeBytes).toInt()
@@ -291,11 +341,14 @@ class MediaService @Inject constructor(
         val properties = Properties().also {
             it["uploadId"] = session.uploadId
             it["tenantId"] = session.tenantId.toString()
+            it["tenantName"] = session.tenantName
             it["ownerUserId"] = session.ownerUserId.toString()
             it["albumPath"] = session.albumPath
             it["filename"] = session.filename
             it["mimeType"] = session.mimeType
             it["sizeBytes"] = session.sizeBytes.toString()
+            it["createdAt"] = session.createdAt.toString()
+            it["updatedAt"] = session.updatedAt.toString()
             session.title?.let { title -> it["title"] = title }
         }
         Files.newOutputStream(uploadDirectory(session.uploadId).resolve("session.properties")).use { output ->
@@ -303,26 +356,123 @@ class MediaService @Inject constructor(
         }
     }
 
-    private fun loadUploadSession(uploadId: String): UploadSession {
-        if (!uploadId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw NotFoundException("Upload not found")
+    private fun updateUploadSessionTimestamp(uploadId: String) {
         val path = uploadDirectory(uploadId).resolve("session.properties")
         if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
         val properties = Properties()
         Files.newInputStream(path).use { input -> properties.load(input) }
+        properties["updatedAt"] = Instant.now().toString()
+        Files.newOutputStream(path).use { output -> properties.store(output, null) }
+    }
+
+    private fun loadUploadSession(uploadId: String): UploadSession {
+        if (!uploadId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw NotFoundException("Upload not found")
+        val path = uploadDirectory(uploadId).resolve("session.properties")
+        if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
+        return loadUploadSession(path)
+    }
+
+    private fun loadUploadSession(path: Path): UploadSession {
+        val properties = Properties()
+        Files.newInputStream(path).use { input -> properties.load(input) }
+        val updatedAt = properties.getProperty("updatedAt")?.let { Instant.parse(it) }
+            ?: Files.getLastModifiedTime(path).toInstant()
+        val createdAt = properties.getProperty("createdAt")?.let { Instant.parse(it) }
+            ?: updatedAt
+        val tenantId = properties.getProperty("tenantId").toLong()
+        val tenantName = properties.getProperty("tenantName")
+            ?: tenantRepo.findById(tenantId)?.name
+            ?: throw NotFoundException("Upload not found")
         return UploadSession(
             uploadId = properties.getProperty("uploadId"),
-            tenantId = properties.getProperty("tenantId").toLong(),
+            tenantId = tenantId,
+            tenantName = tenantName,
             ownerUserId = properties.getProperty("ownerUserId").toLong(),
             albumPath = properties.getProperty("albumPath"),
             filename = properties.getProperty("filename"),
             mimeType = properties.getProperty("mimeType"),
             sizeBytes = properties.getProperty("sizeBytes").toLong(),
             title = properties.getProperty("title"),
+            createdAt = createdAt,
+            updatedAt = updatedAt,
         )
     }
 
     private fun requireCurrentUploadOwner(session: UploadSession) {
-        if (session.tenantId != tenant().id || session.ownerUserId != user().id) throw NotFoundException("Upload not found")
+        if (session.ownerUserId != user().id) throw NotFoundException("Upload not found")
+    }
+
+    private fun resolveUploadTenant(tenantName: String?): Tenant {
+        val targetTenant = tenantName?.trim()?.takeIf { it.isNotBlank() }
+            ?.let { tenantRepo.findByName(it) ?: throw NotFoundException("Tenant not found") }
+            ?: requestContext.tenant
+            ?: throw BadRequestException("tenantName is required")
+
+        if (tenantMemberRepo.findByTenantAndUser(targetTenant, user()) == null) {
+            throw ForbiddenException("User is not member of this tenant")
+        }
+        return targetTenant
+    }
+
+    private fun loadUploadTenant(session: UploadSession): Tenant =
+        tenantRepo.findById(session.tenantId) ?: throw NotFoundException("Tenant not found")
+
+    private fun uploadSessions(): List<UploadSession> {
+        val root = storagePath("_uploads")
+        if (!Files.isDirectory(root)) return emptyList()
+        return Files.list(root).use { stream ->
+            stream
+                .filter { Files.isDirectory(it) }
+                .map { it.resolve("session.properties") }
+                .filter { Files.isRegularFile(it) }
+                .toList()
+                .mapNotNull { path ->
+                    try {
+                        loadUploadSession(path)
+                    } catch (e: Exception) {
+                        log.warn("Ignoring invalid upload session $path", e)
+                        null
+                    }
+                }
+        }
+    }
+
+    private fun UploadSession.toPendingSummary(): PendingMediaUploadSummary {
+        val tenant = loadUploadTenant(this)
+        val uploadedChunks = uploadedChunks(uploadId)
+        val uploadedBytes = uploadedChunks.sumOf { index ->
+            Files.size(uploadDirectory(uploadId).resolve("chunks").resolve("$index.part"))
+        }
+        return PendingMediaUploadSummary(
+            uploadId = uploadId,
+            tenantName = tenant.name,
+            tenantDisplayName = tenant.displayName,
+            albumPath = albumPath,
+            filename = filename,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            title = title,
+            chunkSizeBytes = mediaConfig.chunkSizeBytes,
+            uploadedChunks = uploadedChunks,
+            uploadedBytes = uploadedBytes.coerceAtMost(sizeBytes),
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
+    }
+
+    private fun uploadedChunks(uploadId: String): List<Int> {
+        val chunks = uploadDirectory(uploadId).resolve("chunks")
+        if (!Files.isDirectory(chunks)) return emptyList()
+        return Files.list(chunks).use { stream ->
+            stream
+                .filter { Files.isRegularFile(it) }
+                .toList()
+                .mapNotNull { path ->
+                    val name = path.fileName.toString()
+                    if (!name.endsWith(".part")) null else name.removeSuffix(".part").toIntOrNull()
+                }
+                .sorted()
+        }
     }
 
     private fun uploadDirectory(uploadId: String): Path =

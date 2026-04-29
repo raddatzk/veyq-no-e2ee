@@ -193,7 +193,7 @@
 
 .upload-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.6rem;
   padding: 0.65rem;

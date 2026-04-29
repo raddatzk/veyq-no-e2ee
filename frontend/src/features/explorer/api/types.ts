@@ -97,10 +97,29 @@ export type UploadMediaRequest = {
   albumPath: string
   file: File
   title?: string
+  existingUploadId?: string
+  signal?: AbortSignal
+  onSession?: (session: MediaUploadSession | PendingMediaUploadSession) => void
   onProgress?: (uploadedBytes: number, totalBytes: number) => void
 }
 
 export type MediaUploadSession = {
   uploadId: string
   chunkSizeBytes: number
+}
+
+export type PendingMediaUploadSession = {
+  uploadId: string
+  tenantName: string
+  tenantDisplayName: string
+  albumPath: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  title: string | null
+  chunkSizeBytes: number
+  uploadedChunks: number[]
+  uploadedBytes: number
+  createdAt: string
+  updatedAt: string
 }

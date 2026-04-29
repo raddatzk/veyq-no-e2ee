@@ -11,4 +11,10 @@ interface MediaConfig {
 
     @get:WithName("chunk-size-bytes")
     val chunkSizeBytes: Long
+
+    @get:WithName("upload-session-ttl-hours")
+    val uploadSessionTtlHours: Long
+
+    @get:WithName("upload-session-cleanup-cron")
+    val uploadSessionCleanupCron: String
 }

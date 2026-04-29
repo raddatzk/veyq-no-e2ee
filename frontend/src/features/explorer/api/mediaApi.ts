@@ -3,6 +3,7 @@ import { pathQuery, tenantApiPath } from '../../../shared/utils/paths'
 import type {
   ExplorerMedia,
   MediaUploadSession,
+  PendingMediaUploadSession,
   StreamMediaOptions,
   UploadMediaRequest
 } from './types'
@@ -52,9 +53,10 @@ export async function createMediaUpload(
   tenantName: string,
   request: UploadMediaRequest
 ): Promise<MediaUploadSession> {
-  return callApi(tenantApiPath(tenantName, 'media', '/uploads'), {
+  return callApi<MediaUploadSession>('/api/media/uploads', {
     method: 'POST',
     body: JSON.stringify({
+      tenantName,
       albumPath: request.albumPath,
       filename: request.file.name,
       mimeType: request.file.type,
@@ -65,21 +67,18 @@ export async function createMediaUpload(
 }
 
 export async function uploadMediaChunk(
-  tenantName: string,
   uploadId: string,
   chunkIndex: number,
-  chunk: Blob
+  chunk: Blob,
+  options: { signal?: AbortSignal } = {}
 ): Promise<void> {
   const response = await apiFetch(
-    tenantApiPath(
-      tenantName,
-      'media',
-      `/uploads/${encodeURIComponent(uploadId)}/chunks/${chunkIndex}`
-    ),
+    `/api/media/uploads/${encodeURIComponent(uploadId)}/chunks/${chunkIndex}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/octet-stream' },
-      body: chunk
+      body: chunk,
+      signal: options.signal
     }
   )
 
@@ -92,12 +91,24 @@ export async function uploadMediaChunk(
 }
 
 export function completeMediaUpload(tenantName: string, uploadId: string): Promise<ExplorerMedia> {
-  return callApi(
-    tenantApiPath(tenantName, 'media', `/uploads/${encodeURIComponent(uploadId)}/complete`),
-    {
-      method: 'POST'
-    }
-  )
+  void tenantName
+  return callApi<ExplorerMedia>(`/api/media/uploads/${encodeURIComponent(uploadId)}/complete`, {
+    method: 'POST'
+  })
+}
+
+export function listMediaUploads(): Promise<PendingMediaUploadSession[]> {
+  return callApi<PendingMediaUploadSession[]>('/api/media/uploads')
+}
+
+export function getMediaUpload(uploadId: string): Promise<PendingMediaUploadSession> {
+  return callApi<PendingMediaUploadSession>(`/api/media/uploads/${encodeURIComponent(uploadId)}`)
+}
+
+export function abortMediaUpload(uploadId: string): Promise<void> {
+  return callApi<void>(`/api/media/uploads/${encodeURIComponent(uploadId)}`, {
+    method: 'DELETE'
+  })
 }
 
 function parseNdjson(text: string, onItem: (item: ExplorerMedia) => void) {

@@ -30,7 +30,7 @@ abstract class LibraryService (
     private val albumUserShareRepo: TenantAlbumUserShareRepo,
     private val albumGroupShareRepo: TenantAlbumGroupShareRepo,
     private val groupMemberRepo: TenantGroupMemberRepo,
-    private val requestContext: RequestContext,
+    protected val requestContext: RequestContext,
 ){
     private val validName = Regex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 

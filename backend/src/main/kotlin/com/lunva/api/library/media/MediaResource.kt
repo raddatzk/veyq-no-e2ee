@@ -10,7 +10,6 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.StreamingOutput
 import org.jboss.resteasy.reactive.RestForm
 import org.jboss.resteasy.reactive.multipart.FileUpload
-import java.io.InputStream
 import java.time.Instant
 
 data class StreamMediaSummary(
@@ -36,6 +35,7 @@ data class UploadMediaSummary(
 )
 
 data class CreateMediaUploadRequest(
+    val tenantName: String?,
     val albumPath: String?,
     val filename: String?,
     val mimeType: String?,
@@ -46,6 +46,22 @@ data class CreateMediaUploadRequest(
 data class MediaUploadSessionSummary(
     val uploadId: String,
     val chunkSizeBytes: Long,
+)
+
+data class PendingMediaUploadSummary(
+    val uploadId: String,
+    val tenantName: String,
+    val tenantDisplayName: String,
+    val albumPath: String,
+    val filename: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    val title: String?,
+    val chunkSizeBytes: Long,
+    val uploadedChunks: List<Int>,
+    val uploadedBytes: Long,
+    val createdAt: Instant,
+    val updatedAt: Instant,
 )
 
 @Path("/api/{tenantName}/media")
@@ -76,30 +92,6 @@ class MediaResource @Inject constructor(
         @RestForm title: String?,
     ): UploadMediaSummary =
         mediaService.uploadMedia(file, albumPath, title)
-
-    @POST
-    @Path("/uploads")
-    @Produces(MediaType.APPLICATION_JSON)
-    fun createUpload(request: CreateMediaUploadRequest): MediaUploadSessionSummary =
-        mediaService.createUpload(request)
-
-    @PUT
-    @Path("/uploads/{uploadId}/chunks/{chunkIndex}")
-    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-    fun uploadChunk(
-        @PathParam("uploadId") uploadId: String,
-        @PathParam("chunkIndex") chunkIndex: Int,
-        chunk: InputStream,
-    ): Response {
-        mediaService.uploadChunk(uploadId, chunkIndex, chunk)
-        return Response.noContent().build()
-    }
-
-    @POST
-    @Path("/uploads/{uploadId}/complete")
-    @Produces(MediaType.APPLICATION_JSON)
-    fun completeUpload(@PathParam("uploadId") uploadId: String): UploadMediaSummary =
-        mediaService.completeUpload(uploadId)
 
     @GET
     @Path("/{mediaId}/content")
