@@ -14,9 +14,9 @@ import jakarta.transaction.Transactional
 @ApplicationScoped
 class SetupService @Inject constructor(
     private val userRepo: UserRepo,
-    private val tenantRepo: TenantRepo,
     private val passwordService: PasswordService,
     private val setupFilter: SetupFilter,
+    private val serverState: ServerState,
 ) {
     fun status(): SetupStatusSummary =
         SetupStatusSummary(
@@ -38,7 +38,7 @@ class SetupService @Inject constructor(
             userRepo.persist(it)
         }
         userRepo.flush()
-        setupFilter.markSetupCompleted()
+        serverState.markSetupCompleted()
 
         return UserSummary(
             user.id,

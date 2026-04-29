@@ -31,6 +31,7 @@ import com.lunva.api.library.folder.FolderService
 import com.lunva.api.library.folder.FolderSharesService
 import com.lunva.api.library.media.MediaService
 import com.lunva.api.security.RequestContext
+import com.lunva.api.setup.ServerState
 import com.lunva.api.setup.SetupFilter
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -54,7 +55,7 @@ class LibraryServiceTest {
     @Inject lateinit var albumMediaRepo: AlbumMediaRepo
     @Inject lateinit var mediaRepo: MediaRepo
     @Inject lateinit var passwordService: PasswordService
-    @Inject lateinit var setupFilter: SetupFilter
+    @Inject lateinit var serverState: ServerState
     @Inject lateinit var requestContext: RequestContext
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var explorerService: ExplorerService
@@ -73,7 +74,7 @@ class LibraryServiceTest {
         runId = UUID.randomUUID().toString().take(8)
         owner = createUser("owner-$runId", ServerRole.ServerOwner)
         tenant = createTenant("library-$runId", "Library $runId", owner, TenantRole.TenantOwner)
-        setupFilter.markSetupCompleted()
+        serverState.markSetupCompleted()
         useContext(owner, tenant)
     }
 

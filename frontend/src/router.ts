@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouteLocationNormalized } from 'vue-router'
 import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
 import HomeView from './views/HomeView.vue'
@@ -18,13 +18,70 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const { authState } = useAuthState()
-  const { serverState } = useServerState()
-
   if (authState.loading) return true
-  if (!serverState.setupCompleted && to.name !== 'setup') return { name: 'setup' }
-  if (serverState.setupCompleted && to.name === 'setup') return { name: 'home' }
-  if (!authState.isAuthenticated && to.name === 'tenant') return { name: 'login' }
+
+  if (visitingAnyPageWithoutSetup(to)) return { name: 'setup' }
+
+  if (visitingAnyPageWithSetupWithoutLogin(to)) return { name: 'login' }
+
+  if (visitingSetupPageWithSetup(to)) return `/${resolveHome()}`
+  if (visitingHomePageWithSetupAndLogin(to)) return `/${resolveHome()}`
+
+  if (visitingTenant(to)) {
+    const tenant = to.params.tenantName
+    storeHome(Array.isArray(tenant) ? tenant[0] : tenant)
+  }
+
   return true
 })
+
+function visitingAnyPageWithoutSetup(to: RouteLocationNormalized) {
+  const { serverState } = useServerState()
+  return !serverState.setupCompleted && to.name !== 'setup'
+}
+
+function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
+  const { authState } = useAuthState()
+  return !authState.isAuthenticated && to.name !== 'login' && to.name !== 'setup'
+}
+
+function visitingSetupPageWithSetup(to: RouteLocationNormalized) {
+  const { serverState } = useServerState()
+  return serverState.setupCompleted && to.name === 'setup'
+}
+
+function visitingHomePageWithSetupAndLogin(to: RouteLocationNormalized) {
+  return to.name === 'home'
+}
+
+function visitingTenant(to: RouteLocationNormalized) {
+  return to.name === 'tenant'
+}
+
+function getStoredTenant(): string | null{
+  const { authState } = useAuthState()
+  const { serverState } = useServerState()
+  const serverId = serverState.serverId
+  const userId = authState.user!.userId
+  return localStorage.getItem(`lunva:${serverId}:${userId}:last-active-tenant`)
+}
+
+function resolveHome(): string {
+  const { authState } = useAuthState()
+  const storedTenant = getStoredTenant()
+
+  console.log(storedTenant)
+  console.log(authState.tenants.length)
+  console.log(authState.tenants[0])
+  return (storedTenant === null) ? (authState.tenants.length != 0 ? authState.tenants[0].name : '') : storedTenant
+}
+
+function storeHome(tenantName: string) {
+  const { authState } = useAuthState()
+  const { serverState } = useServerState()
+  const serverId = serverState.serverId
+  const userId = authState.user!.userId
+  localStorage.setItem(`lunva:${serverId}:${userId}:last-active-tenant`, tenantName)
+}
 
 export default router

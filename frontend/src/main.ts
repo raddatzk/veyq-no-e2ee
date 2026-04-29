@@ -12,7 +12,7 @@ import 'primeicons/primeicons.css'
 
 async function bootstrap() {
   const { finishLoading, setAnonymous, setAuthenticated } = useAuthState()
-  const { setSetupCompleted } = useServerState()
+  const { setSetupCompleted, setServerId} = useServerState()
 
   try {
     const entrypoint = await bootstrapClient()
@@ -24,6 +24,7 @@ async function bootstrap() {
     }
 
     setSetupCompleted(true)
+    setServerId(entrypoint.serverId)
   } catch (error) {
     setAnonymous()
     setSetupCompleted(!(error instanceof SetupRequiredError))

@@ -2,6 +2,7 @@ import type { TenantSummary, UserSummary } from '../authState'
 import { callApi } from './httpClient'
 
 export type EntrypointSummary = {
+  serverId: string
   user: UserSummary | null
   tenants: TenantSummary[]
 }

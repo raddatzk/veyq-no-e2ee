@@ -1,5 +1,6 @@
 package com.lunva.api.security
 
+import com.lunva.api.setup.ServerState
 import com.lunva.api.setup.SetupFilter
 import io.quarkus.security.identity.SecurityIdentity
 import io.quarkus.vertx.http.runtime.security.HttpSecurityPolicy
@@ -9,7 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped
 
 @ApplicationScoped
 class LunvaHttpSecurityPolicy(
-    private val setupFilter: SetupFilter,
+    private val serverState: ServerState,
 ) : HttpSecurityPolicy {
     override fun checkPermission(
         routingContext: RoutingContext,
@@ -22,7 +23,7 @@ class LunvaHttpSecurityPolicy(
             return HttpSecurityPolicy.CheckResult.permit()
         }
 
-        if (!setupFilter.isSetupCompleted()) {
+        if (!serverState.setupCompleted) {
             return HttpSecurityPolicy.CheckResult.permit()
         }
 

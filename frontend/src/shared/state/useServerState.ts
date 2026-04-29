@@ -5,8 +5,13 @@ export function useServerState() {
     serverState.setupCompleted = value
   }
 
+  function setServerId(id: string) {
+    serverState.serverId = id
+  }
+
   return {
     serverState,
-    setSetupCompleted
+    setSetupCompleted,
+    setServerId,
   }
 }
