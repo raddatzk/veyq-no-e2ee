@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="lunva@localhost" uuid="b423be46-1f84-46eb-add2-167a069ad301">
+    <data-source source="LOCAL" name="lunva@localhost" uuid="8bc0b1e8-fdbf-465e-9ca1-62aeb85960c6">
       <driver-ref>mariadb</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.mariadb.jdbc.Driver</jdbc-driver>
