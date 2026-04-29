@@ -23,7 +23,7 @@ export function useBreadcrumbs() {
     authState.tenants.find((tenant) => tenant.name === activeTenantName.value)
   )
   const breadcrumbHome = computed<MenuItem>(() => ({
-    label: activeTenant.value?.displayName || 'Home',
+    label: activeTenant.value?.displayName || 'Lunva',
     command: () => {
       void router.push(activeTenant.value ? `/${activeTenant.value.name}` : '/')
     }

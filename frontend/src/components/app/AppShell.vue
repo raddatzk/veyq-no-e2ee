@@ -10,13 +10,13 @@ const createTenantOpen = ref(false)
 
 <template>
   <div class="app-shell">
-    <TenantSidebar @create-tenant="createTenantOpen = true" />
-    <section class="workspace">
-      <WorkspaceTopbar />
+    <WorkspaceTopbar />
+    <div class="app-body">
+      <TenantSidebar @create-tenant="createTenantOpen = true" />
       <main class="content">
         <RouterView />
       </main>
-    </section>
+    </div>
     <CreateTenantDialog v-model:visible="createTenantOpen" />
   </div>
 </template>

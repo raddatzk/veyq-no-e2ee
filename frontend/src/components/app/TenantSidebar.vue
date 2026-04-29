@@ -15,7 +15,6 @@ const activeTenantName = computed(() => String(route.params.tenantName || ''))
 
 <template>
   <aside class="tenant-sidebar">
-    <RouterLink to="/" class="brand-mark" title="Lunva">L</RouterLink>
     <RouterLink
       v-for="tenant in authState.tenants"
       :key="tenant.id"

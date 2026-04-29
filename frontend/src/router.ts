@@ -25,7 +25,8 @@ router.beforeEach((to) => {
   if (visitingAnyPageWithSetupWithoutLogin(to)) return { name: 'login' }
 
   if (visitingSetupPageWithSetup(to)) return `/${resolveHome()}`
-  if (visitingHomePageWithSetupAndLogin(to)) return `/${resolveHome()}`
+
+  if (visitingHomePageWithSetupLoginAndTenants(to)) return `/${resolveHome()}`
 
   if (visitingTenant(to)) {
     const tenant = to.params.tenantName
@@ -50,8 +51,9 @@ function visitingSetupPageWithSetup(to: RouteLocationNormalized) {
   return serverState.setupCompleted && to.name === 'setup'
 }
 
-function visitingHomePageWithSetupAndLogin(to: RouteLocationNormalized) {
-  return to.name === 'home'
+function visitingHomePageWithSetupLoginAndTenants(to: RouteLocationNormalized) {
+  const { authState } = useAuthState()
+  return to.name === 'home' && authState.tenants.length !== 0
 }
 
 function visitingTenant(to: RouteLocationNormalized) {
