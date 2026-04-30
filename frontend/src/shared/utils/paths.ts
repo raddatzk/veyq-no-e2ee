@@ -19,3 +19,7 @@ export function tenantApiPath(tenantName: string, segment: string, suffix = ''):
 export function pathQuery(path: string): string {
   return `path=${encodeURIComponent(path || '/')}`
 }
+
+export function isSettingsPath(path: string): boolean {
+  return path.split('/').filter(Boolean).at(-1) === 'settings'
+}

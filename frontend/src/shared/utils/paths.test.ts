@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   explorerPathToTenantRoute,
+  isSettingsPath,
   pathQuery,
   routePathToExplorerPath,
   tenantApiPath
@@ -21,5 +22,12 @@ describe('path utilities', () => {
   it('encodes api paths and path queries', () => {
     expect(tenantApiPath('my tenant', 'explorer', '?path=%2F')).toBe('/api/my%20tenant/explorer?path=%2F')
     expect(pathQuery('/@family/trip')).toBe('path=%2F%40family%2Ftrip')
+  })
+
+  it('detects settings paths by the final segment', () => {
+    expect(isSettingsPath('/settings')).toBe(true)
+    expect(isSettingsPath('/@family/settings')).toBe(true)
+    expect(isSettingsPath('/@family/settings/archive')).toBe(false)
+    expect(isSettingsPath('/@family/photos')).toBe(false)
   })
 })

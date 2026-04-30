@@ -4,7 +4,7 @@ import { useServerState } from './shared/state/useServerState'
 import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
 import SetupView from './views/SetupView.vue'
-import TenantView from './views/TenantView.vue'
+import TenantRouteView from './views/TenantRouteView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -12,7 +12,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantView }
+    { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantRouteView }
   ]
 })
 

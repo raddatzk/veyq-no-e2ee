@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: Lunva Settings API
+  version: 0.1.0
+  description: API contract for settings pages attached to tenant library locations.
+servers:
+  - url: /
+security:
+  - accessTokenCookie: []
+tags:
+  - name: Settings
+paths:
+  /api/{tenantName}/settings:
+    get:
+      tags:
+        - Settings
+      summary: Load navigation context for a settings page
+      operationId: getSettings
+      parameters:
+        - name: tenantName
+          in: path
+          required: true
+          schema:
+            type: string
+          example: friends
+        - name: path
+          in: query
+          required: true
+          description: Full tenant route path ending in `/settings`.
+          schema:
+            type: string
+          examples:
+            tenantSettings:
+              value: /settings
+            groupSettings:
+              value: /@alle/settings
+            personalSettings:
+              value: /~me/settings
+            folderSettings:
+              value: /@alle/urlaub/settings
+      responses:
+        "200":
+          description: Settings navigation context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+              examples:
+                groupSettings:
+                  value:
+                    location:
+                      kind: SETTINGS
+                      path: /@alle/settings
+                      displayName: Einstellungen
+                      label: Einstellungen
+                    subject:
+                      kind: GROUP
+                      path: /@alle
+                      displayName: Alle
+                      label: "@Alle"
+                    breadcrumbs:
+                      - kind: TENANT
+                        path: /
+                        displayName: Friends
+                        label: Friends
+                      - kind: GROUP
+                        path: /@alle
+                        displayName: Alle
+                        label: "@Alle"
+                      - kind: SETTINGS
+                        path: /@alle/settings
+                        displayName: Einstellungen
+                        label: Einstellungen
+        "400":
+          description: The path is not a supported settings path.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: Unsupported settings path
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: Authentication required
+        "403":
+          description: The authenticated user is not a member of the tenant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: Tenant membership required
+        "404":
+          description: The tenant or subject path was not found or is not visible to the current user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: Path not found
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+  schemas:
+    SettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - location
+        - subject
+        - breadcrumbs
+      properties:
+        location:
+          $ref: "#/components/schemas/SettingsLocation"
+        subject:
+          $ref: "#/components/schemas/SettingsLocation"
+        breadcrumbs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettingsBreadcrumb"
+    SettingsLocation:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+        - label
+      properties:
+        kind:
+          $ref: "#/components/schemas/SettingsLocationKind"
+        path:
+          type: string
+        displayName:
+          type: string
+        label:
+          type: string
+    SettingsBreadcrumb:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+        - label
+      properties:
+        kind:
+          $ref: "#/components/schemas/SettingsLocationKind"
+        path:
+          type: string
+        displayName:
+          type: string
+        label:
+          type: string
+    SettingsLocationKind:
+      type: string
+      enum:
+        - TENANT
+        - GROUP
+        - USER
+        - FOLDER
+        - ALBUM
+        - SETTINGS
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+      properties:
+        message:
+          type: string

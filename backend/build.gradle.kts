@@ -42,6 +42,7 @@ dependencies {
 }
 
 val generatedOpenApiDir = layout.buildDirectory.dir("generated/openapi")
+val generatedSettingsOpenApiDir = layout.buildDirectory.dir("generated/settings-openapi")
 
 openApiGenerate {
     generatorName.set("jaxrs-spec")
@@ -76,6 +77,42 @@ openApiValidate {
     inputSpec.set(layout.projectDirectory.file("../docs/api/explorer.openapi.yaml").asFile.absolutePath)
 }
 
+val openApiGenerateSettings by tasks.registering(org.openapitools.generator.gradle.plugin.tasks.GenerateTask::class) {
+    generatorName.set("jaxrs-spec")
+    library.set("quarkus")
+    inputSpec.set(layout.projectDirectory.file("../docs/api/settings.openapi.yaml").asFile.absolutePath)
+    outputDir.set(generatedSettingsOpenApiDir.get().asFile.absolutePath)
+    apiPackage.set("com.lunva.api.generated.settings.api")
+    modelPackage.set("com.lunva.api.generated.settings.model")
+    invokerPackage.set("com.lunva.api.generated.settings")
+    configOptions.set(
+        mapOf(
+            "interfaceOnly" to "true",
+            "useJakartaEe" to "true",
+            "useSwaggerAnnotations" to "false",
+            "useSwaggerV3Annotations" to "false",
+            "useMicroProfileOpenAPIAnnotations" to "false",
+            "openApiNullable" to "false",
+            "hideGenerationTimestamp" to "true",
+            "useTags" to "true",
+        )
+    )
+    globalProperties.set(
+        mapOf(
+            "apis" to "",
+            "models" to "",
+            "supportingFiles" to "false",
+        )
+    )
+    doFirst {
+        delete(generatedSettingsOpenApiDir)
+    }
+}
+
+val openApiValidateSettings by tasks.registering(org.openapitools.generator.gradle.plugin.tasks.ValidateTask::class) {
+    inputSpec.set(layout.projectDirectory.file("../docs/api/settings.openapi.yaml").asFile.absolutePath)
+}
+
 tasks.named("openApiGenerate") {
     doFirst {
         delete(generatedOpenApiDir)
@@ -86,20 +123,24 @@ sourceSets {
     main {
         java {
             srcDir(generatedOpenApiDir.map { it.dir("src/gen/java") })
+            srcDir(generatedSettingsOpenApiDir.map { it.dir("src/gen/java") })
         }
     }
 }
 
 tasks.named("compileKotlin") {
     dependsOn(tasks.named("openApiGenerate"))
+    dependsOn(openApiGenerateSettings)
 }
 
 tasks.named("compileJava") {
     dependsOn(tasks.named("openApiGenerate"))
+    dependsOn(openApiGenerateSettings)
 }
 
 tasks.named("check") {
     dependsOn(tasks.named("openApiValidate"))
+    dependsOn(openApiValidateSettings)
 }
 
 tasks.withType<Test>().configureEach {

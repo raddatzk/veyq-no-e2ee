@@ -7,9 +7,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import SelectButton from 'primevue/selectbutton'
 import type {
   ExplorerAlbum,
-  ExplorerFolder,
-  ExplorerLocation,
-  LibraryItemType
+  ExplorerFolder
 } from '../features/explorer/api'
 import AlbumCoverDialog from '../components/explorer/AlbumCoverDialog.vue'
 import CreateLibraryItemDialog from '../components/explorer/CreateLibraryItemDialog.vue'
@@ -73,9 +71,8 @@ useTenantExplorerToolbar({
 
 function openContextSettings() {
   const location = explorer.value?.location
-  if (!location || contextType.value === 'TENANT' || contextType.value === 'GROUP' || contextType.value === 'USER') return
-  const type: LibraryItemType = contextType.value === 'ALBUM' ? 'album' : 'folder'
-  dialogs.openEdit(type, dialogs.itemFromLocation(location as ExplorerLocation, type))
+  if (!location) return
+  navigateToPath(location.path === '/' ? '/settings' : `${location.path}/settings`)
 }
 
 function navigateToPath(path: string) {

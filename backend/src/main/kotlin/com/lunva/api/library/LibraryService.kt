@@ -28,6 +28,7 @@ abstract class LibraryService(
     protected val requestContext: RequestContext,
 ) {
     private val validName = Regex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+    private val reservedNames = setOf("settings")
 
     fun tenant(): Tenant = requestContext.tenant!!
     fun user(): User = requestContext.user!!
@@ -144,7 +145,7 @@ abstract class LibraryService(
 
     fun normalizedName(value: String?): String {
         val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required")
-        if (name.length > 120 || !name.matches(validName)) throw BadRequestException("Invalid name")
+        if (name.length > 120 || !name.matches(validName) || name in reservedNames) throw BadRequestException("Invalid name")
         return name
     }
 

@@ -169,6 +169,125 @@ class ExplorerResourceTest {
     }
 
     @Test
+    fun `settings api resolves tenant group personal folder and album breadcrumbs`() {
+        val group = createGroupWithMember("settings-group-$runId", ownerEmail)
+        createFolder(ownerCookie, null, "tenant-folder", "Tenant Folder")
+        createFolder(ownerCookie, null, "group-folder", "Group Folder", """{"type":"GROUP","groupName":"${group.name}"}""")
+        createAlbum(ownerCookie, "/@${group.name}/group-folder", "group-album", "Group Album")
+        createAlbum(ownerCookie, null, "private-album", "Private Album", """{"type":"USER"}""")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(200)
+            .body("location.kind", equalTo("SETTINGS"))
+            .body("location.path", equalTo("/settings"))
+            .body("subject.kind", equalTo("TENANT"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "Einstellungen")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/@${group.name}/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(200)
+            .body("subject.kind", equalTo("GROUP"))
+            .body("subject.path", equalTo("/@${group.name}"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "@${group.displayName}", "Einstellungen")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/~me/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(200)
+            .body("subject.kind", equalTo("USER"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "~owner-$runId", "Einstellungen")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/tenant-folder/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(200)
+            .body("subject.kind", equalTo("FOLDER"))
+            .body("subject.path", equalTo("/tenant-folder"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "Tenant Folder", "Einstellungen")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/@${group.name}/group-folder/group-album/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(200)
+            .body("subject.kind", equalTo("ALBUM"))
+            .body("subject.path", equalTo("/@${group.name}/group-folder/group-album"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "@${group.displayName}", "Group Folder", "Group Album", "Einstellungen")))
+    }
+
+    @Test
+    fun `settings api rejects unsupported paths and hidden group subjects`() {
+        createUser("outsider-$runId", "member123", ServerRole.ServerMember)
+        addTenantMember("outsider-$runId")
+        val outsiderCookie = login("outsider-$runId@example.com", "member123")
+        val group = createGroupWithMember("hidden-settings-$runId", ownerEmail)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/@${group.name}")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(400)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", outsiderCookie)
+            .queryParam("path", "/@${group.name}/settings")
+            .`when`().get("/api/$tenantName/settings")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
+    fun `settings is reserved as folder and album path name`() {
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"parentPath":null,"name":"settings","displayName":"Settings"}""")
+            .`when`().post("/api/$tenantName/folders")
+            .then()
+            .statusCode(400)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"parentPath":null,"name":"settings","displayName":"Settings"}""")
+            .`when`().post("/api/$tenantName/albums")
+            .then()
+            .statusCode(400)
+
+        createFolder(ownerCookie, null, "rename-me", "Rename Me")
+        createAlbum(ownerCookie, null, "rename-album", "Rename Album")
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"path":"/rename-me","name":"settings","displayName":"Settings"}""")
+            .`when`().post("/api/$tenantName/folders/update")
+            .then()
+            .statusCode(400)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"path":"/rename-album","name":"settings","displayName":"Settings"}""")
+            .`when`().post("/api/$tenantName/albums/update")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
     fun `album cover can be hidden from regular album media stream`() {
         createAlbum(ownerCookie, null, "photos", "Photos")
         val visible = createMedia(ownerEmail, "Visible")
@@ -584,11 +703,18 @@ class ExplorerResourceTest {
             .statusCode(200)
     }
 
-    private fun createAlbum(cookie: String, parentPath: String?, name: String, displayName: String) {
+    private fun createAlbum(
+        cookie: String,
+        parentPath: String?,
+        name: String,
+        displayName: String,
+        scopeJson: String? = null,
+    ) {
+        val scope = scopeJson?.let { ""","scope":$it""" } ?: ""
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", cookie)
-            .body("""{"parentPath":${parentPath?.let { "\"$it\"" }},"name":"$name","displayName":"$displayName"}""")
+            .body("""{"parentPath":${parentPath?.let { "\"$it\"" }},"name":"$name","displayName":"$displayName"$scope}""")
             .`when`().post("/api/$tenantName/albums")
             .then()
             .statusCode(200)

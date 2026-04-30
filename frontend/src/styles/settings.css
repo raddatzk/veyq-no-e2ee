@@ -1,0 +1,24 @@
+.settings-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px solid rgb(226 232 240 / 0.78);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08), 0 6px 18px rgb(15 23 42 / 0.04);
+}
+
+.settings-panel h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.settings-panel p {
+  margin: 0;
+  color: #64748b;
+}
