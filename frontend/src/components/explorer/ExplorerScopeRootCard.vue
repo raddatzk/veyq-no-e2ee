@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import Card from 'primevue/card'
 import type { ExplorerScopeRoot } from '../../api/explorerClient'
 
 defineProps<{
@@ -15,20 +14,13 @@ function scopeIcon(scopeRoot: ExplorerScopeRoot): string {
 }
 
 function scopeLabel(scopeRoot: ExplorerScopeRoot): string {
-  return scopeRoot.kind === 'GROUP' ? 'Gruppe' : 'Privat'
+  return scopeRoot.kind === 'GROUP' ? `@${scopeRoot.displayName}` : `~${scopeRoot.displayName}`
 }
 </script>
 
 <template>
-  <Card class="explorer-card explorer-card-scope-root">
-    <template #content>
-      <button class="explorer-card-main" type="button" @click="$emit('open', scopeRoot)">
-        <span :class="['explorer-card-icon', scopeIcon(scopeRoot)]" />
-        <span>
-          <strong>{{ scopeRoot.displayName }}</strong>
-          <small>{{ scopeLabel(scopeRoot) }} · {{ scopeRoot.path }}</small>
-        </span>
-      </button>
-    </template>
-  </Card>
+  <button class="explorer-scope-root-card" type="button" @click="$emit('open', scopeRoot)">
+    <span :class="['explorer-scope-root-icon', scopeIcon(scopeRoot)]" />
+    <strong>{{ scopeLabel(scopeRoot) }}</strong>
+  </button>
 </template>

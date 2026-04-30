@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
+import Menu from 'primevue/menu'
 import type { ExplorerAlbum } from '../../api/explorerClient'
 import ExplorerScopeBadge from './ExplorerScopeBadge.vue'
 
-defineProps<{
+const props = defineProps<{
   album: ExplorerAlbum
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   open: [album: ExplorerAlbum]
   edit: [album: ExplorerAlbum]
   move: [album: ExplorerAlbum]
@@ -16,6 +18,34 @@ defineEmits<{
   delete: [album: ExplorerAlbum]
 }>()
 
+const menu = ref()
+const menuItems = computed(() => [
+  {
+    label: 'Bearbeiten',
+    icon: 'pi pi-pencil',
+    command: () => emit('edit', props.album)
+  },
+  {
+    label: 'Verschieben',
+    icon: 'pi pi-arrow-right-arrow-left',
+    command: () => emit('move', props.album)
+  },
+  {
+    label: 'Cover setzen',
+    icon: 'pi pi-image',
+    command: () => emit('cover', props.album)
+  },
+  {
+    label: 'Löschen',
+    icon: 'pi pi-trash',
+    class: 'explorer-menu-danger',
+    command: () => emit('delete', props.album)
+  }
+])
+
+function toggleMenu(event: Event) {
+  menu.value.toggle(event)
+}
 </script>
 
 <template>
@@ -23,51 +53,23 @@ defineEmits<{
     <template #content>
       <button class="explorer-card-main" type="button" @click="$emit('open', album)">
         <span class="explorer-card-icon pi pi-images" />
-        <span>
+        <span class="explorer-card-text">
           <strong>{{ album.displayName }}</strong>
-          <small>
-            <template v-if="album.ownerBadge">
-              <ExplorerScopeBadge :owner-badge="album.ownerBadge" />
-              ·
-            </template>
-            {{ album.coverMediaId ? `Cover: ${album.coverMediaId}` : album.path }}
+          <small v-if="album.ownerBadge">
+            <ExplorerScopeBadge :owner-badge="album.ownerBadge" />
           </small>
         </span>
       </button>
-      <div class="explorer-card-actions">
-        <Button
-          icon="pi pi-pencil"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Album bearbeiten"
-          @click="$emit('edit', album)"
-        />
-        <Button
-          icon="pi pi-arrow-right-arrow-left"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Album verschieben"
-          @click="$emit('move', album)"
-        />
-        <Button
-          icon="pi pi-image"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Cover setzen"
-          @click="$emit('cover', album)"
-        />
-        <Button
-          icon="pi pi-trash"
-          text
-          rounded
-          severity="danger"
-          aria-label="Album löschen"
-          @click="$emit('delete', album)"
-        />
-      </div>
+      <Button
+        icon="pi pi-ellipsis-v"
+        text
+        rounded
+        severity="secondary"
+        class="explorer-card-menu-button"
+        aria-label="Albumaktionen"
+        @click="toggleMenu"
+      />
+      <Menu ref="menu" :model="menuItems" popup class="explorer-card-menu" />
     </template>
   </Card>
 </template>

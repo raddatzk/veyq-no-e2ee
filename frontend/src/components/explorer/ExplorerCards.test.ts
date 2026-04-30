@@ -10,6 +10,11 @@ const buttonStub = {
   template: '<button @click="$emit(\'click\')"><slot /></button>'
 }
 const cardStub = { template: '<div><slot name="content" /></div>' }
+const menuStub = {
+  props: ['model'],
+  template:
+    '<div><button v-for="item in model" :key="item.label" :aria-label="item.label" @click="item.command">{{ item.label }}</button></div>'
+}
 
 describe('explorer cards', () => {
   it('renders folder owner badge and emits actions', async () => {
@@ -23,13 +28,15 @@ describe('explorer cards', () => {
           ownerBadge: { kind: 'GROUP', name: 'family', displayName: 'Family' }
         }
       },
-      global: { stubs: { Button: buttonStub, Card: cardStub } }
+      global: { stubs: { Button: buttonStub, Card: cardStub, Menu: menuStub } }
     })
 
-    expect(wrapper.text()).toContain('Family')
-    expect(wrapper.text()).toContain('/@family/trip')
+    expect(wrapper.text()).toContain('@Family')
+    expect(wrapper.text()).not.toContain('/@family/trip')
     await wrapper.find('.explorer-card-main').trigger('click')
     expect(wrapper.emitted('open')).toHaveLength(1)
+    await wrapper.find('[aria-label="Verschieben"]').trigger('click')
+    expect(wrapper.emitted('move')).toHaveLength(1)
   })
 
   it('renders album owner badge and cover action', async () => {
@@ -44,13 +51,34 @@ describe('explorer cards', () => {
           ownerBadge: { kind: 'USER', name: 'me', displayName: 'Kevin' }
         }
       },
-      global: { stubs: { Button: buttonStub, Card: cardStub } }
+      global: { stubs: { Button: buttonStub, Card: cardStub, Menu: menuStub } }
     })
 
-    expect(wrapper.text()).toContain('Kevin')
-    expect(wrapper.text()).toContain('/~me/private')
-    await wrapper.find('[aria-label="Album löschen"]').trigger('click')
+    expect(wrapper.text()).toContain('~Kevin')
+    expect(wrapper.text()).not.toContain('/~me/private')
+    await wrapper.find('[aria-label="Löschen"]').trigger('click')
     expect(wrapper.emitted('delete')).toHaveLength(1)
+    await wrapper.find('[aria-label="Cover setzen"]').trigger('click')
+    expect(wrapper.emitted('cover')).toHaveLength(1)
+  })
+
+  it('renders no metadata line when owner badge is missing', () => {
+    const wrapper = mount(ExplorerFolderCard, {
+      props: {
+        folder: {
+          id: 'folder-2',
+          name: 'plain',
+          displayName: 'Plain',
+          path: '/plain',
+          ownerBadge: null
+        }
+      },
+      global: { stubs: { Button: buttonStub, Card: cardStub, Menu: menuStub } }
+    })
+
+    expect(wrapper.text()).toContain('Plain')
+    expect(wrapper.text()).not.toContain('/plain')
+    expect(wrapper.find('small').exists()).toBe(false)
   })
 
   it('renders scope root card and emits open', async () => {
@@ -62,14 +90,11 @@ describe('explorer cards', () => {
           displayName: 'Family',
           path: '/@family'
         }
-      },
-      global: { stubs: { Card: cardStub } }
+      }
     })
 
-    expect(wrapper.text()).toContain('Family')
-    expect(wrapper.text()).toContain('Gruppe')
-    expect(wrapper.text()).toContain('/@family')
-    await wrapper.find('.explorer-card-main').trigger('click')
+    expect(wrapper.text()).toContain('@Family')
+    await wrapper.find('.explorer-scope-root-card').trigger('click')
     expect(wrapper.emitted('open')?.[0]).toEqual([
       { kind: 'GROUP', name: 'family', displayName: 'Family', path: '/@family' }
     ])
@@ -94,10 +119,55 @@ describe('explorer cards', () => {
     expect(wrapper.text()).toContain('Kevin')
     expect(wrapper.text()).toContain('Family')
 
-    await wrapper.findAll('.explorer-card-main')[1].trigger('click')
+    await wrapper.findAll('.explorer-scope-root-card')[1].trigger('click')
     expect(wrapper.emitted('openScopeRoot')?.[0]).toEqual([
       { kind: 'GROUP', name: 'family', displayName: 'Family', path: '/@family' }
     ])
+  })
+
+  it('sorts folders and albums together by display name', async () => {
+    const album = {
+      id: 'album-1',
+      name: 'alpha',
+      displayName: 'alpha',
+      path: '/alpha',
+      coverMediaId: null,
+      ownerBadge: null
+    }
+    const wrapper = mount(ExplorerGrid, {
+      props: {
+        scopeRoots: [],
+        folders: [
+          {
+            id: 'folder-1',
+            name: 'zebra',
+            displayName: 'Zebra',
+            path: '/zebra',
+            ownerBadge: null
+          },
+          {
+            id: 'folder-2',
+            name: 'bravo',
+            displayName: 'Bravo',
+            path: '/bravo',
+            ownerBadge: null
+          }
+        ],
+        albums: [album]
+      },
+      global: { stubs: { Button: buttonStub, Card: cardStub, Menu: menuStub } }
+    })
+
+    expect(wrapper.find('.explorer-list').exists()).toBe(true)
+    expect(wrapper.find('.explorer-grid').exists()).toBe(false)
+    expect(wrapper.findAll('.explorer-card-main strong').map((item) => item.text())).toEqual([
+      'alpha',
+      'Bravo',
+      'Zebra'
+    ])
+
+    await wrapper.findAll('.explorer-card-main')[0].trigger('click')
+    expect(wrapper.emitted('openAlbum')?.[0]).toEqual([album])
   })
 
   it('hides scope root section when there are no scope roots', () => {

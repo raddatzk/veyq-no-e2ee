@@ -137,7 +137,7 @@ abstract class LibraryService(
 
     fun ownerBadge(scope: LibraryScopeKey): OwnerBadge =
         when (scope) {
-            LibraryScopeKey.Tenant -> OwnerBadge(OwnerBadge.KindEnum.TENANT, "Tenant")
+            LibraryScopeKey.Tenant -> OwnerBadge(OwnerBadge.KindEnum.TENANT, tenant().displayName)
             is LibraryScopeKey.Group -> OwnerBadge(OwnerBadge.KindEnum.GROUP, scope.group.displayName).name(scope.group.name)
             is LibraryScopeKey.User -> OwnerBadge(OwnerBadge.KindEnum.USER, scope.user.displayName).name("me")
         }

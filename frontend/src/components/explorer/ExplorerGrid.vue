@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import ExplorerAlbumCard from './ExplorerAlbumCard.vue'
 import ExplorerFolderCard from './ExplorerFolderCard.vue'
 import ExplorerScopeRootCard from './ExplorerScopeRootCard.vue'
 import type { ExplorerAlbum, ExplorerFolder, ExplorerScopeRoot } from '../../api/explorerClient'
 
-defineProps<{
+const props = defineProps<{
   scopeRoots?: ExplorerScopeRoot[]
   folders: ExplorerFolder[]
   albums: ExplorerAlbum[]
@@ -22,6 +23,25 @@ defineEmits<{
   deleteFolder: [folder: ExplorerFolder]
   deleteAlbum: [album: ExplorerAlbum]
 }>()
+
+type SortedExplorerItem =
+  | { type: 'folder'; item: ExplorerFolder }
+  | { type: 'album'; item: ExplorerAlbum }
+
+const sortedItems = computed<SortedExplorerItem[]>(() =>
+  [
+    ...props.folders.map((item) => ({ type: 'folder' as const, item })),
+    ...props.albums.map((item) => ({ type: 'album' as const, item }))
+  ].sort(compareItems)
+)
+
+function compareItems(left: SortedExplorerItem, right: SortedExplorerItem): number {
+  return (
+    left.item.displayName.localeCompare(right.item.displayName, undefined, { sensitivity: 'base' }) ||
+    left.item.name.localeCompare(right.item.name, undefined, { sensitivity: 'base' }) ||
+    left.type.localeCompare(right.type)
+  )
+}
 </script>
 
 <template>
@@ -30,7 +50,7 @@ defineEmits<{
       <h2>Bereiche</h2>
       <span>{{ scopeRoots.length }}</span>
     </div>
-    <div class="explorer-grid">
+    <div class="explorer-scope-root-list">
       <ExplorerScopeRootCard
         v-for="scopeRoot in scopeRoots"
         :key="`${scopeRoot.kind}:${scopeRoot.name}`"
@@ -45,26 +65,29 @@ defineEmits<{
       <h2>Ordner und Alben</h2>
       <span>{{ folders.length + albums.length }}</span>
     </div>
-    <div v-if="folders.length || albums.length" class="explorer-grid">
-      <ExplorerFolderCard
-        v-for="folder in folders"
-        :key="folder.id"
-        :folder="folder"
-        @open="$emit('openFolder', $event)"
-        @edit="$emit('editFolder', $event)"
-        @move="$emit('moveFolder', $event)"
-        @delete="$emit('deleteFolder', $event)"
-      />
-      <ExplorerAlbumCard
-        v-for="album in albums"
-        :key="album.id"
-        :album="album"
-        @open="$emit('openAlbum', $event)"
-        @edit="$emit('editAlbum', $event)"
-        @move="$emit('moveAlbum', $event)"
-        @cover="$emit('coverAlbum', $event)"
-        @delete="$emit('deleteAlbum', $event)"
-      />
+    <div v-if="sortedItems.length" class="explorer-list">
+      <template
+        v-for="entry in sortedItems"
+        :key="`${entry.type}:${entry.item.id}`"
+      >
+        <ExplorerFolderCard
+          v-if="entry.type === 'folder'"
+          :folder="entry.item"
+          @open="$emit('openFolder', $event)"
+          @edit="$emit('editFolder', $event)"
+          @move="$emit('moveFolder', $event)"
+          @delete="$emit('deleteFolder', $event)"
+        />
+        <ExplorerAlbumCard
+          v-else
+          :album="entry.item"
+          @open="$emit('openAlbum', $event)"
+          @edit="$emit('editAlbum', $event)"
+          @move="$emit('moveAlbum', $event)"
+          @cover="$emit('coverAlbum', $event)"
+          @delete="$emit('deleteAlbum', $event)"
+        />
+      </template>
     </div>
     <div v-else class="explorer-empty">Noch keine Ordner oder Alben in diesem Bereich.</div>
   </section>

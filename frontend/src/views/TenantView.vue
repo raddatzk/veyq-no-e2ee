@@ -5,7 +5,6 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import SelectButton from 'primevue/selectbutton'
-import Tag from 'primevue/tag'
 import type {
   ExplorerAlbum,
   ExplorerFolder,
@@ -33,7 +32,6 @@ const { authState } = useAuthState()
 const tenantName = computed(() => String(route.params.tenantName || ''))
 const tenant = computed(() => authState.tenants.find((item) => item.name === tenantName.value))
 const tenantTitle = computed(() => tenant.value?.displayName || tenantName.value)
-const roleLabel = computed(() => (tenant.value?.role === 'TenantOwner' ? 'Owner' : 'Member'))
 const explorerPath = computed(() => routePathToExplorerPath(route.params.pathMatch))
 const viewOptions = [
   { label: 'Ordner und Alben', value: 'structure', icon: 'pi pi-folder' },
@@ -87,13 +85,6 @@ function navigateToPath(path: string) {
 
 <template>
   <div class="explorer-page">
-    <div class="explorer-titlebar">
-      <div>
-        <h1>{{ explorer?.location.displayName || tenantTitle }}</h1>
-      </div>
-      <Tag v-if="tenant" :value="roleLabel" severity="info" />
-    </div>
-
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="mediaError" severity="warn" :closable="false">{{ mediaError }}</Message>
 
