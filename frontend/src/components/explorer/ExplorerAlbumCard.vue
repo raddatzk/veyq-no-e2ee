@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import type { ExplorerAlbum } from '../../api/explorerClient'
+import ExplorerScopeBadge from './ExplorerScopeBadge.vue'
 
 defineProps<{
   album: ExplorerAlbum
@@ -11,10 +12,10 @@ defineEmits<{
   open: [album: ExplorerAlbum]
   edit: [album: ExplorerAlbum]
   move: [album: ExplorerAlbum]
-  share: [album: ExplorerAlbum]
   cover: [album: ExplorerAlbum]
   delete: [album: ExplorerAlbum]
 }>()
+
 </script>
 
 <template>
@@ -24,7 +25,13 @@ defineEmits<{
         <span class="explorer-card-icon pi pi-images" />
         <span>
           <strong>{{ album.displayName }}</strong>
-          <small>{{ album.coverMediaId ? `Cover: ${album.coverMediaId}` : album.path }}</small>
+          <small>
+            <template v-if="album.ownerBadge">
+              <ExplorerScopeBadge :owner-badge="album.ownerBadge" />
+              ·
+            </template>
+            {{ album.coverMediaId ? `Cover: ${album.coverMediaId}` : album.path }}
+          </small>
         </span>
       </button>
       <div class="explorer-card-actions">
@@ -43,14 +50,6 @@ defineEmits<{
           severity="secondary"
           aria-label="Album verschieben"
           @click="$emit('move', album)"
-        />
-        <Button
-          icon="pi pi-share-alt"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Album freigeben"
-          @click="$emit('share', album)"
         />
         <Button
           icon="pi pi-image"

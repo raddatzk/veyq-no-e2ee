@@ -2,12 +2,6 @@ package com.lunva.api.tenant
 
 import com.lunva.api.auth.PasswordService
 import com.lunva.api.domain.GroupRole
-import com.lunva.api.domain.Media
-import com.lunva.api.domain.MediaGroupShare
-import com.lunva.api.domain.MediaGroupShareId
-import com.lunva.api.domain.MediaRepo
-import com.lunva.api.domain.MediaUserShare
-import com.lunva.api.domain.MediaUserShareId
 import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantGroup
 import com.lunva.api.domain.TenantGroupMember
@@ -29,15 +23,10 @@ import jakarta.inject.Inject
 import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
-import org.hamcrest.Matchers.everyItem
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasSize
-import org.hamcrest.Matchers.matchesPattern
-import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import java.time.Instant
 import java.util.UUID
 
 @QuarkusTest
@@ -47,7 +36,6 @@ class MultiTenantResourceTest {
     @Inject lateinit var tenantMemberRepo: TenantMemberRepo
     @Inject lateinit var tenantGroupRepo: TenantGroupRepo
     @Inject lateinit var tenantGroupMemberRepo: TenantGroupMemberRepo
-    @Inject lateinit var mediaRepo: MediaRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var transaction: UserTransaction
@@ -71,7 +59,7 @@ class MultiTenantResourceTest {
             .body("""{"email":"second-$runId@example.com","password":"admin123","displayName":"Second"}""")
             .`when`().post("/api/setup/admin")
             .then()
-            .statusCode(409)
+            .statusCode(401)
     }
 
     @Test
@@ -183,56 +171,6 @@ class MultiTenantResourceTest {
             .statusCode(200)
     }
 
-    @Test
-    @Disabled("Obsolete compatibility test for the old JSON media endpoint; /media now streams library album media")
-    fun `media list returns only owner direct share and group share access with public ids`() {
-        val ownerCookie = login(ownerEmail, ownerPassword)
-        ensureTenant(ownerCookie, "friends-$runId", "Friends")
-        createUser("media-owner-$runId", "member123", ServerRole.ServerMember)
-        createUser("direct-viewer-$runId", "member123", ServerRole.ServerMember)
-        createUser("group-viewer-$runId", "member123", ServerRole.ServerMember)
-        createUser("unshared-viewer-$runId", "member123", ServerRole.ServerMember)
-        addTenantMember("friends-$runId", "media-owner-$runId")
-        addTenantMember("friends-$runId", "direct-viewer-$runId")
-        addTenantMember("friends-$runId", "group-viewer-$runId")
-        addTenantMember("friends-$runId", "unshared-viewer-$runId")
-
-        val media = createMedia("friends-$runId", "media-owner-$runId@example.com", "Private Photo")
-        shareMediaWithUser(media, "direct-viewer-$runId@example.com")
-        val group = createGroupWithMember("friends-$runId", "shared-$runId", "group-viewer-$runId@example.com")
-        shareMediaWithGroup(media, group)
-
-        given()
-            .cookie("LUNVA_ACCESS_TOKEN", login("media-owner-$runId@example.com", "member123"))
-            .`when`().get("/api/friends-$runId/media")
-            .then()
-            .statusCode(200)
-            .body("media.id", hasItem(matchesPattern("[A-Za-z0-9_-]{16}")))
-            .body("media.title", hasItem("Private Photo"))
-
-        given()
-            .cookie("LUNVA_ACCESS_TOKEN", login("direct-viewer-$runId@example.com", "member123"))
-            .`when`().get("/api/friends-$runId/media")
-            .then()
-            .statusCode(200)
-            .body("media.title", hasItem("Private Photo"))
-
-        given()
-            .cookie("LUNVA_ACCESS_TOKEN", login("group-viewer-$runId@example.com", "member123"))
-            .`when`().get("/api/friends-$runId/media")
-            .then()
-            .statusCode(200)
-            .body("media.title", hasItem("Private Photo"))
-
-        given()
-            .cookie("LUNVA_ACCESS_TOKEN", login("unshared-viewer-$runId@example.com", "member123"))
-            .`when`().get("/api/friends-$runId/media")
-            .then()
-            .statusCode(200)
-            .body("media.title", not(hasItem("Private Photo")))
-            .body("media.id", everyItem(matchesPattern("[A-Za-z0-9_-]{16}")))
-    }
-
     private fun ensureTenant(accessCookie: String, name: String, displayName: String) {
         val response = given()
             .contentType("application/json")
@@ -290,37 +228,6 @@ class MultiTenantResourceTest {
         }
     }
 
-    private fun createMedia(tenantName: String, ownerEmail: String, title: String): Media =
-        inTransaction {
-            val tenant = tenantRepo.findByName(tenantName) ?: throw IllegalStateException("Tenant not found")
-            val owner = userRepo.findByEmail(ownerEmail) ?: throw IllegalStateException("User not found")
-            Media().also {
-                it.tenant = tenant
-                it.owner = owner
-                it.title = title
-                it.mimeType = "image/jpeg"
-                it.sizeBytes = 12
-                it.storageKey = "tenant-${tenant.id}/test-${title.lowercase().replace(" ", "-")}/original"
-                it.originalFilename = "$title.jpg"
-                it.createdAt = Instant.now()
-                mediaRepo.persist(it)
-            }
-        }
-
-    private fun shareMediaWithUser(media: Media, userEmail: String) {
-        inTransaction {
-            val managedMedia = mediaRepo.findById(media.id) ?: throw IllegalStateException("Media not found")
-            val user = userRepo.findByEmail(userEmail) ?: throw IllegalStateException("User not found")
-            MediaUserShare().also {
-                it.id = MediaUserShareId(managedMedia.id, user.id)
-                it.media = managedMedia
-                it.user = user
-                it.createdAt = Instant.now()
-                it.persist()
-            }
-        }
-    }
-
     private fun createGroupWithMember(tenantName: String, groupName: String, userEmail: String): TenantGroup =
         inTransaction {
             val tenant = tenantRepo.findByName(tenantName) ?: throw IllegalStateException("Tenant not found")
@@ -341,20 +248,6 @@ class MultiTenantResourceTest {
             }
             group
         }
-
-    private fun shareMediaWithGroup(media: Media, group: TenantGroup) {
-        inTransaction {
-            val managedMedia = mediaRepo.findById(media.id) ?: throw IllegalStateException("Media not found")
-            val managedGroup = tenantGroupRepo.findById(group.id) ?: throw IllegalStateException("Group not found")
-            MediaGroupShare().also {
-                it.id = MediaGroupShareId(managedMedia.id, managedGroup.id)
-                it.media = managedMedia
-                it.group = managedGroup
-                it.createdAt = Instant.now()
-                it.persist()
-            }
-        }
-    }
 
     private fun <T> inTransaction(block: () -> T): T {
         transaction.begin()

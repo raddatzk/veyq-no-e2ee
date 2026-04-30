@@ -99,35 +99,18 @@ create table lunva_media
     public_id varchar(16) not null unique,
     tenant_id     bigint       not null,
     owner_user_id bigint       not null,
+    scope_type    varchar(40)  not null,
+    scope_group_id bigint null,
+    scope_user_id bigint null,
     title         varchar(255) not null,
     created_at    timestamp    not null default current_timestamp,
     constraint fk_lunva_media_tenant foreign key (tenant_id) references lunva_tenant (id) on delete cascade,
-    constraint fk_lunva_media_owner foreign key (owner_user_id) references lunva_user (id) on delete cascade
+    constraint fk_lunva_media_owner foreign key (owner_user_id) references lunva_user (id) on delete cascade,
+    constraint fk_lunva_media_scope_group foreign key (scope_group_id) references lunva_tenant_group (id) on delete cascade,
+    constraint fk_lunva_media_scope_user foreign key (scope_user_id) references lunva_user (id) on delete cascade
 );
 
 create index idx_lunva_media_tenant_id on lunva_media (tenant_id);
 create index idx_lunva_media_owner_user_id on lunva_media (owner_user_id);
-
-create table lunva_media_user_share
-(
-    media_id   bigint    not null,
-    user_id    bigint    not null,
-    created_at timestamp not null default current_timestamp,
-    primary key (media_id, user_id),
-    constraint fk_lunva_media_user_share_media foreign key (media_id) references lunva_media (id) on delete cascade,
-    constraint fk_lunva_media_user_share_user foreign key (user_id) references lunva_user (id) on delete cascade
-);
-
-create index idx_lunva_media_user_share_user_id on lunva_media_user_share (user_id);
-
-create table lunva_media_group_share
-(
-    media_id   bigint    not null,
-    group_id   bigint    not null,
-    created_at timestamp not null default current_timestamp,
-    primary key (media_id, group_id),
-    constraint fk_lunva_media_group_share_media foreign key (media_id) references lunva_media (id) on delete cascade,
-    constraint fk_lunva_media_group_share_group foreign key (group_id) references lunva_tenant_group (id) on delete cascade
-);
-
-create index idx_lunva_media_group_share_group_id on lunva_media_group_share (group_id);
+create index idx_lunva_media_scope_group_id on lunva_media (scope_group_id);
+create index idx_lunva_media_scope_user_id on lunva_media (scope_user_id);

@@ -1,12 +1,17 @@
 package com.lunva.api.library
 
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
 
 data class CreateLibraryItemRequest(
     val parentPath: String?,
     @field:NotBlank(message = "name must not be blank") val name: String?,
     @field:NotBlank(message = "displayName must not be blank") val displayName: String?,
+    val scope: LibraryScopeRequest? = null,
+)
+
+data class LibraryScopeRequest(
+    val type: String?,
+    val groupName: String? = null,
 )
 
 data class UpdateLibraryItemRequest(
@@ -32,29 +37,4 @@ data class SetAlbumCoverRequest(
     @field:NotBlank(message = "albumPath must not be blank") val albumPath: String?,
     @field:NotBlank(message = "mediaId must not be blank") val mediaId: String?,
     val hidden: Boolean?,
-)
-
-data class ShareUserRequest(
-    @field:NotNull(message = "userId must not be blank") val userId: Long?
-)
-
-data class ShareGroupRequest(
-    @field:NotNull(message = "groupId must not be blank") val groupId: Long?
-)
-
-data class LibrarySharesSummary(
-    val users: List<UserShareSummary>,
-    val groups: List<GroupShareSummary>,
-)
-
-data class UserShareSummary(
-    val userId: Long,
-    val email: String,
-    val displayName: String
-)
-
-data class GroupShareSummary(
-    val groupId: Long,
-    val name: String,
-    val displayName: String
 )

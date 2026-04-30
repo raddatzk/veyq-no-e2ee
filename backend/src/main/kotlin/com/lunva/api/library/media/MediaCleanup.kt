@@ -3,7 +3,6 @@ package com.lunva.api.library.media
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.TenantRepo
-import com.lunva.api.library.media.MediaService.UploadSession
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -72,23 +71,16 @@ class MediaCleanup @Inject constructor(
             ?: Files.getLastModifiedTime(path).toInstant()
         val createdAt = properties.getProperty("createdAt")?.let { Instant.parse(it) }
             ?: updatedAt
-        val tenantId = properties.getProperty("tenantId").toLong()
-        val tenantName = properties.getProperty("tenantName")
-            ?: tenantRepo.findById(tenantId)?.name
-            ?: throw NotFoundException("Upload not found")
-        return UploadSession(
-            uploadId = properties.getProperty("uploadId"),
-            tenantId = tenantId,
-            tenantName = tenantName,
-            ownerUserId = properties.getProperty("ownerUserId").toLong(),
-            albumPath = properties.getProperty("albumPath"),
-            filename = properties.getProperty("filename"),
-            mimeType = properties.getProperty("mimeType"),
-            sizeBytes = properties.getProperty("sizeBytes").toLong(),
-            title = properties.getProperty("title"),
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-        )
+        return try {
+            MediaUploadSessions.fromProperties(
+                properties = properties,
+                updatedAtFallback = updatedAt,
+                createdAtFallback = createdAt,
+                tenantNameFallback = { tenantId -> tenantRepo.findById(tenantId)?.name },
+            )
+        } catch (e: Exception) {
+            throw NotFoundException("Upload not found")
+        }
     }
 
     private fun deleteRecursively(path: Path) {

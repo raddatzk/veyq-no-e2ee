@@ -1,24 +1,23 @@
-export type ExplorerContextType =
-  | 'Tenant'
-  | 'Folder'
-  | 'Album'
-  | 'tenant'
-  | 'folder'
-  | 'album'
-  | string
+export type ExplorerLocationKind = 'TENANT' | 'GROUP' | 'USER' | 'FOLDER' | 'ALBUM'
 export type LibraryItemType = 'folder' | 'album'
 
-export type ExplorerContext = {
-  type: ExplorerContextType
+export type ExplorerLocation = {
+  kind: ExplorerLocationKind
   path: string
   displayName: string
 }
 
 export type ExplorerBreadcrumb = {
-  type: ExplorerContextType
-  name: string
+  kind: ExplorerLocationKind
   displayName: string
+  label: string
   path: string
+}
+
+export type OwnerBadge = {
+  kind: 'TENANT' | 'GROUP' | 'USER'
+  displayName: string
+  name?: string
 }
 
 export type ExplorerFolder = {
@@ -26,6 +25,7 @@ export type ExplorerFolder = {
   name: string
   displayName: string
   path: string
+  ownerBadge?: OwnerBadge | null
 }
 
 export type ExplorerAlbum = {
@@ -34,6 +34,14 @@ export type ExplorerAlbum = {
   displayName: string
   path: string
   coverMediaId: string | null
+  ownerBadge?: OwnerBadge | null
+}
+
+export type ExplorerScopeRoot = {
+  kind: 'GROUP' | 'USER'
+  name: string
+  displayName: string
+  path: string
 }
 
 export type ExplorerMedia = {
@@ -48,33 +56,21 @@ export type ExplorerMedia = {
 }
 
 export type ExplorerResponse = {
-  context: ExplorerContext
+  location: ExplorerLocation
   breadcrumbs: ExplorerBreadcrumb[]
+  scopeRoots: ExplorerScopeRoot[]
   folders: ExplorerFolder[]
   albums: ExplorerAlbum[]
-}
-
-export type LibraryShares = {
-  users: UserShare[]
-  groups: GroupShare[]
-}
-
-export type UserShare = {
-  userId: number
-  email: string
-  displayName: string
-}
-
-export type GroupShare = {
-  groupId: number
-  name: string
-  displayName: string
 }
 
 export type CreateLibraryItemRequest = {
   parentPath: string | null
   name: string
   displayName: string
+  scope?: {
+    type: 'TENANT' | 'GROUP' | 'USER'
+    groupName?: string | null
+  } | null
 }
 
 export type UpdateLibraryItemRequest = {

@@ -3,12 +3,12 @@ package com.lunva.api.library.folder
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
+import com.lunva.api.generated.explorer.model.ExplorerFolder
 import com.lunva.api.library.CreateLibraryItemRequest
 import com.lunva.api.library.LibraryService
 import com.lunva.api.library.MoveLibraryItemRequest
 import com.lunva.api.library.UpdateLibraryItemRequest
-import com.lunva.api.library.explorer.ExplorerContext
-import com.lunva.api.library.explorer.FolderSummary
+import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -18,23 +18,22 @@ import jakarta.transaction.Transactional
 class FolderService @Inject constructor(
     private val folderRepo: TenantFolderRepo,
     albumRepo: TenantAlbumRepo,
-    folderUserShareRepo: TenantFolderUserShareRepo,
-    folderGroupShareRepo: TenantFolderGroupShareRepo,
-    albumUserShareRepo: TenantAlbumUserShareRepo,
-    albumGroupShareRepo: TenantAlbumGroupShareRepo,
+    groupRepo: TenantGroupRepo,
     groupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext,
-) : LibraryService(folderRepo, albumRepo, folderUserShareRepo, folderGroupShareRepo, albumUserShareRepo, albumGroupShareRepo, groupMemberRepo, requestContext) {
+) : LibraryService(folderRepo, albumRepo, groupRepo, groupMemberRepo, requestContext) {
 
     @Transactional
-    fun createFolder(request: CreateLibraryItemRequest): FolderSummary {
+    fun createFolder(request: CreateLibraryItemRequest): ExplorerFolder {
         val parent = resolveParent(request.parentPath)
+        val scope = resolveCreateScope(parent, request)
         val name = normalizedName(request.name)
-        validateNoCollision(parent, name)
+        validateNoCollision(parent, scope, name)
         val folder = TenantFolder().also {
             it.tenant = tenant()
             it.parentFolder = parent
             it.owner = user()
+            applyScope(it, scope)
             it.name = name
             it.displayName = request.displayName!!.trim()
             folderRepo.persist(it)
@@ -44,12 +43,12 @@ class FolderService @Inject constructor(
     }
 
     @Transactional
-    fun updateFolder(request: UpdateLibraryItemRequest): FolderSummary {
+    fun updateFolder(request: UpdateLibraryItemRequest): ExplorerFolder {
         val folder = resolveFolder(request.path)
         requireVisible(folder)
         request.name?.let {
             val name = normalizedName(it)
-            if (name != folder.name) validateNoCollision(folder.parentFolder, name)
+            if (name != folder.name) validateNoCollision(folder.parentFolder, folder.scope(), name)
             folder.name = name
         }
         request.displayName?.let { folder.displayName = it.trim() }
@@ -57,16 +56,18 @@ class FolderService @Inject constructor(
     }
 
     @Transactional
-    fun moveFolder(request: MoveLibraryItemRequest): FolderSummary {
+    fun moveFolder(request: MoveLibraryItemRequest): ExplorerFolder {
         val folder = resolveFolder(request.path)
         requireVisible(folder)
         val newParent = resolveParent(request.newParentPath)
+        requireMoveTargetScope(folder.scope(), request.newParentPath)
         if (newParent != null && isDescendantOrSame(newParent, folder)) {
             throw BadRequestException("Cannot move folder into itself")
         }
+        requireSameScope(folder.scope(), newParent)
         val newName = request.name?.let { normalizedName(it) } ?: folder.name
         if (newParent?.id != folder.parentFolder?.id || newName != folder.name) {
-            validateNoCollision(newParent, newName)
+            validateNoCollision(newParent, folder.scope(), newName)
         }
         folder.parentFolder = newParent
         folder.name = newName
@@ -81,7 +82,7 @@ class FolderService @Inject constructor(
     }
 
     private fun resolveFolder(path: String?): TenantFolder =
-        (resolveVisibleContext(path) as? ExplorerContext.Folder)?.folder ?: throw NotFoundException("Folder not found")
+        (resolveVisibleContext(path) as? ResolvedExplorerLocation.Folder)?.scope ?: throw NotFoundException("Folder not found")
 
     private fun isDescendantOrSame(candidate: TenantFolder, ancestor: TenantFolder): Boolean =
         generateSequence(candidate) { it.parentFolder }.any { it.id == ancestor.id }

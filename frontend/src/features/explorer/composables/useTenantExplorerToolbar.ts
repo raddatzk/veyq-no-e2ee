@@ -1,4 +1,4 @@
-import { onBeforeUnmount, watch, type ComputedRef, type Ref } from 'vue'
+import { type ComputedRef, onBeforeUnmount, type Ref, watch } from 'vue'
 import type { ExplorerResponse, LibraryItemType } from '../api'
 import { clearExplorerToolbar, setExplorerToolbar } from '../../../composables/useExplorerToolbar'
 
@@ -39,13 +39,10 @@ export function useTenantExplorerToolbar(options: ToolbarOptions) {
       return
     }
 
-    const breadcrumbs = [
-      { label: options.tenantTitle.value, command: () => options.navigateToPath('/') },
-      ...options.explorer.value.breadcrumbs.map((breadcrumb) => ({
-        label: breadcrumb.displayName,
-        command: () => options.navigateToPath(breadcrumb.path)
-      }))
-    ]
+    const breadcrumbs = options.explorer.value.breadcrumbs.map((breadcrumb) => ({
+      label: breadcrumb.label,
+      command: () => options.navigateToPath(breadcrumb.path)
+    }))
 
     setExplorerToolbar(breadcrumbs, [
       {

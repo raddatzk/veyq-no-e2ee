@@ -103,6 +103,12 @@
   white-space: nowrap;
 }
 
+.explorer-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .explorer-card-icon {
   display: grid;
   place-items: center;
@@ -117,6 +123,11 @@
 .explorer-card-album .explorer-card-icon {
   background: #f0fdf4;
   color: #166534;
+}
+
+.explorer-card-scope-root .explorer-card-icon {
+  background: #f8fafc;
+  color: #334155;
 }
 
 .explorer-card-actions {

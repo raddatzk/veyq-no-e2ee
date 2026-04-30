@@ -2,6 +2,7 @@ package com.lunva.api.library.explorer
 
 import com.lunva.api.auth.PasswordService
 import com.lunva.api.domain.GroupRole
+import com.lunva.api.domain.LibraryScopeType
 import com.lunva.api.domain.Media
 import com.lunva.api.domain.MediaRepo
 import com.lunva.api.domain.ServerRole
@@ -28,7 +29,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
-import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -73,8 +73,9 @@ class ExplorerResourceTest {
             .`when`().get("/api/$tenantName/explorer")
             .then()
             .statusCode(200)
-            .body("context.type", equalTo("Folder"))
-            .body("context.path", equalTo("/urlaub"))
+            .body("location.kind", equalTo("FOLDER"))
+            .body("location.path", equalTo("/urlaub"))
+            .body("breadcrumbs.displayName", equalTo(listOf("Explorer $runId", "Urlaub")))
             .body("albums.name", hasItem("klettern"))
 
         given()
@@ -87,55 +88,77 @@ class ExplorerResourceTest {
     }
 
     @Test
-    fun `tenant owner does not see unshared member content`() {
+    fun `tenant owner sees member tenant scoped content`() {
         createUser("member-$runId", "member123", ServerRole.ServerMember)
         addTenantMember("member-$runId")
         val memberCookie = login("member-$runId@example.com", "member123")
-        createFolder(memberCookie, null, "private", "Private")
+        createFolder(memberCookie, null, "shared", "Shared")
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .`when`().get("/api/$tenantName/explorer")
             .then()
             .statusCode(200)
-            .body("folders.name", not(hasItem("private")))
+            .body("folders.name", hasItem("shared"))
     }
 
     @Test
-    fun `group folder share exposes nested folder as root entry and streams descendant media`() {
+    fun `group scoped folder is visible to group members and streams descendant media`() {
         createUser("author-$runId", "member123", ServerRole.ServerMember)
         createUser("viewer-$runId", "member123", ServerRole.ServerMember)
+        createUser("outsider-$runId", "member123", ServerRole.ServerMember)
         addTenantMember("author-$runId")
         addTenantMember("viewer-$runId")
+        addTenantMember("outsider-$runId")
         val authorCookie = login("author-$runId@example.com", "member123")
         val viewerCookie = login("viewer-$runId@example.com", "member123")
-        createFolder(authorCookie, null, "hidden-parent", "Hidden Parent")
-        createFolder(authorCookie, "/hidden-parent", "shared", "Shared")
-        createAlbum(authorCookie, "/hidden-parent/shared", "trip", "Trip")
-        val media = createMedia("author-$runId@example.com", "Summit")
-        addMedia(authorCookie, "/hidden-parent/shared/trip", media.publicId)
-        val group = createGroupWithMember("shared-$runId", "viewer-$runId@example.com")
-
-        given()
-            .contentType("application/json")
-            .cookie("LUNVA_ACCESS_TOKEN", authorCookie)
-            .queryParam("path", "/hidden-parent/shared")
-            .body("""{"groupId":${group.id}}""")
-            .`when`().post("/api/$tenantName/folders/shares/groups")
-            .then()
-            .statusCode(200)
+        val outsiderCookie = login("outsider-$runId@example.com", "member123")
+        val group = createGroupWithMember("shared-$runId", "author-$runId@example.com")
+        addGroupMember(group, "viewer-$runId@example.com")
+        createFolder(authorCookie, null, "shared", "Shared", """{"type":"GROUP","groupName":"${group.name}"}""")
+        createAlbum(authorCookie, "/@${group.name}/shared", "trip", "Trip")
+        val media = createMedia("author-$runId@example.com", "Summit", group)
+        addMedia(authorCookie, "/@${group.name}/shared/trip", media.publicId)
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
             .`when`().get("/api/$tenantName/explorer")
             .then()
             .statusCode(200)
+            .body("scopeRoots.path", hasItem("/~me"))
+            .body("scopeRoots.path", hasItem("/@${group.name}"))
             .body("folders.name", hasItem("shared"))
-            .body("folders.name", not(hasItem("hidden-parent")))
+            .body("folders.path", hasItem("/@${group.name}/shared"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
+            .queryParam("path", "/@${group.name}")
+            .`when`().get("/api/$tenantName/explorer")
+            .then()
+            .statusCode(200)
+            .body("location.kind", equalTo("GROUP"))
+            .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "@${group.displayName}")))
+            .body("scopeRoots.size()", equalTo(0))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", outsiderCookie)
+            .`when`().get("/api/$tenantName/explorer")
+            .then()
+            .statusCode(200)
+            .body("scopeRoots.path", hasItem("/~me"))
+            .body("scopeRoots.path", org.hamcrest.Matchers.not(hasItem("/@${group.name}")))
+            .body("folders.path", org.hamcrest.Matchers.not(hasItem("/@${group.name}/shared")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", outsiderCookie)
+            .queryParam("path", "/@${group.name}")
+            .`when`().get("/api/$tenantName/explorer")
+            .then()
+            .statusCode(404)
 
         val stream = given()
             .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
-            .queryParam("path", "/hidden-parent/shared")
+            .queryParam("path", "/@${group.name}/shared")
             .`when`().get("/api/$tenantName/media")
             .then()
             .statusCode(200)
@@ -238,7 +261,7 @@ class ExplorerResourceTest {
             .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
             .`when`().get("/api/$tenantName/media/$mediaId/content")
             .then()
-            .statusCode(404)
+            .statusCode(200)
     }
 
     @Test
@@ -272,6 +295,22 @@ class ExplorerResourceTest {
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .header("Range", "bytes=100-200")
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(416)
+            .header("Content-Range", equalTo("bytes */8"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .header("Range", "bytes=-4")
+            .`when`().get("/api/$tenantName/media/$mediaId/content")
+            .then()
+            .statusCode(206)
+            .header("Content-Range", equalTo("bytes 4-7/8"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .header("Range", "invalid")
             .`when`().get("/api/$tenantName/media/$mediaId/content")
             .then()
             .statusCode(416)
@@ -326,6 +365,53 @@ class ExplorerResourceTest {
             .then()
             .statusCode(206)
             .header("Content-Range", equalTo("bytes 4-7/8"))
+
+        val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), mediaId) }
+        assertThat(stored?.scopeType).isEqualTo(LibraryScopeType.Tenant)
+    }
+
+    @Test
+    fun `chunk completion rejects missing chunks and size mismatches`() {
+        createAlbum(ownerCookie, null, "broken-chunks", "Broken Chunks")
+
+        val missingChunkUploadId = createUpload("/broken-chunks", "missing.mp4", 8)
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(byteArrayOf(0, 0, 0, 24))
+            .`when`().put("/api/media/uploads/$missingChunkUploadId/chunks/0")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/media/uploads/$missingChunkUploadId/complete")
+            .then()
+            .statusCode(400)
+
+        val sizeMismatchUploadId = createUpload("/broken-chunks", "mismatch.mp4", 8)
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(byteArrayOf(0, 0, 0, 24))
+            .`when`().put("/api/media/uploads/$sizeMismatchUploadId/chunks/0")
+            .then()
+            .statusCode(204)
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(byteArrayOf(102, 116, 121))
+            .`when`().put("/api/media/uploads/$sizeMismatchUploadId/chunks/1")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/media/uploads/$sizeMismatchUploadId/complete")
+            .then()
+            .statusCode(400)
     }
 
     @Test
@@ -481,11 +567,18 @@ class ExplorerResourceTest {
             .statusCode(200)
     }
 
-    private fun createFolder(cookie: String, parentPath: String?, name: String, displayName: String) {
+    private fun createFolder(
+        cookie: String,
+        parentPath: String?,
+        name: String,
+        displayName: String,
+        scopeJson: String? = null,
+    ) {
+        val scope = scopeJson?.let { ""","scope":$it""" } ?: ""
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", cookie)
-            .body("""{"parentPath":${parentPath?.let { "\"$it\"" }},"name":"$name","displayName":"$displayName"}""")
+            .body("""{"parentPath":${parentPath?.let { "\"$it\"" }},"name":"$name","displayName":"$displayName"$scope}""")
             .`when`().post("/api/$tenantName/folders")
             .then()
             .statusCode(200)
@@ -510,6 +603,16 @@ class ExplorerResourceTest {
             .then()
             .statusCode(200)
     }
+
+    private fun createUpload(albumPath: String, filename: String, sizeBytes: Long): String =
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"tenantName":"$tenantName","albumPath":"$albumPath","filename":"$filename","mimeType":"video/mp4","sizeBytes":$sizeBytes}""")
+            .`when`().post("/api/media/uploads")
+            .then()
+            .statusCode(200)
+            .extract().path("uploadId")
 
     private fun login(email: String, password: String): String {
         val accessCookie = given()
@@ -574,12 +677,31 @@ class ExplorerResourceTest {
             group
         }
 
-    private fun createMedia(ownerEmail: String, title: String): Media =
+    private fun addGroupMember(group: TenantGroup, userEmail: String) {
+        inTransaction {
+            val user = userRepo.findByEmail(userEmail) ?: throw IllegalStateException("User not found")
+            TenantGroupMember().also {
+                it.id = TenantGroupMemberId(group.id, user.id)
+                it.group = group
+                it.user = user
+                it.role = GroupRole.GroupMember
+                tenantGroupMemberRepo.persist(it)
+            }
+        }
+    }
+
+    private fun createMedia(ownerEmail: String, title: String, group: TenantGroup? = null): Media =
         inTransaction {
             val owner = userRepo.findByEmail(ownerEmail) ?: throw IllegalStateException("Owner not found")
             Media().also {
                 it.tenant = tenant()
                 it.owner = owner
+                if (group == null) {
+                    it.scopeType = LibraryScopeType.Tenant
+                } else {
+                    it.scopeType = LibraryScopeType.Group
+                    it.scopeGroup = group
+                }
                 it.title = title
                 it.mimeType = "image/jpeg"
                 it.sizeBytes = 12

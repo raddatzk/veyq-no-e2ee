@@ -93,12 +93,13 @@ Passende IntelliJ-HTTP-Requests liegen unter [http](/Users/kevin.raddatz/IdeaPro
 
 Medien haben eine interne `Long`-ID und eine öffentliche `publicId` mit 16 Zeichen. Die API gibt die `publicId` als `id` nach außen zurück.
 
-Die Media-Liste wird repository-seitig gefiltert:
+Ordner, Alben und Medien verwenden einen Scope:
 
-- Owner sieht eigene Medien.
-- Direkt freigegebene User sehen Medien.
-- Mitglieder freigegebener Gruppen sehen Medien.
-- Server-Owner und Tenant-Owner bekommen keinen automatischen Medienzugriff.
+- `/urlaub`: tenantweiter Scope
+- `/@familie/urlaub`: Gruppen-Scope
+- `/~me/urlaub`: persönlicher Scope
+
+Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien bleiben in Alben und übernehmen deren Scope.
 
 ## Wichtige Konfigurationen
 

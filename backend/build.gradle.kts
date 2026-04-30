@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.3.10"
     id("io.quarkus") version "3.34.6"
+    id("org.openapi.generator") version "7.21.0"
 }
 
 repositories {
@@ -38,6 +39,67 @@ dependencies {
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation(kotlin("test"))
+}
+
+val generatedOpenApiDir = layout.buildDirectory.dir("generated/openapi")
+
+openApiGenerate {
+    generatorName.set("jaxrs-spec")
+    library.set("quarkus")
+    inputSpec.set(layout.projectDirectory.file("../docs/api/explorer.openapi.yaml").asFile.absolutePath)
+    outputDir.set(generatedOpenApiDir.get().asFile.absolutePath)
+    apiPackage.set("com.lunva.api.generated.explorer.api")
+    modelPackage.set("com.lunva.api.generated.explorer.model")
+    invokerPackage.set("com.lunva.api.generated.explorer")
+    configOptions.set(
+        mapOf(
+            "interfaceOnly" to "true",
+            "useJakartaEe" to "true",
+            "useSwaggerAnnotations" to "false",
+            "useSwaggerV3Annotations" to "false",
+            "useMicroProfileOpenAPIAnnotations" to "false",
+            "openApiNullable" to "false",
+            "hideGenerationTimestamp" to "true",
+            "useTags" to "true",
+        )
+    )
+    globalProperties.set(
+        mapOf(
+            "apis" to "",
+            "models" to "",
+            "supportingFiles" to "false",
+        )
+    )
+}
+
+openApiValidate {
+    inputSpec.set(layout.projectDirectory.file("../docs/api/explorer.openapi.yaml").asFile.absolutePath)
+}
+
+tasks.named("openApiGenerate") {
+    doFirst {
+        delete(generatedOpenApiDir)
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir(generatedOpenApiDir.map { it.dir("src/gen/java") })
+        }
+    }
+}
+
+tasks.named("compileKotlin") {
+    dependsOn(tasks.named("openApiGenerate"))
+}
+
+tasks.named("compileJava") {
+    dependsOn(tasks.named("openApiGenerate"))
+}
+
+tasks.named("check") {
+    dependsOn(tasks.named("openApiValidate"))
 }
 
 tasks.withType<Test>().configureEach {

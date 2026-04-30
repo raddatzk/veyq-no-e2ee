@@ -7,6 +7,12 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
 import java.time.Instant
 
+enum class LibraryScopeType {
+    Tenant,
+    Group,
+    User
+}
+
 @Entity
 @Table(name = "lunva_tenant_folder")
 class TenantFolder : PanacheEntityBase {
@@ -28,6 +34,18 @@ class TenantFolder : PanacheEntityBase {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_user_id", nullable = false)
     lateinit var owner: User
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope_type", nullable = false)
+    lateinit var scopeType: LibraryScopeType
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scope_group_id")
+    var scopeGroup: TenantGroup? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scope_user_id")
+    var scopeUser: User? = null
 
     @Column(nullable = false)
     lateinit var name: String
@@ -84,6 +102,18 @@ class TenantAlbum : PanacheEntityBase {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_user_id", nullable = false)
     lateinit var owner: User
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope_type", nullable = false)
+    lateinit var scopeType: LibraryScopeType
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scope_group_id")
+    var scopeGroup: TenantGroup? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "scope_user_id")
+    var scopeUser: User? = null
 
     @Column(nullable = false)
     lateinit var name: String
@@ -159,110 +189,9 @@ data class AlbumMediaId(
     var mediaId: Long = 0,
 ) : java.io.Serializable
 
-@Entity
-@Table(name = "lunva_tenant_folder_user_share")
-class TenantFolderUserShare : PanacheEntityBase {
-    @EmbeddedId
-    lateinit var id: TenantFolderUserShareId
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("folderId")
-    @JoinColumn(name = "folder_id", nullable = false)
-    lateinit var folder: TenantFolder
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("userId")
-    @JoinColumn(name = "user_id", nullable = false)
-    lateinit var user: User
-}
-
-@Embeddable
-data class TenantFolderUserShareId(
-    @Column(name = "folder_id")
-    var folderId: Long = 0,
-    @Column(name = "user_id")
-    var userId: Long = 0,
-) : java.io.Serializable
-
-@Entity
-@Table(name = "lunva_tenant_folder_group_share")
-class TenantFolderGroupShare : PanacheEntityBase {
-    @EmbeddedId
-    lateinit var id: TenantFolderGroupShareId
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("folderId")
-    @JoinColumn(name = "folder_id", nullable = false)
-    lateinit var folder: TenantFolder
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("groupId")
-    @JoinColumn(name = "group_id", nullable = false)
-    lateinit var group: TenantGroup
-}
-
-@Embeddable
-data class TenantFolderGroupShareId(
-    @Column(name = "folder_id")
-    var folderId: Long = 0,
-    @Column(name = "group_id")
-    var groupId: Long = 0,
-) : java.io.Serializable
-
-@Entity
-@Table(name = "lunva_tenant_album_user_share")
-class TenantAlbumUserShare : PanacheEntityBase {
-    @EmbeddedId
-    lateinit var id: TenantAlbumUserShareId
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("albumId")
-    @JoinColumn(name = "album_id", nullable = false)
-    lateinit var album: TenantAlbum
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("userId")
-    @JoinColumn(name = "user_id", nullable = false)
-    lateinit var user: User
-}
-
-@Embeddable
-data class TenantAlbumUserShareId(
-    @Column(name = "album_id")
-    var albumId: Long = 0,
-    @Column(name = "user_id")
-    var userId: Long = 0,
-) : java.io.Serializable
-
-@Entity
-@Table(name = "lunva_tenant_album_group_share")
-class TenantAlbumGroupShare : PanacheEntityBase {
-    @EmbeddedId
-    lateinit var id: TenantAlbumGroupShareId
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("albumId")
-    @JoinColumn(name = "album_id", nullable = false)
-    lateinit var album: TenantAlbum
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @MapsId("groupId")
-    @JoinColumn(name = "group_id", nullable = false)
-    lateinit var group: TenantGroup
-}
-
-@Embeddable
-data class TenantAlbumGroupShareId(
-    @Column(name = "album_id")
-    var albumId: Long = 0,
-    @Column(name = "group_id")
-    var groupId: Long = 0,
-) : java.io.Serializable
-
 @ApplicationScoped
 class TenantFolderRepo : PanacheRepository<TenantFolder> {
     fun listByTenant(tenant: Tenant): List<TenantFolder> = list("tenant", tenant)
-    fun findByPublicId(publicId: String): TenantFolder? = find("publicId", publicId).firstResult()
     fun listChildren(tenant: Tenant, parent: TenantFolder?): List<TenantFolder> =
         if (parent == null) list("tenant = ?1 and parentFolder is null order by displayName", tenant)
         else list("tenant = ?1 and parentFolder = ?2 order by displayName", tenant, parent)
@@ -285,15 +214,3 @@ class AlbumMediaRepo : PanacheRepository<AlbumMedia> {
     fun listVisibleByAlbum(album: TenantAlbum): List<AlbumMedia> =
         list("album = ?1 and hidden = false order by position, createdAt", album)
 }
-
-@ApplicationScoped
-class TenantFolderUserShareRepo : PanacheRepository<TenantFolderUserShare>
-
-@ApplicationScoped
-class TenantFolderGroupShareRepo : PanacheRepository<TenantFolderGroupShare>
-
-@ApplicationScoped
-class TenantAlbumUserShareRepo : PanacheRepository<TenantAlbumUserShare>
-
-@ApplicationScoped
-class TenantAlbumGroupShareRepo : PanacheRepository<TenantAlbumGroupShare>

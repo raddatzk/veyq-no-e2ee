@@ -1,12 +1,11 @@
 import { computed, ref } from 'vue'
-import type { ExplorerAlbum, ExplorerContext, ExplorerFolder, LibraryItemType } from '../api'
+import type { ExplorerAlbum, ExplorerFolder, ExplorerLocation, LibraryItemType } from '../api'
 
 export function useExplorerDialogs() {
   const createType = ref<LibraryItemType>('folder')
   const createOpen = ref(false)
   const editOpen = ref(false)
   const moveOpen = ref(false)
-  const shareOpen = ref(false)
   const deleteOpen = ref(false)
   const coverOpen = ref(false)
   const uploadOpen = ref(false)
@@ -33,12 +32,6 @@ export function useExplorerDialogs() {
     moveOpen.value = true
   }
 
-  function openShare(type: LibraryItemType, item: ExplorerFolder | ExplorerAlbum) {
-    selectedType.value = type
-    selectedItem.value = item
-    shareOpen.value = true
-  }
-
   function openDelete(type: LibraryItemType, item: ExplorerFolder | ExplorerAlbum) {
     selectedType.value = type
     selectedItem.value = item
@@ -51,21 +44,26 @@ export function useExplorerDialogs() {
     coverOpen.value = true
   }
 
-  function itemFromContext(
-    context: ExplorerContext,
+  function itemFromLocation(
+    location: ExplorerLocation,
     type: LibraryItemType
   ): ExplorerFolder | ExplorerAlbum {
-    const name = context.path.split('/').filter(Boolean).at(-1) || ''
+    const name = location.path.split('/').filter(Boolean).at(-1) || ''
     if (type === 'album') {
       return {
-        id: context.path,
+        id: location.path,
         name,
-        displayName: context.displayName,
-        path: context.path,
+        displayName: location.displayName,
+        path: location.path,
         coverMediaId: null
       }
     }
-    return { id: context.path, name, displayName: context.displayName, path: context.path }
+    return {
+      id: location.path,
+      name,
+      displayName: location.displayName,
+      path: location.path
+    }
   }
 
   return {
@@ -74,18 +72,16 @@ export function useExplorerDialogs() {
     createType,
     deleteOpen,
     editOpen,
-    itemFromContext,
+    itemFromLocation,
     moveOpen,
     openCover,
     openCreate,
     openDelete,
     openEdit,
     openMove,
-    openShare,
     selectedAlbum,
     selectedItem,
     selectedType,
-    shareOpen,
     uploadOpen
   }
 }

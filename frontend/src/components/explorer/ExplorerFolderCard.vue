@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import type { ExplorerFolder } from '../../api/explorerClient'
+import ExplorerScopeBadge from './ExplorerScopeBadge.vue'
 
 defineProps<{
   folder: ExplorerFolder
@@ -11,9 +12,9 @@ defineEmits<{
   open: [folder: ExplorerFolder]
   edit: [folder: ExplorerFolder]
   move: [folder: ExplorerFolder]
-  share: [folder: ExplorerFolder]
   delete: [folder: ExplorerFolder]
 }>()
+
 </script>
 
 <template>
@@ -23,7 +24,13 @@ defineEmits<{
         <span class="explorer-card-icon pi pi-folder" />
         <span>
           <strong>{{ folder.displayName }}</strong>
-          <small>{{ folder.path }}</small>
+          <small>
+            <template v-if="folder.ownerBadge">
+              <ExplorerScopeBadge :owner-badge="folder.ownerBadge" />
+              ·
+            </template>
+            {{ folder.path }}
+          </small>
         </span>
       </button>
       <div class="explorer-card-actions">
@@ -42,14 +49,6 @@ defineEmits<{
           severity="secondary"
           aria-label="Ordner verschieben"
           @click="$emit('move', folder)"
-        />
-        <Button
-          icon="pi pi-share-alt"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Ordner freigeben"
-          @click="$emit('share', folder)"
         />
         <Button
           icon="pi pi-trash"

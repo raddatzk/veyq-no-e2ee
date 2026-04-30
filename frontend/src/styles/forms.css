@@ -80,18 +80,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.share-dialog {
-  width: min(620px, calc(100vw - 2rem));
-}
-
-.share-section {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.share-section h3 {
-  margin: 0;
-  font-size: 1rem;
+.scope-select {
+  width: 100%;
 }
 
 .checkbox-row {

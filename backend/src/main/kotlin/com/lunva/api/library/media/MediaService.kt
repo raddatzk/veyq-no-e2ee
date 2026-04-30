@@ -5,7 +5,7 @@ import com.lunva.api.auth.ForbiddenException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.library.LibraryService
-import com.lunva.api.library.explorer.ExplorerContext
+import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -36,39 +36,20 @@ class MediaService @Inject constructor(
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
     folderRepo: TenantFolderRepo,
-    folderUserShareRepo: TenantFolderUserShareRepo,
-    folderGroupShareRepo: TenantFolderGroupShareRepo,
-    albumUserShareRepo: TenantAlbumUserShareRepo,
-    albumGroupShareRepo: TenantAlbumGroupShareRepo,
+    groupRepo: TenantGroupRepo,
     groupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext
-) : LibraryService(folderRepo, albumRepo, folderUserShareRepo, folderGroupShareRepo, albumUserShareRepo, albumGroupShareRepo, groupMemberRepo, requestContext) {
+) : LibraryService(folderRepo, albumRepo, groupRepo, groupMemberRepo, requestContext) {
     private val log: Logger = Logger.getLogger(MediaService::class.java)
-
-    private data class ContentRange(val start: Long, val end: Long) {
-        val length: Long = end - start + 1
-    }
-
-    data class UploadSession(
-        val uploadId: String,
-        val tenantId: Long,
-        val tenantName: String,
-        val ownerUserId: Long,
-        val albumPath: String,
-        val filename: String,
-        val mimeType: String,
-        val sizeBytes: Long,
-        val title: String?,
-        val createdAt: Instant,
-        val updatedAt: Instant,
-    )
 
     fun streamMedia(path: String?): Sequence<StreamMediaSummary> {
         val context = resolveVisibleContext(path)
         val albums = when (context) {
-            ExplorerContext.Root -> visibleAlbums()
-            is ExplorerContext.Folder -> visibleAlbums().filter { it.parentFolder != null && isDescendantOrSame(it.parentFolder!!, context.folder) }
-            is ExplorerContext.Album -> listOf(context.album)
+            ResolvedExplorerLocation.Tenant -> visibleAlbums()
+            is ResolvedExplorerLocation.Group -> visibleAlbums().filter { it.hasScope(context.scope) }
+            is ResolvedExplorerLocation.User -> visibleAlbums().filter { it.hasScope(context.scope) }
+            is ResolvedExplorerLocation.Folder -> visibleAlbums().filter { it.parentFolder != null && isDescendantOrSame(it.parentFolder!!, context.scope) }
+            is ResolvedExplorerLocation.Album -> listOf(context.scope)
         }
 
         return albums.asSequence()
@@ -96,6 +77,7 @@ class MediaService @Inject constructor(
         val media = Media().also {
             it.tenant = tenant()
             it.owner = user()
+            applyScope(it, album.scope())
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: upload.fileName()?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                         ?: "Upload"
@@ -200,6 +182,7 @@ class MediaService @Inject constructor(
         val media = Media().also {
             it.tenant = tenant()
             it.owner = user()
+            applyScope(it, album.scope())
             it.title = session.title ?: session.filename.substringBeforeLast('.').takeIf { value -> value.isNotBlank() } ?: "Upload"
             it.mimeType = session.mimeType
             it.sizeBytes = session.sizeBytes
@@ -227,7 +210,7 @@ class MediaService @Inject constructor(
         if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
         val filename = media.originalFilename?.takeIf { it.isNotBlank() } ?: "${media.publicId}.bin"
         val size = Files.size(path)
-        val range = parseRange(rangeHeader, size)
+        val range = MediaRanges.parse(rangeHeader, size)
 
         if (rangeHeader != null && range == null) {
             return Response.status(Response.Status.REQUESTED_RANGE_NOT_SATISFIABLE)
@@ -261,17 +244,13 @@ class MediaService @Inject constructor(
         generateSequence(candidate) { it.parentFolder }.any { it.id == ancestor.id }
 
     private fun isMediaVisible(media: Media, album: TenantAlbum): Boolean =
-        media.owner.id == user().id ||
-                isAlbumVisible(album) ||
-                mediaRepo.listAccessible(tenant(), user()).any { it.id == media.id }
+        isAlbumVisible(album) && media.scope().sameAs(album.scope())
 
     private fun isMediaAccessible(media: Media): Boolean =
-        media.owner.id == user().id ||
-                mediaRepo.listAccessible(tenant(), user()).any { it.id == media.id } ||
-                albumMediaRepo.list("media", media).any { isAlbumVisible(it.album) }
+        albumMediaRepo.list("media", media).any { isMediaVisible(media, it.album) }
 
     private fun resolveAlbum(path: String?): TenantAlbum =
-        (resolveVisibleContext(path) as? ExplorerContext.Album)?.album ?: throw NotFoundException("Album not found")
+        (resolveVisibleContext(path) as? ResolvedExplorerLocation.Album)?.scope ?: throw NotFoundException("Album not found")
 
     private fun linkMedia(album: TenantAlbum, media: Media) {
         val link = albumMediaRepo.findByAlbumAndMedia(album, media)
@@ -322,19 +301,7 @@ class MediaService @Inject constructor(
     }
 
     private fun saveUploadSession(session: UploadSession) {
-        val properties = Properties().also {
-            it["uploadId"] = session.uploadId
-            it["tenantId"] = session.tenantId.toString()
-            it["tenantName"] = session.tenantName
-            it["ownerUserId"] = session.ownerUserId.toString()
-            it["albumPath"] = session.albumPath
-            it["filename"] = session.filename
-            it["mimeType"] = session.mimeType
-            it["sizeBytes"] = session.sizeBytes.toString()
-            it["createdAt"] = session.createdAt.toString()
-            it["updatedAt"] = session.updatedAt.toString()
-            session.title?.let { title -> it["title"] = title }
-        }
+        val properties = MediaUploadSessions.toProperties(session)
         Files.newOutputStream(uploadDirectory(session.uploadId).resolve("session.properties")).use { output ->
             properties.store(output, null)
         }
@@ -350,7 +317,7 @@ class MediaService @Inject constructor(
     }
 
     private fun loadUploadSession(uploadId: String): UploadSession {
-        if (!uploadId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw NotFoundException("Upload not found")
+        if (!MediaUploadSessions.hasValidUploadId(uploadId)) throw NotFoundException("Upload not found")
         val path = uploadDirectory(uploadId).resolve("session.properties")
         if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
         return loadUploadSession(path)
@@ -363,23 +330,16 @@ class MediaService @Inject constructor(
             ?: Files.getLastModifiedTime(path).toInstant()
         val createdAt = properties.getProperty("createdAt")?.let { Instant.parse(it) }
             ?: updatedAt
-        val tenantId = properties.getProperty("tenantId").toLong()
-        val tenantName = properties.getProperty("tenantName")
-            ?: tenantRepo.findById(tenantId)?.name
-            ?: throw NotFoundException("Upload not found")
-        return UploadSession(
-            uploadId = properties.getProperty("uploadId"),
-            tenantId = tenantId,
-            tenantName = tenantName,
-            ownerUserId = properties.getProperty("ownerUserId").toLong(),
-            albumPath = properties.getProperty("albumPath"),
-            filename = properties.getProperty("filename"),
-            mimeType = properties.getProperty("mimeType"),
-            sizeBytes = properties.getProperty("sizeBytes").toLong(),
-            title = properties.getProperty("title"),
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-        )
+        return try {
+            MediaUploadSessions.fromProperties(
+                properties = properties,
+                updatedAtFallback = updatedAt,
+                createdAtFallback = createdAt,
+                tenantNameFallback = { tenantId -> tenantRepo.findById(tenantId)?.name },
+            )
+        } catch (e: Exception) {
+            throw NotFoundException("Upload not found")
+        }
     }
 
     private fun requireCurrentUploadOwner(session: UploadSession) {
@@ -483,30 +443,6 @@ class MediaService @Inject constructor(
         Files.walk(path).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
-    }
-
-    private fun parseRange(rangeHeader: String?, size: Long): ContentRange? {
-        if (rangeHeader == null) return null
-        if (!rangeHeader.startsWith("bytes=") || size <= 0) return null
-        val range = rangeHeader.removePrefix("bytes=").substringBefore(',')
-        val startText = range.substringBefore('-', "")
-        val endText = range.substringAfter('-', "")
-        if (startText.isBlank() && endText.isBlank()) return null
-
-        val start: Long
-        val end: Long
-        if (startText.isBlank()) {
-            val suffixLength = endText.toLongOrNull() ?: return null
-            if (suffixLength <= 0) return null
-            start = (size - suffixLength).coerceAtLeast(0)
-            end = size - 1
-        } else {
-            start = startText.toLongOrNull() ?: return null
-            end = if (endText.isBlank()) size - 1 else endText.toLongOrNull() ?: return null
-        }
-
-        if (start < 0 || end < start || start >= size) return null
-        return ContentRange(start, end.coerceAtMost(size - 1))
     }
 
     private fun streamRange(path: Path, range: ContentRange): StreamingOutput =

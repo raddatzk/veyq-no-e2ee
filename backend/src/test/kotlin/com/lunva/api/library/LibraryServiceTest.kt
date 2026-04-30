@@ -2,9 +2,11 @@ package com.lunva.api.library
 
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.ConflictException
+import com.lunva.api.auth.NotFoundException
 import com.lunva.api.auth.PasswordService
 import com.lunva.api.domain.AlbumMediaRepo
 import com.lunva.api.domain.GroupRole
+import com.lunva.api.domain.LibraryScopeType
 import com.lunva.api.domain.Media
 import com.lunva.api.domain.MediaRepo
 import com.lunva.api.domain.ServerRole
@@ -23,12 +25,10 @@ import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.TenantRole
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
+import com.lunva.api.generated.explorer.model.LocationKind
 import com.lunva.api.library.album.AlbumService
-import com.lunva.api.library.album.AlbumSharesService
-import com.lunva.api.library.explorer.ExplorerBreadcrumbType
 import com.lunva.api.library.explorer.ExplorerService
 import com.lunva.api.library.folder.FolderService
-import com.lunva.api.library.folder.FolderSharesService
 import com.lunva.api.library.media.MediaService
 import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.setup.ServerState
@@ -60,8 +60,6 @@ class LibraryServiceTest {
     @Inject lateinit var explorerService: ExplorerService
     @Inject lateinit var folderService: FolderService
     @Inject lateinit var albumService: AlbumService
-    @Inject lateinit var folderSharesService: FolderSharesService
-    @Inject lateinit var albumSharesService: AlbumSharesService
     @Inject lateinit var mediaService: MediaService
 
     private lateinit var runId: String
@@ -84,19 +82,21 @@ class LibraryServiceTest {
         albumService.createAlbum(CreateLibraryItemRequest("/urlaub/klettern", "dolomiten", "Dolomiten"))
 
         val root = explorerService.explorer("/")
-        assertThat(root.context.type).isEqualTo(ExplorerBreadcrumbType.Tenant)
+        assertThat(root.location.kind).isEqualTo(LocationKind.TENANT)
+        assertThat(root.breadcrumbs).extracting("kind").containsExactly(LocationKind.TENANT)
         assertThat(root.folders).extracting("name").containsExactly("urlaub")
         assertThat(root.albums).isEmpty()
 
         val folder = explorerService.explorer("/urlaub/klettern")
-        assertThat(folder.context.type).isEqualTo(ExplorerBreadcrumbType.Folder)
-        assertThat(folder.context.path).isEqualTo("/urlaub/klettern")
-        assertThat(folder.breadcrumbs).extracting("name").containsExactly("urlaub", "klettern")
+        assertThat(folder.location.kind).isEqualTo(LocationKind.FOLDER)
+        assertThat(folder.location.path).isEqualTo("/urlaub/klettern")
+        assertThat(folder.breadcrumbs).extracting("displayName").containsExactly("Library $runId", "Urlaub", "Klettern")
         assertThat(folder.albums).extracting("name").containsExactly("dolomiten")
 
         val album = explorerService.explorer("/urlaub/klettern/dolomiten")
-        assertThat(album.context.type).isEqualTo(ExplorerBreadcrumbType.Album)
-        assertThat(album.context.path).isEqualTo("/urlaub/klettern/dolomiten")
+        assertThat(album.location.kind).isEqualTo(LocationKind.ALBUM)
+        assertThat(album.location.path).isEqualTo("/urlaub/klettern/dolomiten")
+        assertThat(album.breadcrumbs.last().path).isEqualTo(album.location.path)
         assertThat(album.folders).isEmpty()
         assertThat(album.albums).isEmpty()
     }
@@ -141,68 +141,108 @@ class LibraryServiceTest {
     }
 
     @Test
-    fun `tenant owner only sees owned or shared library items`() {
-        val member = createUser("member-$runId", ServerRole.ServerMember)
-        addTenantMember(member, TenantRole.TenantMember)
-        useContext(member, tenant)
-        folderService.createFolder(CreateLibraryItemRequest("/", "private", "Private"))
+    fun `root mixes visible scopes and group marker disambiguates tenant folders`() {
+        val group = createGroup("familie-$runId", owner)
+        folderService.createFolder(CreateLibraryItemRequest("/", group.name, "Tenant Familie"))
+        folderService.createFolder(CreateLibraryItemRequest("/", "urlaub", "Gruppenurlaub", LibraryScopeRequest("GROUP", group.name)))
+        albumService.createAlbum(CreateLibraryItemRequest("/", "privat", "Privat", LibraryScopeRequest("USER")))
 
-        useContext(owner, tenant)
-        val beforeShare = explorerService.explorer("/")
-        assertThat(beforeShare.folders).extracting("name").doesNotContain("private")
+        val root = explorerService.explorer("/")
+        assertThat(root.scopeRoots).extracting("path").contains("/~me", "/@${group.name}")
+        assertThat(root.folders).extracting("path").contains("/${group.name}", "/@${group.name}/urlaub")
+        assertThat(root.albums).extracting("path").contains("/~me/privat")
+        assertThat(explorerService.explorer("/${group.name}").location.displayName).isEqualTo("Tenant Familie")
+        assertThat(explorerService.explorer("/@${group.name}/urlaub").location.displayName).isEqualTo("Gruppenurlaub")
+        assertThat(explorerService.explorer("/@${group.name}").scopeRoots).isEmpty()
 
-        useContext(member, tenant)
-        folderSharesService.shareFolderWithUser("/private", ShareUserRequest(owner.id))
-
-        useContext(owner, tenant)
-        val afterShare = explorerService.explorer("/")
-        assertThat(afterShare.folders).extracting("name").contains("private")
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            folderService.moveFolder(MoveLibraryItemRequest("/${group.name}", "/@${group.name}", null))
+        }
     }
 
     @Test
-    fun `folder group share exposes nested folder as root entry and grants recursive media visibility`() {
+    fun `group roots require membership and child items inherit parent scope`() {
+        val author = createUser("scope-author-$runId", ServerRole.ServerMember)
+        val outsider = createUser("scope-outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(author, TenantRole.TenantMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+        val group = createGroup("scope-$runId", author)
+
+        useContext(outsider, tenant)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            folderService.createFolder(CreateLibraryItemRequest("/", "blocked", "Blocked", LibraryScopeRequest("GROUP", group.name)))
+        }
+
+        useContext(author, tenant)
+        folderService.createFolder(CreateLibraryItemRequest("/", "group-root", "Group Root", LibraryScopeRequest("GROUP", group.name)))
+        val child = albumService.createAlbum(
+            CreateLibraryItemRequest("/@${group.name}/group-root", "child", "Child", LibraryScopeRequest("TENANT"))
+        )
+
+        assertThat(child.path).isEqualTo("/@${group.name}/group-root/child")
+        assertThat(albumRepo.findByPublicId(child.id)?.scopeType).isEqualTo(LibraryScopeType.Group)
+    }
+
+    @Test
+    fun `tenant members see and update tenant scoped library items`() {
+        val member = createUser("member-$runId", ServerRole.ServerMember)
+        addTenantMember(member, TenantRole.TenantMember)
+        useContext(member, tenant)
+        folderService.createFolder(CreateLibraryItemRequest("/", "shared", "Shared"))
+
+        useContext(owner, tenant)
+        val root = explorerService.explorer("/")
+        assertThat(root.folders).extracting("name").contains("shared")
+
+        val updated = folderService.updateFolder(UpdateLibraryItemRequest("/shared", null, "Updated"))
+        assertThat(updated.displayName).isEqualTo("Updated")
+    }
+
+    @Test
+    fun `group scoped folders are visible to group members and grant media visibility`() {
         val author = createUser("author-$runId", ServerRole.ServerMember)
         val viewer = createUser("viewer-$runId", ServerRole.ServerMember)
         addTenantMember(author, TenantRole.TenantMember)
         addTenantMember(viewer, TenantRole.TenantMember)
+        val outsider = createUser("outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+        val group = createGroup("shared-$runId", author)
+        addGroupMember(group, viewer)
 
         useContext(author, tenant)
-        folderService.createFolder(CreateLibraryItemRequest("/", "hidden-parent", "Hidden Parent"))
-        folderService.createFolder(CreateLibraryItemRequest("/hidden-parent", "shared", "Shared"))
-        albumService.createAlbum(CreateLibraryItemRequest("/hidden-parent/shared", "trip", "Trip"))
-        val media = createMedia(author, "Summit")
-        albumService.addMediaToAlbum(AlbumMediaRequest("/hidden-parent/shared/trip", media.publicId, false, 0))
-
-        val group = createGroup("shared-$runId", viewer)
-        folderSharesService.shareFolderWithGroup("/hidden-parent/shared", ShareGroupRequest(group.id))
+        folderService.createFolder(CreateLibraryItemRequest("/", "shared", "Shared", LibraryScopeRequest("GROUP", group.name)))
+        albumService.createAlbum(CreateLibraryItemRequest("/@${group.name}/shared", "trip", "Trip"))
+        val media = createMedia(author, "Summit", group)
+        albumService.addMediaToAlbum(AlbumMediaRequest("/@${group.name}/shared/trip", media.publicId, false, 0))
 
         useContext(viewer, tenant)
         val root = explorerService.explorer("/")
+        assertThat(root.scopeRoots).extracting("path").contains("/@${group.name}")
         assertThat(root.folders).extracting("name").contains("shared")
-        assertThat(root.folders).extracting("name").doesNotContain("hidden-parent")
+        assertThat(root.folders.single { it.name == "shared" }.path).isEqualTo("/@${group.name}/shared")
 
-        val stream = mediaService.streamMedia("/hidden-parent/shared").toList()
+        val stream = mediaService.streamMedia("/@${group.name}/shared").toList()
         assertThat(stream).extracting("title").containsExactly("Summit")
-        assertThat(stream.single().albumPath).isEqualTo("/hidden-parent/shared/trip")
+        assertThat(stream.single().albumPath).isEqualTo("/@${group.name}/shared/trip")
+
+        useContext(outsider, tenant)
+        assertThat(explorerService.explorer("/").scopeRoots).extracting("path").doesNotContain("/@${group.name}")
+        assertThat(explorerService.explorer("/").folders).extracting("name").doesNotContain("shared")
     }
 
     @Test
-    fun `album shares grant direct visibility without exposing parent folder`() {
+    fun `personal scoped albums are visible only to that user`() {
         val author = createUser("album-author-$runId", ServerRole.ServerMember)
         val viewer = createUser("album-viewer-$runId", ServerRole.ServerMember)
         addTenantMember(author, TenantRole.TenantMember)
         addTenantMember(viewer, TenantRole.TenantMember)
 
         useContext(author, tenant)
-        folderService.createFolder(CreateLibraryItemRequest("/", "private-parent", "Private Parent"))
-        albumService.createAlbum(CreateLibraryItemRequest("/private-parent", "shared-album", "Shared Album"))
-        albumSharesService.shareAlbumWithUser("/private-parent/shared-album", ShareUserRequest(viewer.id))
+        albumService.createAlbum(CreateLibraryItemRequest("/", "private-album", "Private Album", LibraryScopeRequest("USER")))
+        assertThat(explorerService.explorer("/").albums).extracting("name").contains("private-album")
 
         useContext(viewer, tenant)
-        val root = explorerService.explorer("/")
-        assertThat(root.albums).extracting("name").contains("shared-album")
-        assertThat(root.folders).extracting("name").doesNotContain("private-parent")
-        assertThat(explorerService.explorer("/private-parent/shared-album").context.displayName).isEqualTo("Shared Album")
+        assertThat(explorerService.explorer("/").albums).extracting("name").doesNotContain("private-album")
     }
 
     @Test
@@ -224,6 +264,20 @@ class LibraryServiceTest {
         )
         assertThat(coverLink).isNotNull
         assertThat(coverLink!!.hidden).isTrue()
+    }
+
+    @Test
+    fun `media from another scope cannot be linked or used as cover`() {
+        val group = createGroup("media-scope-$runId", owner)
+        albumService.createAlbum(CreateLibraryItemRequest("/", "tenant-album", "Tenant Album"))
+        val groupMedia = createMedia(owner, "Group Media", group)
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            albumService.addMediaToAlbum(AlbumMediaRequest("/tenant-album", groupMedia.publicId, false, 0))
+        }
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            albumService.setAlbumCover(SetAlbumCoverRequest("/tenant-album", groupMedia.publicId, null))
+        }
     }
 
     @Test
@@ -312,11 +366,29 @@ class LibraryServiceTest {
             group
         }
 
-    private fun createMedia(owner: User, title: String): Media =
+    private fun addGroupMember(group: TenantGroup, user: User) {
+        inTransaction {
+            TenantGroupMember().also {
+                it.id = TenantGroupMemberId(group.id, user.id)
+                it.group = group
+                it.user = user
+                it.role = GroupRole.GroupMember
+                tenantGroupMemberRepo.persist(it)
+            }
+        }
+    }
+
+    private fun createMedia(owner: User, title: String, group: TenantGroup? = null): Media =
         inTransaction {
             Media().also {
                 it.tenant = tenant
                 it.owner = owner
+                if (group == null) {
+                    it.scopeType = LibraryScopeType.Tenant
+                } else {
+                    it.scopeType = LibraryScopeType.Group
+                    it.scopeGroup = group
+                }
                 it.title = title
                 it.mimeType = "image/jpeg"
                 it.sizeBytes = 12

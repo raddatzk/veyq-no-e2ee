@@ -26,11 +26,7 @@ Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe D
 - `lunva_tenant_group_member`
   - Gruppenmitgliedschaft mit `GROUP_OWNER` oder `GROUP_MEMBER`
 - `lunva_media`
-  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant und Owner
-- `lunva_media_user_share`
-  - direkte Medienfreigaben an User
-- `lunva_media_group_share`
-  - Medienfreigaben an Gruppen
+  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Ersteller und Zugriffsscope
 - `lunva_config`
   - technische App-Konfiguration wie bcrypt-Cost
 
@@ -78,15 +74,15 @@ Gruppenrechte:
 - `@GroupOwnerRequired` schützt Gruppenverwaltung.
 - Normale Gruppenmitgliedschaft ist getrennt von Tenant-Mitgliedschaft.
 
-## Medienzugriff
+## Library- und Medienzugriff
 
-Medienzugriff wird in Repository-Queries abgebildet:
+Ordner, Alben und Medien haben einen eindeutigen Zugriffsscope:
 
-- `owner = currentUser`
-- oder direkte Freigabe in `lunva_media_user_share`
-- oder Gruppenfreigabe über `lunva_media_group_share` und `lunva_tenant_group_member`
+- `TENANT`: alle Tenant-Mitglieder
+- `GROUP`: Mitglieder der jeweiligen Tenant-Gruppe
+- `USER`: nur der jeweilige User
 
-Tenant-Membership ist Voraussetzung für jede Tenant-API, aber kein Recht auf alle Medien. Server-Owner und Tenant-Owner sehen fremde Medien nicht automatisch.
+Child-Ordner und Alben erben den Scope ihres Parent-Ordners. Medien übernehmen den Scope des Albums, in dem sie hochgeladen werden. Tenant-Membership ist Voraussetzung für jede Tenant-API; innerhalb eines sichtbaren Scopes dürfen Mitglieder lesen und schreiben.
 
 ## Testing
 
@@ -102,4 +98,4 @@ Abgedeckt sind:
 - Server-Owner Tenant-Erstellung
 - Tenant-Membership-Filter
 - Gruppen-Scoping und Gruppen-Owner
-- Media-Sichtbarkeit und `publicId`
+- Scope-basierte Library-/Media-Sichtbarkeit und `publicId`

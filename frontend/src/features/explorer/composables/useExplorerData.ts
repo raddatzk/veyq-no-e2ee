@@ -19,10 +19,10 @@ export function useExplorerData(
   const viewMode = ref<ExplorerViewMode>('structure')
   let loadSequence = 0
 
-  const contextType = computed(() => String(explorer.value?.context.type || '').toLowerCase())
-  const isAlbumContext = computed(() => contextType.value === 'album')
+  const contextType = computed(() => explorer.value?.location.kind || '')
+  const isAlbumContext = computed(() => contextType.value === 'ALBUM')
   const isLibraryContext = computed(
-    () => contextType.value === 'folder' || contextType.value === 'album'
+    () => contextType.value === 'FOLDER' || contextType.value === 'ALBUM'
   )
   const canSwitchViews = computed(() => !isAlbumContext.value)
   const activeView = computed<ExplorerViewMode>(() =>

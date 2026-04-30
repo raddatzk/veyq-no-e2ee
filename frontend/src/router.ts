@@ -72,9 +72,6 @@ function resolveHome(): string {
   const { authState } = useAuthState()
   const storedTenant = getStoredTenant()
 
-  console.log(storedTenant)
-  console.log(authState.tenants.length)
-  console.log(authState.tenants[0])
   return (storedTenant === null) ? (authState.tenants.length != 0 ? authState.tenants[0].name : '') : storedTenant
 }
 

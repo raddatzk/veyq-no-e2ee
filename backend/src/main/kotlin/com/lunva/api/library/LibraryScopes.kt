@@ -1,0 +1,72 @@
+package com.lunva.api.library
+
+import com.lunva.api.domain.LibraryScopeType
+import com.lunva.api.domain.Media
+import com.lunva.api.domain.TenantAlbum
+import com.lunva.api.domain.TenantFolder
+import com.lunva.api.domain.TenantGroup
+import com.lunva.api.domain.User
+
+sealed class LibraryScopeKey {
+    data object Tenant : LibraryScopeKey()
+    data class Group(val group: TenantGroup) : LibraryScopeKey()
+    data class User(val user: com.lunva.api.domain.User) : LibraryScopeKey()
+}
+
+object LibraryScopes {
+    fun scope(folder: TenantFolder): LibraryScopeKey =
+        fromFields(folder.scopeType, folder.scopeGroup, folder.scopeUser)
+
+    fun scope(album: TenantAlbum): LibraryScopeKey =
+        fromFields(album.scopeType, album.scopeGroup, album.scopeUser)
+
+    fun scope(media: Media): LibraryScopeKey =
+        fromFields(media.scopeType, media.scopeGroup, media.scopeUser)
+
+    fun apply(folder: TenantFolder, scope: LibraryScopeKey) {
+        folder.scopeType = scope.type()
+        folder.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
+        folder.scopeUser = (scope as? LibraryScopeKey.User)?.user
+    }
+
+    fun apply(album: TenantAlbum, scope: LibraryScopeKey) {
+        album.scopeType = scope.type()
+        album.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
+        album.scopeUser = (scope as? LibraryScopeKey.User)?.user
+    }
+
+    fun apply(media: Media, scope: LibraryScopeKey) {
+        media.scopeType = scope.type()
+        media.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
+        media.scopeUser = (scope as? LibraryScopeKey.User)?.user
+    }
+
+    fun pathPrefix(scope: LibraryScopeKey): String =
+        when (scope) {
+            LibraryScopeKey.Tenant -> ""
+            is LibraryScopeKey.Group -> "/@${scope.group.name}"
+            is LibraryScopeKey.User -> "/~me"
+        }
+
+    fun sameAs(left: LibraryScopeKey, right: LibraryScopeKey): Boolean =
+        when {
+            left is LibraryScopeKey.Tenant && right is LibraryScopeKey.Tenant -> true
+            left is LibraryScopeKey.Group && right is LibraryScopeKey.Group -> left.group.id == right.group.id
+            left is LibraryScopeKey.User && right is LibraryScopeKey.User -> left.user.id == right.user.id
+            else -> false
+        }
+
+    private fun LibraryScopeKey.type(): LibraryScopeType =
+        when (this) {
+            LibraryScopeKey.Tenant -> LibraryScopeType.Tenant
+            is LibraryScopeKey.Group -> LibraryScopeType.Group
+            is LibraryScopeKey.User -> LibraryScopeType.User
+        }
+
+    private fun fromFields(type: LibraryScopeType, group: TenantGroup?, user: User?): LibraryScopeKey =
+        when (type) {
+            LibraryScopeType.Tenant -> LibraryScopeKey.Tenant
+            LibraryScopeType.Group -> LibraryScopeKey.Group(group ?: throw IllegalStateException("Group scope has no group"))
+            LibraryScopeType.User -> LibraryScopeKey.User(user ?: throw IllegalStateException("User scope has no user"))
+        }
+}

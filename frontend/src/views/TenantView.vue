@@ -8,8 +8,8 @@ import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import type {
   ExplorerAlbum,
-  ExplorerContext,
   ExplorerFolder,
+  ExplorerLocation,
   LibraryItemType
 } from '../features/explorer/api'
 import AlbumCoverDialog from '../components/explorer/AlbumCoverDialog.vue'
@@ -19,7 +19,6 @@ import EditExplorerItemDialog from '../components/explorer/EditExplorerItemDialo
 import ExplorerGrid from '../components/explorer/ExplorerGrid.vue'
 import ExplorerMediaGrid from '../components/explorer/ExplorerMediaGrid.vue'
 import MoveExplorerItemDialog from '../components/explorer/MoveExplorerItemDialog.vue'
-import ShareExplorerItemDialog from '../components/explorer/ShareExplorerItemDialog.vue'
 import UploadMediaDialog from '../components/explorer/UploadMediaDialog.vue'
 import { useExplorerData } from '../features/explorer/composables/useExplorerData'
 import { useExplorerDialogs } from '../features/explorer/composables/useExplorerDialogs'
@@ -75,10 +74,10 @@ useTenantExplorerToolbar({
 })
 
 function openContextSettings() {
-  const context = explorer.value?.context
-  if (!context || contextType.value === 'tenant') return
-  const type: LibraryItemType = contextType.value === 'album' ? 'album' : 'folder'
-  dialogs.openEdit(type, dialogs.itemFromContext(context as ExplorerContext, type))
+  const location = explorer.value?.location
+  if (!location || contextType.value === 'TENANT' || contextType.value === 'GROUP' || contextType.value === 'USER') return
+  const type: LibraryItemType = contextType.value === 'ALBUM' ? 'album' : 'folder'
+  dialogs.openEdit(type, dialogs.itemFromLocation(location as ExplorerLocation, type))
 }
 
 function navigateToPath(path: string) {
@@ -90,7 +89,7 @@ function navigateToPath(path: string) {
   <div class="explorer-page">
     <div class="explorer-titlebar">
       <div>
-        <h1>{{ explorer?.context.displayName || tenantTitle }}</h1>
+        <h1>{{ explorer?.location.displayName || tenantTitle }}</h1>
       </div>
       <Tag v-if="tenant" :value="roleLabel" severity="info" />
     </div>
@@ -121,16 +120,16 @@ function navigateToPath(path: string) {
 
       <ExplorerGrid
         v-if="activeView === 'structure'"
+        :scope-roots="explorer.scopeRoots"
         :folders="explorer.folders"
         :albums="explorer.albums"
+        @open-scope-root="navigateToPath($event.path)"
         @open-folder="navigateToPath($event.path)"
         @open-album="navigateToPath($event.path)"
         @edit-folder="dialogs.openEdit('folder', $event as ExplorerFolder)"
         @edit-album="dialogs.openEdit('album', $event as ExplorerAlbum)"
         @move-folder="dialogs.openMove('folder', $event as ExplorerFolder)"
         @move-album="dialogs.openMove('album', $event as ExplorerAlbum)"
-        @share-folder="dialogs.openShare('folder', $event as ExplorerFolder)"
-        @share-album="dialogs.openShare('album', $event as ExplorerAlbum)"
         @cover-album="dialogs.openCover"
         @delete-folder="dialogs.openDelete('folder', $event as ExplorerFolder)"
         @delete-album="dialogs.openDelete('album', $event as ExplorerAlbum)"
@@ -175,12 +174,6 @@ function navigateToPath(path: string) {
       :type="dialogs.selectedType.value"
       :item="dialogs.selectedItem.value"
       @saved="loadExplorer"
-    />
-    <ShareExplorerItemDialog
-      v-model:visible="dialogs.shareOpen.value"
-      :tenant-name="tenantName"
-      :type="dialogs.selectedType.value"
-      :item="dialogs.selectedItem.value"
     />
     <DeleteExplorerItemDialog
       v-model:visible="dialogs.deleteOpen.value"
