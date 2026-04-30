@@ -5,7 +5,6 @@ export type ExplorerToolbarAction = {
   key: string
   label: string
   icon: string
-  disabled?: boolean
   severity?: 'secondary' | 'success' | 'info' | 'warn' | 'danger' | 'help' | 'contrast'
   outlined?: boolean
   command: () => void

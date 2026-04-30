@@ -45,34 +45,38 @@ export function useTenantExplorerToolbar(options: ToolbarOptions) {
     }))
 
     setExplorerToolbar(breadcrumbs, [
-      {
-        key: 'create-folder',
-        label: 'Ordner',
-        icon: 'pi pi-folder-plus',
-        disabled: options.isAlbumContext.value,
-        command: () => options.openCreate('folder')
-      },
-      {
-        key: 'create-album',
-        label: 'Album',
-        icon: 'pi pi-images',
-        disabled: options.isAlbumContext.value,
-        command: () => options.openCreate('album')
-      },
-      {
-        key: 'upload',
-        label: 'Hochladen',
-        icon: 'pi pi-upload',
-        disabled: !options.isAlbumContext.value,
-        command: options.openUpload
-      },
+      ...(!options.isAlbumContext.value
+        ? [
+            {
+              key: 'create-folder',
+              label: 'Ordner',
+              icon: 'pi pi-folder-plus',
+              command: () => options.openCreate('folder')
+            },
+            {
+              key: 'create-album',
+              label: 'Album',
+              icon: 'pi pi-images',
+              command: () => options.openCreate('album')
+            }
+          ]
+        : []),
+      ...(options.isAlbumContext.value
+        ? [
+            {
+              key: 'upload',
+              label: 'Hochladen',
+              icon: 'pi pi-upload',
+              command: options.openUpload
+            }
+          ]
+        : []),
       {
         key: 'settings',
         label: 'Einstellungen',
         icon: 'pi pi-cog',
         severity: 'secondary',
         outlined: true,
-        disabled: !options.isLibraryContext.value,
         command: options.openContextSettings
       }
     ])

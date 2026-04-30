@@ -25,7 +25,6 @@ const actions = computed(() => (explorerToolbar.active ? explorerToolbar.actions
           :label="action.label"
           :severity="action.severity"
           :outlined="action.outlined"
-          :disabled="action.disabled"
           size="small"
           @click="action.command"
         />
