@@ -5,8 +5,8 @@ import Breadcrumb from 'primevue/breadcrumb'
 import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
 import { explorerToolbar } from '../../composables/useExplorerToolbar'
 
-const { breadcrumbHome, breadcrumbItems } = useBreadcrumbs()
-const fallbackBreadcrumbs = computed(() => [breadcrumbHome.value, ...breadcrumbItems.value])
+const { fallbackBreadcrumb } = useBreadcrumbs()
+const fallbackBreadcrumbs = computed(() => [fallbackBreadcrumb.value])
 const items = computed(() =>
   explorerToolbar.active ? explorerToolbar.breadcrumbs : fallbackBreadcrumbs.value
 )

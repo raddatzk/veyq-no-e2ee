@@ -140,6 +140,7 @@ function navigateToPath(path: string) {
       v-model:visible="dialogs.createOpen.value"
       :type="dialogs.createType.value"
       :tenant-name="tenantName"
+      :tenant-display-name="tenantTitle"
       :parent-path="explorerPath"
       @saved="loadExplorer"
     />

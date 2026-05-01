@@ -9,11 +9,13 @@ import { createAlbum, createFolder, type LibraryItemType } from '../../api/explo
 import { groups, type TenantGroup } from '../../api/groupClient'
 import { toPermalink } from '../../composables/usePermalink'
 import { getErrorMessage } from '../../shared/utils/errors'
+import { authState} from '../../authState'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   type: LibraryItemType
   tenantName: string
+  tenantDisplayName: string
   parentPath: string
 }>()
 const emit = defineEmits<{
@@ -30,12 +32,12 @@ const scopeValue = ref('TENANT')
 const title = computed(() => (props.type === 'folder' ? 'Ordner erstellen' : 'Album erstellen'))
 const isRootCreate = computed(() => !props.parentPath || props.parentPath === '/')
 const scopeOptions = computed(() => [
-  { label: props.tenantName, value: 'TENANT' },
+  { label: props.tenantDisplayName, value: 'TENANT' },
   ...availableGroups.value.map((group) => ({
     label: `@${group.displayName}`,
     value: `GROUP:${group.name}`
   })),
-  { label: '~me', value: 'USER' }
+  { label: `~${authState.user!.displayName}`, value: 'USER' }
 ])
 
 watch(displayName, (value) => {

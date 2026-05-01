@@ -2,36 +2,23 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { MenuItem } from 'primevue/menuitem'
 import { useAuthState } from '../shared/state/useAuthState'
-import { explorerPathToTenantRoute } from '../shared/utils/paths'
 
 export function useBreadcrumbs() {
   const route = useRoute()
   const router = useRouter()
   const { authState } = useAuthState()
   const activeTenantName = computed(() => String(route.params.tenantName || ''))
-  const routePath = computed(() => route.fullPath.split('?')[0].split('#')[0])
-  const contentPathSegments = computed(() => routePath.value.split('/').filter(Boolean).slice(1))
   const activeTenant = computed(() =>
     authState.tenants.find((tenant) => tenant.name === activeTenantName.value)
   )
-  const breadcrumbHome = computed<MenuItem>(() => ({
+  const fallbackBreadcrumb = computed<MenuItem>(() => ({
     label: activeTenant.value?.displayName || 'Lunva',
     command: () => {
       void router.push(activeTenant.value ? `/${activeTenant.value.name}` : '/')
     }
   }))
-  const breadcrumbItems = computed<MenuItem[]>(() =>
-    contentPathSegments.value.map((segment, index) => ({
-      label: segment,
-      command: () => {
-        const path = `/${contentPathSegments.value.slice(0, index + 1).join('/')}`
-        void router.push(explorerPathToTenantRoute(activeTenantName.value, path))
-      }
-    }))
-  )
   return {
     activeTenant,
-    breadcrumbHome,
-    breadcrumbItems
+    fallbackBreadcrumb
   }
 }
