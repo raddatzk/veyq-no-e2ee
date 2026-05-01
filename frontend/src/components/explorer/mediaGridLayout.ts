@@ -1,8 +1,12 @@
+import { flickrJustifiedLayout } from './vendor/flickrJustifiedLayout'
+
 export type MediaGridLayoutInput = {
   ids: string[]
   aspectRatios: Record<string, number | undefined>
   containerWidth: number
   targetHeight: number
+  minHeight?: number
+  maxHeight?: number
   gap: number
 }
 
@@ -16,73 +20,87 @@ export type MediaGridLayoutRow = {
   items: MediaGridLayoutItem[]
   width: number
   height: number
+  align: 'justify' | 'center'
 }
 
 const fallbackAspectRatio = 4 / 3
-const minHeightRatio = 0.65
-const maxHeightRatio = 1.6
+const rowTopTolerance = 0.5
 
 export function buildJustifiedMediaRows(input: MediaGridLayoutInput): MediaGridLayoutRow[] {
-  const containerWidth = Math.max(0, input.containerWidth)
-  if (!input.ids.length || containerWidth <= 0 || input.targetHeight <= 0) return []
-
-  const rows: MediaGridLayoutRow[] = []
-  let currentIds: string[] = []
-  let currentAspectRatioSum = 0
-
-  input.ids.forEach((id) => {
-    const aspectRatio = safeAspectRatio(input.aspectRatios[id])
-    currentIds.push(id)
-    currentAspectRatioSum += aspectRatio
-
-    const rowGapWidth = input.gap * Math.max(0, currentIds.length - 1)
-    const targetWidth = currentAspectRatioSum * input.targetHeight + rowGapWidth
-    if (targetWidth >= containerWidth) {
-      rows.push(buildRow(currentIds, input, containerWidth))
-      currentIds = []
-      currentAspectRatioSum = 0
-    }
-  })
-
-  if (currentIds.length) {
-    rows.push(buildRow(currentIds, input, containerWidth))
+  const normalized = normalizeInput(input)
+  if (!normalized.ids.length || normalized.containerWidth <= 0 || normalized.targetHeight <= 0) {
+    return []
   }
+
+  const geometry = flickrJustifiedLayout(
+    normalized.ids.map((id) => safeAspectRatio(normalized.aspectRatios[id])),
+    {
+      containerWidth: normalized.containerWidth,
+      boxSpacing: normalized.gap,
+      targetRowHeight: normalized.targetHeight,
+      targetRowHeightTolerance: targetRowHeightTolerance(normalized),
+      minRowHeight: normalized.minHeight,
+      maxRowHeight: normalized.maxHeight,
+      showWidows: true,
+      widowLayoutStyle: 'center'
+    }
+  )
+
+  return groupBoxesIntoRows(normalized.ids, geometry.boxes, normalized.gap)
+}
+
+export function targetRowHeightTolerance(
+  input: Pick<Required<MediaGridLayoutInput>, 'targetHeight' | 'minHeight' | 'maxHeight'>
+): number {
+  if (input.targetHeight <= 0) return 0
+  return (
+    Math.max(input.targetHeight - input.minHeight, input.maxHeight - input.targetHeight, 0) /
+    input.targetHeight
+  )
+}
+
+function normalizeInput(input: MediaGridLayoutInput): Required<MediaGridLayoutInput> {
+  return {
+    ...input,
+    containerWidth: Math.max(0, input.containerWidth),
+    minHeight: input.minHeight ?? input.targetHeight * 0.8,
+    maxHeight: input.maxHeight ?? input.targetHeight
+  }
+}
+
+function groupBoxesIntoRows(
+  ids: string[],
+  boxes: ReturnType<typeof flickrJustifiedLayout>['boxes'],
+  gap: number
+): MediaGridLayoutRow[] {
+  const rows: MediaGridLayoutRow[] = []
+  let currentTop: number | null = null
+
+  boxes.forEach((box, index) => {
+    if (currentTop === null || Math.abs(box.top - currentTop) > rowTopTolerance) {
+      currentTop = box.top
+      rows.push({
+        items: [],
+        width: 0,
+        height: box.height,
+        align: box.layoutStyle === 'center' ? 'center' : 'justify'
+      })
+    }
+
+    const row = rows[rows.length - 1]
+    row.items.push({
+      id: ids[index],
+      width: box.width,
+      height: box.height
+    })
+    row.height = box.height
+    row.align = box.layoutStyle === 'center' ? 'center' : row.align
+    row.width = row.items.reduce((sum, item) => sum + item.width, gap * Math.max(0, row.items.length - 1))
+  })
 
   return rows
 }
 
-function buildRow(
-  ids: string[],
-  input: MediaGridLayoutInput,
-  containerWidth: number
-): MediaGridLayoutRow {
-  const gapWidth = input.gap * Math.max(0, ids.length - 1)
-  const availableWidth = Math.max(0, containerWidth - gapWidth)
-  const aspectRatioSum = ids.reduce(
-    (sum, id) => sum + safeAspectRatio(input.aspectRatios[id]),
-    0
-  )
-  const rawHeight = availableWidth / aspectRatioSum
-  const minHeight = input.targetHeight * minHeightRatio
-  const maxHeight = input.targetHeight * maxHeightRatio
-  const height = clamp(rawHeight, minHeight, maxHeight)
-  const items = ids.map((id) => ({
-    id,
-    width: Math.min(containerWidth, safeAspectRatio(input.aspectRatios[id]) * height),
-    height
-  }))
-
-  return {
-    items,
-    width: items.reduce((sum, item) => sum + item.width, gapWidth),
-    height
-  }
-}
-
 function safeAspectRatio(value: number | undefined): number {
   return value && Number.isFinite(value) && value > 0 ? value : fallbackAspectRatio
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
 }

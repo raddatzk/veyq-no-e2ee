@@ -53,6 +53,8 @@ export type ExplorerMedia = {
   mimeType: string
   sizeBytes: number
   contentUrl: string
+  imageWidth?: number | null
+  imageHeight?: number | null
 }
 
 export type ExplorerResponse = {

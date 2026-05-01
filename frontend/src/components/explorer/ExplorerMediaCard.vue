@@ -3,11 +3,17 @@ import { computed } from 'vue'
 import type { ExplorerMedia } from '../../api/explorerClient'
 import { API_BASE } from '../../api/httpClient'
 
-const props = defineProps<{
-  media: ExplorerMedia
-  width: number
-  height: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    media: ExplorerMedia
+    width: number
+    height: number
+    loading?: 'lazy' | 'eager'
+  }>(),
+  {
+    loading: 'lazy'
+  }
+)
 const emit = defineEmits<{
   open: []
   aspectRatio: [value: number]
@@ -44,7 +50,7 @@ function emitVideoAspectRatio(event: Event) {
         v-if="isImage"
         :src="mediaUrl"
         :alt="media.title || media.id"
-        loading="lazy"
+        :loading="loading"
         @load="emitImageAspectRatio"
       />
       <video

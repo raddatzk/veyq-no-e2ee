@@ -81,7 +81,7 @@ function navigateToPath(path: string) {
 </script>
 
 <template>
-  <div class="explorer-page">
+  <div class="explorer-page" :class="{ 'explorer-page-media': activeView === 'media' }">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="mediaError" severity="warn" :closable="false">{{ mediaError }}</Message>
 

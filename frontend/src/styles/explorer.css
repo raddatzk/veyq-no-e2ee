@@ -3,6 +3,10 @@
   gap: 1.25rem;
 }
 
+.content:has(.explorer-page-media) {
+  max-width: none;
+}
+
 .explorer-titlebar {
   display: flex;
   justify-content: space-between;
@@ -62,11 +66,38 @@
   gap: 0.25rem;
 }
 
+.media-grid-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 180px;
+  color: #64748b;
+}
+
 .media-grid-row {
   display: flex;
   gap: 0.25rem;
   max-width: 100%;
   overflow: hidden;
+}
+
+.media-grid-row-justify {
+  justify-content: flex-start;
+}
+
+.media-grid-row-center {
+  justify-content: center;
+}
+
+.media-ratio-probes {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .explorer-scope-root-list {
