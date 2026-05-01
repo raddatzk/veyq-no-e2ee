@@ -1,4 +1,4 @@
-package com.lunva.api.library.settings
+package com.lunva.api.settings
 
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.ConflictException
@@ -15,6 +15,7 @@ import com.lunva.api.domain.TenantGroupMemberRepo
 import com.lunva.api.domain.TenantGroupRepo
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.generated.explorer.model.ExplorerBreadcrumb
+import com.lunva.api.generated.explorer.model.LocationKind
 import com.lunva.api.generated.settings.model.SettingsBreadcrumb
 import com.lunva.api.generated.settings.model.SettingsLocation
 import com.lunva.api.generated.settings.model.SettingsResponse
@@ -62,7 +63,7 @@ class SettingsService @Inject constructor(
 
     @Transactional
     fun updateMySettings(request: UpdateUserSettingsRequest): UserSettingsResponse {
-        val user = userRepo.findById(user().id) ?: throw NotFoundException("User not found")
+        val user = user()
         val displayName = request.displayName?.trim()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("displayName must not be blank")
         val email = request.email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
@@ -214,15 +215,15 @@ class SettingsService @Inject constructor(
     private fun ResolvedExplorerLocation.toBreadcrumbs(): List<ExplorerBreadcrumb> =
         when (this) {
             ResolvedExplorerLocation.Tenant -> listOf(
-                ExplorerBreadcrumb(com.lunva.api.generated.explorer.model.LocationKind.TENANT, "/", tenant().displayName, tenant().displayName)
+                ExplorerBreadcrumb(LocationKind.TENANT, "/", tenant().displayName, tenant().displayName)
             )
             is ResolvedExplorerLocation.Group -> listOf(
-                ExplorerBreadcrumb(com.lunva.api.generated.explorer.model.LocationKind.TENANT, "/", tenant().displayName, tenant().displayName),
-                ExplorerBreadcrumb(com.lunva.api.generated.explorer.model.LocationKind.GROUP, LibraryScopes.pathPrefix(scope), scope.group.displayName, "@${scope.group.displayName}"),
+                ExplorerBreadcrumb(LocationKind.TENANT, "/", tenant().displayName, tenant().displayName),
+                ExplorerBreadcrumb(LocationKind.GROUP, LibraryScopes.pathPrefix(scope), scope.group.displayName, "@${scope.group.displayName}"),
             )
             is ResolvedExplorerLocation.User -> listOf(
-                ExplorerBreadcrumb(com.lunva.api.generated.explorer.model.LocationKind.TENANT, "/", tenant().displayName, tenant().displayName),
-                ExplorerBreadcrumb(com.lunva.api.generated.explorer.model.LocationKind.USER, LibraryScopes.pathPrefix(scope), scope.user.displayName, "~${scope.user.displayName}"),
+                ExplorerBreadcrumb(LocationKind.TENANT, "/", tenant().displayName, tenant().displayName),
+                ExplorerBreadcrumb(LocationKind.USER, LibraryScopes.pathPrefix(scope), scope.user.displayName, "~${scope.user.displayName}"),
             )
             is ResolvedExplorerLocation.Folder -> breadcrumbs(scope)
             is ResolvedExplorerLocation.Album -> breadcrumbs(scope)
@@ -231,13 +232,13 @@ class SettingsService @Inject constructor(
     private fun ExplorerBreadcrumb.toSettingsBreadcrumb(tenantName: String): SettingsBreadcrumb =
         SettingsBreadcrumb(kind.toSubjectType(), "/$tenantName${path.trimEnd('/')}", displayName, label)
 
-    private fun com.lunva.api.generated.explorer.model.LocationKind.toSubjectType(): SettingsSubjectType =
+    private fun LocationKind.toSubjectType(): SettingsSubjectType =
         when (this) {
-            com.lunva.api.generated.explorer.model.LocationKind.TENANT -> SettingsSubjectType.TENANT
-            com.lunva.api.generated.explorer.model.LocationKind.GROUP -> SettingsSubjectType.GROUP
-            com.lunva.api.generated.explorer.model.LocationKind.USER -> SettingsSubjectType.TENANT_USER
-            com.lunva.api.generated.explorer.model.LocationKind.FOLDER -> SettingsSubjectType.FOLDER
-            com.lunva.api.generated.explorer.model.LocationKind.ALBUM -> SettingsSubjectType.ALBUM
+            LocationKind.TENANT -> SettingsSubjectType.TENANT
+            LocationKind.GROUP -> SettingsSubjectType.GROUP
+            LocationKind.USER -> SettingsSubjectType.TENANT_USER
+            LocationKind.FOLDER -> SettingsSubjectType.FOLDER
+            LocationKind.ALBUM -> SettingsSubjectType.ALBUM
         }
 
     private fun <T> withTenant(tenantName: String, block: () -> T): T {

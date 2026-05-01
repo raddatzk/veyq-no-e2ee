@@ -1,4 +1,4 @@
-package com.lunva.api.library.settings
+package com.lunva.api.settings
 
 import com.lunva.api.auth.filterchain.GroupOwnerRequired
 import com.lunva.api.auth.filterchain.TenantOwnerRequired

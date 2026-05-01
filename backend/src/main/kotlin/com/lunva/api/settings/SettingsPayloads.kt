@@ -1,4 +1,4 @@
-package com.lunva.api.library.settings
+package com.lunva.api.settings
 
 data class ServerSettingsResponse(val displayName: String, val userManagementAvailable: Boolean)
 
