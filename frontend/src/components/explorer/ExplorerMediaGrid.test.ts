@@ -132,6 +132,28 @@ describe('ExplorerMediaGrid', () => {
     expect(wrapper.find('.media-grid-row-center').exists()).toBe(false)
   })
 
+  it('eagerly loads media once a visible row is published', async () => {
+    const wrapper = mountGrid(
+      Array.from({ length: 5 }, (_, index) =>
+        createMedia({
+          id: `media-${index}`,
+          imageWidth: 1000,
+          imageHeight: 1000
+        })
+      )
+    )
+
+    await nextTick()
+
+    expect(wrapper.findAllComponents(ExplorerMediaCard).map((card) => card.props('loading'))).toEqual([
+      'eager',
+      'eager',
+      'eager',
+      'eager',
+      'eager'
+    ])
+  })
+
   it('does not render a fallback justified layout while ratios are unknown', async () => {
     const wrapper = mountGrid([
       createMedia({ id: 'a', imageWidth: null, imageHeight: null }),
@@ -153,14 +175,63 @@ describe('ExplorerMediaGrid', () => {
           imageWidth: 1000,
           imageHeight: 1000
         })
+      )
+    )
+
+    await nextTick()
+
+    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+
+    await wrapper.setProps({ streaming: true })
+    await nextTick()
+
+    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+    expect(wrapper.find('.explorer-loading').exists()).toBe(false)
+  })
+
+  it('waits for the initial media stream before rendering a partial first row', async () => {
+    const wrapper = mountGrid(
+      [createMedia({ id: 'first', imageWidth: 1000, imageHeight: 1000 })],
+      true
+    )
+
+    await nextTick()
+
+    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-row').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Medien werden geladen...')
+
+    await wrapper.setProps({ streaming: false })
+    await nextTick()
+
+    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
+    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+  })
+
+  it('publishes completed rows while keeping the streaming widow row buffered', async () => {
+    const wrapper = mountGrid(
+      Array.from({ length: 6 }, (_, index) =>
+        createMedia({
+          id: `media-${index}`,
+          imageWidth: 1000,
+          imageHeight: 1000
+        })
       ),
       true
     )
 
     await nextTick()
 
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
-    expect(wrapper.find('.explorer-loading').exists()).toBe(false)
+    expect(wrapper.findAll('.media-grid-row')).toHaveLength(1)
+    expect(wrapper.find('.media-grid-row-justify').exists()).toBe(true)
+    expect(wrapper.findAllComponents(ExplorerMediaCard)).toHaveLength(5)
+
+    await wrapper.setProps({ streaming: false })
+    await nextTick()
+
+    expect(wrapper.findAll('.media-grid-row')).toHaveLength(2)
+    expect(wrapper.findAllComponents(ExplorerMediaCard)).toHaveLength(6)
+    expect(wrapper.find('.media-grid-row-center').exists()).toBe(true)
   })
 
   it('shows the streaming loader while the media stream has not yielded items', async () => {

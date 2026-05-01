@@ -21,6 +21,7 @@ export type MediaGridLayoutRow = {
   width: number
   height: number
   align: 'justify' | 'center'
+  widow: boolean
 }
 
 const fallbackAspectRatio = 4 / 3
@@ -46,7 +47,7 @@ export function buildJustifiedMediaRows(input: MediaGridLayoutInput): MediaGridL
     }
   )
 
-  return groupBoxesIntoRows(normalized.ids, geometry.boxes, normalized.gap)
+  return groupBoxesIntoRows(normalized.ids, geometry.boxes, normalized.gap, geometry.widowCount)
 }
 
 export function targetRowHeightTolerance(
@@ -71,19 +72,24 @@ function normalizeInput(input: MediaGridLayoutInput): Required<MediaGridLayoutIn
 function groupBoxesIntoRows(
   ids: string[],
   boxes: ReturnType<typeof flickrJustifiedLayout>['boxes'],
-  gap: number
+  gap: number,
+  widowCount: number
 ): MediaGridLayoutRow[] {
   const rows: MediaGridLayoutRow[] = []
   let currentTop: number | null = null
+  const widowStartIndex = boxes.length - widowCount
 
   boxes.forEach((box, index) => {
+    const isWidow = index >= widowStartIndex
+
     if (currentTop === null || Math.abs(box.top - currentTop) > rowTopTolerance) {
       currentTop = box.top
       rows.push({
         items: [],
         width: 0,
         height: box.height,
-        align: box.layoutStyle === 'center' ? 'center' : 'justify'
+        align: box.layoutStyle === 'center' ? 'center' : 'justify',
+        widow: isWidow
       })
     }
 
@@ -95,6 +101,7 @@ function groupBoxesIntoRows(
     })
     row.height = box.height
     row.align = box.layoutStyle === 'center' ? 'center' : row.align
+    row.widow = row.widow || isWidow
     row.width = row.items.reduce((sum, item) => sum + item.width, gap * Math.max(0, row.items.length - 1))
   })
 

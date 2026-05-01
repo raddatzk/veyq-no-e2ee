@@ -15,6 +15,20 @@ export async function streamExplorerMedia(
   onItem: (item: ExplorerMedia) => void,
   options: StreamMediaOptions = {}
 ): Promise<void> {
+  return streamExplorerMediaMetadata(
+    tenantName,
+    path,
+    (items) => items.forEach((item) => onItem(item)),
+    options
+  )
+}
+
+export async function streamExplorerMediaMetadata(
+  tenantName: string,
+  path: string,
+  onBatch: (items: ExplorerMedia[]) => void,
+  options: StreamMediaOptions = {}
+): Promise<void> {
   const response = await apiFetch(tenantApiPath(tenantName, 'media', `?${pathQuery(path)}`), {
     signal: options.signal,
     headers: { Accept: 'application/x-ndjson' }
@@ -27,9 +41,12 @@ export async function streamExplorerMedia(
     throw new Error(body.error || 'Medien konnten nicht geladen werden')
   }
 
+  const emit = createMetadataBatchEmitter(onBatch, options)
+
   if (!response.body) {
     const text = await response.text()
-    parseNdjson(text, onItem)
+    parseNdjson(text, emit.push)
+    emit.flush()
     return
   }
 
@@ -43,11 +60,12 @@ export async function streamExplorerMedia(
     buffer += decoder.decode(value, { stream: true })
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
-    lines.forEach((line) => parseLine(line, onItem))
+    lines.forEach((line) => parseLine(line, emit.push))
   }
 
   buffer += decoder.decode()
-  parseLine(buffer, onItem)
+  parseLine(buffer, emit.push)
+  emit.flush()
 }
 
 export async function createMediaUpload(
@@ -134,4 +152,55 @@ function parseLine(line: string, onItem: (item: ExplorerMedia) => void) {
   const trimmed = line.trim()
   if (!trimmed) return
   onItem(JSON.parse(trimmed) as ExplorerMedia)
+}
+
+function createMetadataBatchEmitter(
+  onBatch: (items: ExplorerMedia[]) => void,
+  options: StreamMediaOptions
+) {
+  const batchSize = options.batchSize ?? 32
+  let batch: ExplorerMedia[] = []
+  let frame: number | null = null
+
+  function push(item: ExplorerMedia) {
+    if (options.signal?.aborted) return
+
+    batch.push(item)
+    if (batch.length >= batchSize) {
+      cancelScheduledFlush()
+      flush()
+    } else {
+      scheduleFlush()
+    }
+  }
+
+  function scheduleFlush() {
+    if (frame !== null || !batch.length) return
+    if (typeof requestAnimationFrame === 'undefined') return
+
+    frame = requestAnimationFrame(() => {
+      frame = null
+      flush()
+    })
+  }
+
+  function flush() {
+    if (frame !== null) cancelScheduledFlush()
+    if (options.signal?.aborted || !batch.length) return
+
+    const items = batch
+    batch = []
+    onBatch(items)
+  }
+
+  function cancelScheduledFlush() {
+    if (frame === null || typeof cancelAnimationFrame === 'undefined') {
+      frame = null
+      return
+    }
+    cancelAnimationFrame(frame)
+    frame = null
+  }
+
+  return { push, flush }
 }

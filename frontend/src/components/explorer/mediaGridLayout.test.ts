@@ -143,4 +143,18 @@ describe('media grid layout', () => {
     expect(rows[0].height).toBe(210)
     expect(rows[0].width).toBeCloseTo(2 * (4 / 3) * 210 + 4)
   })
+
+  it('marks the final incomplete row as a widow', () => {
+    const rows = buildJustifiedMediaRows({
+      ids: ['a', 'b', 'c', 'd', 'e', 'f'],
+      aspectRatios: { a: 1, b: 1, c: 1, d: 1, e: 1, f: 1 },
+      containerWidth: 1000,
+      ...desktop
+    })
+
+    expect(rows).toHaveLength(2)
+    expect(rows[0].widow).toBe(false)
+    expect(rows[1].widow).toBe(true)
+    expect(rows[1].align).toBe('center')
+  })
 })

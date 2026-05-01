@@ -97,6 +97,7 @@ export type MoveLibraryItemRequest = {
 
 export type StreamMediaOptions = {
   signal?: AbortSignal
+  batchSize?: number
 }
 
 export type UploadMediaRequest = {

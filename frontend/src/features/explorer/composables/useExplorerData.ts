@@ -1,5 +1,10 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef } from 'vue'
-import { getExplorer, streamExplorerMedia, type ExplorerMedia, type ExplorerResponse } from '../api'
+import {
+  getExplorer,
+  streamExplorerMediaMetadata,
+  type ExplorerMedia,
+  type ExplorerResponse
+} from '../api'
 import { getErrorMessage } from '../../../shared/utils/errors'
 
 export type ExplorerViewMode = 'structure' | 'media'
@@ -9,7 +14,7 @@ export function useExplorerData(
   explorerPath: ComputedRef<string>
 ) {
   const explorer = ref<ExplorerResponse | null>(null)
-  const media = ref<ExplorerMedia[]>([])
+  const mediaMetadata = ref<ExplorerMedia[]>([])
   const loading = ref(false)
   const streaming = ref(false)
   const error = ref('')
@@ -52,7 +57,7 @@ export function useExplorerData(
     streaming.value = false
     error.value = ''
     mediaError.value = ''
-    media.value = []
+    mediaMetadata.value = []
     mediaLoaded.value = false
 
     try {
@@ -75,11 +80,11 @@ export function useExplorerData(
     streamController.value = controller
     streaming.value = true
 
-    streamExplorerMedia(
+    streamExplorerMediaMetadata(
       tenantName.value,
       explorerPath.value,
-      (item) => {
-        if (sequence === loadSequence) media.value = [...media.value, item]
+      (items) => {
+        if (sequence === loadSequence) mediaMetadata.value = [...mediaMetadata.value, ...items]
       },
       { signal: controller.signal }
     )
@@ -120,7 +125,7 @@ export function useExplorerData(
     isLibraryContext,
     loadExplorer,
     loading,
-    media,
+    media: mediaMetadata,
     mediaError,
     streaming,
     viewMode

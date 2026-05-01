@@ -4,6 +4,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import ExplorerMediaCard from './ExplorerMediaCard.vue'
 import ExplorerMediaLightbox from './ExplorerMediaLightbox.vue'
 import { buildJustifiedMediaRows } from './mediaGridLayout'
+import type { MediaGridLayoutRow } from './mediaGridLayout'
 import type { ExplorerMedia } from '../../api/explorerClient'
 
 const props = defineProps<{
@@ -17,19 +18,32 @@ const mediaGrid = ref<HTMLElement | null>(null)
 const mediaGridWidth = ref(0)
 const aspectRatios = ref<Record<string, number>>({})
 const mediaOverrides = ref<Record<string, ExplorerMedia>>({})
+const committedRows = ref<MediaGridLayoutRow[]>([])
 let mediaGridObserver: ResizeObserver | null = null
 let observedMediaGrid: HTMLElement | null = null
 let aspectRatioFrame: number | null = null
 let pendingAspectRatios: Record<string, number> = {}
+const committedMediaIds = computed(() =>
+  committedRows.value.flatMap((row) => row.items.map((item) => item.id))
+)
+const currentMediaIds = computed(() => props.media.map((item) => item.id))
+const mediaById = computed(() => new Map(props.media.map((item) => [item.id, item])))
+const visibleMedia = computed(() =>
+  committedMediaIds.value
+    .map((mediaId) => mediaById.value.get(mediaId))
+    .filter((item): item is ExplorerMedia => Boolean(item))
+)
 const selectedMedia = computed(() =>
   selectedIndex.value === null
     ? null
-    : mediaOverrides.value[props.media[selectedIndex.value]?.id] || props.media[selectedIndex.value] || null
+    : mediaOverrides.value[visibleMedia.value[selectedIndex.value]?.id] ||
+      visibleMedia.value[selectedIndex.value] ||
+      null
 )
 const isLightboxOpen = computed(() => selectedMedia.value !== null)
 const canShowPrevious = computed(() => selectedIndex.value !== null && selectedIndex.value > 0)
 const canShowNext = computed(
-  () => selectedIndex.value !== null && selectedIndex.value < props.media.length - 1
+  () => selectedIndex.value !== null && selectedIndex.value < visibleMedia.value.length - 1
 )
 const layoutWidth = computed(() => mediaGridWidth.value || 1024)
 const minTileHeight = computed(() => (layoutWidth.value <= 720 ? 140 : 170))
@@ -52,23 +66,11 @@ const knownAspectRatioIds = computed(
 const unknownAspectRatioMedia = computed(() =>
   props.media.filter((item) => !knownAspectRatioIds.value.has(item.id))
 )
-const canRenderMediaRows = computed(
-  () => props.media.length > 0 && mediaGridWidth.value > 0 && unknownAspectRatioMedia.value.length === 0
+const canRenderMediaRows = computed(() => committedRows.value.length > 0)
+const mediaRows = computed(() => committedRows.value)
+const layoutInputSignature = computed(() =>
+  currentMediaIds.value.map((mediaId) => `${mediaId}:${layoutAspectRatios.value[mediaId] ?? ''}`).join('|')
 )
-const mediaRows = computed(() => {
-  if (!canRenderMediaRows.value) return []
-
-  return buildJustifiedMediaRows({
-    ids: props.media.map((item) => item.id),
-    aspectRatios: layoutAspectRatios.value,
-    containerWidth: layoutWidth.value,
-    targetHeight: targetTileHeight.value,
-    minHeight: minTileHeight.value,
-    maxHeight: maxTileHeight.value,
-    gap: 4
-  })
-})
-const mediaById = computed(() => new Map(props.media.map((item) => [item.id, item])))
 
 onMounted(() => {
   attachMediaGridObserver()
@@ -84,10 +86,44 @@ watch(isLightboxOpen, (isOpen) => {
 
 watch(
   () => props.media.length,
-  (length) => {
-    if (selectedIndex.value !== null && selectedIndex.value >= length) closeLightbox()
+  () => {
+    if (selectedIndex.value !== null && selectedIndex.value >= visibleMedia.value.length) closeLightbox()
     attachMediaGridObserver()
   }
+)
+
+watch(
+  () => props.media.map((item) => item.id).join('|'),
+  () => {
+    if (!props.media.length) {
+      committedRows.value = []
+      aspectRatios.value = {}
+      pendingAspectRatios = {}
+      if (aspectRatioFrame !== null) {
+        cancelAnimationFrame(aspectRatioFrame)
+        aspectRatioFrame = null
+      }
+      return
+    }
+
+    const currentIds = new Set(props.media.map((item) => item.id))
+    if (!isPrefix(committedMediaIds.value, props.media.map((item) => item.id))) {
+      committedRows.value = []
+      closeLightbox()
+    }
+    aspectRatios.value = Object.fromEntries(
+      Object.entries(aspectRatios.value).filter(([mediaId]) => currentIds.has(mediaId))
+    )
+    pendingAspectRatios = Object.fromEntries(
+      Object.entries(pendingAspectRatios).filter(([mediaId]) => currentIds.has(mediaId))
+    )
+  }
+)
+
+watch(
+  [layoutInputSignature, layoutWidth, minTileHeight, targetTileHeight, maxTileHeight, () => props.streaming],
+  commitStableRows,
+  { flush: 'post' }
 )
 
 watch(mediaGrid, attachMediaGridObserver, { flush: 'post' })
@@ -127,7 +163,7 @@ function openLightbox(index: number) {
 }
 
 function mediaIndex(mediaId: string) {
-  return props.media.findIndex((item) => item.id === mediaId)
+  return visibleMedia.value.findIndex((item) => item.id === mediaId)
 }
 
 function mediaAspectRatio(media: ExplorerMedia): number | null {
@@ -147,6 +183,50 @@ function rememberAspectRatio(mediaId: string, aspectRatio: number) {
     pendingAspectRatios = {}
     aspectRatioFrame = null
   })
+}
+
+function commitStableRows() {
+  if (!props.media.length || mediaGridWidth.value <= 0) {
+    committedRows.value = []
+    return
+  }
+
+  const ids = currentMediaIds.value
+  const committedIds = committedMediaIds.value
+  const prefixIds = isPrefix(committedIds, ids) ? committedIds : []
+  const committedPrefixRows = prefixIds.length ? buildRows(prefixIds) : []
+  const suffixIds = ids.slice(prefixIds.length)
+  const knownSuffixIds = leadingKnownAspectRatioIds(suffixIds)
+  const candidateRows = knownSuffixIds.length ? buildRows(knownSuffixIds) : []
+  const publishableRows = props.streaming ? candidateRows.filter((row) => !row.widow) : candidateRows
+
+  committedRows.value = [...committedPrefixRows, ...publishableRows]
+}
+
+function buildRows(ids: string[]): MediaGridLayoutRow[] {
+  if (!ids.length) return []
+  return buildJustifiedMediaRows({
+    ids,
+    aspectRatios: layoutAspectRatios.value,
+    containerWidth: layoutWidth.value,
+    targetHeight: targetTileHeight.value,
+    minHeight: minTileHeight.value,
+    maxHeight: maxTileHeight.value,
+    gap: 4
+  })
+}
+
+function leadingKnownAspectRatioIds(ids: string[]): string[] {
+  const result: string[] = []
+  for (const mediaId of ids) {
+    if (!layoutAspectRatios.value[mediaId]) break
+    result.push(mediaId)
+  }
+  return result
+}
+
+function isPrefix(prefix: string[], values: string[]): boolean {
+  return prefix.every((value, index) => values[index] === value)
 }
 
 function updateMedia(media: ExplorerMedia) {
@@ -198,6 +278,7 @@ function handleKeydown(event: KeyboardEvent) {
             :media="mediaById.get(layoutItem.id)!"
             :width="layoutItem.width"
             :height="layoutItem.height"
+            loading="eager"
             @open="openLightbox(mediaIndex(layoutItem.id))"
             @aspect-ratio="rememberAspectRatio(layoutItem.id, $event)"
           />
@@ -205,7 +286,7 @@ function handleKeydown(event: KeyboardEvent) {
       </template>
       <div v-else class="media-grid-placeholder">
         <ProgressSpinner class="small-spinner" />
-        <span>Medien werden vorbereitet...</span>
+        <span>{{ streaming ? 'Medien werden geladen...' : 'Medien werden vorbereitet...' }}</span>
       </div>
     </div>
     <div v-else-if="streaming" class="explorer-loading">
@@ -214,7 +295,7 @@ function handleKeydown(event: KeyboardEvent) {
     </div>
     <div v-else class="explorer-empty">Keine Medien unter diesem Pfad.</div>
     <div
-      v-if="media.length && !canRenderMediaRows && unknownAspectRatioMedia.length"
+      v-if="media.length && unknownAspectRatioMedia.length"
       class="media-ratio-probes"
       inert
       aria-hidden="true"
