@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Lunva Settings API
-  version: 0.1.0
-  description: API contract for settings pages attached to tenant library locations.
+  version: 0.2.0
+  description: API contract for resolving settings navigation context.
 servers:
   - url: /
 security:
@@ -10,34 +10,30 @@ security:
 tags:
   - name: Settings
 paths:
-  /api/{tenantName}/settings:
+  /api/settings:
     get:
       tags:
         - Settings
       summary: Load navigation context for a settings page
       operationId: getSettings
       parameters:
-        - name: tenantName
-          in: path
-          required: true
-          schema:
-            type: string
-          example: friends
         - name: path
           in: query
           required: true
-          description: Full tenant route path ending in `/settings`.
+          description: Full frontend route path for the settings page.
           schema:
             type: string
           examples:
-            tenantSettings:
+            serverSettings:
               value: /settings
+            userSettings:
+              value: /~me
+            tenantSettings:
+              value: /friends/settings
             groupSettings:
-              value: /@alle/settings
-            personalSettings:
-              value: /~me/settings
+              value: /friends/@alle/settings
             folderSettings:
-              value: /@alle/urlaub/settings
+              value: /friends/urlaub/settings
       responses:
         "200":
           description: Settings navigation context.
@@ -49,26 +45,24 @@ paths:
                 groupSettings:
                   value:
                     location:
-                      kind: SETTINGS
-                      path: /@alle/settings
+                      path: /friends/@alle/settings
                       displayName: Einstellungen
                       label: Einstellungen
                     subject:
-                      kind: GROUP
-                      path: /@alle
+                      type: GROUP
                       displayName: Alle
                       label: "@Alle"
                     breadcrumbs:
-                      - kind: TENANT
-                        path: /
+                      - type: TENANT
+                        path: /friends
                         displayName: Friends
                         label: Friends
-                      - kind: GROUP
-                        path: /@alle
+                      - type: GROUP
+                        path: /friends/@alle
                         displayName: Alle
                         label: "@Alle"
-                      - kind: SETTINGS
-                        path: /@alle/settings
+                      - type: GROUP
+                        path: /friends/@alle/settings
                         displayName: Einstellungen
                         label: Einstellungen
         "400":
@@ -88,13 +82,13 @@ paths:
               example:
                 message: Authentication required
         "403":
-          description: The authenticated user is not a member of the tenant.
+          description: The authenticated user may not access the target settings page.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                message: Tenant membership required
+                message: User has insufficient role on server
         "404":
           description: The tenant or subject path was not found or is not visible to the current user.
           content:
@@ -121,7 +115,7 @@ components:
         location:
           $ref: "#/components/schemas/SettingsLocation"
         subject:
-          $ref: "#/components/schemas/SettingsLocation"
+          $ref: "#/components/schemas/SettingsSubject"
         breadcrumbs:
           type: array
           items:
@@ -130,15 +124,26 @@ components:
       type: object
       additionalProperties: false
       required:
-        - kind
         - path
         - displayName
         - label
       properties:
-        kind:
-          $ref: "#/components/schemas/SettingsLocationKind"
         path:
           type: string
+        displayName:
+          type: string
+        label:
+          type: string
+    SettingsSubject:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - displayName
+        - label
+      properties:
+        type:
+          $ref: "#/components/schemas/SettingsSubjectType"
         displayName:
           type: string
         label:
@@ -147,28 +152,29 @@ components:
       type: object
       additionalProperties: false
       required:
-        - kind
+        - type
         - path
         - displayName
         - label
       properties:
-        kind:
-          $ref: "#/components/schemas/SettingsLocationKind"
+        type:
+          $ref: "#/components/schemas/SettingsSubjectType"
         path:
           type: string
         displayName:
           type: string
         label:
           type: string
-    SettingsLocationKind:
+    SettingsSubjectType:
       type: string
       enum:
-        - TENANT
-        - GROUP
+        - SERVER
         - USER
+        - TENANT
+        - TENANT_USER
+        - GROUP
         - FOLDER
         - ALBUM
-        - SETTINGS
     ErrorResponse:
       type: object
       additionalProperties: false

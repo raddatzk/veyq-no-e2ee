@@ -3,6 +3,7 @@ import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
 import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
+import SettingsView from './views/SettingsView.vue'
 import SetupView from './views/SetupView.vue'
 import TenantRouteView from './views/TenantRouteView.vue'
 
@@ -12,6 +13,8 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/settings', name: 'server-settings', component: SettingsView },
+    { path: '/~me', name: 'user-settings', component: SettingsView },
     { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantRouteView }
   ]
 })
@@ -30,7 +33,7 @@ router.beforeEach((to) => {
 
   if (visitingTenant(to)) {
     const tenant = to.params.tenantName
-    storeHome(Array.isArray(tenant) ? tenant[0] : tenant)
+    if (tenant) storeHome(Array.isArray(tenant) ? tenant[0] : tenant)
   }
 
   return true

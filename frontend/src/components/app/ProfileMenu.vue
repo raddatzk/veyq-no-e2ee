@@ -10,6 +10,7 @@ const userMenu = ref()
 const router = useRouter()
 const { authState, setAnonymous } = useAuthState()
 const profileLabel = computed(() => authState.userLabel.charAt(0).toUpperCase() || 'A')
+const isServerOwner = computed(() => authState.user?.serverRole === 'ServerOwner')
 const menuItems = computed(() => {
   if (!authState.isAuthenticated) {
     return [
@@ -28,6 +29,27 @@ const menuItems = computed(() => {
       label: authState.userLabel,
       icon: 'pi pi-user'
     },
+    {
+      separator: true
+    },
+    {
+      label: 'Meine Einstellungen',
+      icon: 'pi pi-cog',
+      command: () => {
+        void router.push('/~me')
+      }
+    },
+    ...(isServerOwner.value
+      ? [
+          {
+            label: 'Server Einstellungen',
+            icon: 'pi pi-server',
+            command: () => {
+              void router.push('/settings')
+            }
+          }
+        ]
+      : []),
     {
       separator: true
     },

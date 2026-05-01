@@ -63,6 +63,7 @@ openApiGenerate {
             "openApiNullable" to "false",
             "hideGenerationTimestamp" to "true",
             "useTags" to "true",
+            "useBeanValidation" to "false",
         )
     )
     globalProperties.set(
@@ -96,6 +97,7 @@ val openApiGenerateSettings by tasks.registering(org.openapitools.generator.grad
             "openApiNullable" to "false",
             "hideGenerationTimestamp" to "true",
             "useTags" to "true",
+            "useBeanValidation" to "false",
         )
     )
     globalProperties.set(

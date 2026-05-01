@@ -25,7 +25,7 @@ class TenantRolesAllowedInterceptor @Inject constructor(
 
         val user = requestContext.user!!
 
-        val membership = requestContext.tenant!!.members.firstOrNull { it.user == user }
+        val membership = requestContext.tenant!!.members.firstOrNull { it.user.id == user.id }
             ?: throw ForbiddenException("User ${user.displayName} is not member in tenant ")
 
         if (membership.role != TenantRole.TenantOwner) {
@@ -35,4 +35,3 @@ class TenantRolesAllowedInterceptor @Inject constructor(
         return context.proceed()
     }
 }
-

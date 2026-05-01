@@ -29,6 +29,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -179,51 +180,77 @@ class ExplorerResourceTest {
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .queryParam("path", "/settings")
-            .`when`().get("/api/$tenantName/settings")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(200)
-            .body("location.kind", equalTo("SETTINGS"))
+            .body("location.kind", nullValue())
             .body("location.path", equalTo("/settings"))
-            .body("subject.kind", equalTo("TENANT"))
+            .body("subject.type", equalTo("SERVER"))
+            .body("subject.path", nullValue())
+            .body("breadcrumbs.label", equalTo(listOf("Einstellungen")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/~me")
+            .`when`().get("/api/settings")
+            .then()
+            .statusCode(200)
+            .body("location.kind", nullValue())
+            .body("location.path", equalTo("/~me"))
+            .body("subject.type", equalTo("USER"))
+            .body("subject.path", nullValue())
+            .body("breadcrumbs.label", equalTo(listOf("~owner-$runId")))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/$tenantName/settings")
+            .`when`().get("/api/settings")
+            .then()
+            .statusCode(200)
+            .body("location.kind", nullValue())
+            .body("location.path", equalTo("/$tenantName/settings"))
+            .body("subject.type", equalTo("TENANT"))
+            .body("subject.path", nullValue())
             .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "Einstellungen")))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("path", "/@${group.name}/settings")
-            .`when`().get("/api/$tenantName/settings")
+            .queryParam("path", "/$tenantName/@${group.name}/settings")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(200)
-            .body("subject.kind", equalTo("GROUP"))
-            .body("subject.path", equalTo("/@${group.name}"))
+            .body("subject.type", equalTo("GROUP"))
+            .body("subject.path", nullValue())
             .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "@${group.displayName}", "Einstellungen")))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("path", "/~me/settings")
-            .`when`().get("/api/$tenantName/settings")
+            .queryParam("path", "/$tenantName/~me/settings")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(200)
-            .body("subject.kind", equalTo("USER"))
+            .body("subject.type", equalTo("TENANT_USER"))
+            .body("subject.path", nullValue())
             .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "~owner-$runId", "Einstellungen")))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("path", "/tenant-folder/settings")
-            .`when`().get("/api/$tenantName/settings")
+            .queryParam("path", "/$tenantName/tenant-folder/settings")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(200)
-            .body("subject.kind", equalTo("FOLDER"))
-            .body("subject.path", equalTo("/tenant-folder"))
+            .body("subject.type", equalTo("FOLDER"))
+            .body("subject.path", nullValue())
             .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "Tenant Folder", "Einstellungen")))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("path", "/@${group.name}/group-folder/group-album/settings")
-            .`when`().get("/api/$tenantName/settings")
+            .queryParam("path", "/$tenantName/@${group.name}/group-folder/group-album/settings")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(200)
-            .body("subject.kind", equalTo("ALBUM"))
-            .body("subject.path", equalTo("/@${group.name}/group-folder/group-album"))
+            .body("subject.type", equalTo("ALBUM"))
+            .body("subject.path", nullValue())
             .body("breadcrumbs.label", equalTo(listOf("Explorer $runId", "@${group.displayName}", "Group Folder", "Group Album", "Einstellungen")))
     }
 
@@ -236,17 +263,150 @@ class ExplorerResourceTest {
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("path", "/@${group.name}")
-            .`when`().get("/api/$tenantName/settings")
+            .queryParam("path", "/$tenantName/@${group.name}")
+            .`when`().get("/api/settings")
             .then()
             .statusCode(400)
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", outsiderCookie)
-            .queryParam("path", "/@${group.name}/settings")
+            .queryParam("path", "/$tenantName/@${group.name}/settings")
+            .`when`().get("/api/settings")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("path", "/settings")
             .`when`().get("/api/$tenantName/settings")
             .then()
             .statusCode(404)
+    }
+
+    @Test
+    fun `settings APIs enforce server role and update current user`() {
+        createUser("member-settings-$runId", "member123", ServerRole.ServerMember)
+        val memberCookie = login("member-settings-$runId@example.com", "member123")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
+            .`when`().get("/api/settings/server")
+            .then()
+            .statusCode(403)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/settings/server")
+            .then()
+            .statusCode(200)
+            .body("userManagementAvailable", equalTo(true))
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Owner Updated","email":"owner-updated-$runId@example.com"}""")
+            .`when`().put("/api/settings/me")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Owner Updated"))
+            .body("email", equalTo("owner-updated-$runId@example.com"))
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Duplicate","email":"member-settings-$runId@example.com"}""")
+            .`when`().put("/api/settings/me")
+            .then()
+            .statusCode(409)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"currentPassword":"wrong","newPassword":"changed123"}""")
+            .`when`().post("/api/settings/me/password")
+            .then()
+            .statusCode(401)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"currentPassword":"admin123","newPassword":"changed123"}""")
+            .`when`().post("/api/settings/me/password")
+            .then()
+            .statusCode(204)
+
+        login("owner-updated-$runId@example.com", "changed123")
+    }
+
+    @Test
+    fun `settings APIs enforce tenant and group ownership`() {
+        createUser("tenant-member-settings-$runId", "member123", ServerRole.ServerMember)
+        createUser("group-owner-settings-$runId", "member123", ServerRole.ServerMember)
+        createUser("group-member-settings-$runId", "member123", ServerRole.ServerMember)
+        createUser("group-outsider-settings-$runId", "member123", ServerRole.ServerMember)
+        addTenantMember("tenant-member-settings-$runId")
+        addTenantMember("group-owner-settings-$runId")
+        addTenantMember("group-member-settings-$runId")
+        addTenantMember("group-outsider-settings-$runId")
+        val tenantMemberCookie = login("tenant-member-settings-$runId@example.com", "member123")
+        val groupOwnerCookie = login("group-owner-settings-$runId@example.com", "member123")
+        val groupMemberCookie = login("group-member-settings-$runId@example.com", "member123")
+        val groupOutsiderCookie = login("group-outsider-settings-$runId@example.com", "member123")
+        val group = createGroupWithMember("secure-settings-$runId", "group-owner-settings-$runId@example.com", GroupRole.GroupOwner)
+        addGroupMember(group, "group-member-settings-$runId@example.com")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
+            .`when`().get("/api/settings/$tenantName")
+            .then()
+            .statusCode(200)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
+            .body("""{"displayName":"Forbidden Tenant Rename"}""")
+            .`when`().put("/api/settings/$tenantName")
+            .then()
+            .statusCode(403)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Renamed Tenant"}""")
+            .`when`().put("/api/settings/$tenantName")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Renamed Tenant"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", groupMemberCookie)
+            .`when`().get("/api/settings/$tenantName/${group.name}")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo(group.displayName))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", groupOutsiderCookie)
+            .`when`().get("/api/settings/$tenantName/${group.name}")
+            .then()
+            .statusCode(404)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", groupMemberCookie)
+            .body("""{"displayName":"Forbidden Group Rename"}""")
+            .`when`().put("/api/settings/$tenantName/${group.name}")
+            .then()
+            .statusCode(403)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", groupOwnerCookie)
+            .body("""{"displayName":"Renamed Group"}""")
+            .`when`().put("/api/settings/$tenantName/${group.name}")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Renamed Group"))
     }
 
     @Test
@@ -811,7 +971,11 @@ class ExplorerResourceTest {
         }
     }
 
-    private fun createGroupWithMember(groupName: String, userEmail: String): TenantGroup =
+    private fun createGroupWithMember(
+        groupName: String,
+        userEmail: String,
+        role: GroupRole = GroupRole.GroupMember,
+    ): TenantGroup =
         inTransaction {
             val user = userRepo.findByEmail(userEmail) ?: throw IllegalStateException("User not found")
             val group = TenantGroup().also {
@@ -825,7 +989,7 @@ class ExplorerResourceTest {
                 it.id = TenantGroupMemberId(group.id, user.id)
                 it.group = group
                 it.user = user
-                it.role = GroupRole.GroupMember
+                it.role = role
                 tenantGroupMemberRepo.persist(it)
             }
             group
