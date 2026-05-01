@@ -7,6 +7,7 @@ import { buildJustifiedMediaRows } from './mediaGridLayout'
 import type { ExplorerMedia } from '../../api/explorerClient'
 
 const props = defineProps<{
+  tenantName: string
   media: ExplorerMedia[]
   streaming: boolean
 }>()
@@ -15,12 +16,15 @@ const selectedIndex = ref<number | null>(null)
 const mediaGrid = ref<HTMLElement | null>(null)
 const mediaGridWidth = ref(0)
 const aspectRatios = ref<Record<string, number>>({})
+const mediaOverrides = ref<Record<string, ExplorerMedia>>({})
 let mediaGridObserver: ResizeObserver | null = null
 let observedMediaGrid: HTMLElement | null = null
 let aspectRatioFrame: number | null = null
 let pendingAspectRatios: Record<string, number> = {}
 const selectedMedia = computed(() =>
-  selectedIndex.value === null ? null : props.media[selectedIndex.value] || null
+  selectedIndex.value === null
+    ? null
+    : mediaOverrides.value[props.media[selectedIndex.value]?.id] || props.media[selectedIndex.value] || null
 )
 const isLightboxOpen = computed(() => selectedMedia.value !== null)
 const canShowPrevious = computed(() => selectedIndex.value !== null && selectedIndex.value > 0)
@@ -145,6 +149,9 @@ function rememberAspectRatio(mediaId: string, aspectRatio: number) {
   })
 }
 
+function updateMedia(media: ExplorerMedia) {
+  mediaOverrides.value = { ...mediaOverrides.value, [media.id]: media }
+}
 
 function closeLightbox() {
   selectedIndex.value = null
@@ -225,12 +232,14 @@ function handleKeydown(event: KeyboardEvent) {
 
     <ExplorerMediaLightbox
       v-if="selectedMedia"
+      :tenant-name="tenantName"
       :media="selectedMedia"
       :can-show-previous="canShowPrevious"
       :can-show-next="canShowNext"
       @close="closeLightbox"
       @previous="showPrevious"
       @next="showNext"
+      @updated="updateMedia"
     />
   </section>
 </template>

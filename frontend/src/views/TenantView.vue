@@ -123,7 +123,7 @@ function navigateToPath(path: string) {
         @delete-album="dialogs.openDelete('album', $event as ExplorerAlbum)"
       />
 
-      <ExplorerMediaGrid v-else :media="media" :streaming="streaming" />
+      <ExplorerMediaGrid v-else :tenant-name="tenantName" :media="media" :streaming="streaming" />
     </template>
 
     <div v-if="explorer" class="explorer-refresh">

@@ -27,10 +27,20 @@ describe('uploadMedia', () => {
       title: 'Upload',
       albumPath: '/photos',
       ownerUserId: 1,
+      uploaderDisplayName: 'Kevin',
       createdAt: '2026-01-01T00:00:00Z',
+      capturedAt: null,
+      capturedAtOverride: false,
       mimeType: 'video/mp4',
       sizeBytes: 8,
-      contentUrl: '/content'
+      contentUrl: '/content',
+      cameraMake: null,
+      cameraModel: null,
+      lensModel: null,
+      imageWidth: null,
+      imageHeight: null,
+      gpsLatitude: null,
+      gpsLongitude: null
     })
   })
 

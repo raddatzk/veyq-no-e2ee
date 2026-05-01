@@ -45,12 +45,20 @@ function createMedia(overrides: Partial<ExplorerMedia> = {}): ExplorerMedia {
     title: 'Beach',
     albumPath: '/trip',
     ownerUserId: 1,
+    uploaderDisplayName: 'Kevin',
     createdAt: '2026-01-01T00:00:00Z',
+    capturedAt: null,
+    capturedAtOverride: false,
     mimeType: 'image/jpeg',
     sizeBytes: 1234,
     contentUrl: '/api/media/media-1/content',
+    cameraMake: null,
+    cameraModel: null,
+    lensModel: null,
     imageWidth: null,
     imageHeight: null,
+    gpsLatitude: null,
+    gpsLongitude: null,
     ...overrides
   }
 }
@@ -58,6 +66,7 @@ function createMedia(overrides: Partial<ExplorerMedia> = {}): ExplorerMedia {
 function mountGrid(media: ExplorerMedia[], streaming = false) {
   return mount(ExplorerMediaGrid, {
     props: {
+      tenantName: 'tenant',
       media,
       streaming
     },

@@ -49,12 +49,20 @@ export type ExplorerMedia = {
   title: string
   albumPath: string | null
   ownerUserId: number
+  uploaderDisplayName: string
   createdAt: string
+  capturedAt: string | null
+  capturedAtOverride: boolean
   mimeType: string
   sizeBytes: number
   contentUrl: string
-  imageWidth?: number | null
-  imageHeight?: number | null
+  cameraMake: string | null
+  cameraModel: string | null
+  lensModel: string | null
+  imageWidth: number | null
+  imageHeight: number | null
+  gpsLatitude: number | null
+  gpsLongitude: number | null
 }
 
 export type ExplorerResponse = {
@@ -99,6 +107,10 @@ export type UploadMediaRequest = {
   signal?: AbortSignal
   onSession?: (session: MediaUploadSession | PendingMediaUploadSession) => void
   onProgress?: (uploadedBytes: number, totalBytes: number) => void
+}
+
+export type UpdateMediaMetadataRequest = {
+  capturedAt: string | null
 }
 
 export type MediaUploadSession = {

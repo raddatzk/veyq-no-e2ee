@@ -55,6 +55,33 @@ class Media : PanacheEntityBase {
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
+    @Column(name = "captured_at")
+    var capturedAt: Instant? = null
+
+    @Column(name = "captured_at_override", nullable = false)
+    var capturedAtOverride: Boolean = false
+
+    @Column(name = "camera_make")
+    var cameraMake: String? = null
+
+    @Column(name = "camera_model")
+    var cameraModel: String? = null
+
+    @Column(name = "lens_model")
+    var lensModel: String? = null
+
+    @Column(name = "image_width")
+    var imageWidth: Int? = null
+
+    @Column(name = "image_height")
+    var imageHeight: Int? = null
+
+    @Column(name = "gps_latitude")
+    var gpsLatitude: Double? = null
+
+    @Column(name = "gps_longitude")
+    var gpsLongitude: Double? = null
+
     @PrePersist
     fun assignPublicId() {
         if (!::publicId.isInitialized) {

@@ -17,10 +17,20 @@ data class StreamMediaSummary(
     val title: String,
     val albumPath: String?,
     val ownerUserId: Long,
+    val uploaderDisplayName: String,
     val createdAt: Instant,
+    val capturedAt: Instant?,
+    val capturedAtOverride: Boolean,
     val mimeType: String,
     val sizeBytes: Long,
     val contentUrl: String,
+    val cameraMake: String?,
+    val cameraModel: String?,
+    val lensModel: String?,
+    val imageWidth: Int?,
+    val imageHeight: Int?,
+    val gpsLatitude: Double?,
+    val gpsLongitude: Double?,
 )
 
 data class UploadMediaSummary(
@@ -28,10 +38,24 @@ data class UploadMediaSummary(
     val title: String,
     val albumPath: String,
     val ownerUserId: Long,
+    val uploaderDisplayName: String,
     val createdAt: Instant,
+    val capturedAt: Instant?,
+    val capturedAtOverride: Boolean,
     val mimeType: String,
     val sizeBytes: Long,
     val contentUrl: String,
+    val cameraMake: String?,
+    val cameraModel: String?,
+    val lensModel: String?,
+    val imageWidth: Int?,
+    val imageHeight: Int?,
+    val gpsLatitude: Double?,
+    val gpsLongitude: Double?,
+)
+
+data class UpdateMediaMetadataRequest(
+    val capturedAt: Instant?,
 )
 
 data class CreateMediaUploadRequest(
@@ -97,4 +121,13 @@ class MediaResource @Inject constructor(
     @Path("/{mediaId}/content")
     fun content(@PathParam("mediaId") mediaId: String, @HeaderParam("Range") range: String?): Response =
         mediaService.mediaContent(mediaId, range)
+
+    @PATCH
+    @Path("/{mediaId}/metadata")
+    @Produces(MediaType.APPLICATION_JSON)
+    fun updateMetadata(
+        @PathParam("mediaId") mediaId: String,
+        request: UpdateMediaMetadataRequest,
+    ): StreamMediaSummary =
+        mediaService.updateMetadata(mediaId, request)
 }

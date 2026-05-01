@@ -195,10 +195,20 @@ describe('explorer cards', () => {
           title: 'Beach',
           albumPath: '/@family/trip',
           ownerUserId: 1,
+          uploaderDisplayName: 'Kevin',
           createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: null,
+          capturedAtOverride: false,
           mimeType: 'image/jpeg',
           sizeBytes: 1234,
-          contentUrl: '/api/media/media-1/content'
+          contentUrl: '/api/media/media-1/content',
+          cameraMake: null,
+          cameraModel: null,
+          lensModel: null,
+          imageWidth: null,
+          imageHeight: null,
+          gpsLatitude: null,
+          gpsLongitude: null
         }
       }
     })
@@ -221,10 +231,20 @@ describe('explorer cards', () => {
           title: 'Beach',
           albumPath: '/@family/trip',
           ownerUserId: 1,
+          uploaderDisplayName: 'Kevin',
           createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: null,
+          capturedAtOverride: false,
           mimeType: 'image/jpeg',
           sizeBytes: 1234,
-          contentUrl: '/api/media/media-1/content'
+          contentUrl: '/api/media/media-1/content',
+          cameraMake: null,
+          cameraModel: null,
+          lensModel: null,
+          imageWidth: null,
+          imageHeight: null,
+          gpsLatitude: null,
+          gpsLongitude: null
         }
       }
     })
@@ -247,10 +267,20 @@ describe('explorer cards', () => {
           title: 'Clip',
           albumPath: '/@family/trip',
           ownerUserId: 1,
+          uploaderDisplayName: 'Kevin',
           createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: null,
+          capturedAtOverride: false,
           mimeType: 'video/mp4',
           sizeBytes: 5678,
-          contentUrl: '/api/media/media-2/content'
+          contentUrl: '/api/media/media-2/content',
+          cameraMake: null,
+          cameraModel: null,
+          lensModel: null,
+          imageWidth: null,
+          imageHeight: null,
+          gpsLatitude: null,
+          gpsLongitude: null
         }
       }
     })
@@ -269,10 +299,20 @@ describe('explorer cards', () => {
           title: 'Clip',
           albumPath: '/@family/trip',
           ownerUserId: 1,
+          uploaderDisplayName: 'Kevin',
           createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: null,
+          capturedAtOverride: false,
           mimeType: 'video/mp4',
           sizeBytes: 5678,
-          contentUrl: '/api/media/media-2/content'
+          contentUrl: '/api/media/media-2/content',
+          cameraMake: null,
+          cameraModel: null,
+          lensModel: null,
+          imageWidth: null,
+          imageHeight: null,
+          gpsLatitude: null,
+          gpsLongitude: null
         }
       }
     })

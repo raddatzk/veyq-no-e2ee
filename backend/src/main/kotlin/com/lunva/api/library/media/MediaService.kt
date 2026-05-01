@@ -33,6 +33,7 @@ class MediaService @Inject constructor(
     private val albumRepo: TenantAlbumRepo,
     private val mediaRepo: MediaRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
     folderRepo: TenantFolderRepo,
@@ -92,6 +93,7 @@ class MediaService @Inject constructor(
         val storageKey = "tenant-${tenant().id}/${media.publicId}/original"
         writeMediaFile(uploadPath, storageKey)
         media.storageKey = storageKey
+        mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
         linkMedia(album, media)
 
         return media.toUploadSummary(album)
@@ -195,10 +197,25 @@ class MediaService @Inject constructor(
         val storageKey = "tenant-${tenant().id}/${media.publicId}/original"
         assembleChunks(uploadId, chunkCount, session.sizeBytes, storageKey)
         media.storageKey = storageKey
+        mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
         linkMedia(album, media)
         deleteRecursively(uploadDirectory(uploadId))
 
         return media.toUploadSummary(album)
+    }
+
+    @Transactional
+    fun updateMetadata(publicId: String, request: UpdateMediaMetadataRequest): StreamMediaSummary {
+        val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
+            ?: throw NotFoundException("Media not found")
+        if (!isMediaAccessible(media)) throw NotFoundException("Media not found")
+
+        media.capturedAt = request.capturedAt
+        media.capturedAtOverride = true
+        val album = albumMediaRepo.list("media", media)
+            .firstOrNull { isMediaVisible(media, it.album) }
+            ?.album
+        return media.toStreamSummary(album)
     }
 
     fun mediaContent(publicId: String, rangeHeader: String?): Response {
@@ -488,10 +505,48 @@ class MediaService @Inject constructor(
     }
 
     private fun Media.toStreamSummary(album: TenantAlbum?): StreamMediaSummary =
-        StreamMediaSummary(publicId, title, album?.path(), owner.id, createdAt, mimeType, sizeBytes, contentUrl())
+        StreamMediaSummary(
+            id = publicId,
+            title = title,
+            albumPath = album?.path(),
+            ownerUserId = owner.id,
+            uploaderDisplayName = owner.displayName,
+            createdAt = createdAt,
+            capturedAt = capturedAt,
+            capturedAtOverride = capturedAtOverride,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            contentUrl = contentUrl(),
+            cameraMake = cameraMake,
+            cameraModel = cameraModel,
+            lensModel = lensModel,
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
+            gpsLatitude = gpsLatitude,
+            gpsLongitude = gpsLongitude,
+        )
 
     private fun Media.toUploadSummary(album: TenantAlbum): UploadMediaSummary =
-        UploadMediaSummary(publicId, title, album.path(), owner.id, createdAt, mimeType, sizeBytes, contentUrl())
+        UploadMediaSummary(
+            id = publicId,
+            title = title,
+            albumPath = album.path(),
+            ownerUserId = owner.id,
+            uploaderDisplayName = owner.displayName,
+            createdAt = createdAt,
+            capturedAt = capturedAt,
+            capturedAtOverride = capturedAtOverride,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            contentUrl = contentUrl(),
+            cameraMake = cameraMake,
+            cameraModel = cameraModel,
+            lensModel = lensModel,
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
+            gpsLatitude = gpsLatitude,
+            gpsLongitude = gpsLongitude,
+        )
 
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/media/${url(publicId)}/content"

@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAlbum, createFolder } from '../../api/explorerClient'
 import { groups } from '../../api/groupClient'
+import { authState } from '../../authState'
 import CreateLibraryItemDialog from './CreateLibraryItemDialog.vue'
 
 vi.mock('../../api/explorerClient', () => ({
@@ -19,6 +20,12 @@ const groupsMock = vi.mocked(groups)
 
 beforeEach(() => {
   vi.resetAllMocks()
+  authState.user = {
+    userId: 1,
+    email: 'kevin@example.test',
+    displayName: 'Kevin',
+    serverRole: 'ServerMember'
+  }
 })
 
 function mountDialog(parentPath = '/') {
@@ -27,6 +34,7 @@ function mountDialog(parentPath = '/') {
       visible: false,
       type: 'folder',
       tenantName: 'friends',
+      tenantDisplayName: 'Friends',
       parentPath
     },
     global: {

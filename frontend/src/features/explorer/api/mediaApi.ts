@@ -5,6 +5,7 @@ import type {
   MediaUploadSession,
   PendingMediaUploadSession,
   StreamMediaOptions,
+  UpdateMediaMetadataRequest,
   UploadMediaRequest
 } from './types'
 
@@ -109,6 +110,20 @@ export function abortMediaUpload(uploadId: string): Promise<void> {
   return callApi<void>(`/api/media/uploads/${encodeURIComponent(uploadId)}`, {
     method: 'DELETE'
   })
+}
+
+export function updateMediaMetadata(
+  tenantName: string,
+  mediaId: string,
+  request: UpdateMediaMetadataRequest
+): Promise<ExplorerMedia> {
+  return callApi<ExplorerMedia>(
+    tenantApiPath(tenantName, 'media', `/${encodeURIComponent(mediaId)}/metadata`),
+    {
+      method: 'PATCH',
+      body: JSON.stringify(request)
+    }
+  )
 }
 
 function parseNdjson(text: string, onItem: (item: ExplorerMedia) => void) {

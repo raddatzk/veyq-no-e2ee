@@ -359,6 +359,8 @@ class ExplorerResourceTest {
             .body("title", equalTo("Uploaded Photo"))
             .body("albumPath", equalTo("/photos"))
             .body("mimeType", equalTo("image/jpeg"))
+            .body("uploaderDisplayName", equalTo("owner-$runId"))
+            .body("capturedAtOverride", equalTo(false))
             .extract().path<String>("id")
 
         val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), mediaId) }
@@ -381,6 +383,32 @@ class ExplorerResourceTest {
             .`when`().get("/api/$tenantName/media/$mediaId/content")
             .then()
             .statusCode(200)
+    }
+
+    @Test
+    fun `visible user updates captured date metadata`() {
+        createAlbum(ownerCookie, null, "metadata", "Metadata")
+        val media = createMedia(ownerEmail, "Metadata")
+        addMedia(ownerCookie, "/metadata", media.publicId)
+        createUser("viewer-$runId", "member123", ServerRole.ServerMember)
+        addTenantMember("viewer-$runId")
+        val viewerCookie = login("viewer-$runId@example.com", "member123")
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
+            .body("""{"capturedAt":"2026-02-03T04:05:06Z"}""")
+            .`when`().patch("/api/$tenantName/media/${media.publicId}/metadata")
+            .then()
+            .statusCode(200)
+            .body("capturedAt", equalTo("2026-02-03T04:05:06Z"))
+            .body("capturedAtOverride", equalTo(true))
+            .body("createdAt", equalTo(media.createdAt.toString()))
+            .body("uploaderDisplayName", equalTo("owner-$runId"))
+
+        val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), media.publicId) }
+        assertThat(stored?.capturedAt).isEqualTo(Instant.parse("2026-02-03T04:05:06Z"))
+        assertThat(stored?.capturedAtOverride).isTrue()
     }
 
     @Test

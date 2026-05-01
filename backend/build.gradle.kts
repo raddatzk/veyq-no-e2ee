@@ -33,6 +33,7 @@ dependencies {
     implementation("io.quarkus:quarkus-security-jpa")
     implementation("io.quarkus:quarkus-scheduler")
     implementation("com.github.wosherco:jnanoid-enhanced:9819c115e7")
+    implementation("com.drewnoakes:metadata-extractor:2.20.0")
 
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.quarkus:quarkus-junit5")

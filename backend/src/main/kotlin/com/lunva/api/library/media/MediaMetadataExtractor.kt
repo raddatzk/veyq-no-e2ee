@@ -1,0 +1,100 @@
+package com.lunva.api.library.media
+
+import com.drew.imaging.ImageMetadataReader
+import com.drew.metadata.Metadata
+import com.drew.metadata.exif.ExifIFD0Directory
+import com.drew.metadata.exif.ExifSubIFDDirectory
+import com.drew.metadata.exif.GpsDirectory
+import com.drew.metadata.jpeg.JpegDirectory
+import com.drew.metadata.png.PngDirectory
+import com.lunva.api.domain.Media
+import jakarta.inject.Singleton
+import org.jboss.logging.Logger
+import java.nio.file.Path
+import java.time.Instant
+import java.util.TimeZone
+
+data class ExtractedMediaMetadata(
+    val capturedAt: Instant? = null,
+    val cameraMake: String? = null,
+    val cameraModel: String? = null,
+    val lensModel: String? = null,
+    val imageWidth: Int? = null,
+    val imageHeight: Int? = null,
+    val gpsLatitude: Double? = null,
+    val gpsLongitude: Double? = null,
+)
+
+@Singleton
+class MediaMetadataExtractor {
+    private val log: Logger = Logger.getLogger(MediaMetadataExtractor::class.java)
+
+    fun extract(path: Path, mimeType: String): ExtractedMediaMetadata {
+        if (!mimeType.startsWith("image/") || (!mimeType.startsWith("video/"))) return ExtractedMediaMetadata()
+
+        return try {
+            readMetadata(ImageMetadataReader.readMetadata(path.toFile()))
+        } catch (e: Exception) {
+            log.debug("Could not extract metadata from $path", e)
+            ExtractedMediaMetadata()
+        }
+    }
+
+    fun apply(media: Media, metadata: ExtractedMediaMetadata) {
+        media.capturedAt = metadata.capturedAt
+        media.capturedAtOverride = false
+        media.cameraMake = metadata.cameraMake
+        media.cameraModel = metadata.cameraModel
+        media.lensModel = metadata.lensModel
+        media.imageWidth = metadata.imageWidth
+        media.imageHeight = metadata.imageHeight
+        media.gpsLatitude = metadata.gpsLatitude
+        media.gpsLongitude = metadata.gpsLongitude
+    }
+
+    private fun readMetadata(metadata: Metadata): ExtractedMediaMetadata {
+        val ifd0 = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
+        val subIfd = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory::class.java)
+        val gps = metadata.getFirstDirectoryOfType(GpsDirectory::class.java)
+        val jpeg = metadata.getFirstDirectoryOfType(JpegDirectory::class.java)
+        val png = metadata.getFirstDirectoryOfType(PngDirectory::class.java)
+        val dimensions = imageDimensions(subIfd, jpeg, png)
+
+        return ExtractedMediaMetadata(
+            capturedAt = capturedAt(subIfd),
+            cameraMake = ifd0?.getString(ExifIFD0Directory.TAG_MAKE)?.clean(),
+            cameraModel = ifd0?.getString(ExifIFD0Directory.TAG_MODEL)?.clean(),
+            lensModel = subIfd?.getString(ExifSubIFDDirectory.TAG_LENS_MODEL)?.clean(),
+            imageWidth = dimensions?.first,
+            imageHeight = dimensions?.second,
+            gpsLatitude = gps?.geoLocation?.latitude,
+            gpsLongitude = gps?.geoLocation?.longitude,
+        )
+    }
+
+    private fun capturedAt(directory: ExifSubIFDDirectory?): Instant? =
+        directory
+            ?.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL, TimeZone.getTimeZone("UTC"))
+            ?.toInstant()
+
+    private fun imageDimensions(
+        subIfd: ExifSubIFDDirectory?,
+        jpeg: JpegDirectory?,
+        png: PngDirectory?,
+    ): Pair<Int, Int>? {
+        val width = subIfd?.getInteger(ExifSubIFDDirectory.TAG_EXIF_IMAGE_WIDTH)
+            ?: jpeg?.getInteger(JpegDirectory.TAG_IMAGE_WIDTH)
+            ?: png?.getInteger(PngDirectory.TAG_IMAGE_WIDTH)
+        val height = subIfd?.getInteger(ExifSubIFDDirectory.TAG_EXIF_IMAGE_HEIGHT)
+            ?: jpeg?.getInteger(JpegDirectory.TAG_IMAGE_HEIGHT)
+            ?: png?.getInteger(PngDirectory.TAG_IMAGE_HEIGHT)
+
+        return if (width != null && height != null && width > 0 && height > 0) {
+            width to height
+        } else {
+            null
+        }
+    }
+
+    private fun String.clean(): String? = trim().takeIf { it.isNotBlank() }
+}
