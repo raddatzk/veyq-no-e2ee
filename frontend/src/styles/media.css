@@ -1,37 +1,37 @@
-.media-card-button {
-  display: grid;
-  gap: 0.75rem;
-  width: 100%;
-  height: 100%;
+.media-card {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
-  color: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
-.media-card-button:focus-visible {
+.media-card:focus-visible {
   outline: 2px solid #2563eb;
-  outline-offset: 4px;
+  outline-offset: 2px;
 }
 
 .media-thumb {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #eef4ff, #f8fafc);
+  background: #f8fafc;
   color: #64748b;
   font-size: 1.5rem;
 }
 
 .media-thumb img,
 .media-thumb video {
-  width: 100%;
+  display: block;
+  max-width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  object-fit: contain;
 }
 
 .media-lightbox {

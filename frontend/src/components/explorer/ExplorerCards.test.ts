@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import ExplorerAlbumCard from './ExplorerAlbumCard.vue'
 import ExplorerFolderCard from './ExplorerFolderCard.vue'
 import ExplorerGrid from './ExplorerGrid.vue'
+import ExplorerMediaCard from './ExplorerMediaCard.vue'
 import ExplorerScopeRootCard from './ExplorerScopeRootCard.vue'
 
 const buttonStub = {
@@ -182,5 +183,105 @@ describe('explorer cards', () => {
 
     expect(wrapper.text()).not.toContain('Bereiche')
     expect(wrapper.text()).toContain('Noch keine Ordner oder Alben')
+  })
+
+  it('renders media without title or path and emits open', async () => {
+    const wrapper = mount(ExplorerMediaCard, {
+      props: {
+        width: 320,
+        height: 180,
+        media: {
+          id: 'media-1',
+          title: 'Beach',
+          albumPath: '/@family/trip',
+          ownerUserId: 1,
+          createdAt: '2026-01-01T00:00:00Z',
+          mimeType: 'image/jpeg',
+          sizeBytes: 1234,
+          contentUrl: '/api/media/media-1/content'
+        }
+      }
+    })
+
+    expect(wrapper.text()).not.toContain('Beach')
+    expect(wrapper.text()).not.toContain('/@family/trip')
+    expect(wrapper.find('img').exists()).toBe(true)
+
+    await wrapper.find('.media-card').trigger('click')
+    expect(wrapper.emitted('open')).toHaveLength(1)
+  })
+
+  it('emits image aspect ratio when media dimensions are available', async () => {
+    const wrapper = mount(ExplorerMediaCard, {
+      props: {
+        width: 320,
+        height: 180,
+        media: {
+          id: 'media-1',
+          title: 'Beach',
+          albumPath: '/@family/trip',
+          ownerUserId: 1,
+          createdAt: '2026-01-01T00:00:00Z',
+          mimeType: 'image/jpeg',
+          sizeBytes: 1234,
+          contentUrl: '/api/media/media-1/content'
+        }
+      }
+    })
+    const image = wrapper.find('img').element as HTMLImageElement
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 1600 })
+    Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 900 })
+
+    await wrapper.find('img').trigger('load')
+
+    expect(wrapper.emitted('aspectRatio')?.[0]).toEqual([1600 / 900])
+  })
+
+  it('keeps videos visible in the media grid layout', () => {
+    const wrapper = mount(ExplorerMediaCard, {
+      props: {
+        width: 320,
+        height: 180,
+        media: {
+          id: 'media-2',
+          title: 'Clip',
+          albumPath: '/@family/trip',
+          ownerUserId: 1,
+          createdAt: '2026-01-01T00:00:00Z',
+          mimeType: 'video/mp4',
+          sizeBytes: 5678,
+          contentUrl: '/api/media/media-2/content'
+        }
+      }
+    })
+
+    expect(wrapper.text()).not.toContain('Clip')
+    expect(wrapper.find('video').exists()).toBe(true)
+  })
+
+  it('emits video aspect ratio when metadata is available', async () => {
+    const wrapper = mount(ExplorerMediaCard, {
+      props: {
+        width: 320,
+        height: 180,
+        media: {
+          id: 'media-2',
+          title: 'Clip',
+          albumPath: '/@family/trip',
+          ownerUserId: 1,
+          createdAt: '2026-01-01T00:00:00Z',
+          mimeType: 'video/mp4',
+          sizeBytes: 5678,
+          contentUrl: '/api/media/media-2/content'
+        }
+      }
+    })
+    const video = wrapper.find('video').element as HTMLVideoElement
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1920 })
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 1080 })
+
+    await wrapper.find('video').trigger('loadedmetadata')
+
+    expect(wrapper.emitted('aspectRatio')?.[0]).toEqual([1920 / 1080])
   })
 })
