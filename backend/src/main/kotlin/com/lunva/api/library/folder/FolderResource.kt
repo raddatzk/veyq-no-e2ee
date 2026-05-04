@@ -1,36 +1,28 @@
 package com.lunva.api.library.folder
 
-import com.lunva.api.generated.explorer.model.ExplorerFolder
-import com.lunva.api.library.*
+import com.lunva.api.generated.library.api.FoldersApi
+import com.lunva.api.generated.library.model.CreateLibraryItemRequest
+import com.lunva.api.generated.library.model.MoveLibraryItemRequest
+import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import jakarta.validation.Valid
-import jakarta.ws.rs.*
-import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.Response
 
-@Path("/api/{tenantName}/folders")
 @ApplicationScoped
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
 class FolderResource @Inject constructor(
     private val folderService: FolderService,
-) {
-    @POST
-    fun createFolder(@Valid request: CreateLibraryItemRequest): ExplorerFolder =
-        folderService.createFolder(request)
+) : FoldersApi {
+    override fun createFolder(tenantName: String, request: CreateLibraryItemRequest): Response =
+        Response.ok(folderService.createFolder(request)).build()
 
-    @POST
-    @Path("/update")
-    fun updateFolder(@Valid request: UpdateLibraryItemRequest): ExplorerFolder =
-        folderService.updateFolder(request)
+    override fun updateFolder(tenantName: String, request: UpdateLibraryItemRequest): Response =
+        Response.ok(folderService.updateFolder(request)).build()
 
-    @POST
-    @Path("/move")
-    fun moveFolder(@Valid request: MoveLibraryItemRequest): ExplorerFolder =
-        folderService.moveFolder(request)
+    override fun moveFolder(tenantName: String, request: MoveLibraryItemRequest): Response =
+        Response.ok(folderService.moveFolder(request)).build()
 
-    @DELETE
-    fun deleteFolder(@QueryParam("path") path: String?) =
+    override fun deleteFolder(tenantName: String, path: String?): Response {
         folderService.deleteFolder(path)
-
+        return Response.noContent().build()
+    }
 }

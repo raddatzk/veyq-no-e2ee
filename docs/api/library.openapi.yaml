@@ -1,0 +1,1839 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Library API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer Lunva Library API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Folders
+- name: Albums
+- name: Media
+- name: MediaUploads
+paths:
+  "/api/{tenantName}/folders":
+    post:
+      tags:
+      - Folders
+      operationId: createFolder
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerFolder"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '409':
+          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource conflict
+      summary: Ordner anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Ordner anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    delete:
+      tags:
+      - Folders
+      operationId: deleteFolder
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/PathQuery"
+        description:
+        example:
+      responses:
+        '204':
+          description: Folder deleted.
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Ordner löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Ordner löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/folders/update":
+    post:
+      tags:
+      - Folders
+      operationId: updateFolder
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerFolder"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Ordner umbenennen oder umbeschriften
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Ordner umbenennen oder umbeschriften.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/folders/move":
+    post:
+      tags:
+      - Folders
+      operationId: moveFolder
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerFolder"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Ordner verschieben
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Ordner verschieben.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/albums":
+    post:
+      tags:
+      - Albums
+      operationId: createAlbum
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerAlbum"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '409':
+          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource conflict
+      summary: Album anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Album anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    delete:
+      tags:
+      - Albums
+      operationId: deleteAlbum
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/PathQuery"
+        description:
+        example:
+      responses:
+        '204':
+          description: Album deleted.
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Album löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Album löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/albums/update":
+    post:
+      tags:
+      - Albums
+      operationId: updateAlbum
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerAlbum"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Album umbenennen oder umbeschriften
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Album umbenennen oder umbeschriften.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/albums/move":
+    post:
+      tags:
+      - Albums
+      operationId: moveAlbum
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveLibraryItem"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerAlbum"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Album verschieben
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Album verschieben.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/albums/media":
+    post:
+      tags:
+      - Albums
+      operationId: addMedia
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AlbumMediaRequest"
+            example:
+              albumPath: "/@family/vacation/beach"
+              mediaId: med_abc123
+              hidden: false
+              position: 1
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerAlbum"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Medium einem Album hinzufügen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Medium einem Album hinzufügen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/albums/cover":
+    post:
+      tags:
+      - Albums
+      operationId: setCover
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SetAlbumCoverRequest"
+            example:
+              albumPath: "/@family/vacation/beach"
+              mediaId: med_abc123
+              hidden: true
+      responses:
+        '200':
+          "$ref": "#/components/responses/ExplorerAlbum"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Album-Cover setzen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Album-Cover setzen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/media":
+    get:
+      tags:
+      - Media
+      operationId: media
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/PathQuery"
+        description:
+        example:
+      responses:
+        '200':
+          description: Newline-delimited media summaries.
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+              example: >
+                {"id":"med_abc123","title":"Beach","albumPath":"/@family/vacation/beach","ownerUserId":1,"uploaderDisplayName":"Kevin","createdAt":"2026-05-03T12:00:00Z","capturedAt":"2026-05-03T11:45:00Z","capturedAtOverride":false,"mimeType":"image/jpeg","sizeBytes":2048000,"contentUrl":"/api/friends/media/med_abc123/content","cameraMake":"Canon","cameraModel":"R5","lensModel":"RF
+                24-70","imageWidth":4000,"imageHeight":3000,"gpsLatitude":52.52,"gpsLongitude":13.405}
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Medien als NDJSON streamen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Medien als NDJSON streamen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Media
+      operationId: upload
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              - albumPath
+              properties:
+                file:
+                  type: string
+                  format: binary
+                albumPath:
+                  type: string
+                title:
+                  type: string
+            example:
+              file: example
+              albumPath: "/urlaub"
+      responses:
+        '200':
+          description: Uploaded media.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/UploadMediaSummary"
+              example:
+                id: med_abc123
+                title: Beach
+                albumPath: "/@family/vacation/beach"
+                ownerUserId: 1
+                uploaderDisplayName: Kevin
+                createdAt: '2026-05-03T12:00:00Z'
+                capturedAt: '2026-05-03T11:45:00Z'
+                capturedAtOverride: false
+                mimeType: image/jpeg
+                sizeBytes: 2048000
+                contentUrl: "/api/friends/media/med_abc123/content"
+                cameraMake: Canon
+                cameraModel: R5
+                lensModel: RF 24-70
+                imageWidth: 4000
+                imageHeight: 3000
+                gpsLatitude: 52.52
+                gpsLongitude: 13.405
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '413':
+          description: Der Upload ueberschreitet die erlaubte Groesse.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Upload too large
+      summary: Medium direkt hochladen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Medium direkt hochladen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/media/{mediaId}/content":
+    get:
+      tags:
+      - Media
+      operationId: content
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - name: mediaId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Public Media-ID.
+        example: med_abc123
+      - name: Range
+        in: header
+        required: false
+        schema:
+          type: string
+        description: HTTP Range Header fuer partielles Streaming.
+        example: bytes=0-1048575
+      responses:
+        '200':
+          description: Media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<binary media bytes>"
+        '206':
+          description: Partial media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<partial binary media bytes>"
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '416':
+          description: Der angeforderte Byte-Range ist fuer das Medium nicht erfuellbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Requested range not satisfiable
+      summary: Mediendatei ausliefern
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Mediendatei ausliefern.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/media/{mediaId}/metadata":
+    patch:
+      tags:
+      - Media
+      operationId: updateMetadata
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - name: mediaId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Public Media-ID.
+        example: med_abc123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateMediaMetadataRequest"
+            example:
+              capturedAt: '2026-05-03T12:30:00Z'
+      responses:
+        '200':
+          description: Updated media summary.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/StreamMediaSummary"
+              example:
+                id: med_abc123
+                title: Beach
+                albumPath: "/@family/vacation/beach"
+                ownerUserId: 1
+                uploaderDisplayName: Kevin
+                createdAt: '2026-05-03T12:00:00Z'
+                capturedAt: '2026-05-03T11:45:00Z'
+                capturedAtOverride: false
+                mimeType: image/jpeg
+                sizeBytes: 2048000
+                contentUrl: "/api/friends/media/med_abc123/content"
+                cameraMake: Canon
+                cameraModel: R5
+                lensModel: RF 24-70
+                imageWidth: 4000
+                imageHeight: 3000
+                gpsLatitude: 52.52
+                gpsLongitude: 13.405
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Medien-Metadaten aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Medien-Metadaten aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/media/uploads":
+    post:
+      tags:
+      - MediaUploads
+      operationId: createUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateMediaUploadRequest"
+            example:
+              tenantName: friends
+              albumPath: "/@family/vacation/beach"
+              filename: beach.jpg
+              mimeType: image/jpeg
+              sizeBytes: 2048000
+              title: Beach
+      responses:
+        '200':
+          description: Created upload session.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MediaUploadSessionSummary"
+              example:
+                uploadId: upl_abc123
+                chunkSizeBytes: 5242880
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '413':
+          description: Der Upload ueberschreitet die erlaubte Groesse.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Upload too large
+      summary: Chunk-Upload-Session erstellen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Chunk-Upload-Session erstellen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+    get:
+      tags:
+      - MediaUploads
+      operationId: listUploads
+      responses:
+        '200':
+          description: Pending uploads.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/PendingMediaUploadSummary"
+              example:
+              - uploadId: upl_abc123
+                tenantName: friends
+                tenantDisplayName: Friends
+                albumPath: "/@family/vacation/beach"
+                filename: beach.jpg
+                mimeType: image/jpeg
+                sizeBytes: 2048000
+                title: Beach
+                chunkSizeBytes: 5242880
+                uploadedChunks:
+                - 0
+                uploadedBytes: 2048000
+                createdAt: '2026-05-03T12:00:00Z'
+                updatedAt: '2026-05-03T12:01:00Z'
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+      summary: Eigene offene Uploads auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene offene Uploads auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/media/uploads/{uploadId}":
+    get:
+      tags:
+      - MediaUploads
+      operationId: getUpload
+      parameters:
+      - "$ref": "#/components/parameters/UploadId"
+        description:
+        example:
+      responses:
+        '200':
+          description: Upload status.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PendingMediaUploadSummary"
+              example:
+                uploadId: upl_abc123
+                tenantName: friends
+                tenantDisplayName: Friends
+                albumPath: "/@family/vacation/beach"
+                filename: beach.jpg
+                mimeType: image/jpeg
+                sizeBytes: 2048000
+                title: Beach
+                chunkSizeBytes: 5242880
+                uploadedChunks:
+                - 0
+                uploadedBytes: 2048000
+                createdAt: '2026-05-03T12:00:00Z'
+                updatedAt: '2026-05-03T12:01:00Z'
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Upload-Status abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Upload-Status abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: partial.
+    delete:
+      tags:
+      - MediaUploads
+      operationId: abortUpload
+      parameters:
+      - "$ref": "#/components/parameters/UploadId"
+        description:
+        example:
+      responses:
+        '204':
+          description: Upload aborted.
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Chunk-Upload abbrechen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Chunk-Upload abbrechen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: partial.
+  "/api/media/uploads/{uploadId}/chunks/{chunkIndex}":
+    put:
+      tags:
+      - MediaUploads
+      operationId: uploadChunk
+      parameters:
+      - "$ref": "#/components/parameters/UploadId"
+        description:
+        example:
+      - name: chunkIndex
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+        description: chunkIndex
+        example:
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+            example: example
+      responses:
+        '204':
+          description: Chunk accepted.
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '413':
+          description: Der Upload ueberschreitet die erlaubte Groesse.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Upload too large
+      summary: Upload-Chunk speichern
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Upload-Chunk speichern.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: partial.
+  "/api/media/uploads/{uploadId}/complete":
+    post:
+      tags:
+      - MediaUploads
+      operationId: completeUpload
+      parameters:
+      - "$ref": "#/components/parameters/UploadId"
+        description:
+        example:
+      responses:
+        '200':
+          description: Completed upload.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/UploadMediaSummary"
+              example:
+                id: med_abc123
+                title: Beach
+                albumPath: "/@family/vacation/beach"
+                ownerUserId: 1
+                uploaderDisplayName: Kevin
+                createdAt: '2026-05-03T12:00:00Z'
+                capturedAt: '2026-05-03T11:45:00Z'
+                capturedAtOverride: false
+                mimeType: image/jpeg
+                sizeBytes: 2048000
+                contentUrl: "/api/friends/media/med_abc123/content"
+                cameraMake: Canon
+                cameraModel: R5
+                lensModel: RF 24-70
+                imageWidth: 4000
+                imageHeight: 3000
+                gpsLatitude: 52.52
+                gpsLongitude: 13.405
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Chunk-Upload abschließen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Chunk-Upload abschließen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+  parameters:
+    TenantName:
+      name: tenantName
+      in: path
+      required: true
+      schema:
+        type: string
+    UploadId:
+      name: uploadId
+      in: path
+      required: true
+      schema:
+        type: string
+    PathQuery:
+      name: path
+      in: query
+      required: false
+      schema:
+        type: string
+  requestBodies:
+    CreateLibraryItem:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateLibraryItemRequest"
+          example:
+            name: friends
+            displayName: Friends
+    UpdateLibraryItem:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateLibraryItemRequest"
+          example:
+            path: "/urlaub"
+            name: friends
+            displayName: Friends
+    MoveLibraryItem:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveLibraryItemRequest"
+          example:
+            path: "/urlaub"
+  responses:
+    ExplorerFolder:
+      description: Folder summary.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ExplorerFolder"
+          example:
+            id: id_123
+            name: friends
+            displayName: Friends
+            path: "/urlaub"
+    ExplorerAlbum:
+      description: Album summary.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ExplorerAlbum"
+          example:
+            id: id_123
+            name: friends
+            displayName: Friends
+            path: "/urlaub"
+            coverMediaId: med_123
+  schemas:
+    ExplorerFolder:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - path
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        path:
+          type: string
+        ownerBadge:
+          type: object
+          nullable: true
+    ExplorerAlbum:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - path
+      - coverMediaId
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        path:
+          type: string
+        coverMediaId:
+          type: string
+          nullable: true
+        ownerBadge:
+          type: object
+          nullable: true
+    CreateLibraryItemRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      properties:
+        parentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+        displayName:
+          type: string
+        scope:
+          "$ref": "#/components/schemas/LibraryScopeRequest"
+          nullable: true
+    LibraryScopeRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        groupName:
+          type: string
+          nullable: true
+    UpdateLibraryItemRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        path:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+    MoveLibraryItemRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - path
+      properties:
+        path:
+          type: string
+        newParentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+    AlbumMediaRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - albumPath
+      - mediaId
+      properties:
+        albumPath:
+          type: string
+        mediaId:
+          type: string
+        hidden:
+          type: boolean
+        position:
+          type: integer
+          format: int32
+    SetAlbumCoverRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - albumPath
+      - mediaId
+      properties:
+        albumPath:
+          type: string
+        mediaId:
+          type: string
+        hidden:
+          type: boolean
+    UpdateMediaMetadataRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        tenantName:
+          type: string
+        albumPath:
+          type: string
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+          nullable: true
+    MediaUploadSessionSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - uploadId
+      - chunkSizeBytes
+      properties:
+        uploadId:
+          type: string
+        chunkSizeBytes:
+          type: integer
+          format: int64
+    PendingMediaUploadSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - uploadId
+      - tenantName
+      - tenantDisplayName
+      - albumPath
+      - filename
+      - mimeType
+      - sizeBytes
+      - chunkSizeBytes
+      - uploadedChunks
+      - uploadedBytes
+      - createdAt
+      - updatedAt
+      properties:
+        uploadId:
+          type: string
+        tenantName:
+          type: string
+        tenantDisplayName:
+          type: string
+        albumPath:
+          type: string
+          nullable: true
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+        chunkSizeBytes:
+          type: integer
+          format: int64
+        uploadedChunks:
+          type: array
+          items:
+            type: integer
+            format: int32
+        uploadedBytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UploadMediaSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - title
+      - ownerUserId
+      - uploaderDisplayName
+      - createdAt
+      - capturedAtOverride
+      - mimeType
+      - sizeBytes
+      - contentUrl
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        albumPath:
+          type: string
+        ownerUserId:
+          type: integer
+          format: int64
+        uploaderDisplayName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+        capturedAtOverride:
+          type: boolean
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentUrl:
+          type: string
+        cameraMake:
+          type: string
+          nullable: true
+        cameraModel:
+          type: string
+          nullable: true
+        lensModel:
+          type: string
+          nullable: true
+        imageWidth:
+          type: integer
+          format: int32
+          nullable: true
+        imageHeight:
+          type: integer
+          format: int32
+          nullable: true
+        gpsLatitude:
+          type: number
+          format: double
+          nullable: true
+        gpsLongitude:
+          type: number
+          format: double
+          nullable: true
+    StreamMediaSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - title
+      - ownerUserId
+      - uploaderDisplayName
+      - createdAt
+      - capturedAtOverride
+      - mimeType
+      - sizeBytes
+      - contentUrl
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        albumPath:
+          type: string
+          nullable: true
+        ownerUserId:
+          type: integer
+          format: int64
+        uploaderDisplayName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+        capturedAtOverride:
+          type: boolean
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentUrl:
+          type: string
+        cameraMake:
+          type: string
+          nullable: true
+        cameraModel:
+          type: string
+          nullable: true
+        lensModel:
+          type: string
+          nullable: true
+        imageWidth:
+          type: integer
+          format: int32
+          nullable: true
+        imageHeight:
+          type: integer
+          format: int32
+          nullable: true
+        gpsLatitude:
+          type: number
+          format: double
+          nullable: true
+        gpsLongitude:
+          type: number
+          format: double
+          nullable: true
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          description: Fehlertext fuer Clients und Tests.

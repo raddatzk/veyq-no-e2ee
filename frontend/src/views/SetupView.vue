@@ -20,6 +20,7 @@ const { setSetupCompleted } = useServerState()
 const step = ref<'admin' | 'tenant'>('admin')
 const tenantDisplayName = ref('Friends')
 const tenantName = ref('friends')
+const tenantDomain = ref('friends.lunva.local')
 const tenantPermalinkTouched = ref(false)
 const password = ref('')
 const displayName = ref('Administrator')
@@ -65,7 +66,7 @@ async function submitAdmin() {
 async function submitTenant() {
   error.value = ''
   try {
-    const tenant = await createTenant(tenantName.value, tenantDisplayName.value)
+    const tenant = await createTenant(tenantName.value, tenantDisplayName.value, tenantDomain.value)
     setTenants(await tenants())
     await router.push(`/${tenant.name}`)
   } catch (unknownError) {
@@ -118,6 +119,10 @@ async function skipTenant() {
             required
             @update:model-value="updateTenantPermalink"
           />
+        </label>
+        <label>
+          Domain
+          <InputText v-model="tenantDomain" autocomplete="off" required />
         </label>
         <div class="button-row">
           <Button type="submit" label="Tenant erstellen" icon="pi pi-plus" />

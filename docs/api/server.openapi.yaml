@@ -1,0 +1,95 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Server API
+  version: 0.2.0
+  description: API-first target contract for server-level settings and administration metadata.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Server
+paths:
+  "/api/settings/server":
+    get:
+      tags:
+      - Server
+      summary: Server-Einstellungen abrufen
+      description: |-
+        Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+      operationId: getServerSettings
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      responses:
+        '200':
+          description: Server-Einstellungen wurden geladen.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ServerSettingsResponse"
+              example:
+                displayName: Lunva
+                userManagementAvailable: true
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                message: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Serverrolle nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                message: User has insufficient role on server
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+  schemas:
+    ServerSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      - userManagementAvailable
+      properties:
+        displayName:
+          type: string
+          description: Anzeigename des Servers.
+          examples:
+          - Lunva
+        userManagementAvailable:
+          type: boolean
+          description: Gibt an, ob die Benutzerverwaltung fuer den aktuellen Server verfuegbar ist.
+          examples:
+          - true
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Fehlerbeschreibung fuer Clients und Tests.
+          examples:
+          - Authentication required

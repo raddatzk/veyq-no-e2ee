@@ -1,0 +1,16 @@
+.openapi-generator-ignore
+apis/GroupsApi.ts
+apis/index.ts
+index.ts
+models/CreateGroupRequest.ts
+models/ErrorResponse.ts
+models/GroupMemberRequest.ts
+models/GroupMemberSummary.ts
+models/GroupMemberSummaryUser.ts
+models/GroupRole.ts
+models/GroupSummary.ts
+models/GroupsSummary.ts
+models/SimplifiedGroupSummary.ts
+models/UpdateGroupRequest.ts
+models/index.ts
+runtime.ts

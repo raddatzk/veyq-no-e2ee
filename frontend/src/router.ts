@@ -3,6 +3,7 @@ import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
 import HomeView from './views/HomeView.vue'
 import LoginView from './views/LoginView.vue'
+import InviteView from './views/InviteView.vue'
 import SettingsView from './views/SettingsView.vue'
 import SetupView from './views/SetupView.vue'
 import TenantRouteView from './views/TenantRouteView.vue'
@@ -13,6 +14,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/invite/:userId/:token', name: 'invite', component: InviteView },
     { path: '/settings', name: 'server-settings', component: SettingsView },
     { path: '/~me', name: 'user-settings', component: SettingsView },
     { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantRouteView }
@@ -46,7 +48,7 @@ function visitingAnyPageWithoutSetup(to: RouteLocationNormalized) {
 
 function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
   const { authState } = useAuthState()
-  return !authState.isAuthenticated && to.name !== 'login' && to.name !== 'setup'
+  return !authState.isAuthenticated && to.name !== 'login' && to.name !== 'setup' && to.name !== 'invite'
 }
 
 function visitingSetupPageWithSetup(to: RouteLocationNormalized) {

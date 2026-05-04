@@ -1,105 +1,29 @@
 package com.lunva.api.library.media
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import jakarta.validation.constraints.NotBlank
+import com.lunva.api.generated.library.api.MediaApi
+import com.lunva.api.generated.library.model.UpdateMediaMetadataRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response
-import jakarta.ws.rs.*
-import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.StreamingOutput
-import org.jboss.resteasy.reactive.RestForm
+import jakarta.ws.rs.core.MultivaluedHashMap
+import jakarta.ws.rs.core.MultivaluedMap
 import org.jboss.resteasy.reactive.multipart.FileUpload
-import java.time.Instant
+import java.io.InputStream
+import java.net.URLConnection
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 
-data class StreamMediaSummary(
-    val id: String,
-    val title: String,
-    val albumPath: String?,
-    val ownerUserId: Long,
-    val uploaderDisplayName: String,
-    val createdAt: Instant,
-    val capturedAt: Instant?,
-    val capturedAtOverride: Boolean,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val contentUrl: String,
-    val cameraMake: String?,
-    val cameraModel: String?,
-    val lensModel: String?,
-    val imageWidth: Int?,
-    val imageHeight: Int?,
-    val gpsLatitude: Double?,
-    val gpsLongitude: Double?,
-)
-
-data class UploadMediaSummary(
-    val id: String,
-    val title: String,
-    val albumPath: String,
-    val ownerUserId: Long,
-    val uploaderDisplayName: String,
-    val createdAt: Instant,
-    val capturedAt: Instant?,
-    val capturedAtOverride: Boolean,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val contentUrl: String,
-    val cameraMake: String?,
-    val cameraModel: String?,
-    val lensModel: String?,
-    val imageWidth: Int?,
-    val imageHeight: Int?,
-    val gpsLatitude: Double?,
-    val gpsLongitude: Double?,
-)
-
-data class UpdateMediaMetadataRequest(
-    val capturedAt: Instant?,
-)
-
-data class CreateMediaUploadRequest(
-    val tenantName: String?,
-    val albumPath: String?,
-    val filename: String?,
-    val mimeType: String?,
-    val sizeBytes: Long?,
-    val title: String?,
-)
-
-data class MediaUploadSessionSummary(
-    val uploadId: String,
-    val chunkSizeBytes: Long,
-)
-
-data class PendingMediaUploadSummary(
-    val uploadId: String,
-    val tenantName: String,
-    val tenantDisplayName: String,
-    val albumPath: String,
-    val filename: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val title: String?,
-    val chunkSizeBytes: Long,
-    val uploadedChunks: List<Int>,
-    val uploadedBytes: Long,
-    val createdAt: Instant,
-    val updatedAt: Instant,
-)
-
-@Path("/api/{tenantName}/media")
 @ApplicationScoped
-@Consumes(MediaType.APPLICATION_JSON)
 class MediaResource @Inject constructor(
     private val mediaService: MediaService,
     private val objectMapper: ObjectMapper,
-) {
+) : MediaApi {
 
-    @GET
-    @Produces("application/x-ndjson")
-    fun media(@QueryParam("path") path: String?): StreamingOutput =
-        StreamingOutput { output ->
+    override fun media(tenantName: String, path: String?): Response {
+        val stream = StreamingOutput { output ->
             mediaService.streamMedia(path).forEach { media ->
                 output.write(objectMapper.writeValueAsBytes(media))
                 output.write('\n'.code)
@@ -107,27 +31,71 @@ class MediaResource @Inject constructor(
             }
         }
 
-    @POST
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Produces(MediaType.APPLICATION_JSON)
-    fun upload(
-        @RestForm file: FileUpload?,
-        @RestForm @NotBlank albumPath: String?,
-        @RestForm title: String?,
-    ): UploadMediaSummary =
-        mediaService.uploadMedia(file, albumPath, title)
+        return Response.ok(stream, "application/x-ndjson").build()
+    }
 
-    @GET
-    @Path("/{mediaId}/content")
-    fun content(@PathParam("mediaId") mediaId: String, @HeaderParam("Range") range: String?): Response =
+    override fun upload(
+        tenantName: String,
+        fileInputStream: InputStream,
+        albumPath: String?,
+        title: String?,
+    ): Response {
+        val uploadPath = Files.createTempFile("lunva-upload-", ".tmp")
+        return try {
+            fileInputStream.use { input ->
+                Files.copy(input, uploadPath, StandardCopyOption.REPLACE_EXISTING)
+            }
+            Response.ok(mediaService.uploadMedia(GeneratedFileUpload(uploadPath, title), albumPath, title)).build()
+        } finally {
+            Files.deleteIfExists(uploadPath)
+        }
+    }
+
+    override fun content(tenantName: String, mediaId: String, range: String?): Response =
         mediaService.mediaContent(mediaId, range)
 
-    @PATCH
-    @Path("/{mediaId}/metadata")
-    @Produces(MediaType.APPLICATION_JSON)
-    fun updateMetadata(
-        @PathParam("mediaId") mediaId: String,
+    override fun updateMetadata(
+        tenantName: String,
+        mediaId: String,
         request: UpdateMediaMetadataRequest,
-    ): StreamMediaSummary =
-        mediaService.updateMetadata(mediaId, request)
+    ): Response =
+        Response.ok(mediaService.updateMetadata(mediaId, request)).build()
+
+    private class GeneratedFileUpload(
+        private val path: Path,
+        private val title: String?,
+    ) : FileUpload {
+        override fun name(): String = "file"
+        override fun filePath(): Path = path
+        override fun fileName(): String = title?.trim()?.takeIf { it.isNotBlank() } ?: "Upload"
+        override fun size(): Long = Files.size(path)
+        override fun contentType(): String? =
+            detectContentType(path)
+                ?: Files.newInputStream(path).use { input -> URLConnection.guessContentTypeFromStream(input) }
+                ?: Files.probeContentType(path)
+
+        override fun charSet(): String? = null
+        override fun getHeaders(): MultivaluedMap<String, String> = MultivaluedHashMap()
+
+        private fun detectContentType(path: Path): String? {
+            val header = ByteArray(16)
+            val read = Files.newInputStream(path).use { input -> input.read(header) }
+            if (read >= 3 &&
+                header[0] == 0xFF.toByte() &&
+                header[1] == 0xD8.toByte() &&
+                header[2] == 0xFF.toByte()
+            ) {
+                return "image/jpeg"
+            }
+            if (read >= 8 &&
+                header[4] == 'f'.code.toByte() &&
+                header[5] == 't'.code.toByte() &&
+                header[6] == 'y'.code.toByte() &&
+                header[7] == 'p'.code.toByte()
+            ) {
+                return "video/mp4"
+            }
+            return null
+        }
+    }
 }

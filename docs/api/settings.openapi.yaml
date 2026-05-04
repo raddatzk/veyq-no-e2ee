@@ -1,51 +1,52 @@
+---
 openapi: 3.1.0
 info:
   title: Lunva Settings API
   version: 0.2.0
   description: API contract for resolving settings navigation context.
 servers:
-  - url: /
+- url: "/"
 security:
-  - accessTokenCookie: []
+- accessTokenCookie: []
 tags:
-  - name: Settings
+- name: Settings
 paths:
-  /api/settings:
+  "/api/settings":
     get:
       tags:
-        - Settings
+      - Settings
       summary: Load navigation context for a settings page
       operationId: getSettings
       parameters:
-        - name: path
-          in: query
-          required: true
-          description: Full frontend route path for the settings page.
-          schema:
-            type: string
-          examples:
-            serverSettings:
-              value: /settings
-            userSettings:
-              value: /~me
-            tenantSettings:
-              value: /friends/settings
-            groupSettings:
-              value: /friends/@alle/settings
-            folderSettings:
-              value: /friends/urlaub/settings
+      - name: path
+        in: query
+        required: true
+        description: Full frontend route path for the settings page.
+        schema:
+          type: string
+        examples:
+          serverSettings:
+            value: "/settings"
+          userSettings:
+            value: "/~me"
+          tenantSettings:
+            value: "/friends/settings"
+          groupSettings:
+            value: "/friends/@alle/settings"
+          folderSettings:
+            value: "/friends/urlaub/settings"
       responses:
-        "200":
+        '200':
           description: Settings navigation context.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsResponse"
+                "$ref": "#/components/schemas/SettingsResponse"
               examples:
                 groupSettings:
                   value:
                     location:
-                      path: /friends/@alle/settings
+                      path: "/friends/@alle/settings"
                       displayName: Einstellungen
                       label: Einstellungen
                     subject:
@@ -53,50 +54,62 @@ paths:
                       displayName: Alle
                       label: "@Alle"
                     breadcrumbs:
-                      - type: TENANT
-                        path: /friends
-                        displayName: Friends
-                        label: Friends
-                      - type: GROUP
-                        path: /friends/@alle
-                        displayName: Alle
-                        label: "@Alle"
-                      - type: GROUP
-                        path: /friends/@alle/settings
-                        displayName: Einstellungen
-                        label: Einstellungen
-        "400":
+                    - type: TENANT
+                      path: "/friends"
+                      displayName: Friends
+                      label: Friends
+                    - type: GROUP
+                      path: "/friends/@alle"
+                      displayName: Alle
+                      label: "@Alle"
+                    - type: GROUP
+                      path: "/friends/@alle/settings"
+                      displayName: Einstellungen
+                      label: Einstellungen
+        '400':
           description: The path is not a supported settings path.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/ErrorResponse"
               example:
                 message: Unsupported settings path
-        "401":
+        '401':
           description: The request is not authenticated.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/ErrorResponse"
               example:
                 message: Authentication required
-        "403":
+        '403':
           description: The authenticated user may not access the target settings page.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/ErrorResponse"
               example:
                 message: User has insufficient role on server
-        "404":
+        '404':
           description: The tenant or subject path was not found or is not visible to the current user.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                "$ref": "#/components/schemas/ErrorResponse"
               example:
                 message: Path not found
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Load navigation context for a settings page.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
 components:
   securitySchemes:
     accessTokenCookie:
@@ -108,25 +121,25 @@ components:
       type: object
       additionalProperties: false
       required:
-        - location
-        - subject
-        - breadcrumbs
+      - location
+      - subject
+      - breadcrumbs
       properties:
         location:
-          $ref: "#/components/schemas/SettingsLocation"
+          "$ref": "#/components/schemas/SettingsLocation"
         subject:
-          $ref: "#/components/schemas/SettingsSubject"
+          "$ref": "#/components/schemas/SettingsSubject"
         breadcrumbs:
           type: array
           items:
-            $ref: "#/components/schemas/SettingsBreadcrumb"
+            "$ref": "#/components/schemas/SettingsBreadcrumb"
     SettingsLocation:
       type: object
       additionalProperties: false
       required:
-        - path
-        - displayName
-        - label
+      - path
+      - displayName
+      - label
       properties:
         path:
           type: string
@@ -138,12 +151,12 @@ components:
       type: object
       additionalProperties: false
       required:
-        - type
-        - displayName
-        - label
+      - type
+      - displayName
+      - label
       properties:
         type:
-          $ref: "#/components/schemas/SettingsSubjectType"
+          "$ref": "#/components/schemas/SettingsSubjectType"
         displayName:
           type: string
         label:
@@ -152,13 +165,13 @@ components:
       type: object
       additionalProperties: false
       required:
-        - type
-        - path
-        - displayName
-        - label
+      - type
+      - path
+      - displayName
+      - label
       properties:
         type:
-          $ref: "#/components/schemas/SettingsSubjectType"
+          "$ref": "#/components/schemas/SettingsSubjectType"
         path:
           type: string
         displayName:
@@ -168,18 +181,18 @@ components:
     SettingsSubjectType:
       type: string
       enum:
-        - SERVER
-        - USER
-        - TENANT
-        - TENANT_USER
-        - GROUP
-        - FOLDER
-        - ALBUM
+      - SERVER
+      - USER
+      - TENANT
+      - TENANT_USER
+      - GROUP
+      - FOLDER
+      - ALBUM
     ErrorResponse:
       type: object
       additionalProperties: false
       required:
-        - message
+      - message
       properties:
         message:
           type: string

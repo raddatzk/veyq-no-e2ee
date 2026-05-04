@@ -1,19 +1,8 @@
 import { reactive } from 'vue'
+import type { TenantSummary } from './api/generated/tenants'
+import type { UserSummary } from './api/generated/users'
 
-export type TenantSummary = {
-  id: number
-  name: string
-  displayName: string
-  role: 'TenantOwner' | 'TenantMember'
-  admins: UserSummary[]
-}
-
-export type UserSummary = {
-  userId: number
-  email: string
-  displayName: string
-  serverRole: 'ServerOwner' | 'ServerMember'
-}
+export type { TenantSummary, UserSummary }
 
 export const authState = reactive({
   loading: true,

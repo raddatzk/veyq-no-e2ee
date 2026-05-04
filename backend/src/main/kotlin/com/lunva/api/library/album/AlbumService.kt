@@ -12,12 +12,12 @@ import com.lunva.api.domain.TenantFolderRepo
 import com.lunva.api.domain.TenantGroupMemberRepo
 import com.lunva.api.domain.TenantGroupRepo
 import com.lunva.api.generated.explorer.model.ExplorerAlbum
-import com.lunva.api.library.AlbumMediaRequest
-import com.lunva.api.library.CreateLibraryItemRequest
+import com.lunva.api.generated.library.model.AlbumMediaRequest
+import com.lunva.api.generated.library.model.CreateLibraryItemRequest
 import com.lunva.api.library.LibraryService
-import com.lunva.api.library.MoveLibraryItemRequest
-import com.lunva.api.library.SetAlbumCoverRequest
-import com.lunva.api.library.UpdateLibraryItemRequest
+import com.lunva.api.generated.library.model.MoveLibraryItemRequest
+import com.lunva.api.generated.library.model.SetAlbumCoverRequest
+import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject

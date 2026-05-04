@@ -13,11 +13,7 @@ export async function callApi<T>(path: string, options: RequestInit = {}): Promi
   const response = await apiFetch(path, options)
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: 'Request failed' }))
-    if (response.status === 503 && body.error === 'Setup required') {
-      throw new SetupRequiredError()
-    }
-    throw new Error(body.error || 'Request failed')
+    throw await apiError(response)
   }
 
   if (response.status === 204) return null as T
@@ -25,12 +21,17 @@ export async function callApi<T>(path: string, options: RequestInit = {}): Promi
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  let response = await request(path, options)
+  return apiFetchUrl(`${API_BASE}${path}`, options)
+}
+
+export async function apiFetchUrl(url: string, options: RequestInit = {}): Promise<Response> {
+  const path = pathFromUrl(url)
+  let response = await requestUrl(url, options)
 
   if (response.status === 401 && shouldTryRefresh(path)) {
     try {
       await refreshLogin()
-      response = await request(path, options)
+      response = await requestUrl(url, options)
     } catch {
       // Keep the original 401 semantics for callers when refresh is not possible.
     }
@@ -39,7 +40,15 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   return response
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<Response> {
+export async function apiError(response: Response): Promise<Error> {
+  const body = await response.json().catch(() => ({ error: 'Request failed' }))
+  if (response.status === 503 && body.error === 'Setup required') {
+    return new SetupRequiredError()
+  }
+  return new Error(body.error || 'Request failed')
+}
+
+async function requestUrl(url: string, options: RequestInit = {}): Promise<Response> {
   const headers =
     options.body instanceof FormData
       ? { ...(options.headers || {}) }
@@ -48,7 +57,7 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
           ...(options.headers || {})
         }
 
-  return fetch(`${API_BASE}${path}`, {
+  return fetch(url, {
     credentials: 'include',
     ...options,
     headers
@@ -56,11 +65,10 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
 }
 
 async function refreshLogin(): Promise<void> {
-  refreshRequest ||= request('/api/auth/refresh', { method: 'POST' })
+  refreshRequest ||= requestUrl(`${API_BASE}/api/auth/refresh`, { method: 'POST' })
     .then(async (response) => {
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ error: 'Request failed' }))
-        throw new Error(body.error || 'Request failed')
+        throw await apiError(response)
       }
     })
     .finally(() => {
@@ -68,6 +76,12 @@ async function refreshLogin(): Promise<void> {
     })
 
   return refreshRequest
+}
+
+function pathFromUrl(url: string): string {
+  if (API_BASE && url.startsWith(API_BASE)) return url.slice(API_BASE.length) || '/'
+  if (url.startsWith('/')) return url
+  return new URL(url).pathname
 }
 
 function shouldTryRefresh(path: string): boolean {

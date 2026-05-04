@@ -24,6 +24,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.util.UUID
 
 @QuarkusTest
@@ -65,7 +66,7 @@ class SecurityPipelineTest {
             .statusCode(200)
 
         given()
-            .`when`().get("/api/me")
+            .`when`().get("/api/users/me")
             .then()
             .statusCode(401)
 
@@ -169,6 +170,7 @@ class SecurityPipelineTest {
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role
+                it.passwordSetAt = Instant.now()
                 userRepo.persist(it)
             }
         }
@@ -178,6 +180,7 @@ class SecurityPipelineTest {
             Tenant().also {
                 it.name = name
                 it.displayName = displayName
+                it.domain = "$name.example.test"
                 tenantRepo.persist(it)
             }
         }

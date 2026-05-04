@@ -1,0 +1,215 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Auth API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer Lunva Auth API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+tags:
+- name: Auth
+paths:
+  "/api/auth/login":
+    post:
+      tags:
+      - Auth
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/LoginRequest"
+            example:
+              email: kevin@example.test
+              password: correct horse battery staple
+      responses:
+        '200':
+          description: Login succeeded and auth cookies were set.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LoginResponse"
+              example:
+                userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
+        '400':
+          "$ref": "#/components/responses/Error"
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '401':
+          "$ref": "#/components/responses/Error"
+      summary: Anmelden und Auth-Cookies setzen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Anmelden und Auth-Cookies setzen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/auth/logout":
+    post:
+      tags:
+      - Auth
+      operationId: logout
+      security:
+      - accessTokenCookie: []
+      responses:
+        '204':
+          description: Current auth cookies were cleared.
+        '401':
+          "$ref": "#/components/responses/Error"
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+      summary: Aktuelle Sitzung abmelden
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Aktuelle Sitzung abmelden.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/auth/refresh":
+    post:
+      tags:
+      - Auth
+      operationId: refresh
+      security:
+      - refreshTokenCookie: []
+      responses:
+        '200':
+          description: Refresh succeeded and rotated cookies were set.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LoginResponse"
+              example:
+                userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
+        '401':
+          "$ref": "#/components/responses/Error"
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+      summary: Refresh-Token rotieren und neue Cookies setzen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Refresh-Token rotieren und neue Cookies setzen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+    refreshTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_REFRESH_TOKEN
+  responses:
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            message: example
+  schemas:
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - email
+      - displayName
+      - serverRole
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        serverRole:
+          "$ref": "#/components/schemas/ServerRole"
+    ServerRole:
+      type: string
+      enum:
+      - ServerOwner
+      - ServerMember
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          type: string

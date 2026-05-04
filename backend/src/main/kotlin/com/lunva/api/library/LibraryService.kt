@@ -18,6 +18,8 @@ import com.lunva.api.generated.explorer.model.ExplorerBreadcrumb
 import com.lunva.api.generated.explorer.model.ExplorerFolder
 import com.lunva.api.generated.explorer.model.LocationKind
 import com.lunva.api.generated.explorer.model.OwnerBadge
+import com.lunva.api.generated.library.model.CreateLibraryItemRequest
+import com.lunva.api.generated.library.model.LibraryScopeRequest
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 
 abstract class LibraryService(
@@ -50,10 +52,10 @@ abstract class LibraryService(
         (parentFolder?.path()?.trimEnd('/') ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
 
     fun TenantFolder.toSummary(ownerBadge: OwnerBadge? = null): ExplorerFolder =
-        ExplorerFolder(publicId, name, displayName, path()).ownerBadge(ownerBadge)
+        ExplorerFolder(publicId, name, displayName, path(), ownerBadge)
 
     fun TenantAlbum.toSummary(ownerBadge: OwnerBadge? = null): ExplorerAlbum =
-        ExplorerAlbum(publicId, name, displayName, path(), coverMedia?.publicId).ownerBadge(ownerBadge)
+        ExplorerAlbum(publicId, name, displayName, path(), coverMedia?.publicId, ownerBadge)
 
     fun resolveVisibleContext(path: String?): ResolvedExplorerLocation {
         val context = resolveContext(path)
@@ -138,9 +140,9 @@ abstract class LibraryService(
 
     fun ownerBadge(scope: LibraryScopeKey): OwnerBadge =
         when (scope) {
-            LibraryScopeKey.Tenant -> OwnerBadge(OwnerBadge.KindEnum.TENANT, tenant().displayName)
-            is LibraryScopeKey.Group -> OwnerBadge(OwnerBadge.KindEnum.GROUP, scope.group.displayName).name(scope.group.name)
-            is LibraryScopeKey.User -> OwnerBadge(OwnerBadge.KindEnum.USER, scope.user.displayName).name("me")
+            LibraryScopeKey.Tenant -> OwnerBadge(OwnerBadge.Kind.TENANT, tenant().displayName)
+            is LibraryScopeKey.Group -> OwnerBadge(OwnerBadge.Kind.GROUP, scope.group.displayName, scope.group.name)
+            is LibraryScopeKey.User -> OwnerBadge(OwnerBadge.Kind.USER, scope.user.displayName, "me")
         }
 
     fun normalizedName(value: String?): String {

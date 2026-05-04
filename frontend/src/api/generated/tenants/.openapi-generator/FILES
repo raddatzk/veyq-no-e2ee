@@ -1,0 +1,16 @@
+.openapi-generator-ignore
+apis/TenantsApi.ts
+apis/index.ts
+index.ts
+models/CreateTenantRequest.ts
+models/ErrorResponse.ts
+models/GroupSettingsResponse.ts
+models/TenantRole.ts
+models/TenantSettingsResponse.ts
+models/TenantSummary.ts
+models/TenantSummaryAdminsInner.ts
+models/TenantUserSettingsResponse.ts
+models/TenantsSummary.ts
+models/UpdateNamedSettingsRequest.ts
+models/index.ts
+runtime.ts

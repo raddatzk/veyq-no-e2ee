@@ -23,6 +23,9 @@ class Tenant : PanacheEntityBase {
     @Column(nullable = false)
     lateinit var displayName: String
 
+    @Column(nullable = false, unique = true)
+    lateinit var domain: String
+
     @OneToMany(mappedBy = "tenant", fetch = FetchType.LAZY)
     var members: MutableSet<TenantMember> = mutableSetOf()
 
@@ -37,6 +40,9 @@ class TenantRepo : PanacheRepository<Tenant> {
 
     fun existsByName(name: String): Boolean =
         count("name", name) > 0
+
+    fun existsByDomain(domain: String): Boolean =
+        count("domain", domain) > 0
 
     fun existsAny(): Boolean =
         count() > 0

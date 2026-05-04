@@ -26,6 +26,12 @@ import com.lunva.api.domain.TenantRole
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.generated.explorer.model.LocationKind
+import com.lunva.api.generated.library.model.AlbumMediaRequest
+import com.lunva.api.generated.library.model.CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest
+import com.lunva.api.generated.library.model.LibraryScopeRequest
+import com.lunva.api.generated.library.model.MoveLibraryItemRequest
+import com.lunva.api.generated.library.model.SetAlbumCoverRequest
+import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
 import com.lunva.api.library.album.AlbumService
 import com.lunva.api.library.explorer.ExplorerService
 import com.lunva.api.library.folder.FolderService
@@ -65,6 +71,19 @@ class LibraryServiceTest {
     private lateinit var runId: String
     private lateinit var tenant: Tenant
     private lateinit var owner: User
+
+    private fun CreateLibraryItemRequest(
+        parentPath: String,
+        name: String,
+        displayName: String,
+        scope: LibraryScopeRequest? = null,
+    ): GeneratedCreateLibraryItemRequest =
+        GeneratedCreateLibraryItemRequest(
+            name = name,
+            displayName = displayName,
+            parentPath = parentPath,
+            scope = scope,
+        )
 
     @BeforeEach
     fun setUp() {
@@ -313,6 +332,7 @@ class LibraryServiceTest {
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role
+                it.passwordSetAt = Instant.now()
                 userRepo.persist(it)
             }
         }
@@ -322,6 +342,7 @@ class LibraryServiceTest {
             val tenant = Tenant().also {
                 it.name = name
                 it.displayName = displayName
+                it.domain = "$name.example.test"
                 tenantRepo.persist(it)
             }
             tenantRepo.flush()

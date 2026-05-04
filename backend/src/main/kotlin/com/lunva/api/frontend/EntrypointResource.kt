@@ -1,10 +1,10 @@
 package com.lunva.api.frontend
 
 import com.lunva.api.setup.ServerState
+import com.lunva.api.generated.tenants.model.TenantSummary
+import com.lunva.api.generated.users.model.UserSummary
 import com.lunva.api.tenant.TenantService
-import com.lunva.api.tenant.TenantSummary
 import com.lunva.api.usermgmt.UserService
-import com.lunva.api.usermgmt.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.GET

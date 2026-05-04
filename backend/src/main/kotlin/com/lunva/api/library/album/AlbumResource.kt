@@ -1,51 +1,38 @@
 package com.lunva.api.library.album
 
-import com.lunva.api.generated.explorer.model.ExplorerAlbum
-import com.lunva.api.library.AlbumMediaRequest
-import com.lunva.api.library.CreateLibraryItemRequest
-import com.lunva.api.library.MoveLibraryItemRequest
-import com.lunva.api.library.SetAlbumCoverRequest
-import com.lunva.api.library.UpdateLibraryItemRequest
+import com.lunva.api.generated.library.api.AlbumsApi
+import com.lunva.api.generated.library.model.AlbumMediaRequest
+import com.lunva.api.generated.library.model.CreateLibraryItemRequest
+import com.lunva.api.generated.library.model.MoveLibraryItemRequest
+import com.lunva.api.generated.library.model.SetAlbumCoverRequest
+import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import jakarta.validation.Valid
-import jakarta.ws.rs.*
-import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.Response
 
-@Path("/api/{tenantName}/albums")
 @ApplicationScoped
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
 class AlbumResource @Inject constructor(
     private val albumService: AlbumService,
-) {
+) : AlbumsApi {
 
-    @POST
-    fun createAlbum(@Valid request: CreateLibraryItemRequest): ExplorerAlbum =
-        albumService.createAlbum(request)
+    override fun createAlbum(tenantName: String, request: CreateLibraryItemRequest): Response =
+        Response.ok(albumService.createAlbum(request)).build()
 
-    @POST
-    @Path("/update")
-    fun updateAlbum(@Valid request: UpdateLibraryItemRequest): ExplorerAlbum =
-        albumService.updateAlbum(request)
+    override fun updateAlbum(tenantName: String, request: UpdateLibraryItemRequest): Response =
+        Response.ok(albumService.updateAlbum(request)).build()
 
-    @POST
-    @Path("/move")
-    fun moveAlbum(@Valid request: MoveLibraryItemRequest): ExplorerAlbum =
-        albumService.moveAlbum(request)
+    override fun moveAlbum(tenantName: String, request: MoveLibraryItemRequest): Response =
+        Response.ok(albumService.moveAlbum(request)).build()
 
-    @DELETE
-    fun deleteAlbum(@QueryParam("path") path: String?) =
+    override fun deleteAlbum(tenantName: String, path: String?): Response {
         albumService.deleteAlbum(path)
+        return Response.noContent().build()
+    }
 
-    @POST
-    @Path("/media")
-    fun addMedia(@Valid request: AlbumMediaRequest): ExplorerAlbum =
-        albumService.addMediaToAlbum(request)
+    override fun addMedia(tenantName: String, request: AlbumMediaRequest): Response =
+        Response.ok(albumService.addMediaToAlbum(request)).build()
 
-    @POST
-    @Path("/cover")
-    fun setCover(@Valid request: SetAlbumCoverRequest): ExplorerAlbum =
-        albumService.setAlbumCover(request)
+    override fun setCover(tenantName: String, request: SetAlbumCoverRequest): Response =
+        Response.ok(albumService.setAlbumCover(request)).build()
 
 }

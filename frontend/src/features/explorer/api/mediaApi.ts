@@ -1,4 +1,15 @@
-import { apiFetch, callApi } from '../../../shared/api/httpClient'
+import {
+  generatedCall,
+  mediaApi as generatedMediaApi,
+  mediaUploadsApi
+} from '../../../api/generatedClient'
+import type {
+  PendingMediaUploadSummary,
+  StreamMediaSummary,
+  UpdateMediaMetadataRequest as GeneratedUpdateMediaMetadataRequest,
+  UploadMediaSummary
+} from '../../../api/generated/library'
+import { apiFetch } from '../../../shared/api/httpClient'
 import { pathQuery, tenantApiPath } from '../../../shared/utils/paths'
 import type {
   ExplorerMedia,
@@ -8,21 +19,6 @@ import type {
   UpdateMediaMetadataRequest,
   UploadMediaRequest
 } from './types'
-
-export async function streamExplorerMedia(
-  tenantName: string,
-  path: string,
-  onItem: (item: ExplorerMedia) => void,
-  options: StreamMediaOptions = {}
-): Promise<void> {
-  return streamExplorerMediaMetadata(
-    tenantName,
-    path,
-    (items) => items.forEach((item) => onItem(item)),
-    options
-  )
-}
-
 export async function streamExplorerMediaMetadata(
   tenantName: string,
   path: string,
@@ -72,17 +68,18 @@ export async function createMediaUpload(
   tenantName: string,
   request: UploadMediaRequest
 ): Promise<MediaUploadSession> {
-  return callApi<MediaUploadSession>('/api/media/uploads', {
-    method: 'POST',
-    body: JSON.stringify({
-      tenantName,
-      albumPath: request.albumPath,
-      filename: request.file.name,
-      mimeType: request.file.type,
-      sizeBytes: request.file.size,
-      title: request.title
+  return generatedCall(
+    mediaUploadsApi.createUpload({
+      createMediaUploadRequest: {
+        tenantName,
+        albumPath: request.albumPath,
+        filename: request.file.name,
+        mimeType: request.file.type,
+        sizeBytes: request.file.size,
+        title: request.title
+      }
     })
-  })
+  )
 }
 
 export async function uploadMediaChunk(
@@ -91,43 +88,29 @@ export async function uploadMediaChunk(
   chunk: Blob,
   options: { signal?: AbortSignal } = {}
 ): Promise<void> {
-  const response = await apiFetch(
-    `/api/media/uploads/${encodeURIComponent(uploadId)}/chunks/${chunkIndex}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: chunk,
-      signal: options.signal
-    }
+  await generatedCall(
+    mediaUploadsApi.uploadChunk(
+      { uploadId, chunkIndex, body: chunk },
+      { signal: options.signal }
+    )
   )
-
-  if (!response.ok) {
-    const body = await response
-      .json()
-      .catch(() => ({ error: 'Chunk konnte nicht hochgeladen werden' }))
-    throw new Error(body.error || 'Chunk konnte nicht hochgeladen werden')
-  }
 }
 
 export function completeMediaUpload(tenantName: string, uploadId: string): Promise<ExplorerMedia> {
   void tenantName
-  return callApi<ExplorerMedia>(`/api/media/uploads/${encodeURIComponent(uploadId)}/complete`, {
-    method: 'POST'
-  })
+  return generatedCall(mediaUploadsApi.completeUpload({ uploadId })).then(normalizeMedia)
 }
 
 export function listMediaUploads(): Promise<PendingMediaUploadSession[]> {
-  return callApi<PendingMediaUploadSession[]>('/api/media/uploads')
+  return generatedCall(mediaUploadsApi.listUploads()).then((uploads) => uploads.map(normalizeUpload))
 }
 
 export function getMediaUpload(uploadId: string): Promise<PendingMediaUploadSession> {
-  return callApi<PendingMediaUploadSession>(`/api/media/uploads/${encodeURIComponent(uploadId)}`)
+  return generatedCall(mediaUploadsApi.getUpload({ uploadId })).then(normalizeUpload)
 }
 
 export function abortMediaUpload(uploadId: string): Promise<void> {
-  return callApi<void>(`/api/media/uploads/${encodeURIComponent(uploadId)}`, {
-    method: 'DELETE'
-  })
+  return generatedCall(mediaUploadsApi.abortUpload({ uploadId }))
 }
 
 export function updateMediaMetadata(
@@ -135,13 +118,13 @@ export function updateMediaMetadata(
   mediaId: string,
   request: UpdateMediaMetadataRequest
 ): Promise<ExplorerMedia> {
-  return callApi<ExplorerMedia>(
-    tenantApiPath(tenantName, 'media', `/${encodeURIComponent(mediaId)}/metadata`),
-    {
-      method: 'PATCH',
-      body: JSON.stringify(request)
-    }
-  )
+  return generatedCall(
+    generatedMediaApi.updateMetadata({
+      tenantName,
+      mediaId,
+      updateMediaMetadataRequest: request as GeneratedUpdateMediaMetadataRequest
+    })
+  ).then(normalizeMedia)
 }
 
 function parseNdjson(text: string, onItem: (item: ExplorerMedia) => void) {
@@ -151,7 +134,29 @@ function parseNdjson(text: string, onItem: (item: ExplorerMedia) => void) {
 function parseLine(line: string, onItem: (item: ExplorerMedia) => void) {
   const trimmed = line.trim()
   if (!trimmed) return
-  onItem(JSON.parse(trimmed) as ExplorerMedia)
+  onItem(normalizeMedia(JSON.parse(trimmed) as StreamMediaSummary))
+}
+
+function normalizeUpload(upload: PendingMediaUploadSummary): PendingMediaUploadSession {
+  return {
+    ...upload,
+    title: upload.title ?? null
+  }
+}
+
+function normalizeMedia(media: StreamMediaSummary | UploadMediaSummary): ExplorerMedia {
+  return {
+    ...media,
+    albumPath: media.albumPath ?? null,
+    capturedAt: media.capturedAt ?? null,
+    cameraMake: media.cameraMake ?? null,
+    cameraModel: media.cameraModel ?? null,
+    lensModel: media.lensModel ?? null,
+    imageWidth: media.imageWidth ?? null,
+    imageHeight: media.imageHeight ?? null,
+    gpsLatitude: media.gpsLatitude ?? null,
+    gpsLongitude: media.gpsLongitude ?? null
+  }
 }
 
 function createMetadataBatchEmitter(

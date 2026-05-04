@@ -27,6 +27,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasSize
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.util.UUID
 
 @QuarkusTest
@@ -69,7 +70,7 @@ class MultiTenantResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"name":"api","displayName":"API"}""")
+            .body("""{"name":"api","displayName":"API","domain":"api-$runId.example.test"}""")
             .`when`().post("/api/tenants")
             .then()
             .statusCode(400)
@@ -80,7 +81,7 @@ class MultiTenantResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
-            .body("""{"name":"plain-$runId","displayName":"Plain"}""")
+            .body("""{"name":"plain-$runId","displayName":"Plain","domain":"plain-$runId.example.test"}""")
             .`when`().post("/api/tenants")
             .then()
             .statusCode(403)
@@ -175,7 +176,7 @@ class MultiTenantResourceTest {
         val response = given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", accessCookie)
-            .body("""{"name":"$name","displayName":"$displayName"}""")
+            .body("""{"name":"$name","displayName":"$displayName","domain":"$name.example.test"}""")
             .`when`().post("/api/tenants")
 
         if (response.statusCode != 200 && response.statusCode != 409) {
@@ -206,6 +207,7 @@ class MultiTenantResourceTest {
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role
+                it.passwordSetAt = Instant.now()
                 userRepo.persist(it)
             }
         }.also {

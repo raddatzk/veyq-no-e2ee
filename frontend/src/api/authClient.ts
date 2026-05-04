@@ -1,19 +1,12 @@
-import { callApi } from './httpClient'
+import { authApi, generatedCall } from './generatedClient'
+import type { LoginResponse } from './generated/auth'
 
-export type LoginResponse = {
-  userId: number
-  email: string
-  displayName: string
-  serverRole: 'ServerOwner' | 'ServerMember'
-}
+export type { LoginResponse }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  return callApi('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password })
-  })
+  return generatedCall(authApi.login({ loginRequest: { email, password } }))
 }
 
 export async function logout(): Promise<void> {
-  await callApi('/api/auth/logout', { method: 'POST' })
+  await generatedCall(authApi.logout())
 }

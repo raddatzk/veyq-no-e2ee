@@ -1,7 +1,15 @@
-import { callApi } from '../../../shared/api/httpClient'
-import { pathQuery } from '../../../shared/utils/paths'
+import {
+  generatedCall,
+  serverApi,
+  settingsApi,
+  usersApi
+} from '../../../api/generatedClient'
 import type {
   ChangePasswordRequest,
+  CreateManagedUserRequest,
+  ManagedUserSummary,
+  ManagedUsersResponse,
+  ServerRole,
   ServerSettingsResponse,
   SettingsResponse,
   UpdateUserSettingsRequest,
@@ -9,27 +17,42 @@ import type {
 } from './types'
 
 export function getSettings(path: string): Promise<SettingsResponse> {
-  return callApi(`/api/settings?${pathQuery(path)}`)
+  return generatedCall(settingsApi.getSettings({ path }))
 }
 
 export function getServerSettings(): Promise<ServerSettingsResponse> {
-  return callApi('/api/settings/server')
+  return generatedCall(serverApi.getServerSettings())
 }
 
 export function getMySettings(): Promise<UserSettingsResponse> {
-  return callApi('/api/settings/me')
+  return generatedCall(usersApi.me())
 }
 
 export function updateMySettings(request: UpdateUserSettingsRequest): Promise<UserSettingsResponse> {
-  return callApi('/api/settings/me', {
-    method: 'PUT',
-    body: JSON.stringify(request)
-  })
+  return generatedCall(usersApi.updateMySettings({ updateUserSettingsRequest: request }))
 }
 
 export function changeMyPassword(request: ChangePasswordRequest): Promise<void> {
-  return callApi('/api/settings/me/password', {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  return generatedCall(usersApi.changeMyPassword({ changePasswordRequest: request }))
+}
+
+export function getManagedUsers(): Promise<ManagedUsersResponse> {
+  return generatedCall(usersApi.getAllUsers())
+}
+
+export function createManagedUser(request: CreateManagedUserRequest): Promise<ManagedUserSummary> {
+  return generatedCall(usersApi.createManagedUser({ createManagedUserRequest: request }))
+}
+
+export function updateManagedUserRole(
+  userId: number,
+  serverRole: ServerRole
+): Promise<ManagedUserSummary> {
+  return generatedCall(
+    usersApi.updateManagedUser({ userId, updateManagedUserRequest: { serverRole } })
+  )
+}
+
+export function resendManagedUserInvitation(userId: number): Promise<ManagedUserSummary> {
+  return generatedCall(usersApi.sendManagedUserInvitation({ userId }))
 }

@@ -6,10 +6,13 @@ import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
-import com.lunva.api.usermgmt.UserSummary
+import com.lunva.api.generated.setup.model.AdminSetupRequest
+import com.lunva.api.generated.setup.model.SetupStatusSummary
+import com.lunva.api.generated.setup.model.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import java.time.Instant
 
 @ApplicationScoped
 class SetupService @Inject constructor(
@@ -35,6 +38,7 @@ class SetupService @Inject constructor(
             it.displayName = request.displayName!!.trim()
             it.email = email
             it.role = ServerRole.ServerOwner
+            it.passwordSetAt = Instant.now()
             userRepo.persist(it)
         }
         userRepo.flush()
@@ -44,7 +48,7 @@ class SetupService @Inject constructor(
             user.id,
             user.email,
             user.displayName,
-            user.role,
+            UserSummary.ServerRole.ServerOwner,
         )
     }
 }

@@ -1,18 +1,15 @@
-import type { TenantSummary } from '../authState'
-import { callApi } from './httpClient'
+import { generatedCall, tenantsApi } from './generatedClient'
+import type { TenantSummary } from './generated/tenants'
 
-type TenantsResponse = {
-  tenants: TenantSummary[]
-}
+export type { TenantSummary }
 
 export async function tenants(): Promise<TenantSummary[]> {
-  const response = await callApi<TenantsResponse>('/api/tenants')
+  const response = await generatedCall(tenantsApi.myTenants())
   return response.tenants
 }
 
-export async function createTenant(name: string, displayName: string): Promise<TenantSummary> {
-  return callApi('/api/tenants', {
-    method: 'POST',
-    body: JSON.stringify({ name, displayName })
-  })
+export async function createTenant(name: string, displayName: string, domain: string): Promise<TenantSummary> {
+  return generatedCall(
+    tenantsApi.createTenant({ createTenantRequest: { name, displayName, domain } })
+  )
 }

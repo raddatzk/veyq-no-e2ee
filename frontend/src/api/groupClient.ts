@@ -1,17 +1,10 @@
-import { callApi } from './httpClient'
+import { generatedCall, groupsApi } from './generatedClient'
+import type { SimplifiedGroupSummary } from './generated/groups'
 
-export type TenantGroup = {
-  id: number
-  name: string
-  displayName: string
-}
-
-type GroupsResponse = {
-  groups: TenantGroup[]
-}
+export type TenantGroup = SimplifiedGroupSummary
 
 export async function groups(tenantName: string): Promise<TenantGroup[]> {
-  const response = await callApi<GroupsResponse>(`/api/${tenantName}/groups`)
+  const response = await generatedCall(groupsApi.getGroups({ tenantName }))
   return response.groups
 }
 
@@ -20,8 +13,7 @@ export async function createGroup(
   name: string,
   displayName: string
 ): Promise<TenantGroup> {
-  return callApi(`/api/${tenantName}/groups`, {
-    method: 'POST',
-    body: JSON.stringify({ name, displayName })
-  })
+  return generatedCall(
+    groupsApi.createGroup({ tenantName, createGroupRequest: { name, displayName } })
+  )
 }

@@ -1,0 +1,702 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Tenants API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer Lunva Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Tenants
+paths:
+  "/api/tenants":
+    get:
+      tags:
+      - Tenants
+      operationId: myTenants
+      responses:
+        '200':
+          description: Tenants visible to the current user.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantsSummary"
+              example:
+                tenants:
+                - id: 42
+                  name: friends
+                  displayName: Friends
+                  domain: friends.example.test
+                  role: TenantOwner
+                  admins:
+                  - userId: 1
+                    email: kevin@example.test
+                    displayName: Kevin
+                    serverRole: ServerOwner
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+      summary: Eigene Tenants auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene Tenants auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Tenants
+      operationId: createTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTenantRequest"
+            example:
+              name: friends
+              displayName: Friends
+              domain: friends.example.test
+      responses:
+        '200':
+          description: Created tenant.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantSummary"
+              example:
+                id: 42
+                name: friends
+                displayName: Friends
+                domain: friends.example.test
+                role: TenantOwner
+                admins:
+                - userId: 1
+                  email: kevin@example.test
+                  displayName: Kevin
+                  serverRole: ServerOwner
+        '400':
+          "$ref": "#/components/responses/Error"
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          "$ref": "#/components/responses/Error"
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '409':
+          "$ref": "#/components/responses/Error"
+          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource conflict
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+      summary: Tenant anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      description: |-
+        Tenant anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/settings":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Tenant settings.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantSettingsResponse"
+              example:
+                tenantId: 42
+                name: friends
+                displayName: Friends
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Tenant-Einstellungen abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Einstellungen abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateNamedSettingsRequest"
+            example:
+              displayName: Friends & Family
+      responses:
+        '200':
+          description: Updated tenant settings.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantSettingsResponse"
+              example:
+                tenantId: 42
+                name: friends
+                displayName: Friends & Family
+        '403':
+          "$ref": "#/components/responses/Error"
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Tenant-Einstellungen aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Einstellungen aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/me":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantUserSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Current user settings in tenant context.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantUserSettingsResponse"
+              example:
+                tenantId: 42
+                tenantName: friends
+                userId: 1
+                displayName: Kevin
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Benutzereinstellungen im Tenant abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Benutzereinstellungen im Tenant abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantUserSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Updated current user settings in tenant context.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TenantUserSettingsResponse"
+              example:
+                tenantId: 42
+                tenantName: friends
+                userId: 1
+                displayName: Kevin
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Benutzereinstellungen im Tenant aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Benutzereinstellungen im Tenant aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/{groupName}":
+    get:
+      tags:
+      - Tenants
+      operationId: getGroupSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/GroupName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Group settings.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupSettingsResponse"
+              example:
+                groupId: 99
+                name: family
+                displayName: Family
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Gruppen-Einstellungen abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen-Einstellungen abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateGroupSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/GroupName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateNamedSettingsRequest"
+            example:
+              displayName: Close Friends
+      responses:
+        '200':
+          description: Updated group settings.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupSettingsResponse"
+              example:
+                groupId: 99
+                name: family
+                displayName: Close Friends
+        '403':
+          "$ref": "#/components/responses/Error"
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Gruppen-Einstellungen aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen-Einstellungen aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+  parameters:
+    TenantName:
+      name: tenantName
+      in: path
+      required: true
+      schema:
+        type: string
+    GroupName:
+      name: groupName
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            message: example
+  schemas:
+    TenantRole:
+      type: string
+      enum:
+      - TenantOwner
+      - TenantMember
+    CreateTenantRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      - domain
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        domain:
+          type: string
+    TenantSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - domain
+      - role
+      - admins
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+        domain:
+          type: string
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+        admins:
+          type: array
+          items:
+            "$ref": "./users.openapi.yaml#/components/schemas/UserSummary"
+    TenantsSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - tenants
+      properties:
+        tenants:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TenantSummary"
+    TenantSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - tenantId
+      - name
+      - displayName
+      properties:
+        tenantId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+    TenantUserSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - tenantId
+      - tenantName
+      - userId
+      - displayName
+      properties:
+        tenantId:
+          type: integer
+          format: int64
+        tenantName:
+          type: string
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          type: string
+    GroupSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - groupId
+      - name
+      - displayName
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+    UpdateNamedSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      properties:
+        displayName:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          type: string

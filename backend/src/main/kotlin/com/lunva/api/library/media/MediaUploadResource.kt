@@ -1,60 +1,42 @@
 package com.lunva.api.library.media
 
+import com.lunva.api.generated.library.api.MediaUploadsApi
+import com.lunva.api.generated.library.model.CreateMediaUploadRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import jakarta.ws.rs.Consumes
-import jakarta.ws.rs.DELETE
-import jakarta.ws.rs.GET
-import jakarta.ws.rs.POST
-import jakarta.ws.rs.PUT
-import jakarta.ws.rs.Path
-import jakarta.ws.rs.PathParam
-import jakarta.ws.rs.Produces
-import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
-import java.io.InputStream
+import java.io.File
+import java.nio.file.Files
 
-@Path("/api/media/uploads")
 @ApplicationScoped
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
 class MediaUploadResource @Inject constructor(
     private val mediaService: MediaService,
-) {
+) : MediaUploadsApi {
 
-    @POST
-    fun createUpload(request: CreateMediaUploadRequest): MediaUploadSessionSummary =
-        mediaService.createUpload(request)
+    override fun createUpload(request: CreateMediaUploadRequest): Response =
+        Response.ok(mediaService.createUpload(request)).build()
 
-    @GET
-    fun listUploads(): List<PendingMediaUploadSummary> =
-        mediaService.listUploads()
+    override fun listUploads(): Response =
+        Response.ok(mediaService.listUploads()).build()
 
-    @GET
-    @Path("/{uploadId}")
-    fun getUpload(@PathParam("uploadId") uploadId: String): PendingMediaUploadSummary =
-        mediaService.uploadStatus(uploadId)
+    override fun getUpload(uploadId: String): Response =
+        Response.ok(mediaService.uploadStatus(uploadId)).build()
 
-    @PUT
-    @Path("/{uploadId}/chunks/{chunkIndex}")
-    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-    fun uploadChunk(
-        @PathParam("uploadId") uploadId: String,
-        @PathParam("chunkIndex") chunkIndex: Int,
-        chunk: InputStream,
+    override fun uploadChunk(
+        uploadId: String,
+        chunkIndex: Int,
+        body: File,
     ): Response {
-        mediaService.uploadChunk(uploadId, chunkIndex, chunk)
+        Files.newInputStream(body.toPath()).use { chunk ->
+            mediaService.uploadChunk(uploadId, chunkIndex, chunk)
+        }
         return Response.noContent().build()
     }
 
-    @POST
-    @Path("/{uploadId}/complete")
-    fun completeUpload(@PathParam("uploadId") uploadId: String): UploadMediaSummary =
-        mediaService.completeUpload(uploadId)
+    override fun completeUpload(uploadId: String): Response =
+        Response.ok(mediaService.completeUpload(uploadId)).build()
 
-    @DELETE
-    @Path("/{uploadId}")
-    fun abortUpload(@PathParam("uploadId") uploadId: String): Response {
+    override fun abortUpload(uploadId: String): Response {
         mediaService.abortUpload(uploadId)
         return Response.noContent().build()
     }

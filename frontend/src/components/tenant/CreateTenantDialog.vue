@@ -15,6 +15,7 @@ const router = useRouter()
 const { setTenants } = useAuthState()
 const name = ref('')
 const displayName = ref('')
+const domain = ref('')
 const permalinkTouched = ref(false)
 const error = ref('')
 const loading = ref(false)
@@ -30,6 +31,7 @@ watch(visible, (isVisible) => {
     error.value = ''
     name.value = ''
     displayName.value = ''
+    domain.value = ''
     permalinkTouched.value = false
   }
 })
@@ -47,7 +49,7 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    const tenant = await createTenant(tenantName, tenantDisplayName)
+    const tenant = await createTenant(tenantName, tenantDisplayName, domain.value)
     setTenants(await tenants())
     visible.value = false
     await router.push(`/${tenant.name}`)
@@ -74,6 +76,10 @@ async function submit() {
           required
           @update:model-value="updatePermalink"
         />
+      </label>
+      <label>
+        Domain
+        <InputText v-model="domain" autocomplete="off" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">

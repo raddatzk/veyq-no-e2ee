@@ -61,6 +61,7 @@ function tenant(name: string, displayName: string): TenantSummary {
     id: 1,
     name,
     displayName,
+    domain: `${name}.example.test`,
     role: 'TenantOwner',
     admins: []
   }

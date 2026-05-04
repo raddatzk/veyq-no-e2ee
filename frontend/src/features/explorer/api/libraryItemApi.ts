@@ -1,5 +1,9 @@
-import { callApi } from '../../../shared/api/httpClient'
-import { pathQuery, tenantApiPath } from '../../../shared/utils/paths'
+import { albumsApi, foldersApi, generatedCall } from '../../../api/generatedClient'
+import type {
+  CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest,
+  MoveLibraryItemRequest as GeneratedMoveLibraryItemRequest,
+  UpdateLibraryItemRequest as GeneratedUpdateLibraryItemRequest
+} from '../../../api/generated/library'
 import type {
   CreateLibraryItemRequest,
   ExplorerAlbum,
@@ -9,28 +13,22 @@ import type {
   UpdateLibraryItemRequest
 } from './types'
 
-function itemSegment(type: LibraryItemType): string {
-  return type === 'folder' ? 'folders' : 'albums'
-}
-
 export function createFolder(
   tenantName: string,
   request: CreateLibraryItemRequest
 ): Promise<ExplorerFolder> {
-  return callApi(tenantApiPath(tenantName, 'folders'), {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  return generatedCall(
+    foldersApi.createFolder({ tenantName, createLibraryItemRequest: createRequest(request) })
+  ) as Promise<ExplorerFolder>
 }
 
 export function createAlbum(
   tenantName: string,
   request: CreateLibraryItemRequest
 ): Promise<ExplorerAlbum> {
-  return callApi(tenantApiPath(tenantName, 'albums'), {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  return generatedCall(
+    albumsApi.createAlbum({ tenantName, createLibraryItemRequest: createRequest(request) })
+  ) as Promise<ExplorerAlbum>
 }
 
 export function updateLibraryItem(
@@ -38,10 +36,14 @@ export function updateLibraryItem(
   type: LibraryItemType,
   request: UpdateLibraryItemRequest
 ): Promise<ExplorerFolder | ExplorerAlbum> {
-  return callApi(tenantApiPath(tenantName, itemSegment(type), '/update'), {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  if (type === 'folder') {
+    return generatedCall(
+      foldersApi.updateFolder({ tenantName, updateLibraryItemRequest: updateRequest(request) })
+    ) as Promise<ExplorerFolder>
+  }
+  return generatedCall(
+    albumsApi.updateAlbum({ tenantName, updateLibraryItemRequest: updateRequest(request) })
+  ) as Promise<ExplorerAlbum>
 }
 
 export function moveLibraryItem(
@@ -49,10 +51,14 @@ export function moveLibraryItem(
   type: LibraryItemType,
   request: MoveLibraryItemRequest
 ): Promise<ExplorerFolder | ExplorerAlbum> {
-  return callApi(tenantApiPath(tenantName, itemSegment(type), '/move'), {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  if (type === 'folder') {
+    return generatedCall(
+      foldersApi.moveFolder({ tenantName, moveLibraryItemRequest: moveRequest(request) })
+    ) as Promise<ExplorerFolder>
+  }
+  return generatedCall(
+    albumsApi.moveAlbum({ tenantName, moveLibraryItemRequest: moveRequest(request) })
+  ) as Promise<ExplorerAlbum>
 }
 
 export function deleteLibraryItem(
@@ -60,9 +66,10 @@ export function deleteLibraryItem(
   type: LibraryItemType,
   path: string
 ): Promise<void> {
-  return callApi(tenantApiPath(tenantName, itemSegment(type), `?${pathQuery(path)}`), {
-    method: 'DELETE'
-  })
+  if (type === 'folder') {
+    return generatedCall(foldersApi.deleteFolder({ tenantName, path }))
+  }
+  return generatedCall(albumsApi.deleteAlbum({ tenantName, path }))
 }
 
 export function setAlbumCover(
@@ -71,8 +78,32 @@ export function setAlbumCover(
   mediaId: string,
   hidden: boolean
 ): Promise<ExplorerAlbum> {
-  return callApi(tenantApiPath(tenantName, 'albums', '/cover'), {
-    method: 'POST',
-    body: JSON.stringify({ albumPath, mediaId, hidden })
-  })
+  return generatedCall(
+    albumsApi.setCover({ tenantName, setAlbumCoverRequest: { albumPath, mediaId, hidden } })
+  ) as Promise<ExplorerAlbum>
+}
+
+function createRequest(request: CreateLibraryItemRequest): GeneratedCreateLibraryItemRequest {
+  return {
+    name: request.name,
+    displayName: request.displayName,
+    parentPath: request.parentPath ?? undefined,
+    scope: request.scope ?? undefined
+  }
+}
+
+function updateRequest(request: UpdateLibraryItemRequest): GeneratedUpdateLibraryItemRequest {
+  return {
+    path: request.path,
+    name: request.name ?? undefined,
+    displayName: request.displayName ?? undefined
+  }
+}
+
+function moveRequest(request: MoveLibraryItemRequest): GeneratedMoveLibraryItemRequest {
+  return {
+    path: request.path,
+    newParentPath: request.newParentPath ?? undefined,
+    name: request.name ?? undefined
+  }
 }

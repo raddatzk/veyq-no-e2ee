@@ -91,6 +91,7 @@ class TokenServiceTest {
             it.displayName = "Token User $unique"
             it.email = "token-$unique@example.com"
             it.role = ServerRole.ServerOwner
+            it.passwordSetAt = Instant.now()
             userRepo.persist(it)
         }
     }

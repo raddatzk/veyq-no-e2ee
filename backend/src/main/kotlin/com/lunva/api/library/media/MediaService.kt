@@ -7,6 +7,12 @@ import com.lunva.api.domain.*
 import com.lunva.api.library.LibraryService
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
+import com.lunva.api.generated.library.model.CreateMediaUploadRequest
+import com.lunva.api.generated.library.model.MediaUploadSessionSummary
+import com.lunva.api.generated.library.model.PendingMediaUploadSummary
+import com.lunva.api.generated.library.model.StreamMediaSummary
+import com.lunva.api.generated.library.model.UpdateMediaMetadataRequest
+import com.lunva.api.generated.library.model.UploadMediaSummary
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -23,6 +29,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.Comparator
 import java.util.Properties
 import java.util.UUID
@@ -210,7 +218,7 @@ class MediaService @Inject constructor(
             ?: throw NotFoundException("Media not found")
         if (!isMediaAccessible(media)) throw NotFoundException("Media not found")
 
-        media.capturedAt = request.capturedAt
+        media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
         val album = albumMediaRepo.list("media", media)
             .firstOrNull { isMediaVisible(media, it.album) }
@@ -416,8 +424,8 @@ class MediaService @Inject constructor(
             chunkSizeBytes = mediaConfig.chunkSizeBytes,
             uploadedChunks = uploadedChunks,
             uploadedBytes = uploadedBytes.coerceAtMost(sizeBytes),
-            createdAt = createdAt,
-            updatedAt = updatedAt,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            updatedAt = updatedAt.toApiOffsetDateTime(),
         )
     }
 
@@ -511,8 +519,8 @@ class MediaService @Inject constructor(
             albumPath = album?.path(),
             ownerUserId = owner.id,
             uploaderDisplayName = owner.displayName,
-            createdAt = createdAt,
-            capturedAt = capturedAt,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            capturedAt = capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = capturedAtOverride,
             mimeType = mimeType,
             sizeBytes = sizeBytes,
@@ -533,8 +541,8 @@ class MediaService @Inject constructor(
             albumPath = album.path(),
             ownerUserId = owner.id,
             uploaderDisplayName = owner.displayName,
-            createdAt = createdAt,
-            capturedAt = capturedAt,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            capturedAt = capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = capturedAtOverride,
             mimeType = mimeType,
             sizeBytes = sizeBytes,
@@ -556,4 +564,7 @@ class MediaService @Inject constructor(
 
     private fun safeHeaderFilename(value: String): String =
         value.replace("\\", "_").replace("\"", "_").replace("\r", "_").replace("\n", "_")
+
+    private fun Instant.toApiOffsetDateTime(): OffsetDateTime =
+        OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

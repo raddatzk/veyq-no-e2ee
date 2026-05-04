@@ -4,7 +4,7 @@ import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**']
+    ignores: ['dist/**', 'node_modules/**', 'src/api/generated/**']
   },
   ...pluginVue.configs['flat/recommended'],
   ...vueTsEslintConfig(),

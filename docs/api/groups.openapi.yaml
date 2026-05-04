@@ -1,0 +1,466 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Groups API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer Lunva Groups API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Groups
+paths:
+  "/api/{tenantName}/groups":
+    get:
+      tags:
+      - Groups
+      operationId: getGroups
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Tenant groups.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupsSummary"
+              example:
+                groups:
+                - id: 99
+                  name: family
+                  displayName: Family
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Gruppen eines Tenants auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen eines Tenants auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Groups
+      operationId: createGroup
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateGroupRequest"
+            example:
+              name: family
+              displayName: Family
+      responses:
+        '200':
+          description: Created group.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupSummary"
+              example:
+                id: 99
+                name: family
+                displayName: Family
+                members:
+                - user:
+                    userId: 1
+                    email: kevin@example.test
+                    displayName: Kevin
+                    serverRole: ServerOwner
+                  role: GroupOwner
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '409':
+          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource conflict
+      summary: Gruppe anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/groups/{groupName}":
+    get:
+      tags:
+      - Groups
+      operationId: getGroup
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/GroupName"
+        description:
+        example:
+      responses:
+        '200':
+          description: Group details.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupSummary"
+              example:
+                id: 99
+                name: family
+                displayName: Family
+                members:
+                - user:
+                    userId: 1
+                    email: kevin@example.test
+                    displayName: Kevin
+                    serverRole: ServerOwner
+                  role: GroupOwner
+        '404':
+          "$ref": "#/components/responses/Error"
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '403':
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+      summary: Gruppe abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Groups
+      operationId: updateGroup
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+        description:
+        example:
+      - "$ref": "#/components/parameters/GroupName"
+        description:
+        example:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateGroupRequest"
+            example:
+              name: family
+              displayName: Family
+              members:
+              - id: 7
+                role: GroupOwner
+      responses:
+        '200':
+          description: Updated group.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GroupSummary"
+              example:
+                id: 99
+                name: family
+                displayName: Family
+                members:
+                - user:
+                    userId: 2
+                    email: invitee@example.test
+                    displayName: Invitee
+                    serverRole: ServerMember
+                  role: GroupOwner
+        '403':
+          "$ref": "#/components/responses/Error"
+          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Insufficient permissions
+        '401':
+          description: Der Request ist nicht authentifiziert.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Authentication required
+        '400':
+          description: Der Request ist syntaktisch oder fachlich ungueltig.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid request
+        '404':
+          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+              example:
+                error: Resource not found
+      summary: Gruppe aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: LUNVA_ACCESS_TOKEN
+  parameters:
+    TenantName:
+      name: tenantName
+      in: path
+      required: true
+      schema:
+        type: string
+    GroupName:
+      name: groupName
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            message: example
+  schemas:
+    GroupRole:
+      type: string
+      enum:
+      - GroupOwner
+      - GroupMember
+    CreateGroupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+    GroupMemberRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - role
+      properties:
+        id:
+          type: integer
+          format: int64
+        role:
+          "$ref": "#/components/schemas/GroupRole"
+    UpdateGroupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+        members:
+          type: array
+          uniqueItems: true
+          items:
+            "$ref": "#/components/schemas/GroupMemberRequest"
+    GroupMemberSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - user
+      - role
+      properties:
+        user:
+          "$ref": "./users.openapi.yaml#/components/schemas/UserSummary"
+        role:
+          "$ref": "#/components/schemas/GroupRole"
+    GroupSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - members
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+        members:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GroupMemberSummary"
+    SimplifiedGroupSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+    GroupsSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - groups
+      properties:
+        groups:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SimplifiedGroupSummary"
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - message
+      properties:
+        message:
+          type: string

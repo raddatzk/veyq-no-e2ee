@@ -1,6 +1,6 @@
 import type { UserSummary } from '../authState'
-import { callApi } from './httpClient'
+import { generatedCall, usersApi } from './generatedClient'
 
 export async function me(): Promise<UserSummary> {
-  return callApi('/api/me')
+  return generatedCall(usersApi.me())
 }

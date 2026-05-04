@@ -4,6 +4,14 @@ import com.lunva.api.auth.ConflictException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.auth.filterchain.RequestContext
+import com.lunva.api.generated.groups.model.CreateGroupRequest
+import com.lunva.api.generated.groups.model.GroupMemberSummary
+import com.lunva.api.generated.groups.model.GroupMemberSummaryUser
+import com.lunva.api.generated.groups.model.GroupRole as ApiGroupRole
+import com.lunva.api.generated.groups.model.GroupSummary
+import com.lunva.api.generated.groups.model.GroupsSummary
+import com.lunva.api.generated.groups.model.SimplifiedGroupSummary
+import com.lunva.api.generated.groups.model.UpdateGroupRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -30,7 +38,7 @@ class GroupService @Inject constructor(
         return requestContext.tenant!!.groups
             .filter { it.name == groupName }
             .map {
-                val members = it.members.map { GroupMemberSummary(UserService.toUserSummary(it.user), it.role) }
+                val members = it.members.map { GroupMemberSummary(it.user.toGroupMemberSummaryUser(), it.role.toGroupsApiRole()) }
                 GroupSummary(it.id, it.name, it.displayName, members)
             }.firstOrNull()
             ?: throw NotFoundException("Group $groupName not found")
@@ -62,7 +70,7 @@ class GroupService @Inject constructor(
             groupMemberRepo.persist(it)
         }
 
-        val members = listOf(GroupMemberSummary(UserService.toUserSummary(user), GroupRole.GroupOwner))
+        val members = listOf(GroupMemberSummary(user.toGroupMemberSummaryUser(), ApiGroupRole.GroupOwner))
 
         return GroupSummary(group.id, group.name, group.displayName, members)
     }
@@ -79,10 +87,10 @@ class GroupService @Inject constructor(
 
         request.members?.forEach {
             TenantGroupMember().also { member ->
-                member.id = TenantGroupMemberId(group.id, it.id!!)
+                member.id = TenantGroupMemberId(group.id, it.id)
                 member.group = group
                 member.user = userService.findUser(it.id)
-                member.role = it.role
+                member.role = it.role.toDomainRole()
                 member.persist()
             }
         }
@@ -90,3 +98,26 @@ class GroupService @Inject constructor(
         return getGroup(request.name!!)
     }
 }
+
+private fun User.toGroupMemberSummaryUser(): GroupMemberSummaryUser =
+    GroupMemberSummaryUser(
+        id,
+        email,
+        displayName,
+        when (role) {
+            ServerRole.ServerOwner -> GroupMemberSummaryUser.ServerRole.ServerOwner
+            ServerRole.ServerMember -> GroupMemberSummaryUser.ServerRole.ServerMember
+        },
+    )
+
+private fun GroupRole.toGroupsApiRole(): ApiGroupRole =
+    when (this) {
+        GroupRole.GroupOwner -> ApiGroupRole.GroupOwner
+        GroupRole.GroupMember -> ApiGroupRole.GroupMember
+    }
+
+private fun ApiGroupRole.toDomainRole(): GroupRole =
+    when (this) {
+        ApiGroupRole.GroupOwner -> GroupRole.GroupOwner
+        ApiGroupRole.GroupMember -> GroupRole.GroupMember
+    }

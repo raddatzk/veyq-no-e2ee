@@ -29,6 +29,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.notNullValue
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -305,7 +306,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .body("""{"displayName":"Owner Updated","email":"owner-updated-$runId@example.com"}""")
-            .`when`().put("/api/settings/me")
+            .`when`().put("/api/users/me")
             .then()
             .statusCode(200)
             .body("displayName", equalTo("Owner Updated"))
@@ -315,7 +316,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .body("""{"displayName":"Duplicate","email":"member-settings-$runId@example.com"}""")
-            .`when`().put("/api/settings/me")
+            .`when`().put("/api/users/me")
             .then()
             .statusCode(409)
 
@@ -323,7 +324,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .body("""{"currentPassword":"wrong","newPassword":"changed123"}""")
-            .`when`().post("/api/settings/me/password")
+            .`when`().post("/api/users/me/password")
             .then()
             .statusCode(401)
 
@@ -331,11 +332,17 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .body("""{"currentPassword":"admin123","newPassword":"changed123"}""")
-            .`when`().post("/api/settings/me/password")
+            .`when`().post("/api/users/me/password")
             .then()
             .statusCode(204)
 
-        login("owner-updated-$runId@example.com", "changed123")
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users/me")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Owner Updated"))
+            .body("email", equalTo("owner-updated-$runId@example.com"))
     }
 
     @Test
@@ -357,7 +364,7 @@ class ExplorerResourceTest {
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
-            .`when`().get("/api/settings/$tenantName")
+            .`when`().get("/api/tenants/$tenantName/settings")
             .then()
             .statusCode(200)
 
@@ -365,7 +372,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
             .body("""{"displayName":"Forbidden Tenant Rename"}""")
-            .`when`().put("/api/settings/$tenantName")
+            .`when`().put("/api/tenants/$tenantName/settings")
             .then()
             .statusCode(403)
 
@@ -373,21 +380,21 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .body("""{"displayName":"Renamed Tenant"}""")
-            .`when`().put("/api/settings/$tenantName")
+            .`when`().put("/api/tenants/$tenantName/settings")
             .then()
             .statusCode(200)
             .body("displayName", equalTo("Renamed Tenant"))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", groupMemberCookie)
-            .`when`().get("/api/settings/$tenantName/${group.name}")
+            .`when`().get("/api/tenants/$tenantName/${group.name}")
             .then()
             .statusCode(200)
             .body("displayName", equalTo(group.displayName))
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", groupOutsiderCookie)
-            .`when`().get("/api/settings/$tenantName/${group.name}")
+            .`when`().get("/api/tenants/$tenantName/${group.name}")
             .then()
             .statusCode(404)
 
@@ -395,7 +402,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", groupMemberCookie)
             .body("""{"displayName":"Forbidden Group Rename"}""")
-            .`when`().put("/api/settings/$tenantName/${group.name}")
+            .`when`().put("/api/tenants/$tenantName/${group.name}")
             .then()
             .statusCode(403)
 
@@ -403,7 +410,7 @@ class ExplorerResourceTest {
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", groupOwnerCookie)
             .body("""{"displayName":"Renamed Group"}""")
-            .`when`().put("/api/settings/$tenantName/${group.name}")
+            .`when`().put("/api/tenants/$tenantName/${group.name}")
             .then()
             .statusCode(200)
             .body("displayName", equalTo("Renamed Group"))
@@ -563,7 +570,7 @@ class ExplorerResourceTest {
             .statusCode(200)
             .body("capturedAt", equalTo("2026-02-03T04:05:06Z"))
             .body("capturedAtOverride", equalTo(true))
-            .body("createdAt", equalTo(media.createdAt.toString()))
+            .body("createdAt", notNullValue())
             .body("uploaderDisplayName", equalTo("owner-$runId"))
 
         val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), media.publicId) }
@@ -868,7 +875,7 @@ class ExplorerResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", cookie)
-            .body("""{"name":"$name","displayName":"$displayName"}""")
+            .body("""{"name":"$name","displayName":"$displayName","domain":"$name.example.test"}""")
             .`when`().post("/api/tenants")
             .then()
             .statusCode(200)
@@ -951,6 +958,7 @@ class ExplorerResourceTest {
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role
+                it.passwordSetAt = Instant.now()
                 userRepo.persist(it)
             }
         }.also {

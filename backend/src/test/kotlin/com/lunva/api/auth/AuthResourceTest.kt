@@ -69,7 +69,7 @@ class AuthResourceTest {
     @Test
     fun `me requires authentication`() {
         given()
-            .`when`().get("/api/me")
+            .`when`().get("/api/users/me")
             .then()
             .statusCode(401)
     }
@@ -88,10 +88,10 @@ class AuthResourceTest {
 
         val meResponse = given()
             .cookie("LUNVA_ACCESS_TOKEN", accessCookie)
-            .`when`().get("/api/me")
+            .`when`().get("/api/users/me")
 
         assertThat(meResponse.statusCode)
-            .describedAs("GET /api/me failed with body: ${meResponse.body.asString()}")
+            .describedAs("GET /api/users/me failed with body: ${meResponse.body.asString()}")
             .isEqualTo(200)
 
         meResponse
@@ -173,7 +173,7 @@ class AuthResourceTest {
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", accessCookie)
-            .`when`().get("/api/me")
+            .`when`().get("/api/users/me")
             .then()
             .statusCode(401)
     }

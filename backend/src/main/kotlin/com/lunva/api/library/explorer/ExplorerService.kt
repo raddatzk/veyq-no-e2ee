@@ -115,11 +115,11 @@ class ExplorerService @Inject constructor(
             .filter { it.hasScope(scope) && isAlbumVisible(it) }
 
     private fun scopeRoots(): List<ExplorerScopeRoot> {
-        val userRoot = ExplorerScopeRoot(ExplorerScopeRoot.KindEnum.USER, "me", user().displayName, "/~me")
+        val userRoot = ExplorerScopeRoot(ExplorerScopeRoot.Kind.USER, "me", user().displayName, "/~me")
         val groupRoots = groupRepo.listByTenant(tenant())
             .filter { groupMemberRepo.findByGroupAndUser(it, user()) != null }
             .sortedBy { it.displayName.lowercase() }
-            .map { ExplorerScopeRoot(ExplorerScopeRoot.KindEnum.GROUP, it.name, it.displayName, LibraryScopes.pathPrefix(LibraryScopeKey.Group(it))) }
+            .map { ExplorerScopeRoot(ExplorerScopeRoot.Kind.GROUP, it.name, it.displayName, LibraryScopes.pathPrefix(LibraryScopeKey.Group(it))) }
         return listOf(userRoot) + groupRoots
     }
 }

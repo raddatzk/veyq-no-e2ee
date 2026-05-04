@@ -1,61 +1,51 @@
-export type ExplorerLocationKind = 'TENANT' | 'GROUP' | 'USER' | 'FOLDER' | 'ALBUM'
+import type {
+  ExplorerAlbum,
+  ExplorerBreadcrumb,
+  ExplorerFolder,
+  ExplorerLocation,
+  ExplorerResponse,
+  ExplorerScopeRoot,
+  LocationKind as ExplorerLocationKind,
+  OwnerBadge
+} from '../../../api/generated/explorer'
+import type {
+  CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest,
+  LibraryScopeRequest,
+  MediaUploadSessionSummary,
+  MoveLibraryItemRequest as GeneratedMoveLibraryItemRequest,
+  PendingMediaUploadSummary as GeneratedPendingMediaUploadSummary,
+  StreamMediaSummary,
+  UpdateLibraryItemRequest as GeneratedUpdateLibraryItemRequest,
+  UpdateMediaMetadataRequest as GeneratedUpdateMediaMetadataRequest
+} from '../../../api/generated/library'
+
+export type {
+  ExplorerAlbum,
+  ExplorerBreadcrumb,
+  ExplorerFolder,
+  ExplorerLocation,
+  ExplorerLocationKind,
+  ExplorerResponse,
+  ExplorerScopeRoot,
+  LibraryScopeRequest,
+  OwnerBadge,
+}
+
 export type LibraryItemType = 'folder' | 'album'
-
-export type ExplorerLocation = {
-  kind: ExplorerLocationKind
-  path: string
-  displayName: string
-}
-
-export type ExplorerBreadcrumb = {
-  kind: ExplorerLocationKind
-  displayName: string
-  label: string
-  path: string
-}
-
-export type OwnerBadge = {
-  kind: 'TENANT' | 'GROUP' | 'USER'
-  displayName: string
-  name?: string
-}
-
-export type ExplorerFolder = {
-  id: string
-  name: string
-  displayName: string
-  path: string
-  ownerBadge?: OwnerBadge | null
-}
-
-export type ExplorerAlbum = {
-  id: string
-  name: string
-  displayName: string
-  path: string
-  coverMediaId: string | null
-  ownerBadge?: OwnerBadge | null
-}
-
-export type ExplorerScopeRoot = {
-  kind: 'GROUP' | 'USER'
-  name: string
-  displayName: string
-  path: string
-}
-
-export type ExplorerMedia = {
-  id: string
-  title: string
+export type ExplorerMedia = Omit<
+  StreamMediaSummary,
+  | 'albumPath'
+  | 'capturedAt'
+  | 'cameraMake'
+  | 'cameraModel'
+  | 'lensModel'
+  | 'imageWidth'
+  | 'imageHeight'
+  | 'gpsLatitude'
+  | 'gpsLongitude'
+> & {
   albumPath: string | null
-  ownerUserId: number
-  uploaderDisplayName: string
-  createdAt: string
   capturedAt: string | null
-  capturedAtOverride: boolean
-  mimeType: string
-  sizeBytes: number
-  contentUrl: string
   cameraMake: string | null
   cameraModel: string | null
   lensModel: string | null
@@ -65,34 +55,30 @@ export type ExplorerMedia = {
   gpsLongitude: number | null
 }
 
-export type ExplorerResponse = {
-  location: ExplorerLocation
-  breadcrumbs: ExplorerBreadcrumb[]
-  scopeRoots: ExplorerScopeRoot[]
-  folders: ExplorerFolder[]
-  albums: ExplorerAlbum[]
-}
-
-export type CreateLibraryItemRequest = {
+export type CreateLibraryItemRequest = Omit<GeneratedCreateLibraryItemRequest, 'parentPath' | 'scope'> & {
   parentPath: string | null
-  name: string
-  displayName: string
-  scope?: {
-    type: 'TENANT' | 'GROUP' | 'USER'
-    groupName?: string | null
-  } | null
+  scope?: LibraryScopeRequest | null
 }
 
-export type UpdateLibraryItemRequest = {
+export type UpdateLibraryItemRequest = Omit<
+  GeneratedUpdateLibraryItemRequest,
+  'path' | 'name' | 'displayName'
+> & {
   path: string
-  name: string
-  displayName: string
+  name: string | null
+  displayName: string | null
 }
 
-export type MoveLibraryItemRequest = {
-  path: string
+export type MoveLibraryItemRequest = Omit<
+  GeneratedMoveLibraryItemRequest,
+  'newParentPath' | 'name'
+> & {
   newParentPath: string | null
   name: string | null
+}
+
+export type UpdateMediaMetadataRequest = Omit<GeneratedUpdateMediaMetadataRequest, 'capturedAt'> & {
+  capturedAt: string | null
 }
 
 export type StreamMediaOptions = {
@@ -110,27 +96,7 @@ export type UploadMediaRequest = {
   onProgress?: (uploadedBytes: number, totalBytes: number) => void
 }
 
-export type UpdateMediaMetadataRequest = {
-  capturedAt: string | null
-}
-
-export type MediaUploadSession = {
-  uploadId: string
-  chunkSizeBytes: number
-}
-
-export type PendingMediaUploadSession = {
-  uploadId: string
-  tenantName: string
-  tenantDisplayName: string
-  albumPath: string
-  filename: string
-  mimeType: string
-  sizeBytes: number
+export type MediaUploadSession = MediaUploadSessionSummary
+export type PendingMediaUploadSession = Omit<GeneratedPendingMediaUploadSummary, 'title'> & {
   title: string | null
-  chunkSizeBytes: number
-  uploadedChunks: number[]
-  uploadedBytes: number
-  createdAt: string
-  updatedAt: string
 }

@@ -1,23 +1,13 @@
-import { callApi } from './httpClient'
+import { generatedCall, setupApi } from './generatedClient'
+import type { AdminSetupRequest, SetupStatusSummary } from './generated/setup'
 
-export type SetupStatusResponse = {
-  adminRequired: boolean
-  tenantAvailable: boolean
-}
-
-export type AdminSetupRequest = {
-  password: string
-  displayName: string
-  email: string
-}
+export type SetupStatusResponse = SetupStatusSummary
+export type { AdminSetupRequest }
 
 export async function setupStatus(): Promise<SetupStatusResponse> {
-  return callApi('/api/setup')
+  return generatedCall(setupApi.status())
 }
 
 export async function setupAdmin(request: AdminSetupRequest): Promise<void> {
-  await callApi('/api/setup/admin', {
-    method: 'POST',
-    body: JSON.stringify(request)
-  })
+  await generatedCall(setupApi.createAdmin({ adminSetupRequest: request }))
 }
