@@ -16,8 +16,8 @@
 import * as runtime from '../runtime';
 import type {
   AlbumMediaRequest,
+  CreateFolder400Response,
   CreateLibraryItemRequest,
-  ErrorResponse,
   ExplorerAlbum,
   MoveLibraryItemRequest,
   SetAlbumCoverRequest,
@@ -26,10 +26,10 @@ import type {
 import {
     AlbumMediaRequestFromJSON,
     AlbumMediaRequestToJSON,
+    CreateFolder400ResponseFromJSON,
+    CreateFolder400ResponseToJSON,
     CreateLibraryItemRequestFromJSON,
     CreateLibraryItemRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
     ExplorerAlbumFromJSON,
     ExplorerAlbumToJSON,
     MoveLibraryItemRequestFromJSON,
@@ -62,7 +62,7 @@ export interface MoveAlbumRequest {
 
 export interface SetCoverRequest {
     tenantName: string;
-    setAlbumCoverRequest: SetAlbumCoverRequest;
+    setAlbumCoverRequest?: SetAlbumCoverRequest;
 }
 
 export interface UpdateAlbumRequest {
@@ -132,7 +132,7 @@ export interface AlbumsApiInterface {
     /**
      * Creates request options for deleteAlbum without sending the request
      * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @throws {RequiredError}
      * @memberof AlbumsApiInterface
      */
@@ -142,7 +142,7 @@ export interface AlbumsApiInterface {
      * Album löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album löschen
      * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AlbumsApiInterface
@@ -184,7 +184,7 @@ export interface AlbumsApiInterface {
     /**
      * Creates request options for setCover without sending the request
      * @param {string} tenantName 
-     * @param {SetAlbumCoverRequest} setAlbumCoverRequest 
+     * @param {SetAlbumCoverRequest} [setAlbumCoverRequest] Set Album Cover
      * @throws {RequiredError}
      * @memberof AlbumsApiInterface
      */
@@ -194,7 +194,7 @@ export interface AlbumsApiInterface {
      * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album-Cover setzen
      * @param {string} tenantName 
-     * @param {SetAlbumCoverRequest} setAlbumCoverRequest 
+     * @param {SetAlbumCoverRequest} [setAlbumCoverRequest] Set Album Cover
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AlbumsApiInterface
@@ -469,13 +469,6 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
             throw new runtime.RequiredError(
                 'tenantName',
                 'Required parameter "tenantName" was null or undefined when calling setCover().'
-            );
-        }
-
-        if (requestParameters['setAlbumCoverRequest'] == null) {
-            throw new runtime.RequiredError(
-                'setAlbumCoverRequest',
-                'Required parameter "setAlbumCoverRequest" was null or undefined when calling setCover().'
             );
         }
 

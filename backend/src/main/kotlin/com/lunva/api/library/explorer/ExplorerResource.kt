@@ -1,7 +1,7 @@
 package com.lunva.api.library.explorer
 
-import com.lunva.api.generated.explorer.api.ExplorerApi
-import com.lunva.api.generated.explorer.model.ExplorerResponse
+import com.lunva.api.generated.api.ExplorerApi
+import com.lunva.api.generated.model.ExplorerResponse
 import com.lunva.api.domain.TenantAlbum
 import com.lunva.api.domain.TenantFolder
 import com.lunva.api.library.LibraryScopeKey

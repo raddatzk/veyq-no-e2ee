@@ -1,7 +1,7 @@
 package com.lunva.api.tenant
 
 import com.lunva.api.auth.filterchain.RequestContext
-import com.lunva.api.generated.tenants.model.TenantUserSettingsResponse
+import com.lunva.api.generated.model.TenantUserSettingsResponse
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 

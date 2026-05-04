@@ -18,45 +18,16 @@ paths:
       - Groups
       operationId: getGroups
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       responses:
         '200':
-          description: Tenant groups.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupsSummary"
-              example:
-                groups:
-                - id: 99
-                  name: family
-                  displayName: Family
+          "$ref": "#/components/responses/Groups"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Gruppen eines Tenants auflisten
       x-implementation-status: partial
       x-preconditions:
@@ -78,76 +49,22 @@ paths:
       - Groups
       operationId: createGroup
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateGroupRequest"
-            example:
-              name: family
-              displayName: Family
+        "$ref": "#/components/requestBodies/CreateGroup"
       responses:
         '200':
-          description: Created group.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupSummary"
-              example:
-                id: 99
-                name: family
-                displayName: Family
-                members:
-                - user:
-                    userId: 1
-                    email: kevin@example.test
-                    displayName: Kevin
-                    serverRole: ServerOwner
-                  role: GroupOwner
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/Group"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '409':
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Gruppe anlegen
       x-implementation-status: partial
       x-preconditions:
@@ -170,55 +87,17 @@ paths:
       - Groups
       operationId: getGroup
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/GroupName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
       responses:
         '200':
-          description: Group details.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupSummary"
-              example:
-                id: 99
-                name: family
-                displayName: Family
-                members:
-                - user:
-                    userId: 1
-                    email: kevin@example.test
-                    displayName: Kevin
-                    serverRole: ServerOwner
-                  role: GroupOwner
-        '404':
-          "$ref": "#/components/responses/Error"
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "#/components/responses/Group"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Gruppe abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -240,75 +119,21 @@ paths:
       - Groups
       operationId: updateGroup
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/GroupName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateGroupRequest"
-            example:
-              name: family
-              displayName: Family
-              members:
-              - id: 7
-                role: GroupOwner
+        "$ref": "#/components/requestBodies/UpdateGroup"
       responses:
         '200':
-          description: Updated group.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupSummary"
-              example:
-                id: 99
-                name: family
-                displayName: Family
-                members:
-                - user:
-                    userId: 2
-                    email: invitee@example.test
-                    displayName: Invitee
-                    serverRole: ServerMember
-                  role: GroupOwner
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/Group"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Gruppe aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -333,28 +158,61 @@ components:
       type: apiKey
       in: cookie
       name: LUNVA_ACCESS_TOKEN
-  parameters:
-    TenantName:
-      name: tenantName
-      in: path
-      required: true
-      schema:
-        type: string
-    GroupName:
-      name: groupName
-      in: path
-      required: true
-      schema:
-        type: string
+
   responses:
-    Error:
-      description: Request failed.
+    Groups:
+      description: Tenant groups
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/GroupsSummary"
           example:
-            message: example
+            groups:
+            - id: 99
+              name: family
+              displayName: Family
+
+    Group:
+      description: Single group
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/GroupSummary"
+          example:
+            id: 99
+            name: family
+            displayName: Family
+            members:
+            - user:
+                userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
+              role: GroupOwner
+
+  requestBodies:
+    CreateGroup:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateGroupRequest"
+          example:
+            name: family
+            displayName: Family
+
+    UpdateGroup:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateGroupRequest"
+          example:
+            name: family
+            displayName: Family
+            members:
+            - id: 7
+              role: GroupOwner
   schemas:
     GroupRole:
       type: string
@@ -365,13 +223,16 @@ components:
       type: object
       additionalProperties: false
       required:
-      - name
-      - displayName
+        - name
+        - displayName
       properties:
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        name: family
+        displayName: Family
     GroupMemberRequest:
       type: object
       additionalProperties: false
@@ -392,14 +253,20 @@ components:
       - displayName
       properties:
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         members:
           type: array
           uniqueItems: true
           items:
             "$ref": "#/components/schemas/GroupMemberRequest"
+      example:
+        name: family
+        displayName: Family
+        members:
+          - id: 7
+            role: GroupOwner
     GroupMemberSummary:
       type: object
       additionalProperties: false
@@ -408,7 +275,7 @@ components:
       - role
       properties:
         user:
-          "$ref": "./users.openapi.yaml#/components/schemas/UserSummary"
+          "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
         role:
           "$ref": "#/components/schemas/GroupRole"
     GroupSummary:
@@ -424,13 +291,24 @@ components:
           type: integer
           format: int64
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         members:
           type: array
           items:
             "$ref": "#/components/schemas/GroupMemberSummary"
+      example:
+        id: 99
+        name: family
+        displayName: Family
+        members:
+          - user:
+              userId: 1
+              email: kevin@example.test
+              displayName: Kevin
+              serverRole: ServerOwner
+            role: GroupOwner
     SimplifiedGroupSummary:
       type: object
       additionalProperties: false
@@ -443,24 +321,21 @@ components:
           type: integer
           format: int64
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
     GroupsSummary:
       type: object
       additionalProperties: false
       required:
-      - groups
+        - groups
       properties:
         groups:
           type: array
           items:
             "$ref": "#/components/schemas/SimplifiedGroupSummary"
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - message
-      properties:
-        message:
-          type: string
+      example:
+        groups:
+          - id: 99
+            name: family
+            displayName: Family

@@ -32,7 +32,7 @@ export interface AdminSetupRequest {
      */
     displayName: string;
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof AdminSetupRequest
      */

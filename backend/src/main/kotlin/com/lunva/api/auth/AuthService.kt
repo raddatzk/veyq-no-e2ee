@@ -6,15 +6,15 @@ import com.lunva.api.domain.RefreshToken
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.auth.filterchain.RequestContext
-import com.lunva.api.generated.auth.model.LoginRequest
-import com.lunva.api.generated.auth.model.LoginResponse
-import com.lunva.api.generated.auth.model.ServerRole as ApiServerRole
+import com.lunva.api.generated.model.LoginRequest
+import com.lunva.api.generated.model.LoginSessionResponse
+import com.lunva.api.generated.model.ServerRole as ApiServerRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.NewCookie
 
-data class LoginContext(val response: LoginResponse, val accessCookie: NewCookie, val refreshCookie: NewCookie)
+data class LoginContext(val response: LoginSessionResponse, val accessCookie: NewCookie, val refreshCookie: NewCookie)
 data class LogoutContext(val accessCookie: NewCookie, val refreshCookie: NewCookie)
 
 @ApplicationScoped
@@ -85,7 +85,7 @@ class AuthService @Inject constructor(
         val accessCookie = cookieService.createAccessCookie(accessToken)
         val refreshCookie = cookieService.createRefreshCookie(refreshToken)
 
-        val response = LoginResponse(user.id, user.email, user.displayName, user.role.toAuthApiRole())
+        val response = LoginSessionResponse(user.id, user.email, user.displayName, user.role.toAuthApiRole())
 
         return LoginContext(response, accessCookie, refreshCookie)
     }

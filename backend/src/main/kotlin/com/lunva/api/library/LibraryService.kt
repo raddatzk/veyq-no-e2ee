@@ -13,13 +13,13 @@ import com.lunva.api.domain.TenantGroup
 import com.lunva.api.domain.TenantGroupMemberRepo
 import com.lunva.api.domain.TenantGroupRepo
 import com.lunva.api.domain.User
-import com.lunva.api.generated.explorer.model.ExplorerAlbum
-import com.lunva.api.generated.explorer.model.ExplorerBreadcrumb
-import com.lunva.api.generated.explorer.model.ExplorerFolder
-import com.lunva.api.generated.explorer.model.LocationKind
-import com.lunva.api.generated.explorer.model.OwnerBadge
-import com.lunva.api.generated.library.model.CreateLibraryItemRequest
-import com.lunva.api.generated.library.model.LibraryScopeRequest
+import com.lunva.api.generated.model.ExplorerAlbum
+import com.lunva.api.generated.model.ExplorerBreadcrumb
+import com.lunva.api.generated.model.ExplorerFolder
+import com.lunva.api.generated.model.LocationKind
+import com.lunva.api.generated.model.OwnerBadge
+import com.lunva.api.generated.model.CreateLibraryItemRequest
+import com.lunva.api.generated.model.LibraryScopeRequest
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 
 abstract class LibraryService(
@@ -55,7 +55,7 @@ abstract class LibraryService(
         ExplorerFolder(publicId, name, displayName, path(), ownerBadge)
 
     fun TenantAlbum.toSummary(ownerBadge: OwnerBadge? = null): ExplorerAlbum =
-        ExplorerAlbum(publicId, name, displayName, path(), coverMedia?.publicId, ownerBadge)
+        ExplorerAlbum(publicId, name, displayName, path(), coverMedia?.publicId ?: "", ownerBadge)
 
     fun resolveVisibleContext(path: String?): ResolvedExplorerLocation {
         val context = resolveContext(path)

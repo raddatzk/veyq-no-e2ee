@@ -6,9 +6,10 @@ import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
-import com.lunva.api.generated.setup.model.AdminSetupRequest
-import com.lunva.api.generated.setup.model.SetupStatusSummary
-import com.lunva.api.generated.setup.model.UserSummary
+import com.lunva.api.generated.model.AdminSetupRequest
+import com.lunva.api.generated.model.ServerRole as ApiServerRole
+import com.lunva.api.generated.model.SetupStatusSummary
+import com.lunva.api.generated.model.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -48,7 +49,7 @@ class SetupService @Inject constructor(
             user.id,
             user.email,
             user.displayName,
-            UserSummary.ServerRole.ServerOwner,
+            ApiServerRole.ServerOwner,
         )
     }
 }

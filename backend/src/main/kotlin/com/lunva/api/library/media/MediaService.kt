@@ -7,12 +7,11 @@ import com.lunva.api.domain.*
 import com.lunva.api.library.LibraryService
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
-import com.lunva.api.generated.library.model.CreateMediaUploadRequest
-import com.lunva.api.generated.library.model.MediaUploadSessionSummary
-import com.lunva.api.generated.library.model.PendingMediaUploadSummary
-import com.lunva.api.generated.library.model.StreamMediaSummary
-import com.lunva.api.generated.library.model.UpdateMediaMetadataRequest
-import com.lunva.api.generated.library.model.UploadMediaSummary
+import com.lunva.api.generated.model.CreateMediaUploadRequest
+import com.lunva.api.generated.model.MediaUploadSessionSummary
+import com.lunva.api.generated.model.PendingMediaUploadSummary
+import com.lunva.api.generated.model.MediaSummary
+import com.lunva.api.generated.model.UpdateMediaMetadataRequest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -51,7 +50,7 @@ class MediaService @Inject constructor(
 ) : LibraryService(folderRepo, albumRepo, groupRepo, groupMemberRepo, requestContext) {
     private val log: Logger = Logger.getLogger(MediaService::class.java)
 
-    fun streamMedia(path: String?): Sequence<StreamMediaSummary> {
+    fun streamMedia(path: String?): Sequence<MediaSummary> {
         val context = resolveVisibleContext(path)
         val albums = when (context) {
             ResolvedExplorerLocation.Tenant -> visibleAlbums()
@@ -71,7 +70,7 @@ class MediaService @Inject constructor(
     }
 
     @Transactional
-    fun uploadMedia(file: FileUpload?, albumPath: String?, title: String?): UploadMediaSummary {
+    fun uploadMedia(file: FileUpload?, albumPath: String?, title: String?): MediaSummary {
         val album = resolveAlbum(albumPath)
         requireVisible(album)
         val upload = file ?: throw BadRequestException("file is required")
@@ -182,7 +181,7 @@ class MediaService @Inject constructor(
     }
 
     @Transactional
-    fun completeUpload(uploadId: String): UploadMediaSummary {
+    fun completeUpload(uploadId: String): MediaSummary {
         val session = loadUploadSession(uploadId)
         requireCurrentUploadOwner(session)
         requestContext.tenant = loadUploadTenant(session)
@@ -213,7 +212,7 @@ class MediaService @Inject constructor(
     }
 
     @Transactional
-    fun updateMetadata(publicId: String, request: UpdateMediaMetadataRequest): StreamMediaSummary {
+    fun updateMetadata(publicId: String, request: UpdateMediaMetadataRequest): MediaSummary {
         val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
             ?: throw NotFoundException("Media not found")
         if (!isMediaAccessible(media)) throw NotFoundException("Media not found")
@@ -512,8 +511,8 @@ class MediaService @Inject constructor(
         }
     }
 
-    private fun Media.toStreamSummary(album: TenantAlbum?): StreamMediaSummary =
-        StreamMediaSummary(
+    private fun Media.toStreamSummary(album: TenantAlbum?): MediaSummary =
+        MediaSummary(
             id = publicId,
             title = title,
             albumPath = album?.path(),
@@ -534,8 +533,8 @@ class MediaService @Inject constructor(
             gpsLongitude = gpsLongitude,
         )
 
-    private fun Media.toUploadSummary(album: TenantAlbum): UploadMediaSummary =
-        UploadMediaSummary(
+    private fun Media.toUploadSummary(album: TenantAlbum): MediaSummary =
+        MediaSummary(
             id = publicId,
             title = title,
             albumPath = album.path(),

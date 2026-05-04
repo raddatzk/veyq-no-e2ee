@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ * Current authenticated user.
  * @export
  * @interface TenantSummaryAdminsInner
  */
@@ -26,7 +26,7 @@ export interface TenantSummaryAdminsInner {
      */
     userId: number;
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof TenantSummaryAdminsInner
      */

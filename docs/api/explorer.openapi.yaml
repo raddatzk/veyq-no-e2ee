@@ -30,76 +30,18 @@ paths:
       operationId: getExplorer
       parameters:
       - name: tenantName
-        in: path
-        required: true
-        description: Technical tenant name from the URL.
-        schema:
-          type: string
-        example: familie
+        "$ref": "#/components/parameters/TenantName"
       - name: path
-        in: query
-        required: false
-        description: >
-          Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use `/@groupName`; the personal
-          scope uses `/~me`.
-        schema:
-          type: string
-          default: "/"
-        examples:
-          tenantRoot:
-            summary: Tenant root
-            value: "/"
-          groupRoot:
-            summary: Group root
-            value: "/@familie"
-          personalRoot:
-            summary: Personal root
-            value: "/~me"
-          nestedFolder:
-            summary: Folder in a group scope
-            value: "/@familie/urlaub"
+        "$ref": "#/components/parameters/Path"
       responses:
         '200':
-          description: Explorer state for the requested path.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ExplorerResponse"
-              examples:
-                tenantRoot:
-                  "$ref": "#/components/examples/TenantRootExplorer"
-                groupRoot:
-                  "$ref": "#/components/examples/GroupRootExplorer"
-                personalRoot:
-                  "$ref": "#/components/examples/PersonalRootExplorer"
-                album:
-                  "$ref": "#/components/examples/AlbumExplorer"
+          "$ref": "#/components/responses/Explorer"
         '401':
-          description: The request is not authenticated.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: The authenticated user is not a member of the tenant.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Tenant membership required
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: 'The tenant, path, or requested group scope was not found or is not visible to the current user.
-
-            '
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Path not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       x-implementation-status: implemented
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -113,32 +55,78 @@ components:
       in: cookie
       name: LUNVA_ACCESS_TOKEN
       description: HttpOnly access token cookie set by the login endpoint.
+  parameters:
+    TenantName:
+      in: path
+      required: true
+      description: Technical tenant name from the URL.
+      name: tenantName
+      schema:
+        type: string
+      example: familie
+
+    Path:
+      in: query
+      required: false
+      name: path
+      description: >
+        Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use `/@groupName`; the personal
+        scope uses `/~me`.
+      schema:
+        type: string
+        default: "/"
+      examples:
+        tenantRoot:
+          summary: Tenant root
+          value: "/"
+        groupRoot:
+          summary: Group root
+          value: "/@familie"
+        personalRoot:
+          summary: Personal root
+          value: "/~me"
+        nestedFolder:
+          summary: Folder in a group scope
+          value: "/@familie/urlaub"
+
+  responses:
+    Explorer:
+      description: Explorer state for the requested path.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ExplorerResponse"
+          example:
+            location:
+              kind: TENANT_ROOT
+              path: "/"
+              displayName: Friends
+            breadcrumbs: []
+            scopeRoots: []
+            folders: []
+            albums: []
+
   schemas:
     ExplorerResponse:
       type: object
       additionalProperties: false
       required:
-      - location
-      - breadcrumbs
-      - scopeRoots
-      - folders
-      - albums
+        - location
+        - breadcrumbs
+        - scopeRoots
+        - folders
+        - albums
       properties:
         location:
           "$ref": "#/components/schemas/ExplorerLocation"
         breadcrumbs:
           type: array
-          description: 'Full clickable navigation chain including the current location as the last item.
-
-            '
+          description: 'Full clickable navigation chain including the current location as the last item.'
           items:
             "$ref": "#/components/schemas/ExplorerBreadcrumb"
         scopeRoots:
           type: array
-          description: 'Quick navigation entries shown at the tenant root only. Empty for group, personal, folder, and album
-            locations.
-
-            '
+          description: 'Quick navigation entries shown at the tenant root only. Empty for group, personal, folder, and album locations.'
           items:
             "$ref": "#/components/schemas/ExplorerScopeRoot"
         folders:
@@ -151,6 +139,16 @@ components:
           description: Visible child albums at the current location.
           items:
             "$ref": "#/components/schemas/ExplorerAlbum"
+      examples:
+        - tenantRoot:
+          "$ref": "#/components/examples/TenantRootExplorer"
+        - groupRoot:
+          "$ref": "#/components/examples/GroupRootExplorer"
+        - personalRoot:
+          "$ref": "#/components/examples/PersonalRootExplorer"
+        - album:
+          "$ref": "#/components/examples/AlbumExplorer"
+
     ExplorerLocation:
       type: object
       additionalProperties: false
@@ -191,10 +189,7 @@ components:
           description: Human-readable domain name without navigation prefixes.
         label:
           type: string
-          description: 'UI label for the breadcrumb. Group labels include the `@` prefix; personal labels include the `~`
-            prefix.
-
-            '
+          description: 'UI label for the breadcrumb. Group labels include the `@` prefix; personal labels include the `~` prefix.'
     LocationKind:
       type: string
       description: Kind of explorer location or breadcrumb entry.
@@ -259,9 +254,7 @@ components:
           - "$ref": "#/components/schemas/OwnerBadge"
           - type: 'null'
           default:
-          description: 'Optional UI hint for mixed owner lists at the tenant root. This is not authorization data.
-
-            '
+          description: 'Optional UI hint for mixed owner lists at the tenant root. This is not authorization data.'
     ExplorerAlbum:
       type: object
       additionalProperties: false
@@ -294,9 +287,7 @@ components:
           - "$ref": "#/components/schemas/OwnerBadge"
           - type: 'null'
           default:
-          description: 'Optional UI hint for mixed owner lists at the tenant root. This is not authorization data.
-
-            '
+          description: 'Optional UI hint for mixed owner lists at the tenant root. This is not authorization data.'
     OwnerBadge:
       type: object
       additionalProperties: false

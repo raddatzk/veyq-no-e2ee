@@ -4,8 +4,8 @@ import com.lunva.api.auth.filterchain.GroupOwnerRequired
 import com.lunva.api.auth.filterchain.ServerRolesRequired
 import com.lunva.api.auth.filterchain.TenantOwnerRequired
 import com.lunva.api.domain.ServerRole
-import com.lunva.api.generated.server.api.ServerApi
-import com.lunva.api.generated.server.model.ServerSettingsResponse
+import com.lunva.api.generated.api.ServerApi
+import com.lunva.api.generated.model.ServerSettingsResponse
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional

@@ -2,9 +2,9 @@
 apis/AuthApi.ts
 apis/index.ts
 index.ts
-models/ErrorResponse.ts
+models/Login200Response.ts
+models/Login400Response.ts
+models/Login401Response.ts
 models/LoginRequest.ts
-models/LoginResponse.ts
-models/ServerRole.ts
 models/index.ts
 runtime.ts

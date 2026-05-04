@@ -9,6 +9,8 @@ models/ExplorerFolder.ts
 models/ExplorerLocation.ts
 models/ExplorerResponse.ts
 models/ExplorerScopeRoot.ts
+models/GetExplorer401Response.ts
+models/GetExplorer403Response.ts
 models/LocationKind.ts
 models/OwnerBadge.ts
 models/index.ts

@@ -150,7 +150,7 @@ class SecurityPipelineTest {
     private fun login(user: User): String {
         val accessCookie = given()
             .contentType("application/json")
-            .body("""{"email":"${user.email}","password":"password123"}""")
+            .body("""{"email":"${user.email}","password":"password1234"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)
@@ -166,7 +166,7 @@ class SecurityPipelineTest {
     private fun createUser(name: String, role: ServerRole): User =
         inTransaction {
             User().also {
-                it.passwordHash = passwordService.hash("password123")
+                it.passwordHash = passwordService.hash("password1234")
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role

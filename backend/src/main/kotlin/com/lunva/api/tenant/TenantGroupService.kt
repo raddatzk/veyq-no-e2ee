@@ -6,8 +6,8 @@ import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.domain.TenantGroup
 import com.lunva.api.domain.TenantGroupMemberRepo
 import com.lunva.api.domain.TenantGroupRepo
-import com.lunva.api.generated.tenants.model.GroupSettingsResponse
-import com.lunva.api.generated.tenants.model.UpdateNamedSettingsRequest
+import com.lunva.api.generated.model.TenantGroupSettingsResponse
+import com.lunva.api.generated.model.UpdateGroupSettingsRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -18,18 +18,17 @@ class TenantGroupService @Inject constructor(
     private val requestContext: RequestContext,
     private val tenantGroupMemberRepo: TenantGroupMemberRepo,
 ) {
-    fun groupSettings(tenantName: String, groupName: String): GroupSettingsResponse {
+    fun groupSettings(tenantName: String, groupName: String): TenantGroupSettingsResponse {
         val group = tenantGroup(groupName)
         requireGroupMembership(group)
-        return GroupSettingsResponse(group.id, group.name, group.displayName)
+        return TenantGroupSettingsResponse(group.id, group.name, group.displayName)
     }
 
     @Transactional
-    fun updateGroupSettings(tenantName: String, groupName: String, request: UpdateNamedSettingsRequest): GroupSettingsResponse {
+    fun updateGroupSettings(tenantName: String, groupName: String, request: UpdateGroupSettingsRequest): TenantGroupSettingsResponse {
         val group = tenantGroup(groupName)
-        group.displayName = request.displayName?.trim()?.takeIf { it.isNotBlank() }
-            ?: throw BadRequestException("displayName must not be blank")
-        return GroupSettingsResponse(group.id, group.name, group.displayName)
+        group.displayName = request.displayName.trim()
+        return TenantGroupSettingsResponse(group.id, group.name, group.displayName)
     }
 
     private fun tenantGroup(groupName: String) =

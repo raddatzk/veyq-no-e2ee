@@ -1,8 +1,8 @@
 package com.lunva.api.library.media
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.lunva.api.generated.library.api.MediaApi
-import com.lunva.api.generated.library.model.UpdateMediaMetadataRequest
+import com.lunva.api.generated.api.MediaApi
+import com.lunva.api.generated.model.UpdateMediaMetadataRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response

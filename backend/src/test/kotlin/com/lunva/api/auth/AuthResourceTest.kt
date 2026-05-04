@@ -22,14 +22,14 @@ class AuthResourceTest {
     fun ensureAdmin() {
         val loginResponse = given()
             .contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
             .`when`().post("/api/auth/login")
 
         if (loginResponse.statusCode == 200) return
 
         val setupResponse = given()
             .contentType("application/json")
-            .body("""{"password":"admin123","displayName":"Administrator","email":"kevin@raddatz.me"}""")
+            .body("""{"password":"admin1234567","displayName":"Administrator","email":"kevin@raddatz.me"}""")
             .`when`().post("/api/setup/admin")
 
         if (setupResponse.statusCode != 200 && setupResponse.statusCode != 409) {
@@ -41,7 +41,7 @@ class AuthResourceTest {
     fun `login succeeds and sets access and refresh cookies`() {
         val response = given()
             .contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
             .`when`().post("/api/auth/login")
 
         assertThat(response.statusCode)
@@ -60,7 +60,7 @@ class AuthResourceTest {
     fun `login fails for wrong password`() {
         given()
             .contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"nope"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"wrong1234567"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(401)
@@ -77,7 +77,7 @@ class AuthResourceTest {
     @Test
     fun `me returns current user with access cookie`() {
         val accessCookie = given().contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
             .`when`().post("/api/auth/login")
             .then().statusCode(200)
             .extract()
@@ -103,7 +103,7 @@ class AuthResourceTest {
     fun `refresh rotates refresh token and returns new cookies`() {
         val login = given()
             .contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)
@@ -148,7 +148,7 @@ class AuthResourceTest {
     fun `logout invalidates current access token`() {
         val login = given()
             .contentType("application/json")
-            .body("""{"email":"kevin@raddatz.me","password":"admin123"}""")
+            .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)

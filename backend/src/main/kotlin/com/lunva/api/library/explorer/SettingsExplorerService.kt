@@ -4,9 +4,9 @@ import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.ForbiddenException
 import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.domain.*
-import com.lunva.api.generated.explorer.model.ExplorerBreadcrumb
-import com.lunva.api.generated.explorer.model.LocationKind
-import com.lunva.api.generated.settings.model.*
+import com.lunva.api.generated.model.ExplorerBreadcrumb
+import com.lunva.api.generated.model.LocationKind
+import com.lunva.api.generated.model.*
 import com.lunva.api.library.LibraryScopes
 import com.lunva.api.library.LibraryService
 import com.lunva.api.tenant.TenantService
@@ -145,7 +145,7 @@ class SettingsExplorerService @Inject constructor(
         }
 
     private fun requireServerOwner() {
-        if (user().role != ServerRole.ServerOwner) {
+        if (user().role != com.lunva.api.domain.ServerRole.ServerOwner) {
             throw ForbiddenException("User ${user().displayName} has insufficient role on server")
         }
     }

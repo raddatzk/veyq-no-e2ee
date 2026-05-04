@@ -6,11 +6,38 @@ import io.quarkus.elytron.security.common.BcryptUtil
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import java.security.SecureRandom
+import java.time.Instant
+import java.util.Base64
 
 @ApplicationScoped
 class PasswordService @Inject constructor(
     private val bcryptCostProvider: BcryptCostProvider
 ) {
+    private val random = SecureRandom()
+
+    @Transactional
+    fun setPassword(user: User, rawPassword: String, now: Instant) {
+        user.apply {
+            passwordHash = hash(rawPassword)
+            passwordSetAt = now
+        }
+    }
+
+    @Transactional
+    fun updatePassword(user: User, currentPassword: String, newPassword: String, now: Instant = Instant.now()) {
+        if (!matches(currentPassword, user.passwordHash)) {
+            throw UnauthorizedException("Invalid current password")
+        }
+        setPassword(user, newPassword, now)
+    }
+
+    fun randomPasswordHash(): String {
+        val bytes = ByteArray(32)
+        random.nextBytes(bytes)
+        return hash(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes))
+    }
+
     fun matches(rawPassword: String, storedHash: String?): Boolean {
         if (storedHash.isNullOrBlank()) return false
         if (!isBcrypt(storedHash)) return false

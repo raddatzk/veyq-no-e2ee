@@ -1,6 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
-export * from './ErrorResponse';
+export * from './Login200Response';
+export * from './Login400Response';
+export * from './Login401Response';
 export * from './LoginRequest';
-export * from './LoginResponse';
-export * from './ServerRole';

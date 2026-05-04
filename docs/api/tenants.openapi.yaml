@@ -19,31 +19,9 @@ paths:
       operationId: myTenants
       responses:
         '200':
-          description: Tenants visible to the current user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantsSummary"
-              example:
-                tenants:
-                - id: 42
-                  name: friends
-                  displayName: Friends
-                  domain: friends.example.test
-                  role: TenantOwner
-                  admins:
-                  - userId: 1
-                    email: kevin@example.test
-                    displayName: Kevin
-                    serverRole: ServerOwner
+          "$ref": "#/components/responses/Tenants"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Eigene Tenants auflisten
       x-implementation-status: partial
       x-preconditions:
@@ -62,68 +40,18 @@ paths:
       - Tenants
       operationId: createTenant
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateTenantRequest"
-            example:
-              name: friends
-              displayName: Friends
-              domain: friends.example.test
+        "$ref": "#/components/requestBodies/CreateTenant"
       responses:
         '200':
-          description: Created tenant.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantSummary"
-              example:
-                id: 42
-                name: friends
-                displayName: Friends
-                domain: friends.example.test
-                role: TenantOwner
-                admins:
-                - userId: 1
-                  email: kevin@example.test
-                  displayName: Kevin
-                  serverRole: ServerOwner
+          "$ref": "#/components/responses/Tenant"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '409':
-          "$ref": "#/components/responses/Error"
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Tenant anlegen
       x-implementation-status: partial
       x-preconditions:
@@ -146,44 +74,16 @@ paths:
       - Tenants
       operationId: getTenantSettings
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       responses:
         '200':
-          description: Tenant settings.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantSettingsResponse"
-              example:
-                tenantId: 42
-                name: friends
-                displayName: Friends
+          "$ref": "#/components/responses/TenantSettings"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Tenant-Einstellungen abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -205,61 +105,20 @@ paths:
       - Tenants
       operationId: updateTenantSettings
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateNamedSettingsRequest"
-            example:
-              displayName: Friends & Family
+        "$ref": "#/components/requestBodies/UpdateTenantSettings"
       responses:
         '200':
-          description: Updated tenant settings.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantSettingsResponse"
-              example:
-                tenantId: 42
-                name: friends
-                displayName: Friends & Family
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/TenantSettings"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Tenant-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -285,44 +144,15 @@ paths:
       operationId: getTenantUserSettings
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       responses:
         '200':
-          description: Current user settings in tenant context.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantUserSettingsResponse"
-              example:
-                tenantId: 42
-                tenantName: friends
-                userId: 1
-                displayName: Kevin
+          "$ref": "#/components/responses/TenantUserSettings"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Benutzereinstellungen im Tenant abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -344,53 +174,18 @@ paths:
       - Tenants
       operationId: updateTenantUserSettings
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       responses:
         '200':
-          description: Updated current user settings in tenant context.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/TenantUserSettingsResponse"
-              example:
-                tenantId: 42
-                tenantName: friends
-                userId: 1
-                displayName: Kevin
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/TenantUserSettings"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Benutzereinstellungen im Tenant aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -413,47 +208,17 @@ paths:
       - Tenants
       operationId: getGroupSettings
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/GroupName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
       responses:
         '200':
-          description: Group settings.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupSettingsResponse"
-              example:
-                groupId: 99
-                name: family
-                displayName: Family
+          "$ref": "#/components/responses/TenantGroupSettings"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Gruppen-Einstellungen abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -475,64 +240,21 @@ paths:
       - Tenants
       operationId: updateGroupSettings
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/GroupName"
-        description:
-        example:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateNamedSettingsRequest"
-            example:
-              displayName: Close Friends
+        "$ref": "#/components/requestBodies/UpdateGroupSettings"
       responses:
         '200':
-          description: Updated group settings.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GroupSettingsResponse"
-              example:
-                groupId: 99
-                name: family
-                displayName: Close Friends
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/TenantGroupSettings"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Gruppen-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -570,15 +292,66 @@ components:
       required: true
       schema:
         type: string
-  responses:
-    Error:
-      description: Request failed.
+  requestBodies:
+    CreateTenant:
+      required: true
+      description: New tenant
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
-          example:
-            message: example
+            "$ref": "#/components/schemas/CreateTenantRequest"
+
+    UpdateTenantSettings:
+      required: true
+      description: Update Tenant settings
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateTenantSettingsRequest"
+
+    UpdateGroupSettings:
+      required: true
+      description: Update group settings
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateGroupSettingsRequest"
+
+  responses:
+    Tenants:
+      description: Tenants visible to the current user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantsSummary"
+
+    Tenant:
+      description: Created tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantSummary"
+
+    TenantSettings:
+      description: Tenant settings.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantSettingsResponse"
+
+    TenantUserSettings:
+      description: Current settings for a user in a tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUserSettingsResponse"
+
+    TenantGroupSettings:
+      description: Current settings for a group in a tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantGroupSettingsResponse"
   schemas:
     TenantRole:
       type: string
@@ -599,6 +372,10 @@ components:
           type: string
         domain:
           type: string
+      example:
+        name: friends
+        displayName: Friends
+        domain: friends.example.test
     TenantSummary:
       type: object
       additionalProperties: false
@@ -624,7 +401,18 @@ components:
         admins:
           type: array
           items:
-            "$ref": "./users.openapi.yaml#/components/schemas/UserSummary"
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+      example:
+        id: 42
+        name: friends
+        displayName: Friends
+        domain: friends.example.test
+        role: TenantOwner
+        admins:
+          - userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            serverRole: ServerOwner
     TenantsSummary:
       type: object
       additionalProperties: false
@@ -635,6 +423,18 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/TenantSummary"
+      example:
+        tenants:
+          - id: 42
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+            role: TenantOwner
+            admins:
+              - userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
     TenantSettingsResponse:
       type: object
       additionalProperties: false
@@ -650,6 +450,10 @@ components:
           type: string
         displayName:
           type: string
+      example:
+        tenantId: 42
+        name: friends
+        displayName: Friends
     TenantUserSettingsResponse:
       type: object
       additionalProperties: false
@@ -669,7 +473,12 @@ components:
           format: int64
         displayName:
           type: string
-    GroupSettingsResponse:
+      example:
+        tenantId: 42
+        tenantName: friends
+        userId: 1
+        displayName: Kevin
+    TenantGroupSettingsResponse:
       type: object
       additionalProperties: false
       required:
@@ -684,7 +493,11 @@ components:
           type: string
         displayName:
           type: string
-    UpdateNamedSettingsRequest:
+      example:
+        groupId: 99
+        name: family
+        displayName: Family
+    UpdateTenantSettingsRequest:
       type: object
       additionalProperties: false
       required:
@@ -692,11 +505,15 @@ components:
       properties:
         displayName:
           type: string
-    ErrorResponse:
+      example:
+        displayName: Friends & Family
+    UpdateGroupSettingsRequest:
       type: object
       additionalProperties: false
       required:
-      - message
+        - displayName
       properties:
-        message:
+        displayName:
           type: string
+      example:
+        displayName: Friends & Family

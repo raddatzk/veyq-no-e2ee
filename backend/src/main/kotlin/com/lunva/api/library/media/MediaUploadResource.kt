@@ -1,7 +1,7 @@
 package com.lunva.api.library.media
 
-import com.lunva.api.generated.library.api.MediaUploadsApi
-import com.lunva.api.generated.library.model.CreateMediaUploadRequest
+import com.lunva.api.generated.api.MediaUploadsApi
+import com.lunva.api.generated.model.CreateMediaUploadRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response

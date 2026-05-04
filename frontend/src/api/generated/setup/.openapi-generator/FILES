@@ -3,8 +3,9 @@ apis/SetupApi.ts
 apis/index.ts
 index.ts
 models/AdminSetupRequest.ts
-models/ErrorResponse.ts
+models/CreateAdmin400Response.ts
+models/CreateAdmin409Response.ts
+models/InlineObject.ts
 models/SetupStatusSummary.ts
-models/UserSummary.ts
 models/index.ts
 runtime.ts

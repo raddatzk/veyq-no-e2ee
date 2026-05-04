@@ -17,13 +17,7 @@ paths:
       operationId: status
       responses:
         '200':
-          description: Current setup status.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/SetupStatusSummary"
-              example:
-                setupRequired: false
+          "$ref": "#/components/responses/SetupStatus"
       summary: Setup-Status abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -41,38 +35,14 @@ paths:
       - Setup
       operationId: createAdmin
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/AdminSetupRequest"
-            example:
-              email: admin@example.test
-              displayName: Administrator
-              password: admin1234
+        "$ref": "#/components/requestBodies/AdminSetup"
       responses:
         '200':
-          description: Created initial server owner.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/UserSummary"
-              example:
-                userId: 1
-                email: admin@example.test
-                displayName: Administrator
-                serverRole: ServerOwner
+          "$ref": "#/components/responses/User"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '409':
-          "$ref": "#/components/responses/Error"
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Initialen Server-Owner anlegen
       x-implementation-status: partial
       x-preconditions:
@@ -87,15 +57,39 @@ paths:
 
         Implementierungsstatus: partial.
 components:
-  responses:
-    Error:
-      description: Request failed.
+  requestBodies:
+    AdminSetup:
+      description: Create initial admin
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/AdminSetupRequest"
           example:
-            message: example
+            email: admin@example.test
+            displayName: Administrator
+            password: admin1234567
+
+  responses:
+    SetupStatus:
+      description: Current setup status
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/SetupStatusSummary"
+          example:
+            setupRequired: false
+
+    User:
+      description: User
+      content:
+        application/json:
+          schema:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          example:
+            userId: 1
+            email: admin@example.test
+            displayName: Administrator
+            serverRole: ServerOwner
   schemas:
     SetupStatusSummary:
       type: object
@@ -105,6 +99,8 @@ components:
       properties:
         setupRequired:
           type: boolean
+      example:
+        setupRequired: false
     AdminSetupRequest:
       type: object
       additionalProperties: false
@@ -114,20 +110,12 @@ components:
       - email
       properties:
         password:
-          type: string
-          minLength: 8
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         email:
-          type: string
-          format: email
-    UserSummary:
-      "$ref": "./users.openapi.yaml#/components/schemas/UserSummary"
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - message
-      properties:
-        message:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: admin@example.test
+        displayName: Administrator
+        password: admin1234567

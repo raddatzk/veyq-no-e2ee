@@ -44,9 +44,9 @@ class UserManagementResourceTest {
     fun setUp() {
         runId = UUID.randomUUID().toString().take(8)
         mailbox.clear()
-        val owner = createUser("mgmt-owner-$runId", "admin123", ServerRole.ServerOwner)
+        val owner = createUser("mgmt-owner-$runId", "admin1234567", ServerRole.ServerOwner)
         tenant = createTenant("mgmt-$runId", "Management $runId", "mgmt-$runId.example.test", owner)
-        ownerCookie = login(owner.email, "admin123")
+        ownerCookie = login(owner.email, "admin1234567")
     }
 
     @Test
@@ -67,18 +67,18 @@ class UserManagementResourceTest {
 
         given()
             .contentType("application/json")
-            .body("""{"email":"invitee-$runId@example.com","password":"welcome123"}""")
+            .body("""{"email":"invitee-$runId@example.com","password":"welcome123456"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(401)
 
         val message = mailbox.getMailMessagesSentTo("invitee-$runId@example.com").single()
-        assertThat(message.text).contains("https://${tenant.domain}/invite/$invitedUserId/")
-        val token = message.text.substringAfter("/invite/$invitedUserId/").trim()
+        assertThat(message.text).contains("https://${tenant.domain}/invite/$invitedUserId#")
+        val token = message.text.substringAfter("/invite/$invitedUserId#").trim()
 
         given()
             .contentType("application/json")
-            .body("""{"password":"welcome123","token":"$token"}""")
+            .body("""{"password":"welcome123456","token":"$token"}""")
             .`when`().post("/api/users/$invitedUserId/invite/accept")
             .then()
             .statusCode(200)
@@ -89,7 +89,7 @@ class UserManagementResourceTest {
 
         given()
             .contentType("application/json")
-            .body("""{"email":"invitee-$runId@example.com","password":"welcome123"}""")
+            .body("""{"email":"invitee-$runId@example.com","password":"welcome123456"}""")
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)
@@ -98,7 +98,7 @@ class UserManagementResourceTest {
     @Test
     fun `server admin cannot demote the only server owner in a single-admin instance`() {
         val owner = createIsolatedOwner("single-owner-$runId")
-        val singleOwnerCookie = login(owner.email, "admin123")
+        val singleOwnerCookie = login(owner.email, "admin1234567")
         createPendingOwner("pending-owner-$runId", tenant)
 
         given()
@@ -167,7 +167,7 @@ class UserManagementResourceTest {
                 it.role = ServerRole.ServerMember
             }
             User().also {
-                it.passwordHash = passwordService.hash("admin123")
+                it.passwordHash = passwordService.hash("admin1234567")
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = ServerRole.ServerOwner

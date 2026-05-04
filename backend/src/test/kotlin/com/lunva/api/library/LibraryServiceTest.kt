@@ -25,13 +25,13 @@ import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.TenantRole
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
-import com.lunva.api.generated.explorer.model.LocationKind
-import com.lunva.api.generated.library.model.AlbumMediaRequest
-import com.lunva.api.generated.library.model.CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest
-import com.lunva.api.generated.library.model.LibraryScopeRequest
-import com.lunva.api.generated.library.model.MoveLibraryItemRequest
-import com.lunva.api.generated.library.model.SetAlbumCoverRequest
-import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
+import com.lunva.api.generated.model.LocationKind
+import com.lunva.api.generated.model.AlbumMediaRequest
+import com.lunva.api.generated.model.CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest
+import com.lunva.api.generated.model.LibraryScopeRequest
+import com.lunva.api.generated.model.MoveLibraryItemRequest
+import com.lunva.api.generated.model.SetAlbumCoverRequest
+import com.lunva.api.generated.model.UpdateLibraryItemRequest
 import com.lunva.api.library.album.AlbumService
 import com.lunva.api.library.explorer.ExplorerService
 import com.lunva.api.library.folder.FolderService
@@ -328,7 +328,7 @@ class LibraryServiceTest {
     private fun createUser(name: String, role: ServerRole): User =
         inTransaction {
             User().also {
-                it.passwordHash = passwordService.hash("password123")
+                it.passwordHash = passwordService.hash("password1234")
                 it.displayName = name
                 it.email = "$name@example.com"
                 it.role = role

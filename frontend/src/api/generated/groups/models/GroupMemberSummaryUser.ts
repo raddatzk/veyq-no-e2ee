@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ * Current authenticated user.
  * @export
  * @interface GroupMemberSummaryUser
  */
@@ -26,7 +26,7 @@ export interface GroupMemberSummaryUser {
      */
     userId: number;
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof GroupMemberSummaryUser
      */

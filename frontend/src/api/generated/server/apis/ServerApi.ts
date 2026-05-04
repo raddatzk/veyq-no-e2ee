@@ -15,12 +15,15 @@
 
 import * as runtime from '../runtime';
 import type {
-  ErrorResponse,
+  GetServerSettings401Response,
+  GetServerSettings403Response,
   ServerSettingsResponse,
 } from '../models/index';
 import {
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    GetServerSettings401ResponseFromJSON,
+    GetServerSettings401ResponseToJSON,
+    GetServerSettings403ResponseFromJSON,
+    GetServerSettings403ResponseToJSON,
     ServerSettingsResponseFromJSON,
     ServerSettingsResponseToJSON,
 } from '../models/index';

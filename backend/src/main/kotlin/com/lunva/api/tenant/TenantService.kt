@@ -6,15 +6,15 @@ import com.lunva.api.auth.ForbiddenException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.domain.*
-import com.lunva.api.generated.tenants.model.CreateTenantRequest
-import com.lunva.api.generated.tenants.model.TenantRole as ApiTenantRole
-import com.lunva.api.generated.tenants.model.TenantSettingsResponse
-import com.lunva.api.generated.tenants.model.TenantSummary
-import com.lunva.api.generated.tenants.model.TenantSummaryAdminsInner
-import com.lunva.api.generated.tenants.model.TenantsSummary
-import com.lunva.api.generated.tenants.model.UpdateNamedSettingsRequest
-import com.lunva.api.generated.users.model.ManagedUserTenantSummary
-import com.lunva.api.usermgmt.toUsersApiRole
+import com.lunva.api.generated.model.CreateTenantRequest
+import com.lunva.api.generated.model.TenantRole as ApiTenantRole
+import com.lunva.api.generated.model.TenantSettingsResponse
+import com.lunva.api.generated.model.TenantSummary
+import com.lunva.api.generated.model.TenantsSummary
+import com.lunva.api.generated.model.UpdateTenantSettingsRequest
+import com.lunva.api.generated.model.ManagedUserTenantSummary
+import com.lunva.api.generated.model.UserSummary
+import com.lunva.api.usermgmt.user.toUsersApiRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -94,7 +94,7 @@ class TenantService @Inject constructor(
         TenantSettingsResponse(tenant().id, tenant().name, tenant().displayName)
 
     @Transactional
-    fun updateTenantSettings(request: UpdateNamedSettingsRequest): TenantSettingsResponse {
+    fun updateTenantSettings(request: UpdateTenantSettingsRequest): TenantSettingsResponse {
         tenant().displayName = request.displayName!!.trim()
         return TenantSettingsResponse(tenant().id, tenant().name, tenant().displayName)
     }
@@ -148,10 +148,5 @@ private fun TenantRole.toTenantsApiRole(): ApiTenantRole =
         TenantRole.TenantMember -> ApiTenantRole.TenantMember
     }
 
-private fun User.toTenantAdminSummary(): TenantSummaryAdminsInner =
-    TenantSummaryAdminsInner(id, email, displayName, role.toUsersApiRole().let {
-        when (it) {
-            com.lunva.api.generated.users.model.ServerRole.ServerOwner -> TenantSummaryAdminsInner.ServerRole.ServerOwner
-            com.lunva.api.generated.users.model.ServerRole.ServerMember -> TenantSummaryAdminsInner.ServerRole.ServerMember
-        }
-    })
+private fun User.toTenantAdminSummary(): UserSummary =
+    UserSummary(id, email, displayName, role.toUsersApiRole())

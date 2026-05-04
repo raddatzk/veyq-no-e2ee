@@ -15,14 +15,17 @@
 
 import * as runtime from '../runtime';
 import type {
-  ErrorResponse,
   ExplorerResponse,
+  GetExplorer401Response,
+  GetExplorer403Response,
 } from '../models/index';
 import {
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
     ExplorerResponseFromJSON,
     ExplorerResponseToJSON,
+    GetExplorer401ResponseFromJSON,
+    GetExplorer401ResponseToJSON,
+    GetExplorer403ResponseFromJSON,
+    GetExplorer403ResponseToJSON,
 } from '../models/index';
 
 export interface GetExplorerRequest {

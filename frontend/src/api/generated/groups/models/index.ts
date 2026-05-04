@@ -1,7 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './CreateGroupRequest';
-export * from './ErrorResponse';
+export * from './GetGroups401Response';
+export * from './GetGroups403Response';
 export * from './GroupMemberRequest';
 export * from './GroupMemberSummary';
 export * from './GroupMemberSummaryUser';

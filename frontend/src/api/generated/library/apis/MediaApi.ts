@@ -15,20 +15,17 @@
 
 import * as runtime from '../runtime';
 import type {
-  ErrorResponse,
-  StreamMediaSummary,
+  CreateFolder400Response,
+  MediaSummary,
   UpdateMediaMetadataRequest,
-  UploadMediaSummary,
 } from '../models/index';
 import {
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
-    StreamMediaSummaryFromJSON,
-    StreamMediaSummaryToJSON,
+    CreateFolder400ResponseFromJSON,
+    CreateFolder400ResponseToJSON,
+    MediaSummaryFromJSON,
+    MediaSummaryToJSON,
     UpdateMediaMetadataRequestFromJSON,
     UpdateMediaMetadataRequestToJSON,
-    UploadMediaSummaryFromJSON,
-    UploadMediaSummaryToJSON,
 } from '../models/index';
 
 export interface ContentRequest {
@@ -93,7 +90,7 @@ export interface MediaApiInterface {
     /**
      * Creates request options for media without sending the request
      * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @throws {RequiredError}
      * @memberof MediaApiInterface
      */
@@ -103,7 +100,7 @@ export interface MediaApiInterface {
      * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medien als NDJSON streamen
      * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MediaApiInterface
@@ -120,7 +117,7 @@ export interface MediaApiInterface {
      * Creates request options for updateMetadata without sending the request
      * @param {string} tenantName 
      * @param {string} mediaId Public Media-ID.
-     * @param {UpdateMediaMetadataRequest} updateMediaMetadataRequest 
+     * @param {UpdateMediaMetadataRequest} updateMediaMetadataRequest Update Metadata of media
      * @throws {RequiredError}
      * @memberof MediaApiInterface
      */
@@ -131,18 +128,18 @@ export interface MediaApiInterface {
      * @summary Medien-Metadaten aktualisieren
      * @param {string} tenantName 
      * @param {string} mediaId Public Media-ID.
-     * @param {UpdateMediaMetadataRequest} updateMediaMetadataRequest 
+     * @param {UpdateMediaMetadataRequest} updateMediaMetadataRequest Update Metadata of media
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MediaApiInterface
      */
-    updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StreamMediaSummary>>;
+    updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
      * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
-    updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<StreamMediaSummary>;
+    updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
 
     /**
      * Creates request options for upload without sending the request
@@ -166,13 +163,13 @@ export interface MediaApiInterface {
      * @throws {RequiredError}
      * @memberof MediaApiInterface
      */
-    uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadMediaSummary>>;
+    uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
      * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
-    upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadMediaSummary>;
+    upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
 
 }
 
@@ -344,18 +341,18 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
      * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
-    async updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StreamMediaSummary>> {
+    async updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
         const requestOptions = await this.updateMetadataRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => StreamMediaSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MediaSummaryFromJSON(jsonValue));
     }
 
     /**
      * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
-    async updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<StreamMediaSummary> {
+    async updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
         const response = await this.updateMetadataRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -434,18 +431,18 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
      * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
-    async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadMediaSummary>> {
+    async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
         const requestOptions = await this.uploadRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => UploadMediaSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MediaSummaryFromJSON(jsonValue));
     }
 
     /**
      * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
-    async upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadMediaSummary> {
+    async upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
         const response = await this.uploadRaw(requestParameters, initOverrides);
         return await response.value();
     }

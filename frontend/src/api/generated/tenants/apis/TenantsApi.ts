@@ -15,22 +15,26 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateTenant400Response,
   CreateTenantRequest,
-  ErrorResponse,
-  GroupSettingsResponse,
+  MyTenants401Response,
+  TenantGroupSettingsResponse,
   TenantSettingsResponse,
   TenantSummary,
   TenantUserSettingsResponse,
   TenantsSummary,
-  UpdateNamedSettingsRequest,
+  UpdateGroupSettingsRequest,
+  UpdateTenantSettingsRequest,
 } from '../models/index';
 import {
+    CreateTenant400ResponseFromJSON,
+    CreateTenant400ResponseToJSON,
     CreateTenantRequestFromJSON,
     CreateTenantRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
-    GroupSettingsResponseFromJSON,
-    GroupSettingsResponseToJSON,
+    MyTenants401ResponseFromJSON,
+    MyTenants401ResponseToJSON,
+    TenantGroupSettingsResponseFromJSON,
+    TenantGroupSettingsResponseToJSON,
     TenantSettingsResponseFromJSON,
     TenantSettingsResponseToJSON,
     TenantSummaryFromJSON,
@@ -39,8 +43,10 @@ import {
     TenantUserSettingsResponseToJSON,
     TenantsSummaryFromJSON,
     TenantsSummaryToJSON,
-    UpdateNamedSettingsRequestFromJSON,
-    UpdateNamedSettingsRequestToJSON,
+    UpdateGroupSettingsRequestFromJSON,
+    UpdateGroupSettingsRequestToJSON,
+    UpdateTenantSettingsRequestFromJSON,
+    UpdateTenantSettingsRequestToJSON,
 } from '../models/index';
 
 export interface CreateTenantOperationRequest {
@@ -60,15 +66,15 @@ export interface GetTenantUserSettingsRequest {
     tenantName: string;
 }
 
-export interface UpdateGroupSettingsRequest {
+export interface UpdateGroupSettingsOperationRequest {
     tenantName: string;
     groupName: string;
-    updateNamedSettingsRequest: UpdateNamedSettingsRequest;
+    updateGroupSettingsRequest: UpdateGroupSettingsRequest;
 }
 
-export interface UpdateTenantSettingsRequest {
+export interface UpdateTenantSettingsOperationRequest {
     tenantName: string;
-    updateNamedSettingsRequest: UpdateNamedSettingsRequest;
+    updateTenantSettingsRequest: UpdateTenantSettingsRequest;
 }
 
 export interface UpdateTenantUserSettingsRequest {
@@ -84,7 +90,7 @@ export interface UpdateTenantUserSettingsRequest {
 export interface TenantsApiInterface {
     /**
      * Creates request options for createTenant without sending the request
-     * @param {CreateTenantRequest} createTenantRequest 
+     * @param {CreateTenantRequest} createTenantRequest New tenant
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
@@ -93,7 +99,7 @@ export interface TenantsApiInterface {
     /**
      * Tenant anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Tenant anlegen
-     * @param {CreateTenantRequest} createTenantRequest 
+     * @param {CreateTenantRequest} createTenantRequest New tenant
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
@@ -108,8 +114,8 @@ export interface TenantsApiInterface {
 
     /**
      * Creates request options for getGroupSettings without sending the request
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
@@ -118,23 +124,23 @@ export interface TenantsApiInterface {
     /**
      * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppen-Einstellungen abrufen
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
-    getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSettingsResponse>>;
+    getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>>;
 
     /**
      * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
-    getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSettingsResponse>;
+    getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
 
     /**
      * Creates request options for getTenantSettings without sending the request
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
@@ -143,7 +149,7 @@ export interface TenantsApiInterface {
     /**
      * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Tenant-Einstellungen abrufen
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
@@ -204,61 +210,61 @@ export interface TenantsApiInterface {
 
     /**
      * Creates request options for updateGroupSettings without sending the request
-     * @param {string} tenantName 
-     * @param {string} groupName 
-     * @param {UpdateNamedSettingsRequest} updateNamedSettingsRequest 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
+     * @param {UpdateGroupSettingsRequest} updateGroupSettingsRequest Update group settings
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
-    updateGroupSettingsRequestOpts(requestParameters: UpdateGroupSettingsRequest): Promise<runtime.RequestOpts>;
+    updateGroupSettingsRequestOpts(requestParameters: UpdateGroupSettingsOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
      * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * @summary Gruppen-Einstellungen aktualisieren
-     * @param {string} tenantName 
-     * @param {string} groupName 
-     * @param {UpdateNamedSettingsRequest} updateNamedSettingsRequest 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
+     * @param {UpdateGroupSettingsRequest} updateGroupSettingsRequest Update group settings
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
-    updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSettingsResponse>>;
+    updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>>;
 
     /**
      * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
-    updateGroupSettings(requestParameters: UpdateGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSettingsResponse>;
+    updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
 
     /**
      * Creates request options for updateTenantSettings without sending the request
-     * @param {string} tenantName 
-     * @param {UpdateNamedSettingsRequest} updateNamedSettingsRequest 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {UpdateTenantSettingsRequest} updateTenantSettingsRequest Update Tenant settings
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
-    updateTenantSettingsRequestOpts(requestParameters: UpdateTenantSettingsRequest): Promise<runtime.RequestOpts>;
+    updateTenantSettingsRequestOpts(requestParameters: UpdateTenantSettingsOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
      * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * @summary Tenant-Einstellungen aktualisieren
-     * @param {string} tenantName 
-     * @param {UpdateNamedSettingsRequest} updateNamedSettingsRequest 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {UpdateTenantSettingsRequest} updateTenantSettingsRequest Update Tenant settings
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
-    updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
+    updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
 
     /**
      * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
-    updateTenantSettings(requestParameters: UpdateTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
+    updateTenantSettings(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
 
     /**
      * Creates request options for updateTenantUserSettings without sending the request
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
      */
@@ -267,7 +273,7 @@ export interface TenantsApiInterface {
     /**
      * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Benutzereinstellungen im Tenant aktualisieren
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
@@ -375,18 +381,18 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
-    async getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSettingsResponse>> {
+    async getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>> {
         const requestOptions = await this.getGroupSettingsRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => GroupSettingsResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantGroupSettingsResponseFromJSON(jsonValue));
     }
 
     /**
      * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
-    async getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSettingsResponse> {
+    async getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
         const response = await this.getGroupSettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -527,7 +533,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     /**
      * Creates request options for updateGroupSettings without sending the request
      */
-    async updateGroupSettingsRequestOpts(requestParameters: UpdateGroupSettingsRequest): Promise<runtime.RequestOpts> {
+    async updateGroupSettingsRequestOpts(requestParameters: UpdateGroupSettingsOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -542,10 +548,10 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
             );
         }
 
-        if (requestParameters['updateNamedSettingsRequest'] == null) {
+        if (requestParameters['updateGroupSettingsRequest'] == null) {
             throw new runtime.RequiredError(
-                'updateNamedSettingsRequest',
-                'Required parameter "updateNamedSettingsRequest" was null or undefined when calling updateGroupSettings().'
+                'updateGroupSettingsRequest',
+                'Required parameter "updateGroupSettingsRequest" was null or undefined when calling updateGroupSettings().'
             );
         }
 
@@ -565,7 +571,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
-            body: UpdateNamedSettingsRequestToJSON(requestParameters['updateNamedSettingsRequest']),
+            body: UpdateGroupSettingsRequestToJSON(requestParameters['updateGroupSettingsRequest']),
         };
     }
 
@@ -573,18 +579,18 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
-    async updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSettingsResponse>> {
+    async updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>> {
         const requestOptions = await this.updateGroupSettingsRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => GroupSettingsResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantGroupSettingsResponseFromJSON(jsonValue));
     }
 
     /**
      * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
-    async updateGroupSettings(requestParameters: UpdateGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSettingsResponse> {
+    async updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
         const response = await this.updateGroupSettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -592,7 +598,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     /**
      * Creates request options for updateTenantSettings without sending the request
      */
-    async updateTenantSettingsRequestOpts(requestParameters: UpdateTenantSettingsRequest): Promise<runtime.RequestOpts> {
+    async updateTenantSettingsRequestOpts(requestParameters: UpdateTenantSettingsOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -600,10 +606,10 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
             );
         }
 
-        if (requestParameters['updateNamedSettingsRequest'] == null) {
+        if (requestParameters['updateTenantSettingsRequest'] == null) {
             throw new runtime.RequiredError(
-                'updateNamedSettingsRequest',
-                'Required parameter "updateNamedSettingsRequest" was null or undefined when calling updateTenantSettings().'
+                'updateTenantSettingsRequest',
+                'Required parameter "updateTenantSettingsRequest" was null or undefined when calling updateTenantSettings().'
             );
         }
 
@@ -622,7 +628,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
-            body: UpdateNamedSettingsRequestToJSON(requestParameters['updateNamedSettingsRequest']),
+            body: UpdateTenantSettingsRequestToJSON(requestParameters['updateTenantSettingsRequest']),
         };
     }
 
@@ -630,7 +636,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
-    async updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
+    async updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
         const requestOptions = await this.updateTenantSettingsRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
@@ -641,7 +647,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
-    async updateTenantSettings(requestParameters: UpdateTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
+    async updateTenantSettings(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
         const response = await this.updateTenantSettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }

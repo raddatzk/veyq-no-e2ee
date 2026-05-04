@@ -16,37 +16,14 @@ paths:
       - Auth
       operationId: login
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/LoginRequest"
-            example:
-              email: kevin@example.test
-              password: correct horse battery staple
+        "$ref": "#/components/requestBodies/Login"
       responses:
         '200':
-          description: Login succeeded and auth cookies were set.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LoginResponse"
-              example:
-                userId: 1
-                email: kevin@example.test
-                displayName: Kevin
-                serverRole: ServerOwner
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          "$ref": "#/components/responses/Error"
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Anmelden und Auth-Cookies setzen
       x-implementation-status: partial
       x-preconditions:
@@ -70,23 +47,10 @@ paths:
       responses:
         '204':
           description: Current auth cookies were cleared.
-        '401':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Aktuelle Sitzung abmelden
       x-implementation-status: partial
       x-preconditions:
@@ -109,33 +73,11 @@ paths:
       - refreshTokenCookie: []
       responses:
         '200':
-          description: Refresh succeeded and rotated cookies were set.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LoginResponse"
-              example:
-                userId: 1
-                email: kevin@example.test
-                displayName: Kevin
-                serverRole: ServerOwner
-        '401':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Refresh-Token rotieren und neue Cookies setzen
       x-implementation-status: partial
       x-preconditions:
@@ -159,57 +101,27 @@ components:
       type: apiKey
       in: cookie
       name: LUNVA_REFRESH_TOKEN
-  responses:
-    Error:
-      description: Request failed.
+
+  requestBodies:
+    Login:
+      required: true
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
-          example:
-            message: example
+            "$ref": "#/components/schemas/LoginRequest"
+
   schemas:
     LoginRequest:
       type: object
       additionalProperties: false
       required:
-      - email
-      - password
+        - email
+        - password
       properties:
         email:
-          type: string
-          format: email
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
         password:
           type: string
-    LoginResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - userId
-      - email
-      - displayName
-      - serverRole
-      properties:
-        userId:
-          type: integer
-          format: int64
-        email:
-          type: string
-          format: email
-        displayName:
-          type: string
-        serverRole:
-          "$ref": "#/components/schemas/ServerRole"
-    ServerRole:
-      type: string
-      enum:
-      - ServerOwner
-      - ServerMember
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - message
-      properties:
-        message:
-          type: string
+      example:
+        email: kevin@example.test
+        password: correct horse battery staple

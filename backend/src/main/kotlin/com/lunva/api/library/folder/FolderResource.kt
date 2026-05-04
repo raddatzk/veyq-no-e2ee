@@ -1,9 +1,9 @@
 package com.lunva.api.library.folder
 
-import com.lunva.api.generated.library.api.FoldersApi
-import com.lunva.api.generated.library.model.CreateLibraryItemRequest
-import com.lunva.api.generated.library.model.MoveLibraryItemRequest
-import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
+import com.lunva.api.generated.api.FoldersApi
+import com.lunva.api.generated.model.CreateLibraryItemRequest
+import com.lunva.api.generated.model.MoveLibraryItemRequest
+import com.lunva.api.generated.model.UpdateLibraryItemRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response

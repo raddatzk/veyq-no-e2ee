@@ -1,11 +1,11 @@
 package com.lunva.api.library.explorer
 
 import com.lunva.api.auth.filterchain.RequestContext
-import com.lunva.api.generated.explorer.model.ExplorerBreadcrumb
-import com.lunva.api.generated.explorer.model.ExplorerLocation
-import com.lunva.api.generated.explorer.model.ExplorerResponse
-import com.lunva.api.generated.explorer.model.ExplorerScopeRoot
-import com.lunva.api.generated.explorer.model.LocationKind
+import com.lunva.api.generated.model.ExplorerBreadcrumb
+import com.lunva.api.generated.model.ExplorerLocation
+import com.lunva.api.generated.model.ExplorerResponse
+import com.lunva.api.generated.model.ExplorerScopeRoot
+import com.lunva.api.generated.model.LocationKind
 import com.lunva.api.domain.TenantAlbum
 import com.lunva.api.domain.TenantAlbumRepo
 import com.lunva.api.domain.TenantFolder

@@ -19,25 +19,9 @@ paths:
       operationId: me
       responses:
         '200':
-          description: Current authenticated user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/UserSummary"
-              example:
-                userId: 1
-                email: kevin@example.test
-                displayName: Kevin
-                serverRole: ServerOwner
+          "$ref": "#/components/responses/SimpleUser"
         '401':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Aktuellen Benutzer abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -56,45 +40,16 @@ paths:
       - Users
       operationId: updateMySettings
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateUserSettingsRequest"
-            example:
-              displayName: Kevin Raddatz
-              email: kevin@example.test
+        "$ref": "#/components/requestBodies/UpdateUserSettings"
       responses:
         '200':
-          description: Updated current user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/UserSummary"
-              example:
-                userId: 1
-                email: kevin@example.test
-                displayName: Kevin Raddatz
-                serverRole: ServerOwner
+          "$ref": "#/components/responses/SimpleUser"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
-        '409':
-          "$ref": "#/components/responses/Error"
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Eigene Benutzer-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -108,48 +63,81 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
-  "/api/users/me/password":
+  "/api/users/me/password/change":
     post:
       tags:
       - Users
       operationId: changeMyPassword
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/ChangePasswordRequest"
-            example:
-              currentPassword: admin1234
-              newPassword: new-admin1234
+        "$ref": "#/components/requestBodies/ChangePassword"
       responses:
         '204':
           description: Password changed.
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Eigenes Passwort ändern
-      x-implementation-status: partial
+      x-implementation-status: implemented
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Eigenes Passwort ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/password/forgot":
+    post:
+      tags:
+        - Users
+      operationId: forgotMyPassword
+      responses:
+        '200':
+          description: Email sent.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigenes Passwort vergessen
+      x-implementation-status: partial
+      x-preconditions:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigenes Passwort vergessen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/password/reset":
+    post:
+      tags:
+        - Users
+      operationId: resetMyPassword
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/ResetPassword"
+      responses:
+        '200':
+          description: Email sent.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigenes Passwort vergessen
+      x-implementation-status: partial
+      x-preconditions:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigenes Passwort vergessen.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -163,39 +151,11 @@ paths:
       operationId: getAllUsers
       responses:
         '200':
-          description: Managed users.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ManagedUsersResponse"
-              example:
-                users:
-                - userId: 2
-                  email: invitee@example.test
-                  displayName: Invitee
-                  serverRole: ServerMember
-                  status: Pending
-                  tenants:
-                  - tenantId: 42
-                    name: friends
-                    displayName: Friends
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "#/components/responses/ManagedUsers"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
       summary: Verwaltete Benutzer auflisten
       x-implementation-status: partial
       x-preconditions:
@@ -217,67 +177,18 @@ paths:
       - Users
       operationId: createManagedUser
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateManagedUserRequest"
-            example:
-              email: invitee@example.test
-              displayName: Invitee
-              serverRole: ServerMember
-              tenantId: 42
+        "$ref": "#/components/requestBodies/CreateManagedUser"
       responses:
         '200':
-          description: Created pending managed user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ManagedUserSummary"
-              example:
-                userId: 2
-                email: invitee@example.test
-                displayName: Invitee
-                serverRole: ServerMember
-                status: Pending
-                tenants:
-                - tenantId: 42
-                  name: friends
-                  displayName: Friends
+          "$ref": "#/components/responses/ManagedUser"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '409':
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Verwalteten Benutzer einladen
       x-implementation-status: partial
       x-preconditions:
@@ -301,76 +212,21 @@ paths:
       operationId: updateManagedUser
       parameters:
       - "$ref": "#/components/parameters/UserId"
-        description:
-        example:
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateManagedUserRequest"
-            example:
-              serverRole: ServerMember
+        "$ref": "#/components/requestBodies/UpdateManagedUserRole"
       responses:
         '200':
-          description: Updated managed user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ManagedUserSummary"
-              example:
-                userId: 2
-                email: invitee@example.test
-                displayName: Invitee
-                serverRole: ServerMember
-                status: Pending
-                tenants:
-                - tenantId: 42
-                  name: friends
-                  displayName: Friends
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '404':
-          "$ref": "#/components/responses/Error"
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
-        '409':
-          "$ref": "#/components/responses/Error"
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/ManagedUsers"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Server-Rolle eines Benutzers ändern
       x-implementation-status: partial
       x-preconditions:
@@ -394,62 +250,20 @@ paths:
       operationId: sendManagedUserInvitation
       parameters:
       - "$ref": "#/components/parameters/UserId"
-        description:
-        example:
       responses:
         '200':
-          description: Invitation resent.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ManagedUserSummary"
-              example:
-                userId: 2
-                email: invitee@example.test
-                displayName: Invitee
-                serverRole: ServerMember
-                status: Pending
-                tenants:
-                - tenantId: 42
-                  name: friends
-                  displayName: Friends
-        '403':
-          "$ref": "#/components/responses/Error"
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
-        '404':
-          "$ref": "#/components/responses/Error"
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
-        '409':
-          "$ref": "#/components/responses/Error"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/ManagedUser"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
-      summary: Einladung erneut senden
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Einladung senden
       x-implementation-status: partial
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -473,47 +287,15 @@ paths:
       security: []
       parameters:
       - "$ref": "#/components/parameters/UserId"
-        description:
-        example:
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/AcceptInvitationRequest"
-            example:
-              password: welcome123
-              token: invitation-token
+        "$ref": "#/components/requestBodies/AcceptInvitation"
       responses:
         '200':
-          description: Invitation accepted and auth cookies were set.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LoginResponse"
-              example:
-                userId: 2
-                email: invitee@example.test
-                displayName: Invitee
-                serverRole: ServerMember
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
         '400':
-          "$ref": "#/components/responses/Error"
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '404':
-          "$ref": "#/components/responses/Error"
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Einladung annehmen und Passwort setzen
       x-implementation-status: partial
       x-preconditions:
@@ -543,184 +325,290 @@ components:
       schema:
         type: integer
         format: int64
-  responses:
-    Error:
-      description: Request failed.
+      description: Internal ID of the current user
+      example: 12345
+
+  requestBodies:
+    UpdateUserSettings:
+      required: true
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/ErrorResponse"
+            "$ref": "#/components/schemas/UpdateUserSettingsRequest"
           example:
-            message: example
+            displayName: Kevin Raddatz
+            email: kevin@example.test
+
+    ChangePassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ChangePasswordRequest"
+          example:
+            currentPassword: admin1234567
+            newPassword: new-admin1234567
+
+    ResetPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ResetPasswordRequest"
+          example:
+            password: welcome123456
+            token: reset-token
+
+    CreateManagedUser:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateManagedUserRequest"
+          example:
+            email: invitee@example.test
+            displayName: Invitee
+            serverRole: ServerMember
+            tenantId: 42
+
+    UpdateManagedUserRole:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateManagedUserRoleRequest"
+          example:
+            serverRole: ServerMember
+
+    AcceptInvitation:
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AcceptInvitationRequest"
+          example:
+            password: welcome123456
+            token: invitation-token
+
+  responses:
+    ManagedUsers:
+      description: Managed users.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ManagedUsersSummary"
+          example:
+            users:
+            - userId: 2
+              email: invitee@example.test
+              displayName: Invitee
+              serverRole: ServerMember
+              status: Pending
+              tenants:
+              - tenantId: 42
+                name: friends
+                displayName: Friends
+
+    ManagedUser:
+      description: Managed user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ManagedUserSummary"
+          example:
+            userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            serverRole: ServerMember
+            status: Pending
+            tenants:
+            - tenantId: 42
+              name: friends
+              displayName: Friends
+
+    SimpleUser:
+      description: Simple user
+      content:
+        application/json:
+          schema:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          example:
+            userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            serverRole: ServerOwner
+
   schemas:
-    ServerRole:
-      type: string
-      enum:
-      - ServerOwner
-      - ServerMember
     UserStatus:
       type: string
       enum:
-      - Pending
-      - Active
-    UserSummary:
+        - Pending
+        - Active
+
+    ResetPasswordRequest:
       type: object
       additionalProperties: false
       required:
-      - userId
-      - email
-      - displayName
-      - serverRole
+        - password
+        - token
       properties:
-        userId:
-          type: integer
-          format: int64
-        email:
+        password:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+        token:
           type: string
-          format: email
-        displayName:
-          type: string
-        serverRole:
-          "$ref": "#/components/schemas/ServerRole"
-    LoginResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - userId
-      - email
-      - displayName
-      - serverRole
-      properties:
-        userId:
-          type: integer
-          format: int64
-        email:
-          type: string
-          format: email
-        displayName:
-          type: string
-        serverRole:
-          "$ref": "#/components/schemas/ServerRole"
+      example:
+        password: welcome123456
+
     UpdateUserSettingsRequest:
       type: object
       additionalProperties: false
       required:
-      - displayName
-      - email
+        - displayName
+        - email
       properties:
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         email:
-          type: string
-          format: email
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        displayName: Kevin Raddatz
+        email: kevin@example.test
+
     ChangePasswordRequest:
       type: object
       additionalProperties: false
       required:
-      - currentPassword
-      - newPassword
+        - currentPassword
+        - newPassword
       properties:
         currentPassword:
           type: string
         newPassword:
-          type: string
-          minLength: 8
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+      example:
+        currentPassword: admin1234567
+        newPassword: new-admin1234567
+
     ManagedUserTenantSummary:
       type: object
       additionalProperties: false
       required:
-      - tenantId
-      - name
-      - displayName
+        - tenantId
+        - name
+        - displayName
       properties:
         tenantId:
           type: integer
           format: int64
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+
+    ManagedUsersSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - users
+      properties:
+        users:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ManagedUserSummary"
+      example:
+        users:
+          - userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            serverRole: ServerMember
+            status: Pending
+            tenants:
+              - tenantId: 42
+                name: friends
+                displayName: Friends
+
     ManagedUserSummary:
       type: object
       additionalProperties: false
       required:
-      - userId
-      - email
-      - displayName
-      - serverRole
-      - status
-      - tenants
+        - userId
+        - email
+        - displayName
+        - serverRole
+        - status
+        - tenants
       properties:
         userId:
           type: integer
           format: int64
         email:
-          type: string
-          format: email
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         serverRole:
-          "$ref": "#/components/schemas/ServerRole"
+          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
         status:
           "$ref": "#/components/schemas/UserStatus"
         tenants:
           type: array
           items:
             "$ref": "#/components/schemas/ManagedUserTenantSummary"
-    ManagedUsersResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - users
-      properties:
-        users:
-          type: array
-          items:
-            "$ref": "#/components/schemas/ManagedUserSummary"
+      example:
+        userId: 2
+        email: invitee@example.test
+        displayName: Invitee
+        serverRole: ServerMember
+        status: Pending
+        tenants:
+          - tenantId: 42
+            name: friends
+            displayName: Friends
+
     CreateManagedUserRequest:
       type: object
       additionalProperties: false
       required:
-      - email
-      - displayName
-      - serverRole
-      - tenantId
+        - email
+        - displayName
+        - serverRole
+        - tenantId
       properties:
         email:
-          type: string
-          format: email
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         serverRole:
-          "$ref": "#/components/schemas/ServerRole"
+          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
         tenantId:
           type: integer
           format: int64
-    UpdateManagedUserRequest:
+      example:
+        email: invitee@example.test
+        displayName: Invitee
+        serverRole: ServerMember
+        tenantId: 42
+
+    UpdateManagedUserRoleRequest:
       type: object
       additionalProperties: false
       required:
-      - serverRole
+        - serverRole
       properties:
         serverRole:
-          "$ref": "#/components/schemas/ServerRole"
+          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
+      example:
+        serverRole: ServerMember
+
     AcceptInvitationRequest:
       type: object
       additionalProperties: false
       required:
-      - password
-      - token
+        - password
+        - token
       properties:
         password:
-          type: string
-          minLength: 8
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
         token:
           type: string
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - message
-      properties:
-        message:
-          type: string
+      example:
+        password: welcome123456
+        token: invitation-token

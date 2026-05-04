@@ -21,54 +21,22 @@ paths:
       - Folders
       operationId: createFolder
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       requestBody:
         "$ref": "#/components/requestBodies/CreateLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerFolder"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
         '409':
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Ordner anlegen
       x-implementation-status: partial
       x-preconditions:
@@ -90,47 +58,19 @@ paths:
       - Folders
       operationId: deleteFolder
       parameters:
-      - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/PathQuery"
-        description:
-        example:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/Path"
       responses:
         '204':
           description: Folder deleted.
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Ordner löschen
       x-implementation-status: partial
       x-preconditions:
@@ -154,45 +94,19 @@ paths:
       operationId: updateFolder
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
         "$ref": "#/components/requestBodies/UpdateLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerFolder"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Ordner umbenennen oder umbeschriften
       x-implementation-status: partial
       x-preconditions:
@@ -216,45 +130,19 @@ paths:
       operationId: moveFolder
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
         "$ref": "#/components/requestBodies/MoveLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerFolder"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Ordner verschieben
       x-implementation-status: partial
       x-preconditions:
@@ -278,53 +166,21 @@ paths:
       operationId: createAlbum
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
         "$ref": "#/components/requestBodies/CreateLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerAlbum"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
         '409':
-          description: Der Request verletzt einen Eindeutigkeits- oder Zustandskonflikt.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource conflict
+          "$ref": "./common.openapi.yaml#/components/responses/409"
       summary: Album anlegen
       x-implementation-status: partial
       x-preconditions:
@@ -347,46 +203,18 @@ paths:
       operationId: deleteAlbum
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/PathQuery"
-        description:
-        example:
+      - "$ref": "#/components/parameters/Path"
       responses:
         '204':
           description: Album deleted.
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Album löschen
       x-implementation-status: partial
       x-preconditions:
@@ -410,45 +238,19 @@ paths:
       operationId: updateAlbum
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
         "$ref": "#/components/requestBodies/UpdateLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerAlbum"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Album umbenennen oder umbeschriften
       x-implementation-status: partial
       x-preconditions:
@@ -472,45 +274,19 @@ paths:
       operationId: moveAlbum
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
         "$ref": "#/components/requestBodies/MoveLibraryItem"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerAlbum"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Album verschieben
       x-implementation-status: partial
       x-preconditions:
@@ -534,54 +310,19 @@ paths:
       operationId: addMedia
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/AlbumMediaRequest"
-            example:
-              albumPath: "/@family/vacation/beach"
-              mediaId: med_abc123
-              hidden: false
-              position: 1
+        "$ref": "#/components/requestBodies/AlbumMedia"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerAlbum"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Medium einem Album hinzufügen
       x-implementation-status: partial
       x-preconditions:
@@ -605,53 +346,19 @@ paths:
       operationId: setCover
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/SetAlbumCoverRequest"
-            example:
-              albumPath: "/@family/vacation/beach"
-              mediaId: med_abc123
-              hidden: true
+        "$ref": "#/components/requestBodies/SetAlbumCover"
       responses:
         '200':
           "$ref": "#/components/responses/ExplorerAlbum"
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Album-Cover setzen
       x-implementation-status: partial
       x-preconditions:
@@ -675,11 +382,7 @@ paths:
       operationId: media
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - "$ref": "#/components/parameters/PathQuery"
-        description:
-        example:
+      - "$ref": "#/components/parameters/Path"
       responses:
         '200':
           description: Newline-delimited media summaries.
@@ -691,29 +394,11 @@ paths:
                 {"id":"med_abc123","title":"Beach","albumPath":"/@family/vacation/beach","ownerUserId":1,"uploaderDisplayName":"Kevin","createdAt":"2026-05-03T12:00:00Z","capturedAt":"2026-05-03T11:45:00Z","capturedAtOverride":false,"mimeType":"image/jpeg","sizeBytes":2048000,"contentUrl":"/api/friends/media/med_abc123/content","cameraMake":"Canon","cameraModel":"R5","lensModel":"RF
                 24-70","imageWidth":4000,"imageHeight":3000,"gpsLatitude":52.52,"gpsLongitude":13.405}
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Medien als NDJSON streamen
       x-implementation-status: partial
       x-preconditions:
@@ -736,94 +421,21 @@ paths:
       operationId: upload
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
       requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-              - file
-              - albumPath
-              properties:
-                file:
-                  type: string
-                  format: binary
-                albumPath:
-                  type: string
-                title:
-                  type: string
-            example:
-              file: example
-              albumPath: "/urlaub"
+        "$ref": "#/components/requestBodies/MediaUpload"
       responses:
         '200':
-          description: Uploaded media.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/UploadMediaSummary"
-              example:
-                id: med_abc123
-                title: Beach
-                albumPath: "/@family/vacation/beach"
-                ownerUserId: 1
-                uploaderDisplayName: Kevin
-                createdAt: '2026-05-03T12:00:00Z'
-                capturedAt: '2026-05-03T11:45:00Z'
-                capturedAtOverride: false
-                mimeType: image/jpeg
-                sizeBytes: 2048000
-                contentUrl: "/api/friends/media/med_abc123/content"
-                cameraMake: Canon
-                cameraModel: R5
-                lensModel: RF 24-70
-                imageWidth: 4000
-                imageHeight: 3000
-                gpsLatitude: 52.52
-                gpsLongitude: 13.405
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/Media"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
         '413':
-          description: Der Upload ueberschreitet die erlaubte Groesse.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Upload too large
+          "$ref": "./common.openapi.yaml#/components/responses/413"
       summary: Medium direkt hochladen
       x-implementation-status: partial
       x-preconditions:
@@ -847,22 +459,9 @@ paths:
       operationId: content
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - name: mediaId
-        in: path
-        required: true
-        schema:
-          type: string
-        description: Public Media-ID.
+      - "$ref": "#/components/parameters/MediaId"
+      - "$ref": "#/components/parameters/Range"
         example: med_abc123
-      - name: Range
-        in: header
-        required: false
-        schema:
-          type: string
-        description: HTTP Range Header fuer partielles Streaming.
-        example: bytes=0-1048575
       responses:
         '200':
           description: Media content.
@@ -881,37 +480,13 @@ paths:
                 format: binary
               example: "<partial binary media bytes>"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
         '416':
-          description: Der angeforderte Byte-Range ist fuer das Medium nicht erfuellbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Requested range not satisfiable
+          "$ref": "./common.openapi.yaml#/components/responses/416"
       summary: Mediendatei ausliefern
       x-implementation-status: partial
       x-preconditions:
@@ -935,81 +510,20 @@ paths:
       operationId: updateMetadata
       parameters:
       - "$ref": "#/components/parameters/TenantName"
-        description:
-        example:
-      - name: mediaId
-        in: path
-        required: true
-        schema:
-          type: string
-        description: Public Media-ID.
-        example: med_abc123
+      - "$ref": "#/components/parameters/MediaId"
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateMediaMetadataRequest"
-            example:
-              capturedAt: '2026-05-03T12:30:00Z'
+        "$ref": "#/components/requestBodies/UpdateMediaMetadata"
       responses:
         '200':
-          description: Updated media summary.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/StreamMediaSummary"
-              example:
-                id: med_abc123
-                title: Beach
-                albumPath: "/@family/vacation/beach"
-                ownerUserId: 1
-                uploaderDisplayName: Kevin
-                createdAt: '2026-05-03T12:00:00Z'
-                capturedAt: '2026-05-03T11:45:00Z'
-                capturedAtOverride: false
-                mimeType: image/jpeg
-                sizeBytes: 2048000
-                contentUrl: "/api/friends/media/med_abc123/content"
-                cameraMake: Canon
-                cameraModel: R5
-                lensModel: RF 24-70
-                imageWidth: 4000
-                imageHeight: 3000
-                gpsLatitude: 52.52
-                gpsLongitude: 13.405
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/Media"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Insufficient permissions
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Medien-Metadaten aktualisieren
       x-implementation-status: partial
       x-preconditions:
@@ -1032,52 +546,16 @@ paths:
       - MediaUploads
       operationId: createUpload
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateMediaUploadRequest"
-            example:
-              tenantName: friends
-              albumPath: "/@family/vacation/beach"
-              filename: beach.jpg
-              mimeType: image/jpeg
-              sizeBytes: 2048000
-              title: Beach
+        "$ref": "#/components/requestBodies/CreateMediaUpload"
       responses:
         '200':
-          description: Created upload session.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/MediaUploadSessionSummary"
-              example:
-                uploadId: upl_abc123
-                chunkSizeBytes: 5242880
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/MediaUploadSession"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '413':
-          description: Der Upload ueberschreitet die erlaubte Groesse.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Upload too large
+          "$ref": "./common.openapi.yaml#/components/responses/413"
       summary: Chunk-Upload-Session erstellen
       x-implementation-status: partial
       x-preconditions:
@@ -1097,36 +575,9 @@ paths:
       operationId: listUploads
       responses:
         '200':
-          description: Pending uploads.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  "$ref": "#/components/schemas/PendingMediaUploadSummary"
-              example:
-              - uploadId: upl_abc123
-                tenantName: friends
-                tenantDisplayName: Friends
-                albumPath: "/@family/vacation/beach"
-                filename: beach.jpg
-                mimeType: image/jpeg
-                sizeBytes: 2048000
-                title: Beach
-                chunkSizeBytes: 5242880
-                uploadedChunks:
-                - 0
-                uploadedBytes: 2048000
-                createdAt: '2026-05-03T12:00:00Z'
-                updatedAt: '2026-05-03T12:01:00Z'
+          "$ref": "#/components/responses/PendingMediaUploads"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
       summary: Eigene offene Uploads auflisten
       x-implementation-status: partial
       x-preconditions:
@@ -1147,46 +598,13 @@ paths:
       operationId: getUpload
       parameters:
       - "$ref": "#/components/parameters/UploadId"
-        description:
-        example:
       responses:
         '200':
-          description: Upload status.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/PendingMediaUploadSummary"
-              example:
-                uploadId: upl_abc123
-                tenantName: friends
-                tenantDisplayName: Friends
-                albumPath: "/@family/vacation/beach"
-                filename: beach.jpg
-                mimeType: image/jpeg
-                sizeBytes: 2048000
-                title: Beach
-                chunkSizeBytes: 5242880
-                uploadedChunks:
-                - 0
-                uploadedBytes: 2048000
-                createdAt: '2026-05-03T12:00:00Z'
-                updatedAt: '2026-05-03T12:01:00Z'
+          "$ref": "#/components/responses/PendingMediaUpload"
         '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Upload-Status abrufen
       x-implementation-status: partial
       x-preconditions:
@@ -1208,35 +626,15 @@ paths:
       operationId: abortUpload
       parameters:
       - "$ref": "#/components/parameters/UploadId"
-        description:
-        example:
       responses:
         '204':
           description: Upload aborted.
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Chunk-Upload abbrechen
       x-implementation-status: partial
       x-preconditions:
@@ -1259,16 +657,7 @@ paths:
       operationId: uploadChunk
       parameters:
       - "$ref": "#/components/parameters/UploadId"
-        description:
-        example:
-      - name: chunkIndex
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int32
-        description: chunkIndex
-        example:
+      - "$ref": "#/components/parameters/ChunkIndex"
       requestBody:
         required: true
         content:
@@ -1280,38 +669,14 @@ paths:
       responses:
         '204':
           description: Chunk accepted.
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
         '413':
-          description: Der Upload ueberschreitet die erlaubte Groesse.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Upload too large
+          "$ref": "./common.openapi.yaml#/components/responses/413"
       summary: Upload-Chunk speichern
       x-implementation-status: partial
       x-preconditions:
@@ -1334,58 +699,15 @@ paths:
       operationId: completeUpload
       parameters:
       - "$ref": "#/components/parameters/UploadId"
-        description:
-        example:
       responses:
         '200':
-          description: Completed upload.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/UploadMediaSummary"
-              example:
-                id: med_abc123
-                title: Beach
-                albumPath: "/@family/vacation/beach"
-                ownerUserId: 1
-                uploaderDisplayName: Kevin
-                createdAt: '2026-05-03T12:00:00Z'
-                capturedAt: '2026-05-03T11:45:00Z'
-                capturedAtOverride: false
-                mimeType: image/jpeg
-                sizeBytes: 2048000
-                contentUrl: "/api/friends/media/med_abc123/content"
-                cameraMake: Canon
-                cameraModel: R5
-                lensModel: RF 24-70
-                imageWidth: 4000
-                imageHeight: 3000
-                gpsLatitude: 52.52
-                gpsLongitude: 13.405
-        '401':
-          description: Der Request ist nicht authentifiziert.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Authentication required
+          "$ref": "#/components/responses/Media"
         '400':
-          description: Der Request ist syntaktisch oder fachlich ungueltig.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid request
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '404':
-          description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                error: Resource not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       summary: Chunk-Upload abschließen
       x-implementation-status: partial
       x-preconditions:
@@ -1420,12 +742,55 @@ components:
       required: true
       schema:
         type: string
-    PathQuery:
-      name: path
-      in: query
+    ChunkIndex:
+      name: chunkIndex
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+      description: chunkIndex
+      example: 123
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Public Media-ID.
+      example: med_abc123
+    Range:
+      name: Range
+      in: header
       required: false
       schema:
         type: string
+      description: HTTP Range Header fuer partielles Streaming.
+      example: bytes=0-1048575
+
+    Path:
+      in: query
+      name: path
+      required: false
+      description: >
+        Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use `/@groupName`; the personal
+        scope uses `/~me`.
+      schema:
+        type: string
+        default: "/"
+      examples:
+        tenantRoot:
+          summary: Tenant root
+          value: "/"
+        groupRoot:
+          summary: Group root
+          value: "/@familie"
+        personalRoot:
+          summary: Personal root
+          value: "/~me"
+        nestedFolder:
+          summary: Folder in a group scope
+          value: "/@familie/urlaub"
   requestBodies:
     CreateLibraryItem:
       required: true
@@ -1434,8 +799,13 @@ components:
           schema:
             "$ref": "#/components/schemas/CreateLibraryItemRequest"
           example:
-            name: friends
-            displayName: Friends
+            parentPath: "/@family"
+            name: vacation
+            displayName: Vacation
+            scope:
+              type: group
+              groupName: family
+
     UpdateLibraryItem:
       required: true
       content:
@@ -1443,9 +813,10 @@ components:
           schema:
             "$ref": "#/components/schemas/UpdateLibraryItemRequest"
           example:
-            path: "/urlaub"
-            name: friends
-            displayName: Friends
+            path: "/@family/vacation"
+            name: summer-vacation
+            displayName: Summer Vacation
+
     MoveLibraryItem:
       required: true
       content:
@@ -1453,7 +824,68 @@ components:
           schema:
             "$ref": "#/components/schemas/MoveLibraryItemRequest"
           example:
-            path: "/urlaub"
+            path: "/@family/vacation"
+            newParentPath: "/@family/archive"
+            name: vacation-2026
+
+    AlbumMedia:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AlbumMediaRequest"
+          example:
+            albumPath: "/@family/vacation/beach"
+            mediaId: med_abc123
+            hidden: false
+            position: 1
+
+    SetAlbumCover:
+      description: Set Album Cover
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/SetAlbumCoverRequest"
+          example:
+            albumPath: "/@family/vacation/beach"
+            mediaId: med_abc123
+            hidden: false
+
+    MediaUpload:
+      required: true
+      description: Upload binary media
+      content:
+        multipart/form-data:
+          schema:
+            "$ref": "#/components/schemas/BinaryDataRequest"
+          example:
+            file: "<binary image data>"
+
+    UpdateMediaMetadata:
+      required: true
+      description: Update Metadata of media
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMediaMetadataRequest"
+          example:
+            capturedAt: '2026-05-03T12:30:00Z'
+
+    CreateMediaUpload:
+      required: true
+      description: Initiate Upload session
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMediaUploadRequest"
+          example:
+            tenantName: friends
+            albumPath: "/@family/vacation/beach"
+            filename: beach.jpg
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+            title: Beach
+
   responses:
     ExplorerFolder:
       description: Folder summary.
@@ -1463,9 +895,10 @@ components:
             "$ref": "#/components/schemas/ExplorerFolder"
           example:
             id: id_123
-            name: friends
-            displayName: Friends
-            path: "/urlaub"
+            name: vacation
+            displayName: Vacation
+            path: "/@family/vacation"
+
     ExplorerAlbum:
       description: Album summary.
       content:
@@ -1473,11 +906,79 @@ components:
           schema:
             "$ref": "#/components/schemas/ExplorerAlbum"
           example:
-            id: id_123
-            name: friends
-            displayName: Friends
-            path: "/urlaub"
-            coverMediaId: med_123
+            id: id_456
+            name: beach
+            displayName: Beach
+            path: "/@family/vacation/beach"
+            coverMediaId: med_abc123
+
+    Media:
+      description: Uploaded media
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MediaSummary"
+          example:
+            id: med_abc123
+            filename: beach.jpg
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+
+    MediaUploadSession:
+      description: Current session for uploading media
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MediaUploadSessionSummary"
+          example:
+            uploadId: upl_abc123
+            chunkSizeBytes: 5242880
+
+    PendingMediaUploads:
+      description: All upload media sessions for current user
+      content:
+        application/json:
+          schema:
+            type: array
+            "$ref": "#/components/schemas/PendingMediaUploadSummary"
+          example:
+          - uploadId: upl_abc123
+            tenantName: friends
+            tenantDisplayName: Friends
+            albumPath: "/@family/vacation/beach"
+            filename: beach.jpg
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+            title: Beach
+            chunkSizeBytes: 5242880
+            uploadedChunks:
+            - 0
+            uploadedBytes: 5242880
+            createdAt: '2026-05-03T12:30:00Z'
+            updatedAt: '2026-05-03T12:35:00Z'
+
+    PendingMediaUpload:
+      description: Single upload media sessions for current user
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PendingMediaUploadSummary"
+          example:
+            uploadId: upl_abc123
+            tenantName: friends
+            tenantDisplayName: Friends
+            albumPath: "/@family/vacation/beach"
+            filename: beach.jpg
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+            title: Beach
+            chunkSizeBytes: 5242880
+            uploadedChunks:
+            - 0
+            uploadedBytes: 5242880
+            createdAt: '2026-05-03T12:30:00Z'
+            updatedAt: '2026-05-03T12:35:00Z'
+
   schemas:
     ExplorerFolder:
       type: object
@@ -1499,6 +1000,11 @@ components:
         ownerBadge:
           type: object
           nullable: true
+      example:
+        id: id_123
+        name: friends
+        displayName: Friends
+        path: "/urlaub"
     ExplorerAlbum:
       type: object
       additionalProperties: false
@@ -1523,6 +1029,11 @@ components:
         ownerBadge:
           type: object
           nullable: true
+      example:
+        id: id_123
+        name: album
+        displayName: Album
+        path: "/urlaub"
     CreateLibraryItemRequest:
       type: object
       additionalProperties: false
@@ -1540,6 +1051,9 @@ components:
         scope:
           "$ref": "#/components/schemas/LibraryScopeRequest"
           nullable: true
+      example:
+        name: friends
+        displayName: Friends
     LibraryScopeRequest:
       type: object
       additionalProperties: false
@@ -1562,6 +1076,10 @@ components:
         displayName:
           type: string
           nullable: true
+      example:
+        path: "/urlaub"
+        name: friends
+        displayName: Friends
     MoveLibraryItemRequest:
       type: object
       additionalProperties: false
@@ -1576,6 +1094,8 @@ components:
         name:
           type: string
           nullable: true
+      example:
+        path: "/urlaub"
     AlbumMediaRequest:
       type: object
       additionalProperties: false
@@ -1592,6 +1112,11 @@ components:
         position:
           type: integer
           format: int32
+      example:
+        albumPath: "/@family/vacation/beach"
+        mediaId: med_abc123
+        hidden: false
+        position: 1
     SetAlbumCoverRequest:
       type: object
       additionalProperties: false
@@ -1605,6 +1130,10 @@ components:
           type: string
         hidden:
           type: boolean
+      example:
+        albumPath: "/@family/vacation/beach"
+        mediaId: med_abc123
+        hidden: true
     UpdateMediaMetadataRequest:
       type: object
       additionalProperties: false
@@ -1613,6 +1142,8 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        capturedAt: '2026-05-03T12:30:00Z'
     CreateMediaUploadRequest:
       type: object
       additionalProperties: false
@@ -1631,6 +1162,13 @@ components:
         title:
           type: string
           nullable: true
+      example:
+        tenantName: friends
+        albumPath: "/@family/vacation/beach"
+        filename: beach.jpg
+        mimeType: image/jpeg
+        sizeBytes: 2048000
+        title: Beach
     MediaUploadSessionSummary:
       type: object
       additionalProperties: false
@@ -1643,6 +1181,9 @@ components:
         chunkSizeBytes:
           type: integer
           format: int64
+      example:
+        uploadId: upl_abc123
+        chunkSizeBytes: 5242880
     PendingMediaUploadSummary:
       type: object
       additionalProperties: false
@@ -1695,7 +1236,22 @@ components:
         updatedAt:
           type: string
           format: date-time
-    UploadMediaSummary:
+      example:
+        - uploadId: upl_abc123
+          tenantName: friends
+          tenantDisplayName: Friends
+          albumPath: "/@family/vacation/beach"
+          filename: beach.jpg
+          mimeType: image/jpeg
+          sizeBytes: 2048000
+          title: Beach
+          chunkSizeBytes: 5242880
+          uploadedChunks:
+            - 0
+          uploadedBytes: 2048000
+          createdAt: '2026-05-03T12:00:00Z'
+          updatedAt: '2026-05-03T12:01:00Z'
+    MediaSummary:
       type: object
       additionalProperties: false
       required:
@@ -1761,79 +1317,38 @@ components:
           type: number
           format: double
           nullable: true
-    StreamMediaSummary:
+      example:
+        id: med_abc123
+        title: Beach
+        albumPath: "/@family/vacation/beach"
+        ownerUserId: 1
+        uploaderDisplayName: Kevin
+        createdAt: '2026-05-03T12:00:00Z'
+        capturedAt: '2026-05-03T11:45:00Z'
+        capturedAtOverride: false
+        mimeType: image/jpeg
+        sizeBytes: 2048000
+        contentUrl: "/api/friends/media/med_abc123/content"
+        cameraMake: Canon
+        cameraModel: R5
+        lensModel: RF 24-70
+        imageWidth: 4000
+        imageHeight: 3000
+        gpsLatitude: 52.52
+        gpsLongitude: 13.405
+    BinaryDataRequest:
       type: object
-      additionalProperties: false
       required:
-      - id
-      - title
-      - ownerUserId
-      - uploaderDisplayName
-      - createdAt
-      - capturedAtOverride
-      - mimeType
-      - sizeBytes
-      - contentUrl
+        - file
+        - albumPath
       properties:
-        id:
+        file:
+          type: string
+          format: binary
+        albumPath:
           type: string
         title:
           type: string
-        albumPath:
-          type: string
-          nullable: true
-        ownerUserId:
-          type: integer
-          format: int64
-        uploaderDisplayName:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        capturedAt:
-          type: string
-          format: date-time
-          nullable: true
-        capturedAtOverride:
-          type: boolean
-        mimeType:
-          type: string
-        sizeBytes:
-          type: integer
-          format: int64
-        contentUrl:
-          type: string
-        cameraMake:
-          type: string
-          nullable: true
-        cameraModel:
-          type: string
-          nullable: true
-        lensModel:
-          type: string
-          nullable: true
-        imageWidth:
-          type: integer
-          format: int32
-          nullable: true
-        imageHeight:
-          type: integer
-          format: int32
-          nullable: true
-        gpsLatitude:
-          type: number
-          format: double
-          nullable: true
-        gpsLongitude:
-          type: number
-          format: double
-          nullable: true
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - error
-      properties:
-        error:
-          type: string
-          description: Fehlertext fuer Clients und Tests.
+      example:
+        file: example
+        albumPath: "/urlaub"

@@ -1,7 +1,7 @@
 package com.lunva.api.auth
 
-import com.lunva.api.generated.auth.api.AuthApi
-import com.lunva.api.generated.auth.model.LoginRequest
+import com.lunva.api.generated.api.AuthApi
+import com.lunva.api.generated.model.LoginRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response

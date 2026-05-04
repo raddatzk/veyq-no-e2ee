@@ -15,43 +15,49 @@
 
 import * as runtime from '../runtime';
 import type {
+  AcceptInvitation200Response,
   AcceptInvitationRequest,
   ChangePasswordRequest,
   CreateManagedUserRequest,
-  ErrorResponse,
-  LoginResponse,
+  InlineObject,
   ManagedUserSummary,
-  ManagedUsersResponse,
-  UpdateManagedUserRequest,
+  ManagedUsersSummary,
+  Me401Response,
+  ResetPasswordRequest,
+  UpdateManagedUserRoleRequest,
+  UpdateMySettings400Response,
   UpdateUserSettingsRequest,
-  UserSummary,
 } from '../models/index';
 import {
+    AcceptInvitation200ResponseFromJSON,
+    AcceptInvitation200ResponseToJSON,
     AcceptInvitationRequestFromJSON,
     AcceptInvitationRequestToJSON,
     ChangePasswordRequestFromJSON,
     ChangePasswordRequestToJSON,
     CreateManagedUserRequestFromJSON,
     CreateManagedUserRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
-    LoginResponseFromJSON,
-    LoginResponseToJSON,
+    InlineObjectFromJSON,
+    InlineObjectToJSON,
     ManagedUserSummaryFromJSON,
     ManagedUserSummaryToJSON,
-    ManagedUsersResponseFromJSON,
-    ManagedUsersResponseToJSON,
-    UpdateManagedUserRequestFromJSON,
-    UpdateManagedUserRequestToJSON,
+    ManagedUsersSummaryFromJSON,
+    ManagedUsersSummaryToJSON,
+    Me401ResponseFromJSON,
+    Me401ResponseToJSON,
+    ResetPasswordRequestFromJSON,
+    ResetPasswordRequestToJSON,
+    UpdateManagedUserRoleRequestFromJSON,
+    UpdateManagedUserRoleRequestToJSON,
+    UpdateMySettings400ResponseFromJSON,
+    UpdateMySettings400ResponseToJSON,
     UpdateUserSettingsRequestFromJSON,
     UpdateUserSettingsRequestToJSON,
-    UserSummaryFromJSON,
-    UserSummaryToJSON,
 } from '../models/index';
 
 export interface AcceptInvitationOperationRequest {
     userId: number;
-    acceptInvitationRequest: AcceptInvitationRequest;
+    acceptInvitationRequest?: AcceptInvitationRequest;
 }
 
 export interface ChangeMyPasswordRequest {
@@ -62,13 +68,18 @@ export interface CreateManagedUserOperationRequest {
     createManagedUserRequest: CreateManagedUserRequest;
 }
 
+export interface ResetMyPasswordRequest {
+    userId: number;
+    resetPasswordRequest: ResetPasswordRequest;
+}
+
 export interface SendManagedUserInvitationRequest {
     userId: number;
 }
 
-export interface UpdateManagedUserOperationRequest {
+export interface UpdateManagedUserRequest {
     userId: number;
-    updateManagedUserRequest: UpdateManagedUserRequest;
+    updateManagedUserRoleRequest: UpdateManagedUserRoleRequest;
 }
 
 export interface UpdateMySettingsRequest {
@@ -84,8 +95,8 @@ export interface UpdateMySettingsRequest {
 export interface UsersApiInterface {
     /**
      * Creates request options for acceptInvitation without sending the request
-     * @param {number} userId 
-     * @param {AcceptInvitationRequest} acceptInvitationRequest 
+     * @param {number} userId Internal ID of the current user
+     * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
@@ -94,19 +105,19 @@ export interface UsersApiInterface {
     /**
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * @summary Einladung annehmen und Passwort setzen
-     * @param {number} userId 
-     * @param {AcceptInvitationRequest} acceptInvitationRequest 
+     * @param {number} userId Internal ID of the current user
+     * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>>;
+    acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AcceptInvitation200Response>>;
 
     /**
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse>;
+    acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AcceptInvitation200Response>;
 
     /**
      * Creates request options for changeMyPassword without sending the request
@@ -117,7 +128,7 @@ export interface UsersApiInterface {
     changeMyPasswordRequestOpts(requestParameters: ChangeMyPasswordRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Eigenes Passwort ändern
      * @param {ChangePasswordRequest} changePasswordRequest 
      * @param {*} [options] Override http request option.
@@ -127,7 +138,7 @@ export interface UsersApiInterface {
     changeMyPasswordRaw(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -157,6 +168,28 @@ export interface UsersApiInterface {
     createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
 
     /**
+     * Creates request options for forgotMyPassword without sending the request
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    forgotMyPasswordRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * @summary Eigenes Passwort vergessen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    forgotMyPasswordRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    forgotMyPassword(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
      * Creates request options for getAllUsers without sending the request
      * @throws {RequiredError}
      * @memberof UsersApiInterface
@@ -170,13 +203,13 @@ export interface UsersApiInterface {
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersResponse>>;
+    getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>>;
 
     /**
      * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
-    getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersResponse>;
+    getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
 
     /**
      * Creates request options for me without sending the request
@@ -192,17 +225,43 @@ export interface UsersApiInterface {
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+    meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>>;
 
     /**
      * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
-    me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+    me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject>;
+
+    /**
+     * Creates request options for resetMyPassword without sending the request
+     * @param {number} userId Internal ID of the current user
+     * @param {ResetPasswordRequest} resetPasswordRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    resetMyPasswordRequestOpts(requestParameters: ResetMyPasswordRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * @summary Eigenes Passwort vergessen
+     * @param {number} userId Internal ID of the current user
+     * @param {ResetPasswordRequest} resetPasswordRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    resetMyPasswordRaw(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for sendManagedUserInvitation without sending the request
-     * @param {number} userId 
+     * @param {number} userId Internal ID of the current user
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
@@ -210,8 +269,8 @@ export interface UsersApiInterface {
 
     /**
      * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * @summary Einladung erneut senden
-     * @param {number} userId 
+     * @summary Einladung senden
+     * @param {number} userId Internal ID of the current user
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof UsersApiInterface
@@ -220,35 +279,35 @@ export interface UsersApiInterface {
 
     /**
      * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung erneut senden
+     * Einladung senden
      */
     sendManagedUserInvitation(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
 
     /**
      * Creates request options for updateManagedUser without sending the request
-     * @param {number} userId 
-     * @param {UpdateManagedUserRequest} updateManagedUserRequest 
+     * @param {number} userId Internal ID of the current user
+     * @param {UpdateManagedUserRoleRequest} updateManagedUserRoleRequest 
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    updateManagedUserRequestOpts(requestParameters: UpdateManagedUserOperationRequest): Promise<runtime.RequestOpts>;
+    updateManagedUserRequestOpts(requestParameters: UpdateManagedUserRequest): Promise<runtime.RequestOpts>;
 
     /**
      * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Server-Rolle eines Benutzers ändern
-     * @param {number} userId 
-     * @param {UpdateManagedUserRequest} updateManagedUserRequest 
+     * @param {number} userId Internal ID of the current user
+     * @param {UpdateManagedUserRoleRequest} updateManagedUserRoleRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    updateManagedUserRaw(requestParameters: UpdateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>>;
+    updateManagedUserRaw(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>>;
 
     /**
      * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
-    updateManagedUser(requestParameters: UpdateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
+    updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
 
     /**
      * Creates request options for updateMySettings without sending the request
@@ -266,13 +325,13 @@ export interface UsersApiInterface {
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+    updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>>;
 
     /**
      * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
-    updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+    updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject>;
 
 }
 
@@ -289,13 +348,6 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
             throw new runtime.RequiredError(
                 'userId',
                 'Required parameter "userId" was null or undefined when calling acceptInvitation().'
-            );
-        }
-
-        if (requestParameters['acceptInvitationRequest'] == null) {
-            throw new runtime.RequiredError(
-                'acceptInvitationRequest',
-                'Required parameter "acceptInvitationRequest" was null or undefined when calling acceptInvitation().'
             );
         }
 
@@ -322,18 +374,18 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    async acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>> {
+    async acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AcceptInvitation200Response>> {
         const requestOptions = await this.acceptInvitationRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => AcceptInvitation200ResponseFromJSON(jsonValue));
     }
 
     /**
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    async acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse> {
+    async acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AcceptInvitation200Response> {
         const response = await this.acceptInvitationRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -356,7 +408,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
         headerParameters['Content-Type'] = 'application/json';
 
 
-        let urlPath = `/api/users/me/password`;
+        let urlPath = `/api/users/me/password/change`;
 
         return {
             path: urlPath,
@@ -368,7 +420,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     async changeMyPasswordRaw(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -379,7 +431,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     async changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -436,6 +488,44 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
+     * Creates request options for forgotMyPassword without sending the request
+     */
+    async forgotMyPasswordRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/password/forgot`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    async forgotMyPasswordRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.forgotMyPasswordRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    async forgotMyPassword(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.forgotMyPasswordRaw(initOverrides);
+    }
+
+    /**
      * Creates request options for getAllUsers without sending the request
      */
     async getAllUsersRequestOpts(): Promise<runtime.RequestOpts> {
@@ -458,18 +548,18 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
-    async getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersResponse>> {
+    async getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>> {
         const requestOptions = await this.getAllUsersRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ManagedUsersResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ManagedUsersSummaryFromJSON(jsonValue));
     }
 
     /**
      * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
-    async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersResponse> {
+    async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.getAllUsersRaw(initOverrides);
         return await response.value();
     }
@@ -497,20 +587,76 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
-    async meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+    async meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>> {
         const requestOptions = await this.meRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => InlineObjectFromJSON(jsonValue));
     }
 
     /**
      * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
-    async me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+    async me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject> {
         const response = await this.meRaw(initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for resetMyPassword without sending the request
+     */
+    async resetMyPasswordRequestOpts(requestParameters: ResetMyPasswordRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling resetMyPassword().'
+            );
+        }
+
+        if (requestParameters['resetPasswordRequest'] == null) {
+            throw new runtime.RequiredError(
+                'resetPasswordRequest',
+                'Required parameter "resetPasswordRequest" was null or undefined when calling resetMyPassword().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/{userId}/password/reset`;
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ResetPasswordRequestToJSON(requestParameters['resetPasswordRequest']),
+        };
+    }
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    async resetMyPasswordRaw(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.resetMyPasswordRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigenes Passwort vergessen
+     */
+    async resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.resetMyPasswordRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -542,7 +688,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
 
     /**
      * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung erneut senden
+     * Einladung senden
      */
     async sendManagedUserInvitationRaw(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>> {
         const requestOptions = await this.sendManagedUserInvitationRequestOpts(requestParameters);
@@ -553,7 +699,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
 
     /**
      * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung erneut senden
+     * Einladung senden
      */
     async sendManagedUserInvitation(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
         const response = await this.sendManagedUserInvitationRaw(requestParameters, initOverrides);
@@ -563,7 +709,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     /**
      * Creates request options for updateManagedUser without sending the request
      */
-    async updateManagedUserRequestOpts(requestParameters: UpdateManagedUserOperationRequest): Promise<runtime.RequestOpts> {
+    async updateManagedUserRequestOpts(requestParameters: UpdateManagedUserRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['userId'] == null) {
             throw new runtime.RequiredError(
                 'userId',
@@ -571,10 +717,10 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
             );
         }
 
-        if (requestParameters['updateManagedUserRequest'] == null) {
+        if (requestParameters['updateManagedUserRoleRequest'] == null) {
             throw new runtime.RequiredError(
-                'updateManagedUserRequest',
-                'Required parameter "updateManagedUserRequest" was null or undefined when calling updateManagedUser().'
+                'updateManagedUserRoleRequest',
+                'Required parameter "updateManagedUserRoleRequest" was null or undefined when calling updateManagedUser().'
             );
         }
 
@@ -593,7 +739,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
-            body: UpdateManagedUserRequestToJSON(requestParameters['updateManagedUserRequest']),
+            body: UpdateManagedUserRoleRequestToJSON(requestParameters['updateManagedUserRoleRequest']),
         };
     }
 
@@ -601,18 +747,18 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
-    async updateManagedUserRaw(requestParameters: UpdateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>> {
+    async updateManagedUserRaw(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>> {
         const requestOptions = await this.updateManagedUserRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ManagedUserSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => ManagedUsersSummaryFromJSON(jsonValue));
     }
 
     /**
      * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
-    async updateManagedUser(requestParameters: UpdateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
+    async updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.updateManagedUserRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -650,18 +796,18 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
-    async updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+    async updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>> {
         const requestOptions = await this.updateMySettingsRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => InlineObjectFromJSON(jsonValue));
     }
 
     /**
      * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
-    async updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+    async updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject> {
         const response = await this.updateMySettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }

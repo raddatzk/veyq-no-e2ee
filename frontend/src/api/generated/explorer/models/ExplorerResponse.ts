@@ -63,14 +63,12 @@ export interface ExplorerResponse {
     location: ExplorerLocation;
     /**
      * Full clickable navigation chain including the current location as the last item.
-     * 
      * @type {Array<ExplorerBreadcrumb>}
      * @memberof ExplorerResponse
      */
     breadcrumbs: Array<ExplorerBreadcrumb>;
     /**
      * Quick navigation entries shown at the tenant root only. Empty for group, personal, folder, and album locations.
-     * 
      * @type {Array<ExplorerScopeRoot>}
      * @memberof ExplorerResponse
      */

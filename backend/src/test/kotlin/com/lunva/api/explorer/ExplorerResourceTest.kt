@@ -59,8 +59,8 @@ class ExplorerResourceTest {
         runId = UUID.randomUUID().toString().take(8)
         ownerEmail = "owner-$runId@example.com"
         tenantName = "explorer-$runId"
-        createUser("owner-$runId", "admin123", ServerRole.ServerOwner)
-        ownerCookie = login(ownerEmail, "admin123")
+        createUser("owner-$runId", "admin1234567", ServerRole.ServerOwner)
+        ownerCookie = login(ownerEmail, "admin1234567")
         createTenant(ownerCookie, tenantName, "Explorer $runId")
     }
 
@@ -91,9 +91,9 @@ class ExplorerResourceTest {
 
     @Test
     fun `tenant owner sees member tenant scoped content`() {
-        createUser("member-$runId", "member123", ServerRole.ServerMember)
+        createUser("member-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("member-$runId")
-        val memberCookie = login("member-$runId@example.com", "member123")
+        val memberCookie = login("member-$runId@example.com", "member123456")
         createFolder(memberCookie, null, "shared", "Shared")
 
         given()
@@ -106,15 +106,15 @@ class ExplorerResourceTest {
 
     @Test
     fun `group scoped folder is visible to group members and streams descendant media`() {
-        createUser("author-$runId", "member123", ServerRole.ServerMember)
-        createUser("viewer-$runId", "member123", ServerRole.ServerMember)
-        createUser("outsider-$runId", "member123", ServerRole.ServerMember)
+        createUser("author-$runId", "member123456", ServerRole.ServerMember)
+        createUser("viewer-$runId", "member123456", ServerRole.ServerMember)
+        createUser("outsider-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("author-$runId")
         addTenantMember("viewer-$runId")
         addTenantMember("outsider-$runId")
-        val authorCookie = login("author-$runId@example.com", "member123")
-        val viewerCookie = login("viewer-$runId@example.com", "member123")
-        val outsiderCookie = login("outsider-$runId@example.com", "member123")
+        val authorCookie = login("author-$runId@example.com", "member123456")
+        val viewerCookie = login("viewer-$runId@example.com", "member123456")
+        val outsiderCookie = login("outsider-$runId@example.com", "member123456")
         val group = createGroupWithMember("shared-$runId", "author-$runId@example.com")
         addGroupMember(group, "viewer-$runId@example.com")
         createFolder(authorCookie, null, "shared", "Shared", """{"type":"GROUP","groupName":"${group.name}"}""")
@@ -257,9 +257,9 @@ class ExplorerResourceTest {
 
     @Test
     fun `settings api rejects unsupported paths and hidden group subjects`() {
-        createUser("outsider-$runId", "member123", ServerRole.ServerMember)
+        createUser("outsider-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("outsider-$runId")
-        val outsiderCookie = login("outsider-$runId@example.com", "member123")
+        val outsiderCookie = login("outsider-$runId@example.com", "member123456")
         val group = createGroupWithMember("hidden-settings-$runId", ownerEmail)
 
         given()
@@ -286,8 +286,8 @@ class ExplorerResourceTest {
 
     @Test
     fun `settings APIs enforce server role and update current user`() {
-        createUser("member-settings-$runId", "member123", ServerRole.ServerMember)
-        val memberCookie = login("member-settings-$runId@example.com", "member123")
+        createUser("member-settings-$runId", "member123456", ServerRole.ServerMember)
+        val memberCookie = login("member-settings-$runId@example.com", "member123456")
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
@@ -323,16 +323,16 @@ class ExplorerResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"currentPassword":"wrong","newPassword":"changed123"}""")
-            .`when`().post("/api/users/me/password")
+            .body("""{"currentPassword":"wrong1234567","newPassword":"changed123456"}""")
+            .`when`().post("/api/users/me/password/change")
             .then()
             .statusCode(401)
 
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"currentPassword":"admin123","newPassword":"changed123"}""")
-            .`when`().post("/api/users/me/password")
+            .body("""{"currentPassword":"admin1234567","newPassword":"changed123456"}""")
+            .`when`().post("/api/users/me/password/change")
             .then()
             .statusCode(204)
 
@@ -347,18 +347,18 @@ class ExplorerResourceTest {
 
     @Test
     fun `settings APIs enforce tenant and group ownership`() {
-        createUser("tenant-member-settings-$runId", "member123", ServerRole.ServerMember)
-        createUser("group-owner-settings-$runId", "member123", ServerRole.ServerMember)
-        createUser("group-member-settings-$runId", "member123", ServerRole.ServerMember)
-        createUser("group-outsider-settings-$runId", "member123", ServerRole.ServerMember)
+        createUser("tenant-member-settings-$runId", "member123456", ServerRole.ServerMember)
+        createUser("group-owner-settings-$runId", "member123456", ServerRole.ServerMember)
+        createUser("group-member-settings-$runId", "member123456", ServerRole.ServerMember)
+        createUser("group-outsider-settings-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("tenant-member-settings-$runId")
         addTenantMember("group-owner-settings-$runId")
         addTenantMember("group-member-settings-$runId")
         addTenantMember("group-outsider-settings-$runId")
-        val tenantMemberCookie = login("tenant-member-settings-$runId@example.com", "member123")
-        val groupOwnerCookie = login("group-owner-settings-$runId@example.com", "member123")
-        val groupMemberCookie = login("group-member-settings-$runId@example.com", "member123")
-        val groupOutsiderCookie = login("group-outsider-settings-$runId@example.com", "member123")
+        val tenantMemberCookie = login("tenant-member-settings-$runId@example.com", "member123456")
+        val groupOwnerCookie = login("group-owner-settings-$runId@example.com", "member123456")
+        val groupMemberCookie = login("group-member-settings-$runId@example.com", "member123456")
+        val groupOutsiderCookie = login("group-outsider-settings-$runId@example.com", "member123456")
         val group = createGroupWithMember("secure-settings-$runId", "group-owner-settings-$runId@example.com", GroupRole.GroupOwner)
         addGroupMember(group, "group-member-settings-$runId@example.com")
 
@@ -541,9 +541,9 @@ class ExplorerResourceTest {
             .contentType("image/jpeg")
             .header("Content-Disposition", containsString("inline"))
 
-        createUser("viewer-$runId", "member123", ServerRole.ServerMember)
+        createUser("viewer-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("viewer-$runId")
-        val viewerCookie = login("viewer-$runId@example.com", "member123")
+        val viewerCookie = login("viewer-$runId@example.com", "member123456")
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", viewerCookie)
@@ -557,9 +557,9 @@ class ExplorerResourceTest {
         createAlbum(ownerCookie, null, "metadata", "Metadata")
         val media = createMedia(ownerEmail, "Metadata")
         addMedia(ownerCookie, "/metadata", media.publicId)
-        createUser("viewer-$runId", "member123", ServerRole.ServerMember)
+        createUser("viewer-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("viewer-$runId")
-        val viewerCookie = login("viewer-$runId@example.com", "member123")
+        val viewerCookie = login("viewer-$runId@example.com", "member123456")
 
         given()
             .contentType("application/json")
@@ -797,9 +797,9 @@ class ExplorerResourceTest {
     @Test
     fun `global upload sessions can be aborted and are hidden from other users`() {
         createAlbum(ownerCookie, null, "abort", "Abort")
-        createUser("other-$runId", "member123", ServerRole.ServerMember)
+        createUser("other-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("other-$runId")
-        val otherCookie = login("other-$runId@example.com", "member123")
+        val otherCookie = login("other-$runId@example.com", "member123456")
 
         val uploadId = given()
             .contentType("application/json")

@@ -4,14 +4,8 @@ import com.lunva.api.auth.filterchain.GroupOwnerRequired
 import com.lunva.api.auth.filterchain.ServerRolesRequired
 import com.lunva.api.auth.filterchain.TenantOwnerRequired
 import com.lunva.api.domain.ServerRole
-import com.lunva.api.generated.tenants.api.TenantsApi
-import com.lunva.api.generated.tenants.model.CreateTenantRequest
-import com.lunva.api.generated.tenants.model.GroupSettingsResponse
-import com.lunva.api.generated.tenants.model.TenantSettingsResponse
-import com.lunva.api.generated.tenants.model.TenantSummary
-import com.lunva.api.generated.tenants.model.TenantUserSettingsResponse
-import com.lunva.api.generated.tenants.model.TenantsSummary
-import com.lunva.api.generated.tenants.model.UpdateNamedSettingsRequest
+import com.lunva.api.generated.api.TenantsApi
+import com.lunva.api.generated.model.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -39,7 +33,7 @@ class TenantResource @Inject constructor(
     @Transactional
     override fun updateTenantSettings(
         tenantName: String,
-        request: UpdateNamedSettingsRequest,
+        request: UpdateTenantSettingsRequest,
     ): TenantSettingsResponse =
         tenantService.updateTenantSettings(request)
 
@@ -52,7 +46,7 @@ class TenantResource @Inject constructor(
     override fun getGroupSettings(
         tenantName: String,
         groupName: String,
-    ): GroupSettingsResponse =
+    ): TenantGroupSettingsResponse =
         tenantGroupService.groupSettings(tenantName, groupName)
 
     @GroupOwnerRequired
@@ -60,7 +54,7 @@ class TenantResource @Inject constructor(
     override fun updateGroupSettings(
         tenantName: String,
         @PathParam("groupName") groupName: String,
-        request: UpdateNamedSettingsRequest,
-    ): GroupSettingsResponse =
+        request: UpdateGroupSettingsRequest,
+    ): TenantGroupSettingsResponse =
         tenantGroupService.updateGroupSettings(tenantName, groupName, request)
 }

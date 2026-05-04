@@ -15,23 +15,23 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateFolder400Response,
   CreateMediaUploadRequest,
-  ErrorResponse,
+  MediaSummary,
   MediaUploadSessionSummary,
   PendingMediaUploadSummary,
-  UploadMediaSummary,
 } from '../models/index';
 import {
+    CreateFolder400ResponseFromJSON,
+    CreateFolder400ResponseToJSON,
     CreateMediaUploadRequestFromJSON,
     CreateMediaUploadRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    MediaSummaryFromJSON,
+    MediaSummaryToJSON,
     MediaUploadSessionSummaryFromJSON,
     MediaUploadSessionSummaryToJSON,
     PendingMediaUploadSummaryFromJSON,
     PendingMediaUploadSummaryToJSON,
-    UploadMediaSummaryFromJSON,
-    UploadMediaSummaryToJSON,
 } from '../models/index';
 
 export interface AbortUploadRequest {
@@ -103,17 +103,17 @@ export interface MediaUploadsApiInterface {
      * @throws {RequiredError}
      * @memberof MediaUploadsApiInterface
      */
-    completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadMediaSummary>>;
+    completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
      * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
-    completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadMediaSummary>;
+    completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
 
     /**
      * Creates request options for createUpload without sending the request
-     * @param {CreateMediaUploadRequest} createMediaUploadRequest 
+     * @param {CreateMediaUploadRequest} createMediaUploadRequest Initiate Upload session
      * @throws {RequiredError}
      * @memberof MediaUploadsApiInterface
      */
@@ -122,7 +122,7 @@ export interface MediaUploadsApiInterface {
     /**
      * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Chunk-Upload-Session erstellen
-     * @param {CreateMediaUploadRequest} createMediaUploadRequest 
+     * @param {CreateMediaUploadRequest} createMediaUploadRequest Initiate Upload session
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MediaUploadsApiInterface
@@ -173,13 +173,13 @@ export interface MediaUploadsApiInterface {
      * @throws {RequiredError}
      * @memberof MediaUploadsApiInterface
      */
-    listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PendingMediaUploadSummary>>>;
+    listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMediaUploadSummary>>;
 
     /**
      * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
-    listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PendingMediaUploadSummary>>;
+    listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMediaUploadSummary>;
 
     /**
      * Creates request options for uploadChunk without sending the request
@@ -293,18 +293,18 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
      * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
-    async completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadMediaSummary>> {
+    async completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
         const requestOptions = await this.completeUploadRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => UploadMediaSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MediaSummaryFromJSON(jsonValue));
     }
 
     /**
      * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
-    async completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadMediaSummary> {
+    async completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
         const response = await this.completeUploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -428,18 +428,18 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
      * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
-    async listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PendingMediaUploadSummary>>> {
+    async listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMediaUploadSummary>> {
         const requestOptions = await this.listUploadsRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(PendingMediaUploadSummaryFromJSON));
+        return new runtime.JSONApiResponse(response, (jsonValue) => PendingMediaUploadSummaryFromJSON(jsonValue));
     }
 
     /**
      * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
-    async listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PendingMediaUploadSummary>> {
+    async listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMediaUploadSummary> {
         const response = await this.listUploadsRaw(initOverrides);
         return await response.value();
     }

@@ -16,7 +16,8 @@
 import * as runtime from '../runtime';
 import type {
   CreateGroupRequest,
-  ErrorResponse,
+  GetGroups401Response,
+  GetGroups403Response,
   GroupSummary,
   GroupsSummary,
   UpdateGroupRequest,
@@ -24,8 +25,10 @@ import type {
 import {
     CreateGroupRequestFromJSON,
     CreateGroupRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    GetGroups401ResponseFromJSON,
+    GetGroups401ResponseToJSON,
+    GetGroups403ResponseFromJSON,
+    GetGroups403ResponseToJSON,
     GroupSummaryFromJSON,
     GroupSummaryToJSON,
     GroupsSummaryFromJSON,
@@ -63,7 +66,7 @@ export interface UpdateGroupOperationRequest {
 export interface GroupsApiInterface {
     /**
      * Creates request options for createGroup without sending the request
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateGroupRequest} createGroupRequest 
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
@@ -73,7 +76,7 @@ export interface GroupsApiInterface {
     /**
      * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppe anlegen
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateGroupRequest} createGroupRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -89,8 +92,8 @@ export interface GroupsApiInterface {
 
     /**
      * Creates request options for getGroup without sending the request
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
      */
@@ -99,8 +102,8 @@ export interface GroupsApiInterface {
     /**
      * Gruppe abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppe abrufen
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
@@ -115,7 +118,7 @@ export interface GroupsApiInterface {
 
     /**
      * Creates request options for getGroups without sending the request
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
      */
@@ -124,7 +127,7 @@ export interface GroupsApiInterface {
     /**
      * Gruppen eines Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppen eines Tenants auflisten
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
@@ -139,8 +142,8 @@ export interface GroupsApiInterface {
 
     /**
      * Creates request options for updateGroup without sending the request
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @param {UpdateGroupRequest} updateGroupRequest 
      * @throws {RequiredError}
      * @memberof GroupsApiInterface
@@ -150,8 +153,8 @@ export interface GroupsApiInterface {
     /**
      * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * @summary Gruppe aktualisieren
-     * @param {string} tenantName 
-     * @param {string} groupName 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
      * @param {UpdateGroupRequest} updateGroupRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}

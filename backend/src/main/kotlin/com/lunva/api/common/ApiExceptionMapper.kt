@@ -5,7 +5,9 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.ext.ExceptionMapper
 import jakarta.ws.rs.ext.Provider
+import org.hibernate.exception.ConstraintViolationException
 import org.jboss.logging.Logger
+import java.sql.SQLIntegrityConstraintViolationException
 
 @Provider
 class ApiExceptionMapper : ExceptionMapper<Throwable> {
@@ -21,6 +23,16 @@ class ApiExceptionMapper : ExceptionMapper<Throwable> {
                 .type(MediaType.APPLICATION_JSON)
                 .entity(ErrorResponse(message))
                 .build()
+        }
+        if (exception is ConstraintViolationException) {
+            val cause = exception.cause
+            if (cause is SQLIntegrityConstraintViolationException) {
+                val message = cause.message ?: "Constraint violated"
+                return Response.status(409)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(ErrorResponse(message))
+                    .build()
+            }
         }
 
         log.error("Unhandled exception mapped to 500", exception)

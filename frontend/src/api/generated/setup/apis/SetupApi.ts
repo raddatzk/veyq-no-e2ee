@@ -16,23 +16,26 @@
 import * as runtime from '../runtime';
 import type {
   AdminSetupRequest,
-  ErrorResponse,
+  CreateAdmin400Response,
+  CreateAdmin409Response,
+  InlineObject,
   SetupStatusSummary,
-  UserSummary,
 } from '../models/index';
 import {
     AdminSetupRequestFromJSON,
     AdminSetupRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    CreateAdmin400ResponseFromJSON,
+    CreateAdmin400ResponseToJSON,
+    CreateAdmin409ResponseFromJSON,
+    CreateAdmin409ResponseToJSON,
+    InlineObjectFromJSON,
+    InlineObjectToJSON,
     SetupStatusSummaryFromJSON,
     SetupStatusSummaryToJSON,
-    UserSummaryFromJSON,
-    UserSummaryToJSON,
 } from '../models/index';
 
 export interface CreateAdminRequest {
-    adminSetupRequest: AdminSetupRequest;
+    adminSetupRequest?: AdminSetupRequest;
 }
 
 /**
@@ -44,7 +47,7 @@ export interface CreateAdminRequest {
 export interface SetupApiInterface {
     /**
      * Creates request options for createAdmin without sending the request
-     * @param {AdminSetupRequest} adminSetupRequest 
+     * @param {AdminSetupRequest} [adminSetupRequest] Create initial admin
      * @throws {RequiredError}
      * @memberof SetupApiInterface
      */
@@ -53,18 +56,18 @@ export interface SetupApiInterface {
     /**
      * Initialen Server-Owner anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Initialen Server-Owner anlegen
-     * @param {AdminSetupRequest} adminSetupRequest 
+     * @param {AdminSetupRequest} [adminSetupRequest] Create initial admin
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof SetupApiInterface
      */
-    createAdminRaw(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+    createAdminRaw(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>>;
 
     /**
      * Initialen Server-Owner anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
      * Initialen Server-Owner anlegen
      */
-    createAdmin(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+    createAdmin(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject>;
 
     /**
      * Creates request options for status without sending the request
@@ -99,13 +102,6 @@ export class SetupApi extends runtime.BaseAPI implements SetupApiInterface {
      * Creates request options for createAdmin without sending the request
      */
     async createAdminRequestOpts(requestParameters: CreateAdminRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['adminSetupRequest'] == null) {
-            throw new runtime.RequiredError(
-                'adminSetupRequest',
-                'Required parameter "adminSetupRequest" was null or undefined when calling createAdmin().'
-            );
-        }
-
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -128,18 +124,18 @@ export class SetupApi extends runtime.BaseAPI implements SetupApiInterface {
      * Initialen Server-Owner anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
      * Initialen Server-Owner anlegen
      */
-    async createAdminRaw(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+    async createAdminRaw(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<InlineObject>> {
         const requestOptions = await this.createAdminRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => InlineObjectFromJSON(jsonValue));
     }
 
     /**
      * Initialen Server-Owner anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
      * Initialen Server-Owner anlegen
      */
-    async createAdmin(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+    async createAdmin(requestParameters: CreateAdminRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<InlineObject> {
         const response = await this.createAdminRaw(requestParameters, initOverrides);
         return await response.value();
     }

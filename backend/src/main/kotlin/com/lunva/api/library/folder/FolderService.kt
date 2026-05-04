@@ -3,11 +3,11 @@ package com.lunva.api.library.folder
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
-import com.lunva.api.generated.explorer.model.ExplorerFolder
-import com.lunva.api.generated.library.model.CreateLibraryItemRequest
+import com.lunva.api.generated.model.ExplorerFolder
+import com.lunva.api.generated.model.CreateLibraryItemRequest
 import com.lunva.api.library.LibraryService
-import com.lunva.api.generated.library.model.MoveLibraryItemRequest
-import com.lunva.api.generated.library.model.UpdateLibraryItemRequest
+import com.lunva.api.generated.model.MoveLibraryItemRequest
+import com.lunva.api.generated.model.UpdateLibraryItemRequest
 import com.lunva.api.library.explorer.ResolvedExplorerLocation
 import com.lunva.api.auth.filterchain.RequestContext
 import jakarta.inject.Inject

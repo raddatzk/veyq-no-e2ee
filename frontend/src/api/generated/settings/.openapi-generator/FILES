@@ -3,6 +3,8 @@ apis/SettingsApi.ts
 apis/index.ts
 index.ts
 models/ErrorResponse.ts
+models/GetSettings400Response.ts
+models/GetSettings401Response.ts
 models/SettingsBreadcrumb.ts
 models/SettingsLocation.ts
 models/SettingsResponse.ts

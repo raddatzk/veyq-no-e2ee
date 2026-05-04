@@ -47,7 +47,6 @@ export interface ExplorerBreadcrumb {
     displayName: string;
     /**
      * UI label for the breadcrumb. Group labels include the `@` prefix; personal labels include the `~` prefix.
-     * 
      * @type {string}
      * @memberof ExplorerBreadcrumb
      */

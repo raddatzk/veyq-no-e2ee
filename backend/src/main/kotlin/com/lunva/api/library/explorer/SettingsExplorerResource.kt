@@ -1,7 +1,7 @@
 package com.lunva.api.library.explorer
 
-import com.lunva.api.generated.settings.api.SettingsApi
-import com.lunva.api.generated.settings.model.SettingsResponse
+import com.lunva.api.generated.api.SettingsApi
+import com.lunva.api.generated.model.SettingsResponse
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 

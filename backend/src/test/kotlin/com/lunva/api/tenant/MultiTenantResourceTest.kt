@@ -49,7 +49,7 @@ class MultiTenantResourceTest {
     fun createOwner() {
         runId = UUID.randomUUID().toString().take(8)
         ownerEmail = "owner-$runId@example.com"
-        ownerPassword = "admin123"
+        ownerPassword = "admin1234567"
         createUser("owner-$runId", ownerPassword, ServerRole.ServerOwner)
     }
 
@@ -57,7 +57,7 @@ class MultiTenantResourceTest {
     fun `admin setup is blocked after first admin exists`() {
         given()
             .contentType("application/json")
-            .body("""{"email":"second-$runId@example.com","password":"admin123","displayName":"Second"}""")
+            .body("""{"email":"second-$runId@example.com","password":"admin1234567","displayName":"Second"}""")
             .`when`().post("/api/setup/admin")
             .then()
             .statusCode(401)
@@ -75,8 +75,8 @@ class MultiTenantResourceTest {
             .then()
             .statusCode(400)
 
-        createUser("plain-$runId", "member123", ServerRole.ServerMember)
-        val memberCookie = login("plain-$runId@example.com", "member123")
+        createUser("plain-$runId", "member123456", ServerRole.ServerMember)
+        val memberCookie = login("plain-$runId@example.com", "member123456")
 
         given()
             .contentType("application/json")
@@ -102,8 +102,8 @@ class MultiTenantResourceTest {
             .body("tenants.role", hasItem(TenantRole.TenantOwner.name))
             .body("tenants.admins.email.flatten()", hasItem(ownerEmail))
 
-        createUser("outside-$runId", "member123", ServerRole.ServerMember)
-        val outsideCookie = login("outside-$runId@example.com", "member123")
+        createUser("outside-$runId", "member123456", ServerRole.ServerMember)
+        val outsideCookie = login("outside-$runId@example.com", "member123456")
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", outsideCookie)
@@ -117,8 +117,8 @@ class MultiTenantResourceTest {
     fun `tenant filter protects tenant routes`() {
         val ownerCookie = login(ownerEmail, ownerPassword)
         ensureTenant(ownerCookie, "friends-$runId", "Friends")
-        createUser("outside-$runId", "member123", ServerRole.ServerMember)
-        val outsideCookie = login("outside-$runId@example.com", "member123")
+        createUser("outside-$runId", "member123456", ServerRole.ServerMember)
+        val outsideCookie = login("outside-$runId@example.com", "member123456")
 
         given()
             .`when`().get("/api/friends-$runId/media")

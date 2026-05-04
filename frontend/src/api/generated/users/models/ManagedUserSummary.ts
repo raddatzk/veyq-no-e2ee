@@ -13,13 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { ServerRole } from './ServerRole';
-import {
-    ServerRoleFromJSON,
-    ServerRoleFromJSONTyped,
-    ServerRoleToJSON,
-    ServerRoleToJSONTyped,
-} from './ServerRole';
 import type { ManagedUserTenantSummary } from './ManagedUserTenantSummary';
 import {
     ManagedUserTenantSummaryFromJSON,
@@ -48,7 +41,7 @@ export interface ManagedUserSummary {
      */
     userId: number;
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof ManagedUserSummary
      */
@@ -61,10 +54,10 @@ export interface ManagedUserSummary {
     displayName: string;
     /**
      * 
-     * @type {ServerRole}
+     * @type {ManagedUserSummaryServerRoleEnum}
      * @memberof ManagedUserSummary
      */
-    serverRole: ServerRole;
+    serverRole: ManagedUserSummaryServerRoleEnum;
     /**
      * 
      * @type {UserStatus}
@@ -79,6 +72,15 @@ export interface ManagedUserSummary {
     tenants: Array<ManagedUserTenantSummary>;
 }
 
+
+/**
+ * @export
+ */
+export const ManagedUserSummaryServerRoleEnum = {
+    ServerOwner: 'ServerOwner',
+    ServerMember: 'ServerMember'
+} as const;
+export type ManagedUserSummaryServerRoleEnum = typeof ManagedUserSummaryServerRoleEnum[keyof typeof ManagedUserSummaryServerRoleEnum];
 
 
 /**
@@ -107,7 +109,7 @@ export function ManagedUserSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'userId': json['userId'],
         'email': json['email'],
         'displayName': json['displayName'],
-        'serverRole': ServerRoleFromJSON(json['serverRole']),
+        'serverRole': json['serverRole'],
         'status': UserStatusFromJSON(json['status']),
         'tenants': ((json['tenants'] as Array<any>).map(ManagedUserTenantSummaryFromJSON)),
     };
@@ -127,7 +129,7 @@ export function ManagedUserSummaryToJSONTyped(value?: ManagedUserSummary | null,
         'userId': value['userId'],
         'email': value['email'],
         'displayName': value['displayName'],
-        'serverRole': ServerRoleToJSON(value['serverRole']),
+        'serverRole': value['serverRole'],
         'status': UserStatusToJSON(value['status']),
         'tenants': ((value['tenants'] as Array<any>).map(ManagedUserTenantSummaryToJSON)),
     };

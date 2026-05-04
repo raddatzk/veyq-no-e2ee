@@ -13,14 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { ServerRole } from './ServerRole';
-import {
-    ServerRoleFromJSON,
-    ServerRoleFromJSONTyped,
-    ServerRoleToJSON,
-    ServerRoleToJSONTyped,
-} from './ServerRole';
-
 /**
  * 
  * @export
@@ -28,7 +20,7 @@ import {
  */
 export interface CreateManagedUserRequest {
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof CreateManagedUserRequest
      */
@@ -41,10 +33,10 @@ export interface CreateManagedUserRequest {
     displayName: string;
     /**
      * 
-     * @type {ServerRole}
+     * @type {CreateManagedUserRequestServerRoleEnum}
      * @memberof CreateManagedUserRequest
      */
-    serverRole: ServerRole;
+    serverRole: CreateManagedUserRequestServerRoleEnum;
     /**
      * 
      * @type {number}
@@ -53,6 +45,15 @@ export interface CreateManagedUserRequest {
     tenantId: number;
 }
 
+
+/**
+ * @export
+ */
+export const CreateManagedUserRequestServerRoleEnum = {
+    ServerOwner: 'ServerOwner',
+    ServerMember: 'ServerMember'
+} as const;
+export type CreateManagedUserRequestServerRoleEnum = typeof CreateManagedUserRequestServerRoleEnum[keyof typeof CreateManagedUserRequestServerRoleEnum];
 
 
 /**
@@ -78,7 +79,7 @@ export function CreateManagedUserRequestFromJSONTyped(json: any, ignoreDiscrimin
         
         'email': json['email'],
         'displayName': json['displayName'],
-        'serverRole': ServerRoleFromJSON(json['serverRole']),
+        'serverRole': json['serverRole'],
         'tenantId': json['tenantId'],
     };
 }
@@ -96,7 +97,7 @@ export function CreateManagedUserRequestToJSONTyped(value?: CreateManagedUserReq
         
         'email': value['email'],
         'displayName': value['displayName'],
-        'serverRole': ServerRoleToJSON(value['serverRole']),
+        'serverRole': value['serverRole'],
         'tenantId': value['tenantId'],
     };
 }

@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface LoginRequest {
     /**
-     * 
+     * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof LoginRequest
      */

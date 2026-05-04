@@ -3,7 +3,8 @@ apis/GroupsApi.ts
 apis/index.ts
 index.ts
 models/CreateGroupRequest.ts
-models/ErrorResponse.ts
+models/GetGroups401Response.ts
+models/GetGroups403Response.ts
 models/GroupMemberRequest.ts
 models/GroupMemberSummary.ts
 models/GroupMemberSummaryUser.ts

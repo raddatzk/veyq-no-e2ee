@@ -17,7 +17,7 @@ class PasswordServiceTest {
         val hash = service.hash("secret123")
 
         assertThat(service.matches("secret123", hash)).isTrue()
-        assertThat(service.matches("wrong", hash)).isFalse()
+        assertThat(service.matches("wrong1234567", hash)).isFalse()
     }
 
     @Test

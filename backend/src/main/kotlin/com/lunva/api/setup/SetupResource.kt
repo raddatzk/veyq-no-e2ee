@@ -1,9 +1,9 @@
 package com.lunva.api.setup
 
-import com.lunva.api.generated.setup.api.SetupApi
-import com.lunva.api.generated.setup.model.AdminSetupRequest
-import com.lunva.api.generated.setup.model.SetupStatusSummary
-import com.lunva.api.generated.setup.model.UserSummary
+import com.lunva.api.generated.api.SetupApi
+import com.lunva.api.generated.model.AdminSetupRequest
+import com.lunva.api.generated.model.SetupStatusSummary
+import com.lunva.api.generated.model.UserSummary
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 

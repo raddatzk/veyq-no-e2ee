@@ -15,17 +15,20 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateFolder400Response,
   CreateLibraryItemRequest,
-  ErrorResponse,
+  DeleteFolder400Response,
   ExplorerFolder,
   MoveLibraryItemRequest,
   UpdateLibraryItemRequest,
 } from '../models/index';
 import {
+    CreateFolder400ResponseFromJSON,
+    CreateFolder400ResponseToJSON,
     CreateLibraryItemRequestFromJSON,
     CreateLibraryItemRequestToJSON,
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    DeleteFolder400ResponseFromJSON,
+    DeleteFolder400ResponseToJSON,
     ExplorerFolderFromJSON,
     ExplorerFolderToJSON,
     MoveLibraryItemRequestFromJSON,
@@ -63,7 +66,7 @@ export interface UpdateFolderRequest {
 export interface FoldersApiInterface {
     /**
      * Creates request options for createFolder without sending the request
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateLibraryItemRequest} createLibraryItemRequest 
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
@@ -73,7 +76,7 @@ export interface FoldersApiInterface {
     /**
      * Ordner anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Ordner anlegen
-     * @param {string} tenantName 
+     * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateLibraryItemRequest} createLibraryItemRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -89,8 +92,8 @@ export interface FoldersApiInterface {
 
     /**
      * Creates request options for deleteFolder without sending the request
-     * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
@@ -99,8 +102,8 @@ export interface FoldersApiInterface {
     /**
      * Ordner löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Ordner löschen
-     * @param {string} tenantName 
-     * @param {string} [path] 
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface

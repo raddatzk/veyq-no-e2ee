@@ -201,3 +201,13 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
 - Backend: Passwort-, Cookie-, Token-, Token-Cleanup-, Auth-, Setup-, Tenant-, User-Management-, Settings-, Explorer-, Library-, Upload- und Media-Streaming-Tests
 - Backend Contract-Tests: OpenAPI-Beschreibungen/Beispiele/Vorbedingungen, implementierte Endpunkte, Resource-Interface-Bindung und generated Payload-Nutzung
 - Frontend: `vue-tsc`, ESLint, Vitest und Vite-Build über `npm run check`
+
+## TODO
+
+- fix frontend generated api
+- configure email server
+- manage server users
+- manage tenant users
+- create group
+- manage group
+- change email requires email confirmation

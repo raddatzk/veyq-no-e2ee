@@ -15,17 +15,20 @@
 
 import * as runtime from '../runtime';
 import type {
-  ErrorResponse,
+  Login200Response,
+  Login400Response,
+  Login401Response,
   LoginRequest,
-  LoginResponse,
 } from '../models/index';
 import {
-    ErrorResponseFromJSON,
-    ErrorResponseToJSON,
+    Login200ResponseFromJSON,
+    Login200ResponseToJSON,
+    Login400ResponseFromJSON,
+    Login400ResponseToJSON,
+    Login401ResponseFromJSON,
+    Login401ResponseToJSON,
     LoginRequestFromJSON,
     LoginRequestToJSON,
-    LoginResponseFromJSON,
-    LoginResponseToJSON,
 } from '../models/index';
 
 export interface LoginOperationRequest {
@@ -55,13 +58,13 @@ export interface AuthApiInterface {
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>>;
+    loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Login200Response>>;
 
     /**
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse>;
+    login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Login200Response>;
 
     /**
      * Creates request options for logout without sending the request
@@ -99,13 +102,13 @@ export interface AuthApiInterface {
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>>;
+    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Login200Response>>;
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse>;
+    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Login200Response>;
 
 }
 
@@ -147,18 +150,18 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    async loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>> {
+    async loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Login200Response>> {
         const requestOptions = await this.loginRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => Login200ResponseFromJSON(jsonValue));
     }
 
     /**
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    async login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse> {
+    async login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Login200Response> {
         const response = await this.loginRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -224,18 +227,18 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginResponse>> {
+    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Login200Response>> {
         const requestOptions = await this.refreshRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => Login200ResponseFromJSON(jsonValue));
     }
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginResponse> {
+    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Login200Response> {
         const response = await this.refreshRaw(initOverrides);
         return await response.value();
     }

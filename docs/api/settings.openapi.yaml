@@ -18,86 +18,18 @@ paths:
       summary: Load navigation context for a settings page
       operationId: getSettings
       parameters:
-      - name: path
-        in: query
-        required: true
-        description: Full frontend route path for the settings page.
-        schema:
-          type: string
-        examples:
-          serverSettings:
-            value: "/settings"
-          userSettings:
-            value: "/~me"
-          tenantSettings:
-            value: "/friends/settings"
-          groupSettings:
-            value: "/friends/@alle/settings"
-          folderSettings:
-            value: "/friends/urlaub/settings"
+      - "$ref": "#/components/parameters/Path"
       responses:
         '200':
-          description: Settings navigation context.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/SettingsResponse"
-              examples:
-                groupSettings:
-                  value:
-                    location:
-                      path: "/friends/@alle/settings"
-                      displayName: Einstellungen
-                      label: Einstellungen
-                    subject:
-                      type: GROUP
-                      displayName: Alle
-                      label: "@Alle"
-                    breadcrumbs:
-                    - type: TENANT
-                      path: "/friends"
-                      displayName: Friends
-                      label: Friends
-                    - type: GROUP
-                      path: "/friends/@alle"
-                      displayName: Alle
-                      label: "@Alle"
-                    - type: GROUP
-                      path: "/friends/@alle/settings"
-                      displayName: Einstellungen
-                      label: Einstellungen
+          "$ref": "#/components/responses/Settings"
         '400':
-          description: The path is not a supported settings path.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Unsupported settings path
+          "$ref": "./common.openapi.yaml#/components/responses/400"
         '401':
-          description: The request is not authenticated.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Authentication required
+          "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
-          description: The authenticated user may not access the target settings page.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: User has insufficient role on server
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
-          description: The tenant or subject path was not found or is not visible to the current user.
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ErrorResponse"
-              example:
-                message: Path not found
+          "$ref": "./common.openapi.yaml#/components/responses/404"
       x-implementation-status: implemented
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -116,6 +48,49 @@ components:
       type: apiKey
       in: cookie
       name: LUNVA_ACCESS_TOKEN
+
+  parameters:
+    Path:
+      name: path
+      in: query
+      required: true
+      description: Full frontend route path for the settings page.
+      schema:
+        type: string
+      examples:
+        serverSettings:
+          value: "/settings"
+        userSettings:
+          value: "/~me"
+        tenantSettings:
+          value: "/friends/settings"
+        groupSettings:
+          value: "/friends/@alle/settings"
+        folderSettings:
+          value: "/friends/urlaub/settings"
+
+  responses:
+    Settings:
+      description: Settings navigation context
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/SettingsResponse"
+          example:
+            location:
+              path: "/friends/@alle/settings"
+              displayName: Einstellungen
+              label: Einstellungen
+            subject:
+              type: GROUP
+              displayName: Alle
+              label: "@Alle"
+            breadcrumbs:
+            - type: TENANT
+              path: "/friends"
+              displayName: Friends
+              label: Friends
+
   schemas:
     SettingsResponse:
       type: object
@@ -133,6 +108,30 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/SettingsBreadcrumb"
+      example:
+        groupSettings:
+          value:
+            location:
+              path: "/friends/@alle/settings"
+              displayName: Einstellungen
+              label: Einstellungen
+            subject:
+              type: GROUP
+              displayName: Alle
+              label: "@Alle"
+            breadcrumbs:
+              - type: TENANT
+                path: "/friends"
+                displayName: Friends
+                label: Friends
+              - type: GROUP
+                path: "/friends/@alle"
+                displayName: Alle
+                label: "@Alle"
+              - type: GROUP
+                path: "/friends/@alle/settings"
+                displayName: Einstellungen
+                label: Einstellungen
     SettingsLocation:
       type: object
       additionalProperties: false

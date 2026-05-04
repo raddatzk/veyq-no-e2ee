@@ -3,18 +3,18 @@ package com.lunva.api.contract
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.lunva.api.auth.AuthResource
-import com.lunva.api.generated.auth.api.AuthApi
-import com.lunva.api.generated.explorer.api.ExplorerApi
-import com.lunva.api.generated.groups.api.GroupsApi
-import com.lunva.api.generated.library.api.AlbumsApi
-import com.lunva.api.generated.library.api.FoldersApi
-import com.lunva.api.generated.library.api.MediaApi
-import com.lunva.api.generated.library.api.MediaUploadsApi
-import com.lunva.api.generated.server.api.ServerApi
-import com.lunva.api.generated.settings.api.SettingsApi
-import com.lunva.api.generated.setup.api.SetupApi
-import com.lunva.api.generated.tenants.api.TenantsApi
-import com.lunva.api.generated.users.api.UsersApi
+import com.lunva.api.generated.api.AuthApi
+import com.lunva.api.generated.api.ExplorerApi
+import com.lunva.api.generated.api.GroupsApi
+import com.lunva.api.generated.api.AlbumsApi
+import com.lunva.api.generated.api.FoldersApi
+import com.lunva.api.generated.api.MediaApi
+import com.lunva.api.generated.api.MediaUploadsApi
+import com.lunva.api.generated.api.ServerApi
+import com.lunva.api.generated.api.SettingsApi
+import com.lunva.api.generated.api.SetupApi
+import com.lunva.api.generated.api.TenantsApi
+import com.lunva.api.generated.api.UsersApi
 import com.lunva.api.library.album.AlbumResource
 import com.lunva.api.library.explorer.ExplorerResource
 import com.lunva.api.library.explorer.SettingsExplorerResource
@@ -24,8 +24,8 @@ import com.lunva.api.library.media.MediaUploadResource
 import com.lunva.api.settings.SettingsResource
 import com.lunva.api.setup.SetupResource
 import com.lunva.api.tenant.TenantResource
-import com.lunva.api.usermgmt.GroupResource
-import com.lunva.api.usermgmt.UserResource
+import com.lunva.api.usermgmt.group.GroupResource
+import com.lunva.api.usermgmt.user.UserResource
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Method
@@ -137,11 +137,34 @@ class OpenApiContractTest {
             }
     }
 
+    @Test
+    fun `backend openapi code uses one shared generated api and model package`() {
+        val generatedModelFiles = generatedModelSources()
+        assertThat(generatedModelFiles.filter { it.fileName.toString() == "UserSummary.kt" })
+            .describedAs("UserSummary must be generated exactly once")
+            .hasSize(1)
+
+        generatedApiSources().forEach { source ->
+            val sourceText = Files.readString(source)
+            assertThat(sourceText)
+                .describedAs("${source.fileName} must use the shared generated model package")
+                .doesNotContainPattern("""com\.lunva\.api\.generated\.[a-z]+\.model""")
+        }
+
+        generatedModelFiles.forEach { source ->
+            val sourceText = Files.readString(source)
+            assertThat(sourceText)
+                .describedAs("${source.fileName} must not depend on domain generated model packages")
+                .doesNotContainPattern("""com\.lunva\.api\.generated\.[a-z]+\.model""")
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun operations(): List<Operation> {
         return Files.list(apiDirectory()).use { stream ->
             stream
                 .filter { it.name.endsWith(".yaml") }
+                .filter { it.name != "common.openapi.yaml" && it.name != "frontend.openapi.yaml" }
                 .flatMap { file ->
                     val document = mapper.readValue(file.toFile(), Map::class.java) as Map<String, Any?>
                     val paths = document["paths"] as Map<String, Any?>
@@ -185,10 +208,19 @@ class OpenApiContractTest {
     }
 
     private fun generatedApiSources(): List<Path> =
-        Files.walk(buildDirectory().resolve("generated")).use { stream ->
+        Files.walk(buildDirectory().resolve("generated/openapi-api")).use { stream ->
             stream
                 .filter { Files.isRegularFile(it) }
                 .filter { it.fileName.toString().endsWith("Api.java") }
+                .toList()
+        }
+
+    private fun generatedModelSources(): List<Path> =
+        Files.walk(buildDirectory().resolve("generated/openapi-models")).use { stream ->
+            stream
+                .filter { Files.isRegularFile(it) }
+                .filter { it.toString().contains("/src/main/kotlin/") }
+                .filter { it.fileName.toString().endsWith(".kt") }
                 .toList()
         }
 
@@ -248,7 +280,7 @@ class OpenApiContractTest {
             "POST /api/setup/admin",
             "GET /api/users/me",
             "PUT /api/users/me",
-            "POST /api/users/me/password",
+            "POST /api/users/me/password/change",
             "GET /api/users",
             "POST /api/users",
             "PUT /api/users/{userId}/role",
