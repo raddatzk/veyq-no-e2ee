@@ -7,6 +7,7 @@ import com.lunva.api.generated.model.AcceptInvitationRequest
 import com.lunva.api.generated.model.ChangePasswordRequest
 import com.lunva.api.generated.model.ConfirmEmailChangeRequest
 import com.lunva.api.generated.model.CreateManagedUserRequest
+import com.lunva.api.generated.model.ForgotPasswordRequest
 import com.lunva.api.generated.model.ResetPasswordRequest
 import com.lunva.api.generated.model.UpdateManagedUserRoleRequest
 import com.lunva.api.generated.model.UpdateUserSettingsRequest
@@ -34,8 +35,8 @@ class UserResource(
         return Response.noContent().build()
     }
 
-    override fun forgotMyPassword(): Response {
-        userService.forgotMyPassword()
+    override fun forgotPassword(request: ForgotPasswordRequest): Response {
+        userService.forgotPassword(request)
         return Response.noContent().build()
     }
 

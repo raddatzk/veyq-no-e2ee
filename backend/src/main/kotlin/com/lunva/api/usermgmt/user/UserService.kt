@@ -103,13 +103,15 @@ class UserService @Inject constructor(
         return ManagedUsersSummary(userRepo.listAllOrderByEmail().map { it.toManagedUserSummary() })
     }
 
-    fun forgotMyPassword() {
-        val token = resetPasswordService.requestNewPassword()
-        val user = requestContext.user!!
-        val tenant = user.tenantMemberships.first().tenant
-        mailService.sendPasswordResetMail(user, "https://${tenant.domain}/invite/${user.id}#$token")
+    fun forgotPassword(request: ForgotPasswordRequest) {
+        val email = request.email.trim().lowercase()
+        val user = userRepo.findByEmail(email)?.takeIf { it.passwordSetAt != null } ?: return
+        val tenant = user.tenantMemberships.firstOrNull()?.tenant ?: return
+        val token = resetPasswordService.requestNewPassword(user)
+        mailService.sendPasswordResetMail(user, "https://${tenant.domain}/password/reset/${user.id}/$token")
     }
 
+    @Transactional
     fun resetMyPassword(userId: Long, request: ResetPasswordRequest) {
         val user = findUser(userId)
         val now = Instant.now()

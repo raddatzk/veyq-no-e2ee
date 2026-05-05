@@ -32,6 +32,7 @@ models/ExplorerFolder.ts
 models/ExplorerLocation.ts
 models/ExplorerResponse.ts
 models/ExplorerScopeRoot.ts
+models/ForgotPasswordRequest.ts
 models/GroupMemberRequest.ts
 models/GroupMemberSummary.ts
 models/GroupRole.ts

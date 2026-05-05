@@ -123,60 +123,64 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: implemented.
-  "/api/users/me/password/forgot":
+  "/api/users/password/forgot":
     post:
       tags:
         - Users
-      operationId: forgotMyPassword
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/ForgotPassword"
       responses:
-        '200':
+        '204':
           description: Email sent.
         '400':
           "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Eigenes Passwort vergessen
-      x-implementation-status: partial
+      summary: Passwort-Reset anfordern
+      x-implementation-status: implemented
       x-preconditions:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der Endpunkt ist ohne Access-Token erreichbar.
         - Das initiale Setup muss abgeschlossen sein.
       description: |-
-        Eigenes Passwort vergessen.
+        Passwort-Reset anfordern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der Endpunkt ist ohne Access-Token erreichbar.
         - Das initiale Setup muss abgeschlossen sein.
 
-        Implementierungsstatus: partial.
+        Implementierungsstatus: implemented.
   "/api/users/{userId}/password/reset":
     post:
       tags:
         - Users
       operationId: resetMyPassword
+      security: []
       parameters:
         - "$ref": "#/components/parameters/UserId"
       requestBody:
         "$ref": "#/components/requestBodies/ResetPassword"
       responses:
-        '200':
-          description: Email sent.
+        '204':
+          description: Password reset.
         '400':
           "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-      summary: Eigenes Passwort vergessen
-      x-implementation-status: partial
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Passwort zuruecksetzen
+      x-implementation-status: implemented
       x-preconditions:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der Endpunkt ist ohne Access-Token erreichbar.
         - Das initiale Setup muss abgeschlossen sein.
+        - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
       description: |-
-        Eigenes Passwort vergessen.
+        Passwort zuruecksetzen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der Endpunkt ist ohne Access-Token erreichbar.
         - Das initiale Setup muss abgeschlossen sein.
+        - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
 
-        Implementierungsstatus: partial.
+        Implementierungsstatus: implemented.
   "/api/users":
     get:
       tags:
@@ -401,6 +405,15 @@ components:
             password: welcome123456
             token: reset-token
 
+    ForgotPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ForgotPasswordRequest"
+          example:
+            email: kevin@example.test
+
     CreateManagedUser:
       required: true
       content:
@@ -499,6 +512,17 @@ components:
           type: string
       example:
         password: welcome123456
+
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: kevin@example.test
 
     UpdateUserSettingsRequest:
       type: object

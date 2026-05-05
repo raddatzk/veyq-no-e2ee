@@ -20,6 +20,7 @@ import type {
   ConfirmEmailChangeRequest,
   CreateManagedUserRequest,
   ErrorResponse,
+  ForgotPasswordRequest,
   ManagedUserSummary,
   ManagedUsersSummary,
   ResetPasswordRequest,
@@ -38,6 +39,8 @@ import {
     CreateManagedUserRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    ForgotPasswordRequestFromJSON,
+    ForgotPasswordRequestToJSON,
     ManagedUserSummaryFromJSON,
     ManagedUserSummaryToJSON,
     ManagedUsersSummaryFromJSON,
@@ -67,6 +70,10 @@ export interface ConfirmMyEmailChangeRequest {
 
 export interface CreateManagedUserOperationRequest {
     createManagedUserRequest: CreateManagedUserRequest;
+}
+
+export interface ForgotPasswordOperationRequest {
+    forgotPasswordRequest: ForgotPasswordRequest;
 }
 
 export interface ResetMyPasswordRequest {
@@ -193,26 +200,28 @@ export interface UsersApiInterface {
     createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
 
     /**
-     * Creates request options for forgotMyPassword without sending the request
+     * Creates request options for forgotPassword without sending the request
+     * @param {ForgotPasswordRequest} forgotPasswordRequest 
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    forgotMyPasswordRequestOpts(): Promise<runtime.RequestOpts>;
+    forgotPasswordRequestOpts(requestParameters: ForgotPasswordOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * @summary Eigenes Passwort vergessen
+     * Passwort-Reset anfordern.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Passwort-Reset anfordern
+     * @param {ForgotPasswordRequest} forgotPasswordRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    forgotMyPasswordRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+    forgotPasswordRaw(requestParameters: ForgotPasswordOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort-Reset anfordern.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passwort-Reset anfordern
      */
-    forgotMyPassword(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+    forgotPassword(requestParameters: ForgotPasswordOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for getAllUsers without sending the request
@@ -268,8 +277,8 @@ export interface UsersApiInterface {
     resetMyPasswordRequestOpts(requestParameters: ResetMyPasswordRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * @summary Eigenes Passwort vergessen
+     * Passwort zuruecksetzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: implemented.
+     * @summary Passwort zuruecksetzen
      * @param {number} userId Internal ID of the current user
      * @param {ResetPasswordRequest} resetPasswordRequest 
      * @param {*} [options] Override http request option.
@@ -279,8 +288,8 @@ export interface UsersApiInterface {
     resetMyPasswordRaw(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort zuruecksetzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: implemented.
+     * Passwort zuruecksetzen
      */
     resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
@@ -562,41 +571,51 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Creates request options for forgotMyPassword without sending the request
+     * Creates request options for forgotPassword without sending the request
      */
-    async forgotMyPasswordRequestOpts(): Promise<runtime.RequestOpts> {
+    async forgotPasswordRequestOpts(requestParameters: ForgotPasswordOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['forgotPasswordRequest'] == null) {
+            throw new runtime.RequiredError(
+                'forgotPasswordRequest',
+                'Required parameter "forgotPasswordRequest" was null or undefined when calling forgotPassword().'
+            );
+        }
+
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+        headerParameters['Content-Type'] = 'application/json';
 
-        let urlPath = `/api/users/me/password/forgot`;
+
+        let urlPath = `/api/users/password/forgot`;
 
         return {
             path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
+            body: ForgotPasswordRequestToJSON(requestParameters['forgotPasswordRequest']),
         };
     }
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort-Reset anfordern.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passwort-Reset anfordern
      */
-    async forgotMyPasswordRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        const requestOptions = await this.forgotMyPasswordRequestOpts();
+    async forgotPasswordRaw(requestParameters: ForgotPasswordOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.forgotPasswordRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.VoidApiResponse(response);
     }
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort-Reset anfordern.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passwort-Reset anfordern
      */
-    async forgotMyPassword(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.forgotMyPasswordRaw(initOverrides);
+    async forgotPassword(requestParameters: ForgotPasswordOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.forgotPasswordRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -715,8 +734,8 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort zuruecksetzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: implemented.
+     * Passwort zuruecksetzen
      */
     async resetMyPasswordRaw(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const requestOptions = await this.resetMyPasswordRequestOpts(requestParameters);
@@ -726,8 +745,8 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort vergessen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
-     * Eigenes Passwort vergessen
+     * Passwort zuruecksetzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: implemented.
+     * Passwort zuruecksetzen
      */
     async resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.resetMyPasswordRaw(requestParameters, initOverrides);

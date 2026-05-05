@@ -79,11 +79,10 @@ class ResetPasswordToken : PanacheEntityBase {
 }
 
 @ApplicationScoped
-class ResetPasswordTokenRepo : PanacheRepository<UserInvitation> {
-    fun findByTokenHash(tokenHash: String): UserInvitation? =
+class ResetPasswordTokenRepo : PanacheRepository<ResetPasswordToken> {
+    fun findByTokenHash(tokenHash: String): ResetPasswordToken? =
         find("tokenHash", tokenHash).firstResult()
 
-    fun listOpenByUser(user: User): List<UserInvitation> =
+    fun listOpenByUser(user: User): List<ResetPasswordToken> =
         list("user = ?1 and acceptedAt is null and revokedAt is null", user)
 }
-

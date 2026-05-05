@@ -175,6 +175,53 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `password reset can be requested from login email and completed with token`() {
+        val currentEmail = "mgmt-owner-$runId@example.com"
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"missing-$runId@example.com"}""")
+            .`when`().post("/api/users/password/forgot")
+            .then()
+            .statusCode(204)
+        assertThat(mailbox.getMailMessagesSentTo("missing-$runId@example.com")).isEmpty()
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail"}""")
+            .`when`().post("/api/users/password/forgot")
+            .then()
+            .statusCode(204)
+
+        val message = mailbox.getMailMessagesSentTo(currentEmail).single()
+        assertThat(message.text).contains("https://${tenant.domain}/password/reset/")
+        val resetPath = message.text.substringAfter("${tenant.domain}/password/reset/").trim()
+        val resetUserId = resetPath.substringBefore("/").toLong()
+        val resetToken = resetPath.substringAfter("/")
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"new-admin1234567","token":"$resetToken"}""")
+            .`when`().post("/api/users/$resetUserId/password/reset")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail","password":"admin1234567"}""")
+            .`when`().post("/api/auth/login")
+            .then()
+            .statusCode(401)
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail","password":"new-admin1234567"}""")
+            .`when`().post("/api/auth/login")
+            .then()
+            .statusCode(200)
+    }
+
+    @Test
     fun `email confirmation must belong to the logged in user`() {
         val pendingEmail = "wrong-user-$runId@example.com"
         requestEmailChange(pendingEmail)

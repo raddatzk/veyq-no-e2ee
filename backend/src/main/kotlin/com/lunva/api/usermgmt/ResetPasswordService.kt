@@ -2,13 +2,12 @@ package com.lunva.api.usermgmt
 
 import com.lunva.api.auth.BadRequestException
 import com.lunva.api.auth.ForbiddenException
-import com.lunva.api.auth.filterchain.RequestContext
 import com.lunva.api.common.HashingService
-import com.lunva.api.common.mail.MailService
 import com.lunva.api.domain.ResetPasswordToken
 import com.lunva.api.domain.ResetPasswordTokenRepo
+import com.lunva.api.domain.User
+import com.lunva.api.domain.UserRepo
 import com.lunva.api.usermgmt.user.UserConfig
-import com.lunva.api.usermgmt.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
@@ -19,17 +18,14 @@ import java.util.*
 
 @ApplicationScoped
 class ResetPasswordService @Inject constructor(
-    private val mailService: MailService,
-    private val requestContext: RequestContext,
     private val resetPasswordTokenRepo: ResetPasswordTokenRepo,
+    private val userRepo: UserRepo,
     private val userConfig: UserConfig,
-    private val userService: UserService,
 ) {
     private val random = SecureRandom()
 
     @Transactional
-    fun requestNewPassword(): String {
-        val user = requestContext.user!!
+    fun requestNewPassword(user: User): String {
         val now = Instant.now()
         resetPasswordTokenRepo.listOpenByUser(user).forEach { it.revokedAt = now }
 
@@ -47,7 +43,8 @@ class ResetPasswordService @Inject constructor(
 
     @Transactional
     fun checkToken(userId: Long, token: String, now: Instant) {
-        val user = userService.findUser(userId)
+        val user = userRepo.findById(userId)
+            ?: throw ForbiddenException("incorrect token")
 
         val targetToken = resetPasswordTokenRepo.findByTokenHash(HashingService.sha256(token))
             ?: throw ForbiddenException("incorrect token")

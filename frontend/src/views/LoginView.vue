@@ -6,7 +6,7 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
-import { login } from '../api/authClient'
+import { forgotPassword, login } from '../api/authClient'
 import { tenants } from '../api/tenantClient'
 import { useAuthState } from '../shared/state/useAuthState'
 import { getErrorMessage } from '../shared/utils/errors'
@@ -16,9 +16,12 @@ const { authState, setAuthenticated } = useAuthState()
 const email = ref('')
 const password = ref('')
 const error = ref('')
+const message = ref('')
+const sendingReset = ref(false)
 
 async function submit() {
   error.value = ''
+  message.value = ''
   try {
     const user = await login(email.value, password.value)
     setAuthenticated(
@@ -33,6 +36,24 @@ async function submit() {
     await router.push(resolveRedirect())
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, 'Login fehlgeschlagen')
+  }
+}
+
+async function requestPasswordReset() {
+  error.value = ''
+  message.value = ''
+  if (!email.value.trim()) {
+    error.value = 'Bitte gib deine E-Mail-Adresse ein.'
+    return
+  }
+  sendingReset.value = true
+  try {
+    await forgotPassword(email.value)
+    message.value = 'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zuruecksetzen gesendet.'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Passwort-Reset konnte nicht angefordert werden.')
+  } finally {
+    sendingReset.value = false
   }
 }
 
@@ -72,7 +93,19 @@ onMounted(async () => {
           />
         </label>
         <Button type="submit" label="Einloggen" icon="pi pi-sign-in" />
+        <Button
+          type="button"
+          label="Passwort vergessen"
+          icon="pi pi-envelope"
+          severity="secondary"
+          text
+          :loading="sendingReset"
+          @click="requestPasswordReset"
+        />
       </form>
+      <Message v-if="message" severity="success" :closable="false" class="form-message">{{
+        message
+      }}</Message>
       <Message v-if="error" severity="error" :closable="false" class="form-message">{{
         error
       }}</Message>

@@ -18,6 +18,7 @@ export * from './ExplorerFolder';
 export * from './ExplorerLocation';
 export * from './ExplorerResponse';
 export * from './ExplorerScopeRoot';
+export * from './ForgotPasswordRequest';
 export * from './GroupMemberRequest';
 export * from './GroupMemberSummary';
 export * from './GroupRole';
