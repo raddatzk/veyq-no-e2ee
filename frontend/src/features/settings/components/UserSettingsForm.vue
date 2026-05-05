@@ -45,8 +45,12 @@ async function saveProfile() {
   error.value = ''
   profileMessage.value = ''
   try {
-    applySettings(await updateMySettings({ displayName: displayName.value, email: email.value }))
-    profileMessage.value = 'Profil wurde gespeichert.'
+    const nextSettings = await updateMySettings({ displayName: displayName.value, email: email.value })
+    applySettings(nextSettings)
+    profileMessage.value =
+      nextSettings.pendingEmail && nextSettings.pendingEmail !== nextSettings.email
+        ? 'Profil wurde gespeichert. Bitte bestaetige die neue Email-Adresse.'
+        : 'Profil wurde gespeichert.'
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : 'Profil konnte nicht gespeichert werden.'
   } finally {
@@ -106,6 +110,9 @@ function applySettings(nextSettings: UserSettingsResponse) {
           <span>Email</span>
           <InputText v-model="email" type="email" autocomplete="email" />
         </label>
+        <Message v-if="settings.pendingEmail" severity="info" :closable="false">
+          Neue Email wartet auf Bestaetigung: {{ settings.pendingEmail }}
+        </Message>
         <div class="button-row">
           <Button type="submit" label="Speichern" icon="pi pi-save" :loading="savingProfile" />
         </div>

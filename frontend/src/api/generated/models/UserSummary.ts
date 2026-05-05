@@ -51,6 +51,12 @@ export interface UserSummary {
      * @memberof UserSummary
      */
     serverRole: ServerRole;
+    /**
+     * Email address. The backend trims whitespace and stores it lowercase.
+     * @type {string}
+     * @memberof UserSummary
+     */
+    pendingEmail?: string;
 }
 
 
@@ -80,6 +86,7 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'email': json['email'],
         'displayName': json['displayName'],
         'serverRole': ServerRoleFromJSON(json['serverRole']),
+        'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
     };
 }
 
@@ -98,6 +105,7 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
         'email': value['email'],
         'displayName': value['displayName'],
         'serverRole': ServerRoleToJSON(value['serverRole']),
+        'pendingEmail': value['pendingEmail'],
     };
 }
 

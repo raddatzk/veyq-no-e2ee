@@ -109,6 +109,9 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/LoginRequest"
+          example:
+            email: kevin@example.test
+            password: correct horse battery staple
 
   schemas:
     LoginRequest:

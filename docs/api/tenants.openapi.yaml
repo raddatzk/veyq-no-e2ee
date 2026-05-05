@@ -300,6 +300,10 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/CreateTenantRequest"
+          example:
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
 
     UpdateTenantSettings:
       required: true
@@ -308,6 +312,8 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/UpdateTenantSettingsRequest"
+          example:
+            displayName: Friends & Family
 
     UpdateGroupSettings:
       required: true
@@ -316,6 +322,8 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/UpdateGroupSettingsRequest"
+          example:
+            displayName: Friends & Family
 
   responses:
     Tenants:
@@ -324,6 +332,18 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/TenantsSummary"
+          example:
+            tenants:
+              - id: 42
+                name: friends
+                displayName: Friends
+                domain: friends.example.test
+                role: TenantOwner
+                admins:
+                  - userId: 1
+                    email: kevin@example.test
+                    displayName: Kevin
+                    serverRole: ServerOwner
 
     Tenant:
       description: Created tenant.
@@ -331,6 +351,17 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/TenantSummary"
+          example:
+            id: 42
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+            role: TenantOwner
+            admins:
+              - userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
 
     TenantSettings:
       description: Tenant settings.
@@ -338,6 +369,10 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/TenantSettingsResponse"
+          example:
+            tenantId: 42
+            name: friends
+            displayName: Friends
 
     TenantUserSettings:
       description: Current settings for a user in a tenant.
@@ -345,6 +380,11 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/TenantUserSettingsResponse"
+          example:
+            tenantId: 42
+            tenantName: friends
+            userId: 1
+            displayName: Kevin
 
     TenantGroupSettings:
       description: Current settings for a group in a tenant.
@@ -352,6 +392,10 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/TenantGroupSettingsResponse"
+          example:
+            groupId: 99
+            name: family
+            displayName: Family
   schemas:
     TenantRole:
       type: string

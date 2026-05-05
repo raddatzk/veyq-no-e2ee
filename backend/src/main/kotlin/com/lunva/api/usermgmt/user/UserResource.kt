@@ -5,6 +5,7 @@ import com.lunva.api.domain.ServerRole
 import com.lunva.api.generated.api.UsersApi
 import com.lunva.api.generated.model.AcceptInvitationRequest
 import com.lunva.api.generated.model.ChangePasswordRequest
+import com.lunva.api.generated.model.ConfirmEmailChangeRequest
 import com.lunva.api.generated.model.CreateManagedUserRequest
 import com.lunva.api.generated.model.ResetPasswordRequest
 import com.lunva.api.generated.model.UpdateManagedUserRoleRequest
@@ -24,6 +25,9 @@ class UserResource(
 
     override fun updateMySettings(request: UpdateUserSettingsRequest): Response =
         Response.ok(userService.updateMySettings(request)).build()
+
+    override fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): Response =
+        Response.ok(userService.confirmMyEmailChange(request)).build()
 
     override fun changeMyPassword(request: ChangePasswordRequest): Response {
         userService.changeMyPassword(request)

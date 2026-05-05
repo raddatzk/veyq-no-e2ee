@@ -10,6 +10,7 @@ import com.lunva.api.domain.UserRepo
 import com.lunva.api.generated.model.*
 import com.lunva.api.tenant.TenantService
 import com.lunva.api.tenant.toManagedTenantSummary
+import com.lunva.api.usermgmt.EmailChangeService
 import com.lunva.api.usermgmt.InvitationService
 import com.lunva.api.usermgmt.ResetPasswordService
 import jakarta.enterprise.context.ApplicationScoped
@@ -28,9 +29,10 @@ class UserService @Inject constructor(
     private val authService: AuthService,
     private val resetPasswordService: ResetPasswordService,
     private val mailService: MailService,
+    private val emailChangeService: EmailChangeService,
 ) {
     fun me(): UserSummary {
-        return requestContext.user!!.toUserSummary()
+        return requestContext.user!!.toUserSummary(emailChangeService.pendingEmail(requestContext.user!!))
     }
 
     fun findUser(userId: Long): User {
@@ -49,9 +51,20 @@ class UserService @Inject constructor(
         }
 
         user.displayName = displayName
-        user.email = email
+        val pendingEmail = if (email != user.email) {
+            emailChangeService.requestEmailChange(user, email)
+        } else {
+            emailChangeService.pendingEmail(user)
+        }
 
-        return user.toUserSummary()
+        return user.toUserSummary(pendingEmail)
+    }
+
+    @Transactional
+    fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): UserSummary {
+        val user = findUser(user().id)
+        val confirmedUser = emailChangeService.confirmEmailChange(user, request.token)
+        return confirmedUser.toUserSummary()
     }
 
     @Transactional
@@ -161,8 +174,8 @@ class UserService @Inject constructor(
     private fun user(): User = requestContext.user!!
 
     companion object {
-        fun toUserSummary(user: User): UserSummary {
-            return UserSummary(user.id, user.email, user.displayName, user.role.toUsersApiRole())
+        fun toUserSummary(user: User, pendingEmail: String? = null): UserSummary {
+            return UserSummary(user.id, user.email, user.displayName, user.role.toUsersApiRole(), pendingEmail)
         }
     }
 }
@@ -186,8 +199,8 @@ fun User.toManagedUserSummary(knownTenant: Tenant? = null): ManagedUserSummary {
     )
 }
 
-fun User.toUserSummary(): UserSummary {
-    return UserSummary(id, email, displayName, role.toUsersApiRole())
+fun User.toUserSummary(pendingEmail: String? = null): UserSummary {
+    return UserSummary(id, email, displayName, role.toUsersApiRole(), pendingEmail)
 }
 
 fun ServerRole.toUsersApiRole(): ApiServerRole =

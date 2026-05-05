@@ -19,6 +19,7 @@ models/AdminSetupRequest.ts
 models/AlbumMediaRequest.ts
 models/BootstrapResponse.ts
 models/ChangePasswordRequest.ts
+models/ConfirmEmailChangeRequest.ts
 models/CreateGroupRequest.ts
 models/CreateLibraryItemRequest.ts
 models/CreateManagedUserRequest.ts
@@ -39,7 +40,6 @@ models/GroupsSummary.ts
 models/LibraryScopeRequest.ts
 models/LocationKind.ts
 models/LoginRequest.ts
-models/LoginSessionResponse.ts
 models/ManagedUserSummary.ts
 models/ManagedUserTenantSummary.ts
 models/ManagedUsersSummary.ts

@@ -17,15 +17,15 @@ import * as runtime from '../runtime';
 import type {
   ErrorResponse,
   LoginRequest,
-  LoginSessionResponse,
+  UserSummary,
 } from '../models/index';
 import {
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     LoginRequestFromJSON,
     LoginRequestToJSON,
-    LoginSessionResponseFromJSON,
-    LoginSessionResponseToJSON,
+    UserSummaryFromJSON,
+    UserSummaryToJSON,
 } from '../models/index';
 
 export interface LoginOperationRequest {
@@ -55,13 +55,13 @@ export interface AuthApiInterface {
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>>;
+    loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse>;
+    login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
      * Creates request options for logout without sending the request
@@ -99,13 +99,13 @@ export interface AuthApiInterface {
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>>;
+    refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse>;
+    refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
 }
 
@@ -147,18 +147,18 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    async loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>> {
+    async loginRaw(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
         const requestOptions = await this.loginRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginSessionResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
     }
 
     /**
      * Anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Anmelden und Auth-Cookies setzen
      */
-    async login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse> {
+    async login(requestParameters: LoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
         const response = await this.loginRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -224,18 +224,18 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>> {
+    async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
         const requestOptions = await this.refreshRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginSessionResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
     }
 
     /**
      * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
-    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse> {
+    async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
         const response = await this.refreshRaw(initOverrides);
         return await response.value();
     }

@@ -30,15 +30,23 @@ async function submit() {
       },
       await tenants()
     )
-    await router.push('/')
+    await router.push(resolveRedirect())
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, 'Login fehlgeschlagen')
   }
 }
 
+function resolveRedirect(): string {
+  const redirect = router.currentRoute.value.query.redirect
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
+
 onMounted(async () => {
   if (authState.isAuthenticated) {
-    await router.push('/')
+    await router.push(resolveRedirect())
   }
 })
 </script>

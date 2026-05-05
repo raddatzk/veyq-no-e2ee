@@ -43,4 +43,20 @@ class MailService @Inject constructor(
             )
         )
     }
+
+    fun sendEmailChangeConfirmationMail(user: User, pendingEmail: String, confirmUrl: String) {
+        mailer.send(
+            Mail.withText(
+                pendingEmail,
+                "Lunva Email bestaetigen",
+                """
+                    Hallo ${user.displayName},
+
+                    bestaetige deine neue Email-Adresse ueber diesen Link:
+
+                    $confirmUrl
+                """.trimIndent()
+            )
+        )
+    }
 }

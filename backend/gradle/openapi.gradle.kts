@@ -48,7 +48,6 @@ val openApiModelOnlyGlobalProperties = mapOf(
 val sharedSchemaMappings = mapOf(
     "ServerRole" to "$modelPackageName.ServerRole",
     "ErrorResponse" to "$modelPackageName.ErrorResponse",
-    "LoginSessionResponse" to "$modelPackageName.LoginSessionResponse",
     "UserSummary" to "$modelPackageName.UserSummary",
 )
 

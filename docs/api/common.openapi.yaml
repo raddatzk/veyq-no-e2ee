@@ -31,7 +31,7 @@ components:
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/LoginSessionResponse"
+            "$ref": "#/components/schemas/UserSummary"
 
     '400':
       description: Der Request ist syntaktisch oder fachlich ungueltig.
@@ -95,29 +95,6 @@ components:
             error: Requested range not satisfiable
 
   schemas:
-    LoginSessionResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - userId
-        - email
-        - displayName
-        - serverRole
-      properties:
-        userId:
-          type: integer
-          format: int64
-        email:
-          "$ref": "#/components/schemas/EmailAddress"
-        displayName:
-          "$ref": "#/components/schemas/DisplayName"
-        serverRole:
-          "$ref": "#/components/schemas/ServerRole"
-      example:
-        userId: 1
-        email: kevin@example.test
-        displayName: Kevin
-        serverRole: ServerOwner
     UserSummary:
       description: Current authenticated user.
       type: object
@@ -137,6 +114,8 @@ components:
           "$ref": "#/components/schemas/DisplayName"
         serverRole:
           "$ref": "#/components/schemas/ServerRole"
+        pendingEmail:
+          "$ref": "#/components/schemas/EmailAddress"
       example:
         userId: 1
         email: kevin@example.test

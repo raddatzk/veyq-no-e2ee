@@ -63,6 +63,39 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
+  "/api/users/me/email/confirm":
+    post:
+      tags:
+      - Users
+      operationId: confirmMyEmailChange
+      requestBody:
+        "$ref": "#/components/requestBodies/ConfirmEmailChange"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Neue eigene E-Mail-Adresse bestaetigen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
+      description: |-
+        Neue eigene E-Mail-Adresse bestaetigen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
+
+        Implementierungsstatus: implemented.
   "/api/users/me/password/change":
     post:
       tags:
@@ -349,6 +382,15 @@ components:
             currentPassword: admin1234567
             newPassword: new-admin1234567
 
+    ConfirmEmailChange:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ConfirmEmailChangeRequest"
+          example:
+            token: email-change-token
+
     ResetPassword:
       required: true
       content:
@@ -487,6 +529,17 @@ components:
       example:
         currentPassword: admin1234567
         newPassword: new-admin1234567
+
+    ConfirmEmailChangeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: email-change-token
 
     ManagedUserTenantSummary:
       type: object

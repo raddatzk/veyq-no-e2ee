@@ -17,9 +17,9 @@ import * as runtime from '../runtime';
 import type {
   AcceptInvitationRequest,
   ChangePasswordRequest,
+  ConfirmEmailChangeRequest,
   CreateManagedUserRequest,
   ErrorResponse,
-  LoginSessionResponse,
   ManagedUserSummary,
   ManagedUsersSummary,
   ResetPasswordRequest,
@@ -32,12 +32,12 @@ import {
     AcceptInvitationRequestToJSON,
     ChangePasswordRequestFromJSON,
     ChangePasswordRequestToJSON,
+    ConfirmEmailChangeRequestFromJSON,
+    ConfirmEmailChangeRequestToJSON,
     CreateManagedUserRequestFromJSON,
     CreateManagedUserRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
-    LoginSessionResponseFromJSON,
-    LoginSessionResponseToJSON,
     ManagedUserSummaryFromJSON,
     ManagedUserSummaryToJSON,
     ManagedUsersSummaryFromJSON,
@@ -59,6 +59,10 @@ export interface AcceptInvitationOperationRequest {
 
 export interface ChangeMyPasswordRequest {
     changePasswordRequest: ChangePasswordRequest;
+}
+
+export interface ConfirmMyEmailChangeRequest {
+    confirmEmailChangeRequest: ConfirmEmailChangeRequest;
 }
 
 export interface CreateManagedUserOperationRequest {
@@ -108,13 +112,13 @@ export interface UsersApiInterface {
      * @throws {RequiredError}
      * @memberof UsersApiInterface
      */
-    acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>>;
+    acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse>;
+    acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
      * Creates request options for changeMyPassword without sending the request
@@ -139,6 +143,30 @@ export interface UsersApiInterface {
      * Eigenes Passwort ändern
      */
     changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for confirmMyEmailChange without sending the request
+     * @param {ConfirmEmailChangeRequest} confirmEmailChangeRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    confirmMyEmailChangeRequestOpts(requestParameters: ConfirmMyEmailChangeRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * @summary Neue eigene E-Mail-Adresse bestaetigen
+     * @param {ConfirmEmailChangeRequest} confirmEmailChangeRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    confirmMyEmailChangeRaw(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen
+     */
+    confirmMyEmailChange(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
      * Creates request options for createManagedUser without sending the request
@@ -371,18 +399,18 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    async acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LoginSessionResponse>> {
+    async acceptInvitationRaw(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
         const requestOptions = await this.acceptInvitationRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => LoginSessionResponseFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
     }
 
     /**
      * Einladung annehmen und Passwort setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
      * Einladung annehmen und Passwort setzen
      */
-    async acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<LoginSessionResponse> {
+    async acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
         const response = await this.acceptInvitationRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -433,6 +461,55 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.changeMyPasswordRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for confirmMyEmailChange without sending the request
+     */
+    async confirmMyEmailChangeRequestOpts(requestParameters: ConfirmMyEmailChangeRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['confirmEmailChangeRequest'] == null) {
+            throw new runtime.RequiredError(
+                'confirmEmailChangeRequest',
+                'Required parameter "confirmEmailChangeRequest" was null or undefined when calling confirmMyEmailChange().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/me/email/confirm`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ConfirmEmailChangeRequestToJSON(requestParameters['confirmEmailChangeRequest']),
+        };
+    }
+
+    /**
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen
+     */
+    async confirmMyEmailChangeRaw(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.confirmMyEmailChangeRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen
+     */
+    async confirmMyEmailChange(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.confirmMyEmailChangeRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

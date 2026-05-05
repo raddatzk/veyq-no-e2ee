@@ -310,7 +310,8 @@ class ExplorerResourceTest {
             .then()
             .statusCode(200)
             .body("displayName", equalTo("Owner Updated"))
-            .body("email", equalTo("owner-updated-$runId@example.com"))
+            .body("email", equalTo("owner-$runId@example.com"))
+            .body("pendingEmail", equalTo("owner-updated-$runId@example.com"))
 
         given()
             .contentType("application/json")
@@ -342,7 +343,8 @@ class ExplorerResourceTest {
             .then()
             .statusCode(200)
             .body("displayName", equalTo("Owner Updated"))
-            .body("email", equalTo("owner-updated-$runId@example.com"))
+            .body("email", equalTo(ownerEmail))
+            .body("pendingEmail", equalTo("owner-updated-$runId@example.com"))
     }
 
     @Test

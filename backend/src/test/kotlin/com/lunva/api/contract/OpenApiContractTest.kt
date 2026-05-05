@@ -280,6 +280,7 @@ class OpenApiContractTest {
             "POST /api/setup/admin",
             "GET /api/users/me",
             "PUT /api/users/me",
+            "POST /api/users/me/email/confirm",
             "POST /api/users/me/password/change",
             "GET /api/users",
             "POST /api/users",

@@ -32,6 +32,10 @@ export function updateMySettings(request: UpdateUserSettingsRequest): Promise<Us
   return generatedCall(usersApi.updateMySettings({ updateUserSettingsRequest: request }))
 }
 
+export function confirmMyEmailChange(token: string): Promise<UserSettingsResponse> {
+  return generatedCall(usersApi.confirmMyEmailChange({ confirmEmailChangeRequest: { token } }))
+}
+
 export function changeMyPassword(request: ChangePasswordRequest): Promise<void> {
   return generatedCall(usersApi.changeMyPassword({ changePasswordRequest: request }))
 }

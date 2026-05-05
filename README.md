@@ -204,8 +204,6 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
 
 ## TODO
 
-- fix frontend generated api
-- configure email server
 - manage server users
 - manage tenant users
 - create group

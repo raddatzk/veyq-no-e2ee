@@ -1,7 +1,7 @@
 import { authApi, generatedCall } from './generatedClient'
-import type { LoginSessionResponse } from './generated'
+import type { UserSummary } from './generated'
 
-export type LoginResponse = LoginSessionResponse
+export type LoginResponse = UserSummary
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   return generatedCall(authApi.login({ loginRequest: { email, password } }))

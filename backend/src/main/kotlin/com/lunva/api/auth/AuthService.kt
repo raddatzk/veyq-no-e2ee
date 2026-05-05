@@ -6,15 +6,16 @@ import com.lunva.api.domain.RefreshToken
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.auth.filterchain.RequestContext
+import com.lunva.api.domain.ServerRole
 import com.lunva.api.generated.model.LoginRequest
-import com.lunva.api.generated.model.LoginSessionResponse
+import com.lunva.api.generated.model.UserSummary
 import com.lunva.api.generated.model.ServerRole as ApiServerRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.NewCookie
 
-data class LoginContext(val response: LoginSessionResponse, val accessCookie: NewCookie, val refreshCookie: NewCookie)
+data class LoginContext(val response: UserSummary, val accessCookie: NewCookie, val refreshCookie: NewCookie)
 data class LogoutContext(val accessCookie: NewCookie, val refreshCookie: NewCookie)
 
 @ApplicationScoped
@@ -27,8 +28,8 @@ class AuthService @Inject constructor(
 ) {
 
     private fun checkLogin(request: LoginRequest): User {
-        val email = request.email!!.trim().lowercase()
-        val password = request.password!!
+        val email = request.email.trim().lowercase()
+        val password = request.password
 
         val user = userRepo.findByEmail(email)
             ?: throw UnauthorizedException("Invalid email or password")
@@ -85,14 +86,14 @@ class AuthService @Inject constructor(
         val accessCookie = cookieService.createAccessCookie(accessToken)
         val refreshCookie = cookieService.createRefreshCookie(refreshToken)
 
-        val response = LoginSessionResponse(user.id, user.email, user.displayName, user.role.toAuthApiRole())
+        val response = UserSummary(user.id, user.email, user.displayName, user.role.toAuthApiRole())
 
         return LoginContext(response, accessCookie, refreshCookie)
     }
 
-    private fun com.lunva.api.domain.ServerRole.toAuthApiRole(): ApiServerRole =
+    private fun ServerRole.toAuthApiRole(): ApiServerRole =
         when (this) {
-            com.lunva.api.domain.ServerRole.ServerOwner -> ApiServerRole.ServerOwner
-            com.lunva.api.domain.ServerRole.ServerMember -> ApiServerRole.ServerMember
+            ServerRole.ServerOwner -> ApiServerRole.ServerOwner
+            ServerRole.ServerMember -> ApiServerRole.ServerMember
         }
 }
