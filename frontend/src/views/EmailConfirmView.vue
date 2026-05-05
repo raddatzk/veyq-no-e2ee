@@ -17,16 +17,18 @@ const { authState, setAuthenticated } = useAuthState()
 const loading = ref(true)
 const error = ref('')
 const confirmedEmail = ref('')
-const token = computed(() => {
-  const rawToken = route.params.token
-  return Array.isArray(rawToken) ? rawToken[0] : rawToken
-})
+const token = computed(() => route.hash.replace(/^#/, ''))
 
 onMounted(confirmEmail)
 
 async function confirmEmail() {
   loading.value = true
   error.value = ''
+  if (!token.value) {
+    error.value = 'Bestaetigungslink ist ungueltig.'
+    loading.value = false
+    return
+  }
   try {
     const user = await confirmMyEmailChange(token.value)
     setAuthenticated(user, await tenants())

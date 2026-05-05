@@ -17,11 +17,11 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 const userId = computed(() => Number(route.params.userId))
-const token = computed(() => String(route.params.token || ''))
+const token = computed(() => route.hash.replace(/^#/, ''))
 
 async function submit() {
   error.value = ''
-  if (!Number.isInteger(userId.value)) {
+  if (!Number.isInteger(userId.value) || !token.value) {
     error.value = 'Einladungslink ist ungueltig.'
     return
   }

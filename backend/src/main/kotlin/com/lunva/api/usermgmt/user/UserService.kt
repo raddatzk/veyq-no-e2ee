@@ -42,7 +42,7 @@ class UserService @Inject constructor(
 
     @Transactional
     fun updateMySettings(request: UpdateUserSettingsRequest): UserSummary {
-        val user = findUser(user().id)
+        val user = user()
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()
         val emailOwner = userRepo.findByEmail(email)
@@ -62,7 +62,7 @@ class UserService @Inject constructor(
 
     @Transactional
     fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): UserSummary {
-        val user = findUser(user().id)
+        val user = user()
         val confirmedUser = emailChangeService.confirmEmailChange(user, request.token)
         return confirmedUser.toUserSummary()
     }
@@ -71,7 +71,7 @@ class UserService @Inject constructor(
     fun changeMyPassword(request: ChangePasswordRequest) {
         val currentPassword = request.currentPassword
         val newPassword = request.newPassword
-        val user = findUser(user().id)
+        val user = user()
 
         passwordService.updatePassword(user, currentPassword, newPassword)
     }
@@ -108,7 +108,7 @@ class UserService @Inject constructor(
         val user = userRepo.findByEmail(email)?.takeIf { it.passwordSetAt != null } ?: return
         val tenant = user.tenantMemberships.firstOrNull()?.tenant ?: return
         val token = resetPasswordService.requestNewPassword(user)
-        mailService.sendPasswordResetMail(user, "https://${tenant.domain}/password/reset/${user.id}/$token")
+        mailService.sendPasswordResetMail(user, "https://${tenant.domain}/password/reset/${user.id}#$token")
     }
 
     @Transactional

@@ -195,9 +195,11 @@ class UserManagementResourceTest {
 
         val message = mailbox.getMailMessagesSentTo(currentEmail).single()
         assertThat(message.text).contains("https://${tenant.domain}/password/reset/")
+        assertThat(message.text).contains("#")
         val resetPath = message.text.substringAfter("${tenant.domain}/password/reset/").trim()
-        val resetUserId = resetPath.substringBefore("/").toLong()
-        val resetToken = resetPath.substringAfter("/")
+        val resetUserId = resetPath.substringBefore("#").toLong()
+        val resetToken = resetPath.substringAfter("#")
+        assertThat(resetToken).doesNotContain("/")
 
         given()
             .contentType("application/json")
@@ -354,8 +356,8 @@ class UserManagementResourceTest {
 
     private fun emailChangeTokenFromMailbox(pendingEmail: String): String {
         val message = mailbox.getMailMessagesSentTo(pendingEmail).last()
-        assertThat(message.text).contains("/email/confirm/")
-        return message.text.substringAfter("/email/confirm/").trim()
+        assertThat(message.text).contains("/email/confirm#")
+        return message.text.substringAfter("/email/confirm#").trim()
     }
 
     private fun createUser(name: String, password: String, role: ServerRole): User =

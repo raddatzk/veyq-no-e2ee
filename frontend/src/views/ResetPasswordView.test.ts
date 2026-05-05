@@ -19,9 +19,9 @@ describe('ResetPasswordView', () => {
     resetPasswordMock.mockResolvedValue()
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/password/reset/:userId/:token', component: ResetPasswordView }]
+      routes: [{ path: '/password/reset/:userId', component: ResetPasswordView }]
     })
-    await router.push('/password/reset/42/reset-token')
+    await router.push('/password/reset/42#reset-token')
     await router.isReady()
 
     const wrapper = mount(ResetPasswordView, { global: { plugins: [router], stubs: viewStubs() } })

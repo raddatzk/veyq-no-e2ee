@@ -48,7 +48,7 @@ class EmailChangeService @Inject constructor(
 
         val tenant = user.tenantMemberships.firstOrNull()?.tenant
             ?: throw BadRequestException("User has no tenant")
-        val confirmUrl = "https://${tenant.domain}/email/confirm/$token"
+        val confirmUrl = "https://${tenant.domain}/email/confirm#$token"
 
         transactionSynchronizationRegistry.registerInterposedSynchronization(object : Synchronization {
             override fun beforeCompletion() = Unit

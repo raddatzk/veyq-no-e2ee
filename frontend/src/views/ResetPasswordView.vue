@@ -15,12 +15,12 @@ const error = ref('')
 const message = ref('')
 const loading = ref(false)
 const userId = computed(() => Number(route.params.userId))
-const token = computed(() => String(route.params.token || ''))
+const token = computed(() => route.hash.replace(/^#/, ''))
 
 async function submit() {
   error.value = ''
   message.value = ''
-  if (!Number.isInteger(userId.value)) {
+  if (!Number.isInteger(userId.value) || !token.value) {
     error.value = 'Reset-Link ist ungueltig.'
     return
   }

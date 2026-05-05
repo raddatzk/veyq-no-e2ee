@@ -9,10 +9,10 @@ describe('router', () => {
     authState.isAuthenticated = false
     serverState.setupCompleted = true
 
-    await router.push('/email/confirm/token-123')
+    await router.push('/email/confirm#token-123')
     await router.isReady()
 
     expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.redirect).toBe('/email/confirm/token-123')
+    expect(router.currentRoute.value.query.redirect).toBe('/email/confirm#token-123')
   })
 })

@@ -38,9 +38,9 @@ describe('EmailConfirmView', () => {
 
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/email/confirm/:token', component: EmailConfirmView }]
+      routes: [{ path: '/email/confirm', component: EmailConfirmView }]
     })
-    await router.push('/email/confirm/abc123')
+    await router.push('/email/confirm#abc123')
     await router.isReady()
 
     const wrapper = mount(EmailConfirmView, { global: { plugins: [router], stubs: viewStubs() } })

@@ -16,9 +16,9 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomeView },
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
-    { path: '/invite/:userId/:token', name: 'invite', component: InviteView },
-    { path: '/password/reset/:userId/:token', name: 'password-reset', component: ResetPasswordView },
-    { path: '/email/confirm/:token', name: 'email-confirm', component: EmailConfirmView },
+    { path: '/invite/:userId', name: 'invite', component: InviteView },
+    { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
+    { path: '/email/confirm', name: 'email-confirm', component: EmailConfirmView },
     { path: '/settings', name: 'server-settings', component: SettingsView },
     { path: '/~me', name: 'user-settings', component: SettingsView },
     { path: '/:tenantName/:pathMatch(.*)*', name: 'tenant', component: TenantRouteView }
