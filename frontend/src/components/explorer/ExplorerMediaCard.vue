@@ -14,28 +14,13 @@ const props = withDefaults(
     loading: 'lazy'
   }
 )
-const emit = defineEmits<{
+defineEmits<{
   open: []
-  aspectRatio: [value: number]
 }>()
 
 const isImage = computed(() => props.media.mimeType?.startsWith('image/'))
 const isVideo = computed(() => props.media.mimeType?.startsWith('video/'))
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
-
-function emitImageAspectRatio(event: Event) {
-  const image = event.currentTarget as HTMLImageElement
-  if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-    emit('aspectRatio', image.naturalWidth / image.naturalHeight)
-  }
-}
-
-function emitVideoAspectRatio(event: Event) {
-  const video = event.currentTarget as HTMLVideoElement
-  if (video.videoWidth > 0 && video.videoHeight > 0) {
-    emit('aspectRatio', video.videoWidth / video.videoHeight)
-  }
-}
 </script>
 
 <template>
@@ -51,7 +36,6 @@ function emitVideoAspectRatio(event: Event) {
         :src="mediaUrl"
         :alt="media.title || media.id"
         :loading="loading"
-        @load="emitImageAspectRatio"
       />
       <video
         v-else-if="isVideo"
@@ -59,7 +43,6 @@ function emitVideoAspectRatio(event: Event) {
         preload="metadata"
         muted
         playsinline
-        @loadedmetadata="emitVideoAspectRatio"
       />
       <span v-else class="pi pi-image" />
     </span>

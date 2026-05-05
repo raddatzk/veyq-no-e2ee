@@ -1,111 +1,112 @@
-import { flickrJustifiedLayout } from './vendor/flickrJustifiedLayout'
+export type MediaGridLayoutSource = {
+  id: string
+  aspectRatio?: number
+}
 
 export type MediaGridLayoutInput = {
-  ids: string[]
-  aspectRatios: Record<string, number | undefined>
+  items: MediaGridLayoutSource[]
   containerWidth: number
   targetHeight: number
-  minHeight?: number
-  maxHeight?: number
   gap: number
+  showWidows?: boolean
 }
 
-export type MediaGridLayoutItem = {
+export type MediaGridLayoutTile = {
   id: string
-  width: number
-  height: number
-}
-
-export type MediaGridLayoutRow = {
-  items: MediaGridLayoutItem[]
-  width: number
-  height: number
-  align: 'justify' | 'center'
+  left: number
+  top: number
+  renderedWidth: number
+  renderedHeight: number
   widow: boolean
 }
 
+export type MediaGridLayoutResult = {
+  tiles: MediaGridLayoutTile[]
+  height: number
+}
+
 const fallbackAspectRatio = 4 / 3
-const rowTopTolerance = 0.5
 
-export function buildJustifiedMediaRows(input: MediaGridLayoutInput): MediaGridLayoutRow[] {
-  const normalized = normalizeInput(input)
-  if (!normalized.ids.length || normalized.containerWidth <= 0 || normalized.targetHeight <= 0) {
-    return []
-  }
-
-  const geometry = flickrJustifiedLayout(
-    normalized.ids.map((id) => safeAspectRatio(normalized.aspectRatios[id])),
-    {
-      containerWidth: normalized.containerWidth,
-      boxSpacing: normalized.gap,
-      targetRowHeight: normalized.targetHeight,
-      targetRowHeightTolerance: targetRowHeightTolerance(normalized),
-      minRowHeight: normalized.minHeight,
-      maxRowHeight: normalized.maxHeight,
-      showWidows: true,
-      widowLayoutStyle: 'center'
-    }
-  )
-
-  return groupBoxesIntoRows(normalized.ids, geometry.boxes, normalized.gap, geometry.widowCount)
-}
-
-export function targetRowHeightTolerance(
-  input: Pick<Required<MediaGridLayoutInput>, 'targetHeight' | 'minHeight' | 'maxHeight'>
-): number {
-  if (input.targetHeight <= 0) return 0
-  return (
-    Math.max(input.targetHeight - input.minHeight, input.maxHeight - input.targetHeight, 0) /
-    input.targetHeight
-  )
-}
-
-function normalizeInput(input: MediaGridLayoutInput): Required<MediaGridLayoutInput> {
-  return {
-    ...input,
-    containerWidth: Math.max(0, input.containerWidth),
-    minHeight: input.minHeight ?? input.targetHeight * 0.8,
-    maxHeight: input.maxHeight ?? input.targetHeight
-  }
-}
-
-function groupBoxesIntoRows(
-  ids: string[],
-  boxes: ReturnType<typeof flickrJustifiedLayout>['boxes'],
+function layoutRow(
+  row: Required<MediaGridLayoutSource>[],
+  top: number,
+  containerWidth: number,
+  targetHeight: number,
   gap: number,
-  widowCount: number
-): MediaGridLayoutRow[] {
-  const rows: MediaGridLayoutRow[] = []
-  let currentTop: number | null = null
-  const widowStartIndex = boxes.length - widowCount
+  forceJustify: boolean
+): { tiles: MediaGridLayoutTile[]; height: number } {
+  const rowGapTotal = gap * Math.max(row.length - 1, 0)
+  const availableWidth = Math.max(containerWidth - rowGapTotal, 0)
+  const aspectRatioSum = row.reduce((sum, item) => sum + item.aspectRatio, 0)
+  const height = forceJustify && aspectRatioSum > 0 ? availableWidth / aspectRatioSum : targetHeight
 
-  boxes.forEach((box, index) => {
-    const isWidow = index >= widowStartIndex
+  let left = 0
+  const tiles = row.map((item, index) => {
+    const isLast = index === row.length - 1
+    const rawWidth = item.aspectRatio * height
+    const renderedWidth = forceJustify && isLast ? Math.max(containerWidth - left, 0) : rawWidth
 
-    if (currentTop === null || Math.abs(box.top - currentTop) > rowTopTolerance) {
-      currentTop = box.top
-      rows.push({
-        items: [],
-        width: 0,
-        height: box.height,
-        align: box.layoutStyle === 'center' ? 'center' : 'justify',
-        widow: isWidow
-      })
+    const tile: MediaGridLayoutTile = {
+      id: item.id,
+      left,
+      top,
+      renderedWidth,
+      renderedHeight: height,
+      widow: !forceJustify
     }
 
-    const row = rows[rows.length - 1]
-    row.items.push({
-      id: ids[index],
-      width: box.width,
-      height: box.height
-    })
-    row.height = box.height
-    row.align = box.layoutStyle === 'center' ? 'center' : row.align
-    row.widow = row.widow || isWidow
-    row.width = row.items.reduce((sum, item) => sum + item.width, gap * Math.max(0, row.items.length - 1))
+    left += renderedWidth + gap
+    return tile
   })
 
-  return rows
+  return { tiles, height }
+}
+
+export function calculateJustifiedMediaLayout(input: MediaGridLayoutInput): MediaGridLayoutResult {
+  const containerWidth = Math.max(0, Math.floor(input.containerWidth))
+  const targetHeight = Math.max(0, input.targetHeight)
+  const gap = Math.max(0, input.gap)
+  const showWidows = input.showWidows ?? true
+  const items = input.items.map((item) => ({
+    id: item.id,
+    aspectRatio: safeAspectRatio(item.aspectRatio)
+  }))
+
+  if (items.length === 0 || containerWidth <= 0 || targetHeight <= 0) {
+    return { tiles: [], height: 0 }
+  }
+
+  const targetAspectRatio = containerWidth / targetHeight
+  const tiles: MediaGridLayoutTile[] = []
+  let row: Required<MediaGridLayoutSource>[] = []
+  let rowAspectRatio = 0
+  let top = 0
+
+  for (const item of items) {
+    row.push(item)
+    rowAspectRatio += item.aspectRatio
+
+    if (rowAspectRatio >= targetAspectRatio) {
+      const laidOutRow = layoutRow(row, top, containerWidth, targetHeight, gap, true)
+      tiles.push(...laidOutRow.tiles)
+      top += laidOutRow.height + gap
+      row = []
+      rowAspectRatio = 0
+    }
+  }
+
+  if (row.length > 0 && showWidows) {
+    const laidOutRow = layoutRow(row, top, containerWidth, targetHeight, gap, false)
+    tiles.push(...laidOutRow.tiles)
+    top += laidOutRow.height
+  } else if (row.length === 0 && tiles.length > 0) {
+    top -= gap
+  }
+
+  return {
+    tiles,
+    height: Math.max(top, 0)
+  }
 }
 
 function safeAspectRatio(value: number | undefined): number {

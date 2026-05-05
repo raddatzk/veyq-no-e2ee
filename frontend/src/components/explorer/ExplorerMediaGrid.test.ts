@@ -1,15 +1,17 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import ExplorerMediaCard from './ExplorerMediaCard.vue'
 import ExplorerMediaGrid from './ExplorerMediaGrid.vue'
 import type { ExplorerMedia } from '../../api/explorerClient'
 
 const progressSpinnerStub = { template: '<span class="small-spinner" />' }
-const lightboxStub = { template: '<div class="media-lightbox" />' }
+const lightboxStub = {
+  props: ['media', 'canShowPrevious', 'canShowNext'],
+  template:
+    '<div class="media-lightbox">{{ media.id }} {{ canShowPrevious }} {{ canShowNext }}</div>'
+}
 
 let observedWidth = 1000
-let animationFrameCallbacks: FrameRequestCallback[] = []
 
 class ResizeObserverMock {
   private readonly callback: ResizeObserverCallback
@@ -31,12 +33,6 @@ class ResizeObserverMock {
   }
 
   disconnect() {}
-}
-
-function runAnimationFrames() {
-  const callbacks = animationFrameCallbacks
-  animationFrameCallbacks = []
-  callbacks.forEach((callback, index) => callback(index))
 }
 
 function createMedia(overrides: Partial<ExplorerMedia> = {}): ExplorerMedia {
@@ -79,97 +75,134 @@ function mountGrid(media: ExplorerMedia[], streaming = false) {
   })
 }
 
+async function settleLayout() {
+  await nextTick()
+  await nextTick()
+  await nextTick()
+}
+
 describe('ExplorerMediaGrid', () => {
   beforeEach(() => {
     observedWidth = 1000
-    animationFrameCallbacks = []
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      animationFrameCallbacks.push(callback)
-      return animationFrameCallbacks.length
-    })
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('uses backend image dimensions before media load events', async () => {
+  it('renders absolute positioned tiles with a fixed gallery height', async () => {
+    const wrapper = mountGrid(
+      Array.from({ length: 4 }, (_, index) =>
+        createMedia({
+          id: `media-${index}`,
+          imageWidth: 1000,
+          imageHeight: 1000
+        })
+      )
+    )
+
+    await settleLayout()
+
+    const grid = wrapper.find('.media-grid')
+    const tiles = wrapper.findAll('.media-grid-tile')
+
+    expect(grid.attributes('style')).toContain('height: 244px')
+    expect(tiles).toHaveLength(4)
+    expect(tiles[0].attributes('style')).toContain('transform: translate(0px, 0px)')
+    expect(tiles[0].attributes('style')).toContain('width: 244px')
+    expect(tiles[0].attributes('style')).toContain('height: 244px')
+    expect(tiles[3].attributes('style')).toContain('transform: translate(756px, 0px)')
+  })
+
+  it('requests media after layout and reveals each tile after its own load event', async () => {
+    const wrapper = mountGrid([
+      createMedia({ id: 'a', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'b', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'c', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'd', imageWidth: 1000, imageHeight: 1000 })
+    ])
+
+    await nextTick()
+
+    expect(wrapper.find('.media-grid-tile-placeholder').exists()).toBe(true)
+    expect(wrapper.find('img').exists()).toBe(false)
+
+    await settleLayout()
+
+    expect(wrapper.findAll('img')).toHaveLength(4)
+    expect(wrapper.findAll('.media-grid-tile-placeholder')).toHaveLength(4)
+
+    await wrapper.findAll('img')[0].trigger('load')
+
+    expect(wrapper.findAll('.media-grid-tile-placeholder')).toHaveLength(3)
+    expect(wrapper.findAll('img')[0].classes()).toContain('media-grid-tile-media-loaded')
+  })
+
+  it('uses backend dimensions before image load events', async () => {
     const wrapper = mountGrid([
       createMedia({ id: 'wide', imageWidth: 1600, imageHeight: 900 }),
       createMedia({ id: 'square', imageWidth: 900, imageHeight: 900 }),
       createMedia({ id: 'portrait', imageWidth: 900, imageHeight: 1350 })
     ])
 
-    await nextTick()
+    await settleLayout()
 
-    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
-    expect(wrapper.find('.media-grid-row-center').exists()).toBe(true)
-    expect(wrapper.find('.media-ratio-probes').exists()).toBe(false)
-
-    const cards = wrapper.findAllComponents(ExplorerMediaCard)
-    expect(cards).toHaveLength(3)
-    expect(cards[0].props('width')).toBeGreaterThan(cards[1].props('width') as number)
-    expect(cards[2].props('width')).toBeLessThan(cards[1].props('width') as number)
+    const tiles = wrapper.findAll('.media-grid-tile')
+    expect(tiles).toHaveLength(3)
+    expect(tiles[0].attributes('style')).toContain('width: 462.222')
+    expect(tiles[1].attributes('style')).toContain('width: 260')
+    expect(tiles[2].attributes('style')).toContain('width: 173.333')
   })
 
-  it('sets justified row alignment when the row fills the container', async () => {
-    const wrapper = mountGrid(
-      Array.from({ length: 5 }, (_, index) =>
-        createMedia({
-          id: `media-${index}`,
-          imageWidth: 1000,
-          imageHeight: 1000
-        })
-      )
-    )
-
-    await nextTick()
-
-    expect(wrapper.find('.media-grid-row-justify').exists()).toBe(true)
-    expect(wrapper.find('.media-grid-row-center').exists()).toBe(false)
-  })
-
-  it('eagerly loads media once a visible row is published', async () => {
-    const wrapper = mountGrid(
-      Array.from({ length: 5 }, (_, index) =>
-        createMedia({
-          id: `media-${index}`,
-          imageWidth: 1000,
-          imageHeight: 1000
-        })
-      )
-    )
-
-    await nextTick()
-
-    expect(wrapper.findAllComponents(ExplorerMediaCard).map((card) => card.props('loading'))).toEqual([
-      'eager',
-      'eager',
-      'eager',
-      'eager',
-      'eager'
-    ])
-  })
-
-  it('does not render a fallback justified layout while ratios are unknown', async () => {
+  it('renders a fallback layout while dimensions are unknown', async () => {
     const wrapper = mountGrid([
       createMedia({ id: 'a', imageWidth: null, imageHeight: null }),
       createMedia({ id: 'b', imageWidth: null, imageHeight: null })
     ])
 
-    await nextTick()
+    await settleLayout()
 
-    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(true)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(false)
-    expect(wrapper.find('.media-ratio-probes').exists()).toBe(true)
+    const tiles = wrapper.findAll('.media-grid-tile')
+    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
+    expect(tiles).toHaveLength(2)
+    expect(tiles[0].attributes('style')).toContain('width: 346.666')
+    expect(tiles[1].attributes('style')).toContain('width: 346.666')
+  })
+
+  it('keeps media and videos in the same absolute tile model', async () => {
+    const wrapper = mountGrid([
+      createMedia({ id: 'image', mimeType: 'image/jpeg', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'video', mimeType: 'video/mp4', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'file', mimeType: 'application/octet-stream', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'image-2', mimeType: 'image/jpeg', imageWidth: 1000, imageHeight: 1000 })
+    ])
+
+    await settleLayout()
+
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(4)
+    expect(wrapper.findAll('img')).toHaveLength(2)
+    expect(wrapper.findAll('video')).toHaveLength(1)
+    expect(wrapper.find('.media-grid-icon').exists()).toBe(true)
+  })
+
+  it('opens the lightbox using tile order', async () => {
+    const wrapper = mountGrid([
+      createMedia({ id: 'a', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'b', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'c', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'd', imageWidth: 1000, imageHeight: 1000 })
+    ])
+
+    await settleLayout()
+    await wrapper.findAll('.media-grid-tile')[1].trigger('click')
+
+    expect(wrapper.find('.media-lightbox').text()).toContain('b true true')
   })
 
   it('does not show the streaming loader below an already rendered grid', async () => {
     const wrapper = mountGrid(
-      Array.from({ length: 5 }, (_, index) =>
+      Array.from({ length: 4 }, (_, index) =>
         createMedia({
           id: `media-${index}`,
           imageWidth: 1000,
@@ -178,14 +211,13 @@ describe('ExplorerMediaGrid', () => {
       )
     )
 
-    await nextTick()
-
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+    await settleLayout()
+    expect(wrapper.find('.media-grid-tile').exists()).toBe(true)
 
     await wrapper.setProps({ streaming: true })
-    await nextTick()
+    await settleLayout()
 
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-tile').exists()).toBe(true)
     expect(wrapper.find('.explorer-loading').exists()).toBe(false)
   })
 
@@ -195,17 +227,17 @@ describe('ExplorerMediaGrid', () => {
       true
     )
 
-    await nextTick()
+    await settleLayout()
 
     expect(wrapper.find('.media-grid-placeholder').exists()).toBe(true)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(false)
+    expect(wrapper.find('.media-grid-tile').exists()).toBe(false)
     expect(wrapper.text()).toContain('Medien werden geladen...')
 
     await wrapper.setProps({ streaming: false })
-    await nextTick()
+    await settleLayout()
 
     expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-tile').exists()).toBe(true)
   })
 
   it('publishes completed rows while keeping the streaming widow row buffered', async () => {
@@ -220,18 +252,14 @@ describe('ExplorerMediaGrid', () => {
       true
     )
 
-    await nextTick()
+    await settleLayout()
 
-    expect(wrapper.findAll('.media-grid-row')).toHaveLength(1)
-    expect(wrapper.find('.media-grid-row-justify').exists()).toBe(true)
-    expect(wrapper.findAllComponents(ExplorerMediaCard)).toHaveLength(5)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(4)
 
     await wrapper.setProps({ streaming: false })
-    await nextTick()
+    await settleLayout()
 
-    expect(wrapper.findAll('.media-grid-row')).toHaveLength(2)
-    expect(wrapper.findAllComponents(ExplorerMediaCard)).toHaveLength(6)
-    expect(wrapper.find('.media-grid-row-center').exists()).toBe(true)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(6)
   })
 
   it('shows the streaming loader while the media stream has not yielded items', async () => {
@@ -241,28 +269,5 @@ describe('ExplorerMediaGrid', () => {
 
     expect(wrapper.find('.explorer-loading').exists()).toBe(true)
     expect(wrapper.text()).toContain('Medien werden geladen...')
-  })
-
-  it('applies browser aspect ratio updates in one animation frame', async () => {
-    const wrapper = mountGrid([
-      createMedia({ id: 'a', imageWidth: null, imageHeight: null }),
-      createMedia({ id: 'b', imageWidth: null, imageHeight: null })
-    ])
-    await nextTick()
-
-    const probeCards = wrapper.findAllComponents(ExplorerMediaCard)
-    await probeCards[0].vm.$emit('aspectRatio', 16 / 9)
-    await probeCards[1].vm.$emit('aspectRatio', 1)
-    await nextTick()
-
-    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(true)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(false)
-
-    runAnimationFrames()
-    await nextTick()
-
-    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
-    expect(wrapper.find('.media-grid-row').exists()).toBe(true)
-    expect(wrapper.findAllComponents(ExplorerMediaCard)).toHaveLength(2)
   })
 })

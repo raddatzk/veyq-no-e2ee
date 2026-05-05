@@ -221,42 +221,6 @@ describe('explorer cards', () => {
     expect(wrapper.emitted('open')).toHaveLength(1)
   })
 
-  it('emits image aspect ratio when media dimensions are available', async () => {
-    const wrapper = mount(ExplorerMediaCard, {
-      props: {
-        width: 320,
-        height: 180,
-        media: {
-          id: 'media-1',
-          title: 'Beach',
-          albumPath: '/@family/trip',
-          ownerUserId: 1,
-          uploaderDisplayName: 'Kevin',
-          createdAt: '2026-01-01T00:00:00Z',
-          capturedAt: null,
-          capturedAtOverride: false,
-          mimeType: 'image/jpeg',
-          sizeBytes: 1234,
-          contentUrl: '/api/media/media-1/content',
-          cameraMake: null,
-          cameraModel: null,
-          lensModel: null,
-          imageWidth: null,
-          imageHeight: null,
-          gpsLatitude: null,
-          gpsLongitude: null
-        }
-      }
-    })
-    const image = wrapper.find('img').element as HTMLImageElement
-    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 1600 })
-    Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 900 })
-
-    await wrapper.find('img').trigger('load')
-
-    expect(wrapper.emitted('aspectRatio')?.[0]).toEqual([1600 / 900])
-  })
-
   it('keeps videos visible in the media grid layout', () => {
     const wrapper = mount(ExplorerMediaCard, {
       props: {
@@ -289,39 +253,4 @@ describe('explorer cards', () => {
     expect(wrapper.find('video').exists()).toBe(true)
   })
 
-  it('emits video aspect ratio when metadata is available', async () => {
-    const wrapper = mount(ExplorerMediaCard, {
-      props: {
-        width: 320,
-        height: 180,
-        media: {
-          id: 'media-2',
-          title: 'Clip',
-          albumPath: '/@family/trip',
-          ownerUserId: 1,
-          uploaderDisplayName: 'Kevin',
-          createdAt: '2026-01-01T00:00:00Z',
-          capturedAt: null,
-          capturedAtOverride: false,
-          mimeType: 'video/mp4',
-          sizeBytes: 5678,
-          contentUrl: '/api/media/media-2/content',
-          cameraMake: null,
-          cameraModel: null,
-          lensModel: null,
-          imageWidth: null,
-          imageHeight: null,
-          gpsLatitude: null,
-          gpsLongitude: null
-        }
-      }
-    })
-    const video = wrapper.find('video').element as HTMLVideoElement
-    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1920 })
-    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 1080 })
-
-    await wrapper.find('video').trigger('loadedmetadata')
-
-    expect(wrapper.emitted('aspectRatio')?.[0]).toEqual([1920 / 1080])
-  })
 })
