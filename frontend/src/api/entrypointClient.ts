@@ -1,5 +1,5 @@
 import type { TenantSummary, UserSummary } from '../authState'
-import { callApi } from './httpClient'
+import { frontendApi, generatedCall } from './generatedClient'
 
 export type EntrypointSummary = {
   serverId: string
@@ -8,5 +8,5 @@ export type EntrypointSummary = {
 }
 
 export async function bootstrap(): Promise<EntrypointSummary> {
-  return callApi('/api/frontend/bootstrap')
+  return generatedCall(frontendApi.entrypoint())
 }

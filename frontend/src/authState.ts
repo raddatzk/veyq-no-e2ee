@@ -1,6 +1,5 @@
 import { reactive } from 'vue'
-import type { TenantSummary } from './api/generated/tenants'
-import type { UserSummary } from './api/generated/users'
+import type { TenantSummary, UserSummary } from './api/generated'
 
 export type { TenantSummary, UserSummary }
 

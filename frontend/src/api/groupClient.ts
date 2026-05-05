@@ -1,5 +1,5 @@
 import { generatedCall, groupsApi } from './generatedClient'
-import type { SimplifiedGroupSummary } from './generated/groups'
+import type { SimplifiedGroupSummary } from './generated'
 
 export type TenantGroup = SimplifiedGroupSummary
 

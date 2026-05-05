@@ -1,38 +1,37 @@
 import { apiError, apiFetchUrl, API_BASE } from '../shared/api/httpClient'
-import { AuthApi, Configuration as AuthConfiguration } from './generated/auth'
-import { ExplorerApi, Configuration as ExplorerConfiguration } from './generated/explorer'
-import { GroupsApi, Configuration as GroupsConfiguration } from './generated/groups'
 import {
   AlbumsApi,
-  Configuration as LibraryConfiguration,
+  AuthApi,
+  Configuration,
+  ExplorerApi,
   FoldersApi,
+  FrontendApi,
+  GroupsApi,
   MediaApi,
-  MediaUploadsApi
-} from './generated/library'
-import { ServerApi, Configuration as ServerConfiguration } from './generated/server'
-import { SettingsApi, Configuration as SettingsConfiguration } from './generated/settings'
-import { SetupApi, Configuration as SetupConfiguration } from './generated/setup'
-import { TenantsApi, Configuration as TenantsConfiguration } from './generated/tenants'
-import { UsersApi, Configuration as UsersConfiguration } from './generated/users'
+  MediaUploadsApi,
+  ServerApi,
+  SettingsApi,
+  SetupApi,
+  TenantsApi,
+  UsersApi
+} from './generated'
 
 const fetchApi: typeof fetch = (url, init) => apiFetchUrl(String(url), init)
+const generatedConfiguration = new Configuration({ basePath: API_BASE, fetchApi })
 
-export const authApi = new AuthApi(new AuthConfiguration({ basePath: API_BASE, fetchApi }))
-export const setupApi = new SetupApi(new SetupConfiguration({ basePath: API_BASE, fetchApi }))
-export const usersApi = new UsersApi(new UsersConfiguration({ basePath: API_BASE, fetchApi }))
-export const tenantsApi = new TenantsApi(new TenantsConfiguration({ basePath: API_BASE, fetchApi }))
-export const groupsApi = new GroupsApi(new GroupsConfiguration({ basePath: API_BASE, fetchApi }))
-export const explorerApi = new ExplorerApi(new ExplorerConfiguration({ basePath: API_BASE, fetchApi }))
-export const foldersApi = new FoldersApi(new LibraryConfiguration({ basePath: API_BASE, fetchApi }))
-export const albumsApi = new AlbumsApi(new LibraryConfiguration({ basePath: API_BASE, fetchApi }))
-export const mediaApi = new MediaApi(new LibraryConfiguration({ basePath: API_BASE, fetchApi }))
-export const mediaUploadsApi = new MediaUploadsApi(
-  new LibraryConfiguration({ basePath: API_BASE, fetchApi })
-)
-export const serverApi = new ServerApi(new ServerConfiguration({ basePath: API_BASE, fetchApi }))
-export const settingsApi = new SettingsApi(
-  new SettingsConfiguration({ basePath: API_BASE, fetchApi })
-)
+export const authApi = new AuthApi(generatedConfiguration)
+export const setupApi = new SetupApi(generatedConfiguration)
+export const usersApi = new UsersApi(generatedConfiguration)
+export const tenantsApi = new TenantsApi(generatedConfiguration)
+export const groupsApi = new GroupsApi(generatedConfiguration)
+export const explorerApi = new ExplorerApi(generatedConfiguration)
+export const foldersApi = new FoldersApi(generatedConfiguration)
+export const albumsApi = new AlbumsApi(generatedConfiguration)
+export const mediaApi = new MediaApi(generatedConfiguration)
+export const mediaUploadsApi = new MediaUploadsApi(generatedConfiguration)
+export const serverApi = new ServerApi(generatedConfiguration)
+export const settingsApi = new SettingsApi(generatedConfiguration)
+export const frontendApi = new FrontendApi(generatedConfiguration)
 
 export async function generatedCall<T>(request: Promise<T>): Promise<T> {
   try {

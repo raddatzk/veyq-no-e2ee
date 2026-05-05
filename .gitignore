@@ -222,7 +222,7 @@ $RECYCLE.BIN/
 ### Gradle ###
 .gradle
 **/build/
-!src/**/build/
+!justifiedgrid/**/build/
 
 # Ignore Gradle GUI config
 gradle-app.setting

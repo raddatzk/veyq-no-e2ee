@@ -3,7 +3,7 @@ import type {
   CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest,
   MoveLibraryItemRequest as GeneratedMoveLibraryItemRequest,
   UpdateLibraryItemRequest as GeneratedUpdateLibraryItemRequest
-} from '../../../api/generated/library'
+} from '../../../api/generated'
 import type {
   CreateLibraryItemRequest,
   ExplorerAlbum,

@@ -1,4 +1,4 @@
-import type { LoginResponse } from './generated/users'
+import type { LoginResponse } from './authClient'
 import { generatedCall, usersApi } from './generatedClient'
 
 export async function acceptInvitation(

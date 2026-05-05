@@ -1,5 +1,5 @@
 import { generatedCall, tenantsApi } from './generatedClient'
-import type { TenantSummary } from './generated/tenants'
+import type { TenantSummary } from './generated'
 
 export type { TenantSummary }
 

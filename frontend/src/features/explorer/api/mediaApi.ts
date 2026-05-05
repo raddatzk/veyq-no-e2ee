@@ -4,11 +4,10 @@ import {
   mediaUploadsApi
 } from '../../../api/generatedClient'
 import type {
+  MediaSummary,
   PendingMediaUploadSummary,
-  StreamMediaSummary,
-  UpdateMediaMetadataRequest as GeneratedUpdateMediaMetadataRequest,
-  UploadMediaSummary
-} from '../../../api/generated/library'
+  UpdateMediaMetadataRequest as GeneratedUpdateMediaMetadataRequest
+} from '../../../api/generated'
 import { apiFetch } from '../../../shared/api/httpClient'
 import { pathQuery, tenantApiPath } from '../../../shared/utils/paths'
 import type {
@@ -134,7 +133,7 @@ function parseNdjson(text: string, onItem: (item: ExplorerMedia) => void) {
 function parseLine(line: string, onItem: (item: ExplorerMedia) => void) {
   const trimmed = line.trim()
   if (!trimmed) return
-  onItem(normalizeMedia(JSON.parse(trimmed) as StreamMediaSummary))
+  onItem(normalizeMedia(JSON.parse(trimmed) as MediaSummary))
 }
 
 function normalizeUpload(upload: PendingMediaUploadSummary): PendingMediaUploadSession {
@@ -144,7 +143,7 @@ function normalizeUpload(upload: PendingMediaUploadSummary): PendingMediaUploadS
   }
 }
 
-function normalizeMedia(media: StreamMediaSummary | UploadMediaSummary): ExplorerMedia {
+function normalizeMedia(media: MediaSummary): ExplorerMedia {
   return {
     ...media,
     albumPath: media.albumPath ?? null,

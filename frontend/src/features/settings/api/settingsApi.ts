@@ -8,7 +8,7 @@ import type {
   ChangePasswordRequest,
   CreateManagedUserRequest,
   ManagedUserSummary,
-  ManagedUsersResponse,
+  ManagedUsersSummary,
   ServerRole,
   ServerSettingsResponse,
   SettingsResponse,
@@ -36,7 +36,7 @@ export function changeMyPassword(request: ChangePasswordRequest): Promise<void> 
   return generatedCall(usersApi.changeMyPassword({ changePasswordRequest: request }))
 }
 
-export function getManagedUsers(): Promise<ManagedUsersResponse> {
+export function getManagedUsers(): Promise<ManagedUsersSummary> {
   return generatedCall(usersApi.getAllUsers())
 }
 
@@ -49,10 +49,18 @@ export function updateManagedUserRole(
   serverRole: ServerRole
 ): Promise<ManagedUserSummary> {
   return generatedCall(
-    usersApi.updateManagedUser({ userId, updateManagedUserRequest: { serverRole } })
-  )
+    usersApi.updateManagedUser({ userId, updateManagedUserRoleRequest: { serverRole } })
+  ).then((summary) => findManagedUser(summary, userId))
 }
 
 export function resendManagedUserInvitation(userId: number): Promise<ManagedUserSummary> {
   return generatedCall(usersApi.sendManagedUserInvitation({ userId }))
+}
+
+function findManagedUser(summary: ManagedUsersSummary, userId: number): ManagedUserSummary {
+  const user = summary.users.find((item) => item.userId === userId)
+  if (!user) {
+    throw new Error('Aktualisierter User fehlt in der API-Antwort.')
+  }
+  return user
 }

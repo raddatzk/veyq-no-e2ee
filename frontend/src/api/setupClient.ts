@@ -1,5 +1,5 @@
 import { generatedCall, setupApi } from './generatedClient'
-import type { AdminSetupRequest, SetupStatusSummary } from './generated/setup'
+import type { AdminSetupRequest, SetupStatusSummary } from './generated'
 
 export type SetupStatusResponse = SetupStatusSummary
 export type { AdminSetupRequest }

@@ -7,17 +7,17 @@ import type {
   ExplorerScopeRoot,
   LocationKind as ExplorerLocationKind,
   OwnerBadge
-} from '../../../api/generated/explorer'
+} from '../../../api/generated'
 import type {
   CreateLibraryItemRequest as GeneratedCreateLibraryItemRequest,
   LibraryScopeRequest,
+  MediaSummary,
   MediaUploadSessionSummary,
   MoveLibraryItemRequest as GeneratedMoveLibraryItemRequest,
   PendingMediaUploadSummary as GeneratedPendingMediaUploadSummary,
-  StreamMediaSummary,
   UpdateLibraryItemRequest as GeneratedUpdateLibraryItemRequest,
   UpdateMediaMetadataRequest as GeneratedUpdateMediaMetadataRequest
-} from '../../../api/generated/library'
+} from '../../../api/generated'
 
 export type {
   ExplorerAlbum,
@@ -33,7 +33,7 @@ export type {
 
 export type LibraryItemType = 'folder' | 'album'
 export type ExplorerMedia = Omit<
-  StreamMediaSummary,
+  MediaSummary,
   | 'albumPath'
   | 'capturedAt'
   | 'cameraMake'

@@ -4,16 +4,16 @@ export type {
   SettingsResponse,
   SettingsSubject,
   SettingsSubjectType
-} from '../../../api/generated/settings'
-export type { ServerSettingsResponse } from '../../../api/generated/server'
+} from '../../../api/generated'
+export type { ServerSettingsResponse } from '../../../api/generated'
 export type {
   ChangePasswordRequest,
   CreateManagedUserRequest,
   ManagedUserSummary,
   ManagedUserTenantSummary,
-  ManagedUsersResponse,
+  ManagedUsersSummary,
   ServerRole,
   UpdateUserSettingsRequest,
   UserStatus as ManagedUserStatus,
   UserSummary as UserSettingsResponse
-} from '../../../api/generated/users'
+} from '../../../api/generated'
