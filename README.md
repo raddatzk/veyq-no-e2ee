@@ -230,5 +230,3 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
 - manage tenant users
 - create group
 - manage group
-- cleanup reset password
-- cleanup change email

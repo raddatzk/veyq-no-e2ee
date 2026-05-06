@@ -1,5 +1,6 @@
-package com.lunva.api.auth.token
+package com.lunva.api.cron
 
+import com.lunva.api.auth.token.TokenConfig
 import com.lunva.api.domain.AccessTokenRepo
 import com.lunva.api.domain.RefreshTokenRepo
 import io.quarkus.scheduler.Scheduled
@@ -15,7 +16,7 @@ class TokenCleanup @Inject constructor(
 ) {
 
     @Transactional
-//    @Scheduled(cron = "{app.auth.token.cleanup-cron}")
+    @Scheduled(cron = "{lunva.auth.token.cleanup-cron}")
     fun cleanup() {
         accessTokenRepo.deleteExpiredToken(tokenConfig.cleanupAccessTokenAuditDays)
         refreshTokenRepo.deleteExpiredToken(tokenConfig.cleanupRefreshTokenAuditDays)

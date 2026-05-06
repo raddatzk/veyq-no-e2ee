@@ -7,4 +7,16 @@ import io.smallrye.config.WithName
 interface UserConfig {
     @get:WithName("invitation-ttl-days")
     val invitationTtlDays: Long
+
+    @get:WithName("email-change-ttl-hours")
+    val emailChangeTtlHours: Long
+
+    @get:WithName("reset-password-ttl-hours")
+    val resetPasswordTtlHours: Long
+
+    @get:WithName("cleanup-cron")
+    val cleanupCron: String
+
+    @get:WithName("cleanup-retention-days")
+    val cleanupRetentionDays: Long
 }

@@ -1,6 +1,6 @@
 package com.lunva.api.auth
 
-import com.lunva.api.auth.token.TokenCleanup
+import com.lunva.api.cron.TokenCleanup
 import com.lunva.api.domain.AccessToken
 import com.lunva.api.domain.AccessTokenRepo
 import com.lunva.api.domain.RefreshToken

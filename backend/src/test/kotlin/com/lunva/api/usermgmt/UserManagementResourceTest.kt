@@ -1,6 +1,7 @@
 package com.lunva.api.usermgmt
 
 import com.lunva.api.auth.PasswordService
+import com.lunva.api.domain.ResetPasswordTokenRepo
 import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.Tenant
 import com.lunva.api.domain.TenantMember
@@ -35,6 +36,7 @@ class UserManagementResourceTest {
     @Inject lateinit var tenantMemberRepo: TenantMemberRepo
     @Inject lateinit var invitationRepo: UserInvitationRepo
     @Inject lateinit var emailChangeRepo: UserEmailChangeRepo
+    @Inject lateinit var resetPasswordTokenRepo: ResetPasswordTokenRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var transaction: UserTransaction
@@ -79,6 +81,8 @@ class UserManagementResourceTest {
         val message = mailbox.getMailMessagesSentTo("invitee-$runId@example.com").single()
         assertThat(message.text).contains("https://${tenant.domain}/invite/$invitedUserId#")
         val token = message.text.substringAfter("/invite/$invitedUserId#").trim()
+        val pendingInvitation = invitationRepo.listAll().single { it.user.email == "invitee-$runId@example.com" }
+        assertExpiresAround(pendingInvitation.expiresAt, Duration.ofDays(7))
 
         given()
             .contentType("application/json")
@@ -130,6 +134,8 @@ class UserManagementResourceTest {
             .statusCode(200)
 
         val token = emailChangeTokenFromMailbox(pendingEmail)
+        val pendingChange = emailChangeRepo.findLatestOpenByUser(userRepo.findByEmail(currentEmail)!!)!!
+        assertExpiresAround(pendingChange.expiresAt, Duration.ofHours(24))
 
         given()
             .contentType("application/json")
@@ -200,6 +206,8 @@ class UserManagementResourceTest {
         val resetUserId = resetPath.substringBefore("#").toLong()
         val resetToken = resetPath.substringAfter("#")
         assertThat(resetToken).doesNotContain("/")
+        val resetPasswordToken = resetPasswordTokenRepo.listOpenByUser(userRepo.findByEmail(currentEmail)!!).single()
+        assertExpiresAround(resetPasswordToken.expiresAt, Duration.ofHours(2))
 
         given()
             .contentType("application/json")
@@ -358,6 +366,13 @@ class UserManagementResourceTest {
         val message = mailbox.getMailMessagesSentTo(pendingEmail).last()
         assertThat(message.text).contains("/email/confirm#")
         return message.text.substringAfter("/email/confirm#").trim()
+    }
+
+    private fun assertExpiresAround(expiresAt: Instant, expectedAfter: Duration) {
+        val expected = Instant.now().plus(expectedAfter)
+        assertThat(expiresAt)
+            .isAfter(expected.minus(Duration.ofMinutes(1)))
+            .isBefore(expected.plus(Duration.ofMinutes(1)))
     }
 
     private fun createUser(name: String, password: String, role: ServerRole): User =

@@ -42,7 +42,7 @@ class EmailChangeService @Inject constructor(
             it.pendingEmail = pendingEmail
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
-            it.expiresAt = now.plus(Duration.ofDays(userConfig.invitationTtlDays))
+            it.expiresAt = now.plus(Duration.ofHours(userConfig.emailChangeTtlHours))
             emailChangeRepo.persist(it)
         }
 

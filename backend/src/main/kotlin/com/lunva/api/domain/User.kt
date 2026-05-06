@@ -85,4 +85,7 @@ class ResetPasswordTokenRepo : PanacheRepository<ResetPasswordToken> {
 
     fun listOpenByUser(user: User): List<ResetPasswordToken> =
         list("user = ?1 and acceptedAt is null and revokedAt is null", user)
+
+    fun deleteInvalidBefore(cutoff: Instant): Long =
+        delete("expiresAt < ?1 or acceptedAt < ?1 or revokedAt < ?1", cutoff)
 }
