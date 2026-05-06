@@ -37,7 +37,7 @@ describe('SettingsView', () => {
     await flushPromises()
 
     expect(getSettingsMock).toHaveBeenCalledWith('/friends/@family/settings')
-    expect(wrapper.text()).toContain('@Family')
+    expect(wrapper.text()).toContain('Group settings family')
   })
 })
 
@@ -80,6 +80,11 @@ function viewStubs() {
     Message: { template: '<div><slot /></div>' },
     ProgressSpinner: { template: '<div />' },
     ServerSettingsPanel: { template: '<section>Server settings</section>' },
+    GroupSettingsPanel: {
+      template: '<section>Group settings {{ groupName }}</section>',
+      props: ['groupName']
+    },
+    TenantSettingsPanel: { template: '<section>Tenant settings</section>' },
     UserSettingsForm: { template: '<section>User settings</section>' }
   }
 }

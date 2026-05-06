@@ -5,6 +5,7 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { clearExplorerToolbar, setExplorerToolbar } from '../composables/useExplorerToolbar'
 import { getSettings, type SettingsResponse } from '../features/settings/api'
+import GroupSettingsPanel from '../features/settings/components/GroupSettingsPanel.vue'
 import ServerSettingsPanel from '../features/settings/components/ServerSettingsPanel.vue'
 import TenantSettingsPanel from '../features/settings/components/TenantSettingsPanel.vue'
 import UserSettingsForm from '../features/settings/components/UserSettingsForm.vue'
@@ -14,6 +15,10 @@ const router = useRouter()
 
 const settingsPath = computed(() => route.path || '/')
 const tenantName = computed(() => settingsPath.value.trim().split('/').filter(Boolean)[0] || '')
+const groupName = computed(() => {
+  const groupSegment = settingsPath.value.trim().split('/').find((segment) => segment.startsWith('@'))
+  return groupSegment ? groupSegment.substring(1) : ''
+})
 const settings = ref<SettingsResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -63,9 +68,14 @@ function navigateToPath(path: string) {
     <template v-else-if="settings">
       <ServerSettingsPanel v-if="settings.subject.type === 'SERVER'" />
       <UserSettingsForm v-else-if="settings.subject.type === 'USER'" />
-      <TenantSettingsPanel
-        v-else-if="settings.subject.type === 'TENANT'"
+      <template v-else-if="settings.subject.type === 'TENANT'">
+        <TenantSettingsPanel :tenant-name="tenantName" />
+        <GroupSettingsPanel :tenant-name="tenantName" />
+      </template>
+      <GroupSettingsPanel
+        v-else-if="settings.subject.type === 'GROUP'"
         :tenant-name="tenantName"
+        :group-name="groupName"
       />
       <section v-else class="settings-panel">
         <h1>{{ settings.subject.label }}</h1>
