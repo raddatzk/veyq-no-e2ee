@@ -78,14 +78,3 @@ components:
       example:
         displayName: Lunva
         userManagementAvailable: true
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - message
-      properties:
-        message:
-          type: string
-          description: Fehlerbeschreibung fuer Clients und Tests.
-          examples:
-          - Authentication required

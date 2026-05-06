@@ -30,7 +30,7 @@ paths:
       operationId: getExplorer
       parameters:
       - name: tenantName
-        "$ref": "#/components/parameters/TenantName"
+        "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
       - name: path
         "$ref": "#/components/parameters/Path"
       responses:
@@ -56,15 +56,6 @@ components:
       name: LUNVA_ACCESS_TOKEN
       description: HttpOnly access token cookie set by the login endpoint.
   parameters:
-    TenantName:
-      in: path
-      required: true
-      description: Technical tenant name from the URL.
-      name: tenantName
-      schema:
-        type: string
-      example: familie
-
     Path:
       in: query
       required: false

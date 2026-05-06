@@ -1046,7 +1046,7 @@ components:
         name:
           type: string
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         path:
           type: string
         ownerBadge:
@@ -1072,7 +1072,7 @@ components:
         name:
           type: string
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         path:
           type: string
         coverMediaId:
@@ -1099,7 +1099,7 @@ components:
         name:
           type: string
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         scope:
           "$ref": "#/components/schemas/LibraryScopeRequest"
           nullable: true
@@ -1126,7 +1126,7 @@ components:
           type: string
           nullable: true
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
           nullable: true
       example:
         path: "/urlaub"
@@ -1202,6 +1202,8 @@ components:
       properties:
         tenantName:
           type: string
+          x-field-extra-annotation:
+            - '@field:com.lunva.api.common.validation.Normalize'
         albumPath:
           type: string
         filename:
@@ -1214,6 +1216,8 @@ components:
         title:
           type: string
           nullable: true
+          x-field-extra-annotation:
+            - '@field:com.lunva.api.common.validation.Normalize'
       example:
         tenantName: friends
         albumPath: "/@family/vacation/beach"
@@ -1271,6 +1275,8 @@ components:
           format: int64
         title:
           type: string
+          x-field-extra-annotation:
+            - '@field:com.lunva.api.common.validation.Normalize'
         chunkSizeBytes:
           type: integer
           format: int64

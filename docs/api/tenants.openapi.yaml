@@ -670,10 +670,14 @@ components:
       properties:
         name:
           type: string
+          x-field-extra-annotation:
+            - '@field:com.lunva.api.common.validation.Normalize'
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         domain:
           type: string
+          x-field-extra-annotation:
+            - '@field:com.lunva.api.common.validation.Host'
       example:
         name: friends
         displayName: Friends
@@ -862,7 +866,7 @@ components:
       - displayName
       properties:
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
       example:
         displayName: Friends & Family
     UpdateGroupSettingsRequest:
@@ -872,7 +876,7 @@ components:
         - displayName
       properties:
         displayName:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
       example:
         displayName: Friends & Family
     UpdateTenantUserRoleRequest:
