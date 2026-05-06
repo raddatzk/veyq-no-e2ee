@@ -11,6 +11,7 @@ type GalleryItem = {
   id: string
   aspectRatio: number
   mediaUrl: string
+  previewUrl: string | null
   alt: string
   media: ExplorerMedia
 }
@@ -28,7 +29,8 @@ const mediaGrid = ref<HTMLElement | null>(null)
 const containerWidth = ref(0)
 const layout = ref<MediaGridLayoutResult>({ tiles: [], height: 0 })
 const shouldRequestMedia = ref(false)
-const loadedTileKeys = ref<Set<string>>(new Set())
+const loadedPreviewKeys = ref<Set<string>>(new Set())
+const loadedOriginalKeys = ref<Set<string>>(new Set())
 const mediaOverrides = ref<Record<string, ExplorerMedia>>({})
 let mediaGridObserver: ResizeObserver | null = null
 let layoutSequence = 0
@@ -38,6 +40,7 @@ const galleryItems = computed<GalleryItem[]>(() =>
     id: media.id,
     aspectRatio: mediaAspectRatio(media),
     mediaUrl: `${API_BASE}${media.contentUrl}`,
+    previewUrl: media.previewUrl ? `${API_BASE}${media.previewUrl}` : null,
     alt: media.title || media.id,
     media
   }))
@@ -64,6 +67,11 @@ const canShowNext = computed(
   () => selectedIndex.value !== null && selectedIndex.value < visibleMedia.value.length - 1
 )
 const canRenderGallery = computed(() => galleryTiles.value.length > 0)
+const canRequestOriginalMedia = computed(
+  () =>
+    galleryTiles.value.length > 0 &&
+    galleryTiles.value.every((tile) => !hasPreview(tile) || isPreviewLoaded(tile))
+)
 const layoutSignature = computed(() =>
   props.media
     .map((item) => `${item.id}:${item.imageWidth ?? ''}x${item.imageHeight ?? ''}`)
@@ -95,11 +103,7 @@ watch(
     mediaOverrides.value = Object.fromEntries(
       Object.entries(mediaOverrides.value).filter(([mediaId]) => currentIds.has(mediaId))
     )
-    loadedTileKeys.value = new Set(
-      [...loadedTileKeys.value].filter((key) =>
-        galleryItems.value.some((item) => tileLoadKey(item) === key)
-      )
-    )
+    pruneLoadedMediaKeys()
 
     if (selectedIndex.value !== null && selectedIndex.value >= visibleMedia.value.length) closeLightbox()
   }
@@ -114,6 +118,10 @@ watch(
 )
 
 watch(mediaGrid, attachMediaGridObserver, { flush: 'post' })
+
+watch(canRequestOriginalMedia, (canRequest) => {
+  if (canRequest) preloadOriginalImages()
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
@@ -175,18 +183,83 @@ function isVideo(media: ExplorerMedia): boolean {
   return Boolean(media.mimeType?.startsWith('video/'))
 }
 
-function tileLoadKey(tile: Pick<GalleryTile, 'id' | 'mediaUrl'>): string {
-  return `${tile.id}:${tile.mediaUrl}`
+function hasPreview(tile: Pick<GalleryTile, 'previewUrl'>): boolean {
+  return Boolean(tile.previewUrl)
 }
 
-function isTileLoaded(tile: GalleryTile): boolean {
-  return loadedTileKeys.value.has(tileLoadKey(tile))
+function usesPreviewImage(tile: GalleryTile): boolean {
+  return isImage(tile.media) || (isVideo(tile.media) && hasPreview(tile))
 }
 
-function markTileLoaded(tile: GalleryTile) {
-  const key = tileLoadKey(tile)
-  if (loadedTileKeys.value.has(key)) return
-  loadedTileKeys.value = new Set([...loadedTileKeys.value, key])
+function mediaLoadKey(tile: Pick<GalleryTile, 'id'>, url: string): string {
+  return `${tile.id}:${url}`
+}
+
+function previewLoadKey(tile: GalleryTile): string {
+  return mediaLoadKey(tile, tile.previewUrl || tile.mediaUrl)
+}
+
+function originalLoadKey(tile: GalleryTile): string {
+  return mediaLoadKey(tile, tile.mediaUrl)
+}
+
+function isPreviewLoaded(tile: GalleryTile): boolean {
+  return loadedPreviewKeys.value.has(previewLoadKey(tile))
+}
+
+function isOriginalLoaded(tile: GalleryTile): boolean {
+  return loadedOriginalKeys.value.has(originalLoadKey(tile))
+}
+
+function markPreviewLoaded(tile: GalleryTile) {
+  const key = previewLoadKey(tile)
+  if (loadedPreviewKeys.value.has(key)) return
+  loadedPreviewKeys.value = new Set([...loadedPreviewKeys.value, key])
+}
+
+function markOriginalLoaded(tile: GalleryTile) {
+  const key = originalLoadKey(tile)
+  if (loadedOriginalKeys.value.has(key)) return
+  loadedOriginalKeys.value = new Set([...loadedOriginalKeys.value, key])
+}
+
+function markTileImageLoaded(tile: GalleryTile) {
+  if (tileImageUrl(tile) === tile.mediaUrl && canRequestOriginalMedia.value) {
+    markOriginalLoaded(tile)
+  } else {
+    markPreviewLoaded(tile)
+  }
+}
+
+function tileImageUrl(tile: GalleryTile): string {
+  return isImage(tile.media) && canRequestOriginalMedia.value && isOriginalLoaded(tile)
+    ? tile.mediaUrl
+    : tile.previewUrl || tile.mediaUrl
+}
+
+function isTileDisplayLoaded(tile: GalleryTile): boolean {
+  return usesPreviewImage(tile)
+    ? isPreviewLoaded(tile) || isOriginalLoaded(tile)
+    : isVideo(tile.media)
+      ? isOriginalLoaded(tile)
+      : true
+}
+
+function preloadOriginalImages() {
+  galleryTiles.value
+    .filter((tile) => isImage(tile.media) && !isOriginalLoaded(tile))
+    .forEach((tile) => {
+      const image = new Image()
+      image.onload = () => markOriginalLoaded(tile)
+      image.src = tile.mediaUrl
+    })
+}
+
+function pruneLoadedMediaKeys() {
+  const previewKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.previewUrl || item.mediaUrl)))
+  const originalKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.mediaUrl)))
+  loadedPreviewKeys.value = new Set([...loadedPreviewKeys.value].filter((key) => previewKeys.has(key)))
+  loadedOriginalKeys.value = new Set([...loadedOriginalKeys.value].filter((key) => originalKeys.has(key)))
 }
 
 function openLightbox(index: number) {
@@ -250,28 +323,28 @@ function handleKeydown(event: KeyboardEvent) {
         >
           <template v-if="shouldRequestMedia">
             <img
-              v-if="isImage(tile.media)"
+              v-if="usesPreviewImage(tile)"
               class="media-grid-tile-media"
-              :class="{ 'media-grid-tile-media-loaded': isTileLoaded(tile) }"
-              :src="tile.mediaUrl"
+              :class="{ 'media-grid-tile-media-loaded': isTileDisplayLoaded(tile) }"
+              :src="tileImageUrl(tile)"
               :alt="tile.alt"
-              loading="lazy"
+              loading="eager"
               decoding="async"
-              @load="markTileLoaded(tile)"
+              @load="markTileImageLoaded(tile)"
             />
             <video
               v-else-if="isVideo(tile.media)"
               class="media-grid-tile-media"
-              :class="{ 'media-grid-tile-media-loaded': isTileLoaded(tile) }"
+              :class="{ 'media-grid-tile-media-loaded': isTileDisplayLoaded(tile) }"
               :src="tile.mediaUrl"
               preload="metadata"
               muted
               playsinline
-              @loadedmetadata="markTileLoaded(tile)"
+              @loadedmetadata="markOriginalLoaded(tile)"
             />
             <span v-else class="pi pi-image media-grid-icon" />
             <span
-              v-if="(isImage(tile.media) || isVideo(tile.media)) && !isTileLoaded(tile)"
+              v-if="(isImage(tile.media) || isVideo(tile.media)) && !isTileDisplayLoaded(tile)"
               class="media-grid-tile-placeholder"
             />
           </template>

@@ -357,7 +357,7 @@ class OpenApiContractTest {
                 "library.openapi.yaml" -> when (operationId) {
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
                     "createAlbum", "deleteAlbum", "updateAlbum", "moveAlbum", "addMedia", "setCover" -> AlbumsApi::class.java
-                    "media", "upload", "content", "updateMetadata" -> MediaApi::class.java
+                    "media", "upload", "uploadMedia", "content", "preview", "updateMetadata" -> MediaApi::class.java
                     "createUpload", "listUploads", "getUpload", "abortUpload", "uploadChunk", "completeUpload" -> MediaUploadsApi::class.java
                     else -> error("No generated library interface mapping for $operationId")
                 }

@@ -19,6 +19,12 @@ interface MediaConfig {
     @get:WithName("upload-session-cleanup-cron")
     val uploadSessionCleanupCron: String
 
+    @get:WithName("ffmpeg-path")
+    val ffmpegPath: String
+
+    @get:WithName("preview-timeout-seconds")
+    val previewTimeoutSeconds: Long
+
     val chunkSizeBytes: Long
         get() = chunkSize.asLongValue()
 }

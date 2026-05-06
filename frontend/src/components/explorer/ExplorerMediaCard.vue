@@ -21,6 +21,10 @@ defineEmits<{
 const isImage = computed(() => props.media.mimeType?.startsWith('image/'))
 const isVideo = computed(() => props.media.mimeType?.startsWith('video/'))
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
+const previewUrl = computed(() =>
+  props.media.previewUrl ? `${API_BASE}${props.media.previewUrl}` : mediaUrl.value
+)
+const usesPreviewImage = computed(() => isImage.value || (isVideo.value && Boolean(props.media.previewUrl)))
 </script>
 
 <template>
@@ -32,8 +36,8 @@ const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
   >
     <span class="media-thumb">
       <img
-        v-if="isImage"
-        :src="mediaUrl"
+        v-if="usesPreviewImage"
+        :src="previewUrl"
         :alt="media.title || media.id"
         :loading="loading"
       />

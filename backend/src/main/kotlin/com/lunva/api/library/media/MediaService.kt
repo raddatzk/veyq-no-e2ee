@@ -19,6 +19,10 @@ import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.core.StreamingOutput
 import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.multipart.FileUpload
+import java.awt.Color
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -32,6 +36,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Comparator
 import java.util.Properties
+import java.util.concurrent.TimeUnit
 import java.util.UUID
 
 @Singleton
@@ -101,6 +106,7 @@ class MediaService @Inject constructor(
         writeMediaFile(uploadPath, storageKey)
         media.storageKey = storageKey
         mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
+        generatePreviewIfSupported(media)
         linkMedia(album, media)
 
         return media.toUploadSummary(album)
@@ -205,6 +211,7 @@ class MediaService @Inject constructor(
         assembleChunks(uploadId, chunkCount, session.sizeBytes, storageKey)
         media.storageKey = storageKey
         mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
+        generatePreviewIfSupported(media)
         linkMedia(album, media)
         deleteRecursively(uploadDirectory(uploadId))
 
@@ -258,6 +265,23 @@ class MediaService @Inject constructor(
             .header("Accept-Ranges", "bytes")
             .header("Content-Length", media.sizeBytes)
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
+            .build()
+    }
+
+    fun mediaPreview(publicId: String): Response {
+        val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
+            ?: throw NotFoundException("Media not found")
+        if (!isMediaAccessible(media) || !canGeneratePreview(media)) throw NotFoundException("Media not found")
+
+        val previewPath = previewPath(media)
+        if (!Files.isRegularFile(previewPath)) {
+            if (!generatePreview(media, throwOnFailure = false)) throw NotFoundException("Media preview not found")
+        }
+
+        return Response.ok(previewPath.toFile(), "image/jpeg")
+            .header("Cache-Control", "private, max-age=31536000, immutable")
+            .header("Content-Length", Files.size(previewPath))
+            .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(media.publicId)}-preview.jpg\"")
             .build()
     }
 
@@ -321,6 +345,104 @@ class MediaService @Inject constructor(
         } catch (e: Exception) {
             Files.deleteIfExists(temp)
             throw e
+        }
+    }
+
+    private fun generatePreviewIfSupported(media: Media) {
+        if (!canGeneratePreview(media)) return
+        generatePreview(media, throwOnFailure = false)
+    }
+
+    private fun generatePreview(media: Media, throwOnFailure: Boolean): Boolean {
+        val originalPath = storagePath(media.storageKey)
+        if (!Files.isRegularFile(originalPath)) return false
+        return when {
+            media.mimeType.startsWith("image/") -> generateImagePreview(media, originalPath, throwOnFailure)
+            media.mimeType.startsWith("video/") -> generateVideoPreview(media, originalPath, throwOnFailure)
+            else -> false
+        }
+    }
+
+    private fun generateImagePreview(media: Media, originalPath: Path, throwOnFailure: Boolean): Boolean {
+        val previewPath = previewPath(media)
+        Files.createDirectories(previewPath.parent)
+        val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
+        try {
+            val source = ImageIO.read(originalPath.toFile()) ?: return false
+            val scale = minOf(1.0, PREVIEW_MAX_EDGE.toDouble() / maxOf(source.width, source.height).toDouble())
+            val targetWidth = maxOf(1, (source.width * scale).toInt())
+            val targetHeight = maxOf(1, (source.height * scale).toInt())
+            val preview = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
+            val graphics = preview.createGraphics()
+            try {
+                graphics.color = Color.WHITE
+                graphics.fillRect(0, 0, targetWidth, targetHeight)
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                graphics.drawImage(source, 0, 0, targetWidth, targetHeight, null)
+            } finally {
+                graphics.dispose()
+            }
+            if (!ImageIO.write(preview, "jpg", temp.toFile())) return false
+            Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            return true
+        } catch (e: Exception) {
+            if (throwOnFailure) throw e
+            log.warn("Failed to generate media preview for ${media.publicId}: ${e.message}")
+            return false
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private fun generateVideoPreview(media: Media, originalPath: Path, throwOnFailure: Boolean): Boolean {
+        val previewPath = previewPath(media)
+        Files.createDirectories(previewPath.parent)
+        val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
+        val logFile = Files.createTempFile(previewPath.parent, "preview-", ".log")
+        try {
+            val process = ProcessBuilder(
+                mediaConfig.ffmpegPath,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-ss",
+                "00:00:01",
+                "-i",
+                originalPath.toString(),
+                "-frames:v",
+                "1",
+                "-vf",
+                "scale=720:720:force_original_aspect_ratio=decrease",
+                "-q:v",
+                "3",
+                temp.toString(),
+            )
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.to(logFile.toFile()))
+                .start()
+
+            val completed = process.waitFor(mediaConfig.previewTimeoutSeconds, TimeUnit.SECONDS)
+            if (!completed) {
+                process.destroyForcibly()
+                throw IOException("ffmpeg timed out after ${mediaConfig.previewTimeoutSeconds}s")
+            }
+            if (process.exitValue() != 0) {
+                val message = Files.readString(logFile).trim().take(500)
+                throw IOException("ffmpeg exited with ${process.exitValue()}: $message")
+            }
+            if (!Files.isRegularFile(temp) || Files.size(temp) <= 0) return false
+            Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            return true
+        } catch (e: Exception) {
+            if (throwOnFailure) throw e
+            log.warn("Failed to generate media preview for ${media.publicId}: ${e.message}")
+            return false
+        } finally {
+            Files.deleteIfExists(temp)
+            Files.deleteIfExists(logFile)
         }
     }
 
@@ -524,6 +646,7 @@ class MediaService @Inject constructor(
             mimeType = mimeType,
             sizeBytes = sizeBytes,
             contentUrl = contentUrl(),
+            previewUrl = previewUrl(),
             cameraMake = cameraMake,
             cameraModel = cameraModel,
             lensModel = lensModel,
@@ -546,6 +669,7 @@ class MediaService @Inject constructor(
             mimeType = mimeType,
             sizeBytes = sizeBytes,
             contentUrl = contentUrl(),
+            previewUrl = previewUrl(),
             cameraMake = cameraMake,
             cameraModel = cameraModel,
             lensModel = lensModel,
@@ -558,6 +682,15 @@ class MediaService @Inject constructor(
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/media/${url(publicId)}/content"
 
+    private fun Media.previewUrl(): String? =
+        if (canGeneratePreview(this)) "/api/${url(tenant().name)}/media/${url(publicId)}/preview" else null
+
+    private fun canGeneratePreview(media: Media): Boolean =
+        media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")
+
+    private fun previewPath(media: Media): Path =
+        storagePath("tenant-${media.tenant.id}/${media.publicId}/preview.jpg")
+
     private fun url(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
 
@@ -566,4 +699,8 @@ class MediaService @Inject constructor(
 
     private fun Instant.toApiOffsetDateTime(): OffsetDateTime =
         OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+
+    companion object {
+        private const val PREVIEW_MAX_EDGE = 720
+    }
 }

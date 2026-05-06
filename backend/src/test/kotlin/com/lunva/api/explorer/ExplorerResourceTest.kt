@@ -31,11 +31,16 @@ import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.notNullValue
 import org.hamcrest.Matchers.nullValue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.awt.Color
+import java.awt.image.BufferedImage
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import java.util.UUID
+import javax.imageio.ImageIO
 
 @QuarkusTest
 class ExplorerResourceTest {
@@ -513,11 +518,9 @@ class ExplorerResourceTest {
     @Test
     fun `uploads image into album and serves content`() {
         createAlbum(ownerCookie, null, "photos", "Photos")
-        val file = File.createTempFile("lunva-upload-", ".jpg").also {
-            it.writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte()))
-        }
+        val file = createTestJpeg()
 
-        val mediaId = given()
+        val uploadResponse = given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
             .multiPart("albumPath", "/photos")
             .multiPart("title", "Uploaded Photo")
@@ -530,7 +533,9 @@ class ExplorerResourceTest {
             .body("mimeType", equalTo("image/jpeg"))
             .body("uploaderDisplayName", equalTo("owner-$runId"))
             .body("capturedAtOverride", equalTo(false))
-            .extract().path<String>("id")
+            .extract()
+        val mediaId = uploadResponse.path<String>("id")
+        assertThat(uploadResponse.path<String>("previewUrl")).isEqualTo("/api/$tenantName/media/$mediaId/preview")
 
         val stored = inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), mediaId) }
         assertThat(stored?.storageKey).isEqualTo("tenant-${tenant().id}/$mediaId/original")
@@ -542,6 +547,14 @@ class ExplorerResourceTest {
             .statusCode(200)
             .contentType("image/jpeg")
             .header("Content-Disposition", containsString("inline"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/preview")
+            .then()
+            .statusCode(200)
+            .contentType("image/jpeg")
+            .header("Cache-Control", containsString("immutable"))
 
         createUser("viewer-$runId", "member123456", ServerRole.ServerMember)
         addTenantMember("viewer-$runId")
@@ -595,7 +608,14 @@ class ExplorerResourceTest {
             .then()
             .statusCode(200)
             .body("mimeType", equalTo("video/mp4"))
+            .body("previewUrl", notNullValue())
             .extract().path<String>("id")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/preview")
+            .then()
+            .statusCode(404)
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
@@ -631,6 +651,74 @@ class ExplorerResourceTest {
             .then()
             .statusCode(416)
             .header("Content-Range", equalTo("bytes */8"))
+    }
+
+    @Test
+    fun `uploads video into album and serves generated preview`() {
+        assumeTrue(ffmpegAvailable(), "ffmpeg is required for video preview generation")
+        createAlbum(ownerCookie, null, "video-previews", "Video Previews")
+        val file = createTestVideo()
+
+        val uploadResponse = given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .multiPart("albumPath", "/video-previews")
+            .multiPart("file", file, "video/mp4")
+            .`when`().post("/api/$tenantName/media")
+            .then()
+            .statusCode(200)
+            .body("mimeType", equalTo("video/mp4"))
+            .extract()
+        val mediaId = uploadResponse.path<String>("id")
+        assertThat(uploadResponse.path<String>("previewUrl")).isEqualTo("/api/$tenantName/media/$mediaId/preview")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/preview")
+            .then()
+            .statusCode(200)
+            .contentType("image/jpeg")
+    }
+
+    @Test
+    fun `uploads video through chunk session and serves generated preview`() {
+        assumeTrue(ffmpegAvailable(), "ffmpeg is required for video preview generation")
+        createAlbum(ownerCookie, null, "chunk-video-previews", "Chunk Video Previews")
+        val file = createTestVideo()
+
+        val uploadId = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"tenantName":"$tenantName","albumPath":"/chunk-video-previews","filename":"clip.mp4","mimeType":"video/mp4","sizeBytes":${file.length()}}""")
+            .`when`().post("/api/media/uploads")
+            .then()
+            .statusCode(200)
+            .extract().path<String>("uploadId")
+
+        given()
+            .contentType("application/octet-stream")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body(file.readBytes())
+            .`when`().put("/api/media/uploads/$uploadId/chunks/0")
+            .then()
+            .statusCode(204)
+
+        val completeResponse = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/media/uploads/$uploadId/complete")
+            .then()
+            .statusCode(200)
+            .body("mimeType", equalTo("video/mp4"))
+            .extract()
+        val mediaId = completeResponse.path<String>("id")
+        assertThat(completeResponse.path<String>("previewUrl")).isEqualTo("/api/$tenantName/media/$mediaId/preview")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/$tenantName/media/$mediaId/preview")
+            .then()
+            .statusCode(200)
+            .contentType("image/jpeg")
     }
 
     @Test
@@ -1039,6 +1127,47 @@ class ExplorerResourceTest {
                 it.createdAt = Instant.now()
                 mediaRepo.persist(it)
             }
+        }
+
+    private fun createTestJpeg(): File =
+        File.createTempFile("lunva-upload-", ".jpg").also { file ->
+            val image = BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB)
+            val graphics = image.createGraphics()
+            try {
+                graphics.color = Color.BLUE
+                graphics.fillRect(0, 0, image.width, image.height)
+            } finally {
+                graphics.dispose()
+            }
+            ImageIO.write(image, "jpg", file)
+        }
+
+    private fun createTestVideo(): File =
+        File.createTempFile("lunva-upload-", ".mp4").also { file ->
+            val process = ProcessBuilder(
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc=size=64x48:rate=1:duration=2",
+                "-pix_fmt",
+                "yuv420p",
+                file.absolutePath,
+            ).start()
+            assertThat(process.waitFor(10, TimeUnit.SECONDS)).isTrue()
+            assertThat(process.exitValue()).isEqualTo(0)
+        }
+
+    private fun ffmpegAvailable(): Boolean =
+        try {
+            val process = ProcessBuilder("ffmpeg", "-version").start()
+            process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0
+        } catch (e: Exception) {
+            false
         }
 
     private fun tenant(): Tenant = tenantRepo.findByName(tenantName) ?: throw IllegalStateException("Tenant not found")

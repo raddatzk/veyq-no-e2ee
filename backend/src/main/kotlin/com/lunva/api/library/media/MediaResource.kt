@@ -37,6 +37,24 @@ class MediaResource @Inject constructor(
     override fun content(tenantName: String, mediaId: String, range: String?): Response =
         mediaService.mediaContent(mediaId, range)
 
+    override fun preview(tenantName: String, mediaId: String): Response =
+        mediaService.mediaPreview(mediaId)
+
+    override fun uploadMedia(
+        tenantName: String,
+        albumPath: String?,
+        fileInputStream: InputStream,
+        title: String?,
+    ): Response {
+        val temp = Files.createTempFile("lunva-upload-", ".tmp")
+        return try {
+            fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            Response.ok(mediaService.uploadMedia(GeneratedFileUpload(temp, title), albumPath, title)).build()
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
     override fun updateMetadata(
         tenantName: String,
         mediaId: String,

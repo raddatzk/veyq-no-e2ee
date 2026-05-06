@@ -23,6 +23,7 @@ function media(overrides: Partial<ExplorerMedia> = {}): ExplorerMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 2048,
     contentUrl: '/api/friends/media/media-1/content',
+    previewUrl: '/api/friends/media/media-1/preview',
     cameraMake: 'Canon',
     cameraModel: 'R6',
     lensModel: 'RF 35mm',
@@ -93,5 +94,24 @@ describe('ExplorerMediaLightbox', () => {
     expect(wrapper.find('.media-lightbox-details-open').exists()).toBe(false)
     await wrapper.find('.media-lightbox-sheet-handle').trigger('click')
     expect(wrapper.find('.media-lightbox-details-open').exists()).toBe(true)
+  })
+
+  it('uses preview url as video poster without changing the original media source', () => {
+    const wrapper = mount(ExplorerMediaLightbox, {
+      props: {
+        tenantName: 'friends',
+        media: media({
+          mimeType: 'video/mp4',
+          contentUrl: '/api/friends/media/media-1/content',
+          previewUrl: '/api/friends/media/media-1/preview'
+        }),
+        canShowPrevious: false,
+        canShowNext: false
+      }
+    })
+
+    const video = wrapper.find('video')
+    expect(video.attributes('src')).toBe('/api/friends/media/media-1/content')
+    expect(video.attributes('poster')).toBe('/api/friends/media/media-1/preview')
   })
 })

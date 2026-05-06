@@ -36,6 +36,7 @@ export type ExplorerMedia = Omit<
   MediaSummary,
   | 'albumPath'
   | 'capturedAt'
+  | 'previewUrl'
   | 'cameraMake'
   | 'cameraModel'
   | 'lensModel'
@@ -46,6 +47,7 @@ export type ExplorerMedia = Omit<
 > & {
   albumPath: string | null
   capturedAt: string | null
+  previewUrl: string | null
   cameraMake: string | null
   cameraModel: string | null
   lensModel: string | null

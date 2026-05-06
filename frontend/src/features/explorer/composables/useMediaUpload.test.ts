@@ -34,6 +34,7 @@ describe('uploadMedia', () => {
       mimeType: 'video/mp4',
       sizeBytes: 8,
       contentUrl: '/content',
+      previewUrl: null,
       cameraMake: null,
       cameraModel: null,
       lensModel: null,

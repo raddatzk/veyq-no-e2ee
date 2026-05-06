@@ -48,6 +48,7 @@ function createMedia(overrides: Partial<ExplorerMedia> = {}): ExplorerMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 1234,
     contentUrl: '/api/media/media-1/content',
+    previewUrl: '/api/media/media-1/preview',
     cameraMake: null,
     cameraModel: null,
     lensModel: null,
@@ -175,15 +176,36 @@ describe('ExplorerMediaGrid', () => {
       createMedia({ id: 'image', mimeType: 'image/jpeg', imageWidth: 1000, imageHeight: 1000 }),
       createMedia({ id: 'video', mimeType: 'video/mp4', imageWidth: 1000, imageHeight: 1000 }),
       createMedia({ id: 'file', mimeType: 'application/octet-stream', imageWidth: 1000, imageHeight: 1000 }),
+      createMedia({ id: 'video-raw', mimeType: 'video/mp4', previewUrl: null, imageWidth: 1000, imageHeight: 1000 }),
       createMedia({ id: 'image-2', mimeType: 'image/jpeg', imageWidth: 1000, imageHeight: 1000 })
     ])
 
     await settleLayout()
 
-    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(4)
-    expect(wrapper.findAll('img')).toHaveLength(2)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(5)
+    expect(wrapper.findAll('img')).toHaveLength(3)
     expect(wrapper.findAll('video')).toHaveLength(1)
     expect(wrapper.find('.media-grid-icon').exists()).toBe(true)
+  })
+
+  it('renders videos with preview urls as preview images first', async () => {
+    const wrapper = mountGrid([
+      createMedia({
+        id: 'video',
+        mimeType: 'video/mp4',
+        contentUrl: '/api/media/video/content',
+        previewUrl: '/api/media/video/preview',
+        imageWidth: 1000,
+        imageHeight: 1000
+      })
+    ])
+
+    await settleLayout()
+
+    const image = wrapper.find('img')
+    expect(image.exists()).toBe(true)
+    expect(image.attributes('src')).toBe('/api/media/video/preview')
+    expect(wrapper.find('video').exists()).toBe(false)
   })
 
   it('opens the lightbox using tile order', async () => {

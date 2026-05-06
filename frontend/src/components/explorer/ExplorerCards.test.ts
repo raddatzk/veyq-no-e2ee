@@ -202,6 +202,7 @@ describe('explorer cards', () => {
           mimeType: 'image/jpeg',
           sizeBytes: 1234,
           contentUrl: '/api/media/media-1/content',
+          previewUrl: '/api/media/media-1/preview',
           cameraMake: null,
           cameraModel: null,
           lensModel: null,
@@ -238,6 +239,7 @@ describe('explorer cards', () => {
           mimeType: 'video/mp4',
           sizeBytes: 5678,
           contentUrl: '/api/media/media-2/content',
+          previewUrl: null,
           cameraMake: null,
           cameraModel: null,
           lensModel: null,
@@ -251,6 +253,39 @@ describe('explorer cards', () => {
 
     expect(wrapper.text()).not.toContain('Clip')
     expect(wrapper.find('video').exists()).toBe(true)
+  })
+
+  it('uses generated previews for video media cards when available', () => {
+    const wrapper = mount(ExplorerMediaCard, {
+      props: {
+        width: 320,
+        height: 180,
+        media: {
+          id: 'media-3',
+          title: 'Preview Clip',
+          albumPath: '/@family/trip',
+          ownerUserId: 1,
+          uploaderDisplayName: 'Kevin',
+          createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: null,
+          capturedAtOverride: false,
+          mimeType: 'video/mp4',
+          sizeBytes: 5678,
+          contentUrl: '/api/media/media-3/content',
+          previewUrl: '/api/media/media-3/preview',
+          cameraMake: null,
+          cameraModel: null,
+          lensModel: null,
+          imageWidth: null,
+          imageHeight: null,
+          gpsLatitude: null,
+          gpsLongitude: null
+        }
+      }
+    })
+
+    expect(wrapper.find('img').attributes('src')).toBe('/api/media/media-3/preview')
+    expect(wrapper.find('video').exists()).toBe(false)
   })
 
 })

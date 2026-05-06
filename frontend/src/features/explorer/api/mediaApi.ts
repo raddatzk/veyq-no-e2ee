@@ -148,6 +148,7 @@ function normalizeMedia(media: MediaSummary): ExplorerMedia {
     ...media,
     albumPath: media.albumPath ?? null,
     capturedAt: media.capturedAt ?? null,
+    previewUrl: media.previewUrl ?? null,
     cameraMake: media.cameraMake ?? null,
     cameraModel: media.cameraModel ?? null,
     lensModel: media.lensModel ?? null,

@@ -15,6 +15,7 @@ function media(id: string): ExplorerMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 1000,
     contentUrl: `/api/media/${id}/content`,
+    previewUrl: `/api/media/${id}/preview`,
     cameraMake: null,
     cameraModel: null,
     lensModel: null,

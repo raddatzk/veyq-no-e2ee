@@ -18,6 +18,14 @@ const emit = defineEmits<{
 }>()
 
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
+const previewUrl = computed(() =>
+  props.media.previewUrl ? `${API_BASE}${props.media.previewUrl}` : null
+)
+const originalImageLoaded = ref(false)
+let imageLoadToken = 0
+const displayImageUrl = computed(() =>
+  previewUrl.value && !originalImageLoaded.value ? previewUrl.value : mediaUrl.value
+)
 const isImage = computed(() => props.media.mimeType?.startsWith('image/'))
 const isVideo = computed(() => props.media.mimeType?.startsWith('video/'))
 const title = computed(() => props.media.title || props.media.id)
@@ -67,6 +75,22 @@ watch(
     isEditingCapturedAt.value = false
     capturedAtInput.value = isoToDatetimeLocal(props.media.capturedAt)
     saveError.value = ''
+  },
+  { immediate: true }
+)
+
+watch(
+  [() => props.media.id, mediaUrl, previewUrl, isImage],
+  () => {
+    const token = ++imageLoadToken
+    originalImageLoaded.value = !isImage.value || !previewUrl.value
+    if (!isImage.value || !previewUrl.value) return
+
+    const image = new Image()
+    image.onload = () => {
+      if (token === imageLoadToken) originalImageLoaded.value = true
+    }
+    image.src = mediaUrl.value
   },
   { immediate: true }
 )
@@ -187,8 +211,15 @@ function onSheetPointerUp(event: PointerEvent) {
         </button>
 
         <div class="media-lightbox-stage">
-          <img v-if="isImage" :src="mediaUrl" :alt="title" />
-          <video v-else-if="isVideo" :src="mediaUrl" controls playsinline />
+          <img v-if="isImage" :src="displayImageUrl" :alt="title" />
+          <video
+            v-else-if="isVideo"
+            :src="mediaUrl"
+            :poster="previewUrl || undefined"
+            controls
+            playsinline
+            preload="metadata"
+          />
           <a v-else :href="mediaUrl" :download="downloadName">{{ title }}</a>
         </div>
 
