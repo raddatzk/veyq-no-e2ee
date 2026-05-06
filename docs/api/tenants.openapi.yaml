@@ -223,7 +223,7 @@ paths:
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
-      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
       description: |-
         Tenant-Mitglieder auflisten.
@@ -231,7 +231,7 @@ paths:
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
-        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
         Implementierungsstatus: partial.
   "/api/tenants/{tenantName}/users/search":

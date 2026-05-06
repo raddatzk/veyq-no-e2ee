@@ -9,12 +9,16 @@ import GroupSettingsPanel from '../features/settings/components/GroupSettingsPan
 import ServerSettingsPanel from '../features/settings/components/ServerSettingsPanel.vue'
 import TenantSettingsPanel from '../features/settings/components/TenantSettingsPanel.vue'
 import UserSettingsForm from '../features/settings/components/UserSettingsForm.vue'
+import { useAuthState } from '../shared/state/useAuthState'
 
 const route = useRoute()
 const router = useRouter()
+const { authState } = useAuthState()
 
 const settingsPath = computed(() => route.path || '/')
 const tenantName = computed(() => settingsPath.value.trim().split('/').filter(Boolean)[0] || '')
+const activeTenant = computed(() => authState.tenants.find((tenant) => tenant.name === tenantName.value))
+const canManageTenant = computed(() => activeTenant.value?.role === 'TenantOwner')
 const groupName = computed(() => {
   const groupSegment = settingsPath.value.trim().split('/').find((segment) => segment.startsWith('@'))
   return groupSegment ? groupSegment.substring(1) : ''
@@ -69,7 +73,7 @@ function navigateToPath(path: string) {
       <ServerSettingsPanel v-if="settings.subject.type === 'SERVER'" />
       <UserSettingsForm v-else-if="settings.subject.type === 'USER'" />
       <template v-else-if="settings.subject.type === 'TENANT'">
-        <TenantSettingsPanel :tenant-name="tenantName" />
+        <TenantSettingsPanel v-if="canManageTenant" :tenant-name="tenantName" />
         <GroupSettingsPanel :tenant-name="tenantName" />
       </template>
       <GroupSettingsPanel

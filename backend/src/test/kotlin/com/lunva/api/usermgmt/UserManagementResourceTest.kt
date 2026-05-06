@@ -391,6 +391,35 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `tenant member can list tenant users but cannot mutate tenant users`() {
+        val tenantMember = createUser("tenant-member-$runId", "admin1234567", ServerRole.ServerMember)
+        addTenantMember(tenantMember, tenant, TenantRole.TenantMember)
+        val tenantMemberCookie = login(tenantMember.email, "admin1234567")
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
+            .`when`().get("/api/tenants/${tenant.name}/users")
+            .then()
+            .statusCode(200)
+            .body("users.email", hasItem(tenantMember.email))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
+            .queryParam("q", "owner")
+            .`when`().get("/api/tenants/${tenant.name}/users/search")
+            .then()
+            .statusCode(403)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().put("/api/tenants/${tenant.name}/users/${tenantMember.id}/role")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
     fun `duplicate global pending user can be invited into another tenant`() {
         val email = "multi-pending-$runId@example.com"
         val userId = given()

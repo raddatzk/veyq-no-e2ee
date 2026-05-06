@@ -17,6 +17,7 @@ import {
   type TenantGroup
 } from '../../../api/groupClient'
 import { toPermalink } from '../../../composables/usePermalink'
+import { useAuthState } from '../../../shared/state/useAuthState'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
 import { getTenantUsers, type TenantUserSummary } from '../api'
 
@@ -25,6 +26,7 @@ const props = defineProps<{
   groupName?: string
 }>()
 
+const { authState } = useAuthState()
 const groupList = ref<TenantGroup[]>([])
 const tenantUsers = ref<TenantUserSummary[]>([])
 const selectedGroup = ref<GroupSummary | null>(null)
@@ -62,6 +64,9 @@ const availableTenantUsers = computed(() => {
 const ownerCount = computed(
   () => selectedMembers.value.filter((member) => member.role === 'GroupOwner').length
 )
+const canManageSelectedGroup = computed(() =>
+  selectedGroup.value ? isCurrentUserGroupOwner(selectedGroup.value) : false
+)
 const showDetail = computed(() => Boolean(selectedGroup.value || props.groupName))
 
 watch(displayName, (value) => {
@@ -82,12 +87,8 @@ async function load() {
   error.value = ''
   message.value = ''
   try {
-    const [loadedGroups, loadedUsers] = await Promise.all([
-      groups(props.tenantName),
-      getTenantUsers(props.tenantName)
-    ])
-    groupList.value = loadedGroups
-    tenantUsers.value = loadedUsers
+    groupList.value = await groups(props.tenantName)
+    tenantUsers.value = []
     if (props.groupName) {
       await openGroup(props.groupName)
     } else {
@@ -114,6 +115,11 @@ async function openGroup(groupName: string) {
     permalinkTouched.value = false
     selectedUserId.value = null
     selectedRole.value = 'GroupMember'
+    if (isCurrentUserGroupOwner(group)) {
+      await loadTenantUsers()
+    } else {
+      tenantUsers.value = []
+    }
   } catch (caught) {
     selectedGroup.value = null
     error.value = getErrorMessage(caught, 'Gruppe konnte nicht geladen werden.')
@@ -158,6 +164,7 @@ async function submitCreate() {
     displayName.value = created.displayName
     name.value = created.name
     permalinkTouched.value = false
+    await loadTenantUsers()
     message.value = 'Gruppe wurde erstellt.'
   } catch (caught) {
     if (isApiStatus(caught, 409)) {
@@ -171,7 +178,7 @@ async function submitCreate() {
 }
 
 function addMember() {
-  if (!selectedGroup.value || selectedUserId.value === null) return
+  if (!canManageSelectedGroup.value || !selectedGroup.value || selectedUserId.value === null) return
   const userId = Number(selectedUserId.value)
   const user = tenantUsers.value.find((tenantUser) => tenantUser.userId === userId)
   if (!user) return
@@ -196,7 +203,7 @@ function addMember() {
 }
 
 function changeRole(member: GroupMemberSummary, role: GroupRole) {
-  if (!selectedGroup.value) return
+  if (!canManageSelectedGroup.value || !selectedGroup.value) return
   if (member.role === 'GroupOwner' && role !== 'GroupOwner' && ownerCount.value <= 1) {
     error.value = 'Mindestens ein Owner muss in der Gruppe bleiben.'
     return
@@ -210,7 +217,7 @@ function changeRole(member: GroupMemberSummary, role: GroupRole) {
 }
 
 function removeMember(member: GroupMemberSummary) {
-  if (!selectedGroup.value) return
+  if (!canManageSelectedGroup.value || !selectedGroup.value) return
   if (member.role === 'GroupOwner' && ownerCount.value <= 1) {
     error.value = 'Mindestens ein Owner muss in der Gruppe bleiben.'
     return
@@ -222,7 +229,7 @@ function removeMember(member: GroupMemberSummary) {
 }
 
 async function saveGroup() {
-  if (!selectedGroup.value) return
+  if (!canManageSelectedGroup.value || !selectedGroup.value) return
   const groupName = name.value.trim()
   const groupDisplayName = displayName.value.trim()
   if (!groupName || !groupDisplayName) return
@@ -276,6 +283,18 @@ function resetEditor() {
   selectedUserId.value = null
   selectedRole.value = 'GroupMember'
 }
+
+async function loadTenantUsers() {
+  if (tenantUsers.value.length > 0) return
+  tenantUsers.value = await getTenantUsers(props.tenantName)
+}
+
+function isCurrentUserGroupOwner(group: GroupSummary): boolean {
+  const currentUserId = authState.user?.userId
+  return group.members.some(
+    (member) => member.user.userId === currentUserId && member.role === 'GroupOwner'
+  )
+}
 </script>
 
 <template>
@@ -323,7 +342,11 @@ function resetEditor() {
         <span>Gruppe wird geladen...</span>
       </div>
 
-      <form v-else-if="showDetail && selectedGroup" class="settings-form group-detail-form" @submit.prevent="saveGroup">
+      <form
+        v-else-if="showDetail && selectedGroup && canManageSelectedGroup"
+        class="settings-form group-detail-form"
+        @submit.prevent="saveGroup"
+      >
         <label>
           <span>Name</span>
           <InputText v-model="displayName" autocomplete="off" required />
@@ -401,6 +424,13 @@ function resetEditor() {
           <Button type="submit" label="Speichern" icon="pi pi-save" :loading="saving" />
         </div>
       </form>
+      <div v-else-if="showDetail && selectedGroup" class="settings-entry">
+        <div>
+          <strong>{{ selectedGroup.displayName }}</strong>
+          <span>@{{ selectedGroup.name }}</span>
+        </div>
+        <i class="pi pi-users"></i>
+      </div>
     </template>
 
     <Dialog v-model:visible="createDialogVisible" header="Gruppe erstellen" modal class="tenant-dialog">

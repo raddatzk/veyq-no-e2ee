@@ -76,7 +76,7 @@ create table lunva.lunva_media
     image_height         int                                             null,
     gps_latitude         double                                          null,
     gps_longitude        double                                          null,
-    constraint public_id
+    constraint uq_lunva_media_public_id
         unique (public_id),
     constraint fk_lunva_media_owner
         foreign key (owner_user_id) references lunva.lunva_user (id)
@@ -115,7 +115,7 @@ create table lunva.lunva_refresh_token
     created_at       timestamp default current_timestamp() not null,
     last_accessed_at timestamp default current_timestamp() not null,
     rotated_to       bigint                                null,
-    constraint token_hash
+    constraint uq_lunva_refresh_token_hash
         unique (token_hash),
     constraint fk_lunva_refresh_token_rotated_to
         foreign key (rotated_to) references lunva.lunva_refresh_token (id),
@@ -135,7 +135,7 @@ create table lunva.lunva_access_token
     created_at       timestamp default current_timestamp() not null,
     last_accessed_at timestamp default current_timestamp() not null,
     refresh_token_id bigint                                not null,
-    constraint token_hash
+    constraint uq_lunva_access_token_hash
         unique (token_hash),
     constraint fk_lunva_access_token_refresh_token
         foreign key (refresh_token_id) references lunva.lunva_refresh_token (id),
@@ -172,7 +172,7 @@ create table lunva.lunva_reset_password_token
     accepted_at timestamp                             null,
     revoked_at  timestamp                             null,
     created_at  timestamp default current_timestamp() not null,
-    constraint token_hash
+    constraint uq_lunva_reset_password_token_hash
         unique (token_hash),
     constraint fk_lunva_reset_password_token_user
         foreign key (user_id) references lunva.lunva_user (id)
@@ -200,7 +200,7 @@ create table lunva.lunva_tenant_folder
     displayName      varchar(255)                          not null,
     created_at       timestamp default current_timestamp() not null,
     updated_at       timestamp default current_timestamp() not null,
-    constraint public_id
+    constraint uq_lunva_tenant_folder_public_id
         unique (public_id),
     constraint uq_lunva_tenant_folder_name
         unique (tenant_id, parent_folder_id, name),
@@ -237,7 +237,7 @@ create table lunva.lunva_tenant_album
     cover_media_id   bigint                                null,
     created_at       timestamp default current_timestamp() not null,
     updated_at       timestamp default current_timestamp() not null,
-    constraint public_id
+    constraint uq_lunva_tenant_album_public_id
         unique (public_id),
     constraint uq_lunva_tenant_album_name
         unique (tenant_id, parent_folder_id, name),
@@ -355,7 +355,7 @@ create table lunva.lunva_user_email_change
     accepted_at   timestamp                             null,
     revoked_at    timestamp                             null,
     created_at    timestamp default current_timestamp() not null,
-    constraint token_hash
+    constraint uq_lunva_user_email_change_token_hash
         unique (token_hash),
     constraint fk_lunva_user_email_change_user
         foreign key (user_id) references lunva.lunva_user (id)
@@ -382,7 +382,7 @@ create table lunva.lunva_user_invitation
     revoked_at  timestamp                             null,
     created_at  timestamp default current_timestamp() not null,
     tenant_id   bigint                                not null,
-    constraint token_hash
+    constraint uq_lunva_user_invitation_token_hash
         unique (token_hash),
     constraint fk_lunva_user_invitation_tenant
         foreign key (tenant_id) references lunva.lunva_tenant (id)
@@ -400,4 +400,3 @@ create index idx_lunva_user_invitation_tenant_id
 
 create index idx_lunva_user_invitation_user_id
     on lunva.lunva_user_invitation (user_id);
-

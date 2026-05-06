@@ -36,7 +36,7 @@ paths:
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
       description: |-
-        Gruppen eines Tenants auflisten.
+        Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -106,7 +106,7 @@ paths:
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
       description: |-
-        Gruppe abrufen.
+        Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.

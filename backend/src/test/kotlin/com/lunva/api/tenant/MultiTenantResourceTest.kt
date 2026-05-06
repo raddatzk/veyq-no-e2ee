@@ -172,6 +172,84 @@ class MultiTenantResourceTest {
             .statusCode(200)
     }
 
+    @Test
+    fun `tenant members can create groups and only read accessible groups`() {
+        val ownerCookie = login(ownerEmail, ownerPassword)
+        ensureTenant(ownerCookie, "friends-$runId", "Friends")
+        createUser("member-$runId", "member123456", ServerRole.ServerMember)
+        addTenantMember("friends-$runId", "member-$runId")
+        val memberCookie = login("member-$runId@example.com", "member123456")
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
+            .body("""{"name":"owned","displayName":"Owned"}""")
+            .`when`().post("/api/friends-$runId/groups")
+            .then()
+            .statusCode(200)
+            .body("name", equalTo("owned"))
+            .body("members.role", hasItem(GroupRole.GroupOwner.name))
+
+        createGroupWithMember("friends-$runId", "foreign-$runId", ownerEmail, GroupRole.GroupOwner)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
+            .`when`().get("/api/friends-$runId/groups")
+            .then()
+            .statusCode(200)
+            .body("groups", hasSize<Any>(1))
+            .body("groups.name", hasItem("owned"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
+            .`when`().get("/api/friends-$runId/groups/foreign-$runId")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
+    fun `group update requires active tenant members and a group owner`() {
+        val ownerCookie = login(ownerEmail, ownerPassword)
+        ensureTenant(ownerCookie, "friends-$runId", "Friends")
+        val outsider = createUser("outsider-$runId", "member123456", ServerRole.ServerMember)
+        val member = createUser("crew-member-$runId", "member123456", ServerRole.ServerMember)
+        addTenantMember("friends-$runId", "crew-member-$runId")
+        val ownerId = userRepo.findByEmail(ownerEmail)!!.id
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"crew","displayName":"Crew"}""")
+            .`when`().post("/api/friends-$runId/groups")
+            .then()
+            .statusCode(200)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"crew","displayName":"Crew","members":[]}""")
+            .`when`().post("/api/friends-$runId/groups/crew")
+            .then()
+            .statusCode(409)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"crew","displayName":"Crew","members":[{"id":${outsider.id},"role":"GroupOwner"}]}""")
+            .`when`().post("/api/friends-$runId/groups/crew")
+            .then()
+            .statusCode(404)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"crew","displayName":"Crew","members":[{"id":$ownerId,"role":"GroupOwner"},{"id":${member.id},"role":"GroupMember"}]}""")
+            .`when`().post("/api/friends-$runId/groups/crew")
+            .then()
+            .statusCode(200)
+            .body("members.user.userId", hasItem(member.id.toInt()))
+    }
+
     private fun ensureTenant(accessCookie: String, name: String, displayName: String) {
         val response = given()
             .contentType("application/json")
@@ -231,7 +309,12 @@ class MultiTenantResourceTest {
         }
     }
 
-    private fun createGroupWithMember(tenantName: String, groupName: String, userEmail: String): TenantGroup =
+    private fun createGroupWithMember(
+        tenantName: String,
+        groupName: String,
+        userEmail: String,
+        role: GroupRole = GroupRole.GroupMember,
+    ): TenantGroup =
         inTransaction {
             val tenant = tenantRepo.findByName(tenantName) ?: throw IllegalStateException("Tenant not found")
             val user = userRepo.findByEmail(userEmail) ?: throw IllegalStateException("User not found")
@@ -246,7 +329,7 @@ class MultiTenantResourceTest {
                 it.id = TenantGroupMemberId(group.id, user.id)
                 it.group = group
                 it.user = user
-                it.role = GroupRole.GroupMember
+                it.role = role
                 tenantGroupMemberRepo.persist(it)
             }
             group

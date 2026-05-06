@@ -43,7 +43,6 @@ class TenantResource @Inject constructor(
     override fun updateTenantUserSettings(tenantName: String): TenantUserSettingsResponse =
         tenantUserService.tenantUserSettings(tenantName)
 
-    @TenantOwnerRequired
     override fun tenantUsers(tenantName: String): TenantUsersSummary =
         tenantUserService.tenantUsers(tenantName)
 

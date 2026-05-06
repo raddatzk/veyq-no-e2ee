@@ -8,6 +8,7 @@ import {
   type GroupSummary
 } from '../../../api/groupClient'
 import { getTenantUsers } from '../api'
+import { authState } from '../../../authState'
 import GroupSettingsPanel from './GroupSettingsPanel.vue'
 
 vi.mock('../../../api/groupClient', () => ({
@@ -30,9 +31,11 @@ const getTenantUsersMock = vi.mocked(getTenantUsers)
 describe('GroupSettingsPanel', () => {
   afterEach(() => {
     vi.resetAllMocks()
+    authState.user = null
   })
 
   it('loads groups and creates a new group', async () => {
+    authState.user = userSummary(1, 'Owner')
     groupsMock.mockResolvedValue([])
     getTenantUsersMock.mockResolvedValue([tenantUser(1, 'Owner')])
     createGroupMock.mockResolvedValue(groupSummary('family', 'Family', [{ userId: 1, role: 'GroupOwner' }]))
@@ -41,6 +44,7 @@ describe('GroupSettingsPanel', () => {
     await flushPromises()
 
     expect(groupsMock).toHaveBeenCalledWith('friends')
+    expect(getTenantUsersMock).not.toHaveBeenCalled()
     await wrapper.find('button').trigger('click')
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('Family')
@@ -53,6 +57,7 @@ describe('GroupSettingsPanel', () => {
   })
 
   it('loads a group detail and saves members with roles', async () => {
+    authState.user = userSummary(1, 'Owner')
     groupsMock.mockResolvedValue([{ id: 99, name: 'family', displayName: 'Family' }])
     getTenantUsersMock.mockResolvedValue([tenantUser(1, 'Owner'), tenantUser(2, 'Member')])
     getGroupMock.mockResolvedValue(groupSummary('family', 'Family', [{ userId: 1, role: 'GroupOwner' }]))
@@ -84,6 +89,7 @@ describe('GroupSettingsPanel', () => {
   })
 
   it('prevents removing the last owner', async () => {
+    authState.user = userSummary(1, 'Owner')
     groupsMock.mockResolvedValue([{ id: 99, name: 'family', displayName: 'Family' }])
     getTenantUsersMock.mockResolvedValue([tenantUser(1, 'Owner')])
     getGroupMock.mockResolvedValue(groupSummary('family', 'Family', [{ userId: 1, role: 'GroupOwner' }]))
@@ -94,6 +100,25 @@ describe('GroupSettingsPanel', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Entfernen'))!.trigger('click')
 
     expect(wrapper.text()).toContain('Mindestens ein Owner muss in der Gruppe bleiben.')
+  })
+
+  it('renders group detail read-only for regular group members', async () => {
+    authState.user = userSummary(2, 'Member')
+    groupsMock.mockResolvedValue([{ id: 99, name: 'family', displayName: 'Family' }])
+    getGroupMock.mockResolvedValue(
+      groupSummary('family', 'Family', [
+        { userId: 1, role: 'GroupOwner' },
+        { userId: 2, role: 'GroupMember' }
+      ])
+    )
+
+    const wrapper = mountPanel('family')
+    await flushPromises()
+
+    expect(getTenantUsersMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('@family')
+    expect(wrapper.text()).not.toContain('Speichern')
+    expect(wrapper.text()).not.toContain('Entfernen')
   })
 })
 
@@ -136,6 +161,15 @@ function tenantUser(userId: number, displayName: string) {
     displayName,
     role: 'TenantMember',
     status: 'Active'
+  } as const
+}
+
+function userSummary(userId: number, displayName: string) {
+  return {
+    userId,
+    email: `${displayName.toLowerCase()}@example.test`,
+    displayName,
+    serverRole: 'ServerMember'
   } as const
 }
 
