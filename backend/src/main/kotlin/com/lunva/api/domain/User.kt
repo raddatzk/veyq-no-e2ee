@@ -47,6 +47,11 @@ class UserRepo : PanacheRepository<User> {
     fun listAllOrderByEmail(): List<User> =
         list("order by email")
 
+    fun searchByNameOrEmail(query: String): List<User> {
+        val pattern = "%${query.lowercase()}%"
+        return list("lower(displayName) like ?1 or lower(email) like ?1 order by displayName, email", pattern)
+    }
+
     fun countActiveByRole(role: ServerRole): Long =
         count("role = ?1 and passwordSetAt is not null", role)
 }

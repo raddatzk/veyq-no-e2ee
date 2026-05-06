@@ -226,20 +226,17 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '409':
           "$ref": "./common.openapi.yaml#/components/responses/409"
-      summary: Verwalteten Benutzer einladen
+      summary: Globalen Pending-User anlegen
       x-implementation-status: partial
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
-      - Der aktuelle Benutzer muss ServerOwner sein.
-      x-required-role: ServerOwner
       description: |-
-        Verwalteten Benutzer einladen.
+        Globalen Pending-User anlegen.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
-        - Der aktuelle Benutzer muss ServerOwner sein.
 
         Implementierungsstatus: partial.
   "/api/users/{userId}/role":
@@ -273,42 +270,6 @@ paths:
       x-required-role: ServerOwner
       description: |-
         Server-Rolle eines Benutzers ändern.
-
-        Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-        - Der aktuelle Benutzer muss ServerOwner sein.
-
-        Implementierungsstatus: partial.
-  "/api/users/{userId}/invite":
-    post:
-      tags:
-      - Users
-      operationId: sendManagedUserInvitation
-      parameters:
-      - "$ref": "#/components/parameters/UserId"
-      responses:
-        '200':
-          "$ref": "#/components/responses/ManagedUser"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '404':
-          "$ref": "./common.openapi.yaml#/components/responses/404"
-        '409':
-          "$ref": "./common.openapi.yaml#/components/responses/409"
-      summary: Einladung senden
-      x-implementation-status: partial
-      x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      - Der aktuelle Benutzer muss ServerOwner sein.
-      x-required-role: ServerOwner
-      description: |-
-        Einladung erneut senden.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -422,9 +383,6 @@ components:
             "$ref": "#/components/schemas/CreateManagedUserRequest"
           example:
             email: invitee@example.test
-            displayName: Invitee
-            serverRole: ServerMember
-            tenantId: 42
 
     UpdateManagedUserRole:
       required: true
@@ -436,11 +394,13 @@ components:
             serverRole: ServerMember
 
     AcceptInvitation:
+      required: true
       content:
         application/json:
           schema:
             "$ref": "#/components/schemas/AcceptInvitationRequest"
           example:
+            displayName: Invitee
             password: welcome123456
             token: invitation-token
 
@@ -645,24 +605,11 @@ components:
       additionalProperties: false
       required:
         - email
-        - displayName
-        - serverRole
-        - tenantId
       properties:
         email:
           "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
-        displayName:
-          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
-        serverRole:
-          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
-        tenantId:
-          type: integer
-          format: int64
       example:
         email: invitee@example.test
-        displayName: Invitee
-        serverRole: ServerMember
-        tenantId: 42
 
     UpdateManagedUserRoleRequest:
       type: object
@@ -679,13 +626,15 @@ components:
       type: object
       additionalProperties: false
       required:
-        - password
         - token
       properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         password:
           "$ref": "./common.openapi.yaml#/components/schemas/Password"
         token:
           type: string
       example:
+        displayName: Invitee
         password: welcome123456
         token: invitation-token

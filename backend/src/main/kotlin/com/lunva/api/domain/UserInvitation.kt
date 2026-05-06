@@ -17,6 +17,10 @@ class UserInvitation : PanacheEntityBase {
     @JoinColumn(name = "user_id", nullable = false)
     lateinit var user: User
 
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    lateinit var tenant: Tenant
+
     @Column(name = "token_hash", nullable = false, unique = true)
     lateinit var tokenHash: String
 
@@ -40,6 +44,9 @@ class UserInvitationRepo : PanacheRepository<UserInvitation> {
 
     fun listOpenByUser(user: User): List<UserInvitation> =
         list("user = ?1 and acceptedAt is null and revokedAt is null", user)
+
+    fun listOpenByUserAndTenant(user: User, tenant: Tenant): List<UserInvitation> =
+        list("user = ?1 and tenant = ?2 and acceptedAt is null and revokedAt is null", user, tenant)
 
     fun deleteInvalidBefore(cutoff: Instant): Long =
         delete("expiresAt < ?1 or acceptedAt < ?1 or revokedAt < ?1", cutoff)

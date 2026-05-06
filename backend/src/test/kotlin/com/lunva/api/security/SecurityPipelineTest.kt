@@ -194,6 +194,7 @@ class SecurityPipelineTest {
                 it.tenant = managedTenant
                 it.user = managedUser
                 it.role = role
+                it.acceptedAt = java.time.Instant.now()
                 tenantMemberRepo.persist(it)
             }
         }

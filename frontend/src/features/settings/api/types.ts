@@ -13,6 +13,10 @@ export type {
   ManagedUserTenantSummary,
   ManagedUsersSummary,
   ServerRole,
+  TenantRole,
+  TenantUserSearchSummary,
+  TenantUserStatus,
+  TenantUserSummary,
   UpdateUserSettingsRequest,
   UserStatus as ManagedUserStatus,
   UserSummary as UserSettingsResponse

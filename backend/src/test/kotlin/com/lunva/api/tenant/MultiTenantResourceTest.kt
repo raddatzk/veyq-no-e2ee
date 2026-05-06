@@ -224,6 +224,7 @@ class MultiTenantResourceTest {
                     it.tenant = tenant
                     it.user = user
                     it.role = TenantRole.TenantMember
+                    it.acceptedAt = java.time.Instant.now()
                     tenantMemberRepo.persist(it)
                 }
             }

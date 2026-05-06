@@ -55,11 +55,13 @@ describe('InviteView', () => {
     await router.isReady()
 
     const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
-    await wrapper.find('input').setValue('welcome123456')
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('Invitee')
+    await inputs[1].setValue('welcome123456')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(acceptInvitationMock).toHaveBeenCalledWith(42, 'invite-token', 'welcome123456')
+    expect(acceptInvitationMock).toHaveBeenCalledWith(42, 'invite-token', 'welcome123456', 'Invitee')
   })
 })
 
@@ -71,6 +73,11 @@ function viewStubs() {
     },
     Card: { template: '<section><slot name="title" /><slot name="content" /></section>' },
     Message: { template: '<div><slot /></div>' },
+    InputText: {
+      template:
+        '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+      props: ['modelValue']
+    },
     Password: {
       template:
         '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',

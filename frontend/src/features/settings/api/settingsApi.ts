@@ -2,6 +2,7 @@ import {
   generatedCall,
   serverApi,
   settingsApi,
+  tenantsApi,
   usersApi
 } from '../../../api/generatedClient'
 import type {
@@ -12,6 +13,9 @@ import type {
   ServerRole,
   ServerSettingsResponse,
   SettingsResponse,
+  TenantRole,
+  TenantUserSearchSummary,
+  TenantUserSummary,
   UpdateUserSettingsRequest,
   UserSettingsResponse
 } from './types'
@@ -57,8 +61,45 @@ export function updateManagedUserRole(
   ).then((summary) => findManagedUser(summary, userId))
 }
 
-export function resendManagedUserInvitation(userId: number): Promise<ManagedUserSummary> {
-  return generatedCall(usersApi.sendManagedUserInvitation({ userId }))
+export function getTenantUsers(tenantName: string): Promise<TenantUserSummary[]> {
+  return generatedCall(tenantsApi.tenantUsers({ tenantName })).then((summary) => summary.users)
+}
+
+export function searchTenantUsers(
+  tenantName: string,
+  query: string
+): Promise<TenantUserSearchSummary[]> {
+  return generatedCall(tenantsApi.searchTenantUsers({ tenantName, q: query })).then(
+    (summary) => summary.users
+  )
+}
+
+export function inviteTenantUser(
+  tenantName: string,
+  userId: number,
+  role: TenantRole
+): Promise<TenantUserSummary> {
+  return generatedCall(
+    tenantsApi.inviteTenantUser({ tenantName, userId, inviteTenantUserRequest: { role } })
+  )
+}
+
+export function reinviteTenantUser(tenantName: string, userId: number): Promise<TenantUserSummary> {
+  return generatedCall(tenantsApi.reinviteTenantUser({ tenantName, userId }))
+}
+
+export function updateTenantUserRole(
+  tenantName: string,
+  userId: number,
+  role: TenantRole
+): Promise<TenantUserSummary> {
+  return generatedCall(
+    tenantsApi.updateTenantUserRole({
+      tenantName,
+      userId,
+      updateTenantUserRoleRequest: { role }
+    })
+  )
 }
 
 function findManagedUser(summary: ManagedUsersSummary, userId: number): ManagedUserSummary {

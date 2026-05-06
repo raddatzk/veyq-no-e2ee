@@ -62,8 +62,71 @@
 
 .settings-toolbar {
   display: flex;
+  gap: 0.75rem;
   justify-content: flex-end;
+  align-items: center;
   margin-top: 0.75rem;
+}
+
+.form-inline {
+  display: flex;
+  flex: 1;
+  gap: 0.5rem;
+}
+
+.form-inline .p-inputtext {
+  width: 100%;
+}
+
+.tenant-search {
+  position: relative;
+  align-items: center;
+}
+
+.suggest-panel {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.12);
+}
+
+.suggest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, auto);
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  border-top: 1px solid var(--app-line);
+  background: #fff;
+  color: var(--app-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggest-row:first-child {
+  border-top: 0;
+}
+
+.suggest-row:hover {
+  background: #f8fafc;
+}
+
+.suggest-row span,
+.suggest-row small {
+  color: #64748b;
+}
+
+.suggest-row.create-row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(9rem, auto);
 }
 
 .settings-table {
@@ -81,6 +144,14 @@
   align-items: center;
   padding: 0.75rem;
   border-top: 1px solid var(--app-line);
+}
+
+.settings-table-row.tenant-users-row {
+  grid-template-columns: minmax(13rem, 1.4fr) 8rem minmax(10rem, 1fr) 11rem;
+}
+
+.settings-table-row.tenant-search-row {
+  grid-template-columns: minmax(13rem, 1.4fr) minmax(10rem, 1fr) 10rem;
 }
 
 .settings-table-row:first-child {
@@ -117,5 +188,10 @@
     grid-template-columns: 1fr;
     border: 1px solid var(--app-line);
     border-radius: 8px;
+  }
+
+  .settings-table-row.tenant-users-row,
+  .settings-table-row.tenant-search-row {
+    grid-template-columns: 1fr;
   }
 }

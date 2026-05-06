@@ -49,7 +49,6 @@ class UserResource(
     override fun getAllUsers(): Response =
         Response.ok(userService.getAllUsers()).build()
 
-    @ServerRolesRequired(ServerRole.ServerOwner)
     override fun createManagedUser(request: CreateManagedUserRequest): Response =
         Response.ok(userService.createUser(request)).build()
 
@@ -59,10 +58,6 @@ class UserResource(
         request: UpdateManagedUserRoleRequest,
     ): Response =
         Response.ok(userService.updateManagedUser(userId, request)).build()
-
-    @ServerRolesRequired(ServerRole.ServerOwner)
-    override fun sendManagedUserInvitation(userId: Long): Response =
-        Response.ok(userService.sendInvitation(userId)).build()
 
     override fun acceptInvitation(
         userId: Long,

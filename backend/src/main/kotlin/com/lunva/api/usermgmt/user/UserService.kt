@@ -2,13 +2,12 @@ package com.lunva.api.usermgmt.user
 
 import com.lunva.api.auth.*
 import com.lunva.api.auth.filterchain.RequestContext
-import com.lunva.api.common.mail.MailService
 import com.lunva.api.domain.ServerRole
 import com.lunva.api.domain.Tenant
+import com.lunva.api.domain.TenantMemberRepo
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserRepo
 import com.lunva.api.generated.model.*
-import com.lunva.api.tenant.TenantService
 import com.lunva.api.tenant.toManagedTenantSummary
 import com.lunva.api.usermgmt.EmailChangeService
 import com.lunva.api.usermgmt.InvitationService
@@ -24,11 +23,10 @@ class UserService @Inject constructor(
     private val userRepo: UserRepo,
     private val requestContext: RequestContext,
     private val passwordService: PasswordService,
-    private val tenantService: TenantService,
+    private val tenantMemberRepo: TenantMemberRepo,
     private val invitationService: InvitationService,
     private val authService: AuthService,
     private val resetPasswordService: ResetPasswordService,
-    private val mailService: MailService,
     private val emailChangeService: EmailChangeService,
 ) {
     fun me(): UserSummary {
@@ -42,7 +40,7 @@ class UserService @Inject constructor(
 
     @Transactional
     fun updateMySettings(request: UpdateUserSettingsRequest): UserSummary {
-        val user = user()
+        val user = managedUser()
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()
         val emailOwner = userRepo.findByEmail(email)
@@ -62,7 +60,7 @@ class UserService @Inject constructor(
 
     @Transactional
     fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): UserSummary {
-        val user = user()
+        val user = managedUser()
         val confirmedUser = emailChangeService.confirmEmailChange(user, request.token)
         return confirmedUser.toUserSummary()
     }
@@ -71,32 +69,30 @@ class UserService @Inject constructor(
     fun changeMyPassword(request: ChangePasswordRequest) {
         val currentPassword = request.currentPassword
         val newPassword = request.newPassword
-        val user = user()
+        val user = managedUser()
 
         passwordService.updatePassword(user, currentPassword, newPassword)
     }
 
     @Transactional
     fun createUser(request: CreateManagedUserRequest): ManagedUserSummary {
-        val email = request.email
-        val displayName = request.displayName.trim()
-        val role = request.serverRole.toDomainRole()
-        val tenant = tenantService.findTenantById(request.tenantId)
+        managedUser()
+        val email = normalizeEmail(request.email)
+
+        if (userRepo.findByEmail(email) != null) {
+            throw ConflictException("Email already exists")
+        }
 
         val user = User().also {
             it.email = email
-            it.displayName = displayName
-            it.role = role
+            it.displayName = email.substringBefore("@").ifBlank { email }
+            it.role = ServerRole.ServerMember
             it.passwordHash = passwordService.randomPasswordHash()
             it.passwordSetAt = null
             it.persistAndFlush()
         }
 
-        tenantService.addUserToTenant(tenant, user)
-
-        invitationService.createAndSendInvitation(user, tenant)
-
-        return user.toManagedUserSummary(tenant)
+        return user.toManagedUserSummary()
     }
 
     fun getAllUsers(): ManagedUsersSummary {
@@ -150,20 +146,35 @@ class UserService @Inject constructor(
     fun acceptInvitation(userId: Long, request: AcceptInvitationRequest): LoginContext {
         val targetUser = findUser(userId)
 
-        val rawPassword = request.password.takeIf { it.length >= 8 }
-            ?: throw BadRequestException("password must be at least 8 characters")
+        if (requestContext.user != null && targetUser.id != requestContext.user?.id) {
+            throw ConflictException("You are already logged in with another user")
+        }
 
         val now = Instant.now()
 
-        val invitedUser = invitationService.checkToken(request.token, now)
+        val invitation = invitationService.checkToken(request.token, now)
+        val invitedUser = invitation.user
 
         if (invitedUser != targetUser) {
             throw UnauthorizedException("User is already accepted")
         }
 
-        passwordService.setPassword(invitedUser, rawPassword, now)
+        if (invitedUser.passwordSetAt == null) {
+            val displayName = request.displayName?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw BadRequestException("displayName must not be blank")
+            val rawPassword = request.password
+                ?: throw BadRequestException("password must not be blank")
+            invitedUser.displayName = displayName
+            passwordService.setPassword(invitedUser, rawPassword, now)
+        } else if (requestContext.user?.id != invitedUser.id) {
+            throw UnauthorizedException("User must be logged in to accept this invitation")
+        }
 
-        invitationService.revokeTokenForUser(invitedUser, now)
+        val membership = tenantMemberRepo.findByTenantAndUser(invitation.tenant, invitedUser)
+            ?: throw BadRequestException("Invitation membership is missing")
+        membership.acceptedAt = now
+
+        invitationService.acceptTokenForUserAndTenant(invitedUser, invitation.tenant, now)
 
         return authService.loginUser(targetUser)
     }
@@ -173,6 +184,9 @@ class UserService @Inject constructor(
             ?: throw BadRequestException("email must not be blank")
 
     private fun user(): User = requestContext.user!!
+
+    private fun managedUser(): User =
+        userRepo.findById(user().id) ?: throw UnauthorizedException("Invalid user")
 
     companion object {
         fun toUserSummary(user: User, pendingEmail: String? = null): UserSummary {

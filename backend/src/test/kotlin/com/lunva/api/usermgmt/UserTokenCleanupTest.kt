@@ -4,6 +4,8 @@ import com.lunva.api.cron.UserTokenCleanup
 import com.lunva.api.domain.ResetPasswordToken
 import com.lunva.api.domain.ResetPasswordTokenRepo
 import com.lunva.api.domain.ServerRole
+import com.lunva.api.domain.Tenant
+import com.lunva.api.domain.TenantRepo
 import com.lunva.api.domain.User
 import com.lunva.api.domain.UserEmailChange
 import com.lunva.api.domain.UserEmailChangeRepo
@@ -13,6 +15,7 @@ import com.lunva.api.domain.UserRepo
 import io.quarkus.test.TestTransaction
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -31,32 +34,42 @@ class UserTokenCleanupTest {
     lateinit var userEmailChangeRepo: UserEmailChangeRepo
     @Inject
     lateinit var userRepo: UserRepo
+    @Inject
+    lateinit var tenantRepo: TenantRepo
+    @Inject
+    lateinit var entityManager: EntityManager
 
     @Test
     @TestTransaction
     fun `cleanup deletes old invalid user workflow tokens and keeps active or recent invalid ones`() {
         val user = createUser()
+        val tenant = createTenant()
         val now = Instant.now()
 
-        val oldExpiredReset = resetPasswordToken(user, now.minus(40, ChronoUnit.DAYS))
-        val oldAcceptedReset = resetPasswordToken(user, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(40, ChronoUnit.DAYS))
-        val oldRevokedReset = resetPasswordToken(user, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(40, ChronoUnit.DAYS))
+        val oldExpiredReset = resetPasswordToken(user, now.minus(400, ChronoUnit.DAYS))
+        val oldAcceptedReset = resetPasswordToken(user, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(400, ChronoUnit.DAYS))
+        val oldRevokedReset = resetPasswordToken(user, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(400, ChronoUnit.DAYS))
         val activeReset = resetPasswordToken(user, now.plus(7, ChronoUnit.DAYS))
         val recentExpiredReset = resetPasswordToken(user, now.minus(2, ChronoUnit.DAYS))
 
-        val oldExpiredInvitation = invitation(user, now.minus(40, ChronoUnit.DAYS))
-        val oldAcceptedInvitation = invitation(user, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(40, ChronoUnit.DAYS))
-        val oldRevokedInvitation = invitation(user, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(40, ChronoUnit.DAYS))
-        val activeInvitation = invitation(user, now.plus(7, ChronoUnit.DAYS))
-        val recentExpiredInvitation = invitation(user, now.minus(2, ChronoUnit.DAYS))
+        val oldExpiredInvitation = invitation(user, tenant, now.minus(400, ChronoUnit.DAYS))
+        val oldAcceptedInvitation = invitation(user, tenant, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(400, ChronoUnit.DAYS))
+        val oldRevokedInvitation = invitation(user, tenant, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(400, ChronoUnit.DAYS))
+        val activeInvitation = invitation(user, tenant, now.plus(7, ChronoUnit.DAYS))
+        val recentExpiredInvitation = invitation(user, tenant, now.minus(2, ChronoUnit.DAYS))
 
-        val oldExpiredEmailChange = emailChange(user, now.minus(40, ChronoUnit.DAYS))
-        val oldAcceptedEmailChange = emailChange(user, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(40, ChronoUnit.DAYS))
-        val oldRevokedEmailChange = emailChange(user, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(40, ChronoUnit.DAYS))
+        val oldExpiredEmailChange = emailChange(user, now.minus(400, ChronoUnit.DAYS))
+        val oldAcceptedEmailChange = emailChange(user, now.plus(7, ChronoUnit.DAYS), acceptedAt = now.minus(400, ChronoUnit.DAYS))
+        val oldRevokedEmailChange = emailChange(user, now.plus(7, ChronoUnit.DAYS), revokedAt = now.minus(400, ChronoUnit.DAYS))
         val activeEmailChange = emailChange(user, now.plus(7, ChronoUnit.DAYS))
         val recentExpiredEmailChange = emailChange(user, now.minus(2, ChronoUnit.DAYS))
 
+        resetPasswordTokenRepo.flush()
+        userInvitationRepo.flush()
+        userEmailChangeRepo.flush()
+
         userTokenCleanup.cleanup()
+        entityManager.clear()
 
         assertThat(resetPasswordTokenRepo.findById(oldExpiredReset.id)).isNull()
         assertThat(resetPasswordTokenRepo.findById(oldAcceptedReset.id)).isNull()
@@ -75,6 +88,16 @@ class UserTokenCleanupTest {
         assertThat(userEmailChangeRepo.findById(oldRevokedEmailChange.id)).isNull()
         assertThat(userEmailChangeRepo.findById(activeEmailChange.id)).isNotNull()
         assertThat(userEmailChangeRepo.findById(recentExpiredEmailChange.id)).isNotNull()
+    }
+
+    private fun createTenant(): Tenant {
+        val unique = UUID.randomUUID().toString().take(8)
+        return Tenant().also {
+            it.name = "user-token-cleanup-$unique"
+            it.displayName = "User Token Cleanup $unique"
+            it.domain = "user-token-cleanup-$unique.example.test"
+            tenantRepo.persist(it)
+        }
     }
 
     private fun createUser(): User {
@@ -107,12 +130,14 @@ class UserTokenCleanupTest {
 
     private fun invitation(
         user: User,
+        tenant: Tenant,
         expiresAt: Instant,
         acceptedAt: Instant? = null,
         revokedAt: Instant? = null,
     ): UserInvitation =
         UserInvitation().also {
             it.user = user
+            it.tenant = tenant
             it.tokenHash = tokenHash()
             it.createdAt = expiresAt.minus(1, ChronoUnit.DAYS)
             it.expiresAt = expiresAt

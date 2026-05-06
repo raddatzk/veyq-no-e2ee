@@ -202,6 +202,190 @@ paths:
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
         Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users":
+    get:
+      tags:
+      - Tenants
+      operationId: tenantUsers
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUsers"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Mitglieder auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Mitglieder auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/search":
+    get:
+      tags:
+      - Tenants
+      operationId: searchTenantUsers
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserSearchQuery"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUserSearch"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Globale User fuer Tenant suchen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      - Der Suchbegriff muss mindestens 3 Zeichen enthalten.
+      x-required-membership: TenantMember
+      description: |-
+        Globale User fuer Tenant suchen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+        - Der Suchbegriff muss mindestens 3 Zeichen enthalten.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}/invite":
+    post:
+      tags:
+      - Tenants
+      operationId: inviteTenantUser
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/InviteTenantUser"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: User in Tenant einladen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      x-required-membership: TenantMember
+      description: |-
+        Bestehenden globalen User mit Zielrolle in Tenant einladen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}/reinvite":
+    post:
+      tags:
+      - Tenants
+      operationId: reinviteTenantUser
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Pending-User erneut einladen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      - Der User muss bereits Pending-Mitglied dieses Tenants sein.
+      x-required-membership: TenantMember
+      description: |-
+        Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+        - Der User muss bereits Pending-Mitglied dieses Tenants sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}/role":
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantUserRole
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateTenantUserRole"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Tenant-Rolle eines Mitglieds ändern
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Rolle eines Mitglieds ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+
+        Implementierungsstatus: partial.
   "/api/tenants/{tenantName}/{groupName}":
     get:
       tags:
@@ -292,6 +476,20 @@ components:
       required: true
       schema:
         type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    UserSearchQuery:
+      name: q
+      in: query
+      required: true
+      schema:
+        type: string
+        minLength: 3
   requestBodies:
     CreateTenant:
       required: true
@@ -324,6 +522,25 @@ components:
             "$ref": "#/components/schemas/UpdateGroupSettingsRequest"
           example:
             displayName: Friends & Family
+
+    UpdateTenantUserRole:
+      required: true
+      description: Update tenant user role
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateTenantUserRoleRequest"
+          example:
+            role: TenantMember
+    InviteTenantUser:
+      required: true
+      description: Invite user to tenant with target role
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/InviteTenantUserRequest"
+          example:
+            role: TenantMember
 
   responses:
     Tenants:
@@ -396,12 +613,53 @@ components:
             groupId: 99
             name: family
             displayName: Family
+    TenantUsers:
+      description: Tenant users.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUsersSummary"
+          example:
+            users:
+              - userId: 2
+                email: invitee@example.test
+                displayName: Invitee
+                role: TenantMember
+                status: Pending
+    TenantUser:
+      description: Tenant user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUserSummary"
+          example:
+            userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            role: TenantMember
+            status: Pending
+    TenantUserSearch:
+      description: Matching users outside the tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUserSearchResponse"
+          example:
+            users:
+              - userId: 3
+                displayName: Kevin Raddatz
+                maskedEmail: k***n@e***e.t**
   schemas:
     TenantRole:
       type: string
       enum:
       - TenantOwner
       - TenantMember
+    TenantUserStatus:
+      type: string
+      enum:
+      - Pending
+      - Active
     CreateTenantRequest:
       type: object
       additionalProperties: false
@@ -541,6 +799,62 @@ components:
         groupId: 99
         name: family
         displayName: Family
+    TenantUsersSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - users
+      properties:
+        users:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TenantUserSummary"
+    TenantUserSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - email
+      - displayName
+      - role
+      - status
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+        status:
+          "$ref": "#/components/schemas/TenantUserStatus"
+    TenantUserSearchResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - users
+      properties:
+        users:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TenantUserSearchSummary"
+    TenantUserSearchSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - displayName
+      - maskedEmail
+      properties:
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        maskedEmail:
+          type: string
     UpdateTenantSettingsRequest:
       type: object
       additionalProperties: false
@@ -561,3 +875,23 @@ components:
           type: string
       example:
         displayName: Friends & Family
+    UpdateTenantUserRoleRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - role
+      properties:
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+      example:
+        role: TenantMember
+    InviteTenantUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - role
+      properties:
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+      example:
+        role: TenantMember

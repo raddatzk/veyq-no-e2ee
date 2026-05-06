@@ -18,6 +18,7 @@ import io.quarkus.mailer.MockMailbox
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
 import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
@@ -39,6 +40,7 @@ class UserManagementResourceTest {
     @Inject lateinit var resetPasswordTokenRepo: ResetPasswordTokenRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var serverState: ServerState
+    @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var mailbox: MockMailbox
 
@@ -60,16 +62,28 @@ class UserManagementResourceTest {
         val invitedUserId = given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"email":"invitee-$runId@example.com","displayName":"Invitee","serverRole":"ServerMember","tenantId":${tenant.id}}""")
+            .body("""{"email":"invitee-$runId@example.com"}""")
             .`when`().post("/api/users")
             .then()
             .statusCode(200)
             .body("email", equalTo("invitee-$runId@example.com"))
             .body("status", equalTo("Pending"))
-            .body("tenants.displayName", hasItem("Management $runId"))
+            .body("tenants", equalTo(emptyList<Any>()))
             .extract()
             .path<Number>("userId")
             .toLong()
+
+        assertThat(mailbox.getMailMessagesSentTo("invitee-$runId@example.com")).isEmpty()
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/$invitedUserId/invite")
+            .then()
+            .statusCode(200)
+            .body("email", equalTo("invitee-$runId@example.com"))
+            .body("status", equalTo("Pending"))
 
         given()
             .contentType("application/json")
@@ -86,12 +100,14 @@ class UserManagementResourceTest {
 
         given()
             .contentType("application/json")
-            .body("""{"password":"welcome123456","token":"$token"}""")
+            .body("""{"displayName":"Invitee","password":"welcome123456","token":"$token"}""")
             .`when`().post("/api/users/$invitedUserId/invite/accept")
             .then()
             .statusCode(200)
             .body("email", equalTo("invitee-$runId@example.com"))
+            .body("displayName", equalTo("Invitee"))
 
+        entityManager.clear()
         val invitation = invitationRepo.listAll().single { it.user.email == "invitee-$runId@example.com" }
         assertThat(invitation.acceptedAt).isNotNull
 
@@ -232,6 +248,210 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `tenant owner searches invites and activates existing tenant user`() {
+        val existingUser = createUser("searchable-$runId", "admin1234567", ServerRole.ServerMember)
+
+        val searchResponse = given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("q", "searchable")
+            .`when`().get("/api/tenants/${tenant.name}/users/search")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<List<Map<String, Any>>>("users")
+
+        assertThat(searchResponse).hasSize(1)
+        assertThat(searchResponse.single()["userId"]).isEqualTo(existingUser.id.toInt())
+        assertThat(searchResponse.single()["displayName"]).isEqualTo("searchable-$runId")
+        assertThat(searchResponse.single()["maskedEmail"]).isEqualTo("s***${runId.last()}@e**.c**")
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/${existingUser.id}/invite")
+            .then()
+            .statusCode(200)
+            .body("email", equalTo(existingUser.email))
+            .body("role", equalTo("TenantMember"))
+            .body("status", equalTo("Pending"))
+
+        val firstInviteMessage = mailbox.getMailMessagesSentTo(existingUser.email).single()
+        val token = firstInviteMessage.text.substringAfter("/invite/${existingUser.id}#").trim()
+        val pendingMembership = tenantMemberRepo.findByTenantAndUser(tenant, existingUser)!!
+        assertThat(pendingMembership.acceptedAt).isNull()
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/tenants/${tenant.name}/users")
+            .then()
+            .statusCode(200)
+            .body("users.email", hasItem(existingUser.email))
+            .body("users.status", hasItem("Pending"))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("q", "searchable")
+            .`when`().get("/api/tenants/${tenant.name}/users/search")
+            .then()
+            .statusCode(200)
+            .body("users", equalTo(emptyList<Any>()))
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/tenants/${tenant.name}/users/${existingUser.id}/reinvite")
+            .then()
+            .statusCode(200)
+            .body("status", equalTo("Pending"))
+        assertThat(mailbox.getMailMessagesSentTo(existingUser.email)).hasSize(2)
+        val latestToken = mailbox.getMailMessagesSentTo(existingUser.email)
+            .last()
+            .text
+            .substringAfter("/invite/${existingUser.id}#")
+            .trim()
+
+        given()
+            .contentType("application/json")
+            .body("""{"token":"$latestToken"}""")
+            .`when`().post("/api/users/${existingUser.id}/invite/accept")
+            .then()
+            .statusCode(401)
+
+        val existingUserCookie = login(existingUser.email, "admin1234567")
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", existingUserCookie)
+            .body("""{"displayName":"Ignored","password":"ignored123456","token":"$latestToken"}""")
+            .`when`().post("/api/users/${existingUser.id}/invite/accept")
+            .then()
+            .statusCode(200)
+
+        entityManager.clear()
+        val acceptedUser = userRepo.findById(existingUser.id)!!
+        assertThat(acceptedUser.displayName).isEqualTo("searchable-$runId")
+        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, acceptedUser)!!.acceptedAt).isNotNull
+    }
+
+    @Test
+    fun `tenant owner creates tenant user without server role escalation and manages tenant role`() {
+        val tenantAdmin = createUser("tenant-admin-$runId", "admin1234567", ServerRole.ServerMember)
+        addTenantMember(tenantAdmin, tenant, TenantRole.TenantOwner)
+        val tenantAdminCookie = login(tenantAdmin.email, "admin1234567")
+
+        val createdUserId = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", tenantAdminCookie)
+            .body("""{"email":"tenant-created-$runId@example.com"}""")
+            .`when`().post("/api/users")
+            .then()
+            .statusCode(200)
+            .body("email", equalTo("tenant-created-$runId@example.com"))
+            .body("serverRole", equalTo("ServerMember"))
+            .body("status", equalTo("Pending"))
+            .body("tenants", equalTo(emptyList<Any>()))
+            .extract()
+            .path<Number>("userId")
+            .toLong()
+
+        val createdUser = userRepo.findById(createdUserId)!!
+        assertThat(createdUser.role).isEqualTo(ServerRole.ServerMember)
+        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, createdUser)).isNull()
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", tenantAdminCookie)
+            .body("""{"role":"TenantOwner"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/$createdUserId/invite")
+            .then()
+            .statusCode(200)
+            .body("role", equalTo("TenantOwner"))
+            .body("status", equalTo("Pending"))
+
+        entityManager.clear()
+        val createdMembership = tenantMemberRepo.findByTenantAndUser(tenant, createdUser)!!
+        assertThat(createdMembership.role).isEqualTo(TenantRole.TenantOwner)
+        assertThat(createdMembership.acceptedAt).isNull()
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().put("/api/tenants/${tenant.name}/users/${tenantAdmin.id}/role")
+            .then()
+            .statusCode(200)
+            .body("role", equalTo("TenantMember"))
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().put("/api/tenants/${tenant.name}/users/${ownerUserId()}/role")
+            .then()
+            .statusCode(409)
+    }
+
+    @Test
+    fun `duplicate global pending user can be invited into another tenant`() {
+        val email = "multi-pending-$runId@example.com"
+        val userId = given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"email":"$email"}""")
+            .`when`().post("/api/users")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<Number>("userId")
+            .toLong()
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/$userId/invite")
+            .then()
+            .statusCode(200)
+
+        val otherTenant = createTenant("mgmt-other-$runId", "Other $runId", "other-$runId.example.test", userRepo.findByEmail("mgmt-owner-$runId@example.com")!!)
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"email":"$email"}""")
+            .`when`().post("/api/users")
+            .then()
+            .statusCode(409)
+
+        val searchResponse = given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .queryParam("q", email)
+            .`when`().get("/api/tenants/${otherTenant.name}/users/search")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<List<Map<String, Any>>>("users")
+
+        assertThat(searchResponse).hasSize(1)
+        assertThat(searchResponse.single()["userId"]).isEqualTo(userId.toInt())
+
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"TenantOwner"}""")
+            .`when`().post("/api/tenants/${otherTenant.name}/users/$userId/invite")
+            .then()
+            .statusCode(200)
+            .body("role", equalTo("TenantOwner"))
+            .body("status", equalTo("Pending"))
+
+        entityManager.clear()
+        val user = userRepo.findById(userId)!!
+        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, user)).isNotNull
+        assertThat(tenantMemberRepo.findByTenantAndUser(otherTenant, user)).isNotNull
+        assertThat(mailbox.getMailMessagesSentTo(email)).hasSize(2)
+    }
+
+    @Test
     fun `email confirmation must belong to the logged in user`() {
         val pendingEmail = "wrong-user-$runId@example.com"
         requestEmailChange(pendingEmail)
@@ -368,6 +588,8 @@ class UserManagementResourceTest {
         return message.text.substringAfter("/email/confirm#").trim()
     }
 
+    private fun ownerUserId(): Long = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!.id
+
     private fun assertExpiresAround(expiresAt: Instant, expectedAfter: Duration) {
         val expected = Instant.now().plus(expectedAfter)
         assertThat(expiresAt)
@@ -422,10 +644,24 @@ class UserManagementResourceTest {
                 it.tenant = tenant
                 it.user = user
                 it.role = TenantRole.TenantMember
+                it.acceptedAt = java.time.Instant.now()
                 tenantMemberRepo.persist(it)
             }
             user
         }
+
+    private fun addTenantMember(user: User, tenant: Tenant, role: TenantRole) {
+        inTransaction {
+            TenantMember().also {
+                it.id = TenantMemberId(tenant.id, user.id)
+                it.tenant = tenant
+                it.user = user
+                it.role = role
+                it.acceptedAt = java.time.Instant.now()
+                tenantMemberRepo.persist(it)
+            }
+        }
+    }
 
     private fun createTenant(name: String, displayName: String, domain: String, owner: User): Tenant =
         inTransaction {
@@ -441,6 +677,7 @@ class UserManagementResourceTest {
                 it.tenant = tenant
                 it.user = owner
                 it.role = TenantRole.TenantOwner
+                it.acceptedAt = java.time.Instant.now()
                 tenantMemberRepo.persist(it)
             }
             tenant

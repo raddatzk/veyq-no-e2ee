@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
+import java.time.Instant
 
 enum class TenantRole {
     TenantOwner,
@@ -67,6 +68,9 @@ class TenantMember : PanacheEntityBase {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     lateinit var role: TenantRole
+
+    @Column(name = "accepted_at")
+    var acceptedAt: Instant? = null
 }
 
 @Embeddable
@@ -84,4 +88,10 @@ class TenantMemberRepo : PanacheRepository<TenantMember> {
 
     fun listByUser(user: User): List<TenantMember> =
         list("user", user)
+
+    fun listByTenant(tenant: Tenant): List<TenantMember> =
+        list("tenant", tenant)
+
+    fun countActiveTenantOwners(tenant: Tenant): Long =
+        count("tenant = ?1 and role = ?2 and acceptedAt is not null", tenant, TenantRole.TenantOwner)
 }

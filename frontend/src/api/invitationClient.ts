@@ -4,12 +4,13 @@ import { generatedCall, usersApi } from './generatedClient'
 export async function acceptInvitation(
   userId: number,
   token: string,
-  password: string
+  password?: string,
+  displayName?: string
 ): Promise<LoginResponse> {
   return generatedCall(
     usersApi.acceptInvitation({
       userId,
-      acceptInvitationRequest: { password, token }
+      acceptInvitationRequest: { displayName, password, token }
     })
   )
 }

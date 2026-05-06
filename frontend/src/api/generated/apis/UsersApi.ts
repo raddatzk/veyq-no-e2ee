@@ -81,10 +81,6 @@ export interface ResetMyPasswordRequest {
     resetPasswordRequest: ResetPasswordRequest;
 }
 
-export interface SendManagedUserInvitationRequest {
-    userId: number;
-}
-
 export interface UpdateManagedUserRequest {
     userId: number;
     updateManagedUserRoleRequest: UpdateManagedUserRoleRequest;
@@ -184,8 +180,8 @@ export interface UsersApiInterface {
     createManagedUserRequestOpts(requestParameters: CreateManagedUserOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Verwalteten Benutzer einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * @summary Verwalteten Benutzer einladen
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * @summary Globalen Pending-User anlegen
      * @param {CreateManagedUserRequest} createManagedUserRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -194,8 +190,8 @@ export interface UsersApiInterface {
     createManagedUserRaw(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>>;
 
     /**
-     * Verwalteten Benutzer einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Verwalteten Benutzer einladen
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen
      */
     createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
 
@@ -292,30 +288,6 @@ export interface UsersApiInterface {
      * Passwort zuruecksetzen
      */
     resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
-
-    /**
-     * Creates request options for sendManagedUserInvitation without sending the request
-     * @param {number} userId Internal ID of the current user
-     * @throws {RequiredError}
-     * @memberof UsersApiInterface
-     */
-    sendManagedUserInvitationRequestOpts(requestParameters: SendManagedUserInvitationRequest): Promise<runtime.RequestOpts>;
-
-    /**
-     * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * @summary Einladung senden
-     * @param {number} userId Internal ID of the current user
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof UsersApiInterface
-     */
-    sendManagedUserInvitationRaw(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>>;
-
-    /**
-     * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung senden
-     */
-    sendManagedUserInvitation(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
 
     /**
      * Creates request options for updateManagedUser without sending the request
@@ -551,8 +523,8 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwalteten Benutzer einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Verwalteten Benutzer einladen
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen
      */
     async createManagedUserRaw(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>> {
         const requestOptions = await this.createManagedUserRequestOpts(requestParameters);
@@ -562,8 +534,8 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwalteten Benutzer einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Verwalteten Benutzer einladen
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen
      */
     async createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
         const response = await this.createManagedUserRaw(requestParameters, initOverrides);
@@ -750,53 +722,6 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async resetMyPassword(requestParameters: ResetMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.resetMyPasswordRaw(requestParameters, initOverrides);
-    }
-
-    /**
-     * Creates request options for sendManagedUserInvitation without sending the request
-     */
-    async sendManagedUserInvitationRequestOpts(requestParameters: SendManagedUserInvitationRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['userId'] == null) {
-            throw new runtime.RequiredError(
-                'userId',
-                'Required parameter "userId" was null or undefined when calling sendManagedUserInvitation().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/users/{userId}/invite`;
-        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
-
-        return {
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
-     * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung senden
-     */
-    async sendManagedUserInvitationRaw(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>> {
-        const requestOptions = await this.sendManagedUserInvitationRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => ManagedUserSummaryFromJSON(jsonValue));
-    }
-
-    /**
-     * Einladung erneut senden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
-     * Einladung senden
-     */
-    async sendManagedUserInvitation(requestParameters: SendManagedUserInvitationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
-        const response = await this.sendManagedUserInvitationRaw(requestParameters, initOverrides);
-        return await response.value();
     }
 
     /**

@@ -18,6 +18,7 @@ import com.lunva.api.usermgmt.user.toUsersApiRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import java.time.Instant
 
 @ApplicationScoped
 class TenantService @Inject constructor(
@@ -37,6 +38,7 @@ class TenantService @Inject constructor(
     fun listMyTenants(): TenantsSummary {
         return TenantsSummary(
             requestContext.user!!.tenantMemberships
+                .filter { it.acceptedAt != null }
                 .sortedBy { it.tenant.name }
                 .map {
                     val tenantOwners = findUsersWithRole(it.tenant, TenantRole.TenantOwner).map { user -> user.toTenantAdminSummary() }
@@ -46,21 +48,25 @@ class TenantService @Inject constructor(
     }
 
     private fun findUsersWithRole(tenant: Tenant, role: TenantRole): List<User> {
-        return tenant.members.filter { it.role == role }.map { it.user }
+        return tenant.members.filter { it.role == role && it.acceptedAt != null }.map { it.user }
     }
 
     fun requireTenantMembership(tenant: Tenant, user: User) {
-        tenantMemberRepo.findByTenantAndUser(tenant, user)
+        tenantMemberRepo.findByTenantAndUser(tenant, user)?.takeIf { it.acceptedAt != null }
             ?: throw ForbiddenException("User is not member of this tenant")
     }
 
-    fun addUserToTenant(tenant: Tenant, user: User) {
+    fun addUserToTenant(tenant: Tenant, user: User, role: TenantRole = TenantRole.TenantMember, acceptedAt: Instant? = null): TenantMember {
+        tenantMemberRepo.findByTenantAndUser(tenant, user)?.let { return it }
+
         TenantMember().also {
             it.id = TenantMemberId(tenant.id, user.id)
             it.tenant = tenant
             it.user = user
-            it.role = TenantRole.TenantMember
+            it.role = role
+            it.acceptedAt = acceptedAt
             it.persist()
+            return it
         }
     }
 
@@ -84,6 +90,7 @@ class TenantService @Inject constructor(
             it.tenant = tenant
             it.user = owner
             it.role = TenantRole.TenantOwner
+            it.acceptedAt = Instant.now()
             tenantMemberRepo.persist(it)
         }
 

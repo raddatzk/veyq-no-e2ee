@@ -24,7 +24,13 @@ export interface AcceptInvitationRequest {
      * @type {string}
      * @memberof AcceptInvitationRequest
      */
-    password: string;
+    displayName?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof AcceptInvitationRequest
+     */
+    password?: string;
     /**
      * 
      * @type {string}
@@ -37,7 +43,6 @@ export interface AcceptInvitationRequest {
  * Check if a given object implements the AcceptInvitationRequest interface.
  */
 export function instanceOfAcceptInvitationRequest(value: object): value is AcceptInvitationRequest {
-    if (!('password' in value) || value['password'] === undefined) return false;
     if (!('token' in value) || value['token'] === undefined) return false;
     return true;
 }
@@ -52,7 +57,8 @@ export function AcceptInvitationRequestFromJSONTyped(json: any, ignoreDiscrimina
     }
     return {
         
-        'password': json['password'],
+        'displayName': json['displayName'] == null ? undefined : json['displayName'],
+        'password': json['password'] == null ? undefined : json['password'],
         'token': json['token'],
     };
 }
@@ -68,6 +74,7 @@ export function AcceptInvitationRequestToJSONTyped(value?: AcceptInvitationReque
 
     return {
         
+        'displayName': value['displayName'],
         'password': value['password'],
         'token': value['token'],
     };

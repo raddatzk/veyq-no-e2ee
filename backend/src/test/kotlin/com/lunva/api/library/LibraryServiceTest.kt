@@ -351,6 +351,7 @@ class LibraryServiceTest {
                 it.tenant = tenant
                 it.user = user
                 it.role = role
+                it.acceptedAt = java.time.Instant.now()
                 tenantMemberRepo.persist(it)
             }
             tenant
@@ -363,6 +364,7 @@ class LibraryServiceTest {
                 it.tenant = tenant
                 it.user = user
                 it.role = role
+                it.acceptedAt = java.time.Instant.now()
                 tenantMemberRepo.persist(it)
             }
         }

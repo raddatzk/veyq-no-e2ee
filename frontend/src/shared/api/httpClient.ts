@@ -9,6 +9,17 @@ export class SetupRequiredError extends Error {
   }
 }
 
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly body: unknown
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 export async function callApi<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await apiFetch(path, options)
 
@@ -45,7 +56,7 @@ export async function apiError(response: Response): Promise<Error> {
   if (response.status === 503 && body.error === 'Setup required') {
     return new SetupRequiredError()
   }
-  return new Error(body.error || 'Request failed')
+  return new ApiError(response.status, body.error || 'Request failed', body)
 }
 
 async function requestUrl(url: string, options: RequestInit = {}): Promise<Response> {

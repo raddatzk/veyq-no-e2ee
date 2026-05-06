@@ -32,11 +32,12 @@ class InvitationService @Inject constructor(
     @Transactional
     fun createAndSendInvitation(user: User, tenant: Tenant) {
         val now = Instant.now()
-        invitationRepo.listOpenByUser(user).forEach { it.revokedAt = now }
+        invitationRepo.listOpenByUserAndTenant(user, tenant).forEach { it.revokedAt = now }
 
         val token = newInvitationToken()
         UserInvitation().also {
             it.user = user
+            it.tenant = tenant
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
             it.expiresAt = now.plus(Duration.ofDays(userConfig.invitationTtlDays))
@@ -59,7 +60,7 @@ class InvitationService @Inject constructor(
     fun findByToken(token: String): UserInvitation? =
         invitationRepo.findByTokenHash(HashingService.sha256(token))
 
-    fun checkToken(token: String, now: Instant): User {
+    fun checkToken(token: String, now: Instant): UserInvitation {
         val invitation = findByToken(token)
             ?: throw NotFoundException("Invitation not found")
 
@@ -67,11 +68,11 @@ class InvitationService @Inject constructor(
             throw BadRequestException("Invitation is no longer valid")
         }
 
-        return invitation.user
+        return invitation
     }
 
-    fun revokeTokenForUser(user: User, timestamp: Instant) {
-        invitationRepo.listOpenByUser(user)
+    fun acceptTokenForUserAndTenant(user: User, tenant: Tenant, timestamp: Instant) {
+        invitationRepo.listOpenByUserAndTenant(user, tenant)
             .filter { it.acceptedAt == null }
             .forEach { it.acceptedAt = timestamp }
     }

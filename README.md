@@ -227,6 +227,8 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
 ## TODO
 
 - manage server users
-- manage tenant users
+- create user only with role and email. User sets Name with Password in Invite Link
+- live search field 
+  - mask email domain
 - create group
 - manage group

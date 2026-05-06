@@ -13,14 +13,6 @@
  */
 
 import { mapValues } from '../runtime';
-import type { ServerRole } from './ServerRole';
-import {
-    ServerRoleFromJSON,
-    ServerRoleFromJSONTyped,
-    ServerRoleToJSON,
-    ServerRoleToJSONTyped,
-} from './ServerRole';
-
 /**
  * 
  * @export
@@ -33,36 +25,13 @@ export interface CreateManagedUserRequest {
      * @memberof CreateManagedUserRequest
      */
     email: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateManagedUserRequest
-     */
-    displayName: string;
-    /**
-     * 
-     * @type {ServerRole}
-     * @memberof CreateManagedUserRequest
-     */
-    serverRole: ServerRole;
-    /**
-     * 
-     * @type {number}
-     * @memberof CreateManagedUserRequest
-     */
-    tenantId: number;
 }
-
-
 
 /**
  * Check if a given object implements the CreateManagedUserRequest interface.
  */
 export function instanceOfCreateManagedUserRequest(value: object): value is CreateManagedUserRequest {
     if (!('email' in value) || value['email'] === undefined) return false;
-    if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('serverRole' in value) || value['serverRole'] === undefined) return false;
-    if (!('tenantId' in value) || value['tenantId'] === undefined) return false;
     return true;
 }
 
@@ -77,9 +46,6 @@ export function CreateManagedUserRequestFromJSONTyped(json: any, ignoreDiscrimin
     return {
         
         'email': json['email'],
-        'displayName': json['displayName'],
-        'serverRole': ServerRoleFromJSON(json['serverRole']),
-        'tenantId': json['tenantId'],
     };
 }
 
@@ -95,9 +61,6 @@ export function CreateManagedUserRequestToJSONTyped(value?: CreateManagedUserReq
     return {
         
         'email': value['email'],
-        'displayName': value['displayName'],
-        'serverRole': ServerRoleToJSON(value['serverRole']),
-        'tenantId': value['tenantId'],
     };
 }
 

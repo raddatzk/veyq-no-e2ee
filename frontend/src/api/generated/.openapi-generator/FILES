@@ -38,6 +38,7 @@ models/GroupMemberSummary.ts
 models/GroupRole.ts
 models/GroupSummary.ts
 models/GroupsSummary.ts
+models/InviteTenantUserRequest.ts
 models/LibraryScopeRequest.ts
 models/LocationKind.ts
 models/LoginRequest.ts
@@ -64,7 +65,12 @@ models/TenantGroupSettingsResponse.ts
 models/TenantRole.ts
 models/TenantSettingsResponse.ts
 models/TenantSummary.ts
+models/TenantUserSearchResponse.ts
+models/TenantUserSearchSummary.ts
 models/TenantUserSettingsResponse.ts
+models/TenantUserStatus.ts
+models/TenantUserSummary.ts
+models/TenantUsersSummary.ts
 models/TenantsSummary.ts
 models/UpdateGroupRequest.ts
 models/UpdateGroupSettingsRequest.ts
@@ -72,6 +78,7 @@ models/UpdateLibraryItemRequest.ts
 models/UpdateManagedUserRoleRequest.ts
 models/UpdateMediaMetadataRequest.ts
 models/UpdateTenantSettingsRequest.ts
+models/UpdateTenantUserRoleRequest.ts
 models/UpdateUserSettingsRequest.ts
 models/UserStatus.ts
 models/UserSummary.ts
