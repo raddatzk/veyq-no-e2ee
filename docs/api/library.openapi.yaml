@@ -415,43 +415,6 @@ paths:
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
         Implementierungsstatus: partial.
-    post:
-      tags:
-      - Media
-      operationId: upload
-      parameters:
-      - "$ref": "#/components/parameters/TenantName"
-      requestBody:
-        "$ref": "#/components/requestBodies/MediaUpload"
-      responses:
-        '200':
-          "$ref": "#/components/responses/Media"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '404':
-          "$ref": "./common.openapi.yaml#/components/responses/404"
-        '413':
-          "$ref": "./common.openapi.yaml#/components/responses/413"
-      summary: Medium direkt hochladen
-      x-implementation-status: partial
-      x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
-      x-required-membership: TenantMember
-      description: |-
-        Medium direkt hochladen.
-
-        Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
-
-        Implementierungsstatus: partial.
   "/api/{tenantName}/media/{mediaId}/content":
     get:
       tags:
@@ -850,16 +813,6 @@ components:
             albumPath: "/@family/vacation/beach"
             mediaId: med_abc123
             hidden: false
-
-    MediaUpload:
-      required: true
-      description: Upload binary media
-      content:
-        multipart/form-data:
-          schema:
-            "$ref": "#/components/schemas/BinaryDataRequest"
-          example:
-            file: "<binary image data>"
 
     UpdateMediaMetadata:
       required: true
@@ -1336,19 +1289,3 @@ components:
         imageHeight: 3000
         gpsLatitude: 52.52
         gpsLongitude: 13.405
-    BinaryDataRequest:
-      type: object
-      required:
-        - file
-        - albumPath
-      properties:
-        file:
-          type: string
-          format: binary
-        albumPath:
-          type: string
-        title:
-          type: string
-      example:
-        file: example
-        albumPath: "/urlaub"

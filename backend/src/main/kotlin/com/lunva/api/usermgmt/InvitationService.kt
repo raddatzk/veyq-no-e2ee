@@ -30,7 +30,7 @@ class InvitationService @Inject constructor(
     private val random = SecureRandom()
 
     @Transactional
-    fun createAndSendInvitation(user: User, tenant: Tenant): String {
+    fun createAndSendInvitation(user: User, tenant: Tenant) {
         val now = Instant.now()
         invitationRepo.listOpenByUser(user).forEach { it.revokedAt = now }
 
@@ -50,12 +50,10 @@ class InvitationService @Inject constructor(
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
-                    mailService.sendInvitationMail(user, inviteUrl)
+                    mailService.sendInvitationMail(user, inviteUrl, tenant)
                 }
             }
         })
-
-        return token
     }
 
     fun findByToken(token: String): UserInvitation? =

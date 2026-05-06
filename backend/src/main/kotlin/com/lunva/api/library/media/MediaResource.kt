@@ -34,23 +34,6 @@ class MediaResource @Inject constructor(
         return Response.ok(stream, "application/x-ndjson").build()
     }
 
-    override fun upload(
-        tenantName: String,
-        fileInputStream: InputStream,
-        albumPath: String?,
-        title: String?,
-    ): Response {
-        val uploadPath = Files.createTempFile("lunva-upload-", ".tmp")
-        return try {
-            fileInputStream.use { input ->
-                Files.copy(input, uploadPath, StandardCopyOption.REPLACE_EXISTING)
-            }
-            Response.ok(mediaService.uploadMedia(GeneratedFileUpload(uploadPath, title), albumPath, title)).build()
-        } finally {
-            Files.deleteIfExists(uploadPath)
-        }
-    }
-
     override fun content(tenantName: String, mediaId: String, range: String?): Response =
         mediaService.mediaContent(mediaId, range)
 

@@ -1,22 +1,25 @@
 package com.lunva.api.common.mail
 
+import com.lunva.api.domain.Tenant
 import com.lunva.api.domain.User
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.jboss.logging.Logger
 
 @ApplicationScoped
 class MailService @Inject constructor(
     private val mailer: Mailer,
-    private val mailConfig: MailConfig,
+    @param:ConfigProperty(name = "quarkus.mailer.from")
+    private val senderAddress: String,
 ){
     companion object {
         private val LOG: Logger = Logger.getLogger(MailService::class.java)
     }
 
-    fun sendInvitationMail(user: User, inviteUrl: String) {
+    fun sendInvitationMail(user: User, inviteUrl: String, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 user.email,
@@ -29,13 +32,13 @@ class MailService @Inject constructor(
 
                 $inviteUrl
                 """.trimIndent(),
-            ),
+            ).setFrom(sender(tenant.displayName)),
             purpose = "invitation",
             recipient = user.email,
         )
     }
 
-    fun sendPasswordResetMail(user: User, resetUrl: String) {
+    fun sendPasswordResetMail(user: User, resetUrl: String, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 user.email,
@@ -47,13 +50,13 @@ class MailService @Inject constructor(
                     
                     $resetUrl
                 """.trimIndent()
-            ),
+            ).setFrom(sender(tenant.displayName)),
             purpose = "password reset",
             recipient = user.email,
         )
     }
 
-    fun sendEmailChangeConfirmationMail(user: User, pendingEmail: String, confirmUrl: String) {
+    fun sendEmailChangeConfirmationMail(user: User, pendingEmail: String, confirmUrl: String, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 pendingEmail,
@@ -65,7 +68,7 @@ class MailService @Inject constructor(
 
                     $confirmUrl
                 """.trimIndent()
-            ),
+            ).setFrom(sender(tenant.displayName)),
             purpose = "email change confirmation",
             recipient = pendingEmail,
         )
@@ -78,4 +81,13 @@ class MailService @Inject constructor(
             LOG.warn("Failed to send $purpose mail to $recipient", exception)
         }
     }
+
+    private fun sender(tenantName: String): String =
+        "${safeSenderName(tenantName)} <${senderAddress.trim()}>"
+
+    private fun safeSenderName(value: String): String =
+        value
+            .replace(Regex("[\\r\\n<>]"), " ")
+            .trim()
+            .ifBlank { "Lunva" }
 }

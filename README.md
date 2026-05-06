@@ -14,14 +14,37 @@ Lunva ist eine Quarkus/Vue-Anwendung mit globalen User-Accounts, cookie-basierte
 
 ```bash
 cd infra
+cp .env.example .env
+# .env anpassen
 docker compose up --build
 ```
 
 Danach:
 
-- App: `http://localhost:8080`
-- Health: `http://localhost:8080/q/health`
-- MariaDB: `localhost:3306`
+- App: `https://<LUNVA_DOMAIN>`
+- Health: `https://<LUNVA_DOMAIN>/q/health`
+
+Die echte `infra/.env` enthält Domains, Datenbank-Zugangsdaten, Reset-Zugangsdaten und
+die Let's-Encrypt-E-Mail. Sie ist absichtlich nicht versioniert; `infra/.env.example`
+dokumentiert alle benötigten Werte.
+Der `lunva`-Container lädt dieselbe Datei per `env_file`, damit die in
+`backend/src/main/resources/application.properties` referenzierten Variablen im Container
+verfügbar sind.
+
+### Reset der Docker-Compose-Testinstanz
+
+Die Compose-Umgebung enthält einen kleinen Reset-Sidecar für Testinstanzen. Er verwendet
+`RESET_USERNAME` und `RESET_PASSWORD` aus `infra/.env`:
+
+```bash
+cd infra
+docker compose up --build
+```
+
+Der Reset leert alle Lunva-Datenbanktabellen außer `flyway_schema_history`, löscht den
+Inhalt des Medien-Volumes unter `/data/lunva-media` und startet danach den `lunva`-Container
+neu. Datenbankschema und Volumes bleiben bestehen; die App landet danach wieder im initialen
+Setup-Flow.
 
 ## Lokale Entwicklung
 
@@ -188,7 +211,6 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
   - `BCRYPT_BENCHMARK_SAMPLES`
 - Einladungen:
   - `INVITATION_TTL_DAYS`
-  - `INVITATION_MAIL_FROM`
 - Medien:
   - `MEDIA_STORAGE_DIR`
   - `MEDIA_CHUNK_SIZE_BYTES`
@@ -208,4 +230,5 @@ Alle Mitglieder eines sichtbaren Scopes dürfen dort lesen und schreiben. Medien
 - manage tenant users
 - create group
 - manage group
-- change email requires email confirmation
+- cleanup reset password
+- cleanup change email

@@ -107,8 +107,7 @@ class UserService @Inject constructor(
         val email = request.email.trim().lowercase()
         val user = userRepo.findByEmail(email)?.takeIf { it.passwordSetAt != null } ?: return
         val tenant = user.tenantMemberships.firstOrNull()?.tenant ?: return
-        val token = resetPasswordService.requestNewPassword(user)
-        mailService.sendPasswordResetMail(user, "https://${tenant.domain}/password/reset/${user.id}#$token")
+        resetPasswordService.requestNewPassword(user, tenant)
     }
 
     @Transactional

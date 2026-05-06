@@ -1,5 +1,6 @@
 package com.lunva.api.library.media
 
+import io.quarkus.runtime.configuration.MemorySize
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithName
 import java.nio.file.Path
@@ -9,12 +10,15 @@ interface MediaConfig {
     @get:WithName("storage-dir")
     val storageDir: Path
 
-    @get:WithName("chunk-size-bytes")
-    val chunkSizeBytes: Long
+    @get:WithName("chunk-size")
+    val chunkSize: MemorySize
 
     @get:WithName("upload-session-ttl-hours")
     val uploadSessionTtlHours: Long
 
     @get:WithName("upload-session-cleanup-cron")
     val uploadSessionCleanupCron: String
+
+    val chunkSizeBytes: Long
+        get() = chunkSize.asLongValue()
 }

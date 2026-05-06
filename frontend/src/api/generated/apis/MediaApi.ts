@@ -45,13 +45,6 @@ export interface UpdateMetadataRequest {
     updateMediaMetadataRequest: UpdateMediaMetadataRequest;
 }
 
-export interface UploadRequest {
-    tenantName: string;
-    file: Blob;
-    albumPath: string;
-    title?: string;
-}
-
 /**
  * MediaApi - interface
  * 
@@ -140,36 +133,6 @@ export interface MediaApiInterface {
      * Medien-Metadaten aktualisieren
      */
     updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
-
-    /**
-     * Creates request options for upload without sending the request
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {Blob} file 
-     * @param {string} albumPath 
-     * @param {string} [title] 
-     * @throws {RequiredError}
-     * @memberof MediaApiInterface
-     */
-    uploadRequestOpts(requestParameters: UploadRequest): Promise<runtime.RequestOpts>;
-
-    /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * @summary Medium direkt hochladen
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {Blob} file 
-     * @param {string} albumPath 
-     * @param {string} [title] 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof MediaApiInterface
-     */
-    uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
-
-    /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Medium direkt hochladen
-     */
-    upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
 
 }
 
@@ -354,96 +317,6 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
      */
     async updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
         const response = await this.updateMetadataRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Creates request options for upload without sending the request
-     */
-    async uploadRequestOpts(requestParameters: UploadRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['tenantName'] == null) {
-            throw new runtime.RequiredError(
-                'tenantName',
-                'Required parameter "tenantName" was null or undefined when calling upload().'
-            );
-        }
-
-        if (requestParameters['file'] == null) {
-            throw new runtime.RequiredError(
-                'file',
-                'Required parameter "file" was null or undefined when calling upload().'
-            );
-        }
-
-        if (requestParameters['albumPath'] == null) {
-            throw new runtime.RequiredError(
-                'albumPath',
-                'Required parameter "albumPath" was null or undefined when calling upload().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        const consumes: runtime.Consume[] = [
-            { contentType: 'multipart/form-data' },
-        ];
-        // @ts-ignore: canConsumeForm may be unused
-        const canConsumeForm = runtime.canConsumeForm(consumes);
-
-        let formParams: { append(param: string, value: any): any };
-        let useForm = false;
-        // use FormData to transmit files using content-type "multipart/form-data"
-        useForm = canConsumeForm;
-        if (useForm) {
-            formParams = new FormData();
-        } else {
-            formParams = new URLSearchParams();
-        }
-
-        if (requestParameters['file'] != null) {
-            formParams.append('file', requestParameters['file'] as any);
-        }
-
-        if (requestParameters['albumPath'] != null) {
-            formParams.append('albumPath', requestParameters['albumPath'] as any);
-        }
-
-        if (requestParameters['title'] != null) {
-            formParams.append('title', requestParameters['title'] as any);
-        }
-
-
-        let urlPath = `/api/{tenantName}/media`;
-        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
-
-        return {
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: formParams,
-        };
-    }
-
-    /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Medium direkt hochladen
-     */
-    async uploadRaw(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
-        const requestOptions = await this.uploadRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => MediaSummaryFromJSON(jsonValue));
-    }
-
-    /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Medium direkt hochladen
-     */
-    async upload(requestParameters: UploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
-        const response = await this.uploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

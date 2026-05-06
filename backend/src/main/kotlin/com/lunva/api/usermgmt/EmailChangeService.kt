@@ -55,7 +55,7 @@ class EmailChangeService @Inject constructor(
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
-                    mailService.sendEmailChangeConfirmationMail(user, pendingEmail, confirmUrl)
+                    mailService.sendEmailChangeConfirmationMail(user, pendingEmail, confirmUrl, tenant)
                 }
             }
         })

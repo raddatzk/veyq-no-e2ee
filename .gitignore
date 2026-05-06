@@ -193,6 +193,9 @@ dist/
 npm-debug.log
 yarn-error.log
 
+# Local deployment secrets
+infra/.env
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db

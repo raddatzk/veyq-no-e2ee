@@ -14,11 +14,13 @@ USER quarkus
 RUN ./gradlew --no-daemon help
 
 FROM backend-build-base AS backend-build-jvm
+COPY --chown=quarkus:quarkus docs/api ../docs/api
 COPY --chown=quarkus:quarkus backend/src ./src
 COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
 RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.package.type=fast-jar -x test
 
 FROM backend-build-base AS backend-build-native
+COPY --chown=quarkus:quarkus docs/api ../docs/api
 COPY --chown=quarkus:quarkus backend/src ./src
 COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
 RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -x test
