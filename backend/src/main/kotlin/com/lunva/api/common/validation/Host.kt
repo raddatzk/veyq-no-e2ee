@@ -19,10 +19,12 @@ annotation class Host(
 
 class HostValidator : ConstraintValidator<Host, String> {
     override fun isValid(value: String?, context: ConstraintValidatorContext?): Boolean {
-        return value == null || REGEX_V4.matches(value) || REGEX_v6.matches(value) || REGEX_DOMAIN.matches(value)
+        return value == null || REGEX_LOCALHOST.matches(value) || REGEX_V4.matches(value) || REGEX_v6.matches(value) || REGEX_DOMAIN.matches(value)
     }
 
     companion object {
+        val REGEX_LOCALHOST =
+            Regex("^localhost(?::(6553[0-5]|655[0-2]\\d|65[0-4]\\d{2}|6[0-4]\\d{3}|[1-5]?\\d{1,4}))?\$")
         val REGEX_V4 =
             Regex("^((?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d))(?::(6553[0-5]|655[0-2]\\d|65[0-4]\\d{2}|6[0-4]\\d{3}|[1-5]?\\d{1,4}))?\$")
         val REGEX_v6 =

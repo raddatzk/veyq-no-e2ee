@@ -70,13 +70,10 @@ class TenantService @Inject constructor(
         }
     }
 
-    private fun createTenant(name: String, displayName: String, domainInput: String, owner: User): Tenant {
-        validateTenantName(name)
-        val domain = normalizeDomain(domainInput)
-        if (tenantRepo.existsByDomain(domain)) {
-            throw ConflictException("Tenant domain already exists")
+    private fun createTenant(name: String, displayName: String, domain: String, owner: User): Tenant {
+        if (tenantRepo.existsByName(name)) {
+            throw ConflictException("Tenant name already exists")
         }
-
         val tenant = Tenant().also {
             it.name = name
             it.displayName = displayName.trim()
@@ -107,9 +104,6 @@ class TenantService @Inject constructor(
     }
 
     fun validateTenantName(name: String) {
-        if (!TenantName.isValid(name)) {
-            throw BadRequestException("Invalid tenant name")
-        }
         if (tenantRepo.existsByName(name)) {
             throw ConflictException("Tenant name already exists")
         }
@@ -119,10 +113,6 @@ class TenantService @Inject constructor(
         return tenantRepo.findByName(name)
             ?: throw NotFoundException("Tenant not found")
     }
-
-    fun findTenantById(id: Long): Tenant =
-        tenantRepo.findById(id)
-            ?: throw NotFoundException("Tenant not found")
 
     fun normalizeDomain(input: String): String {
         val domain = input.trim().lowercase()
