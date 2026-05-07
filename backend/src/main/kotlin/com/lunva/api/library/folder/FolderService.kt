@@ -5,6 +5,7 @@ import com.lunva.api.auth.NotFoundException
 import com.lunva.api.domain.*
 import com.lunva.api.generated.model.ExplorerFolder
 import com.lunva.api.generated.model.CreateLibraryItemRequest
+import com.lunva.api.library.LibraryDeletionService
 import com.lunva.api.library.LibraryService
 import com.lunva.api.generated.model.MoveLibraryItemRequest
 import com.lunva.api.generated.model.UpdateLibraryItemRequest
@@ -17,6 +18,7 @@ import jakarta.transaction.Transactional
 @Singleton
 class FolderService @Inject constructor(
     private val folderRepo: TenantFolderRepo,
+    private val libraryDeletionService: LibraryDeletionService,
     albumRepo: TenantAlbumRepo,
     groupRepo: TenantGroupRepo,
     groupMemberRepo: TenantGroupMemberRepo,
@@ -78,7 +80,7 @@ class FolderService @Inject constructor(
     fun deleteFolder(path: String?) {
         val folder = resolveFolder(path)
         requireVisible(folder)
-        folder.delete()
+        libraryDeletionService.deleteFolder(folder)
     }
 
     private fun resolveFolder(path: String?): TenantFolder =

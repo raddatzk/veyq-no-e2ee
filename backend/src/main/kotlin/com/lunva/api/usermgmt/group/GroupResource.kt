@@ -9,6 +9,7 @@ import com.lunva.api.generated.model.UpdateGroupRequest
 import com.lunva.api.tenant.TenantService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import jakarta.transaction.Transactional
 import jakarta.ws.rs.PathParam
 
 @ApplicationScoped
@@ -32,6 +33,15 @@ class GroupResource @Inject constructor(
         request: CreateGroupRequest,
     ): GroupSummary {
         return groupService.createGroup(request)
+    }
+
+    @GroupOwnerRequired
+    @Transactional
+    override fun deleteGroup(
+        tenantName: String,
+        @PathParam("groupName") groupName: String,
+    ) {
+        groupService.deleteGroup(groupName)
     }
 
     @GroupOwnerRequired

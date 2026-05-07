@@ -12,6 +12,7 @@ import com.lunva.api.generated.model.GroupsSummary
 import com.lunva.api.generated.model.SimplifiedGroupSummary
 import com.lunva.api.generated.model.UpdateGroupRequest
 import com.lunva.api.generated.model.UserSummary
+import com.lunva.api.library.LibraryDeletionService
 import com.lunva.api.usermgmt.user.toUsersApiRole
 import com.lunva.api.usermgmt.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
@@ -24,6 +25,7 @@ class GroupService @Inject constructor(
     private val userService: UserService,
     private val groupMemberRepo: TenantGroupMemberRepo,
     private val tenantMemberRepo: TenantMemberRepo,
+    private val libraryDeletionService: LibraryDeletionService,
     private val requestContext: RequestContext,
 ) {
 
@@ -119,6 +121,13 @@ class GroupService @Inject constructor(
         } ?: throw NotFoundException("Group $oldName not found")
 
         return group.toGroupSummary()
+    }
+
+    @Transactional
+    fun deleteGroup(groupName: String) {
+        val group = tenantGroupRepo.findByTenantAndName(requestContext.tenant!!, groupName)
+            ?: throw NotFoundException("Group $groupName not found")
+        libraryDeletionService.deleteGroup(group)
     }
 
     private fun visibleGroups(): List<TenantGroup> {

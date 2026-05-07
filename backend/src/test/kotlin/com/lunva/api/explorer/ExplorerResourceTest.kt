@@ -424,6 +424,65 @@ class ExplorerResourceTest {
     }
 
     @Test
+    fun `tenant owner deletes tenant recursively and tenant member is forbidden`() {
+        createUser("delete-member-$runId", "member123456", ServerRole.ServerMember)
+        addTenantMember("delete-member-$runId")
+        val memberCookie = login("delete-member-$runId@example.com", "member123456")
+        createAlbum(ownerCookie, null, "tenant-delete-album", "Tenant Delete Album")
+        val media = createMedia(ownerEmail, "Tenant Delete Media")
+        addMedia(ownerCookie, "/tenant-delete-album", media.publicId)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", memberCookie)
+            .`when`().delete("/api/tenants/$tenantName")
+            .then()
+            .statusCode(403)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+            .`when`().delete("/api/tenants/$tenantName")
+            .then()
+            .statusCode(204)
+
+        assertThat(inTransaction { tenantRepo.findByName(tenantName) }).isNull()
+        assertThat(inTransaction { mediaRepo.find("publicId", media.publicId).firstResult() }).isNull()
+    }
+
+    @Test
+    fun `group owner deletes group recursively and group member is forbidden`() {
+        createUser("delete-owner-$runId", "member123456", ServerRole.ServerMember)
+        createUser("delete-member-$runId", "member123456", ServerRole.ServerMember)
+        addTenantMember("delete-owner-$runId")
+        addTenantMember("delete-member-$runId")
+        val groupOwnerCookie = login("delete-owner-$runId@example.com", "member123456")
+        val groupMemberCookie = login("delete-member-$runId@example.com", "member123456")
+        val group = createGroupWithMember("delete-group-$runId", "delete-owner-$runId@example.com", GroupRole.GroupOwner)
+        addGroupMember(group, "delete-member-$runId@example.com")
+        createFolder(ownerCookie, null, "tenant-folder", "Tenant Folder")
+        createFolder(groupOwnerCookie, null, "group-folder", "Group Folder", """{"type":"GROUP","groupName":"${group.name}"}""")
+        createAlbum(groupOwnerCookie, "/@${group.name}/group-folder", "group-album", "Group Album")
+        val groupMedia = createMedia("delete-owner-$runId@example.com", "Group Delete Media", group)
+        val tenantMedia = createMedia(ownerEmail, "Tenant Keep Media")
+        addMedia(groupOwnerCookie, "/@${group.name}/group-folder/group-album", groupMedia.publicId)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", groupMemberCookie)
+            .`when`().delete("/api/$tenantName/groups/${group.name}")
+            .then()
+            .statusCode(403)
+
+        given()
+            .cookie("LUNVA_ACCESS_TOKEN", groupOwnerCookie)
+            .`when`().delete("/api/$tenantName/groups/${group.name}")
+            .then()
+            .statusCode(204)
+
+        assertThat(inTransaction { tenantGroupRepo.findByTenantAndName(tenant(), group.name) }).isNull()
+        assertThat(inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), groupMedia.publicId) }).isNull()
+        assertThat(inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), tenantMedia.publicId) }).isNotNull
+    }
+
+    @Test
     fun `settings is reserved as folder and album path name`() {
         given()
             .contentType("application/json")
@@ -490,7 +549,7 @@ class ExplorerResourceTest {
     }
 
     @Test
-    fun `move delete and preserve media rows`() {
+    fun `move and delete album recursively removes media rows`() {
         createFolder(ownerCookie, null, "folder", "Folder")
         createAlbum(ownerCookie, "/folder", "album", "Album")
         val media = createMedia(ownerEmail, "Keep Me")
@@ -512,7 +571,7 @@ class ExplorerResourceTest {
             .then()
             .statusCode(204)
 
-        assertThat(inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), media.publicId) }).isNotNull
+        assertThat(inTransaction { mediaRepo.findByTenantAndPublicId(tenant(), media.publicId) }).isNull()
     }
 
     @Test
@@ -694,13 +753,15 @@ class ExplorerResourceTest {
             .statusCode(200)
             .extract().path<String>("uploadId")
 
-        given()
-            .contentType("application/octet-stream")
-            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body(file.readBytes())
-            .`when`().put("/api/media/uploads/$uploadId/chunks/0")
-            .then()
-            .statusCode(204)
+        file.readBytes().asIterable().chunked(4).forEachIndexed { index, chunk ->
+            given()
+                .contentType("application/octet-stream")
+                .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
+                .body(chunk.toByteArray())
+                .`when`().put("/api/media/uploads/$uploadId/chunks/$index")
+                .then()
+                .statusCode(204)
+        }
 
         val completeResponse = given()
             .contentType("application/json")

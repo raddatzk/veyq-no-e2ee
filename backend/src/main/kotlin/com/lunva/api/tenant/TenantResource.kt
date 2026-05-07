@@ -31,6 +31,12 @@ class TenantResource @Inject constructor(
 
     @TenantOwnerRequired
     @Transactional
+    override fun deleteTenant(tenantName: String) {
+        tenantService.deleteTenant()
+    }
+
+    @TenantOwnerRequired
+    @Transactional
     override fun updateTenantSettings(
         tenantName: String,
         request: UpdateTenantSettingsRequest,

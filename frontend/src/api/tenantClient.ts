@@ -13,3 +13,7 @@ export async function createTenant(name: string, displayName: string, domain: st
     tenantsApi.createTenant({ createTenantRequest: { name, displayName, domain } })
   )
 }
+
+export async function deleteTenant(tenantName: string): Promise<void> {
+  return generatedCall(tenantsApi.deleteTenant({ tenantName }))
+}

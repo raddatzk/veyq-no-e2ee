@@ -14,6 +14,7 @@ import com.lunva.api.generated.model.TenantsSummary
 import com.lunva.api.generated.model.UpdateTenantSettingsRequest
 import com.lunva.api.generated.model.ManagedUserTenantSummary
 import com.lunva.api.generated.model.UserSummary
+import com.lunva.api.library.LibraryDeletionService
 import com.lunva.api.usermgmt.user.toUsersApiRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -24,13 +25,16 @@ import java.time.Instant
 class TenantService @Inject constructor(
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
+    private val libraryDeletionService: LibraryDeletionService,
     private val requestContext: RequestContext,
 ) {
 
     @Transactional
     fun createTenantForCurrentUser(request: CreateTenantRequest): TenantSummary {
         val user = requestContext.user!!
-        val tenant = createTenant(request.name!!, request.displayName!!, request.domain!!, user)
+        val name = request.name!!.trim().lowercase()
+        if (!TenantName.isValid(name)) throw BadRequestException("Invalid tenant name")
+        val tenant = createTenant(name, request.displayName!!, request.domain!!, user)
 
         return TenantSummary(tenant.id, tenant.name, tenant.displayName, tenant.domain, ApiTenantRole.TenantOwner, listOf(user.toTenantAdminSummary()))
     }
@@ -101,6 +105,12 @@ class TenantService @Inject constructor(
     fun updateTenantSettings(request: UpdateTenantSettingsRequest): TenantSettingsResponse {
         tenant().displayName = request.displayName!!.trim()
         return TenantSettingsResponse(tenant().id, tenant().name, tenant().displayName)
+    }
+
+    @Transactional
+    fun deleteTenant() {
+        libraryDeletionService.deleteTenant(tenant())
+        requestContext.tenant = null
     }
 
     fun validateTenantName(name: String) {

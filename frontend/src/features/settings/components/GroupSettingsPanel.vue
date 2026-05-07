@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -8,6 +9,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import {
   createGroup,
+  deleteGroup as deleteGroupApi,
   getGroup,
   groups,
   updateGroup,
@@ -26,6 +28,7 @@ const props = defineProps<{
   groupName?: string
 }>()
 
+const router = useRouter()
 const { authState } = useAuthState()
 const groupList = ref<TenantGroup[]>([])
 const tenantUsers = ref<TenantUserSummary[]>([])
@@ -36,6 +39,8 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const createDialogVisible = ref(false)
+const deleteDialogVisible = ref(false)
+const deleteConfirmation = ref('')
 const createDisplayName = ref('')
 const createName = ref('')
 const createPermalinkTouched = ref(false)
@@ -68,6 +73,12 @@ const canManageSelectedGroup = computed(() =>
   selectedGroup.value ? isCurrentUserGroupOwner(selectedGroup.value) : false
 )
 const showDetail = computed(() => Boolean(selectedGroup.value || props.groupName))
+const canConfirmDeleteGroup = computed(
+  () =>
+    Boolean(selectedGroup.value) &&
+    deleteConfirmation.value.trim() === selectedGroup.value!.displayName.trim() &&
+    !saving.value
+)
 
 watch(displayName, (value) => {
   if (!permalinkTouched.value) name.value = toPermalink(value)
@@ -135,6 +146,13 @@ function openCreateDialog() {
   error.value = ''
   message.value = ''
   createDialogVisible.value = true
+}
+
+function openDeleteDialog() {
+  deleteConfirmation.value = ''
+  error.value = ''
+  message.value = ''
+  deleteDialogVisible.value = true
 }
 
 function updatePermalink(value: string | undefined) {
@@ -254,6 +272,30 @@ async function saveGroup() {
     message.value = 'Gruppe wurde gespeichert.'
   } catch (caught) {
     error.value = getErrorMessage(caught, 'Gruppe konnte nicht gespeichert werden.')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitDeleteGroup() {
+  if (!selectedGroup.value || !canConfirmDeleteGroup.value) return
+  saving.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    const deletedGroupName = selectedGroup.value.name
+    await deleteGroupApi(props.tenantName, deletedGroupName)
+    groupList.value = groupList.value.filter((group) => group.name !== deletedGroupName)
+    selectedGroup.value = null
+    resetEditor()
+    deleteDialogVisible.value = false
+    if (props.groupName) {
+      await router.push(`/${props.tenantName}/settings`)
+    } else {
+      message.value = 'Gruppe wurde gelöscht.'
+    }
+  } catch (caught) {
+    error.value = getErrorMessage(caught, 'Gruppe konnte nicht gelöscht werden.')
   } finally {
     saving.value = false
   }
@@ -422,6 +464,14 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
 
         <div class="button-row">
           <Button type="submit" label="Speichern" icon="pi pi-save" :loading="saving" />
+          <Button
+            type="button"
+            label="Gruppe löschen"
+            icon="pi pi-trash"
+            severity="danger"
+            outlined
+            @click="openDeleteDialog"
+          />
         </div>
       </form>
       <div v-else-if="showDetail && selectedGroup" class="settings-entry">
@@ -459,6 +509,39 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
         </div>
       </form>
+    </Dialog>
+
+    <Dialog v-model:visible="deleteDialogVisible" header="Gruppe löschen" modal class="tenant-dialog">
+      <div v-if="selectedGroup" class="form">
+        <p>
+          <strong>{{ selectedGroup.displayName }}</strong> wirklich rekursiv löschen?
+        </p>
+        <label>
+          Display-Name zur Bestätigung
+          <InputText
+            v-model="deleteConfirmation"
+            autocomplete="off"
+            :placeholder="selectedGroup.displayName"
+          />
+        </label>
+        <div class="button-row">
+          <Button
+            label="Löschen"
+            icon="pi pi-trash"
+            severity="danger"
+            :disabled="!canConfirmDeleteGroup"
+            :loading="saving"
+            @click="submitDeleteGroup"
+          />
+          <Button
+            type="button"
+            label="Abbrechen"
+            severity="secondary"
+            outlined
+            @click="deleteDialogVisible = false"
+          />
+        </div>
+      </div>
     </Dialog>
   </section>
 </template>

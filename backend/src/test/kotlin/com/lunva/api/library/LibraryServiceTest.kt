@@ -300,7 +300,7 @@ class LibraryServiceTest {
     }
 
     @Test
-    fun `delete album and folder remove structure links but preserve media rows`() {
+    fun `delete album and folder recursively remove structure and media rows`() {
         folderService.createFolder(CreateLibraryItemRequest("/", "folder", "Folder"))
         albumService.createAlbum(CreateLibraryItemRequest("/folder", "album", "Album"))
         val media = createMedia(owner, "Keep Me")
@@ -308,7 +308,7 @@ class LibraryServiceTest {
 
         albumService.deleteAlbum("/folder/album")
         assertThat(albumRepo.listByTenant(tenant)).extracting("name").doesNotContain("album")
-        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.publicId)).isNotNull
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.publicId)).isNull()
 
         albumService.createAlbum(CreateLibraryItemRequest("/folder", "second", "Second"))
         val second = createMedia(owner, "Keep Me Too")
@@ -317,7 +317,7 @@ class LibraryServiceTest {
 
         assertThat(folderRepo.listByTenant(tenant)).extracting("name").doesNotContain("folder")
         assertThat(albumRepo.listByTenant(tenant)).extracting("name").doesNotContain("second")
-        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.publicId)).isNotNull
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.publicId)).isNull()
     }
 
     private fun useContext(user: User, tenant: Tenant) {

@@ -41,3 +41,7 @@ export async function updateGroup(
     groupsApi.updateGroup({ tenantName, groupName, updateGroupRequest: request })
   )
 }
+
+export async function deleteGroup(tenantName: string, groupName: string): Promise<void> {
+  return generatedCall(groupsApi.deleteGroup({ tenantName, groupName }))
+}

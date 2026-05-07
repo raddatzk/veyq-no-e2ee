@@ -114,6 +114,40 @@ paths:
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
         Implementierungsstatus: partial.
+    delete:
+      tags:
+      - Groups
+      operationId: deleteGroup
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      responses:
+        '204':
+          description: Group deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppe löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe rekursiv und final löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
     post:
       tags:
       - Groups

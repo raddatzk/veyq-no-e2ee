@@ -68,6 +68,38 @@ paths:
         - Der aktuelle Benutzer muss ServerOwner sein.
 
         Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}":
+    delete:
+      tags:
+      - Tenants
+      operationId: deleteTenant
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '204':
+          description: Tenant deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant rekursiv und final löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: partial.
   "/api/tenants/{tenantName}/settings":
     get:
       tags:

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -7,6 +8,8 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
+import { deleteTenant as deleteTenantApi, tenants as loadTenantSummaries } from '../../../api/tenantClient'
+import { useAuthState } from '../../../shared/state/useAuthState'
 import {
   createManagedUser,
   getTenantUsers,
@@ -23,6 +26,8 @@ const props = defineProps<{
   tenantName: string
 }>()
 
+const router = useRouter()
+const { authState, setTenants } = useAuthState()
 const users = ref<TenantUserSummary[]>([])
 const searchResults = ref<TenantUserSearchSummary[]>([])
 const loading = ref(false)
@@ -33,6 +38,8 @@ const message = ref('')
 const query = ref('')
 const createDialogVisible = ref(false)
 const inviteDialogVisible = ref(false)
+const deleteDialogVisible = ref(false)
+const deleteConfirmation = ref('')
 const newEmail = ref('')
 const newTenantRole = ref<TenantRole>('TenantMember')
 const selectedUser = ref<TenantUserSearchSummary | null>(null)
@@ -45,6 +52,20 @@ const canSuggest = computed(() => trimmedQuery.value.length >= 3)
 const isEmailQuery = computed(() => EMAIL_REGEX.test(trimmedQuery.value))
 const showSuggestions = computed(
   () => canSuggest.value && (searching.value || searchResults.value.length > 0 || trimmedQuery.value.length >= 3)
+)
+const tenantDisplayName = computed(
+  () => authState.tenants.find((tenant) => tenant.name === props.tenantName)?.displayName || props.tenantName
+)
+const canDeleteTenant = computed(() =>
+  users.value.some(
+    (user) =>
+      user.userId === authState.user?.userId &&
+      user.status === 'Active' &&
+      user.role === 'TenantOwner'
+  )
+)
+const canConfirmDeleteTenant = computed(
+  () => deleteConfirmation.value.trim() === tenantDisplayName.value.trim() && !saving.value
 )
 
 const roleOptions = [
@@ -124,6 +145,13 @@ function openInviteDialog(user: TenantUserSearchSummary) {
   error.value = ''
   message.value = ''
   inviteDialogVisible.value = true
+}
+
+function openDeleteDialog() {
+  deleteConfirmation.value = ''
+  error.value = ''
+  message.value = ''
+  deleteDialogVisible.value = true
 }
 
 async function createUser() {
@@ -218,6 +246,23 @@ async function changeRole(user: TenantUserSummary, role: TenantRole) {
   }
 }
 
+async function submitDeleteTenant() {
+  if (!canConfirmDeleteTenant.value) return
+  saving.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    await deleteTenantApi(props.tenantName)
+    setTenants(await loadTenantSummaries())
+    deleteDialogVisible.value = false
+    await router.push('/')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, 'Tenant konnte nicht gelöscht werden.')
+  } finally {
+    saving.value = false
+  }
+}
+
 function closeCreateDialog() {
   createDialogVisible.value = false
   searchResults.value = searchResults.value.filter(
@@ -309,6 +354,16 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           <span v-else></span>
         </div>
       </div>
+
+      <div v-if="canDeleteTenant" class="button-row">
+        <Button
+          label="Tenant löschen"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          @click="openDeleteDialog"
+        />
+      </div>
     </template>
 
     <Dialog v-model:visible="createDialogVisible" header="User erstellen" modal class="tenant-dialog">
@@ -365,6 +420,35 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
           />
         </div>
       </form>
+    </Dialog>
+
+    <Dialog v-model:visible="deleteDialogVisible" header="Tenant löschen" modal class="tenant-dialog">
+      <div class="form">
+        <p>
+          <strong>{{ tenantDisplayName }}</strong> wirklich rekursiv löschen?
+        </p>
+        <label>
+          Display-Name zur Bestätigung
+          <InputText v-model="deleteConfirmation" autocomplete="off" :placeholder="tenantDisplayName" />
+        </label>
+        <div class="button-row">
+          <Button
+            label="Löschen"
+            icon="pi pi-trash"
+            severity="danger"
+            :disabled="!canConfirmDeleteTenant"
+            :loading="saving"
+            @click="submitDeleteTenant"
+          />
+          <Button
+            type="button"
+            label="Abbrechen"
+            severity="secondary"
+            outlined
+            @click="deleteDialogVisible = false"
+          />
+        </div>
+      </div>
     </Dialog>
   </section>
 </template>

@@ -65,6 +65,10 @@ export interface CreateTenantOperationRequest {
     createTenantRequest: CreateTenantRequest;
 }
 
+export interface DeleteTenantRequest {
+    tenantName: string;
+}
+
 export interface GetGroupSettingsRequest {
     tenantName: string;
     groupName: string;
@@ -149,6 +153,30 @@ export interface TenantsApiInterface {
      * Tenant anlegen
      */
     createTenant(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSummary>;
+
+    /**
+     * Creates request options for deleteTenant without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    deleteTenantRequestOpts(requestParameters: DeleteTenantRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * @summary Tenant löschen
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    deleteTenantRaw(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant löschen
+     */
+    deleteTenant(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for getGroupSettings without sending the request
@@ -510,6 +538,52 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     async createTenant(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSummary> {
         const response = await this.createTenantRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for deleteTenant without sending the request
+     */
+    async deleteTenantRequestOpts(requestParameters: DeleteTenantRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteTenant().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/tenants/{tenantName}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant löschen
+     */
+    async deleteTenantRaw(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteTenantRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant löschen
+     */
+    async deleteTenant(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteTenantRaw(requestParameters, initOverrides);
     }
 
     /**

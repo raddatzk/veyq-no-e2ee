@@ -39,6 +39,11 @@ export interface CreateGroupOperationRequest {
     createGroupRequest: CreateGroupRequest;
 }
 
+export interface DeleteGroupRequest {
+    tenantName: string;
+    groupName: string;
+}
+
 export interface GetGroupRequest {
     tenantName: string;
     groupName: string;
@@ -86,6 +91,32 @@ export interface GroupsApiInterface {
      * Gruppe anlegen
      */
     createGroup(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary>;
+
+    /**
+     * Creates request options for deleteGroup without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
+     * @throws {RequiredError}
+     * @memberof GroupsApiInterface
+     */
+    deleteGroupRequestOpts(requestParameters: DeleteGroupRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * @summary Gruppe löschen
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} groupName Permalink group name from the URL.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof GroupsApiInterface
+     */
+    deleteGroupRaw(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe löschen
+     */
+    deleteGroup(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for getGroup without sending the request
@@ -227,6 +258,60 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     async createGroup(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary> {
         const response = await this.createGroupRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for deleteGroup without sending the request
+     */
+    async deleteGroupRequestOpts(requestParameters: DeleteGroupRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteGroup().'
+            );
+        }
+
+        if (requestParameters['groupName'] == null) {
+            throw new runtime.RequiredError(
+                'groupName',
+                'Required parameter "groupName" was null or undefined when calling deleteGroup().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/groups/{groupName}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"groupName"}}`, encodeURIComponent(String(requestParameters['groupName'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe löschen
+     */
+    async deleteGroupRaw(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteGroupRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe löschen
+     */
+    async deleteGroup(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteGroupRaw(requestParameters, initOverrides);
     }
 
     /**

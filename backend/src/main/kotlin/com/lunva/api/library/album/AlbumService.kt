@@ -14,6 +14,7 @@ import com.lunva.api.domain.TenantGroupRepo
 import com.lunva.api.generated.model.ExplorerAlbum
 import com.lunva.api.generated.model.AlbumMediaRequest
 import com.lunva.api.generated.model.CreateLibraryItemRequest
+import com.lunva.api.library.LibraryDeletionService
 import com.lunva.api.library.LibraryService
 import com.lunva.api.generated.model.MoveLibraryItemRequest
 import com.lunva.api.generated.model.SetAlbumCoverRequest
@@ -29,6 +30,7 @@ class AlbumService @Inject constructor(
     private val albumRepo: TenantAlbumRepo,
     private val mediaRepo: MediaRepo,
     private val albumMediaRepo: AlbumMediaRepo,
+    private val libraryDeletionService: LibraryDeletionService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     groupMemberRepo: TenantGroupMemberRepo,
@@ -86,7 +88,7 @@ class AlbumService @Inject constructor(
     fun deleteAlbum(path: String?) {
         val album = resolveAlbum(path)
         requireVisible(album)
-        album.delete()
+        libraryDeletionService.deleteAlbum(album)
     }
 
     @Transactional

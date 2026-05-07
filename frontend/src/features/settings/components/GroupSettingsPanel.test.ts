@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createGroup,
+  deleteGroup,
   getGroup,
   groups,
   updateGroup,
@@ -13,9 +14,15 @@ import GroupSettingsPanel from './GroupSettingsPanel.vue'
 
 vi.mock('../../../api/groupClient', () => ({
   createGroup: vi.fn(),
+  deleteGroup: vi.fn(),
   getGroup: vi.fn(),
   groups: vi.fn(),
   updateGroup: vi.fn()
+}))
+
+const pushMock = vi.fn()
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: pushMock })
 }))
 
 vi.mock('../api', () => ({
@@ -25,12 +32,14 @@ vi.mock('../api', () => ({
 const groupsMock = vi.mocked(groups)
 const getGroupMock = vi.mocked(getGroup)
 const createGroupMock = vi.mocked(createGroup)
+const deleteGroupMock = vi.mocked(deleteGroup)
 const updateGroupMock = vi.mocked(updateGroup)
 const getTenantUsersMock = vi.mocked(getTenantUsers)
 
 describe('GroupSettingsPanel', () => {
   afterEach(() => {
     vi.resetAllMocks()
+    pushMock.mockReset()
     authState.user = null
   })
 
@@ -100,6 +109,29 @@ describe('GroupSettingsPanel', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Entfernen'))!.trigger('click')
 
     expect(wrapper.text()).toContain('Mindestens ein Owner muss in der Gruppe bleiben.')
+  })
+
+  it('requires the group display name before deleting a group', async () => {
+    authState.user = userSummary(1, 'Owner')
+    groupsMock.mockResolvedValue([{ id: 99, name: 'family', displayName: 'Family' }])
+    getTenantUsersMock.mockResolvedValue([tenantUser(1, 'Owner')])
+    getGroupMock.mockResolvedValue(groupSummary('family', 'Family', [{ userId: 1, role: 'GroupOwner' }]))
+    deleteGroupMock.mockResolvedValue()
+
+    const wrapper = mountPanel('family')
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Gruppe löschen'))!.trigger('click')
+    const deleteButton = () =>
+      wrapper.findAll('button').find((button) => button.text() === 'Löschen')!
+    expect(deleteButton().attributes('disabled')).toBeDefined()
+
+    await wrapper.findAll('input').at(-1)!.setValue('Family')
+    await deleteButton().trigger('click')
+    await flushPromises()
+
+    expect(deleteGroupMock).toHaveBeenCalledWith('friends', 'family')
+    expect(pushMock).toHaveBeenCalledWith('/friends/settings')
   })
 
   it('renders group detail read-only for regular group members', async () => {

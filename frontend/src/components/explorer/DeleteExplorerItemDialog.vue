@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import {
   deleteLibraryItem,
@@ -22,15 +23,21 @@ const emit = defineEmits<{
 }>()
 
 const error = ref('')
+const confirmation = ref('')
 const loading = ref(false)
 const itemLabel = computed(() => props.item?.displayName || 'Eintrag')
+const expectedName = computed(() => props.item?.displayName.trim() || '')
+const canDelete = computed(() => confirmation.value.trim() === expectedName.value && !loading.value)
 
 watch(visible, (isVisible) => {
-  if (isVisible) error.value = ''
+  if (isVisible) {
+    error.value = ''
+    confirmation.value = ''
+  }
 })
 
 async function submit() {
-  if (!props.item) return
+  if (!props.item || !canDelete.value) return
   error.value = ''
   loading.value = true
   try {
@@ -49,14 +56,19 @@ async function submit() {
   <Dialog v-model:visible="visible" header="Löschen" modal class="tenant-dialog">
     <div class="form">
       <p>
-        <strong>{{ itemLabel }}</strong> wirklich löschen?
+        Möchtest du <strong>{{ itemLabel }}</strong> wirklich löschen?
       </p>
+      <label>
+        Gib {{ itemLabel }} erneut ein zur Bestätigung
+        <InputText v-model="confirmation" autocomplete="off" :placeholder="expectedName" />
+      </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button
           label="Löschen"
           icon="pi pi-trash"
           severity="danger"
+          :disabled="!canDelete"
           :loading="loading"
           @click="submit"
         />
