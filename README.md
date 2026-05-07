@@ -117,7 +117,6 @@ Wichtige globale Endpunkte:
 - `GET /api/users`
 - `POST /api/users`
 - `PUT /api/users/{userId}/role`
-- `POST /api/users/{userId}/invite`
 - `POST /api/users/{userId}/invite/accept`
 - `GET /api/settings`
 - `GET /api/settings/server`
@@ -132,6 +131,10 @@ Tenant-Endpunkte:
 - `PUT /api/tenants/{tenantName}/settings`
 - `GET /api/tenants/{tenantName}/me`
 - `PUT /api/tenants/{tenantName}/me`
+- `GET /api/tenants/{tenantName}/users`
+- `POST /api/tenants/{tenantName}/users/invite`
+- `POST /api/tenants/{tenantName}/users/{userId}/reinvite`
+- `PUT /api/tenants/{tenantName}/users/{userId}/role`
 - `GET /api/tenants/{tenantName}/{groupName}`
 - `PUT /api/tenants/{tenantName}/{groupName}`
 - `GET /api/{tenantName}/groups`
@@ -169,7 +172,8 @@ Frontend:
 - Access- und Refresh-Tokens werden als `HttpOnly` Cookies gesetzt.
 - `LunvaHttpSecurityPolicy` erlaubt nur explizit öffentliche API-Pfade ohne Login.
 - `ServerOwner` ist eine globale Server-Rolle am User.
-- Neue User werden über `POST /api/users` eingeladen und müssen beim Anlegen direkt einem Tenant zugewiesen werden.
+- ServerOwner verwalten globale User über `POST /api/users`, `GET /api/users` und Rollenänderungen.
+- TenantOwner laden Tenant-Mitglieder direkt per E-Mail über `POST /api/tenants/{tenantName}/users/invite` ein; bestehende globale User werden anhand der E-Mail wiederverwendet, sonst wird ein Pending-User angelegt.
 - Einladungslinks werden über die Domain des zugewiesenen Tenants im Format `https://{tenant.domain}/invite/{userId}/{token}` erstellt.
 - Tenant-Membership wird im `TenantMembershipFilter` für alle Routen mit `{tenantName}` geprüft.
 - `TenantOwnerRequired` und `GroupOwnerRequired` sind Marker-Annotationen für stärkere Owner-Rechte.

@@ -128,7 +128,7 @@ export interface GroupsApiInterface {
     getGroupRequestOpts(requestParameters: GetGroupRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppe abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppe abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -139,7 +139,7 @@ export interface GroupsApiInterface {
     getGroupRaw(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>>;
 
     /**
-     * Gruppe abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     getGroup(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary>;
@@ -153,7 +153,7 @@ export interface GroupsApiInterface {
     getGroupsRequestOpts(requestParameters: GetGroupsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppen eines Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppen eines Tenants auflisten
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -163,7 +163,7 @@ export interface GroupsApiInterface {
     getGroupsRaw(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupsSummary>>;
 
     /**
-     * Gruppen eines Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     getGroups(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupsSummary>;
@@ -350,7 +350,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     async getGroupRaw(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>> {
@@ -361,7 +361,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     async getGroup(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary> {
@@ -397,7 +397,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppen eines Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     async getGroupsRaw(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupsSummary>> {
@@ -408,7 +408,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppen eines Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     async getGroups(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupsSummary> {

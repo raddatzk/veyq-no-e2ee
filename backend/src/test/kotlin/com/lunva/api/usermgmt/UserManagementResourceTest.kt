@@ -78,8 +78,8 @@ class UserManagementResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"role":"TenantMember"}""")
-            .`when`().post("/api/tenants/${tenant.name}/users/$invitedUserId/invite")
+            .body("""{"email":"invitee-$runId@example.com","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
             .statusCode(200)
             .body("email", equalTo("invitee-$runId@example.com"))
@@ -248,28 +248,14 @@ class UserManagementResourceTest {
     }
 
     @Test
-    fun `tenant owner searches invites and activates existing tenant user`() {
+    fun `tenant owner invites and activates existing tenant user by email`() {
         val existingUser = createUser("searchable-$runId", "admin1234567", ServerRole.ServerMember)
-
-        val searchResponse = given()
-            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("q", "searchable")
-            .`when`().get("/api/tenants/${tenant.name}/users/search")
-            .then()
-            .statusCode(200)
-            .extract()
-            .path<List<Map<String, Any>>>("users")
-
-        assertThat(searchResponse).hasSize(1)
-        assertThat(searchResponse.single()["userId"]).isEqualTo(existingUser.id.toInt())
-        assertThat(searchResponse.single()["displayName"]).isEqualTo("searchable-$runId")
-        assertThat(searchResponse.single()["maskedEmail"]).isEqualTo("s***${runId.last()}@e**.c**")
 
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"role":"TenantMember"}""")
-            .`when`().post("/api/tenants/${tenant.name}/users/${existingUser.id}/invite")
+            .body("""{"email":"${existingUser.email}","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
             .statusCode(200)
             .body("email", equalTo(existingUser.email))
@@ -290,12 +276,12 @@ class UserManagementResourceTest {
             .body("users.status", hasItem("Pending"))
 
         given()
+            .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("q", "searchable")
-            .`when`().get("/api/tenants/${tenant.name}/users/search")
+            .body("""{"email":"${existingUser.email}","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
-            .statusCode(200)
-            .body("users", equalTo(emptyList<Any>()))
+            .statusCode(409)
 
         given()
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
@@ -333,39 +319,35 @@ class UserManagementResourceTest {
     }
 
     @Test
-    fun `tenant owner creates tenant user without server role escalation and manages tenant role`() {
+    fun `tenant owner invites new tenant user by email without server role escalation and manages tenant role`() {
         val tenantAdmin = createUser("tenant-admin-$runId", "admin1234567", ServerRole.ServerMember)
         addTenantMember(tenantAdmin, tenant, TenantRole.TenantOwner)
         val tenantAdminCookie = login(tenantAdmin.email, "admin1234567")
 
+        given()
+            .contentType("application/json")
+            .cookie("LUNVA_ACCESS_TOKEN", tenantAdminCookie)
+            .body("""{"email":"global-created-$runId@example.com"}""")
+            .`when`().post("/api/users")
+            .then()
+            .statusCode(403)
+
         val createdUserId = given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", tenantAdminCookie)
-            .body("""{"email":"tenant-created-$runId@example.com"}""")
-            .`when`().post("/api/users")
+            .body("""{"email":"tenant-created-$runId@example.com","role":"TenantOwner"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
             .statusCode(200)
             .body("email", equalTo("tenant-created-$runId@example.com"))
-            .body("serverRole", equalTo("ServerMember"))
+            .body("role", equalTo("TenantOwner"))
             .body("status", equalTo("Pending"))
-            .body("tenants", equalTo(emptyList<Any>()))
             .extract()
             .path<Number>("userId")
             .toLong()
 
         val createdUser = userRepo.findById(createdUserId)!!
         assertThat(createdUser.role).isEqualTo(ServerRole.ServerMember)
-        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, createdUser)).isNull()
-
-        given()
-            .contentType("application/json")
-            .cookie("LUNVA_ACCESS_TOKEN", tenantAdminCookie)
-            .body("""{"role":"TenantOwner"}""")
-            .`when`().post("/api/tenants/${tenant.name}/users/$createdUserId/invite")
-            .then()
-            .statusCode(200)
-            .body("role", equalTo("TenantOwner"))
-            .body("status", equalTo("Pending"))
 
         entityManager.clear()
         val createdMembership = tenantMemberRepo.findByTenantAndUser(tenant, createdUser)!!
@@ -404,17 +386,18 @@ class UserManagementResourceTest {
             .body("users.email", hasItem(tenantMember.email))
 
         given()
+            .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
-            .queryParam("q", "owner")
-            .`when`().get("/api/tenants/${tenant.name}/users/search")
+            .body("""{"role":"TenantMember"}""")
+            .`when`().put("/api/tenants/${tenant.name}/users/${tenantMember.id}/role")
             .then()
             .statusCode(403)
 
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", tenantMemberCookie)
-            .body("""{"role":"TenantMember"}""")
-            .`when`().put("/api/tenants/${tenant.name}/users/${tenantMember.id}/role")
+            .body("""{"email":"blocked-$runId@example.com","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
             .statusCode(403)
     }
@@ -436,8 +419,8 @@ class UserManagementResourceTest {
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"role":"TenantMember"}""")
-            .`when`().post("/api/tenants/${tenant.name}/users/$userId/invite")
+            .body("""{"email":"$email","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
             .then()
             .statusCode(200)
 
@@ -451,25 +434,14 @@ class UserManagementResourceTest {
             .then()
             .statusCode(409)
 
-        val searchResponse = given()
-            .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .queryParam("q", email)
-            .`when`().get("/api/tenants/${otherTenant.name}/users/search")
-            .then()
-            .statusCode(200)
-            .extract()
-            .path<List<Map<String, Any>>>("users")
-
-        assertThat(searchResponse).hasSize(1)
-        assertThat(searchResponse.single()["userId"]).isEqualTo(userId.toInt())
-
         given()
             .contentType("application/json")
             .cookie("LUNVA_ACCESS_TOKEN", ownerCookie)
-            .body("""{"role":"TenantOwner"}""")
-            .`when`().post("/api/tenants/${otherTenant.name}/users/$userId/invite")
+            .body("""{"email":"$email","role":"TenantOwner"}""")
+            .`when`().post("/api/tenants/${otherTenant.name}/users/invite")
             .then()
             .statusCode(200)
+            .body("userId", equalTo(userId.toInt()))
             .body("role", equalTo("TenantOwner"))
             .body("status", equalTo("Pending"))
 

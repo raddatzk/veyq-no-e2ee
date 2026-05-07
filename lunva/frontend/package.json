@@ -1,0 +1,41 @@
+{
+  "name": "lunva-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 8081",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:api": "node scripts/generate-openapi.mjs",
+    "format": "prettier --write .",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "preview": "vite preview --host 0.0.0.0 --port 8081"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^2.0.3",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.32.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "@vue/test-utils": "^2.4.9",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.9.0",
+    "happy-dom": "^20.9.0",
+    "js-yaml": "^4.1.1",
+    "prettier": "^3.8.3",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.2.7"
+  }
+}

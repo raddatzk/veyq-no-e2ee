@@ -1,0 +1,120 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: lunva-traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:?Set LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+
+  lunva-db:
+    image: mariadb:10.11
+    container_name: lunva-db
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-lunva}
+      MARIADB_USER: ${DB_USER:-lunva}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - lunva-db:/var/lib/mysql
+
+  lunva:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ${LUNVA_BUILD_TARGET:-runtime-jvm}
+    container_name: lunva
+    environment:
+      DB_URL: jdbc:mariadb://lunva-db:3306/${DB_NAME:-lunva}
+      DB_USER: ${DB_USER:-lunva}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_ACCESS_TOKEN_NAME: ${COOKIE_ACCESS_TOKEN_NAME:-LUNVA_ACCESS_TOKEN}
+      COOKIE_REFRESH_TOKEN_NAME: ${COOKIE_REFRESH_TOKEN_NAME:-LUNVA_REFRESH_TOKEN}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_MINUTES: ${REFRESH_TOKEN_TTL_MINUTES:-43200}
+      ACCESS_TOKEN_AUDIT_TTL_DAYS: ${ACCESS_TOKEN_AUDIT_TTL_DAYS:-30}
+      REFRESH_TOKEN_AUDIT_TTL_DAYS: ${REFRESH_TOKEN_AUDIT_TTL_DAYS:-90}
+      TOKEN_CLEANUP_CRON: "${TOKEN_CLEANUP_CRON:-0 0 0 * * ?}"
+      INVITATION_TTL_DAYS: ${INVITATION_TTL_DAYS:-7}
+      EMAIL_CHANGE_TTL_HOURS: ${EMAIL_CHANGE_TTL_HOURS:-24}
+      RESET_PASSWORD_TTL_HOURS: ${RESET_PASSWORD_TTL_HOURS:-2}
+      USER_CLEANUP_CRON: "${USER_CLEANUP_CRON:-0 0 0 * * ?}"
+      USER_CLEANUP_RETENTION_DAYS: ${USER_CLEANUP_RETENTION_DAYS:-30}
+      BCRYPT_TARGET_MS: ${BCRYPT_TARGET_MS:-500}
+      BCRYPT_MIN_COST: ${BCRYPT_MIN_COST:-10}
+      BCRYPT_MAX_COST: ${BCRYPT_MAX_COST:-18}
+      BCRYPT_BENCHMARK_SAMPLES: ${BCRYPT_BENCHMARK_SAMPLES:-2}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
+      MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
+      MEDIA_UPLOAD_SESSION_CLEANUP_CRON: "${MEDIA_UPLOAD_SESSION_CLEANUP_CRON:-0 0 * * * ?}"
+      MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD}
+      MAIL_LOGIN: ${MAIL_LOGIN:-REQUIRED}
+      MAIL_TLS: ${MAIL_TLS:-true}
+    expose:
+      - "8080"
+    volumes:
+      - lunva-media:${MEDIA_STORAGE_DIR:-/data/lunva-media}
+    depends_on:
+      - lunva-db
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lunva.rule=${LUNVA_TRAEFIK_RULE:?Set LUNVA_TRAEFIK_RULE}
+      - traefik.http.routers.lunva.entrypoints=websecure
+      - traefik.http.routers.lunva.tls.certresolver=letsencrypt
+      - traefik.http.services.lunva.loadbalancer.server.port=8080
+
+  lunva-reset:
+    profiles: ["reset"]
+    build:
+      context: ./reset
+    container_name: lunva-reset
+    environment:
+      RESET_USERNAME: ${RESET_USERNAME:?Set RESET_USERNAME}
+      RESET_PASSWORD: ${RESET_PASSWORD:?Set RESET_PASSWORD}
+      RESET_RESTART_CONTAINER: ${RESET_RESTART_CONTAINER:-lunva}
+      DB_HOST: lunva-db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-lunva}
+      DB_USER: ${DB_USER:-lunva}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/lunva-media}
+    expose:
+      - "8081"
+    volumes:
+      - lunva-media:${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - lunva-db
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lunva-reset.rule=${RESET_TRAEFIK_RULE:?Set RESET_TRAEFIK_RULE}
+      - traefik.http.routers.lunva-reset.entrypoints=websecure
+      - traefik.http.routers.lunva-reset.tls.certresolver=letsencrypt
+      - traefik.http.services.lunva-reset.loadbalancer.server.port=8081
+
+volumes:
+  lunva-db:
+  lunva-media:
+  traefik-letsencrypt:

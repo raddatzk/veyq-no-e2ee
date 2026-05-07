@@ -53,16 +53,11 @@ class TenantResource @Inject constructor(
         tenantUserService.tenantUsers(tenantName)
 
     @TenantOwnerRequired
-    override fun searchTenantUsers(tenantName: String, q: String): TenantUserSearchResponse =
-        tenantUserService.searchTenantUsers(tenantName, q)
-
-    @TenantOwnerRequired
     override fun inviteTenantUser(
         tenantName: String,
-        userId: Long,
         request: InviteTenantUserRequest,
     ): TenantUserSummary =
-        tenantUserService.inviteTenantUser(tenantName, userId, request)
+        tenantUserService.inviteTenantUser(tenantName, request)
 
     @TenantOwnerRequired
     override fun reinviteTenantUser(tenantName: String, userId: Long): TenantUserSummary =

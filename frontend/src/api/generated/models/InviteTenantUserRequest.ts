@@ -28,6 +28,12 @@ import {
  */
 export interface InviteTenantUserRequest {
     /**
+     * Email address. The backend trims whitespace and stores it lowercase.
+     * @type {string}
+     * @memberof InviteTenantUserRequest
+     */
+    email: string;
+    /**
      * 
      * @type {TenantRole}
      * @memberof InviteTenantUserRequest
@@ -41,6 +47,7 @@ export interface InviteTenantUserRequest {
  * Check if a given object implements the InviteTenantUserRequest interface.
  */
 export function instanceOfInviteTenantUserRequest(value: object): value is InviteTenantUserRequest {
+    if (!('email' in value) || value['email'] === undefined) return false;
     if (!('role' in value) || value['role'] === undefined) return false;
     return true;
 }
@@ -55,6 +62,7 @@ export function InviteTenantUserRequestFromJSONTyped(json: any, ignoreDiscrimina
     }
     return {
         
+        'email': json['email'],
         'role': TenantRoleFromJSON(json['role']),
     };
 }
@@ -70,6 +78,7 @@ export function InviteTenantUserRequestToJSONTyped(value?: InviteTenantUserReque
 
     return {
         
+        'email': value['email'],
         'role': TenantRoleToJSON(value['role']),
     };
 }

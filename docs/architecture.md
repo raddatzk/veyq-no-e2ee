@@ -65,9 +65,9 @@ Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe D
    - erstellt den ersten globalen Server-Owner
    - ist gesperrt, sobald ein User existiert
 
-3. `POST /api/users`
-   - erstellt durch einen Server-Owner einen eingeladenen User
-   - weist den User direkt einem Tenant zu
+3. `POST /api/tenants/{tenantName}/users/invite`
+   - lädt durch einen TenantOwner einen User per E-Mail in den Tenant ein
+   - verwendet einen bestehenden globalen User mit gleicher E-Mail oder erstellt einen Pending-User
    - erzeugt eine Einladung mit TTL und sendet einen Link im Format `https://{tenant.domain}/invite/{userId}/{token}`
 
 4. `POST /api/users/{userId}/invite/accept`

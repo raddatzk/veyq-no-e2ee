@@ -1,0 +1,114 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import Password from 'primevue/password'
+import { forgotPassword, login } from '../api/authClient'
+import { tenants } from '../api/tenantClient'
+import { useAuthState } from '../shared/state/useAuthState'
+import { getErrorMessage } from '../shared/utils/errors'
+
+const router = useRouter()
+const { authState, setAuthenticated } = useAuthState()
+const email = ref('')
+const password = ref('')
+const error = ref('')
+const message = ref('')
+const sendingReset = ref(false)
+
+async function submit() {
+  error.value = ''
+  message.value = ''
+  try {
+    const user = await login(email.value, password.value)
+    setAuthenticated(
+      {
+        userId: user.userId,
+        email: user.email,
+        displayName: user.displayName,
+        serverRole: user.serverRole
+      },
+      await tenants()
+    )
+    await router.push(resolveRedirect())
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Login fehlgeschlagen')
+  }
+}
+
+async function requestPasswordReset() {
+  error.value = ''
+  message.value = ''
+  if (!email.value.trim()) {
+    error.value = 'Bitte gib deine E-Mail-Adresse ein.'
+    return
+  }
+  sendingReset.value = true
+  try {
+    await forgotPassword(email.value)
+    message.value = 'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zuruecksetzen gesendet.'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Passwort-Reset konnte nicht angefordert werden.')
+  } finally {
+    sendingReset.value = false
+  }
+}
+
+function resolveRedirect(): string {
+  const redirect = router.currentRoute.value.query.redirect
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
+
+onMounted(async () => {
+  if (authState.isAuthenticated) {
+    await router.push(resolveRedirect())
+  }
+})
+</script>
+
+<template>
+  <Card class="login-card">
+    <template #title>Login</template>
+    <template #content>
+      <form class="form" @submit.prevent="submit">
+        <label>
+          E-Mail
+          <InputText v-model="email" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          Passwort
+          <Password
+            v-model="password"
+            autocomplete="current-password"
+            required
+            :feedback="false"
+            toggle-mask
+            fluid
+          />
+        </label>
+        <Button type="submit" label="Einloggen" icon="pi pi-sign-in" />
+        <Button
+          type="button"
+          label="Passwort vergessen"
+          icon="pi pi-envelope"
+          severity="secondary"
+          text
+          :loading="sendingReset"
+          @click="requestPasswordReset"
+        />
+      </form>
+      <Message v-if="message" severity="success" :closable="false" class="form-message">{{
+        message
+      }}</Message>
+      <Message v-if="error" severity="error" :closable="false" class="form-message">{{
+        error
+      }}</Message>
+    </template>
+  </Card>
+</template>

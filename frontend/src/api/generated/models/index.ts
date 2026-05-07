@@ -51,8 +51,6 @@ export * from './TenantGroupSettingsResponse';
 export * from './TenantRole';
 export * from './TenantSettingsResponse';
 export * from './TenantSummary';
-export * from './TenantUserSearchResponse';
-export * from './TenantUserSearchSummary';
 export * from './TenantUserSettingsResponse';
 export * from './TenantUserStatus';
 export * from './TenantUserSummary';

@@ -14,7 +14,6 @@ export type {
   ManagedUsersSummary,
   ServerRole,
   TenantRole,
-  TenantUserSearchSummary,
   TenantUserStatus,
   TenantUserSummary,
   UpdateUserSettingsRequest,

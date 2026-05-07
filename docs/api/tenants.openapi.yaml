@@ -266,51 +266,13 @@ paths:
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
         Implementierungsstatus: partial.
-  "/api/tenants/{tenantName}/users/search":
-    get:
-      tags:
-      - Tenants
-      operationId: searchTenantUsers
-      parameters:
-      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
-      - "$ref": "#/components/parameters/UserSearchQuery"
-      responses:
-        '200':
-          "$ref": "#/components/responses/TenantUserSearch"
-        '400':
-          "$ref": "./common.openapi.yaml#/components/responses/400"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '404':
-          "$ref": "./common.openapi.yaml#/components/responses/404"
-      summary: Globale User fuer Tenant suchen
-      x-implementation-status: partial
-      x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-      - Das initiale Setup muss abgeschlossen sein.
-      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
-      - Der Suchbegriff muss mindestens 3 Zeichen enthalten.
-      x-required-membership: TenantMember
-      description: |-
-        Globale User fuer Tenant suchen.
-
-        Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
-        - Das initiale Setup muss abgeschlossen sein.
-        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
-        - Der Suchbegriff muss mindestens 3 Zeichen enthalten.
-
-        Implementierungsstatus: partial.
-  "/api/tenants/{tenantName}/users/{userId}/invite":
+  "/api/tenants/{tenantName}/users/invite":
     post:
       tags:
       - Tenants
       operationId: inviteTenantUser
       parameters:
       - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
-      - "$ref": "#/components/parameters/UserId"
       requestBody:
         "$ref": "#/components/requestBodies/InviteTenantUser"
       responses:
@@ -334,7 +296,9 @@ paths:
       - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
       x-required-membership: TenantMember
       description: |-
-        Bestehenden globalen User mit Zielrolle in Tenant einladen.
+        User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits
+        zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls
+        wird ein globaler Pending-User angelegt.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
@@ -515,13 +479,6 @@ components:
       schema:
         type: integer
         format: int64
-    UserSearchQuery:
-      name: q
-      in: query
-      required: true
-      schema:
-        type: string
-        minLength: 3
   requestBodies:
     CreateTenant:
       required: true
@@ -572,6 +529,7 @@ components:
           schema:
             "$ref": "#/components/schemas/InviteTenantUserRequest"
           example:
+            email: invitee@example.test
             role: TenantMember
 
   responses:
@@ -670,17 +628,6 @@ components:
             displayName: Invitee
             role: TenantMember
             status: Pending
-    TenantUserSearch:
-      description: Matching users outside the tenant.
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/TenantUserSearchResponse"
-          example:
-            users:
-              - userId: 3
-                displayName: Kevin Raddatz
-                maskedEmail: k***n@e***e.t**
   schemas:
     TenantRole:
       type: string
@@ -866,31 +813,6 @@ components:
           "$ref": "#/components/schemas/TenantRole"
         status:
           "$ref": "#/components/schemas/TenantUserStatus"
-    TenantUserSearchResponse:
-      type: object
-      additionalProperties: false
-      required:
-      - users
-      properties:
-        users:
-          type: array
-          items:
-            "$ref": "#/components/schemas/TenantUserSearchSummary"
-    TenantUserSearchSummary:
-      type: object
-      additionalProperties: false
-      required:
-      - userId
-      - displayName
-      - maskedEmail
-      properties:
-        userId:
-          type: integer
-          format: int64
-        displayName:
-          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
-        maskedEmail:
-          type: string
     UpdateTenantSettingsRequest:
       type: object
       additionalProperties: false
@@ -925,9 +847,13 @@ components:
       type: object
       additionalProperties: false
       required:
+      - email
       - role
       properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
         role:
           "$ref": "#/components/schemas/TenantRole"
       example:
+        email: invitee@example.test
         role: TenantMember

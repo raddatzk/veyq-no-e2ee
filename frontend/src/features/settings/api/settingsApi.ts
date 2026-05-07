@@ -14,7 +14,6 @@ import type {
   ServerSettingsResponse,
   SettingsResponse,
   TenantRole,
-  TenantUserSearchSummary,
   TenantUserSummary,
   UpdateUserSettingsRequest,
   UserSettingsResponse
@@ -65,22 +64,13 @@ export function getTenantUsers(tenantName: string): Promise<TenantUserSummary[]>
   return generatedCall(tenantsApi.tenantUsers({ tenantName })).then((summary) => summary.users)
 }
 
-export function searchTenantUsers(
-  tenantName: string,
-  query: string
-): Promise<TenantUserSearchSummary[]> {
-  return generatedCall(tenantsApi.searchTenantUsers({ tenantName, q: query })).then(
-    (summary) => summary.users
-  )
-}
-
 export function inviteTenantUser(
   tenantName: string,
-  userId: number,
+  email: string,
   role: TenantRole
 ): Promise<TenantUserSummary> {
   return generatedCall(
-    tenantsApi.inviteTenantUser({ tenantName, userId, inviteTenantUserRequest: { role } })
+    tenantsApi.inviteTenantUser({ tenantName, inviteTenantUserRequest: { email, role } })
   )
 }
 

@@ -21,7 +21,6 @@ import type {
   TenantGroupSettingsResponse,
   TenantSettingsResponse,
   TenantSummary,
-  TenantUserSearchResponse,
   TenantUserSettingsResponse,
   TenantUserSummary,
   TenantUsersSummary,
@@ -43,8 +42,6 @@ import {
     TenantSettingsResponseToJSON,
     TenantSummaryFromJSON,
     TenantSummaryToJSON,
-    TenantUserSearchResponseFromJSON,
-    TenantUserSearchResponseToJSON,
     TenantUserSettingsResponseFromJSON,
     TenantUserSettingsResponseToJSON,
     TenantUserSummaryFromJSON,
@@ -84,18 +81,12 @@ export interface GetTenantUserSettingsRequest {
 
 export interface InviteTenantUserOperationRequest {
     tenantName: string;
-    userId: number;
     inviteTenantUserRequest: InviteTenantUserRequest;
 }
 
 export interface ReinviteTenantUserRequest {
     tenantName: string;
     userId: number;
-}
-
-export interface SearchTenantUsersRequest {
-    tenantName: string;
-    q: string;
 }
 
 export interface TenantUsersRequest {
@@ -255,7 +246,6 @@ export interface TenantsApiInterface {
     /**
      * Creates request options for inviteTenantUser without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {number} userId Internal ID of the current user
      * @param {InviteTenantUserRequest} inviteTenantUserRequest Invite user to tenant with target role
      * @throws {RequiredError}
      * @memberof TenantsApiInterface
@@ -263,10 +253,9 @@ export interface TenantsApiInterface {
     inviteTenantUserRequestOpts(requestParameters: InviteTenantUserOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Bestehenden globalen User mit Zielrolle in Tenant einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * @summary User in Tenant einladen
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {number} userId Internal ID of the current user
      * @param {InviteTenantUserRequest} inviteTenantUserRequest Invite user to tenant with target role
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -275,7 +264,7 @@ export interface TenantsApiInterface {
     inviteTenantUserRaw(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>>;
 
     /**
-     * Bestehenden globalen User mit Zielrolle in Tenant einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     inviteTenantUser(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary>;
@@ -329,32 +318,6 @@ export interface TenantsApiInterface {
     reinviteTenantUser(requestParameters: ReinviteTenantUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary>;
 
     /**
-     * Creates request options for searchTenantUsers without sending the request
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} q 
-     * @throws {RequiredError}
-     * @memberof TenantsApiInterface
-     */
-    searchTenantUsersRequestOpts(requestParameters: SearchTenantUsersRequest): Promise<runtime.RequestOpts>;
-
-    /**
-     * Globale User fuer Tenant suchen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der Suchbegriff muss mindestens 3 Zeichen enthalten.  Implementierungsstatus: partial.
-     * @summary Globale User fuer Tenant suchen
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} q 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof TenantsApiInterface
-     */
-    searchTenantUsersRaw(requestParameters: SearchTenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSearchResponse>>;
-
-    /**
-     * Globale User fuer Tenant suchen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der Suchbegriff muss mindestens 3 Zeichen enthalten.  Implementierungsstatus: partial.
-     * Globale User fuer Tenant suchen
-     */
-    searchTenantUsers(requestParameters: SearchTenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSearchResponse>;
-
-    /**
      * Creates request options for tenantUsers without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @throws {RequiredError}
@@ -363,7 +326,7 @@ export interface TenantsApiInterface {
     tenantUsersRequestOpts(requestParameters: TenantUsersRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Tenant-Mitglieder auflisten
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -373,7 +336,7 @@ export interface TenantsApiInterface {
     tenantUsersRaw(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUsersSummary>>;
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     tenantUsers(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUsersSummary>;
@@ -746,13 +709,6 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
             );
         }
 
-        if (requestParameters['userId'] == null) {
-            throw new runtime.RequiredError(
-                'userId',
-                'Required parameter "userId" was null or undefined when calling inviteTenantUser().'
-            );
-        }
-
         if (requestParameters['inviteTenantUserRequest'] == null) {
             throw new runtime.RequiredError(
                 'inviteTenantUserRequest',
@@ -767,9 +723,8 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
         headerParameters['Content-Type'] = 'application/json';
 
 
-        let urlPath = `/api/tenants/{tenantName}/users/{userId}/invite`;
+        let urlPath = `/api/tenants/{tenantName}/users/invite`;
         urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
-        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
 
         return {
             path: urlPath,
@@ -781,7 +736,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Bestehenden globalen User mit Zielrolle in Tenant einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     async inviteTenantUserRaw(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>> {
@@ -792,7 +747,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Bestehenden globalen User mit Zielrolle in Tenant einladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     async inviteTenantUser(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary> {
@@ -895,64 +850,6 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Creates request options for searchTenantUsers without sending the request
-     */
-    async searchTenantUsersRequestOpts(requestParameters: SearchTenantUsersRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['tenantName'] == null) {
-            throw new runtime.RequiredError(
-                'tenantName',
-                'Required parameter "tenantName" was null or undefined when calling searchTenantUsers().'
-            );
-        }
-
-        if (requestParameters['q'] == null) {
-            throw new runtime.RequiredError(
-                'q',
-                'Required parameter "q" was null or undefined when calling searchTenantUsers().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['q'] != null) {
-            queryParameters['q'] = requestParameters['q'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/tenants/{tenantName}/users/search`;
-        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
-     * Globale User fuer Tenant suchen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der Suchbegriff muss mindestens 3 Zeichen enthalten.  Implementierungsstatus: partial.
-     * Globale User fuer Tenant suchen
-     */
-    async searchTenantUsersRaw(requestParameters: SearchTenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSearchResponse>> {
-        const requestOptions = await this.searchTenantUsersRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => TenantUserSearchResponseFromJSON(jsonValue));
-    }
-
-    /**
-     * Globale User fuer Tenant suchen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der Suchbegriff muss mindestens 3 Zeichen enthalten.  Implementierungsstatus: partial.
-     * Globale User fuer Tenant suchen
-     */
-    async searchTenantUsers(requestParameters: SearchTenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSearchResponse> {
-        const response = await this.searchTenantUsersRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
      * Creates request options for tenantUsers without sending the request
      */
     async tenantUsersRequestOpts(requestParameters: TenantUsersRequest): Promise<runtime.RequestOpts> {
@@ -980,7 +877,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     async tenantUsersRaw(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUsersSummary>> {
@@ -991,7 +888,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     async tenantUsers(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUsersSummary> {

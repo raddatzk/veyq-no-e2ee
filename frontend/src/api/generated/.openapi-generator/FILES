@@ -65,8 +65,6 @@ models/TenantGroupSettingsResponse.ts
 models/TenantRole.ts
 models/TenantSettingsResponse.ts
 models/TenantSummary.ts
-models/TenantUserSearchResponse.ts
-models/TenantUserSearchSummary.ts
 models/TenantUserSettingsResponse.ts
 models/TenantUserStatus.ts
 models/TenantUserSummary.ts

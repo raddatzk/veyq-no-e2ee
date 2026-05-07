@@ -49,6 +49,7 @@ class UserResource(
     override fun getAllUsers(): Response =
         Response.ok(userService.getAllUsers()).build()
 
+    @ServerRolesRequired(ServerRole.ServerOwner)
     override fun createManagedUser(request: CreateManagedUserRequest): Response =
         Response.ok(userService.createUser(request)).build()
 

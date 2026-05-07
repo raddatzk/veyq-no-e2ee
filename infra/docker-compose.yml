@@ -29,7 +29,7 @@ services:
       MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
     ports:
-      - "3306"
+      - "3306:3306"
     volumes:
       - lunva-db:/var/lib/mysql
 

@@ -1,0 +1,121 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Setup API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer Lunva Setup API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+tags:
+- name: Setup
+paths:
+  "/api/setup":
+    get:
+      tags:
+      - Setup
+      operationId: status
+      responses:
+        '200':
+          "$ref": "#/components/responses/SetupStatus"
+      summary: Setup-Status abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      description: |-
+        Setup-Status abrufen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+
+        Implementierungsstatus: partial.
+  "/api/setup/admin":
+    post:
+      tags:
+      - Setup
+      operationId: createAdmin
+      requestBody:
+        "$ref": "#/components/requestBodies/AdminSetup"
+      responses:
+        '200':
+          "$ref": "#/components/responses/User"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Initialen Server-Owner anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup darf noch nicht abgeschlossen sein.
+      description: |-
+        Initialen Server-Owner anlegen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup darf noch nicht abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+components:
+  requestBodies:
+    AdminSetup:
+      description: Create initial admin
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AdminSetupRequest"
+          example:
+            email: admin@example.test
+            displayName: Administrator
+            password: admin1234567
+
+  responses:
+    SetupStatus:
+      description: Current setup status
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/SetupStatusSummary"
+          example:
+            setupRequired: false
+
+    User:
+      description: User
+      content:
+        application/json:
+          schema:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          example:
+            userId: 1
+            email: admin@example.test
+            displayName: Administrator
+            serverRole: ServerOwner
+  schemas:
+    SetupStatusSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - setupRequired
+      properties:
+        setupRequired:
+          type: boolean
+      example:
+        setupRequired: false
+    AdminSetupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - password
+      - displayName
+      - email
+      properties:
+        password:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: admin@example.test
+        displayName: Administrator
+        password: admin1234567

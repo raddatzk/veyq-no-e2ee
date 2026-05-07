@@ -231,12 +231,15 @@ paths:
       x-preconditions:
       - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
       description: |-
         Globalen Pending-User anlegen.
 
         Vorbedingungen:
         - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
 
         Implementierungsstatus: partial.
   "/api/users/{userId}/role":

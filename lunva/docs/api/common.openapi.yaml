@@ -1,0 +1,163 @@
+---
+openapi: 3.1.0
+info:
+  title: Lunva Common API Components
+  version: 0.1.0
+  description: Shared API-first components used by Lunva backend API specs.
+paths: {}
+components:
+  parameters:
+    TenantName:
+      in: path
+      required: true
+      description: Permalink tenant name from the URL.
+      name: tenantName
+      schema:
+        type: string
+      example: familie
+
+    GroupName:
+      in: path
+      required: true
+      description: Permalink group name from the URL.
+      name: groupName
+      schema:
+        type: string
+      example: holidays
+
+  responses:
+    LoginSession:
+      description: Login succeeded and auth cookies were set.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UserSummary"
+
+    '400':
+      description: Der Request ist syntaktisch oder fachlich ungueltig.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Invalid request
+    '401':
+      description: Der Request ist nicht authentifiziert.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Authentication required
+    '403':
+      description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Insufficient permissions
+
+    '404':
+      description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Resource not found
+
+    '409':
+      description: Es besteht ein Konflikt mit der bestehenden Ressource
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Conflict with existing resource
+
+    '413':
+      description: Der Upload ueberschreitet die erlaubte Groesse.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Upload too large
+
+    '416':
+      description: Der angeforderte Byte-Range ist fuer das Medium nicht erfuellbar.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            error: Requested range not satisfiable
+
+  schemas:
+    UserSummary:
+      description: Current authenticated user.
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - email
+        - displayName
+        - serverRole
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          "$ref": "#/components/schemas/EmailAddress"
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+        serverRole:
+          "$ref": "#/components/schemas/ServerRole"
+        pendingEmail:
+          "$ref": "#/components/schemas/EmailAddress"
+      example:
+        userId: 1
+        email: kevin@example.test
+        displayName: Kevin
+        serverRole: ServerOwner
+
+    EmailAddress:
+      type: string
+      description: Email address. The backend trims whitespace and stores it lowercase.
+      example: admin@example.com
+      x-normalization:
+        - trim
+        - lowercase
+      x-field-extra-annotation:
+        - '@field:com.lunva.api.common.validation.Email'
+
+    Password:
+      type: string
+      x-field-extra-annotation:
+        - '@field:com.lunva.api.common.validation.Password'
+
+    DisplayName:
+      type: string
+      x-field-extra-annotation:
+        - '@field:com.lunva.api.common.validation.Normalize'
+
+    Name:
+      type: string
+      x-field-extra-annotation:
+        - '@field:com.lunva.api.common.validation.Normalize'
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+      properties:
+        message:
+          type: string
+
+    ServerRole:
+      type: string
+      enum:
+        - ServerOwner
+        - ServerMember
