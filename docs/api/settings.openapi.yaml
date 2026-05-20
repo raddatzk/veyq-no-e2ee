@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Settings API
+  title: Veyq Settings API
   version: 0.2.0
   description: API contract for resolving settings navigation context.
 servers:
@@ -32,13 +32,13 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/404"
       x-implementation-status: implemented
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Load navigation context for a settings page.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: implemented.
@@ -47,7 +47,7 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
 
   parameters:
     Path:

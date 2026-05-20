@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -71,7 +71,7 @@ export interface AuthApiInterface {
     logoutRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Aktuelle Sitzung abmelden
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -80,7 +80,7 @@ export interface AuthApiInterface {
     logoutRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuelle Sitzung abmelden
      */
     logout(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -93,7 +93,7 @@ export interface AuthApiInterface {
     refreshRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Refresh-Token rotieren und neue Cookies setzen
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -102,7 +102,7 @@ export interface AuthApiInterface {
     refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
-     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
     refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
@@ -183,7 +183,7 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
     }
 
     /**
-     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuelle Sitzung abmelden
      */
     async logoutRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -194,7 +194,7 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
     }
 
     /**
-     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuelle Sitzung abmelden.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuelle Sitzung abmelden
      */
     async logout(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -221,7 +221,7 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
     }
 
     /**
-     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
     async refreshRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
@@ -232,7 +232,7 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
     }
 
     /**
-     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Refresh-Token rotieren und neue Cookies setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Refresh-Token rotieren und neue Cookies setzen
      */
     async refresh(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {

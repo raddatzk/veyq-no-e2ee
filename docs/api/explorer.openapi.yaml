@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Explorer API
+  title: Veyq Explorer API
   version: 0.1.0
   description: >
     Draft contract for the planned Explorer API shape. This document is a discussion artifact and may intentionally differ
@@ -22,7 +22,7 @@ paths:
         Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -44,7 +44,7 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/404"
       x-implementation-status: implemented
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -53,7 +53,7 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
       description: HttpOnly access token cookie set by the login endpoint.
   parameters:
     Path:

@@ -1,6 +1,6 @@
-# Lunva
+# Veyq
 
-Lunva ist eine Quarkus/Vue-Anwendung mit globalen User-Accounts, cookie-basierter Authentifizierung und tenant-scoped Bereichen. Tenants werden aktuell über einen technischen `name` im Pfad adressiert, z. B. `/friends` im Frontend und `/api/friends/groups` im Backend. Domains und TLS liegen bewusst vor Lunva beim Admin-Proxy.
+Veyq ist eine Quarkus/Vue-Anwendung mit globalen User-Accounts, cookie-basierter Authentifizierung und tenant-scoped Bereichen. Tenants werden aktuell über einen technischen `name` im Pfad adressiert, z. B. `/friends` im Frontend und `/api/friends/groups` im Backend. Domains und TLS liegen bewusst vor Veyq beim Admin-Proxy.
 
 ## Projektstruktur
 
@@ -21,13 +21,13 @@ docker compose up --build
 
 Danach:
 
-- App: `https://<LUNVA_DOMAIN>`
-- Health: `https://<LUNVA_DOMAIN>/q/health`
+- App: `https://<VEYQ_DOMAIN>`
+- Health: `https://<VEYQ_DOMAIN>/q/health`
 
 Die echte `infra/.env` enthält Domains, Datenbank-Zugangsdaten, Reset-Zugangsdaten und
 die Let's-Encrypt-E-Mail. Sie ist absichtlich nicht versioniert; `infra/.env.example`
 dokumentiert alle benötigten Werte.
-Der `lunva`-Container lädt dieselbe Datei per `env_file`, damit die in
+Der `veyq`-Container lädt dieselbe Datei per `env_file`, damit die in
 `backend/src/main/resources/application.properties` referenzierten Variablen im Container
 verfügbar sind.
 
@@ -41,8 +41,8 @@ cd infra
 docker compose up --build
 ```
 
-Der Reset leert alle Lunva-Datenbanktabellen außer `flyway_schema_history`, löscht den
-Inhalt des Medien-Volumes unter `/data/lunva-media` und startet danach den `lunva`-Container
+Der Reset leert alle Veyq-Datenbanktabellen außer `flyway_schema_history`, löscht den
+Inhalt des Medien-Volumes unter `/data/veyq-media` und startet danach den `veyq`-Container
 neu. Datenbankschema und Volumes bleiben bestehen; die App landet danach wieder im initialen
 Setup-Flow.
 
@@ -88,7 +88,7 @@ Sobald ein User existiert, ist Admin-Setup gesperrt. Neue Tenants dürfen nur Us
 
 ## API
 
-Die Backend-API ist API-first. Die Zielverträge liegen als OpenAPI 3.1 Specs unter [docs/api](/Users/kevin.raddatz/IdeaProjects/lunva/docs/api). Jede Spec-Operation dokumentiert Vorbedingungen, Beispiele, Fehlerfälle und `x-implementation-status`. Backend-Resources implementieren die generierten JAX-RS-Interfaces; JSON-Payloads werden im Backend als Kotlin-Models und im Frontend als TypeScript-Clients/Models aus denselben Specs generiert.
+Die Backend-API ist API-first. Die Zielverträge liegen als OpenAPI 3.1 Specs unter [docs/api](/Users/kevin.raddatz/IdeaProjects/veyq/docs/api). Jede Spec-Operation dokumentiert Vorbedingungen, Beispiele, Fehlerfälle und `x-implementation-status`. Backend-Resources implementieren die generierten JAX-RS-Interfaces; JSON-Payloads werden im Backend als Kotlin-Models und im Frontend als TypeScript-Clients/Models aus denselben Specs generiert.
 
 OpenAPI-Domänen:
 
@@ -148,7 +148,7 @@ Tenant-Endpunkte:
 - `GET /api/{tenantName}/media/{mediaId}/content`
 - `PATCH /api/{tenantName}/media/{mediaId}/metadata`
 
-Passende IntelliJ-HTTP-Requests liegen unter [http](/Users/kevin.raddatz/IdeaProjects/lunva/http).
+Passende IntelliJ-HTTP-Requests liegen unter [http](/Users/kevin.raddatz/IdeaProjects/veyq/http).
 
 ## API-Codegenerierung
 
@@ -168,9 +168,9 @@ Frontend:
 
 ## Auth- und Security-Modell
 
-- Auth läuft über `LunvaAuthenticationMechanism` und `LunvaIdentityProvider`.
+- Auth läuft über `VeyqAuthenticationMechanism` und `VeyqIdentityProvider`.
 - Access- und Refresh-Tokens werden als `HttpOnly` Cookies gesetzt.
-- `LunvaHttpSecurityPolicy` erlaubt nur explizit öffentliche API-Pfade ohne Login.
+- `VeyqHttpSecurityPolicy` erlaubt nur explizit öffentliche API-Pfade ohne Login.
 - `ServerOwner` ist eine globale Server-Rolle am User.
 - ServerOwner verwalten globale User über `POST /api/users`, `GET /api/users` und Rollenänderungen.
 - TenantOwner laden Tenant-Mitglieder direkt per E-Mail über `POST /api/tenants/{tenantName}/users/invite` ein; bestehende globale User werden anhand der E-Mail wiederverwendet, sonst wird ein Pending-User angelegt.

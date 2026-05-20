@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Users API
+  title: Veyq Users API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Lunva Users API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer Veyq Users API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -25,13 +25,13 @@ paths:
       summary: Aktuellen Benutzer abrufen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Aktuellen Benutzer abrufen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -53,13 +53,13 @@ paths:
       summary: Eigene Benutzer-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Eigene Benutzer-Einstellungen aktualisieren.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -84,14 +84,14 @@ paths:
       summary: Neue eigene E-Mail-Adresse bestaetigen
       x-implementation-status: implemented
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
       description: |-
         Neue eigene E-Mail-Adresse bestaetigen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
 
@@ -113,13 +113,13 @@ paths:
       summary: Eigenes Passwort ändern
       x-implementation-status: implemented
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Eigenes Passwort ändern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: implemented.
@@ -196,7 +196,7 @@ paths:
       summary: Verwaltete Benutzer auflisten
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss ServerOwner sein.
       x-required-role: ServerOwner
@@ -204,7 +204,7 @@ paths:
         Verwaltete Benutzer auflisten.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss ServerOwner sein.
 
@@ -229,7 +229,7 @@ paths:
       summary: Globalen Pending-User anlegen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss ServerOwner sein.
       x-required-role: ServerOwner
@@ -237,7 +237,7 @@ paths:
         Globalen Pending-User anlegen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss ServerOwner sein.
 
@@ -267,7 +267,7 @@ paths:
       summary: Server-Rolle eines Benutzers ändern
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss ServerOwner sein.
       x-required-role: ServerOwner
@@ -275,7 +275,7 @@ paths:
         Server-Rolle eines Benutzers ändern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss ServerOwner sein.
 
@@ -317,7 +317,7 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
   parameters:
     UserId:
       name: userId

@@ -12,7 +12,7 @@ export function useBreadcrumbs() {
     authState.tenants.find((tenant) => tenant.name === activeTenantName.value)
   )
   const fallbackBreadcrumb = computed<MenuItem>(() => ({
-    label: activeTenant.value?.displayName || 'Lunva',
+    label: activeTenant.value?.displayName || 'Veyq',
     command: () => {
       void router.push(activeTenant.value ? `/${activeTenant.value.name}` : '/')
     }

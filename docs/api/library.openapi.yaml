@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Library API
+  title: Veyq Library API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Lunva Library API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer Veyq Library API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -40,7 +40,7 @@ paths:
       summary: Ordner anlegen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -48,7 +48,7 @@ paths:
         Ordner anlegen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -74,7 +74,7 @@ paths:
       summary: Ordner löschen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -82,7 +82,7 @@ paths:
         Ordner löschen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -110,7 +110,7 @@ paths:
       summary: Ordner umbenennen oder umbeschriften
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -118,7 +118,7 @@ paths:
         Ordner umbenennen oder umbeschriften.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -146,7 +146,7 @@ paths:
       summary: Ordner verschieben
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -154,7 +154,7 @@ paths:
         Ordner verschieben.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -184,7 +184,7 @@ paths:
       summary: Album anlegen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -192,7 +192,7 @@ paths:
         Album anlegen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -218,7 +218,7 @@ paths:
       summary: Album löschen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -226,7 +226,7 @@ paths:
         Album löschen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -254,7 +254,7 @@ paths:
       summary: Album umbenennen oder umbeschriften
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -262,7 +262,7 @@ paths:
         Album umbenennen oder umbeschriften.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -290,7 +290,7 @@ paths:
       summary: Album verschieben
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -298,7 +298,7 @@ paths:
         Album verschieben.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -326,7 +326,7 @@ paths:
       summary: Medium einem Album hinzufügen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -334,7 +334,7 @@ paths:
         Medium einem Album hinzufügen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -362,7 +362,7 @@ paths:
       summary: Album-Cover setzen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -370,7 +370,7 @@ paths:
         Album-Cover setzen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -402,7 +402,7 @@ paths:
       summary: Medien als NDJSON streamen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -410,7 +410,7 @@ paths:
         Medien als NDJSON streamen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -439,7 +439,7 @@ paths:
       summary: Medium direkt hochladen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -447,7 +447,7 @@ paths:
         Medium direkt hochladen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -490,7 +490,7 @@ paths:
       summary: Mediendatei ausliefern
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -498,7 +498,7 @@ paths:
         Mediendatei ausliefern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -529,7 +529,7 @@ paths:
       summary: Medienvorschau ausliefern
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -537,7 +537,7 @@ paths:
         Medienvorschau als JPEG ausliefern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -566,7 +566,7 @@ paths:
       summary: Medien-Metadaten aktualisieren
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -574,7 +574,7 @@ paths:
         Medien-Metadaten aktualisieren.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -598,13 +598,13 @@ paths:
       summary: Chunk-Upload-Session erstellen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Chunk-Upload-Session erstellen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -620,13 +620,13 @@ paths:
       summary: Eigene offene Uploads auflisten
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Eigene offene Uploads auflisten.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -647,14 +647,14 @@ paths:
       summary: Upload-Status abrufen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
       description: |-
         Upload-Status abrufen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
 
@@ -677,14 +677,14 @@ paths:
       summary: Chunk-Upload abbrechen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
       description: |-
         Chunk-Upload abbrechen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
 
@@ -719,14 +719,14 @@ paths:
       summary: Upload-Chunk speichern
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
       description: |-
         Upload-Chunk speichern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
 
@@ -750,14 +750,14 @@ paths:
       summary: Chunk-Upload abschließen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
       description: |-
         Chunk-Upload abschließen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Die Upload-Session muss dem aktuellen Benutzer gehoeren.
 
@@ -767,7 +767,7 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
   parameters:
     TenantName:
       name: tenantName
@@ -1203,7 +1203,7 @@ components:
         tenantName:
           type: string
           x-field-extra-annotation:
-            - '@field:com.lunva.api.common.validation.Normalize'
+            - '@field:com.veyq.api.common.validation.Normalize'
         albumPath:
           type: string
         filename:
@@ -1217,7 +1217,7 @@ components:
           type: string
           nullable: true
           x-field-extra-annotation:
-            - '@field:com.lunva.api.common.validation.Normalize'
+            - '@field:com.veyq.api.common.validation.Normalize'
       example:
         tenantName: friends
         albumPath: "/@family/vacation/beach"
@@ -1276,7 +1276,7 @@ components:
         title:
           type: string
           x-field-extra-annotation:
-            - '@field:com.lunva.api.common.validation.Normalize'
+            - '@field:com.veyq.api.common.validation.Normalize'
         chunkSizeBytes:
           type: integer
           format: int64

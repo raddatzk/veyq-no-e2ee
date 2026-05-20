@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Tenants API
+  title: Veyq Tenants API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Lunva Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer Veyq Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -25,13 +25,13 @@ paths:
       summary: Eigene Tenants auflisten
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Eigene Tenants auflisten.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -55,7 +55,7 @@ paths:
       summary: Tenant anlegen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss ServerOwner sein.
       x-required-role: ServerOwner
@@ -63,7 +63,7 @@ paths:
         Tenant anlegen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss ServerOwner sein.
 
@@ -87,7 +87,7 @@ paths:
       summary: Tenant löschen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss TenantOwner sein.
       x-required-membership: TenantMember
@@ -95,7 +95,7 @@ paths:
         Tenant rekursiv und final löschen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss TenantOwner sein.
 
@@ -119,7 +119,7 @@ paths:
       summary: Tenant-Einstellungen abrufen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -127,7 +127,7 @@ paths:
         Tenant-Einstellungen abrufen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -154,7 +154,7 @@ paths:
       summary: Tenant-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       - Der aktuelle Benutzer muss TenantOwner sein.
@@ -163,7 +163,7 @@ paths:
         Tenant-Einstellungen aktualisieren.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
         - Der aktuelle Benutzer muss TenantOwner sein.
@@ -188,7 +188,7 @@ paths:
       summary: Benutzereinstellungen im Tenant abrufen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -196,7 +196,7 @@ paths:
         Benutzereinstellungen im Tenant abrufen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -221,7 +221,7 @@ paths:
       summary: Benutzereinstellungen im Tenant aktualisieren
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -229,7 +229,7 @@ paths:
         Benutzereinstellungen im Tenant aktualisieren.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -253,7 +253,7 @@ paths:
       summary: Tenant-Mitglieder auflisten
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -261,7 +261,7 @@ paths:
         Tenant-Mitglieder auflisten.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -291,7 +291,7 @@ paths:
       summary: User in Tenant einladen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
       x-required-membership: TenantMember
@@ -301,7 +301,7 @@ paths:
         wird ein globaler Pending-User angelegt.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
 
@@ -328,7 +328,7 @@ paths:
       summary: Pending-User erneut einladen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
       - Der User muss bereits Pending-Mitglied dieses Tenants sein.
@@ -337,7 +337,7 @@ paths:
         Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
         - Der User muss bereits Pending-Mitglied dieses Tenants sein.
@@ -369,7 +369,7 @@ paths:
       summary: Tenant-Rolle eines Mitglieds ändern
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
       x-required-membership: TenantMember
@@ -377,7 +377,7 @@ paths:
         Tenant-Rolle eines Mitglieds ändern.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
 
@@ -402,7 +402,7 @@ paths:
       summary: Gruppen-Einstellungen abrufen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       x-required-membership: TenantMember
@@ -410,7 +410,7 @@ paths:
         Gruppen-Einstellungen abrufen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
 
@@ -438,7 +438,7 @@ paths:
       summary: Gruppen-Einstellungen aktualisieren
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
       - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
@@ -447,7 +447,7 @@ paths:
         Gruppen-Einstellungen aktualisieren.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
         - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
@@ -458,7 +458,7 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
   parameters:
     TenantName:
       name: tenantName
@@ -650,13 +650,13 @@ components:
         name:
           type: string
           x-field-extra-annotation:
-            - '@field:com.lunva.api.common.validation.Normalize'
+            - '@field:com.veyq.api.common.validation.Normalize'
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         domain:
           type: string
           x-field-extra-annotation:
-            - '@field:com.lunva.api.common.validation.Host'
+            - '@field:com.veyq.api.common.validation.Host'
       example:
         name: friends
         displayName: Friends

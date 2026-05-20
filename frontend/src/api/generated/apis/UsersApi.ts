@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -132,7 +132,7 @@ export interface UsersApiInterface {
     changeMyPasswordRequestOpts(requestParameters: ChangeMyPasswordRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Eigenes Passwort ändern
      * @param {ChangePasswordRequest} changePasswordRequest
      * @param {*} [options] Override http request option.
@@ -142,7 +142,7 @@ export interface UsersApiInterface {
     changeMyPasswordRaw(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -156,7 +156,7 @@ export interface UsersApiInterface {
     confirmMyEmailChangeRequestOpts(requestParameters: ConfirmMyEmailChangeRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
      * @summary Neue eigene E-Mail-Adresse bestaetigen
      * @param {ConfirmEmailChangeRequest} confirmEmailChangeRequest
      * @param {*} [options] Override http request option.
@@ -166,7 +166,7 @@ export interface UsersApiInterface {
     confirmMyEmailChangeRaw(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
-     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
      * Neue eigene E-Mail-Adresse bestaetigen
      */
     confirmMyEmailChange(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
@@ -180,7 +180,7 @@ export interface UsersApiInterface {
     createManagedUserRequestOpts(requestParameters: CreateManagedUserOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Globalen Pending-User anlegen
      * @param {CreateManagedUserRequest} createManagedUserRequest
      * @param {*} [options] Override http request option.
@@ -190,7 +190,7 @@ export interface UsersApiInterface {
     createManagedUserRaw(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>>;
 
     /**
-     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Globalen Pending-User anlegen
      */
     createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
@@ -227,7 +227,7 @@ export interface UsersApiInterface {
     getAllUsersRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Verwaltete Benutzer auflisten
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -236,7 +236,7 @@ export interface UsersApiInterface {
     getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>>;
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
@@ -249,7 +249,7 @@ export interface UsersApiInterface {
     meRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Aktuellen Benutzer abrufen
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -258,7 +258,7 @@ export interface UsersApiInterface {
     meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
-     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
     me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
@@ -299,7 +299,7 @@ export interface UsersApiInterface {
     updateManagedUserRequestOpts(requestParameters: UpdateManagedUserRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Server-Rolle eines Benutzers ändern
      * @param {number} userId Internal ID of the current user
      * @param {UpdateManagedUserRoleRequest} updateManagedUserRoleRequest
@@ -310,7 +310,7 @@ export interface UsersApiInterface {
     updateManagedUserRaw(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>>;
 
     /**
-     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
     updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
@@ -324,7 +324,7 @@ export interface UsersApiInterface {
     updateMySettingsRequestOpts(requestParameters: UpdateMySettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Eigene Benutzer-Einstellungen aktualisieren
      * @param {UpdateUserSettingsRequest} updateUserSettingsRequest
      * @param {*} [options] Override http request option.
@@ -334,7 +334,7 @@ export interface UsersApiInterface {
     updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
 
     /**
-     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
     updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
@@ -433,7 +433,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     async changeMyPasswordRaw(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -444,7 +444,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Passwort ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Eigenes Passwort ändern
      */
     async changeMyPassword(requestParameters: ChangeMyPasswordRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -481,7 +481,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
      * Neue eigene E-Mail-Adresse bestaetigen
      */
     async confirmMyEmailChangeRaw(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
@@ -492,7 +492,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
+     * Neue eigene E-Mail-Adresse bestaetigen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.  Implementierungsstatus: implemented.
      * Neue eigene E-Mail-Adresse bestaetigen
      */
     async confirmMyEmailChange(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
@@ -530,7 +530,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Globalen Pending-User anlegen
      */
     async createManagedUserRaw(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUserSummary>> {
@@ -541,7 +541,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Globalen Pending-User anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Globalen Pending-User anlegen
      */
     async createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
@@ -617,7 +617,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     async getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>> {
@@ -628,7 +628,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
@@ -656,7 +656,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
     async meRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
@@ -667,7 +667,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Aktuellen Benutzer abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Aktuellen Benutzer abrufen
      */
     async me(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
@@ -769,7 +769,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
     async updateManagedUserRaw(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>> {
@@ -780,7 +780,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Server-Rolle eines Benutzers ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Rolle eines Benutzers ändern
      */
     async updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
@@ -818,7 +818,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
     async updateMySettingsRaw(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
@@ -829,7 +829,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Benutzer-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Benutzer-Einstellungen aktualisieren
      */
     async updateMySettings(requestParameters: UpdateMySettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {

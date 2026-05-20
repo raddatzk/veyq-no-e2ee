@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -75,7 +75,7 @@ export interface MediaApiInterface {
     contentRequestOpts(requestParameters: ContentRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Mediendatei ausliefern
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} mediaId Public Media-ID.
@@ -87,7 +87,7 @@ export interface MediaApiInterface {
     contentRaw(requestParameters: ContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
 
     /**
-     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Mediendatei ausliefern
      */
     content(requestParameters: ContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
@@ -102,7 +102,7 @@ export interface MediaApiInterface {
     mediaRequestOpts(requestParameters: MediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medien als NDJSON streamen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;.
@@ -113,7 +113,7 @@ export interface MediaApiInterface {
     mediaRaw(requestParameters: MediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>>;
 
     /**
-     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien als NDJSON streamen
      */
     media(requestParameters: MediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string>;
@@ -128,7 +128,7 @@ export interface MediaApiInterface {
     previewRequestOpts(requestParameters: PreviewRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medienvorschau ausliefern
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} mediaId Public Media-ID.
@@ -139,7 +139,7 @@ export interface MediaApiInterface {
     previewRaw(requestParameters: PreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
 
     /**
-     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medienvorschau ausliefern
      */
     preview(requestParameters: PreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
@@ -155,7 +155,7 @@ export interface MediaApiInterface {
     updateMetadataRequestOpts(requestParameters: UpdateMetadataRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medien-Metadaten aktualisieren
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} mediaId Public Media-ID.
@@ -167,7 +167,7 @@ export interface MediaApiInterface {
     updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
-     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
     updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
@@ -184,7 +184,7 @@ export interface MediaApiInterface {
     uploadMediaRequestOpts(requestParameters: UploadMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medium direkt hochladen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} albumPath
@@ -197,7 +197,7 @@ export interface MediaApiInterface {
     uploadMediaRaw(requestParameters: UploadMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
     uploadMedia(requestParameters: UploadMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
@@ -249,7 +249,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Mediendatei ausliefern
      */
     async contentRaw(requestParameters: ContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
@@ -260,7 +260,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Mediendatei ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Mediendatei ausliefern
      */
     async content(requestParameters: ContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
@@ -300,7 +300,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien als NDJSON streamen
      */
     async mediaRaw(requestParameters: MediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
@@ -315,7 +315,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien als NDJSON streamen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien als NDJSON streamen
      */
     async media(requestParameters: MediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {
@@ -359,7 +359,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medienvorschau ausliefern
      */
     async previewRaw(requestParameters: PreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
@@ -370,7 +370,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medienvorschau als JPEG ausliefern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medienvorschau ausliefern
      */
     async preview(requestParameters: PreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
@@ -424,7 +424,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
     async updateMetadataRaw(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
@@ -435,7 +435,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medien-Metadaten aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medien-Metadaten aktualisieren
      */
     async updateMetadata(requestParameters: UpdateMetadataRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
@@ -514,7 +514,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
     async uploadMediaRaw(requestParameters: UploadMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
@@ -525,7 +525,7 @@ export class MediaApi extends runtime.BaseAPI implements MediaApiInterface {
     }
 
     /**
-     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium direkt hochladen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium direkt hochladen
      */
     async uploadMedia(requestParameters: UploadMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {

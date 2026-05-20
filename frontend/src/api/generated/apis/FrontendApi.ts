@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -40,7 +40,7 @@ export interface FrontendApiInterface {
     entrypointRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Frontend-Bootstrap laden
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -49,7 +49,7 @@ export interface FrontendApiInterface {
     entrypointRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BootstrapResponse>>;
 
     /**
-     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Frontend-Bootstrap laden
      */
     entrypoint(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BootstrapResponse>;
@@ -81,7 +81,7 @@ export class FrontendApi extends runtime.BaseAPI implements FrontendApiInterface
     }
 
     /**
-     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Frontend-Bootstrap laden
      */
     async entrypointRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BootstrapResponse>> {
@@ -92,7 +92,7 @@ export class FrontendApi extends runtime.BaseAPI implements FrontendApiInterface
     }
 
     /**
-     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Frontend-Bootstrap laden
      */
     async entrypoint(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BootstrapResponse> {

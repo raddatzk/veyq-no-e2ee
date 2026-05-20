@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -45,7 +45,7 @@ export interface SettingsApiInterface {
     getSettingsRequestOpts(requestParameters: GetSettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Load navigation context for a settings page
      * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
      * @param {*} [options] Override http request option.
@@ -55,7 +55,7 @@ export interface SettingsApiInterface {
     getSettingsRaw(requestParameters: GetSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SettingsResponse>>;
 
     /**
-     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Load navigation context for a settings page
      */
     getSettings(requestParameters: GetSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SettingsResponse>;
@@ -91,7 +91,7 @@ export class SettingsApi extends runtime.BaseAPI implements SettingsApiInterface
     }
 
     /**
-     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Load navigation context for a settings page
      */
     async getSettingsRaw(requestParameters: GetSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SettingsResponse>> {
@@ -102,7 +102,7 @@ export class SettingsApi extends runtime.BaseAPI implements SettingsApiInterface
     }
 
     /**
-     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Load navigation context for a settings page
      */
     async getSettings(requestParameters: GetSettingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SettingsResponse> {

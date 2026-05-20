@@ -1,9 +1,9 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Common API Components
+  title: Veyq Common API Components
   version: 0.1.0
-  description: Shared API-first components used by Lunva backend API specs.
+  description: Shared API-first components used by Veyq backend API specs.
 paths: {}
 components:
   parameters:
@@ -130,22 +130,22 @@ components:
         - trim
         - lowercase
       x-field-extra-annotation:
-        - '@field:com.lunva.api.common.validation.Email'
+        - '@field:com.veyq.api.common.validation.Email'
 
     Password:
       type: string
       x-field-extra-annotation:
-        - '@field:com.lunva.api.common.validation.Password'
+        - '@field:com.veyq.api.common.validation.Password'
 
     DisplayName:
       type: string
       x-field-extra-annotation:
-        - '@field:com.lunva.api.common.validation.Normalize'
+        - '@field:com.veyq.api.common.validation.Normalize'
 
     Name:
       type: string
       x-field-extra-annotation:
-        - '@field:com.lunva.api.common.validation.Normalize'
+        - '@field:com.veyq.api.common.validation.Normalize'
 
     ErrorResponse:
       type: object

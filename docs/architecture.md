@@ -1,8 +1,8 @@
-# Lunva Architektur
+# Veyq Architektur
 
 ## Zielbild
 
-Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
+Veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
 
 ## Laufzeit
 
@@ -15,23 +15,23 @@ Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe D
 
 ## Domänenmodell
 
-- `lunva_user`
+- `veyq_user`
   - globale User inkl. `email`, `password_hash`, `display_name`, `role`, `password_set_at`
-- `lunva_user_invitation`
+- `veyq_user_invitation`
   - gehashte Einladungstokens, Ablaufdatum, Accepted-/Revoked-Zeitpunkte
-- `lunva_refresh_token` / `lunva_access_token`
+- `veyq_refresh_token` / `veyq_access_token`
   - gehashte Tokens, Ablaufdaten, Revocation und Refresh-Rotation
-- `lunva_tenant`
+- `veyq_tenant`
   - tenant-scoped Bereich mit eindeutigem `name` und eindeutiger `domain`
-- `lunva_tenant_member`
+- `veyq_tenant_member`
   - User-Mitgliedschaft pro Tenant mit `TenantOwner` oder `TenantMember`
-- `lunva_tenant_group`
+- `veyq_tenant_group`
   - Gruppen innerhalb eines Tenants
-- `lunva_tenant_group_member`
+- `veyq_tenant_group_member`
   - Gruppenmitgliedschaft mit `GroupOwner` oder `GroupMember`
-- `lunva_media`
+- `veyq_media`
   - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Ersteller und Zugriffsscope
-- `lunva_config`
+- `veyq_config`
   - technische App-Konfiguration wie bcrypt-Cost
 
 ## Auth-Flow
@@ -42,10 +42,10 @@ Lunva läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe D
    - setzt beide Tokens als Cookies
 
 2. Geschützte API-Aufrufe
-   - `LunvaAuthenticationMechanism` liest das passende Cookie
-   - `LunvaIdentityProvider` validiert Token und baut die `SecurityIdentity`
+   - `VeyqAuthenticationMechanism` liest das passende Cookie
+   - `VeyqIdentityProvider` validiert Token und baut die `SecurityIdentity`
    - `RequestContextFilter` befüllt den request-scoped `RequestContext`
-   - `LunvaHttpSecurityPolicy` blockt anonyme Requests auf geschützte `/api/**` Pfade
+   - `VeyqHttpSecurityPolicy` blockt anonyme Requests auf geschützte `/api/**` Pfade
 
 3. `POST /api/auth/refresh`
    - liest Refresh-Cookie

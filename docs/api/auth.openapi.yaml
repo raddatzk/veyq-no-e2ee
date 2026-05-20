@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Lunva Auth API
+  title: Veyq Auth API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Lunva Auth API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer Veyq Auth API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 tags:
@@ -54,13 +54,13 @@ paths:
       summary: Aktuelle Sitzung abmelden
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Aktuelle Sitzung abmelden.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -81,13 +81,13 @@ paths:
       summary: Refresh-Token rotieren und neue Cookies setzen
       x-implementation-status: partial
       x-preconditions:
-      - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
       - Das initiale Setup muss abgeschlossen sein.
       description: |-
         Refresh-Token rotieren und neue Cookies setzen.
 
         Vorbedingungen:
-        - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
@@ -96,11 +96,11 @@ components:
     accessTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_ACCESS_TOKEN
+      name: VEYQ_ACCESS_TOKEN
     refreshTokenCookie:
       type: apiKey
       in: cookie
-      name: LUNVA_REFRESH_TOKEN
+      name: VEYQ_REFRESH_TOKEN
 
   requestBodies:
     Login:

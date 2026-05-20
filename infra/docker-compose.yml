@@ -1,7 +1,7 @@
 services:
   traefik:
     image: traefik:v3.3
-    container_name: lunva-traefik
+    container_name: veyq-traefik
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -20,32 +20,32 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-letsencrypt:/letsencrypt
 
-  lunva-db:
+  veyq-db:
     image: mariadb:10.11
-    container_name: lunva-db
+    container_name: veyq-db
     environment:
-      MARIADB_DATABASE: ${DB_NAME:-lunva}
-      MARIADB_USER: ${DB_USER:-lunva}
+      MARIADB_DATABASE: ${DB_NAME:-veyq}
+      MARIADB_USER: ${DB_USER:-veyq}
       MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
-      - lunva-db:/var/lib/mysql
+      - veyq-db:/var/lib/mysql
 
-  lunva:
+  veyq:
     build:
       context: ..
       dockerfile: Dockerfile
-      target: ${LUNVA_BUILD_TARGET:-runtime-jvm}
-    container_name: lunva
+      target: ${VEYQ_BUILD_TARGET:-runtime-jvm}
+    container_name: veyq
     environment:
-      DB_URL: jdbc:mariadb://lunva-db:3306/${DB_NAME:-lunva}
-      DB_USER: ${DB_USER:-lunva}
+      DB_URL: jdbc:mariadb://veyq-db:3306/${DB_NAME:-veyq}
+      DB_USER: ${DB_USER:-veyq}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
-      COOKIE_ACCESS_TOKEN_NAME: ${COOKIE_ACCESS_TOKEN_NAME:-LUNVA_ACCESS_TOKEN}
-      COOKIE_REFRESH_TOKEN_NAME: ${COOKIE_REFRESH_TOKEN_NAME:-LUNVA_REFRESH_TOKEN}
+      COOKIE_ACCESS_TOKEN_NAME: ${COOKIE_ACCESS_TOKEN_NAME:-VEYQ_ACCESS_TOKEN}
+      COOKIE_REFRESH_TOKEN_NAME: ${COOKIE_REFRESH_TOKEN_NAME:-VEYQ_REFRESH_TOKEN}
       ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
       REFRESH_TOKEN_TTL_MINUTES: ${REFRESH_TOKEN_TTL_MINUTES:-43200}
       ACCESS_TOKEN_AUDIT_TTL_DAYS: ${ACCESS_TOKEN_AUDIT_TTL_DAYS:-30}
@@ -60,7 +60,7 @@ services:
       BCRYPT_MIN_COST: ${BCRYPT_MIN_COST:-10}
       BCRYPT_MAX_COST: ${BCRYPT_MAX_COST:-18}
       BCRYPT_BENCHMARK_SAMPLES: ${BCRYPT_BENCHMARK_SAMPLES:-2}
-      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
       MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
       MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
       MEDIA_UPLOAD_SESSION_CLEANUP_CRON: "${MEDIA_UPLOAD_SESSION_CLEANUP_CRON:-0 0 * * * ?}"
@@ -75,46 +75,46 @@ services:
     expose:
       - "8080"
     volumes:
-      - lunva-media:${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      - veyq-media:${MEDIA_STORAGE_DIR:-/data/veyq-media}
     depends_on:
-      - lunva-db
+      - veyq-db
     labels:
       - traefik.enable=true
-      - traefik.http.routers.lunva.rule=${LUNVA_TRAEFIK_RULE:?Set LUNVA_TRAEFIK_RULE}
-      - traefik.http.routers.lunva.entrypoints=websecure
-      - traefik.http.routers.lunva.tls.certresolver=letsencrypt
-      - traefik.http.services.lunva.loadbalancer.server.port=8080
+      - traefik.http.routers.veyq.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}
+      - traefik.http.routers.veyq.entrypoints=websecure
+      - traefik.http.routers.veyq.tls.certresolver=letsencrypt
+      - traefik.http.services.veyq.loadbalancer.server.port=8080
 
-  lunva-reset:
+  veyq-reset:
     profiles: ["reset"]
     build:
       context: ./reset
-    container_name: lunva-reset
+    container_name: veyq-reset
     environment:
       RESET_USERNAME: ${RESET_USERNAME:?Set RESET_USERNAME}
       RESET_PASSWORD: ${RESET_PASSWORD:?Set RESET_PASSWORD}
-      RESET_RESTART_CONTAINER: ${RESET_RESTART_CONTAINER:-lunva}
-      DB_HOST: lunva-db
+      RESET_RESTART_CONTAINER: ${RESET_RESTART_CONTAINER:-veyq}
+      DB_HOST: veyq-db
       DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-lunva}
-      DB_USER: ${DB_USER:-lunva}
+      DB_NAME: ${DB_NAME:-veyq}
+      DB_USER: ${DB_USER:-veyq}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
     expose:
       - "8081"
     volumes:
-      - lunva-media:${MEDIA_STORAGE_DIR:-/data/lunva-media}
+      - veyq-media:${MEDIA_STORAGE_DIR:-/data/veyq-media}
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - lunva-db
+      - veyq-db
     labels:
       - traefik.enable=true
-      - traefik.http.routers.lunva-reset.rule=${RESET_TRAEFIK_RULE:?Set RESET_TRAEFIK_RULE}
-      - traefik.http.routers.lunva-reset.entrypoints=websecure
-      - traefik.http.routers.lunva-reset.tls.certresolver=letsencrypt
-      - traefik.http.services.lunva-reset.loadbalancer.server.port=8081
+      - traefik.http.routers.veyq-reset.rule=${RESET_TRAEFIK_RULE:?Set RESET_TRAEFIK_RULE}
+      - traefik.http.routers.veyq-reset.entrypoints=websecure
+      - traefik.http.routers.veyq-reset.tls.certresolver=letsencrypt
+      - traefik.http.services.veyq-reset.loadbalancer.server.port=8081
 
 volumes:
-  lunva-db:
-  lunva-media:
+  veyq-db:
+  veyq-media:
   traefik-letsencrypt:

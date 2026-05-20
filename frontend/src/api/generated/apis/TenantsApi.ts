@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -130,7 +130,7 @@ export interface TenantsApiInterface {
     createTenantRequestOpts(requestParameters: CreateTenantOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Tenant anlegen
      * @param {CreateTenantRequest} createTenantRequest New tenant
      * @param {*} [options] Override http request option.
@@ -140,7 +140,7 @@ export interface TenantsApiInterface {
     createTenantRaw(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSummary>>;
 
     /**
-     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Tenant anlegen
      */
     createTenant(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSummary>;
@@ -154,7 +154,7 @@ export interface TenantsApiInterface {
     deleteTenantRequestOpts(requestParameters: DeleteTenantRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * @summary Tenant löschen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -164,7 +164,7 @@ export interface TenantsApiInterface {
     deleteTenantRaw(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant löschen
      */
     deleteTenant(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -179,7 +179,7 @@ export interface TenantsApiInterface {
     getGroupSettingsRequestOpts(requestParameters: GetGroupSettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppen-Einstellungen abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -190,7 +190,7 @@ export interface TenantsApiInterface {
     getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>>;
 
     /**
-     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
     getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
@@ -204,7 +204,7 @@ export interface TenantsApiInterface {
     getTenantSettingsRequestOpts(requestParameters: GetTenantSettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Tenant-Einstellungen abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -214,7 +214,7 @@ export interface TenantsApiInterface {
     getTenantSettingsRaw(requestParameters: GetTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
 
     /**
-     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen abrufen
      */
     getTenantSettings(requestParameters: GetTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
@@ -228,7 +228,7 @@ export interface TenantsApiInterface {
     getTenantUserSettingsRequestOpts(requestParameters: GetTenantUserSettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Benutzereinstellungen im Tenant abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -238,7 +238,7 @@ export interface TenantsApiInterface {
     getTenantUserSettingsRaw(requestParameters: GetTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSettingsResponse>>;
 
     /**
-     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant abrufen
      */
     getTenantUserSettings(requestParameters: GetTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSettingsResponse>;
@@ -253,7 +253,7 @@ export interface TenantsApiInterface {
     inviteTenantUserRequestOpts(requestParameters: InviteTenantUserOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * @summary User in Tenant einladen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {InviteTenantUserRequest} inviteTenantUserRequest Invite user to tenant with target role
@@ -264,7 +264,7 @@ export interface TenantsApiInterface {
     inviteTenantUserRaw(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>>;
 
     /**
-     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     inviteTenantUser(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary>;
@@ -277,7 +277,7 @@ export interface TenantsApiInterface {
     myTenantsRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Eigene Tenants auflisten
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -286,7 +286,7 @@ export interface TenantsApiInterface {
     myTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantsSummary>>;
 
     /**
-     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Tenants auflisten
      */
     myTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantsSummary>;
@@ -301,7 +301,7 @@ export interface TenantsApiInterface {
     reinviteTenantUserRequestOpts(requestParameters: ReinviteTenantUserRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
+     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
      * @summary Pending-User erneut einladen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {number} userId Internal ID of the current user
@@ -312,7 +312,7 @@ export interface TenantsApiInterface {
     reinviteTenantUserRaw(requestParameters: ReinviteTenantUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>>;
 
     /**
-     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
+     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
      * Pending-User erneut einladen
      */
     reinviteTenantUser(requestParameters: ReinviteTenantUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary>;
@@ -326,7 +326,7 @@ export interface TenantsApiInterface {
     tenantUsersRequestOpts(requestParameters: TenantUsersRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Tenant-Mitglieder auflisten
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -336,7 +336,7 @@ export interface TenantsApiInterface {
     tenantUsersRaw(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUsersSummary>>;
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     tenantUsers(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUsersSummary>;
@@ -352,7 +352,7 @@ export interface TenantsApiInterface {
     updateGroupSettingsRequestOpts(requestParameters: UpdateGroupSettingsOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * @summary Gruppen-Einstellungen aktualisieren
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -364,7 +364,7 @@ export interface TenantsApiInterface {
     updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>>;
 
     /**
-     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
     updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
@@ -379,7 +379,7 @@ export interface TenantsApiInterface {
     updateTenantSettingsRequestOpts(requestParameters: UpdateTenantSettingsOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * @summary Tenant-Einstellungen aktualisieren
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {UpdateTenantSettingsRequest} updateTenantSettingsRequest Update Tenant settings
@@ -390,7 +390,7 @@ export interface TenantsApiInterface {
     updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
 
     /**
-     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
     updateTenantSettings(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
@@ -406,7 +406,7 @@ export interface TenantsApiInterface {
     updateTenantUserRoleRequestOpts(requestParameters: UpdateTenantUserRoleOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * @summary Tenant-Rolle eines Mitglieds ändern
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {number} userId Internal ID of the current user
@@ -418,7 +418,7 @@ export interface TenantsApiInterface {
     updateTenantUserRoleRaw(requestParameters: UpdateTenantUserRoleOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>>;
 
     /**
-     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * Tenant-Rolle eines Mitglieds ändern
      */
     updateTenantUserRole(requestParameters: UpdateTenantUserRoleOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary>;
@@ -432,7 +432,7 @@ export interface TenantsApiInterface {
     updateTenantUserSettingsRequestOpts(requestParameters: UpdateTenantUserSettingsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Benutzereinstellungen im Tenant aktualisieren
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -442,7 +442,7 @@ export interface TenantsApiInterface {
     updateTenantUserSettingsRaw(requestParameters: UpdateTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSettingsResponse>>;
 
     /**
-     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant aktualisieren
      */
     updateTenantUserSettings(requestParameters: UpdateTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSettingsResponse>;
@@ -484,7 +484,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Tenant anlegen
      */
     async createTenantRaw(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSummary>> {
@@ -495,7 +495,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Tenant anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Tenant anlegen
      */
     async createTenant(requestParameters: CreateTenantOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSummary> {
@@ -531,7 +531,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant löschen
      */
     async deleteTenantRaw(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -542,7 +542,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant löschen
      */
     async deleteTenant(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -585,7 +585,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
     async getGroupSettingsRaw(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>> {
@@ -596,7 +596,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen abrufen
      */
     async getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
@@ -632,7 +632,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen abrufen
      */
     async getTenantSettingsRaw(requestParameters: GetTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
@@ -643,7 +643,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen abrufen
      */
     async getTenantSettings(requestParameters: GetTenantSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
@@ -679,7 +679,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant abrufen
      */
     async getTenantUserSettingsRaw(requestParameters: GetTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSettingsResponse>> {
@@ -690,7 +690,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant abrufen
      */
     async getTenantUserSettings(requestParameters: GetTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSettingsResponse> {
@@ -736,7 +736,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     async inviteTenantUserRaw(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>> {
@@ -747,7 +747,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls wird ein globaler Pending-User angelegt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * User in Tenant einladen
      */
     async inviteTenantUser(requestParameters: InviteTenantUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary> {
@@ -775,7 +775,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Tenants auflisten
      */
     async myTenantsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantsSummary>> {
@@ -786,7 +786,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene Tenants auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene Tenants auflisten
      */
     async myTenants(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantsSummary> {
@@ -830,7 +830,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
+     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
      * Pending-User erneut einladen
      */
     async reinviteTenantUserRaw(requestParameters: ReinviteTenantUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>> {
@@ -841,7 +841,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
+     * Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein. - Der User muss bereits Pending-Mitglied dieses Tenants sein.  Implementierungsstatus: partial.
      * Pending-User erneut einladen
      */
     async reinviteTenantUser(requestParameters: ReinviteTenantUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary> {
@@ -877,7 +877,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     async tenantUsersRaw(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUsersSummary>> {
@@ -888,7 +888,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Tenant-Mitglieder auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Tenant-Mitglieder auflisten
      */
     async tenantUsers(requestParameters: TenantUsersRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUsersSummary> {
@@ -942,7 +942,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
     async updateGroupSettingsRaw(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantGroupSettingsResponse>> {
@@ -953,7 +953,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppen-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppen-Einstellungen aktualisieren
      */
     async updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
@@ -999,7 +999,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
     async updateTenantSettingsRaw(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
@@ -1010,7 +1010,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
+     * Tenant-Einstellungen aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: partial.
      * Tenant-Einstellungen aktualisieren
      */
     async updateTenantSettings(requestParameters: UpdateTenantSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
@@ -1064,7 +1064,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * Tenant-Rolle eines Mitglieds ändern
      */
     async updateTenantUserRoleRaw(requestParameters: UpdateTenantUserRoleOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSummary>> {
@@ -1075,7 +1075,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
+     * Tenant-Rolle eines Mitglieds ändern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.  Implementierungsstatus: partial.
      * Tenant-Rolle eines Mitglieds ändern
      */
     async updateTenantUserRole(requestParameters: UpdateTenantUserRoleOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSummary> {
@@ -1111,7 +1111,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant aktualisieren
      */
     async updateTenantUserSettingsRaw(requestParameters: UpdateTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantUserSettingsResponse>> {
@@ -1122,7 +1122,7 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
-     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Benutzereinstellungen im Tenant aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Benutzereinstellungen im Tenant aktualisieren
      */
     async updateTenantUserSettings(requestParameters: UpdateTenantUserSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantUserSettingsResponse> {

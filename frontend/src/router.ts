@@ -80,7 +80,7 @@ function getStoredTenant(): string | null{
   const { serverState } = useServerState()
   const serverId = serverState.serverId
   const userId = authState.user!.userId
-  return localStorage.getItem(`lunva:${serverId}:${userId}:last-active-tenant`)
+  return localStorage.getItem(`veyq:${serverId}:${userId}:last-active-tenant`)
 }
 
 function resolveHome(): string {
@@ -95,7 +95,7 @@ function storeHome(tenantName: string) {
   const { serverState } = useServerState()
   const serverId = serverState.serverId
   const userId = authState.user!.userId
-  localStorage.setItem(`lunva:${serverId}:${userId}:last-active-tenant`, tenantName)
+  localStorage.setItem(`veyq:${serverId}:${userId}:last-active-tenant`, tenantName)
 }
 
 export default router

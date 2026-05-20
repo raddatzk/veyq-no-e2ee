@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -72,7 +72,7 @@ export interface MediaUploadsApiInterface {
     abortUploadRequestOpts(requestParameters: AbortUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * @summary Chunk-Upload abbrechen
      * @param {string} uploadId 
      * @param {*} [options] Override http request option.
@@ -82,7 +82,7 @@ export interface MediaUploadsApiInterface {
     abortUploadRaw(requestParameters: AbortUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abbrechen
      */
     abortUpload(requestParameters: AbortUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -96,7 +96,7 @@ export interface MediaUploadsApiInterface {
     completeUploadRequestOpts(requestParameters: CompleteUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * @summary Chunk-Upload abschließen
      * @param {string} uploadId 
      * @param {*} [options] Override http request option.
@@ -106,7 +106,7 @@ export interface MediaUploadsApiInterface {
     completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>>;
 
     /**
-     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
     completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary>;
@@ -120,7 +120,7 @@ export interface MediaUploadsApiInterface {
     createUploadRequestOpts(requestParameters: CreateUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Chunk-Upload-Session erstellen
      * @param {CreateMediaUploadRequest} createMediaUploadRequest Initiate Upload session
      * @param {*} [options] Override http request option.
@@ -130,7 +130,7 @@ export interface MediaUploadsApiInterface {
     createUploadRaw(requestParameters: CreateUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaUploadSessionSummary>>;
 
     /**
-     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Chunk-Upload-Session erstellen
      */
     createUpload(requestParameters: CreateUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaUploadSessionSummary>;
@@ -144,7 +144,7 @@ export interface MediaUploadsApiInterface {
     getUploadRequestOpts(requestParameters: GetUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * @summary Upload-Status abrufen
      * @param {string} uploadId 
      * @param {*} [options] Override http request option.
@@ -154,7 +154,7 @@ export interface MediaUploadsApiInterface {
     getUploadRaw(requestParameters: GetUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMediaUploadSummary>>;
 
     /**
-     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Status abrufen
      */
     getUpload(requestParameters: GetUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMediaUploadSummary>;
@@ -167,7 +167,7 @@ export interface MediaUploadsApiInterface {
     listUploadsRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * @summary Eigene offene Uploads auflisten
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -176,7 +176,7 @@ export interface MediaUploadsApiInterface {
     listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PendingMediaUploadSummary>>>;
 
     /**
-     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
     listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PendingMediaUploadSummary>>;
@@ -192,7 +192,7 @@ export interface MediaUploadsApiInterface {
     uploadChunkRequestOpts(requestParameters: UploadChunkRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * @summary Upload-Chunk speichern
      * @param {string} uploadId 
      * @param {number} chunkIndex chunkIndex
@@ -204,7 +204,7 @@ export interface MediaUploadsApiInterface {
     uploadChunkRaw(requestParameters: UploadChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Chunk speichern
      */
     uploadChunk(requestParameters: UploadChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -244,7 +244,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abbrechen
      */
     async abortUploadRaw(requestParameters: AbortUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -255,7 +255,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abbrechen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abbrechen
      */
     async abortUpload(requestParameters: AbortUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -290,7 +290,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
     async completeUploadRaw(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaSummary>> {
@@ -301,7 +301,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Chunk-Upload abschließen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Chunk-Upload abschließen
      */
     async completeUpload(requestParameters: CompleteUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaSummary> {
@@ -339,7 +339,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Chunk-Upload-Session erstellen
      */
     async createUploadRaw(requestParameters: CreateUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MediaUploadSessionSummary>> {
@@ -350,7 +350,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Chunk-Upload-Session erstellen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Chunk-Upload-Session erstellen
      */
     async createUpload(requestParameters: CreateUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MediaUploadSessionSummary> {
@@ -386,7 +386,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Status abrufen
      */
     async getUploadRaw(requestParameters: GetUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMediaUploadSummary>> {
@@ -397,7 +397,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Status abrufen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Status abrufen
      */
     async getUpload(requestParameters: GetUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMediaUploadSummary> {
@@ -425,7 +425,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
     async listUploadsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PendingMediaUploadSummary>>> {
@@ -436,7 +436,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
+     * Eigene offene Uploads auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: partial.
      * Eigene offene Uploads auflisten
      */
     async listUploads(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PendingMediaUploadSummary>> {
@@ -490,7 +490,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Chunk speichern
      */
     async uploadChunkRaw(requestParameters: UploadChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -501,7 +501,7 @@ export class MediaUploadsApi extends runtime.BaseAPI implements MediaUploadsApiI
     }
 
     /**
-     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
+     * Upload-Chunk speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Die Upload-Session muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: partial.
      * Upload-Chunk speichern
      */
     async uploadChunk(requestParameters: UploadChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

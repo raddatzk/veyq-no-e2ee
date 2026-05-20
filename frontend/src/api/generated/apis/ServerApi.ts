@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -40,7 +40,7 @@ export interface ServerApiInterface {
     getServerSettingsRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Server-Einstellungen abrufen
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -49,7 +49,7 @@ export interface ServerApiInterface {
     getServerSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerSettingsResponse>>;
 
     /**
-     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Einstellungen abrufen
      */
     getServerSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerSettingsResponse>;
@@ -81,7 +81,7 @@ export class ServerApi extends runtime.BaseAPI implements ServerApiInterface {
     }
 
     /**
-     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Einstellungen abrufen
      */
     async getServerSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerSettingsResponse>> {
@@ -92,7 +92,7 @@ export class ServerApi extends runtime.BaseAPI implements ServerApiInterface {
     }
 
     /**
-     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Server-Einstellungen abrufen
      */
     async getServerSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerSettingsResponse> {

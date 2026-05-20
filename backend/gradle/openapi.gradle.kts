@@ -19,9 +19,9 @@ val generatedApiDir = layout.buildDirectory.dir("generated/openapi-api")
 val generatedModelsDir = layout.buildDirectory.dir("generated/openapi-models")
 val bundledSpecDir = layout.buildDirectory.dir("generated/openapi-bundled")
 
-val apiPackageName = "com.lunva.api.generated.api"
-val modelPackageName = "com.lunva.api.generated.model"
-val invokerPackageName = "com.lunva.api.generated"
+val apiPackageName = "com.veyq.api.generated.api"
+val modelPackageName = "com.veyq.api.generated.model"
+val invokerPackageName = "com.veyq.api.generated"
 
 val openApiGeneratorOptions = mapOf(
     "interfaceOnly" to "true",

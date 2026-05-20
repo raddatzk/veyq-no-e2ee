@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, quote
 import pymysql
 
 
-APP_TITLE = "Lunva Test Reset"
+APP_TITLE = "Veyq Test Reset"
 EXCLUDED_TABLES = {"flyway_schema_history"}
 
 
@@ -31,15 +31,15 @@ class ResetConfig:
     def __init__(self) -> None:
         self.username = required_env("RESET_USERNAME")
         self.password = required_env("RESET_PASSWORD")
-        self.db_host = os.environ.get("DB_HOST", "lunva-db")
+        self.db_host = os.environ.get("DB_HOST", "veyq-db")
         self.db_port = int(os.environ.get("DB_PORT", "3306"))
-        self.db_name = os.environ.get("DB_NAME", "lunva")
-        self.db_user = os.environ.get("DB_USER", "lunva")
+        self.db_name = os.environ.get("DB_NAME", "veyq")
+        self.db_user = os.environ.get("DB_USER", "veyq")
         self.db_password = required_env("DB_PASSWORD")
         self.media_storage_dir = safe_storage_root(
-            os.environ.get("MEDIA_STORAGE_DIR", "/data/lunva-media")
+            os.environ.get("MEDIA_STORAGE_DIR", "/data/veyq-media")
         )
-        self.restart_container = os.environ.get("RESET_RESTART_CONTAINER", "lunva").strip()
+        self.restart_container = os.environ.get("RESET_RESTART_CONTAINER", "veyq").strip()
         self.docker_socket = Path(os.environ.get("DOCKER_SOCKET", "/var/run/docker.sock"))
         self.restart_timeout_seconds = int(os.environ.get("RESET_RESTART_TIMEOUT_SECONDS", "10"))
 
@@ -311,7 +311,7 @@ def render_page(status: Optional[str] = None, details: Optional[dict[str, Any]] 
 
 
 class ResetHandler(BaseHTTPRequestHandler):
-    server_version = "LunvaReset/1.0"
+    server_version = "VeyqReset/1.0"
 
     @property
     def config(self) -> ResetConfig:
@@ -347,7 +347,7 @@ class ResetHandler(BaseHTTPRequestHandler):
             self.write_html(
                 HTTPStatus.UNAUTHORIZED,
                 render_page("Invalid username or password."),
-                extra_headers={"WWW-Authenticate": 'Basic realm="Lunva Reset"'},
+                extra_headers={"WWW-Authenticate": 'Basic realm="Veyq Reset"'},
             )
             return
 

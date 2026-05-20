@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -87,7 +87,7 @@ export interface AlbumsApiInterface {
     addMediaRequestOpts(requestParameters: AddMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Medium einem Album hinzufügen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {AlbumMediaRequest} albumMediaRequest 
@@ -98,7 +98,7 @@ export interface AlbumsApiInterface {
     addMediaRaw(requestParameters: AddMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>>;
 
     /**
-     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium einem Album hinzufügen
      */
     addMedia(requestParameters: AddMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum>;
@@ -113,7 +113,7 @@ export interface AlbumsApiInterface {
     createAlbumRequestOpts(requestParameters: CreateAlbumRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Album anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album anlegen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateLibraryItemRequest} createLibraryItemRequest 
@@ -124,7 +124,7 @@ export interface AlbumsApiInterface {
     createAlbumRaw(requestParameters: CreateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>>;
 
     /**
-     * Album anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album anlegen
      */
     createAlbum(requestParameters: CreateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum>;
@@ -139,7 +139,7 @@ export interface AlbumsApiInterface {
     deleteAlbumRequestOpts(requestParameters: DeleteAlbumRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Album löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album löschen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
@@ -150,7 +150,7 @@ export interface AlbumsApiInterface {
     deleteAlbumRaw(requestParameters: DeleteAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Album löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album löschen
      */
     deleteAlbum(requestParameters: DeleteAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -165,7 +165,7 @@ export interface AlbumsApiInterface {
     moveAlbumRequestOpts(requestParameters: MoveAlbumRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Album verschieben.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album verschieben
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {MoveLibraryItemRequest} moveLibraryItemRequest 
@@ -176,7 +176,7 @@ export interface AlbumsApiInterface {
     moveAlbumRaw(requestParameters: MoveAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>>;
 
     /**
-     * Album verschieben.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album verschieben
      */
     moveAlbum(requestParameters: MoveAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum>;
@@ -191,7 +191,7 @@ export interface AlbumsApiInterface {
     setCoverRequestOpts(requestParameters: SetCoverRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album-Cover setzen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {SetAlbumCoverRequest} [setAlbumCoverRequest] Set Album Cover
@@ -202,7 +202,7 @@ export interface AlbumsApiInterface {
     setCoverRaw(requestParameters: SetCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>>;
 
     /**
-     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album-Cover setzen
      */
     setCover(requestParameters: SetCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum>;
@@ -217,7 +217,7 @@ export interface AlbumsApiInterface {
     updateAlbumRequestOpts(requestParameters: UpdateAlbumRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Album umbenennen oder umbeschriften
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {UpdateLibraryItemRequest} updateLibraryItemRequest 
@@ -228,7 +228,7 @@ export interface AlbumsApiInterface {
     updateAlbumRaw(requestParameters: UpdateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>>;
 
     /**
-     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album umbenennen oder umbeschriften
      */
     updateAlbum(requestParameters: UpdateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum>;
@@ -278,7 +278,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium einem Album hinzufügen
      */
     async addMediaRaw(requestParameters: AddMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>> {
@@ -289,7 +289,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Medium einem Album hinzufügen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Medium einem Album hinzufügen
      */
     async addMedia(requestParameters: AddMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum> {
@@ -335,7 +335,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album anlegen
      */
     async createAlbumRaw(requestParameters: CreateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>> {
@@ -346,7 +346,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album anlegen
      */
     async createAlbum(requestParameters: CreateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum> {
@@ -386,7 +386,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album löschen
      */
     async deleteAlbumRaw(requestParameters: DeleteAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -397,7 +397,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album löschen
      */
     async deleteAlbum(requestParameters: DeleteAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -442,7 +442,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album verschieben.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album verschieben
      */
     async moveAlbumRaw(requestParameters: MoveAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>> {
@@ -453,7 +453,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album verschieben.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album verschieben
      */
     async moveAlbum(requestParameters: MoveAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum> {
@@ -492,7 +492,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album-Cover setzen
      */
     async setCoverRaw(requestParameters: SetCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>> {
@@ -503,7 +503,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album-Cover setzen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album-Cover setzen
      */
     async setCover(requestParameters: SetCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum> {
@@ -549,7 +549,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album umbenennen oder umbeschriften
      */
     async updateAlbumRaw(requestParameters: UpdateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerAlbum>> {
@@ -560,7 +560,7 @@ export class AlbumsApi extends runtime.BaseAPI implements AlbumsApiInterface {
     }
 
     /**
-     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Album umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Album umbenennen oder umbeschriften
      */
     async updateAlbum(requestParameters: UpdateAlbumRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerAlbum> {

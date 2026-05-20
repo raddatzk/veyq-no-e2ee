@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -76,7 +76,7 @@ export interface GroupsApiInterface {
     createGroupRequestOpts(requestParameters: CreateGroupOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppe anlegen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {CreateGroupRequest} createGroupRequest 
@@ -87,7 +87,7 @@ export interface GroupsApiInterface {
     createGroupRaw(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>>;
 
     /**
-     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe anlegen
      */
     createGroup(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary>;
@@ -102,7 +102,7 @@ export interface GroupsApiInterface {
     deleteGroupRequestOpts(requestParameters: DeleteGroupRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * @summary Gruppe löschen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -113,7 +113,7 @@ export interface GroupsApiInterface {
     deleteGroupRaw(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe löschen
      */
     deleteGroup(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -128,7 +128,7 @@ export interface GroupsApiInterface {
     getGroupRequestOpts(requestParameters: GetGroupRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppe abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -139,7 +139,7 @@ export interface GroupsApiInterface {
     getGroupRaw(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>>;
 
     /**
-     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     getGroup(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary>;
@@ -153,7 +153,7 @@ export interface GroupsApiInterface {
     getGroupsRequestOpts(requestParameters: GetGroupsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * @summary Gruppen eines Tenants auflisten
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {*} [options] Override http request option.
@@ -163,7 +163,7 @@ export interface GroupsApiInterface {
     getGroupsRaw(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupsSummary>>;
 
     /**
-     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     getGroups(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupsSummary>;
@@ -179,7 +179,7 @@ export interface GroupsApiInterface {
     updateGroupRequestOpts(requestParameters: UpdateGroupOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * @summary Gruppe aktualisieren
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -191,7 +191,7 @@ export interface GroupsApiInterface {
     updateGroupRaw(requestParameters: UpdateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>>;
 
     /**
-     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe aktualisieren
      */
     updateGroup(requestParameters: UpdateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary>;
@@ -241,7 +241,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe anlegen
      */
     async createGroupRaw(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>> {
@@ -252,7 +252,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe anlegen
      */
     async createGroup(requestParameters: CreateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary> {
@@ -296,7 +296,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe löschen
      */
     async deleteGroupRaw(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -307,7 +307,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe rekursiv und final löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe löschen
      */
     async deleteGroup(requestParameters: DeleteGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -350,7 +350,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     async getGroupRaw(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>> {
@@ -361,7 +361,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppe abrufen
      */
     async getGroup(requestParameters: GetGroupRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary> {
@@ -397,7 +397,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     async getGroupsRaw(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupsSummary>> {
@@ -408,7 +408,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
+     * Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
      * Gruppen eines Tenants auflisten
      */
     async getGroups(requestParameters: GetGroupsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupsSummary> {
@@ -462,7 +462,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe aktualisieren
      */
     async updateGroupRaw(requestParameters: UpdateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GroupSummary>> {
@@ -473,7 +473,7 @@ export class GroupsApi extends runtime.BaseAPI implements GroupsApiInterface {
     }
 
     /**
-     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
+     * Gruppe aktualisieren.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.  Implementierungsstatus: partial.
      * Gruppe aktualisieren
      */
     async updateGroup(requestParameters: UpdateGroupOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GroupSummary> {

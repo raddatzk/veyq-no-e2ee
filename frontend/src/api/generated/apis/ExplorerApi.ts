@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Lunva API
+ * Veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -47,7 +47,7 @@ export interface ExplorerApiInterface {
     getExplorerRequestOpts(requestParameters: GetExplorerRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
+     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
      * @summary Load the library explorer for a tenant path
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
@@ -58,7 +58,7 @@ export interface ExplorerApiInterface {
     getExplorerRaw(requestParameters: GetExplorerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerResponse>>;
 
     /**
-     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
+     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
      * Load the library explorer for a tenant path
      */
     getExplorer(requestParameters: GetExplorerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerResponse>;
@@ -102,7 +102,7 @@ export class ExplorerApi extends runtime.BaseAPI implements ExplorerApiInterface
     }
 
     /**
-     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
+     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
      * Load the library explorer for a tenant path
      */
     async getExplorerRaw(requestParameters: GetExplorerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerResponse>> {
@@ -113,7 +113,7 @@ export class ExplorerApi extends runtime.BaseAPI implements ExplorerApiInterface
     }
 
     /**
-     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger LUNVA_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
+     * Returns the current explorer location, its full breadcrumb chain, visible scope root shortcuts, child folders, and child albums.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: implemented.
      * Load the library explorer for a tenant path
      */
     async getExplorer(requestParameters: GetExplorerRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerResponse> {

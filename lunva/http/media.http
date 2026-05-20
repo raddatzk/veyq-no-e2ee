@@ -1,3 +1,0 @@
-### List visible media
-GET {{baseUrl}}/api/{{tenantName}}/media
-
