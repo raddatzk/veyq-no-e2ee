@@ -6,14 +6,14 @@ Accepted
 
 ## Context
 
-The current implementation exposes folders, albums and media as the primary library model. The product direction is a memory sharing product where a Memory is the main rich content object.
+The original implementation exposed folders, albums and media as the primary library model. The product direction is a memory sharing product where a Memory is the main rich content object.
 
 ## Decision
 
-Use `Memory` as the product-facing term for new work. Current folder, album and media implementation details may remain during migration, but new product-facing APIs, UI and documentation should use Memory language.
+Use `Memory` as the product-facing term for new work. Memory UI v1 and Memory APIs are now the active baseline.
 
-Folders are organizational only and must not become rich content objects. Albums are treated as the legacy implementation baseline that will be migrated into Memories.
+Folders are organizational only and must not become rich content objects. Albums are removed as a product and public API concept.
 
 ## Consequences
 
-New APIs and frontend surfaces should be Memory-first. Existing album/folder code can stay temporarily for compatibility, but it should not receive new product functionality unless required for migration.
+New APIs and frontend surfaces must be Memory-first. Album/Explorer flows and tables should not be reintroduced.

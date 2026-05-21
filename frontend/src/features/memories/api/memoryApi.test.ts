@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMemory,
+  getMemoryByPath,
   listMemories,
+  listMemoriesByFolder,
   listMemoryMedia,
   updateMemory,
   uploadMemoryMedia
@@ -10,6 +12,8 @@ import {
 const mocks = vi.hoisted(() => ({
   generatedCall: vi.fn((request: Promise<unknown>) => request),
   listMemories: vi.fn(),
+  listMemoriesByFolder: vi.fn(),
+  getMemoryByPath: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),
   listMemoryMedia: vi.fn(),
@@ -20,6 +24,8 @@ vi.mock('../../../api/generatedClient', () => ({
   generatedCall: mocks.generatedCall,
   memoriesApi: {
     listMemories: mocks.listMemories,
+    listMemoriesByFolder: mocks.listMemoriesByFolder,
+    getMemoryByPath: mocks.getMemoryByPath,
     createMemory: mocks.createMemory,
     updateMemory: mocks.updateMemory
   },
@@ -32,6 +38,26 @@ vi.mock('../../../api/generatedClient', () => ({
 describe('memoryApi facade', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('maps folder and path based memory lookups through generatedCall', async () => {
+    mocks.listMemoriesByFolder.mockResolvedValue([memoryResponse('trip')])
+    mocks.getMemoryByPath.mockResolvedValue(memoryResponse('trip'))
+
+    const memories = await listMemoriesByFolder('tenant', '/travel')
+    const memory = await getMemoryByPath('tenant', '/travel/trip')
+
+    expect(memories[0].path).toBe('/trip')
+    expect(memory.id).toBe('mem-trip')
+    expect(mocks.listMemoriesByFolder).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      folderPath: '/travel'
+    })
+    expect(mocks.getMemoryByPath).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      path: '/travel/trip'
+    })
+    expect(mocks.generatedCall).toHaveBeenCalledTimes(2)
   })
 
   it('normalizes optional memory fields to null', async () => {
@@ -73,6 +99,7 @@ describe('memoryApi facade', () => {
       name: 'created',
       displayName: 'Created',
       parentId: null,
+      folderPath: null,
       scope: null
     })
     await updateMemory('tenant', 'mem-1', {
@@ -87,6 +114,7 @@ describe('memoryApi facade', () => {
         name: 'created',
         displayName: 'Created',
         parentId: undefined,
+        folderPath: undefined,
         scope: undefined
       }
     })

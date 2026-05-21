@@ -9,6 +9,9 @@ import { useAuthState } from '../../shared/state/useAuthState'
 const userMenu = ref()
 const router = useRouter()
 const { authState, setAnonymous } = useAuthState()
+defineProps<{
+  showName?: boolean
+}>()
 const profileLabel = computed(() => authState.userLabel.charAt(0).toUpperCase() || 'A')
 const isServerOwner = computed(() => authState.user?.serverRole === 'ServerOwner')
 const menuItems = computed(() => {
@@ -73,6 +76,8 @@ async function doLogout() {
 <template>
   <button class="profile-button" type="button" @click="userMenu.toggle($event)">
     <Avatar :label="profileLabel" shape="circle" />
+    <span v-if="showName" class="profile-button-name">{{ authState.userLabel }}</span>
+    <span v-if="showName" class="pi pi-chevron-down profile-button-chevron" />
   </button>
   <Menu ref="userMenu" :model="menuItems" popup />
 </template>

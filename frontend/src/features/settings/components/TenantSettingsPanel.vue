@@ -166,7 +166,7 @@ function upsertUser(user: TenantUserSummary) {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <div v-if="loading" class="explorer-loading">
+    <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>Mitglieder werden geladen...</span>
     </div>

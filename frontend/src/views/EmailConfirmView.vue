@@ -45,7 +45,7 @@ async function confirmEmail() {
   <Card class="login-card">
     <template #title>Email bestaetigen</template>
     <template #content>
-      <div v-if="loading" class="explorer-loading">
+      <div v-if="loading" class="memory-loading">
         <ProgressSpinner class="small-spinner" />
         <span>Email wird bestaetigt...</span>
       </div>

@@ -25,6 +25,10 @@ class Memory : PanacheEntityBase {
     @JoinColumn(name = "parent_memory_id")
     var parentMemory: Memory? = null
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_folder_id")
+    var parentFolder: TenantFolder? = null
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_user_id", nullable = false)
     lateinit var owner: User
@@ -82,7 +86,14 @@ class MemoryRepo : PanacheRepository<Memory> {
         find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
 
     fun listRoots(tenant: Tenant): List<Memory> =
-        list("tenant = ?1 and parentMemory is null order by displayName", tenant)
+        list("tenant = ?1 and parentMemory is null and parentFolder is null order by displayName", tenant)
+
+    fun listByFolder(tenant: Tenant, parentFolder: TenantFolder?): List<Memory> =
+        if (parentFolder == null) {
+            list("tenant = ?1 and parentMemory is null and parentFolder is null order by displayName", tenant)
+        } else {
+            list("tenant = ?1 and parentMemory is null and parentFolder = ?2 order by displayName", tenant, parentFolder)
+        }
 
     fun listChildren(tenant: Tenant, parent: Memory): List<Memory> =
         list("tenant = ?1 and parentMemory = ?2 order by displayName", tenant, parent)

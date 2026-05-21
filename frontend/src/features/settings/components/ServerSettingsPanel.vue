@@ -31,7 +31,7 @@ async function loadSettings() {
     <p>Server-Einstellungen</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div v-else-if="loading" class="explorer-loading">
+    <div v-else-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>Server-Einstellungen werden geladen...</span>
     </div>

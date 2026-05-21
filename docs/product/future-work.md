@@ -24,6 +24,8 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Needs API Design
 
+- Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
+- Cover selection and cover removal flows for Memories.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.
 - Memory header summary endpoint.
 - Journal read/update endpoint.
@@ -38,8 +40,7 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Needs UX Design
 
-- First Memory-facing UI that consumes the implemented Memory API without exposing Folder/Album language for new product surfaces.
-- Memory detail layout with `Gallery`, `Journal`, `Map`, `Tracks` and `Child Memories` tabs.
+- Memory detail next pass with `Journal`, `Map`, `Tracks` and richer `Unter-Memories` tabs.
 - Memory header with cover, time range, places, weather, playlist, participants and track summary.
 - Child Memory navigation without file-system feel.
 - Parent Memory aggregation indicators.
@@ -89,8 +90,9 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Implemented Baseline To Build On
 
-- Memory CRUD and direct child traversal exist as an API-first backend layer.
+- Memory UI v1 is the active library surface.
+- Memory navigation, folder navigation, Memory CRUD and direct child traversal exist as API-first backend layers.
 - Memory-scoped media upload, listing and timestamp correction exist.
 - `includeChildren=true` aggregates media from descendant Memories while preserving direct asset ownership.
-- Memories currently coexist with legacy Folder/Album Explorer APIs; replacing the visible UI is still future work.
-- ADRs already capture Memory terminology, direct asset ownership and basic tree invariants.
+- Album/Explorer APIs, frontend flows and database tables have been removed.
+- ADRs already capture Memory terminology, direct asset ownership, basic tree invariants and the Album removal cut.

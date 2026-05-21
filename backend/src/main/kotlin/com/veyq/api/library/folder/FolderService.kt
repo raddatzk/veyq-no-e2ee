@@ -1,16 +1,23 @@
 package com.veyq.api.library.folder
 
 import com.veyq.api.auth.BadRequestException
+import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.NotFoundException
-import com.veyq.api.domain.*
-import com.veyq.api.generated.model.ExplorerFolder
-import com.veyq.api.generated.model.CreateLibraryItemRequest
-import com.veyq.api.library.LibraryDeletionService
-import com.veyq.api.library.LibraryService
-import com.veyq.api.generated.model.MoveLibraryItemRequest
-import com.veyq.api.generated.model.UpdateLibraryItemRequest
-import com.veyq.api.library.explorer.ResolvedExplorerLocation
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.domain.Memory
+import com.veyq.api.domain.MemoryRepo
+import com.veyq.api.domain.TenantFolder
+import com.veyq.api.domain.TenantFolderRepo
+import com.veyq.api.domain.TenantGroupMemberRepo
+import com.veyq.api.domain.TenantGroupRepo
+import com.veyq.api.generated.model.CreateFolderRequest
+import com.veyq.api.generated.model.MemoryFolder
+import com.veyq.api.generated.model.MoveFolderRequest
+import com.veyq.api.generated.model.UpdateFolderRequest
+import com.veyq.api.library.LibraryDeletionService
+import com.veyq.api.library.LibraryScopeKey
+import com.veyq.api.library.LibraryService
+import com.veyq.api.library.ResolvedMemoryLocation
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -18,26 +25,27 @@ import jakarta.transaction.Transactional
 @Singleton
 class FolderService @Inject constructor(
     private val folderRepo: TenantFolderRepo,
+    private val memoryRepo: MemoryRepo,
     private val libraryDeletionService: LibraryDeletionService,
-    albumRepo: TenantAlbumRepo,
     groupRepo: TenantGroupRepo,
     groupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext,
-) : LibraryService(folderRepo, albumRepo, groupRepo, groupMemberRepo, requestContext) {
+) : LibraryService(folderRepo, groupRepo, groupMemberRepo, requestContext) {
 
     @Transactional
-    fun createFolder(request: CreateLibraryItemRequest): ExplorerFolder {
+    fun createFolder(request: CreateFolderRequest): MemoryFolder {
         val parent = resolveParent(request.parentPath)
-        val scope = resolveCreateScope(parent, request)
+        val scope = resolveCreateScope(parent, request.scope)
         val name = normalizedName(request.name)
-        validateNoCollision(parent, scope, name)
+        validateNoFolderCollision(parent, scope, name)
+        validateNoMemoryCollision(parent, scope, name)
         val folder = TenantFolder().also {
             it.tenant = tenant()
             it.parentFolder = parent
             it.owner = user()
             applyScope(it, scope)
             it.name = name
-            it.displayName = request.displayName!!.trim()
+            it.displayName = request.displayName.trim()
             folderRepo.persist(it)
         }
         folderRepo.flush()
@@ -45,12 +53,15 @@ class FolderService @Inject constructor(
     }
 
     @Transactional
-    fun updateFolder(request: UpdateLibraryItemRequest): ExplorerFolder {
+    fun updateFolder(request: UpdateFolderRequest): MemoryFolder {
         val folder = resolveFolder(request.path)
         requireVisible(folder)
         request.name?.let {
             val name = normalizedName(it)
-            if (name != folder.name) validateNoCollision(folder.parentFolder, folder.scope(), name)
+            if (name != folder.name) {
+                validateNoFolderCollision(folder.parentFolder, folder.scope(), name)
+                validateNoMemoryCollision(folder.parentFolder, folder.scope(), name)
+            }
             folder.name = name
         }
         request.displayName?.let { folder.displayName = it.trim() }
@@ -58,7 +69,7 @@ class FolderService @Inject constructor(
     }
 
     @Transactional
-    fun moveFolder(request: MoveLibraryItemRequest): ExplorerFolder {
+    fun moveFolder(request: MoveFolderRequest): MemoryFolder {
         val folder = resolveFolder(request.path)
         requireVisible(folder)
         val newParent = resolveParent(request.newParentPath)
@@ -69,7 +80,8 @@ class FolderService @Inject constructor(
         requireSameScope(folder.scope(), newParent)
         val newName = request.name?.let { normalizedName(it) } ?: folder.name
         if (newParent?.id != folder.parentFolder?.id || newName != folder.name) {
-            validateNoCollision(newParent, folder.scope(), newName)
+            validateNoFolderCollision(newParent, folder.scope(), newName)
+            validateNoMemoryCollision(newParent, folder.scope(), newName)
         }
         folder.parentFolder = newParent
         folder.name = newName
@@ -84,8 +96,13 @@ class FolderService @Inject constructor(
     }
 
     private fun resolveFolder(path: String?): TenantFolder =
-        (resolveVisibleContext(path) as? ResolvedExplorerLocation.Folder)?.scope ?: throw NotFoundException("Folder not found")
+        (resolveVisibleContext(path) as? ResolvedMemoryLocation.Folder)?.folder ?: throw NotFoundException("Folder not found")
 
     private fun isDescendantOrSame(candidate: TenantFolder, ancestor: TenantFolder): Boolean =
         generateSequence(candidate) { it.parentFolder }.any { it.id == ancestor.id }
+
+    private fun validateNoMemoryCollision(parent: TenantFolder?, scope: LibraryScopeKey, name: String) {
+        val collision = memoryRepo.listByFolder(tenant(), parent).any { it.name == name && it.scope().sameAs(scope) }
+        if (collision) throw ConflictException("Path name already exists")
+    }
 }

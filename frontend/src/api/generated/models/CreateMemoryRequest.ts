@@ -34,6 +34,12 @@ export interface CreateMemoryRequest {
      */
     parentId?: string;
     /**
+     * Organizational folder path for new top-level Memories. Ignored when `parentId` is present.
+     * @type {string}
+     * @memberof CreateMemoryRequest
+     */
+    folderPath?: string;
+    /**
      * URL-safe sibling name.
      * @type {string}
      * @memberof CreateMemoryRequest
@@ -73,6 +79,7 @@ export function CreateMemoryRequestFromJSONTyped(json: any, ignoreDiscriminator:
     return {
         
         'parentId': json['parentId'] == null ? undefined : json['parentId'],
+        'folderPath': json['folderPath'] == null ? undefined : json['folderPath'],
         'name': json['name'],
         'displayName': json['displayName'],
         'scope': json['scope'] == null ? undefined : MemoryScopeRequestFromJSON(json['scope']),
@@ -91,6 +98,7 @@ export function CreateMemoryRequestToJSONTyped(value?: CreateMemoryRequest | nul
     return {
         
         'parentId': value['parentId'],
+        'folderPath': value['folderPath'],
         'name': value['name'],
         'displayName': value['displayName'],
         'scope': MemoryScopeRequestToJSON(value['scope']),

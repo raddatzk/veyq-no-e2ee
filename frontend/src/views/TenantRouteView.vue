@@ -3,10 +3,10 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import TenantView from './TenantView.vue'
 import SettingsView from './SettingsView.vue'
-import { isSettingsPath, routePathToExplorerPath } from '../shared/utils/paths'
+import { isSettingsPath, routePathToMemoryPath } from '../shared/utils/paths'
 
 const route = useRoute()
-const path = computed(() => routePathToExplorerPath(route.params.pathMatch))
+const path = computed(() => routePathToMemoryPath(route.params.pathMatch))
 const isSettingsRoute = computed(() => isSettingsPath(path.value))
 </script>
 

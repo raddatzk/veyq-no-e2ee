@@ -347,7 +347,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <div v-if="loading" class="explorer-loading">
+    <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>Gruppen werden geladen...</span>
     </div>
@@ -379,7 +379,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </div>
       </div>
 
-      <div v-if="detailLoading" class="explorer-loading">
+      <div v-if="detailLoading" class="memory-loading">
         <ProgressSpinner class="small-spinner" />
         <span>Gruppe wird geladen...</span>
       </div>

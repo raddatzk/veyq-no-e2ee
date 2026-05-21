@@ -1,6 +1,18 @@
 .login-card {
-  max-width: 460px;
-  margin: 0 auto;
+  width: min(460px, 100%);
+  border: 1px solid var(--app-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--app-shadow-md);
+}
+
+.login-card .p-card-title {
+  color: var(--app-text);
+  font-size: 1.65rem;
+}
+
+.login-card .p-card-content {
+  padding-top: 0.5rem;
 }
 
 .tenant-dialog {
@@ -10,6 +22,17 @@
 .form {
   display: grid;
   gap: 1rem;
+}
+
+.form .p-inputtext,
+.form .p-password,
+.form .p-select {
+  width: 100%;
+}
+
+.form .p-inputtext,
+.form .p-password-input {
+  border-radius: var(--app-radius-sm);
 }
 
 .button-row {
@@ -35,7 +58,7 @@
   gap: 1rem;
   padding: 0.8rem;
   border: 1px solid var(--app-line);
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   color: var(--app-text);
   text-decoration: none;
   background: #fff;
@@ -57,7 +80,7 @@
   gap: 0.2rem;
   padding: 0.85rem;
   border: 1px solid var(--app-line);
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   background: #fff;
 }
 

@@ -26,7 +26,7 @@ import {
 } from '../models/index';
 
 export interface GetSettingsRequest {
-    path?: string;
+    path: string;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface GetSettingsRequest {
 export interface SettingsApiInterface {
     /**
      * Creates request options for getSettings without sending the request
-     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
+     * @param {string} path Full frontend route path for the settings page.
      * @throws {RequiredError}
      * @memberof SettingsApiInterface
      */
@@ -47,7 +47,7 @@ export interface SettingsApiInterface {
     /**
      * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Load navigation context for a settings page
-     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
+     * @param {string} path Full frontend route path for the settings page.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof SettingsApiInterface
@@ -71,6 +71,13 @@ export class SettingsApi extends runtime.BaseAPI implements SettingsApiInterface
      * Creates request options for getSettings without sending the request
      */
     async getSettingsRequestOpts(requestParameters: GetSettingsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['path'] == null) {
+            throw new runtime.RequiredError(
+                'path',
+                'Required parameter "path" was null or undefined when calling getSettings().'
+            );
+        }
+
         const queryParameters: any = {};
 
         if (requestParameters['path'] != null) {
@@ -105,7 +112,7 @@ export class SettingsApi extends runtime.BaseAPI implements SettingsApiInterface
      * Load navigation context for a settings page.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Load navigation context for a settings page
      */
-    async getSettings(requestParameters: GetSettingsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SettingsResponse> {
+    async getSettings(requestParameters: GetSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SettingsResponse> {
         const response = await this.getSettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }

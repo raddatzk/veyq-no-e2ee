@@ -49,6 +49,11 @@ export interface GetMemoryRequest {
     memoryId: string;
 }
 
+export interface GetMemoryByPathRequest {
+    tenantName: string;
+    path: string;
+}
+
 export interface ListChildMemoriesRequest {
     tenantName: string;
     memoryId: string;
@@ -56,6 +61,11 @@ export interface ListChildMemoriesRequest {
 
 export interface ListMemoriesRequest {
     tenantName: string;
+}
+
+export interface ListMemoriesByFolderRequest {
+    tenantName: string;
+    folderPath?: string;
 }
 
 export interface SetMemoryCoverOperationRequest {
@@ -156,6 +166,32 @@ export interface MemoriesApiInterface {
     getMemory(requestParameters: GetMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
 
     /**
+     * Creates request options for getMemoryByPath without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} path Canonical Memory UI path with folder segments followed by one or more Memory name segments.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryByPathRequestOpts(requestParameters: GetMemoryByPathRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`. The path may contain organizational folder segments followed by one or more nested Memory name segments.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Get a memory by folder path and memory name
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} path Canonical Memory UI path with folder segments followed by one or more Memory name segments.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryByPathRaw(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`. The path may contain organizational folder segments followed by one or more nested Memory name segments.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get a memory by folder path and memory name
+     */
+    getMemoryByPath(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+
+    /**
      * Creates request options for listChildMemories without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -204,6 +240,32 @@ export interface MemoriesApiInterface {
      * List root memories
      */
     listMemories(requestParameters: ListMemoriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
+
+    /**
+     * Creates request options for listMemoriesByFolder without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [folderPath] Organizational folder path. Empty or omitted addresses the tenant root.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    listMemoriesByFolderRequestOpts(requestParameters: ListMemoriesByFolderRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary List memories in a folder path
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [folderPath] Organizational folder path. Empty or omitted addresses the tenant root.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    listMemoriesByFolderRaw(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemorySummary>>>;
+
+    /**
+     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * List memories in a folder path
+     */
+    listMemoriesByFolder(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
 
     /**
      * Creates request options for setMemoryCover without sending the request
@@ -435,6 +497,64 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
+     * Creates request options for getMemoryByPath without sending the request
+     */
+    async getMemoryByPathRequestOpts(requestParameters: GetMemoryByPathRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getMemoryByPath().'
+            );
+        }
+
+        if (requestParameters['path'] == null) {
+            throw new runtime.RequiredError(
+                'path',
+                'Required parameter "path" was null or undefined when calling getMemoryByPath().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['path'] != null) {
+            queryParameters['path'] = requestParameters['path'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/by-path`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`. The path may contain organizational folder segments followed by one or more nested Memory name segments.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get a memory by folder path and memory name
+     */
+    async getMemoryByPathRaw(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+        const requestOptions = await this.getMemoryByPathRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemorySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`. The path may contain organizational folder segments followed by one or more nested Memory name segments.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get a memory by folder path and memory name
+     */
+    async getMemoryByPath(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+        const response = await this.getMemoryByPathRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for listChildMemories without sending the request
      */
     async listChildMemoriesRequestOpts(requestParameters: ListChildMemoriesRequest): Promise<runtime.RequestOpts> {
@@ -533,6 +653,57 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async listMemories(requestParameters: ListMemoriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>> {
         const response = await this.listMemoriesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listMemoriesByFolder without sending the request
+     */
+    async listMemoriesByFolderRequestOpts(requestParameters: ListMemoriesByFolderRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling listMemoriesByFolder().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['folderPath'] != null) {
+            queryParameters['folderPath'] = requestParameters['folderPath'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/by-folder`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * List memories in a folder path
+     */
+    async listMemoriesByFolderRaw(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemorySummary>>> {
+        const requestOptions = await this.listMemoriesByFolderRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemorySummaryFromJSON));
+    }
+
+    /**
+     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * List memories in a folder path
+     */
+    async listMemoriesByFolder(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>> {
+        const response = await this.listMemoriesByFolderRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -121,19 +121,19 @@ class MultiTenantResourceTest {
         val outsideCookie = login("outside-$runId@example.com", "member123456")
 
         given()
-            .`when`().get("/api/friends-$runId/media")
+            .`when`().get("/api/friends-$runId/memory-navigation")
             .then()
             .statusCode(401)
 
         given()
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
-            .`when`().get("/api/missing-$runId/media")
+            .`when`().get("/api/missing-$runId/memory-navigation")
             .then()
             .statusCode(404)
 
         given()
             .cookie("VEYQ_ACCESS_TOKEN", outsideCookie)
-            .`when`().get("/api/friends-$runId/media")
+            .`when`().get("/api/friends-$runId/memory-navigation")
             .then()
             .statusCode(403)
     }

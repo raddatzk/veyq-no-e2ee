@@ -60,7 +60,6 @@ val sharedPrimitiveTypeMappings = mapOf(
 
 val openApiSpecs = listOf(
     OpenApiSpec("common", "../docs/api/common.openapi.yaml", generateApi = false),
-    OpenApiSpec("explorer", "../docs/api/explorer.openapi.yaml"),
     OpenApiSpec("settings", "../docs/api/settings.openapi.yaml"),
     OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("setup", "../docs/api/setup.openapi.yaml"),
@@ -68,7 +67,6 @@ val openApiSpecs = listOf(
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml"),
     OpenApiSpec("groups", "../docs/api/groups.openapi.yaml"),
     OpenApiSpec("memories", "../docs/api/memories.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("library", "../docs/api/library.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("server", "../docs/api/server.openapi.yaml"),
     OpenApiSpec("frontend", "../docs/api/frontend.openapi.yaml"),
 )

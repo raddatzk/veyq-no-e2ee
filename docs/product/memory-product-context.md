@@ -2,7 +2,7 @@
 
 This document captures the product and architecture context discussed for Veyq so future work can turn it into ADRs, API contracts, UI designs and implementation tasks.
 
-It is intentionally broader than the current implementation. The codebase currently still uses folders, albums and media in parts of the library domain. The product direction described here moves toward nested `Memories`.
+It is intentionally broader than the current implementation. Memory UI v1 and Memory APIs are now the active baseline. Folders remain organizational; albums are no longer part of the active product, API or database schema.
 
 ## Product Positioning
 
@@ -275,9 +275,9 @@ Setup and accounts:
 Current routing and scopes:
 
 - Tenants are addressed by technical path names, for example `/friends` in the frontend and `/api/friends/groups` in the backend.
-- Current library scopes use paths such as `/urlaub` for tenant scope, `/@familie/urlaub` for group scope and `/~me/urlaub` for personal scope.
+- Current Memory navigation scopes use paths such as `/urlaub` for tenant scope, `/@familie/urlaub` for group scope and `/~me/urlaub` for personal scope.
 - All members of a visible scope may currently read and write there.
-- Media currently remain in albums and inherit the album scope.
+- Media belong directly to one Memory and inherit that Memory's scope.
 
 API-first workflow:
 
@@ -298,8 +298,7 @@ Current OpenAPI domains:
 - `groups`
 - `server`
 - `settings`
-- `explorer`
-- `library`
+- `memories`
 - `frontend`
 
 Authentication and security:
@@ -320,11 +319,11 @@ Current media access:
 - Media have an internal `Long` ID and a public 16-character `publicId`.
 - APIs expose the `publicId` as `id`.
 - Binary media content supports range requests.
-- Large uploads use upload sessions with chunks.
+- Memory uploads use multipart form uploads to a concrete Memory.
 
 Current test coverage:
 
-- Backend tests cover password hashing, cookies, token rotation, token cleanup, auth, setup, tenant handling, user management, settings, explorer, library, upload and media streaming.
+- Backend tests cover password hashing, cookies, token rotation, token cleanup, auth, setup, tenant handling, user management, settings, Memory navigation, Memory ownership, upload and media streaming.
 - Contract tests cover OpenAPI descriptions, examples, preconditions, implemented endpoints, resource interface binding and generated payload usage.
 - Frontend checks include `vue-tsc`, ESLint, Vitest and Vite build through `npm run check`.
 

@@ -23,8 +23,7 @@ export const SettingsSubjectType = {
     Tenant: 'TENANT',
     TenantUser: 'TENANT_USER',
     Group: 'GROUP',
-    Folder: 'FOLDER',
-    Album: 'ALBUM'
+    Folder: 'FOLDER'
 } as const;
 export type SettingsSubjectType = typeof SettingsSubjectType[keyof typeof SettingsSubjectType];
 

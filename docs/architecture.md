@@ -100,7 +100,7 @@ Gruppenrechte:
 
 ## API-first Vertrag
 
-- Jede Backend-API-Domäne hat eine eigene OpenAPI-Datei: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `explorer`, `library`, `memories`.
+- Jede Backend-API-Domäne hat eine eigene OpenAPI-Datei: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `memories`.
 - Operationen enthalten `summary`, `description`, Beispiele, Fehlerfälle, `x-preconditions`, `x-implementation-status` und bei Bedarf Rollen-/Membership-Hinweise.
 - Der Gradle-Build generiert JAX-RS-Interfaces und Kotlin-Models. Resource-Klassen implementieren die generierten Interfaces direkt.
 - Services konvertieren an Domain-Grenzen zwischen Domain-Entities/-Enums und generated API-Models.
@@ -108,28 +108,25 @@ Gruppenrechte:
 - Das Vue-Frontend generiert TypeScript-Fetch-Clients nach `frontend/src/api/generated/<domain>` und nutzt sie über `frontend/src/api/generatedClient.ts`.
 - Frontend-spezifische Facades bleiben als stabile Imports erhalten; sie kapseln generated Clients, Error-Mapping, Cookie-Refresh und Media-Sonderfälle.
 
-## Library- und Medienzugriff
+## Memory- und Medienzugriff
 
-Ordner, Alben und Medien haben einen eindeutigen Zugriffsscope:
+Ordner, Memories und Medien haben einen eindeutigen Zugriffsscope:
 
 - `TENANT`: alle Tenant-Mitglieder
 - `GROUP`: Mitglieder der jeweiligen Tenant-Gruppe
 - `USER`: nur der jeweilige User
 
-Child-Ordner und Alben erben den Scope ihres Parent-Ordners. Medien übernehmen den Scope des Albums, in dem sie hochgeladen werden. Tenant-Membership ist Voraussetzung für jede Tenant-API; innerhalb eines sichtbaren Scopes dürfen Mitglieder lesen und schreiben.
+Child-Ordner und root-level Memories in Ordnern erben den Scope ihres Parent-Ordners. Child-Memories erben den Scope ihres Parent-Memory. Medien übernehmen den Scope der Memory, in die sie hochgeladen werden. Tenant-Membership ist Voraussetzung für jede Tenant-API; innerhalb eines sichtbaren Scopes dürfen Mitglieder lesen und schreiben.
 
-Medien werden über `publicId` adressiert. Metadatenlisten können als NDJSON gestreamt werden; Binärcontent unterstützt Range-Requests. Große Uploads laufen über Upload-Sessions mit Chunks unter `/api/media/uploads`.
+Medien werden über `publicId` adressiert. Memory-Media-Listen laufen über `/api/{tenantName}/memories/{memoryId}/media`; Binärcontent und Previews laufen über `/api/{tenantName}/memory-media/{mediaId}/...` und unterstützen Range-Requests für Originalcontent.
 
 ## Memory-Schicht
 
-Die aktuelle App enthält parallel zwei fachliche Ebenen:
-
-- Die sichtbare Library ist weiterhin über Folder, Album und Media implementiert.
-- Die neue Memory-Schicht bildet das Zielmodell für neue Produktarbeit ab.
+Memory UI v1 und die Memory APIs sind die aktive fachliche Ebene. Tenant Home, persönliche Bereiche, Gruppenbereiche, Ordner und Memory-Details werden über Memory-Navigation, Folder- und Memory-Endpunkte abgebildet.
 
 Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder User-Scope. Child-Memories erben den Scope ihres Parent-Memory. Neue Memory-Media-Uploads schreiben die direkte `memory_id` an `veyq_media`; ein Asset gehört im Memory-Modell genau zu einem Memory. `includeChildren=true` bei Memory-Media-Listen aggregiert Medien aus sichtbaren Descendant-Memories, ohne die direkte Ownership zu verändern.
 
-Die Migration `V2__memory_model.sql` legt für bestehende Alben initial root-level Memories an und verknüpft bestehende Medien anhand ihrer ersten Album-Verknüpfung. Die Legacy-Albumtabellen bleiben erhalten, damit bestehende Explorer- und Album-APIs weiter funktionieren, bis eine spätere ADR die Produktmigration weg von Albums festlegt.
+Die Migration `V2__memory_model.sql` legt die Memory-Tabelle und die direkte `memory_id`-Zuordnung auf Medien an. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
 
 ## Testing
 
@@ -145,7 +142,7 @@ Abgedeckt sind:
 - Server-Owner Tenant-Erstellung
 - Tenant-Membership-Filter
 - Gruppen-Scoping und Gruppen-Owner
-- Scope-basierte Library-/Media-Sichtbarkeit und `publicId`
+- Scope-basierte Memory-/Media-Sichtbarkeit und `publicId`
 - Memory-Tree-Invarianten, Scope-Sichtbarkeit, Memory-Media-Ownership und Cover-Regeln
 - OpenAPI-Contract-Tests für API-first Bindung
 - Frontend-Codegen-Facades, NDJSON-Parsing, Upload-Composables und UI-Komponenten über Vitest

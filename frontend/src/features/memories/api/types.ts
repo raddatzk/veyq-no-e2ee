@@ -1,10 +1,16 @@
 import type {
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
+  CreateFolderRequest as GeneratedCreateFolderRequest,
+  MemoryFolder,
+  MemoryNavigationResponse,
   MemoryMediaSummary,
   MemoryScope,
   MemoryScopeRequest,
   MemorySummary,
+  MemoryScopeRoot,
+  MoveFolderRequest as GeneratedMoveFolderRequest,
   SetMemoryCoverRequest as GeneratedSetMemoryCoverRequest,
+  UpdateFolderRequest as GeneratedUpdateFolderRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
@@ -12,6 +18,9 @@ import type {
 export type {
   MemoryScope,
   MemoryScopeRequest,
+  MemoryFolder,
+  MemoryNavigationResponse,
+  MemoryScopeRoot,
 }
 
 export type Memory = Omit<MemorySummary, 'parentId' | 'coverMediaId' | 'scope'> & {
@@ -43,8 +52,9 @@ export type MemoryMedia = Omit<
   gpsLongitude: number | null
 }
 
-export type CreateMemoryRequest = Omit<GeneratedCreateMemoryRequest, 'parentId' | 'scope'> & {
+export type CreateMemoryRequest = Omit<GeneratedCreateMemoryRequest, 'parentId' | 'folderPath' | 'scope'> & {
   parentId?: string | null
+  folderPath?: string | null
   scope?: MemoryScopeRequest | null
 }
 
@@ -71,3 +81,11 @@ export type UploadMemoryMediaRequest = {
   title?: string | null
 }
 
+export type CreateFolderRequest = Omit<GeneratedCreateFolderRequest, 'parentPath' | 'scope'> & {
+  parentPath?: string | null
+  scope?: MemoryScopeRequest | null
+}
+
+export type UpdateFolderRequest = GeneratedUpdateFolderRequest
+
+export type MoveFolderRequest = GeneratedMoveFolderRequest

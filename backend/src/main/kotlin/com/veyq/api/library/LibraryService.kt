@@ -4,27 +4,22 @@ import com.veyq.api.auth.BadRequestException
 import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.domain.Media
+import com.veyq.api.domain.Memory
 import com.veyq.api.domain.Tenant
-import com.veyq.api.domain.TenantAlbum
-import com.veyq.api.domain.TenantAlbumRepo
 import com.veyq.api.domain.TenantFolder
 import com.veyq.api.domain.TenantFolderRepo
 import com.veyq.api.domain.TenantGroup
 import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.User
-import com.veyq.api.generated.model.ExplorerAlbum
-import com.veyq.api.generated.model.ExplorerBreadcrumb
-import com.veyq.api.generated.model.ExplorerFolder
-import com.veyq.api.generated.model.LocationKind
-import com.veyq.api.generated.model.OwnerBadge
-import com.veyq.api.generated.model.CreateLibraryItemRequest
-import com.veyq.api.generated.model.LibraryScopeRequest
-import com.veyq.api.library.explorer.ResolvedExplorerLocation
+import com.veyq.api.generated.model.MemoryFolder
+import com.veyq.api.generated.model.MemoryNavigationBreadcrumb
+import com.veyq.api.generated.model.MemoryNavigationKind
+import com.veyq.api.generated.model.MemoryScopeRequest
 
 abstract class LibraryService(
     private val folderRepo: TenantFolderRepo,
-    private val albumRepo: TenantAlbumRepo,
     private val groupRepo: TenantGroupRepo,
     private val groupMemberRepo: TenantGroupMemberRepo,
     protected val requestContext: RequestContext,
@@ -35,48 +30,37 @@ abstract class LibraryService(
     fun tenant(): Tenant = requestContext.tenant!!
     fun user(): User = requestContext.user!!
 
-    fun breadcrumbs(folder: TenantFolder): List<ExplorerBreadcrumb> {
+    fun breadcrumbs(folder: TenantFolder): List<MemoryNavigationBreadcrumb> {
         val folders = generateSequence(folder) { it.parentFolder }.toList().asReversed()
         return scopeBreadcrumbs(folder.scope()) +
-            folders.map { ExplorerBreadcrumb(LocationKind.FOLDER, it.path(), it.displayName, it.displayName) }
+            folders.map { MemoryNavigationBreadcrumb(MemoryNavigationKind.FOLDER, it.path(), it.displayName, it.displayName) }
     }
-
-    fun breadcrumbs(album: TenantAlbum): List<ExplorerBreadcrumb> =
-        (album.parentFolder?.let { breadcrumbs(it) } ?: scopeBreadcrumbs(album.scope())) +
-        ExplorerBreadcrumb(LocationKind.ALBUM, album.path(), album.displayName, album.displayName)
 
     fun TenantFolder.path(): String =
         (parentFolder?.path()?.trimEnd('/') ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
 
-    fun TenantAlbum.path(): String =
-        (parentFolder?.path()?.trimEnd('/') ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
+    fun TenantFolder.toSummary(): MemoryFolder =
+        MemoryFolder(publicId, name, displayName, path())
 
-    fun TenantFolder.toSummary(ownerBadge: OwnerBadge? = null): ExplorerFolder =
-        ExplorerFolder(publicId, name, displayName, path(), ownerBadge)
-
-    fun TenantAlbum.toSummary(ownerBadge: OwnerBadge? = null): ExplorerAlbum =
-        ExplorerAlbum(publicId, name, displayName, path(), coverMedia?.publicId ?: "", ownerBadge)
-
-    fun resolveVisibleContext(path: String?): ResolvedExplorerLocation {
+    fun resolveVisibleContext(path: String?): ResolvedMemoryLocation {
         val context = resolveContext(path)
         when (context) {
-            is ResolvedExplorerLocation.Tenant -> Unit
-            is ResolvedExplorerLocation.Group -> requireScopeVisible(context.scope)
-            is ResolvedExplorerLocation.User -> requireScopeVisible(context.scope)
-            is ResolvedExplorerLocation.Folder -> requireVisible(context.scope)
-            is ResolvedExplorerLocation.Album -> requireVisible(context.scope)
+            ResolvedMemoryLocation.Tenant -> Unit
+            is ResolvedMemoryLocation.Group -> requireScopeVisible(context.scope)
+            is ResolvedMemoryLocation.User -> requireScopeVisible(context.scope)
+            is ResolvedMemoryLocation.Folder -> requireVisible(context.folder)
         }
         return context
     }
 
-    fun resolveContext(path: String?): ResolvedExplorerLocation {
+    fun resolveContext(path: String?): ResolvedMemoryLocation {
         val parsed = parseScopedPath(path)
-        val parsedScope = parsed.scope ?: return ResolvedExplorerLocation.Tenant
+        val parsedScope = parsed.scope ?: return ResolvedMemoryLocation.Tenant
         if (parsed.segments.isEmpty()) {
             return when (parsedScope) {
-                is LibraryScopeKey.Tenant -> ResolvedExplorerLocation.Tenant
-                is LibraryScopeKey.Group -> ResolvedExplorerLocation.Group(parsedScope)
-                is LibraryScopeKey.User -> ResolvedExplorerLocation.User(parsedScope)
+                is LibraryScopeKey.Tenant -> ResolvedMemoryLocation.Tenant
+                is LibraryScopeKey.Group -> ResolvedMemoryLocation.Group(parsedScope)
+                is LibraryScopeKey.User -> ResolvedMemoryLocation.User(parsedScope)
             }
         }
 
@@ -84,12 +68,8 @@ abstract class LibraryService(
         parsed.segments.forEachIndexed { index, segment ->
             val folder = folderRepo.listChildren(tenant(), parent)
                 .firstOrNull { it.name == segment && it.hasScope(parsedScope) }
-            val album = albumRepo.listChildren(tenant(), parent)
-                .firstOrNull { it.name == segment && it.hasScope(parsedScope) }
-            if (folder != null && album != null) throw ConflictException("Ambiguous path")
             if (index == parsed.segments.lastIndex) {
-                if (folder != null) return ResolvedExplorerLocation.Folder(folder)
-                if (album != null) return ResolvedExplorerLocation.Album(album)
+                if (folder != null) return ResolvedMemoryLocation.Folder(folder)
             } else {
                 parent = folder ?: throw NotFoundException("Path not found")
             }
@@ -99,51 +79,39 @@ abstract class LibraryService(
 
     fun isFolderVisible(folder: TenantFolder): Boolean = isScopeVisible(folder.scope())
 
-    fun isAlbumVisible(album: TenantAlbum): Boolean = isScopeVisible(album.scope())
-
-    fun resolveParent(path: String?): TenantFolder? {
-        return when (val context = resolveVisibleContext(path)) {
-            ResolvedExplorerLocation.Tenant -> null
-            is ResolvedExplorerLocation.Group -> null
-            is ResolvedExplorerLocation.User -> null
-            is ResolvedExplorerLocation.Folder -> context.scope
-            is ResolvedExplorerLocation.Album -> throw BadRequestException("Album cannot be parent")
+    fun resolveParent(path: String?): TenantFolder? =
+        when (val context = resolveVisibleContext(path)) {
+            ResolvedMemoryLocation.Tenant -> null
+            is ResolvedMemoryLocation.Group -> null
+            is ResolvedMemoryLocation.User -> null
+            is ResolvedMemoryLocation.Folder -> context.folder
         }
-    }
 
-    fun resolveCreateScope(parent: TenantFolder?, request: CreateLibraryItemRequest): LibraryScopeKey =
-        parent?.scope() ?: resolveRequestedRootScope(request.scope)
+    fun resolveCreateScope(parent: TenantFolder?, request: MemoryScopeRequest?): LibraryScopeKey =
+        parent?.scope() ?: resolveRequestedRootScope(request)
 
-    fun validateNoCollision(parent: TenantFolder?, scope: LibraryScopeKey, name: String) {
+    fun validateNoFolderCollision(parent: TenantFolder?, scope: LibraryScopeKey, name: String) {
         val folderCollision = folderRepo.listChildren(tenant(), parent).any { it.name == name && it.hasScope(scope) }
-        val albumCollision = albumRepo.listChildren(tenant(), parent).any { it.name == name && it.hasScope(scope) }
-        if (folderCollision || albumCollision) throw ConflictException("Path name already exists")
+        if (folderCollision) throw ConflictException("Path name already exists")
     }
 
     fun requireSameScope(itemScope: LibraryScopeKey, parent: TenantFolder?) {
         if (parent != null && !parent.hasScope(itemScope)) {
-            throw BadRequestException("Cannot move library item between scopes")
+            throw BadRequestException("Cannot move item between scopes")
         }
     }
 
     fun requireMoveTargetScope(itemScope: LibraryScopeKey, newParentPath: String?) {
         val context = resolveVisibleContext(newParentPath)
         val targetScope = when (context) {
-            is ResolvedExplorerLocation.Group -> context.scope
-            is ResolvedExplorerLocation.User -> context.scope
+            is ResolvedMemoryLocation.Group -> context.scope
+            is ResolvedMemoryLocation.User -> context.scope
             else -> null
         }
         if (targetScope != null && !targetScope.sameAs(itemScope)) {
-            throw BadRequestException("Cannot move library item between scopes")
+            throw BadRequestException("Cannot move item between scopes")
         }
     }
-
-    fun ownerBadge(scope: LibraryScopeKey): OwnerBadge =
-        when (scope) {
-            LibraryScopeKey.Tenant -> OwnerBadge(OwnerBadge.Kind.TENANT, tenant().displayName)
-            is LibraryScopeKey.Group -> OwnerBadge(OwnerBadge.Kind.GROUP, scope.group.displayName, scope.group.name)
-            is LibraryScopeKey.User -> OwnerBadge(OwnerBadge.Kind.USER, scope.user.displayName, "me")
-        }
 
     fun normalizedName(value: String?): String {
         val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required")
@@ -155,50 +123,40 @@ abstract class LibraryService(
         if (!isFolderVisible(folder)) throw NotFoundException("Folder not found")
     }
 
-    fun requireVisible(album: TenantAlbum) {
-        if (!isAlbumVisible(album)) throw NotFoundException("Album not found")
-    }
-
     fun applyScope(folder: TenantFolder, scope: LibraryScopeKey) {
         LibraryScopes.apply(folder, scope)
     }
 
-    fun applyScope(album: TenantAlbum, scope: LibraryScopeKey) {
-        LibraryScopes.apply(album, scope)
-    }
-
-    fun applyScope(media: com.veyq.api.domain.Media, scope: LibraryScopeKey) {
+    fun applyScope(media: Media, scope: LibraryScopeKey) {
         LibraryScopes.apply(media, scope)
     }
 
     fun TenantFolder.scope(): LibraryScopeKey =
         LibraryScopes.scope(this)
 
-    fun TenantAlbum.scope(): LibraryScopeKey =
+    fun Media.scope(): LibraryScopeKey =
         LibraryScopes.scope(this)
 
-    fun com.veyq.api.domain.Media.scope(): LibraryScopeKey =
+    fun Memory.scope(): LibraryScopeKey =
         LibraryScopes.scope(this)
 
     fun TenantFolder.hasScope(scope: LibraryScopeKey): Boolean = scope().sameAs(scope)
 
-    fun TenantAlbum.hasScope(scope: LibraryScopeKey): Boolean = scope().sameAs(scope)
-
     fun LibraryScopeKey.sameAs(other: LibraryScopeKey): Boolean =
         LibraryScopes.sameAs(this, other)
 
-    private fun requireScopeVisible(scope: LibraryScopeKey) {
-        if (!isScopeVisible(scope)) throw NotFoundException("Path not found")
-    }
-
-    private fun isScopeVisible(scope: LibraryScopeKey): Boolean =
+    fun isScopeVisible(scope: LibraryScopeKey): Boolean =
         when (scope) {
             LibraryScopeKey.Tenant -> true
             is LibraryScopeKey.Group -> isUserInGroup(scope.group)
             is LibraryScopeKey.User -> scope.user.id == user().id
         }
 
-    private fun resolveRequestedRootScope(scope: LibraryScopeRequest?): LibraryScopeKey =
+    private fun requireScopeVisible(scope: LibraryScopeKey) {
+        if (!isScopeVisible(scope)) throw NotFoundException("Path not found")
+    }
+
+    private fun resolveRequestedRootScope(scope: MemoryScopeRequest?): LibraryScopeKey =
         when (scope?.type?.trim()?.uppercase() ?: "TENANT") {
             "TENANT" -> LibraryScopeKey.Tenant
             "GROUP" -> {
@@ -231,21 +189,21 @@ abstract class LibraryService(
     private fun isUserInGroup(group: TenantGroup): Boolean =
         group.tenant.id == tenant().id && groupMemberRepo.findByGroupAndUser(group, user()) != null
 
-    private fun scopeBreadcrumbs(scope: LibraryScopeKey): List<ExplorerBreadcrumb> =
-        listOf(ExplorerBreadcrumb(LocationKind.TENANT, "/", tenant().displayName, tenant().displayName)) +
+    private fun scopeBreadcrumbs(scope: LibraryScopeKey): List<MemoryNavigationBreadcrumb> =
+        listOf(MemoryNavigationBreadcrumb(MemoryNavigationKind.TENANT, "/", tenant().displayName, tenant().displayName)) +
             when (scope) {
                 LibraryScopeKey.Tenant -> emptyList()
                 is LibraryScopeKey.Group -> listOf(
-                    ExplorerBreadcrumb(
-                        LocationKind.GROUP,
+                    MemoryNavigationBreadcrumb(
+                        MemoryNavigationKind.GROUP,
                         LibraryScopes.pathPrefix(scope),
                         scope.group.displayName,
                         "@${scope.group.displayName}",
                     )
                 )
                 is LibraryScopeKey.User -> listOf(
-                    ExplorerBreadcrumb(
-                        LocationKind.USER,
+                    MemoryNavigationBreadcrumb(
+                        MemoryNavigationKind.USER,
                         LibraryScopes.pathPrefix(scope),
                         scope.user.displayName,
                         "~${scope.user.displayName}",
@@ -260,4 +218,11 @@ abstract class LibraryService(
         val scope: LibraryScopeKey?,
         val segments: List<String>,
     )
+}
+
+sealed class ResolvedMemoryLocation {
+    data object Tenant : ResolvedMemoryLocation()
+    data class Group(val scope: LibraryScopeKey.Group) : ResolvedMemoryLocation()
+    data class User(val scope: LibraryScopeKey.User) : ResolvedMemoryLocation()
+    data class Folder(val folder: TenantFolder) : ResolvedMemoryLocation()
 }

@@ -95,7 +95,7 @@ function applySettings(nextSettings: UserSettingsResponse) {
     <p>Profil und Anmeldung</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div v-if="loading" class="explorer-loading">
+    <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>User-Einstellungen werden geladen...</span>
     </div>

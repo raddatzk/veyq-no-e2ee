@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The legacy implementation links media to albums through `AlbumMedia`, including per-album position and hidden flags. The target product model says an asset belongs to exactly one Memory.
+The legacy implementation linked media to albums through an album-media join model, including per-album position and hidden flags. The active Memory model says an asset belongs to exactly one Memory.
 
 ## Decision
 
@@ -16,4 +16,4 @@ Manual sorting is not part of V1. Asset ordering is based on corrected `captured
 
 ## Consequences
 
-New upload APIs require a target Memory. New media list APIs are Memory-scoped. The legacy `AlbumMedia` join table remains only for migration and compatibility while old library APIs exist.
+Upload APIs require a target Memory. Media list APIs are Memory-scoped. The legacy album-media join table has been removed with the Album product model.

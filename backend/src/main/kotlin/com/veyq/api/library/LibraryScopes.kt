@@ -3,7 +3,6 @@ package com.veyq.api.library
 import com.veyq.api.domain.LibraryScopeType
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.Memory
-import com.veyq.api.domain.TenantAlbum
 import com.veyq.api.domain.TenantFolder
 import com.veyq.api.domain.TenantGroup
 import com.veyq.api.domain.User
@@ -18,9 +17,6 @@ object LibraryScopes {
     fun scope(folder: TenantFolder): LibraryScopeKey =
         fromFields(folder.scopeType, folder.scopeGroup, folder.scopeUser)
 
-    fun scope(album: TenantAlbum): LibraryScopeKey =
-        fromFields(album.scopeType, album.scopeGroup, album.scopeUser)
-
     fun scope(media: Media): LibraryScopeKey =
         fromFields(media.scopeType, media.scopeGroup, media.scopeUser)
 
@@ -31,12 +27,6 @@ object LibraryScopes {
         folder.scopeType = scope.type()
         folder.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
         folder.scopeUser = (scope as? LibraryScopeKey.User)?.user
-    }
-
-    fun apply(album: TenantAlbum, scope: LibraryScopeKey) {
-        album.scopeType = scope.type()
-        album.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
-        album.scopeUser = (scope as? LibraryScopeKey.User)?.user
     }
 
     fun apply(media: Media, scope: LibraryScopeKey) {

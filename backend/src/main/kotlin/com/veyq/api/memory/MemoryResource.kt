@@ -15,11 +15,17 @@ class MemoryResource @Inject constructor(
     override fun listMemories(tenantName: String): Response =
         Response.ok(memoryService.listRootMemories()).build()
 
+    override fun listMemoriesByFolder(tenantName: String, folderPath: String?): Response =
+        Response.ok(memoryService.listMemoriesByFolderPath(folderPath)).build()
+
     override fun createMemory(tenantName: String, request: CreateMemoryRequest): Response =
         Response.ok(memoryService.createMemory(request)).build()
 
     override fun getMemory(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.getMemory(memoryId)).build()
+
+    override fun getMemoryByPath(tenantName: String, path: String): Response =
+        Response.ok(memoryService.getMemoryByPath(path)).build()
 
     override fun updateMemory(tenantName: String, memoryId: String, request: UpdateMemoryRequest): Response =
         Response.ok(memoryService.updateMemory(memoryId, request)).build()

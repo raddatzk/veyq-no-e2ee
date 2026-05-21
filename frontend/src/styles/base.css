@@ -1,7 +1,18 @@
 :root {
-  --app-bg: #f6f7fb;
+  --app-bg: #f7f8fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f4f6fb;
   --app-text: #111827;
-  --app-line: #d9dee8;
+  --app-muted: #667085;
+  --app-line: #dce2ec;
+  --app-accent: #5b4df5;
+  --app-accent-soft: #f0eeff;
+  --app-radius: 12px;
+  --app-radius-sm: 10px;
+  --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --app-shadow-md: 0 14px 40px rgb(15 23 42 / 0.08);
+  --app-sidebar-width: 304px;
+  --app-topbar-height: 72px;
 }
 
 * {
@@ -14,6 +25,7 @@ body {
   font-family: Inter, 'Avenir Next', 'Segoe UI', sans-serif;
   background: var(--app-bg);
   color: var(--app-text);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {

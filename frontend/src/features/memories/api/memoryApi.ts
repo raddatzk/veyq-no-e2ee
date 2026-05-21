@@ -1,19 +1,48 @@
-import { generatedCall, memoriesApi, memoryMediaApi } from '../../../api/generatedClient'
+import {
+  foldersApi,
+  generatedCall,
+  memoriesApi,
+  memoryMediaApi,
+  memoryNavigationApi
+} from '../../../api/generatedClient'
 import type {
+  CreateFolderRequest as GeneratedCreateFolderRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   SetMemoryCoverRequest as GeneratedSetMemoryCoverRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
 import type {
+  CreateFolderRequest,
   CreateMemoryRequest,
   Memory,
+  MemoryFolder,
   MemoryMedia,
+  MemoryNavigationResponse,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
   UploadMemoryMediaRequest
 } from './types'
+
+export function getMemoryNavigation(
+  tenantName: string,
+  path: string
+): Promise<MemoryNavigationResponse> {
+  return generatedCall(memoryNavigationApi.getMemoryNavigation({ tenantName, path }))
+}
+
+export function createFolder(
+  tenantName: string,
+  request: CreateFolderRequest
+): Promise<MemoryFolder> {
+  return generatedCall(
+    foldersApi.createFolder({
+      tenantName,
+      createFolderRequest: createFolderRequest(request)
+    })
+  )
+}
 
 export function listMemories(tenantName: string): Promise<Memory[]> {
   return generatedCall(memoriesApi.listMemories({ tenantName })).then((memories) =>
@@ -21,8 +50,18 @@ export function listMemories(tenantName: string): Promise<Memory[]> {
   )
 }
 
+export function listMemoriesByFolder(tenantName: string, folderPath: string): Promise<Memory[]> {
+  return generatedCall(memoriesApi.listMemoriesByFolder({ tenantName, folderPath })).then((memories) =>
+    memories.map(normalizeMemory)
+  )
+}
+
 export function getMemory(tenantName: string, memoryId: string): Promise<Memory> {
   return generatedCall(memoriesApi.getMemory({ tenantName, memoryId })).then(normalizeMemory)
+}
+
+export function getMemoryByPath(tenantName: string, path: string): Promise<Memory> {
+  return generatedCall(memoriesApi.getMemoryByPath({ tenantName, path })).then(normalizeMemory)
 }
 
 export function createMemory(tenantName: string, request: CreateMemoryRequest): Promise<Memory> {
@@ -118,6 +157,16 @@ function createMemoryRequest(request: CreateMemoryRequest): GeneratedCreateMemor
     name: request.name,
     displayName: request.displayName,
     parentId: request.parentId ?? undefined,
+    folderPath: request.folderPath ?? undefined,
+    scope: request.scope ?? undefined
+  }
+}
+
+function createFolderRequest(request: CreateFolderRequest): GeneratedCreateFolderRequest {
+  return {
+    name: request.name,
+    displayName: request.displayName,
+    parentPath: request.parentPath ?? undefined,
     scope: request.scope ?? undefined
   }
 }
@@ -178,4 +227,3 @@ function normalizeMemoryMedia(media: {
     gpsLongitude: media.gpsLongitude ?? null
   }
 }
-

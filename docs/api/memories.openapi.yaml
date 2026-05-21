@@ -3,15 +3,165 @@ openapi: 3.1.0
 info:
   title: Veyq Memories API
   version: 0.1.0
-  description: Memory-first API for the Veyq product model. This API coexists with the legacy folder and album library while the product migrates toward nested Memories.
+  description: Memory-first API for the Veyq product model. Memories are the only rich content objects; folders remain organizational containers.
 servers:
   - url: /
 security:
   - accessTokenCookie: []
 tags:
+  - name: MemoryNavigation
+  - name: Folders
   - name: Memories
   - name: MemoryMedia
 paths:
+  "/api/{tenantName}/memory-navigation":
+    get:
+      tags:
+        - MemoryNavigation
+      operationId: getMemoryNavigation
+      summary: Load memory navigation for a tenant path
+      x-implementation-status: implemented
+      x-preconditions: &memoryPreconditions
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Returns the current memory navigation location, its breadcrumb chain, visible scope roots and child folders.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/NavigationPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryNavigation"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/folders":
+    post:
+      tags:
+        - Folders
+      operationId: createFolder
+      summary: Create an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Creates an organizational folder for grouping Memories. Folders are not rich content objects.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags:
+        - Folders
+      operationId: deleteFolder
+      summary: Delete an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Deletes a visible organizational folder.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/FolderPathParam"
+      responses:
+        '204':
+          description: Folder deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/folders/update":
+    post:
+      tags:
+        - Folders
+      operationId: updateFolder
+      summary: Update an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Updates the name or display name of a visible organizational folder.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/folders/move":
+    post:
+      tags:
+        - Folders
+      operationId: moveFolder
+      summary: Move an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Moves a visible organizational folder inside the same scope.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories":
     get:
       tags:
@@ -19,7 +169,7 @@ paths:
       operationId: listMemories
       summary: List root memories
       x-implementation-status: implemented
-      x-preconditions: &memoryPreconditions
+      x-preconditions:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: &memoryDescription |-
@@ -73,6 +223,67 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/404"
         '409':
           "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/memories/by-folder":
+    get:
+      tags:
+        - Memories
+      operationId: listMemoriesByFolder
+      summary: List memories in a folder path
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/FolderPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemorySummaries"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/by-path":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryByPath
+      summary: Get a memory by folder path and memory name
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`.
+        The path may contain organizational folder segments followed by one or more nested Memory name segments.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}":
     get:
       tags:
@@ -336,6 +547,84 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/content":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaContent
+      summary: Download memory media content
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the original file for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+        - in: header
+          name: Range
+          required: false
+          schema:
+            type: string
+          description: Optional HTTP byte range.
+      responses:
+        '200':
+          description: Media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<binary media content>"
+        '206':
+          description: Partial media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<partial binary media content>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/preview":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaPreview
+      summary: Download memory media preview
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated JPEG preview for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media preview.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg preview>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
 components:
   parameters:
     MemoryId:
@@ -354,6 +643,40 @@ components:
         type: string
       description: Public media id.
       example: med_abc123
+    FolderPath:
+      in: query
+      required: false
+      name: folderPath
+      schema:
+        type: string
+        default: "/"
+      description: Organizational folder path. Empty or omitted addresses the tenant root.
+      example: /summer
+    NavigationPath:
+      in: query
+      required: false
+      name: path
+      schema:
+        type: string
+        default: "/"
+      description: Organizational navigation path. Empty or omitted loads the tenant root.
+      example: /@family/summer
+    FolderPathParam:
+      in: query
+      required: true
+      name: path
+      schema:
+        type: string
+      description: Canonical folder path.
+      example: /@family/summer
+    MemoryPath:
+      in: query
+      required: true
+      name: path
+      schema:
+        type: string
+      description: Canonical Memory UI path with folder segments followed by one or more Memory name segments.
+      example: /summer/beach-day
   requestBodies:
     CreateMemory:
       required: true
@@ -362,6 +685,7 @@ components:
           schema:
             "$ref": "#/components/schemas/CreateMemoryRequest"
           example:
+            folderPath: /summer
             name: summer-trip
             displayName: Summer Trip
     UpdateMemory:
@@ -406,7 +730,68 @@ components:
             "$ref": "#/components/schemas/UpdateMemoryMediaMetadataRequest"
           example:
             capturedAt: '2026-05-03T12:30:00Z'
+    CreateFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateFolderRequest"
+          example:
+            parentPath: /@family
+            name: summer
+            displayName: Summer
+    UpdateFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateFolderRequest"
+          example:
+            path: /@family/summer
+            displayName: Summer 2026
+    MoveFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveFolderRequest"
+          example:
+            path: /@family/summer
+            newParentPath: /@family/archive
   responses:
+    MemoryNavigation:
+      description: Memory navigation state.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryNavigationResponse"
+          example:
+            location:
+              kind: TENANT
+              path: /
+              displayName: Friends
+            breadcrumbs:
+              - kind: TENANT
+                path: /
+                displayName: Friends
+                label: Friends
+            scopeRoots:
+              - kind: USER
+                name: me
+                displayName: Kevin
+                path: /~me
+            folders: []
+    Folder:
+      description: Organizational folder.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryFolder"
+          example:
+            id: fol_abc123
+            name: summer
+            displayName: Summer
+            path: /@family/summer
     Memory:
       description: Memory.
       content:
@@ -451,8 +836,8 @@ components:
             capturedAtOverride: false
             mimeType: image/jpeg
             sizeBytes: 2048000
-            contentUrl: /api/friends/media/med_abc123/content
-            previewUrl: /api/friends/media/med_abc123/preview
+            contentUrl: /api/friends/memory-media/med_abc123/content
+            previewUrl: /api/friends/memory-media/med_abc123/preview
     MemoryMediaSummaries:
       description: Memory media summaries.
       content:
@@ -464,6 +849,150 @@ components:
           example:
             - *memoryMediaExample
   schemas:
+    MemoryNavigationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - location
+        - breadcrumbs
+        - scopeRoots
+        - folders
+      properties:
+        location:
+          "$ref": "#/components/schemas/MemoryNavigationLocation"
+        breadcrumbs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryNavigationBreadcrumb"
+        scopeRoots:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryScopeRoot"
+        folders:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryFolder"
+    MemoryNavigationLocation:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+      properties:
+        kind:
+          "$ref": "#/components/schemas/MemoryNavigationKind"
+        path:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+    MemoryNavigationBreadcrumb:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+        - label
+      properties:
+        kind:
+          "$ref": "#/components/schemas/MemoryNavigationKind"
+        path:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        label:
+          type: string
+    MemoryNavigationKind:
+      type: string
+      enum:
+        - TENANT
+        - GROUP
+        - USER
+        - FOLDER
+    MemoryScopeRoot:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - name
+        - displayName
+        - path
+      properties:
+        kind:
+          type: string
+          enum:
+            - GROUP
+            - USER
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+    MemoryFolder:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - displayName
+        - path
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+    CreateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - displayName
+      properties:
+        parentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        scope:
+          "$ref": "#/components/schemas/MemoryScopeRequest"
+          nullable: true
+    UpdateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+      properties:
+        path:
+          type: string
+        name:
+          type: string
+          nullable: true
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+          nullable: true
+    MoveFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - newParentPath
+      properties:
+        path:
+          type: string
+        newParentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
     MemorySummary:
       type: object
       additionalProperties: false
@@ -528,6 +1057,10 @@ components:
           type: string
           nullable: true
           description: Parent Memory id. When present, the created Memory inherits the parent scope.
+        folderPath:
+          type: string
+          nullable: true
+          description: Organizational folder path for new top-level Memories. Ignored when `parentId` is present.
         name:
           type: string
           description: URL-safe sibling name.

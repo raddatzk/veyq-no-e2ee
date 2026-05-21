@@ -25,10 +25,12 @@ import com.veyq.api.domain.TenantRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
+import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.SetMemoryCoverRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
+import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
@@ -56,6 +58,7 @@ class MemoryServiceTest {
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var memoryService: MemoryService
     @Inject lateinit var mediaService: MediaService
+    @Inject lateinit var folderService: FolderService
 
     private lateinit var runId: String
     private lateinit var tenant: Tenant
@@ -73,7 +76,7 @@ class MemoryServiceTest {
     @Test
     fun `creates root and child memories and lists descendant media by taken time`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("trip", "Trip"))
-        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", trip.id))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
         val tripEntity = memory(trip.id)
         val dayEntity = memory(day.id)
         val rootMedia = createMedia(owner, tripEntity, "Root Photo", capturedAt = Instant.parse("2026-01-02T10:00:00Z"))
@@ -85,6 +88,41 @@ class MemoryServiceTest {
             .containsExactly(rootMedia.publicId)
         assertThat(mediaService.listMemoryMedia(trip.id, includeChildren = true)).extracting("id")
             .containsExactly(childMedia.publicId, rootMedia.publicId)
+    }
+
+    @Test
+    fun `creates and resolves memories by folder path`() {
+        folderService.createFolder(CreateFolderRequest("travel", "Travel"))
+        folderService.createFolder(CreateFolderRequest("italy", "Italy", parentPath = "/travel"))
+
+        val trip = memoryService.createMemory(CreateMemoryRequest("dolomites", "Dolomites", folderPath = "/travel/italy"))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
+
+        assertThat(memoryService.listRootMemories()).extracting("id").doesNotContain(trip.id)
+        assertThat(memoryService.listMemoriesByFolderPath("/travel/italy")).extracting("path")
+            .containsExactly("/travel/italy/dolomites")
+        assertThat(memoryService.getMemoryByPath("/travel/italy/dolomites").id).isEqualTo(trip.id)
+        assertThat(memoryService.getMemoryByPath("/travel/italy/dolomites/day-one").id).isEqualTo(day.id)
+    }
+
+    @Test
+    fun `folder paths preserve group and personal root scopes`() {
+        val group = createGroup("folder-group-$runId", owner)
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest("shared-trip", "Shared Trip", folderPath = "/@${group.name}")
+        )
+        val personalMemory = memoryService.createMemory(
+            CreateMemoryRequest("private-trip", "Private Trip", folderPath = "/~me")
+        )
+
+        assertThat(groupMemory.path).isEqualTo("/@${group.name}/shared-trip")
+        assertThat(personalMemory.path).isEqualTo("/~me/private-trip")
+        assertThat(memoryService.listMemoriesByFolderPath("/")).extracting("id")
+            .doesNotContain(groupMemory.id, personalMemory.id)
+        assertThat(memoryService.listMemoriesByFolderPath("/@${group.name}")).extracting("id")
+            .containsExactly(groupMemory.id)
+        assertThat(memoryService.listMemoriesByFolderPath("/~me")).extracting("id")
+            .containsExactly(personalMemory.id)
     }
 
     @Test
@@ -110,7 +148,7 @@ class MemoryServiceTest {
             CreateMemoryRequest("shared-trip", "Shared Trip", scope = MemoryScopeRequest("GROUP", group.name))
         )
         val child = memoryService.createMemory(
-            CreateMemoryRequest("shared-day", "Shared Day", shared.id, MemoryScopeRequest("TENANT"))
+            CreateMemoryRequest("shared-day", "Shared Day", parentId = shared.id, scope = MemoryScopeRequest("TENANT"))
         )
 
         assertThat(child.path).isEqualTo("/@${group.name}/shared-trip/shared-day")
@@ -129,15 +167,15 @@ class MemoryServiceTest {
     @Test
     fun `prevents sibling collisions cycles and cross-scope moves`() {
         val parent = memoryService.createMemory(CreateMemoryRequest("parent", "Parent"))
-        val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parent.id))
-        memoryService.createMemory(CreateMemoryRequest("sibling", "Sibling", parent.id))
+        val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parentId = parent.id))
+        memoryService.createMemory(CreateMemoryRequest("sibling", "Sibling", parentId = parent.id))
         val group = createGroup("move-group-$runId", owner)
         val groupMemory = memoryService.createMemory(
             CreateMemoryRequest("group-root", "Group Root", scope = MemoryScopeRequest("GROUP", group.name))
         )
 
         assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
-            memoryService.createMemory(CreateMemoryRequest("child", "Duplicate", parent.id))
+            memoryService.createMemory(CreateMemoryRequest("child", "Duplicate", parentId = parent.id))
         }
         assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
             memoryService.updateMemory(parent.id, UpdateMemoryRequest(parentId = child.id))
@@ -150,7 +188,7 @@ class MemoryServiceTest {
     @Test
     fun `sets covers only from own memory and deletes descendant memories and media`() {
         val root = memoryService.createMemory(CreateMemoryRequest("root", "Root"))
-        val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", root.id))
+        val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parentId = root.id))
         val other = memoryService.createMemory(CreateMemoryRequest("other", "Other"))
         val rootMedia = createMedia(owner, memory(root.id), "Root Cover")
         val childMedia = createMedia(owner, memory(child.id), "Child Media")

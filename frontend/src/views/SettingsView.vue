@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import { clearExplorerToolbar, setExplorerToolbar } from '../composables/useExplorerToolbar'
+import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
 import { getSettings, type SettingsResponse } from '../features/settings/api'
 import GroupSettingsPanel from '../features/settings/components/GroupSettingsPanel.vue'
 import ServerSettingsPanel from '../features/settings/components/ServerSettingsPanel.vue'
@@ -30,7 +30,7 @@ const error = ref('')
 watch(settingsPath, loadSettings, { immediate: true })
 
 onBeforeUnmount(() => {
-  clearExplorerToolbar()
+  clearWorkspaceToolbar()
 })
 
 async function loadSettings() {
@@ -39,7 +39,7 @@ async function loadSettings() {
   try {
     const response = await getSettings(settingsPath.value)
     settings.value = response
-    setExplorerToolbar(
+    setWorkspaceToolbar(
       response.breadcrumbs.map((breadcrumb) => ({
         label: breadcrumb.label,
         command: () => navigateToPath(breadcrumb.path)
@@ -49,7 +49,7 @@ async function loadSettings() {
   } catch (caught) {
     settings.value = null
     error.value = caught instanceof Error ? caught.message : 'Einstellungen konnten nicht geladen werden.'
-    clearExplorerToolbar()
+    clearWorkspaceToolbar()
   } finally {
     loading.value = false
   }
@@ -64,7 +64,7 @@ function navigateToPath(path: string) {
   <div class="settings-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-    <div v-if="loading" class="explorer-loading">
+    <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>Einstellungen werden geladen...</span>
     </div>

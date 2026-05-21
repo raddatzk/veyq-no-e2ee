@@ -3,32 +3,35 @@ import { computed } from 'vue'
 import Button from 'primevue/button'
 import Breadcrumb from 'primevue/breadcrumb'
 import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
-import { explorerToolbar } from '../../composables/useExplorerToolbar'
+import { workspaceToolbar } from '../../composables/useWorkspaceToolbar'
 
 const { fallbackBreadcrumb } = useBreadcrumbs()
 const fallbackBreadcrumbs = computed(() => [fallbackBreadcrumb.value])
 const items = computed(() =>
-  explorerToolbar.active ? explorerToolbar.breadcrumbs : fallbackBreadcrumbs.value
+  workspaceToolbar.active ? workspaceToolbar.breadcrumbs : fallbackBreadcrumbs.value
 )
-const actions = computed(() => (explorerToolbar.active ? explorerToolbar.actions : []))
+const actions = computed(() => (workspaceToolbar.active ? workspaceToolbar.actions : []))
 </script>
 
 <template>
   <header class="workspace-topbar">
     <Breadcrumb :model="items" class="app-breadcrumb" />
+    <div class="workspace-topbar-center" aria-label="Globale Suche">
+      <span class="pi pi-search" />
+      <input type="search" placeholder="Suche in allem, worauf du Zugriff hast..." disabled />
+      <kbd>⌘K</kbd>
+    </div>
     <div class="workspace-actions">
-      <template v-if="explorerToolbar.active">
-        <Button
-          v-for="action in actions"
-          :key="action.key"
-          :icon="action.icon"
-          :label="action.label"
-          :severity="action.severity"
-          :outlined="action.outlined"
-          size="small"
-          @click="action.command"
-        />
-      </template>
+      <Button
+        v-for="action in actions"
+        :key="action.key"
+        :icon="action.icon"
+        :aria-label="action.label"
+        :severity="action.severity"
+        :outlined="action.outlined"
+        size="small"
+        @click="action.command"
+      />
     </div>
   </header>
 </template>

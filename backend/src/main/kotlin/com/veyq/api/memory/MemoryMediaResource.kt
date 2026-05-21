@@ -45,6 +45,12 @@ class MemoryMediaResource @Inject constructor(
     ): Response =
         Response.ok(mediaService.updateMemoryMediaMetadata(memoryId, mediaId, request)).build()
 
+    override fun memoryMediaContent(tenantName: String, mediaId: String, range: String?): Response =
+        mediaService.mediaContent(mediaId, range)
+
+    override fun memoryMediaPreview(tenantName: String, mediaId: String): Response =
+        mediaService.mediaPreview(mediaId)
+
     private class GeneratedFileUpload(
         private val path: Path,
         private val title: String?,

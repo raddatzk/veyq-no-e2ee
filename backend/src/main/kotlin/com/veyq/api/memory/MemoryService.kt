@@ -13,6 +13,8 @@ import com.veyq.api.generated.model.SetMemoryCoverRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
+import com.veyq.api.library.LibraryService
+import com.veyq.api.library.ResolvedMemoryLocation
 import com.veyq.api.library.media.MediaConfig
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -25,21 +27,32 @@ import java.util.Comparator
 class MemoryService @Inject constructor(
     private val memoryRepo: MemoryRepo,
     private val mediaRepo: MediaRepo,
+    private val folderRepo: TenantFolderRepo,
     private val groupRepo: TenantGroupRepo,
-    private val groupMemberRepo: TenantGroupMemberRepo,
+    private val memoryGroupMemberRepo: TenantGroupMemberRepo,
     private val mediaConfig: MediaConfig,
-    private val requestContext: RequestContext,
-) {
-    private val validName = Regex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
-    private val reservedNames = setOf("settings")
+    requestContext: RequestContext,
+) : LibraryService(folderRepo, groupRepo, memoryGroupMemberRepo, requestContext) {
 
     fun listRootMemories(): List<MemorySummary> =
         memoryRepo.listRoots(tenant())
             .filter(::isMemoryVisible)
             .map(::toSummary)
 
+    fun listMemoriesByFolderPath(folderPath: String?): List<MemorySummary> {
+        val folderTarget = resolveFolderTarget(folderPath)
+        val memories = memoryRepo.listByFolder(tenant(), folderTarget.parentFolder)
+        return memories
+            .filter(::isMemoryVisible)
+            .filter { it.scope().sameAs(folderTarget.scope) }
+            .map(::toSummary)
+    }
+
     fun getMemory(publicId: String): MemorySummary =
         toSummary(resolveVisibleMemory(publicId))
+
+    fun getMemoryByPath(path: String?): MemorySummary =
+        toSummary(resolveVisibleMemoryByPath(path))
 
     fun listChildren(publicId: String): List<MemorySummary> =
         memoryRepo.listChildren(tenant(), resolveVisibleMemory(publicId))
@@ -49,12 +62,19 @@ class MemoryService @Inject constructor(
     @Transactional
     fun createMemory(request: CreateMemoryRequest): MemorySummary {
         val parent = request.parentId?.trim()?.takeIf { it.isNotBlank() }?.let(::resolveVisibleMemory)
-        val scope = parent?.scope() ?: resolveRequestedRootScope(request.scope)
+        val folderTarget = if (parent == null) request.folderPath
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && it != "/" }
+            ?.let(::resolveFolderTarget)
+        else null
+        val parentFolder = folderTarget?.parentFolder
+        val scope = parent?.scope() ?: folderTarget?.scope ?: resolveRequestedRootScope(request.scope)
         val name = normalizedName(request.name)
-        validateNoCollision(parent, scope, name)
+        validateNoCollision(parent, parentFolder, scope, name)
         val memory = Memory().also {
             it.tenant = tenant()
             it.parentMemory = parent
+            it.parentFolder = parentFolder
             it.owner = user()
             LibraryScopes.apply(it, scope)
             it.name = name
@@ -77,10 +97,11 @@ class MemoryService @Inject constructor(
                 throw BadRequestException("Cannot move memory between scopes")
             }
             memory.parentMemory = parent
+            memory.parentFolder = null
         }
         request.name?.let {
             val name = normalizedName(it)
-            if (name != memory.name) validateNoCollision(memory.parentMemory, memory.scope(), name)
+            if (name != memory.name) validateNoCollision(memory.parentMemory, memory.parentFolder, memory.scope(), name)
             memory.name = name
         }
         request.displayName?.let { memory.displayName = requiredDisplayName(it) }
@@ -126,10 +147,13 @@ class MemoryService @Inject constructor(
     fun isMemoryVisible(memory: Memory): Boolean =
         memory.tenant.id == tenant().id && isScopeVisible(memory.scope())
 
-    private fun validateNoCollision(parent: Memory?, scope: LibraryScopeKey, name: String) {
-        val collision = (parent?.let { memoryRepo.listChildren(tenant(), it) } ?: memoryRepo.listRoots(tenant()))
+    private fun validateNoCollision(parentMemory: Memory?, parentFolder: TenantFolder?, scope: LibraryScopeKey, name: String) {
+        val memoryCollision = (parentMemory?.let { memoryRepo.listChildren(tenant(), it) }
+            ?: memoryRepo.listByFolder(tenant(), parentFolder))
             .any { it.name == name && it.scope().sameAs(scope) }
-        if (collision) throw ConflictException("Memory name already exists")
+        val folderCollision = parentMemory == null && folderRepo.listChildren(tenant(), parentFolder)
+            .any { it.name == name && it.hasScope(scope) }
+        if (memoryCollision || folderCollision) throw ConflictException("Path name already exists")
     }
 
     private fun resolveRequestedRootScope(scope: MemoryScopeRequest?): LibraryScopeKey =
@@ -146,21 +170,8 @@ class MemoryService @Inject constructor(
             if (!isScopeVisible(it)) throw NotFoundException("Scope not found")
         }
 
-    private fun isScopeVisible(scope: LibraryScopeKey): Boolean =
-        when (scope) {
-            LibraryScopeKey.Tenant -> true
-            is LibraryScopeKey.Group -> scope.group.tenant.id == tenant().id && groupMemberRepo.findByGroupAndUser(scope.group, user()) != null
-            is LibraryScopeKey.User -> scope.user.id == user().id
-        }
-
     private fun resolveGroup(name: String): TenantGroup =
         groupRepo.findByTenantAndName(tenant(), name) ?: throw NotFoundException("Group not found")
-
-    private fun normalizedName(value: String?): String {
-        val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required")
-        if (name.length > 120 || !name.matches(validName) || name in reservedNames) throw BadRequestException("Invalid name")
-        return name
-    }
 
     private fun requiredDisplayName(value: String?): String =
         value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required")
@@ -179,7 +190,9 @@ class MemoryService @Inject constructor(
         )
 
     private fun Memory.path(): String =
-        (parentMemory?.path()?.trimEnd('/') ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
+        (parentMemory?.path()?.trimEnd('/')
+            ?: parentFolder?.path()?.trimEnd('/')
+            ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
 
     private fun LibraryScopeKey.toApiScope(): MemoryScope =
         when (this) {
@@ -194,6 +207,49 @@ class MemoryService @Inject constructor(
 
     private fun isDescendantOrSame(candidate: Memory, ancestor: Memory): Boolean =
         generateSequence(candidate) { it.parentMemory }.any { it.id == ancestor.id }
+
+    private data class MemoryFolderTarget(
+        val parentFolder: TenantFolder?,
+        val scope: LibraryScopeKey,
+    )
+
+    private fun resolveFolderTarget(path: String?): MemoryFolderTarget =
+        when (val context = resolveVisibleContext(path)) {
+            ResolvedMemoryLocation.Tenant -> MemoryFolderTarget(null, LibraryScopeKey.Tenant)
+            is ResolvedMemoryLocation.Group -> MemoryFolderTarget(null, context.scope)
+            is ResolvedMemoryLocation.User -> MemoryFolderTarget(null, context.scope)
+            is ResolvedMemoryLocation.Folder -> MemoryFolderTarget(context.folder, context.folder.scope())
+        }
+
+    private fun resolveVisibleMemoryByPath(path: String?): Memory {
+        val segments = pathSegments(path)
+        if (segments.isEmpty()) throw NotFoundException("Memory not found")
+
+        segments.indices.reversed().forEach { memoryIndex ->
+            val folderPath = segments.take(memoryIndex).toPathOrNull()
+            val folderTarget = try {
+                resolveFolderTarget(folderPath)
+            } catch (_: NotFoundException) {
+                return@forEach
+            }
+            var memory = memoryRepo.listByFolder(tenant(), folderTarget.parentFolder)
+                .firstOrNull { it.name == segments[memoryIndex] && it.scope().sameAs(folderTarget.scope) }
+                ?: return@forEach
+            for (childName in segments.drop(memoryIndex + 1)) {
+                memory = memoryRepo.listChildren(tenant(), memory).firstOrNull { it.name == childName }
+                    ?: return@forEach
+            }
+            if (isMemoryVisible(memory)) return memory
+        }
+
+        throw NotFoundException("Memory not found")
+    }
+
+    private fun pathSegments(path: String?): List<String> =
+        path?.trim()?.trim('/')?.split('/')?.filter { it.isNotBlank() } ?: emptyList()
+
+    private fun List<String>.toPathOrNull(): String? =
+        if (isEmpty()) null else "/" + joinToString("/")
 
     private fun mediaDirectory(media: Media): Path {
         val originalPath = storagePath(media.storageKey)
@@ -213,13 +269,4 @@ class MemoryService @Inject constructor(
             stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
     }
-
-    private fun tenant(): Tenant = requestContext.tenant!!
-    private fun user(): User = requestContext.user!!
-
-    private fun Memory.scope(): LibraryScopeKey =
-        LibraryScopes.scope(this)
-
-    private fun LibraryScopeKey.sameAs(other: LibraryScopeKey): Boolean =
-        LibraryScopes.sameAs(this, other)
 }

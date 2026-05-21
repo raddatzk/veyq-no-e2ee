@@ -12,7 +12,7 @@ The long-term goal is a self-hostable product that works on arbitrary domains, k
 
 The current implementation is a Quarkus/Vue application with global user accounts, cookie-based authentication and tenant-scoped content.
 
-Some implemented library concepts still use folders, albums and media. A first Memory API and backend domain layer now exists, but the visible app experience is still largely the legacy Explorer. Treat folders and albums as the current baseline, and nested `Memories` as the product direction until a migration decision is captured in an ADR.
+Memory UI v1 and the Memory APIs are now the active product baseline. Folders remain as organizational containers around Memories, but they are not rich content objects. The former Album/Explorer product line has been removed from the public API, frontend and database schema.
 
 ## Tech Stack
 

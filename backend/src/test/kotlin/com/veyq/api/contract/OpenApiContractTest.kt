@@ -4,27 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.veyq.api.auth.AuthResource
 import com.veyq.api.generated.api.AuthApi
-import com.veyq.api.generated.api.ExplorerApi
 import com.veyq.api.generated.api.GroupsApi
-import com.veyq.api.generated.api.AlbumsApi
 import com.veyq.api.generated.api.FoldersApi
-import com.veyq.api.generated.api.MediaApi
-import com.veyq.api.generated.api.MediaUploadsApi
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.api.MemoryMediaApi
+import com.veyq.api.generated.api.MemoryNavigationApi
 import com.veyq.api.generated.api.ServerApi
 import com.veyq.api.generated.api.SettingsApi
 import com.veyq.api.generated.api.SetupApi
 import com.veyq.api.generated.api.TenantsApi
 import com.veyq.api.generated.api.UsersApi
-import com.veyq.api.library.album.AlbumResource
-import com.veyq.api.library.explorer.ExplorerResource
-import com.veyq.api.library.explorer.SettingsExplorerResource
 import com.veyq.api.library.folder.FolderResource
-import com.veyq.api.library.media.MediaResource
-import com.veyq.api.library.media.MediaUploadResource
 import com.veyq.api.memory.MemoryMediaResource
+import com.veyq.api.memory.MemoryNavigationResource
 import com.veyq.api.memory.MemoryResource
+import com.veyq.api.settings.SettingsNavigationResource
 import com.veyq.api.settings.SettingsResource
 import com.veyq.api.setup.SetupResource
 import com.veyq.api.tenant.TenantResource
@@ -312,27 +306,14 @@ class OpenApiContractTest {
             "POST /api/{tenantName}/groups/{groupName}",
             "GET /api/settings",
             "GET /api/settings/server",
-            "GET /api/{tenantName}/explorer",
+            "GET /api/{tenantName}/memory-navigation",
             "POST /api/{tenantName}/folders",
             "POST /api/{tenantName}/folders/update",
             "POST /api/{tenantName}/folders/move",
             "DELETE /api/{tenantName}/folders",
-            "POST /api/{tenantName}/albums",
-            "POST /api/{tenantName}/albums/update",
-            "POST /api/{tenantName}/albums/move",
-            "DELETE /api/{tenantName}/albums",
-            "POST /api/{tenantName}/albums/media",
-            "POST /api/{tenantName}/albums/cover",
-            "GET /api/{tenantName}/media",
-            "GET /api/{tenantName}/media/{mediaId}/content",
-            "PATCH /api/{tenantName}/media/{mediaId}/metadata",
-            "POST /api/media/uploads",
-            "GET /api/media/uploads",
-            "GET /api/media/uploads/{uploadId}",
-            "PUT /api/media/uploads/{uploadId}/chunks/{chunkIndex}",
-            "POST /api/media/uploads/{uploadId}/complete",
-            "DELETE /api/media/uploads/{uploadId}",
             "GET /api/{tenantName}/memories",
+            "GET /api/{tenantName}/memories/by-folder",
+            "GET /api/{tenantName}/memories/by-path",
             "POST /api/{tenantName}/memories",
             "GET /api/{tenantName}/memories/{memoryId}",
             "PUT /api/{tenantName}/memories/{memoryId}",
@@ -342,6 +323,8 @@ class OpenApiContractTest {
             "POST /api/{tenantName}/memories/{memoryId}/media",
             "PUT /api/{tenantName}/memories/{memoryId}/cover",
             "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata",
+            "GET /api/{tenantName}/memory-media/{mediaId}/content",
+            "GET /api/{tenantName}/memory-media/{mediaId}/preview",
         )
 
         val generatedInterfaceBindings = mapOf(
@@ -351,12 +334,9 @@ class OpenApiContractTest {
             TenantsApi::class.java to TenantResource::class.java,
             GroupsApi::class.java to GroupResource::class.java,
             ServerApi::class.java to SettingsResource::class.java,
-            ExplorerApi::class.java to ExplorerResource::class.java,
-            SettingsApi::class.java to SettingsExplorerResource::class.java,
+            SettingsApi::class.java to SettingsNavigationResource::class.java,
             FoldersApi::class.java to FolderResource::class.java,
-            AlbumsApi::class.java to AlbumResource::class.java,
-            MediaApi::class.java to MediaResource::class.java,
-            MediaUploadsApi::class.java to MediaUploadResource::class.java,
+            MemoryNavigationApi::class.java to MemoryNavigationResource::class.java,
             MemoriesApi::class.java to MemoryResource::class.java,
             MemoryMediaApi::class.java to MemoryMediaResource::class.java,
         )
@@ -369,20 +349,14 @@ class OpenApiContractTest {
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
-                    "listMemories", "createMemory", "getMemory", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover" -> MemoriesApi::class.java
-                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata" -> MemoryMediaApi::class.java
+                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover" -> MemoriesApi::class.java
+                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
+                    "getMemoryNavigation" -> MemoryNavigationApi::class.java
+                    "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
                     else -> error("No generated memories interface mapping for $operationId")
                 }
                 "server.openapi.yaml" -> ServerApi::class.java
                 "settings.openapi.yaml" -> SettingsApi::class.java
-                "explorer.openapi.yaml" -> ExplorerApi::class.java
-                "library.openapi.yaml" -> when (operationId) {
-                    "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
-                    "createAlbum", "deleteAlbum", "updateAlbum", "moveAlbum", "addMedia", "setCover" -> AlbumsApi::class.java
-                    "media", "upload", "uploadMedia", "content", "preview", "updateMetadata" -> MediaApi::class.java
-                    "createUpload", "listUploads", "getUpload", "abortUpload", "uploadChunk", "completeUpload" -> MediaUploadsApi::class.java
-                    else -> error("No generated library interface mapping for $operationId")
-                }
                 else -> error("No generated interface mapping for $specFile")
             }
     }

@@ -34,6 +34,17 @@ export interface ListMemoryMediaRequest {
     includeChildren?: boolean;
 }
 
+export interface MemoryMediaContentRequest {
+    tenantName: string;
+    mediaId: string;
+    range?: string;
+}
+
+export interface MemoryMediaPreviewRequest {
+    tenantName: string;
+    mediaId: string;
+}
+
 export interface UpdateMemoryMediaMetadataOperationRequest {
     tenantName: string;
     memoryId: string;
@@ -82,6 +93,60 @@ export interface MemoryMediaApiInterface {
      * List memory media
      */
     listMemoryMedia(requestParameters: ListMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaSummary>>;
+
+    /**
+     * Creates request options for memoryMediaContent without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @param {string} [range] Optional HTTP byte range.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaContentRequestOpts(requestParameters: MemoryMediaContentRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams the original file for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * @summary Download memory media content
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @param {string} [range] Optional HTTP byte range.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaContentRaw(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams the original file for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media content
+     */
+    memoryMediaContent(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for memoryMediaPreview without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaPreviewRequestOpts(requestParameters: MemoryMediaPreviewRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams the generated JPEG preview for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * @summary Download memory media preview
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaPreviewRaw(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams the generated JPEG preview for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media preview
+     */
+    memoryMediaPreview(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for updateMemoryMediaMetadata without sending the request
@@ -206,6 +271,120 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async listMemoryMedia(requestParameters: ListMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaSummary>> {
         const response = await this.listMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for memoryMediaContent without sending the request
+     */
+    async memoryMediaContentRequestOpts(requestParameters: MemoryMediaContentRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling memoryMediaContent().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling memoryMediaContent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (requestParameters['range'] != null) {
+            headerParameters['Range'] = String(requestParameters['range']);
+        }
+
+
+        let urlPath = `/api/{tenantName}/memory-media/{mediaId}/content`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the original file for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media content
+     */
+    async memoryMediaContentRaw(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryMediaContentRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the original file for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media content
+     */
+    async memoryMediaContent(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryMediaContentRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for memoryMediaPreview without sending the request
+     */
+    async memoryMediaPreviewRequestOpts(requestParameters: MemoryMediaPreviewRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling memoryMediaPreview().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling memoryMediaPreview().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memory-media/{mediaId}/preview`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the generated JPEG preview for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media preview
+     */
+    async memoryMediaPreviewRaw(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryMediaPreviewRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the generated JPEG preview for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media preview
+     */
+    async memoryMediaPreview(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryMediaPreviewRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

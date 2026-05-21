@@ -15,43 +15,43 @@
 
 import * as runtime from '../runtime';
 import type {
-  CreateLibraryItemRequest,
+  CreateFolderRequest,
   ErrorResponse,
-  ExplorerFolder,
-  MoveLibraryItemRequest,
-  UpdateLibraryItemRequest,
+  MemoryFolder,
+  MoveFolderRequest,
+  UpdateFolderRequest,
 } from '../models/index';
 import {
-    CreateLibraryItemRequestFromJSON,
-    CreateLibraryItemRequestToJSON,
+    CreateFolderRequestFromJSON,
+    CreateFolderRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
-    ExplorerFolderFromJSON,
-    ExplorerFolderToJSON,
-    MoveLibraryItemRequestFromJSON,
-    MoveLibraryItemRequestToJSON,
-    UpdateLibraryItemRequestFromJSON,
-    UpdateLibraryItemRequestToJSON,
+    MemoryFolderFromJSON,
+    MemoryFolderToJSON,
+    MoveFolderRequestFromJSON,
+    MoveFolderRequestToJSON,
+    UpdateFolderRequestFromJSON,
+    UpdateFolderRequestToJSON,
 } from '../models/index';
 
-export interface CreateFolderRequest {
+export interface CreateFolderOperationRequest {
     tenantName: string;
-    createLibraryItemRequest: CreateLibraryItemRequest;
+    createFolderRequest: CreateFolderRequest;
 }
 
 export interface DeleteFolderRequest {
     tenantName: string;
-    path?: string;
+    path: string;
 }
 
-export interface MoveFolderRequest {
+export interface MoveFolderOperationRequest {
     tenantName: string;
-    moveLibraryItemRequest: MoveLibraryItemRequest;
+    moveFolderRequest: MoveFolderRequest;
 }
 
-export interface UpdateFolderRequest {
+export interface UpdateFolderOperationRequest {
     tenantName: string;
-    updateLibraryItemRequest: UpdateLibraryItemRequest;
+    updateFolderRequest: UpdateFolderRequest;
 }
 
 /**
@@ -64,43 +64,43 @@ export interface FoldersApiInterface {
     /**
      * Creates request options for createFolder without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {CreateLibraryItemRequest} createLibraryItemRequest 
+     * @param {CreateFolderRequest} createFolderRequest 
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    createFolderRequestOpts(requestParameters: CreateFolderRequest): Promise<runtime.RequestOpts>;
+    createFolderRequestOpts(requestParameters: CreateFolderOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Ordner anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * @summary Ordner anlegen
+     * Creates an organizational folder for grouping Memories. Folders are not rich content objects.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+     * @summary Create an organizational folder
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {CreateLibraryItemRequest} createLibraryItemRequest 
+     * @param {CreateFolderRequest} createFolderRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    createFolderRaw(requestParameters: CreateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>>;
+    createFolderRaw(requestParameters: CreateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>>;
 
     /**
-     * Ordner anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner anlegen
+     * Creates an organizational folder for grouping Memories. Folders are not rich content objects.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+     * Create an organizational folder
      */
-    createFolder(requestParameters: CreateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder>;
+    createFolder(requestParameters: CreateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder>;
 
     /**
      * Creates request options for deleteFolder without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
+     * @param {string} path Canonical folder path.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
     deleteFolderRequestOpts(requestParameters: DeleteFolderRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Ordner löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * @summary Ordner löschen
+     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * @summary Delete an organizational folder
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} [path] Explorer path inside the tenant. Empty or omitted loads the tenant root. Group scopes use &#x60;/@groupName&#x60;; the personal scope uses &#x60;/~me&#x60;. 
+     * @param {string} path Canonical folder path.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
@@ -108,62 +108,62 @@ export interface FoldersApiInterface {
     deleteFolderRaw(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Ordner löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner löschen
+     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Delete an organizational folder
      */
     deleteFolder(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for moveFolder without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {MoveLibraryItemRequest} moveLibraryItemRequest 
+     * @param {MoveFolderRequest} moveFolderRequest 
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    moveFolderRequestOpts(requestParameters: MoveFolderRequest): Promise<runtime.RequestOpts>;
+    moveFolderRequestOpts(requestParameters: MoveFolderOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Ordner verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * @summary Ordner verschieben
+     * Moves a visible organizational folder inside the same scope.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+     * @summary Move an organizational folder
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {MoveLibraryItemRequest} moveLibraryItemRequest 
+     * @param {MoveFolderRequest} moveFolderRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    moveFolderRaw(requestParameters: MoveFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>>;
+    moveFolderRaw(requestParameters: MoveFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>>;
 
     /**
-     * Ordner verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner verschieben
+     * Moves a visible organizational folder inside the same scope.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+     * Move an organizational folder
      */
-    moveFolder(requestParameters: MoveFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder>;
+    moveFolder(requestParameters: MoveFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder>;
 
     /**
      * Creates request options for updateFolder without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {UpdateLibraryItemRequest} updateLibraryItemRequest 
+     * @param {UpdateFolderRequest} updateFolderRequest 
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    updateFolderRequestOpts(requestParameters: UpdateFolderRequest): Promise<runtime.RequestOpts>;
+    updateFolderRequestOpts(requestParameters: UpdateFolderOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Ordner umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * @summary Ordner umbenennen oder umbeschriften
+     * Updates the name or display name of a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * @summary Update an organizational folder
      * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {UpdateLibraryItemRequest} updateLibraryItemRequest 
+     * @param {UpdateFolderRequest} updateFolderRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof FoldersApiInterface
      */
-    updateFolderRaw(requestParameters: UpdateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>>;
+    updateFolderRaw(requestParameters: UpdateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>>;
 
     /**
-     * Ordner umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner umbenennen oder umbeschriften
+     * Updates the name or display name of a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Update an organizational folder
      */
-    updateFolder(requestParameters: UpdateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder>;
+    updateFolder(requestParameters: UpdateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder>;
 
 }
 
@@ -175,7 +175,7 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     /**
      * Creates request options for createFolder without sending the request
      */
-    async createFolderRequestOpts(requestParameters: CreateFolderRequest): Promise<runtime.RequestOpts> {
+    async createFolderRequestOpts(requestParameters: CreateFolderOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -183,10 +183,10 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             );
         }
 
-        if (requestParameters['createLibraryItemRequest'] == null) {
+        if (requestParameters['createFolderRequest'] == null) {
             throw new runtime.RequiredError(
-                'createLibraryItemRequest',
-                'Required parameter "createLibraryItemRequest" was null or undefined when calling createFolder().'
+                'createFolderRequest',
+                'Required parameter "createFolderRequest" was null or undefined when calling createFolder().'
             );
         }
 
@@ -205,26 +205,26 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: CreateLibraryItemRequestToJSON(requestParameters['createLibraryItemRequest']),
+            body: CreateFolderRequestToJSON(requestParameters['createFolderRequest']),
         };
     }
 
     /**
-     * Ordner anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner anlegen
+     * Creates an organizational folder for grouping Memories. Folders are not rich content objects.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+     * Create an organizational folder
      */
-    async createFolderRaw(requestParameters: CreateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>> {
+    async createFolderRaw(requestParameters: CreateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>> {
         const requestOptions = await this.createFolderRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ExplorerFolderFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryFolderFromJSON(jsonValue));
     }
 
     /**
-     * Ordner anlegen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner anlegen
+     * Creates an organizational folder for grouping Memories. Folders are not rich content objects.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+     * Create an organizational folder
      */
-    async createFolder(requestParameters: CreateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder> {
+    async createFolder(requestParameters: CreateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder> {
         const response = await this.createFolderRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -237,6 +237,13 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             throw new runtime.RequiredError(
                 'tenantName',
                 'Required parameter "tenantName" was null or undefined when calling deleteFolder().'
+            );
+        }
+
+        if (requestParameters['path'] == null) {
+            throw new runtime.RequiredError(
+                'path',
+                'Required parameter "path" was null or undefined when calling deleteFolder().'
             );
         }
 
@@ -261,8 +268,8 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     }
 
     /**
-     * Ordner löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner löschen
+     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Delete an organizational folder
      */
     async deleteFolderRaw(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
         const requestOptions = await this.deleteFolderRequestOpts(requestParameters);
@@ -272,8 +279,8 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     }
 
     /**
-     * Ordner löschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner löschen
+     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Delete an organizational folder
      */
     async deleteFolder(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deleteFolderRaw(requestParameters, initOverrides);
@@ -282,7 +289,7 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     /**
      * Creates request options for moveFolder without sending the request
      */
-    async moveFolderRequestOpts(requestParameters: MoveFolderRequest): Promise<runtime.RequestOpts> {
+    async moveFolderRequestOpts(requestParameters: MoveFolderOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -290,10 +297,10 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             );
         }
 
-        if (requestParameters['moveLibraryItemRequest'] == null) {
+        if (requestParameters['moveFolderRequest'] == null) {
             throw new runtime.RequiredError(
-                'moveLibraryItemRequest',
-                'Required parameter "moveLibraryItemRequest" was null or undefined when calling moveFolder().'
+                'moveFolderRequest',
+                'Required parameter "moveFolderRequest" was null or undefined when calling moveFolder().'
             );
         }
 
@@ -312,26 +319,26 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: MoveLibraryItemRequestToJSON(requestParameters['moveLibraryItemRequest']),
+            body: MoveFolderRequestToJSON(requestParameters['moveFolderRequest']),
         };
     }
 
     /**
-     * Ordner verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner verschieben
+     * Moves a visible organizational folder inside the same scope.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+     * Move an organizational folder
      */
-    async moveFolderRaw(requestParameters: MoveFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>> {
+    async moveFolderRaw(requestParameters: MoveFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>> {
         const requestOptions = await this.moveFolderRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ExplorerFolderFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryFolderFromJSON(jsonValue));
     }
 
     /**
-     * Ordner verschieben.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner verschieben
+     * Moves a visible organizational folder inside the same scope.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+     * Move an organizational folder
      */
-    async moveFolder(requestParameters: MoveFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder> {
+    async moveFolder(requestParameters: MoveFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder> {
         const response = await this.moveFolderRaw(requestParameters, initOverrides);
         return await response.value();
     }
@@ -339,7 +346,7 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     /**
      * Creates request options for updateFolder without sending the request
      */
-    async updateFolderRequestOpts(requestParameters: UpdateFolderRequest): Promise<runtime.RequestOpts> {
+    async updateFolderRequestOpts(requestParameters: UpdateFolderOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -347,10 +354,10 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             );
         }
 
-        if (requestParameters['updateLibraryItemRequest'] == null) {
+        if (requestParameters['updateFolderRequest'] == null) {
             throw new runtime.RequiredError(
-                'updateLibraryItemRequest',
-                'Required parameter "updateLibraryItemRequest" was null or undefined when calling updateFolder().'
+                'updateFolderRequest',
+                'Required parameter "updateFolderRequest" was null or undefined when calling updateFolder().'
             );
         }
 
@@ -369,26 +376,26 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: UpdateLibraryItemRequestToJSON(requestParameters['updateLibraryItemRequest']),
+            body: UpdateFolderRequestToJSON(requestParameters['updateFolderRequest']),
         };
     }
 
     /**
-     * Ordner umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner umbenennen oder umbeschriften
+     * Updates the name or display name of a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Update an organizational folder
      */
-    async updateFolderRaw(requestParameters: UpdateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ExplorerFolder>> {
+    async updateFolderRaw(requestParameters: UpdateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryFolder>> {
         const requestOptions = await this.updateFolderRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => ExplorerFolderFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryFolderFromJSON(jsonValue));
     }
 
     /**
-     * Ordner umbenennen oder umbeschriften.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.  Implementierungsstatus: partial.
-     * Ordner umbenennen oder umbeschriften
+     * Updates the name or display name of a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Update an organizational folder
      */
-    async updateFolder(requestParameters: UpdateFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ExplorerFolder> {
+    async updateFolder(requestParameters: UpdateFolderOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryFolder> {
         const response = await this.updateFolderRaw(requestParameters, initOverrides);
         return await response.value();
     }

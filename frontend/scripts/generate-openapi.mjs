@@ -11,7 +11,6 @@ const bundledSpec = resolve(root, 'build', 'generated', 'openapi', 'frontend.ope
 
 const domains = [
   'common',
-  'explorer',
   'settings',
   'auth',
   'setup',
@@ -19,7 +18,6 @@ const domains = [
   'tenants',
   'groups',
   'memories',
-  'library',
   'server',
   'frontend'
 ]

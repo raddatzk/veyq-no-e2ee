@@ -1,27 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import SelectButton from 'primevue/selectbutton'
-import type {
-  ExplorerAlbum,
-  ExplorerFolder
-} from '../features/explorer/api'
-import AlbumCoverDialog from '../components/explorer/AlbumCoverDialog.vue'
-import CreateLibraryItemDialog from '../components/explorer/CreateLibraryItemDialog.vue'
-import DeleteExplorerItemDialog from '../components/explorer/DeleteExplorerItemDialog.vue'
-import EditExplorerItemDialog from '../components/explorer/EditExplorerItemDialog.vue'
-import ExplorerGrid from '../components/explorer/ExplorerGrid.vue'
-import ExplorerMediaGrid from '../components/explorer/ExplorerMediaGrid.vue'
-import MoveExplorerItemDialog from '../components/explorer/MoveExplorerItemDialog.vue'
-import UploadMediaDialog from '../components/explorer/UploadMediaDialog.vue'
-import { useExplorerData } from '../features/explorer/composables/useExplorerData'
-import { useExplorerDialogs } from '../features/explorer/composables/useExplorerDialogs'
-import { useTenantExplorerToolbar } from '../features/explorer/composables/useTenantExplorerToolbar'
+import CreateFolderDialog from '../features/memories/components/CreateFolderDialog.vue'
+import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
+import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
+import MemoryFolderOverview from '../features/memories/components/MemoryFolderOverview.vue'
+import MemoryUploadDialog from '../features/memories/components/MemoryUploadDialog.vue'
+import { useMemoryRouteData } from '../features/memories/composables/useMemoryRouteData'
+import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
-import { explorerPathToTenantRoute, routePathToExplorerPath } from '../shared/utils/paths'
+import { memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/paths'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,152 +21,108 @@ const { authState } = useAuthState()
 const tenantName = computed(() => String(route.params.tenantName || ''))
 const tenant = computed(() => authState.tenants.find((item) => item.name === tenantName.value))
 const tenantTitle = computed(() => tenant.value?.displayName || tenantName.value)
-const explorerPath = computed(() => routePathToExplorerPath(route.params.pathMatch))
-const viewOptions = [
-  { label: 'Ordner und Alben', value: 'structure', icon: 'pi pi-folder' },
-  { label: 'Alle Medien', value: 'media', icon: 'pi pi-images' }
-]
+const routePath = computed(() => routePathToMemoryPath(route.params.pathMatch))
+const createFolderOpen = ref(false)
+const createMemoryOpen = ref(false)
+const uploadOpen = ref(false)
 
 const {
-  activeView,
-  canSwitchViews,
-  contextType,
+  childMemories,
+  currentFolderPath,
   error,
-  explorer,
-  isAlbumContext,
-  isLibraryContext,
-  loadExplorer,
+  isMemoryRoute,
+  load,
   loading,
   media,
-  mediaError,
-  streaming,
-  viewMode
-} = useExplorerData(tenantName, explorerPath)
+  memories,
+  memory,
+  navigation
+} = useMemoryRouteData(tenantName, routePath)
 
-const dialogs = useExplorerDialogs()
-
-useTenantExplorerToolbar({
-  explorer,
+useMemoryToolbar({
+  navigation,
+  memory,
+  loading,
   tenantName,
-  tenantTitle,
-  isAlbumContext,
-  isLibraryContext,
-  contextType,
-  navigateToPath,
-  openCreate: dialogs.openCreate,
-  openContextSettings,
+  tenantLabel: tenantTitle,
+  routePath,
   openUpload: () => {
-    dialogs.uploadOpen.value = true
-  }
+    uploadOpen.value = true
+  },
+  openContextSettings,
+  navigateToPath
 })
 
 function openContextSettings() {
-  const location = explorer.value?.location
+  const location = navigation.value?.location
   if (!location) return
   navigateToPath(location.path === '/' ? '/settings' : `${location.path}/settings`)
 }
 
 function navigateToPath(path: string) {
-  void router.push(explorerPathToTenantRoute(tenantName.value, path))
+  void router.push(memoryPathToTenantRoute(tenantName.value, path))
 }
 </script>
 
 <template>
-  <div class="explorer-page" :class="{ 'explorer-page-media': activeView === 'media' }">
+  <div class="memory-page memory-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <Message v-if="mediaError" severity="warn" :closable="false">{{ mediaError }}</Message>
 
-    <div v-if="loading" class="explorer-loading">
+    <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Explorer wird geladen...</span>
+      <span>Memories werden geladen...</span>
     </div>
 
-    <template v-else-if="explorer">
-      <div v-if="canSwitchViews" class="explorer-view-switch">
-        <SelectButton
-          v-model="viewMode"
-          :options="viewOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-        >
-          <template #option="{ option }">
-            <span :class="option.icon" />
-            <span>{{ option.label }}</span>
-          </template>
-        </SelectButton>
-      </div>
+    <MemoryDetail
+      v-else-if="isMemoryRoute && memory"
+      :tenant-name="tenantName"
+      :memory="memory"
+      :child-memories="childMemories"
+      :media="media"
+      @open-memory="navigateToPath($event.path)"
+      @create-child-memory="createMemoryOpen = true"
+    />
 
-      <ExplorerGrid
-        v-if="activeView === 'structure'"
-        :scope-roots="explorer.scopeRoots"
-        :folders="explorer.folders"
-        :albums="explorer.albums"
-        @open-scope-root="navigateToPath($event.path)"
-        @open-folder="navigateToPath($event.path)"
-        @open-album="navigateToPath($event.path)"
-        @edit-folder="dialogs.openEdit('folder', $event as ExplorerFolder)"
-        @edit-album="dialogs.openEdit('album', $event as ExplorerAlbum)"
-        @move-folder="dialogs.openMove('folder', $event as ExplorerFolder)"
-        @move-album="dialogs.openMove('album', $event as ExplorerAlbum)"
-        @cover-album="dialogs.openCover"
-        @delete-folder="dialogs.openDelete('folder', $event as ExplorerFolder)"
-        @delete-album="dialogs.openDelete('album', $event as ExplorerAlbum)"
-      />
+    <MemoryFolderOverview
+      v-else-if="navigation"
+      :navigation="navigation"
+      :memories="memories"
+      @open-folder="navigateToPath($event.path)"
+      @open-memory="navigateToPath($event.path)"
+      @create-folder="createFolderOpen = true"
+      @create-memory="createMemoryOpen = true"
+    />
 
-      <ExplorerMediaGrid v-else :tenant-name="tenantName" :media="media" :streaming="streaming" />
-    </template>
-
-    <div v-if="explorer" class="explorer-refresh">
+    <div v-if="navigation || memory" class="memory-refresh">
       <Button
         label="Aktualisieren"
         icon="pi pi-refresh"
         severity="secondary"
         outlined
-        @click="loadExplorer"
+        @click="load"
       />
     </div>
 
-    <CreateLibraryItemDialog
-      v-model:visible="dialogs.createOpen.value"
-      :type="dialogs.createType.value"
+    <CreateFolderDialog
+      v-model:visible="createFolderOpen"
       :tenant-name="tenantName"
       :tenant-display-name="tenantTitle"
-      :parent-path="explorerPath"
-      @saved="loadExplorer"
+      :parent-path="currentFolderPath"
+      @saved="load"
     />
-    <UploadMediaDialog
-      v-model:visible="dialogs.uploadOpen.value"
+    <CreateMemoryDialog
+      v-model:visible="createMemoryOpen"
       :tenant-name="tenantName"
-      :album-path="explorerPath"
-      @saved="loadExplorer"
+      :tenant-display-name="tenantTitle"
+      :folder-path="currentFolderPath"
+      :parent-memory-id="memory?.id || null"
+      @saved="load"
     />
-    <EditExplorerItemDialog
-      v-model:visible="dialogs.editOpen.value"
+    <MemoryUploadDialog
+      v-model:visible="uploadOpen"
       :tenant-name="tenantName"
-      :type="dialogs.selectedType.value"
-      :item="dialogs.selectedItem.value"
-      @saved="loadExplorer"
-    />
-    <MoveExplorerItemDialog
-      v-model:visible="dialogs.moveOpen.value"
-      :tenant-name="tenantName"
-      :type="dialogs.selectedType.value"
-      :item="dialogs.selectedItem.value"
-      @saved="loadExplorer"
-    />
-    <DeleteExplorerItemDialog
-      v-model:visible="dialogs.deleteOpen.value"
-      :tenant-name="tenantName"
-      :type="dialogs.selectedType.value"
-      :item="dialogs.selectedItem.value"
-      @deleted="loadExplorer"
-    />
-    <AlbumCoverDialog
-      v-model:visible="dialogs.coverOpen.value"
-      :tenant-name="tenantName"
-      :album="dialogs.selectedAlbum.value"
-      @saved="loadExplorer"
+      :memory-id="memory?.id || null"
+      @saved="load"
     />
   </div>
 </template>

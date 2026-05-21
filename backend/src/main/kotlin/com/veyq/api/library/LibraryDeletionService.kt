@@ -1,13 +1,12 @@
 package com.veyq.api.library
 
 import com.veyq.api.auth.BadRequestException
-import com.veyq.api.domain.AlbumMediaRepo
 import com.veyq.api.domain.LibraryScopeType
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.MediaRepo
+import com.veyq.api.domain.Memory
+import com.veyq.api.domain.MemoryRepo
 import com.veyq.api.domain.Tenant
-import com.veyq.api.domain.TenantAlbum
-import com.veyq.api.domain.TenantAlbumRepo
 import com.veyq.api.domain.TenantFolder
 import com.veyq.api.domain.TenantFolderRepo
 import com.veyq.api.domain.TenantGroup
@@ -29,17 +28,15 @@ class LibraryDeletionService @Inject constructor(
     private val groupRepo: TenantGroupRepo,
     private val groupMemberRepo: TenantGroupMemberRepo,
     private val folderRepo: TenantFolderRepo,
-    private val albumRepo: TenantAlbumRepo,
-    private val albumMediaRepo: AlbumMediaRepo,
+    private val memoryRepo: MemoryRepo,
     private val mediaRepo: MediaRepo,
     private val mediaConfig: MediaConfig,
 ) {
     fun deleteTenant(tenant: Tenant) {
-        val media = mediaRepo.list("tenant", tenant)
-        deleteMedia(media)
+        deleteMedia(mediaRepo.list("tenant", tenant))
         tenantMemberRepo.delete("tenant", tenant)
         groupRepo.listByTenant(tenant).forEach { group -> groupMemberRepo.delete("group", group) }
-        albumRepo.delete("tenant", tenant)
+        memoryRepo.delete("tenant", tenant)
         folderRepo.delete("tenant", tenant)
         groupRepo.delete("tenant", tenant)
         tenantRepo.delete(tenant)
@@ -48,49 +45,44 @@ class LibraryDeletionService @Inject constructor(
     }
 
     fun deleteGroup(group: TenantGroup) {
-        val media = mediaRepo.list(
-            "tenant = ?1 and scopeType = ?2 and scopeGroup = ?3",
-            group.tenant,
-            LibraryScopeType.Group,
-            group,
+        deleteMedia(
+            mediaRepo.list(
+                "tenant = ?1 and scopeType = ?2 and scopeGroup = ?3",
+                group.tenant,
+                LibraryScopeType.Group,
+                group,
+            )
         )
-        deleteMedia(media)
         groupMemberRepo.delete("group", group)
-        albumRepo.delete("tenant = ?1 and scopeType = ?2 and scopeGroup = ?3", group.tenant, LibraryScopeType.Group, group)
+        memoryRepo.delete("tenant = ?1 and scopeType = ?2 and scopeGroup = ?3", group.tenant, LibraryScopeType.Group, group)
         folderRepo.delete("tenant = ?1 and scopeType = ?2 and scopeGroup = ?3", group.tenant, LibraryScopeType.Group, group)
         group.delete()
     }
 
     fun deleteFolder(folder: TenantFolder) {
         val folders = descendants(folder)
-        val albums = albumRepo.listByTenant(folder.tenant)
-            .filter { album -> album.parentFolder != null && folders.any { it.id == album.parentFolder!!.id } }
-        deleteAlbumMedia(albums)
+        val memories = memoryRepo.list("tenant", folder.tenant)
+            .filter { memory -> memory.parentFolder != null && folders.any { it.id == memory.parentFolder!!.id } }
+        deleteMemories(memories)
         folder.delete()
     }
 
-    fun deleteAlbum(album: TenantAlbum) {
-        deleteAlbumMedia(listOf(album))
-        album.delete()
-    }
-
-    private fun deleteAlbumMedia(albums: Collection<TenantAlbum>) {
-        val media = albums
-            .flatMap { album -> albumMediaRepo.list("album", album).map { it.media } }
+    private fun deleteMemories(memories: Collection<Memory>) {
+        val expanded = memories
+            .flatMap { root ->
+                memoryRepo.list("tenant", root.tenant)
+                    .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } } + root
+            }
             .distinctBy { it.id }
-        deleteMedia(media)
+        deleteMedia(expanded.flatMap { mediaRepo.listByMemory(it) })
+        expanded.forEach { it.delete() }
     }
 
     private fun deleteMedia(media: Collection<Media>) {
         val distinctMedia = media.distinctBy { it.id }
         if (distinctMedia.isEmpty()) return
 
-        albumRepo.update("coverMedia = null where coverMedia in ?1", distinctMedia)
-        distinctMedia.forEach { media ->
-            albumMediaRepo.list("media", media).forEach { it.delete() }
-        }
-        albumMediaRepo.flush()
-
+        memoryRepo.update("coverMedia = null where coverMedia in ?1", distinctMedia)
         val mediaDirectories = distinctMedia.map { mediaDirectory(it) }.distinct()
         distinctMedia.forEach { it.delete() }
         mediaRepo.flush()
