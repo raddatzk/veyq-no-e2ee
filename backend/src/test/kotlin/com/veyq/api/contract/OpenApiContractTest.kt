@@ -10,6 +10,8 @@ import com.veyq.api.generated.api.AlbumsApi
 import com.veyq.api.generated.api.FoldersApi
 import com.veyq.api.generated.api.MediaApi
 import com.veyq.api.generated.api.MediaUploadsApi
+import com.veyq.api.generated.api.MemoriesApi
+import com.veyq.api.generated.api.MemoryMediaApi
 import com.veyq.api.generated.api.ServerApi
 import com.veyq.api.generated.api.SettingsApi
 import com.veyq.api.generated.api.SetupApi
@@ -21,6 +23,8 @@ import com.veyq.api.library.explorer.SettingsExplorerResource
 import com.veyq.api.library.folder.FolderResource
 import com.veyq.api.library.media.MediaResource
 import com.veyq.api.library.media.MediaUploadResource
+import com.veyq.api.memory.MemoryMediaResource
+import com.veyq.api.memory.MemoryResource
 import com.veyq.api.settings.SettingsResource
 import com.veyq.api.setup.SetupResource
 import com.veyq.api.tenant.TenantResource
@@ -328,6 +332,16 @@ class OpenApiContractTest {
             "PUT /api/media/uploads/{uploadId}/chunks/{chunkIndex}",
             "POST /api/media/uploads/{uploadId}/complete",
             "DELETE /api/media/uploads/{uploadId}",
+            "GET /api/{tenantName}/memories",
+            "POST /api/{tenantName}/memories",
+            "GET /api/{tenantName}/memories/{memoryId}",
+            "PUT /api/{tenantName}/memories/{memoryId}",
+            "DELETE /api/{tenantName}/memories/{memoryId}",
+            "GET /api/{tenantName}/memories/{memoryId}/children",
+            "GET /api/{tenantName}/memories/{memoryId}/media",
+            "POST /api/{tenantName}/memories/{memoryId}/media",
+            "PUT /api/{tenantName}/memories/{memoryId}/cover",
+            "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata",
         )
 
         val generatedInterfaceBindings = mapOf(
@@ -343,6 +357,8 @@ class OpenApiContractTest {
             AlbumsApi::class.java to AlbumResource::class.java,
             MediaApi::class.java to MediaResource::class.java,
             MediaUploadsApi::class.java to MediaUploadResource::class.java,
+            MemoriesApi::class.java to MemoryResource::class.java,
+            MemoryMediaApi::class.java to MemoryMediaResource::class.java,
         )
 
         fun generatedInterface(specFile: String, operationId: String): Class<*> =
@@ -352,6 +368,11 @@ class OpenApiContractTest {
                 "users.openapi.yaml" -> UsersApi::class.java
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
+                "memories.openapi.yaml" -> when (operationId) {
+                    "listMemories", "createMemory", "getMemory", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover" -> MemoriesApi::class.java
+                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata" -> MemoryMediaApi::class.java
+                    else -> error("No generated memories interface mapping for $operationId")
+                }
                 "server.openapi.yaml" -> ServerApi::class.java
                 "settings.openapi.yaml" -> SettingsApi::class.java
                 "explorer.openapi.yaml" -> ExplorerApi::class.java

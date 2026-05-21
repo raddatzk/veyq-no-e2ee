@@ -8,6 +8,8 @@ export * from './FrontendApi';
 export * from './GroupsApi';
 export * from './MediaApi';
 export * from './MediaUploadsApi';
+export * from './MemoriesApi';
+export * from './MemoryMediaApi';
 export * from './ServerApi';
 export * from './SettingsApi';
 export * from './SetupApi';

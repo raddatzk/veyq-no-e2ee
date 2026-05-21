@@ -37,6 +37,10 @@ class Media : PanacheEntityBase {
     @JoinColumn(name = "scope_user_id")
     var scopeUser: User? = null
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "memory_id")
+    var memory: Memory? = null
+
     @Column(nullable = false)
     lateinit var title: String
 
@@ -97,4 +101,7 @@ class Media : PanacheEntityBase {
 class MediaRepo : PanacheRepository<Media> {
     fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Media? =
         find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
+
+    fun listByMemory(memory: Memory): List<Media> =
+        list("memory = ?1 order by coalesce(capturedAt, createdAt), createdAt", memory)
 }

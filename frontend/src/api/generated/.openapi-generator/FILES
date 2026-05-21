@@ -7,6 +7,8 @@ apis/FrontendApi.ts
 apis/GroupsApi.ts
 apis/MediaApi.ts
 apis/MediaUploadsApi.ts
+apis/MemoriesApi.ts
+apis/MemoryMediaApi.ts
 apis/ServerApi.ts
 apis/SettingsApi.ts
 apis/SetupApi.ts
@@ -24,6 +26,7 @@ models/CreateGroupRequest.ts
 models/CreateLibraryItemRequest.ts
 models/CreateManagedUserRequest.ts
 models/CreateMediaUploadRequest.ts
+models/CreateMemoryRequest.ts
 models/CreateTenantRequest.ts
 models/ErrorResponse.ts
 models/ExplorerAlbum.ts
@@ -47,6 +50,10 @@ models/ManagedUserTenantSummary.ts
 models/ManagedUsersSummary.ts
 models/MediaSummary.ts
 models/MediaUploadSessionSummary.ts
+models/MemoryMediaSummary.ts
+models/MemoryScope.ts
+models/MemoryScopeRequest.ts
+models/MemorySummary.ts
 models/MoveLibraryItemRequest.ts
 models/OwnerBadge.ts
 models/PendingMediaUploadSummary.ts
@@ -54,6 +61,7 @@ models/ResetPasswordRequest.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts
 models/SetAlbumCoverRequest.ts
+models/SetMemoryCoverRequest.ts
 models/SettingsBreadcrumb.ts
 models/SettingsLocation.ts
 models/SettingsResponse.ts
@@ -75,6 +83,8 @@ models/UpdateGroupSettingsRequest.ts
 models/UpdateLibraryItemRequest.ts
 models/UpdateManagedUserRoleRequest.ts
 models/UpdateMediaMetadataRequest.ts
+models/UpdateMemoryMediaMetadataRequest.ts
+models/UpdateMemoryRequest.ts
 models/UpdateTenantSettingsRequest.ts
 models/UpdateTenantUserRoleRequest.ts
 models/UpdateUserSettingsRequest.ts

@@ -30,7 +30,9 @@ Veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Do
 - `veyq_tenant_group_member`
   - Gruppenmitgliedschaft mit `GroupOwner` oder `GroupMember`
 - `veyq_media`
-  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Ersteller und Zugriffsscope
+  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Ersteller, Zugriffsscope und optionaler Memory-Zuordnung
+- `veyq_memory`
+  - neue Memory-Zielstruktur mit öffentlicher `public_id`, Parent-Memory, Zugriffsscope, Cover-Media und direkter Media-Zuordnung
 - `veyq_config`
   - technische App-Konfiguration wie bcrypt-Cost
 
@@ -98,7 +100,7 @@ Gruppenrechte:
 
 ## API-first Vertrag
 
-- Jede Backend-API-Domäne hat eine eigene OpenAPI-Datei: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `explorer`, `library`.
+- Jede Backend-API-Domäne hat eine eigene OpenAPI-Datei: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `explorer`, `library`, `memories`.
 - Operationen enthalten `summary`, `description`, Beispiele, Fehlerfälle, `x-preconditions`, `x-implementation-status` und bei Bedarf Rollen-/Membership-Hinweise.
 - Der Gradle-Build generiert JAX-RS-Interfaces und Kotlin-Models. Resource-Klassen implementieren die generierten Interfaces direkt.
 - Services konvertieren an Domain-Grenzen zwischen Domain-Entities/-Enums und generated API-Models.
@@ -118,6 +120,17 @@ Child-Ordner und Alben erben den Scope ihres Parent-Ordners. Medien übernehmen 
 
 Medien werden über `publicId` adressiert. Metadatenlisten können als NDJSON gestreamt werden; Binärcontent unterstützt Range-Requests. Große Uploads laufen über Upload-Sessions mit Chunks unter `/api/media/uploads`.
 
+## Memory-Schicht
+
+Die aktuelle App enthält parallel zwei fachliche Ebenen:
+
+- Die sichtbare Library ist weiterhin über Folder, Album und Media implementiert.
+- Die neue Memory-Schicht bildet das Zielmodell für neue Produktarbeit ab.
+
+Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder User-Scope. Child-Memories erben den Scope ihres Parent-Memory. Neue Memory-Media-Uploads schreiben die direkte `memory_id` an `veyq_media`; ein Asset gehört im Memory-Modell genau zu einem Memory. `includeChildren=true` bei Memory-Media-Listen aggregiert Medien aus sichtbaren Descendant-Memories, ohne die direkte Ownership zu verändern.
+
+Die Migration `V2__memory_model.sql` legt für bestehende Alben initial root-level Memories an und verknüpft bestehende Medien anhand ihrer ersten Album-Verknüpfung. Die Legacy-Albumtabellen bleiben erhalten, damit bestehende Explorer- und Album-APIs weiter funktionieren, bis eine spätere ADR die Produktmigration weg von Albums festlegt.
+
 ## Testing
 
 Backend-Tests laufen mit Quarkus-Test, H2 im MySQL-Modus und Flyway Clean/Migrate pro Testlauf.
@@ -133,5 +146,6 @@ Abgedeckt sind:
 - Tenant-Membership-Filter
 - Gruppen-Scoping und Gruppen-Owner
 - Scope-basierte Library-/Media-Sichtbarkeit und `publicId`
+- Memory-Tree-Invarianten, Scope-Sichtbarkeit, Memory-Media-Ownership und Cover-Regeln
 - OpenAPI-Contract-Tests für API-first Bindung
 - Frontend-Codegen-Facades, NDJSON-Parsing, Upload-Composables und UI-Komponenten über Vitest

@@ -18,6 +18,7 @@ const domains = [
   'users',
   'tenants',
   'groups',
+  'memories',
   'library',
   'server',
   'frontend'

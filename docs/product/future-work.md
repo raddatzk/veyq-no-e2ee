@@ -1,0 +1,96 @@
+# Veyq Product Future Work
+
+This document turns the Memory product context into follow-up topics for developers and agents. Items here are not all implementation tasks yet. Many need an ADR, API proposal or UX sketch first.
+
+## Needs ADRs
+
+- Decide sync semantics: last-write-wins now, ETags or conflict resolution later.
+- Decide privacy model for public Memory shares and person/participant pages.
+- Decide license strategy: AGPL, trademark policy, community/commercial split.
+- Decide optional central services: push gateway, managed hosting, update/license services.
+- Decide E2E encryption stance for V1 and what metadata remains server-visible.
+
+## Needs Domain Modeling
+
+- Journal as exactly one Markdown document per Memory.
+- Lightweight embed references in journal Markdown.
+- Playlist reference and cached metadata model.
+- Track model and relationship to map views.
+- Weather metadata model.
+- Participant/person model with optional user linkage.
+- Public share links and permission grants.
+- Anonymous uploader identity and virtual uploader buckets.
+- Live Photo asset representation.
+
+## Needs API Design
+
+- Parent Memory aggregate summary endpoints beyond media list aggregation.
+- Memory header summary endpoint.
+- Journal read/update endpoint.
+- Playlist attach/update/remove endpoints.
+- Track upload/list/detail endpoints.
+- Public share resolution and permission-aware views.
+- Public upload-link flow.
+- Person/participant endpoints that avoid cross-Memory graph leakage.
+- Instance branding metadata for native apps and deep links.
+- Keep API-first contracts complete with preconditions, examples, error cases and `x-implementation-status`.
+- Preserve generated backend/frontend API model usage for new Memory APIs.
+
+## Needs UX Design
+
+- First Memory-facing UI that consumes the implemented Memory API without exposing Folder/Album language for new product surfaces.
+- Memory detail layout with `Gallery`, `Journal`, `Map`, `Tracks` and `Child Memories` tabs.
+- Memory header with cover, time range, places, weather, playlist, participants and track summary.
+- Child Memory navigation without file-system feel.
+- Parent Memory aggregation indicators.
+- Wrong-upload recovery flow when assets are not movable.
+- Timestamp correction UI.
+- Public share pages.
+- Public upload-link flow for anonymous contributors.
+- Uploader attribution and privacy modes.
+- Tenant switcher.
+- Demo Memory and empty-state strategy.
+- "Open in App" banner and universal link behavior.
+- Server user management.
+- Tenant user invite flow where admins create users only with role and email, and invited users set display name and password through the invite link.
+- Live search fields where useful.
+- Email-domain masking in user search or invite flows where privacy requires it.
+- Group creation.
+- Group management.
+
+## Needs Technical Spikes
+
+- Media derivation pipeline: WebP thumbnails, previews, H264 MP4 previews, streaming versions.
+- Local filesystem storage layout for originals and derived assets.
+- Video preview and streaming performance.
+- EXIF extraction and correction persistence.
+- GPS track parsing and map rendering.
+- Playlist metadata fetching and caching for Apple Music and Spotify.
+- Weather provider integration.
+- Face recognition and image classification feasibility, including ARM hosting.
+- Browser/mobile-side analysis feasibility under E2E constraints.
+- Semantic search architecture under privacy constraints.
+- Push gateway design for APNS/FCM with self-hosted instances.
+- Federation and remote share bookmarking.
+
+## V1 Guardrails
+
+- Keep comments out of V1.
+- Keep local accounts first; passkeys can come later.
+- Keep storage local-filesystem compatible.
+- Avoid manual asset sort fields in V1.
+- Avoid asset moves in V1 unless a later ADR explicitly changes this.
+- Avoid self-hosted music files; use external streaming references.
+- Avoid public person graph features.
+- Keep central infrastructure optional.
+- Keep reverse-proxy responsibility for domains, TLS and path rewrites unless a later ADR changes this.
+- Keep tenant and group roles separate from global security roles.
+- Keep public media identifiers separate from internal database IDs.
+
+## Implemented Baseline To Build On
+
+- Memory CRUD and direct child traversal exist as an API-first backend layer.
+- Memory-scoped media upload, listing and timestamp correction exist.
+- `includeChildren=true` aggregates media from descendant Memories while preserving direct asset ownership.
+- Memories currently coexist with legacy Folder/Album Explorer APIs; replacing the visible UI is still future work.
+- ADRs already capture Memory terminology, direct asset ownership and basic tree invariants.

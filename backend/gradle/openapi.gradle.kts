@@ -67,6 +67,7 @@ val openApiSpecs = listOf(
     OpenApiSpec("users", "../docs/api/users.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml"),
     OpenApiSpec("groups", "../docs/api/groups.openapi.yaml"),
+    OpenApiSpec("memories", "../docs/api/memories.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("library", "../docs/api/library.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("server", "../docs/api/server.openapi.yaml"),
     OpenApiSpec("frontend", "../docs/api/frontend.openapi.yaml"),

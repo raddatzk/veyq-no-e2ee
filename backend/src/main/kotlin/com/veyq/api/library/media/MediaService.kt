@@ -4,6 +4,8 @@ import com.veyq.api.auth.BadRequestException
 import com.veyq.api.auth.ForbiddenException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.domain.*
+import com.veyq.api.library.LibraryScopeKey
+import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.explorer.ResolvedExplorerLocation
 import com.veyq.api.auth.filterchain.RequestContext
@@ -12,6 +14,8 @@ import com.veyq.api.generated.model.MediaUploadSessionSummary
 import com.veyq.api.generated.model.PendingMediaUploadSummary
 import com.veyq.api.generated.model.MediaSummary
 import com.veyq.api.generated.model.UpdateMediaMetadataRequest
+import com.veyq.api.generated.model.MemoryMediaSummary
+import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -44,15 +48,16 @@ class MediaService @Inject constructor(
     private val albumMediaRepo: AlbumMediaRepo,
     private val albumRepo: TenantAlbumRepo,
     private val mediaRepo: MediaRepo,
+    private val memoryRepo: MemoryRepo,
     private val mediaConfig: MediaConfig,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
-    groupMemberRepo: TenantGroupMemberRepo,
+    private val mediaGroupMemberRepo: TenantGroupMemberRepo,
     requestContext: RequestContext
-) : LibraryService(folderRepo, albumRepo, groupRepo, groupMemberRepo, requestContext) {
+) : LibraryService(folderRepo, albumRepo, groupRepo, mediaGroupMemberRepo, requestContext) {
     private val log: Logger = Logger.getLogger(MediaService::class.java)
 
     fun streamMedia(path: String?): Sequence<MediaSummary> {
@@ -72,6 +77,17 @@ class MediaService @Inject constructor(
                     .map { it.media.toStreamSummary(album) }
             }
             .distinctBy { it.id }
+    }
+
+    fun listMemoryMedia(memoryId: String, includeChildren: Boolean): List<MemoryMediaSummary> {
+        val memory = resolveVisibleMemory(memoryId)
+        val memories = if (includeChildren) descendantsAndSelf(memory) else listOf(memory)
+        return memories
+            .filter(::isMemoryVisible)
+            .flatMap { mediaRepo.listByMemory(it) }
+            .distinctBy { it.id }
+            .sortedWith(compareBy<Media> { it.capturedAt ?: it.createdAt }.thenBy { it.createdAt })
+            .map { it.toMemorySummary() }
     }
 
     @Transactional
@@ -110,6 +126,43 @@ class MediaService @Inject constructor(
         linkMedia(album, media)
 
         return media.toUploadSummary(album)
+    }
+
+    @Transactional
+    fun uploadMemoryMedia(memoryId: String, file: FileUpload?, title: String?): MemoryMediaSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val upload = file ?: throw BadRequestException("file is required")
+        val uploadPath = upload.uploadedFile()
+        val size = Files.size(uploadPath)
+        if (size <= 0) throw BadRequestException("file must not be empty")
+        val mimeType = upload.contentType() ?: Files.probeContentType(uploadPath) ?: ""
+        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
+            throw BadRequestException("Only image and video uploads are supported")
+        }
+
+        val media = Media().also {
+            it.tenant = tenant()
+            it.owner = user()
+            applyScope(it, memory.scope())
+            it.memory = memory
+            it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
+                ?: upload.fileName()?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
+                        ?: "Upload"
+            it.mimeType = mimeType
+            it.sizeBytes = size
+            it.storageKey = ""
+            it.originalFilename = upload.fileName()
+            mediaRepo.persist(it)
+        }
+        mediaRepo.flush()
+
+        val storageKey = "tenant-${tenant().id}/${media.publicId}/original"
+        writeMediaFile(uploadPath, storageKey)
+        media.storageKey = storageKey
+        mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
+        generatePreviewIfSupported(media)
+
+        return media.toMemorySummary()
     }
 
     fun createUpload(request: CreateMediaUploadRequest): MediaUploadSessionSummary {
@@ -232,6 +285,18 @@ class MediaService @Inject constructor(
         return media.toStreamSummary(album)
     }
 
+    @Transactional
+    fun updateMemoryMediaMetadata(memoryId: String, publicId: String, request: UpdateMemoryMediaMetadataRequest): MemoryMediaSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
+            ?: throw NotFoundException("Media not found")
+        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+
+        media.capturedAt = request.capturedAt?.toInstant()
+        media.capturedAtOverride = true
+        return media.toMemorySummary()
+    }
+
     fun mediaContent(publicId: String, rangeHeader: String?): Response {
         val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
             ?: throw NotFoundException("Media not found")
@@ -295,7 +360,26 @@ class MediaService @Inject constructor(
         isAlbumVisible(album) && media.scope().sameAs(album.scope())
 
     private fun isMediaAccessible(media: Media): Boolean =
-        albumMediaRepo.list("media", media).any { isMediaVisible(media, it.album) }
+        media.memory?.let(::isMemoryVisible) == true ||
+            albumMediaRepo.list("media", media).any { isMediaVisible(media, it.album) }
+
+    private fun resolveVisibleMemory(publicId: String): Memory {
+        val memory = memoryRepo.findByTenantAndPublicId(tenant(), publicId)
+            ?: throw NotFoundException("Memory not found")
+        if (!isMemoryVisible(memory)) throw NotFoundException("Memory not found")
+        return memory
+    }
+
+    private fun isMemoryVisible(memory: Memory): Boolean =
+        memory.tenant.id == tenant().id && when (val scope = memory.scope()) {
+            LibraryScopeKey.Tenant -> true
+            is LibraryScopeKey.Group -> scope.group.tenant.id == tenant().id && mediaGroupMemberRepo.findByGroupAndUser(scope.group, user()) != null
+            is LibraryScopeKey.User -> scope.user.id == user().id
+        }
+
+    private fun descendantsAndSelf(root: Memory): List<Memory> =
+        listOf(root) + memoryRepo.list("tenant", tenant())
+            .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
 
     private fun resolveAlbum(path: String?): TenantAlbum =
         (resolveVisibleContext(path) as? ResolvedExplorerLocation.Album)?.scope ?: throw NotFoundException("Album not found")
@@ -679,6 +763,29 @@ class MediaService @Inject constructor(
             gpsLongitude = gpsLongitude,
         )
 
+    private fun Media.toMemorySummary(): MemoryMediaSummary =
+        MemoryMediaSummary(
+            id = publicId,
+            memoryId = memory?.publicId ?: "",
+            title = title,
+            ownerUserId = owner.id,
+            uploaderDisplayName = owner.displayName,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            capturedAt = capturedAt?.toApiOffsetDateTime(),
+            capturedAtOverride = capturedAtOverride,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            contentUrl = contentUrl(),
+            previewUrl = previewUrl(),
+            cameraMake = cameraMake,
+            cameraModel = cameraModel,
+            lensModel = lensModel,
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
+            gpsLatitude = gpsLatitude,
+            gpsLongitude = gpsLongitude,
+        )
+
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/media/${url(publicId)}/content"
 
@@ -699,6 +806,9 @@ class MediaService @Inject constructor(
 
     private fun Instant.toApiOffsetDateTime(): OffsetDateTime =
         OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+
+    private fun Memory.scope(): LibraryScopeKey =
+        LibraryScopes.scope(this)
 
     companion object {
         private const val PREVIEW_MAX_EDGE = 720

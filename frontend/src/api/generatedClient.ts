@@ -9,6 +9,8 @@ import {
   GroupsApi,
   MediaApi,
   MediaUploadsApi,
+  MemoriesApi,
+  MemoryMediaApi,
   ServerApi,
   SettingsApi,
   SetupApi,
@@ -29,6 +31,8 @@ export const foldersApi = new FoldersApi(generatedConfiguration)
 export const albumsApi = new AlbumsApi(generatedConfiguration)
 export const mediaApi = new MediaApi(generatedConfiguration)
 export const mediaUploadsApi = new MediaUploadsApi(generatedConfiguration)
+export const memoriesApi = new MemoriesApi(generatedConfiguration)
+export const memoryMediaApi = new MemoryMediaApi(generatedConfiguration)
 export const serverApi = new ServerApi(generatedConfiguration)
 export const settingsApi = new SettingsApi(generatedConfiguration)
 export const frontendApi = new FrontendApi(generatedConfiguration)

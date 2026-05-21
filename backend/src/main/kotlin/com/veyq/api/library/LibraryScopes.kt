@@ -2,6 +2,7 @@ package com.veyq.api.library
 
 import com.veyq.api.domain.LibraryScopeType
 import com.veyq.api.domain.Media
+import com.veyq.api.domain.Memory
 import com.veyq.api.domain.TenantAlbum
 import com.veyq.api.domain.TenantFolder
 import com.veyq.api.domain.TenantGroup
@@ -23,6 +24,9 @@ object LibraryScopes {
     fun scope(media: Media): LibraryScopeKey =
         fromFields(media.scopeType, media.scopeGroup, media.scopeUser)
 
+    fun scope(memory: Memory): LibraryScopeKey =
+        fromFields(memory.scopeType, memory.scopeGroup, memory.scopeUser)
+
     fun apply(folder: TenantFolder, scope: LibraryScopeKey) {
         folder.scopeType = scope.type()
         folder.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
@@ -39,6 +43,12 @@ object LibraryScopes {
         media.scopeType = scope.type()
         media.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
         media.scopeUser = (scope as? LibraryScopeKey.User)?.user
+    }
+
+    fun apply(memory: Memory, scope: LibraryScopeKey) {
+        memory.scopeType = scope.type()
+        memory.scopeGroup = (scope as? LibraryScopeKey.Group)?.group
+        memory.scopeUser = (scope as? LibraryScopeKey.User)?.user
     }
 
     fun pathPrefix(scope: LibraryScopeKey): String =
