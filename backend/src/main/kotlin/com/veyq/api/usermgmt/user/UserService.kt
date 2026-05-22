@@ -11,6 +11,7 @@ import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.*
 import com.veyq.api.tenant.toManagedTenantSummary
+import com.veyq.api.security.RateLimitService
 import com.veyq.api.usermgmt.EmailChangeService
 import com.veyq.api.usermgmt.InvitationService
 import com.veyq.api.usermgmt.ResetPasswordService
@@ -32,6 +33,7 @@ class UserService @Inject constructor(
     private val authService: AuthService,
     private val resetPasswordService: ResetPasswordService,
     private val emailChangeService: EmailChangeService,
+    private val rateLimitService: RateLimitService,
     private val passkeyService: PasskeyService,
 ) {
     fun me(): UserSummary {
@@ -66,7 +68,21 @@ class UserService @Inject constructor(
     @Transactional
     fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): UserSummary {
         val user = managedUser()
-        val confirmedUser = emailChangeService.confirmEmailChange(user, request.token)
+        val target = user.id.toString()
+        rateLimitService.checkTokenFailureAllowed("email-change", target)
+        val confirmedUser = try {
+            emailChangeService.confirmEmailChange(user, request.token)
+        } catch (exception: UnauthorizedException) {
+            rateLimitService.recordTokenFailure("email-change", target)
+            throw exception
+        } catch (exception: ForbiddenException) {
+            rateLimitService.recordTokenFailure("email-change", target)
+            throw exception
+        } catch (exception: BadRequestException) {
+            rateLimitService.recordTokenFailure("email-change", target)
+            throw exception
+        }
+        rateLimitService.recordTokenSuccess("email-change", target)
         return summarize(confirmedUser)
     }
 
@@ -106,6 +122,7 @@ class UserService @Inject constructor(
 
     fun forgotPassword(request: ForgotPasswordRequest) {
         val email = request.email.trim().lowercase()
+        rateLimitService.checkForgotPassword(email)
         val user = userRepo.findByEmail(email)?.takeIf { it.passwordSetAt != null } ?: return
         val tenant = user.tenantMemberships.firstOrNull()?.tenant ?: return
         resetPasswordService.requestNewPassword(user, tenant)
@@ -115,9 +132,20 @@ class UserService @Inject constructor(
     fun resetMyPassword(userId: Long, request: ResetPasswordRequest) {
         val user = findUser(userId)
         val now = Instant.now()
-        resetPasswordService.checkToken(userId, request.token, now)
+        val target = userId.toString()
+        rateLimitService.checkTokenFailureAllowed("password-reset", target)
+        try {
+            resetPasswordService.checkToken(userId, request.token, now)
+        } catch (exception: ForbiddenException) {
+            rateLimitService.recordTokenFailure("password-reset", target)
+            throw exception
+        } catch (exception: BadRequestException) {
+            rateLimitService.recordTokenFailure("password-reset", target)
+            throw exception
+        }
 
         passwordService.setPassword(user, request.password, now)
+        rateLimitService.recordTokenSuccess("password-reset", target)
     }
 
     @Transactional
@@ -156,11 +184,22 @@ class UserService @Inject constructor(
         }
 
         val now = Instant.now()
+        val target = targetUser.id.toString()
+        rateLimitService.checkTokenFailureAllowed("invitation", target)
 
-        val invitation = invitationService.checkToken(request.token, now)
+        val invitation = try {
+            invitationService.checkToken(request.token, now)
+        } catch (exception: NotFoundException) {
+            rateLimitService.recordTokenFailure("invitation", target)
+            throw exception
+        } catch (exception: BadRequestException) {
+            rateLimitService.recordTokenFailure("invitation", target)
+            throw exception
+        }
         val invitedUser = invitation.user
 
         if (invitedUser != targetUser) {
+            rateLimitService.recordTokenFailure("invitation", target)
             throw UnauthorizedException("User is already accepted")
         }
 
@@ -180,6 +219,7 @@ class UserService @Inject constructor(
         membership.acceptedAt = now
 
         invitationService.acceptTokenForUserAndTenant(invitedUser, invitation.tenant, now)
+        rateLimitService.recordTokenSuccess("invitation", target)
 
         return authService.loginUser(targetUser)
     }

@@ -49,6 +49,7 @@ val sharedSchemaMappings = mapOf(
     "ServerRole" to "$modelPackageName.ServerRole",
     "ErrorResponse" to "$modelPackageName.ErrorResponse",
     "UserSummary" to "$modelPackageName.UserSummary",
+    "PublicUserSummary" to "$modelPackageName.PublicUserSummary",
 )
 
 val sharedPrimitiveTypeMappings = mapOf(

@@ -9,6 +9,7 @@ import jakarta.ws.rs.Priorities
 import jakarta.ws.rs.container.ContainerRequestContext
 import jakarta.ws.rs.container.ContainerRequestFilter
 import jakarta.ws.rs.ext.Provider
+import io.vertx.ext.web.RoutingContext
 
 @Provider
 @ApplicationScoped
@@ -17,8 +18,10 @@ class RequestContextFilter @Inject constructor(
     private val identity: SecurityIdentity,
     private val userRepo: UserRepo,
     private val requestContext: RequestContext,
+    private val routingContext: RoutingContext,
 ) : ContainerRequestFilter {
     override fun filter(context: ContainerRequestContext) {
+        requestContext.clientIp = clientIp(context)
         if (identity.isAnonymous) {
             return
         }
@@ -29,5 +32,16 @@ class RequestContextFilter @Inject constructor(
             identity.getCredential(TokenCredentials::class.java),
             context.uriInfo.path == "api/auth/refresh",
         )
+    }
+
+    private fun clientIp(context: ContainerRequestContext): String {
+        val forwardedFor = context.getHeaderString("X-Forwarded-For")
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        return forwardedFor
+            ?: routingContext.request().remoteAddress()?.host()
+            ?: "unknown"
     }
 }

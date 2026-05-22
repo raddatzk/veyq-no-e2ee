@@ -796,22 +796,18 @@ components:
       type: object
       additionalProperties: false
       required:
-      - userId
-      - email
-      - displayName
-      - role
-      - status
+      - user
       properties:
-        userId:
-          type: integer
-          format: int64
+        user:
+          "$ref": "./common.openapi.yaml#/components/schemas/PublicUserSummary"
         email:
+          description: Present only for tenant owners and server owners.
           "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
-        displayName:
-          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         role:
+          description: Present only for tenant owners and server owners.
           "$ref": "#/components/schemas/TenantRole"
         status:
+          description: Present only for tenant owners and server owners.
           "$ref": "#/components/schemas/TenantUserStatus"
     UpdateTenantSettingsRequest:
       type: object

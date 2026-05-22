@@ -60,10 +60,10 @@ const selectedMembers = computed(() => selectedGroup.value?.members || [])
 const availableTenantUsers = computed(() => {
   const memberIds = new Set(selectedMembers.value.map((member) => member.user.userId))
   return tenantUsers.value
-    .filter((user) => !memberIds.has(user.userId) && user.status === 'Active')
+    .filter((user) => !memberIds.has(user.user.userId) && user.status === 'Active')
     .map((user) => ({
-      label: `${user.displayName} (${user.email})`,
-      value: user.userId
+      label: user.email ? `${user.user.displayName} (${user.email})` : user.user.displayName,
+      value: user.user.userId
     }))
 })
 const ownerCount = computed(
@@ -198,7 +198,7 @@ async function submitCreate() {
 function addMember() {
   if (!canManageSelectedGroup.value || !selectedGroup.value || selectedUserId.value === null) return
   const userId = Number(selectedUserId.value)
-  const user = tenantUsers.value.find((tenantUser) => tenantUser.userId === userId)
+  const user = tenantUsers.value.find((tenantUser) => tenantUser.user.userId === userId)
   if (!user) return
 
   selectedGroup.value = {
@@ -207,15 +207,12 @@ function addMember() {
       ...selectedGroup.value.members,
       {
         user: {
-          userId: user.userId,
-          email: user.email,
-          displayName: user.displayName,
-          serverRole: 'ServerMember' as const,
-          passkeyCount: 0
+          userId: user.user.userId,
+          displayName: user.user.displayName
         },
         role: selectedRole.value
       }
-    ].sort((left, right) => left.user.email.localeCompare(right.user.email))
+    ].sort((left, right) => left.user.displayName.localeCompare(right.user.displayName))
   }
   selectedUserId.value = null
   selectedRole.value = 'GroupMember'
@@ -263,7 +260,7 @@ async function saveGroup() {
       members: new Set(
         selectedGroup.value.members.map((member) => ({
           id: member.user.userId,
-          role: member.role
+          role: member.role || 'GroupMember'
         }))
       )
     })
@@ -417,7 +414,6 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           >
             <div>
               <strong>{{ member.user.displayName }}</strong>
-              <span>{{ member.user.email }}</span>
             </div>
             <Select
               :model-value="member.role"

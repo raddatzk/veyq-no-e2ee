@@ -15,6 +15,7 @@ import com.veyq.api.domain.User
 import com.veyq.api.domain.UserEmailChangeRepo
 import com.veyq.api.domain.UserInvitationRepo
 import com.veyq.api.domain.UserRepo
+import com.veyq.api.security.RateLimitService
 import com.veyq.api.setup.ServerState
 import io.quarkus.mailer.MockMailbox
 import io.quarkus.test.junit.QuarkusTest
@@ -46,6 +47,7 @@ class UserManagementResourceTest {
     @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var mailbox: MockMailbox
+    @Inject lateinit var rateLimitService: RateLimitService
 
     private lateinit var runId: String
     private lateinit var ownerCookie: String
@@ -55,6 +57,7 @@ class UserManagementResourceTest {
     fun setUp() {
         runId = UUID.randomUUID().toString().take(8)
         mailbox.clear()
+        rateLimitService.clearAll()
         val owner = createUser("mgmt-owner-$runId", "admin1234567", ServerRole.ServerOwner)
         tenant = createTenant("mgmt-$runId", "Management $runId", "mgmt-$runId.example.test", owner)
         ownerCookie = login(owner.email, "admin1234567")
@@ -279,6 +282,73 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `forgot password requests are rate limited`() {
+        val currentEmail = "mgmt-owner-$runId@example.com"
+
+        repeat(3) {
+            given()
+                .contentType("application/json")
+                .body("""{"email":"$currentEmail"}""")
+                .`when`().post("/api/users/password/forgot")
+                .then()
+                .statusCode(204)
+        }
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail"}""")
+            .`when`().post("/api/users/password/forgot")
+            .then()
+            .statusCode(429)
+            .header("Retry-After", org.hamcrest.Matchers.notNullValue())
+    }
+
+    @Test
+    fun `reset password token failures are rate limited and success clears the failure counter`() {
+        val currentEmail = "mgmt-owner-$runId@example.com"
+        val userId = userRepo.findByEmail(currentEmail)!!.id
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail"}""")
+            .`when`().post("/api/users/password/forgot")
+            .then()
+            .statusCode(204)
+        val token = resetPasswordTokenFromMailbox(currentEmail)
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"ignored123456","token":"wrong"}""")
+            .`when`().post("/api/users/$userId/password/reset")
+            .then()
+            .statusCode(403)
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"new-admin1234567","token":"$token"}""")
+            .`when`().post("/api/users/$userId/password/reset")
+            .then()
+            .statusCode(204)
+
+        repeat(5) {
+            given()
+                .contentType("application/json")
+                .body("""{"password":"ignored123456","token":"wrong-$it"}""")
+                .`when`().post("/api/users/$userId/password/reset")
+                .then()
+                .statusCode(403)
+        }
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"ignored123456","token":"blocked"}""")
+            .`when`().post("/api/users/$userId/password/reset")
+            .then()
+            .statusCode(429)
+            .header("Retry-After", org.hamcrest.Matchers.notNullValue())
+    }
+
+    @Test
     fun `tenant owner invites and activates existing tenant user by email`() {
         val existingUser = createUser("searchable-$runId", "admin1234567", ServerRole.ServerMember)
 
@@ -374,7 +444,7 @@ class UserManagementResourceTest {
             .body("role", equalTo("TenantOwner"))
             .body("status", equalTo("Pending"))
             .extract()
-            .path<Number>("userId")
+            .path<Number>("user.userId")
             .toLong()
 
         val createdUser = userRepo.findById(createdUserId)!!
@@ -414,7 +484,10 @@ class UserManagementResourceTest {
             .`when`().get("/api/tenants/${tenant.name}/users")
             .then()
             .statusCode(200)
-            .body("users.email", hasItem(tenantMember.email))
+            .body("users.user.displayName", hasItem(tenantMember.displayName))
+            .body("users.email", hasItem(nullValue()))
+            .body("users.role", hasItem(nullValue()))
+            .body("users.status", hasItem(nullValue()))
 
         given()
             .contentType("application/json")
@@ -472,7 +545,7 @@ class UserManagementResourceTest {
             .`when`().post("/api/tenants/${otherTenant.name}/users/invite")
             .then()
             .statusCode(200)
-            .body("userId", equalTo(userId.toInt()))
+            .body("user.userId", equalTo(userId.toInt()))
             .body("role", equalTo("TenantOwner"))
             .body("status", equalTo("Pending"))
 
@@ -618,6 +691,12 @@ class UserManagementResourceTest {
         val message = mailbox.getMailMessagesSentTo(pendingEmail).last()
         assertThat(message.text).contains("/email/confirm#")
         return message.text.substringAfter("/email/confirm#").trim()
+    }
+
+    private fun resetPasswordTokenFromMailbox(email: String): String {
+        val message = mailbox.getMailMessagesSentTo(email).last()
+        assertThat(message.text).contains("/password/reset/")
+        return message.text.substringAfter("#").trim()
     }
 
     private fun ownerUserId(): Long = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!.id

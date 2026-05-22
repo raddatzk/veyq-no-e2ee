@@ -188,9 +188,11 @@ function mountPanel(groupName?: string) {
 
 function tenantUser(userId: number, displayName: string) {
   return {
-    userId,
+    user: {
+      userId,
+      displayName
+    },
     email: `${displayName.toLowerCase()}@example.test`,
-    displayName,
     role: 'TenantMember',
     status: 'Active'
   } as const
@@ -218,10 +220,7 @@ function groupSummary(
     members: members.map((member) => ({
       user: {
         userId: member.userId,
-        email: `${member.userId}@example.test`,
-        displayName: member.userId === 1 ? 'Owner' : 'Member',
-        serverRole: 'ServerMember',
-        passkeyCount: 0
+        displayName: member.userId === 1 ? 'Owner' : 'Member'
       },
       role: member.role
     }))

@@ -306,11 +306,11 @@ components:
       additionalProperties: false
       required:
       - user
-      - role
       properties:
         user:
-          "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          "$ref": "./common.openapi.yaml#/components/schemas/PublicUserSummary"
         role:
+          description: Present only for group owners, tenant owners and server owners.
           "$ref": "#/components/schemas/GroupRole"
     GroupSummary:
       type: object
@@ -339,9 +339,7 @@ components:
         members:
           - user:
               userId: 1
-              email: kevin@example.test
               displayName: Kevin
-              serverRole: ServerOwner
             role: GroupOwner
     SimplifiedGroupSummary:
       type: object

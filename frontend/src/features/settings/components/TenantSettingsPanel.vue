@@ -42,7 +42,7 @@ const tenantDisplayName = computed(
 const canDeleteTenant = computed(() =>
   users.value.some(
     (user) =>
-      user.userId === authState.user?.userId &&
+      user.user.userId === authState.user?.userId &&
       user.status === 'Active' &&
       user.role === 'TenantOwner'
   )
@@ -111,7 +111,7 @@ async function reinviteUser(user: TenantUserSummary) {
   error.value = ''
   message.value = ''
   try {
-    upsertUser(await reinviteTenantUser(props.tenantName, user.userId))
+    upsertUser(await reinviteTenantUser(props.tenantName, user.user.userId))
     message.value = 'Einladung wurde erneut gesendet.'
   } catch (caught) {
     error.value = getErrorMessage(caught, 'Einladung konnte nicht erneut gesendet werden.')
@@ -124,7 +124,7 @@ async function changeRole(user: TenantUserSummary, role: TenantRole) {
   error.value = ''
   message.value = ''
   try {
-    upsertUser(await updateTenantUserRole(props.tenantName, user.userId, role))
+    upsertUser(await updateTenantUserRole(props.tenantName, user.user.userId, role))
     message.value = 'Rolle wurde gespeichert.'
   } catch (caught) {
     error.value = getErrorMessage(caught, 'Rolle konnte nicht gespeichert werden.')
@@ -149,12 +149,18 @@ async function submitDeleteTenant() {
 }
 
 function upsertUser(user: TenantUserSummary) {
-  const index = users.value.findIndex((item) => item.userId === user.userId)
+  const index = users.value.findIndex((item) => item.user.userId === user.user.userId)
   if (index === -1) {
-    users.value = [...users.value, user].sort((left, right) => left.email.localeCompare(right.email))
+    users.value = [...users.value, user].sort((left, right) =>
+      userSortLabel(left).localeCompare(userSortLabel(right))
+    )
   } else {
     users.value.splice(index, 1, user)
   }
+}
+
+function userSortLabel(user: TenantUserSummary): string {
+  return user.email || user.user.displayName
 }
 </script>
 
@@ -183,10 +189,10 @@ function upsertUser(user: TenantUserSummary) {
           <span>Rolle</span>
           <span></span>
         </div>
-        <div v-for="user in users" :key="user.userId" class="settings-table-row tenant-users-row">
+        <div v-for="user in users" :key="user.user.userId" class="settings-table-row tenant-users-row">
           <div>
-            <strong>{{ user.displayName }}</strong>
-            <span>{{ user.email }}</span>
+            <strong>{{ user.user.displayName }}</strong>
+            <span v-if="user.email">{{ user.email }}</span>
           </div>
           <span>{{ user.status === 'Active' ? 'Aktiv' : 'Ausstehend' }}</span>
           <Select

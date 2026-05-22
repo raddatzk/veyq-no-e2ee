@@ -102,7 +102,7 @@ fabric.properties
 .idea/*
 
 !.idea/codeStyles
-!.idea/runConfigurations
+.idea/runConfigurations
 
 ### Kotlin ###
 # Compiled class file

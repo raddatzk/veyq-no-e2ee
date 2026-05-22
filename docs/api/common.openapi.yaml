@@ -128,6 +128,23 @@ components:
         serverRole: ServerOwner
         passkeyCount: 1
 
+    PublicUserSummary:
+      description: Privacy-preserving user reference for tenant and group member lists.
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+      properties:
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+      example:
+        userId: 1
+        displayName: Kevin
+
     EmailAddress:
       type: string
       description: Email address. The backend trims whitespace and stores it lowercase.

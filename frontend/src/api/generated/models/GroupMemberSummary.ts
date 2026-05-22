@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { PublicUserSummary } from './PublicUserSummary';
+import {
+    PublicUserSummaryFromJSON,
+    PublicUserSummaryFromJSONTyped,
+    PublicUserSummaryToJSON,
+    PublicUserSummaryToJSONTyped,
+} from './PublicUserSummary';
 import type { GroupRole } from './GroupRole';
 import {
     GroupRoleFromJSON,
@@ -20,13 +27,6 @@ import {
     GroupRoleToJSON,
     GroupRoleToJSONTyped,
 } from './GroupRole';
-import type { UserSummary } from './UserSummary';
-import {
-    UserSummaryFromJSON,
-    UserSummaryFromJSONTyped,
-    UserSummaryToJSON,
-    UserSummaryToJSONTyped,
-} from './UserSummary';
 
 /**
  * 
@@ -36,16 +36,16 @@ import {
 export interface GroupMemberSummary {
     /**
      * 
-     * @type {UserSummary}
+     * @type {PublicUserSummary}
      * @memberof GroupMemberSummary
      */
-    user: UserSummary;
+    user: PublicUserSummary;
     /**
-     * 
+     * Present only for group owners, tenant owners and server owners.
      * @type {GroupRole}
      * @memberof GroupMemberSummary
      */
-    role: GroupRole;
+    role?: GroupRole;
 }
 
 
@@ -55,7 +55,6 @@ export interface GroupMemberSummary {
  */
 export function instanceOfGroupMemberSummary(value: object): value is GroupMemberSummary {
     if (!('user' in value) || value['user'] === undefined) return false;
-    if (!('role' in value) || value['role'] === undefined) return false;
     return true;
 }
 
@@ -69,8 +68,8 @@ export function GroupMemberSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
     }
     return {
         
-        'user': UserSummaryFromJSON(json['user']),
-        'role': GroupRoleFromJSON(json['role']),
+        'user': PublicUserSummaryFromJSON(json['user']),
+        'role': json['role'] == null ? undefined : GroupRoleFromJSON(json['role']),
     };
 }
 
@@ -85,7 +84,7 @@ export function GroupMemberSummaryToJSONTyped(value?: GroupMemberSummary | null,
 
     return {
         
-        'user': UserSummaryToJSON(value['user']),
+        'user': PublicUserSummaryToJSON(value['user']),
         'role': GroupRoleToJSON(value['role']),
     };
 }

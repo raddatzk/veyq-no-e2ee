@@ -15,6 +15,8 @@ import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.ResolvedMemoryLocation
 import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaKind
+import com.veyq.api.library.media.MediaTypeDetector
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -32,6 +34,7 @@ class MemoryService @Inject constructor(
     private val groupRepo: TenantGroupRepo,
     private val memoryGroupMemberRepo: TenantGroupMemberRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaTypeDetector: MediaTypeDetector,
     requestContext: RequestContext,
 ) : LibraryService(folderRepo, groupRepo, memoryGroupMemberRepo, requestContext) {
 
@@ -134,14 +137,15 @@ class MemoryService @Inject constructor(
     fun setCover(publicId: String, uploadPath: Path, originalFilename: String?): MemorySummary {
         val memory = resolveVisibleMemory(publicId)
         if (Files.size(uploadPath) <= 0) throw BadRequestException("file must not be empty")
-        val mimeType = detectCoverMimeType(uploadPath)
-        if (!mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported")
+        val mediaType = mediaTypeDetector.detect(uploadPath)
+            ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
+        if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
 
         memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
         val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}/cover"
         writeFile(uploadPath, storageKey)
         memory.coverStorageKey = storageKey
-        memory.coverMimeType = mimeType
+        memory.coverMimeType = mediaType.mimeType
         memory.coverOriginalFilename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "cover"
         return toSummary(memory)
     }
@@ -154,6 +158,7 @@ class MemoryService @Inject constructor(
         return Response.ok(path.toFile(), memory.coverMimeType ?: "application/octet-stream")
             .header("Cache-Control", "private, max-age=31536000, immutable")
             .header("Content-Length", Files.size(path))
+            .header("X-Content-Type-Options", "nosniff")
             .build()
     }
 
@@ -304,27 +309,6 @@ class MemoryService @Inject constructor(
             Files.deleteIfExists(temp)
             throw e
         }
-    }
-
-    private fun detectCoverMimeType(path: Path): String {
-        val header = ByteArray(16)
-        val read = Files.newInputStream(path).use { input -> input.read(header) }
-        if (read >= 3 &&
-            header[0] == 0xFF.toByte() &&
-            header[1] == 0xD8.toByte() &&
-            header[2] == 0xFF.toByte()
-        ) {
-            return "image/jpeg"
-        }
-        if (read >= 8 &&
-            header[0] == 0x89.toByte() &&
-            header[1] == 'P'.code.toByte() &&
-            header[2] == 'N'.code.toByte() &&
-            header[3] == 'G'.code.toByte()
-        ) {
-            return "image/png"
-        }
-        return Files.probeContentType(path) ?: ""
     }
 
     private fun storagePath(storageKey: String): Path {

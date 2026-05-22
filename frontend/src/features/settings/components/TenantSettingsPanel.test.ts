@@ -134,9 +134,11 @@ function tenantUser(
   status: 'Active' | 'Pending' = 'Active'
 ) {
   return {
-    userId,
+    user: {
+      userId,
+      displayName
+    },
     email,
-    displayName,
     role,
     status
   } as const

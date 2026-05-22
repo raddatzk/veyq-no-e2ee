@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { PublicUserSummary } from './PublicUserSummary';
+import {
+    PublicUserSummaryFromJSON,
+    PublicUserSummaryFromJSONTyped,
+    PublicUserSummaryToJSON,
+    PublicUserSummaryToJSONTyped,
+} from './PublicUserSummary';
 import type { TenantUserStatus } from './TenantUserStatus';
 import {
     TenantUserStatusFromJSON,
@@ -36,34 +43,28 @@ import {
 export interface TenantUserSummary {
     /**
      * 
-     * @type {number}
+     * @type {PublicUserSummary}
      * @memberof TenantUserSummary
      */
-    userId: number;
+    user: PublicUserSummary;
     /**
-     * Email address. The backend trims whitespace and stores it lowercase.
+     * Present only for tenant owners and server owners.
      * @type {string}
      * @memberof TenantUserSummary
      */
-    email: string;
+    email?: string;
     /**
-     * 
-     * @type {string}
-     * @memberof TenantUserSummary
-     */
-    displayName: string;
-    /**
-     * 
+     * Present only for tenant owners and server owners.
      * @type {TenantRole}
      * @memberof TenantUserSummary
      */
-    role: TenantRole;
+    role?: TenantRole;
     /**
-     * 
+     * Present only for tenant owners and server owners.
      * @type {TenantUserStatus}
      * @memberof TenantUserSummary
      */
-    status: TenantUserStatus;
+    status?: TenantUserStatus;
 }
 
 
@@ -72,11 +73,7 @@ export interface TenantUserSummary {
  * Check if a given object implements the TenantUserSummary interface.
  */
 export function instanceOfTenantUserSummary(value: object): value is TenantUserSummary {
-    if (!('userId' in value) || value['userId'] === undefined) return false;
-    if (!('email' in value) || value['email'] === undefined) return false;
-    if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('role' in value) || value['role'] === undefined) return false;
-    if (!('status' in value) || value['status'] === undefined) return false;
+    if (!('user' in value) || value['user'] === undefined) return false;
     return true;
 }
 
@@ -90,11 +87,10 @@ export function TenantUserSummaryFromJSONTyped(json: any, ignoreDiscriminator: b
     }
     return {
         
-        'userId': json['userId'],
-        'email': json['email'],
-        'displayName': json['displayName'],
-        'role': TenantRoleFromJSON(json['role']),
-        'status': TenantUserStatusFromJSON(json['status']),
+        'user': PublicUserSummaryFromJSON(json['user']),
+        'email': json['email'] == null ? undefined : json['email'],
+        'role': json['role'] == null ? undefined : TenantRoleFromJSON(json['role']),
+        'status': json['status'] == null ? undefined : TenantUserStatusFromJSON(json['status']),
     };
 }
 
@@ -109,9 +105,8 @@ export function TenantUserSummaryToJSONTyped(value?: TenantUserSummary | null, i
 
     return {
         
-        'userId': value['userId'],
+        'user': PublicUserSummaryToJSON(value['user']),
         'email': value['email'],
-        'displayName': value['displayName'],
         'role': TenantRoleToJSON(value['role']),
         'status': TenantUserStatusToJSON(value['status']),
     };

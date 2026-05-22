@@ -9,11 +9,10 @@ import com.veyq.api.generated.model.GroupMemberSummary
 import com.veyq.api.generated.model.GroupRole as ApiGroupRole
 import com.veyq.api.generated.model.GroupSummary
 import com.veyq.api.generated.model.GroupsSummary
+import com.veyq.api.generated.model.PublicUserSummary
 import com.veyq.api.generated.model.SimplifiedGroupSummary
 import com.veyq.api.generated.model.UpdateGroupRequest
-import com.veyq.api.generated.model.UserSummary
 import com.veyq.api.library.LibraryDeletionService
-import com.veyq.api.usermgmt.user.toUsersApiRole
 import com.veyq.api.usermgmt.user.UserService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -151,17 +150,25 @@ class GroupService @Inject constructor(
             id,
             name,
             displayName,
-            members.map { GroupMemberSummary(it.user.toGroupMemberSummaryUser(), it.role.toGroupsApiRole()) }
+            members.map {
+                GroupMemberSummary(
+                    it.user.toGroupMemberSummaryUser(),
+                    if (canManageGroup(this)) it.role.toGroupsApiRole() else null,
+                )
+            }
         )
+
+    private fun canManageGroup(group: TenantGroup): Boolean {
+        if (requestContext.user!!.role == ServerRole.ServerOwner) return true
+        if (currentTenantRole() == TenantRole.TenantOwner) return true
+        return groupMemberRepo.findByGroupAndUser(group, requestContext.user!!)?.role == GroupRole.GroupOwner
+    }
 }
 
-private fun User.toGroupMemberSummaryUser(): UserSummary =
-    UserSummary(
+private fun User.toGroupMemberSummaryUser(): PublicUserSummary =
+    PublicUserSummary(
         id,
-        email,
         displayName,
-        role.toUsersApiRole(),
-        passkeyCredentials.size,
     )
 
 private fun GroupRole.toGroupsApiRole(): ApiGroupRole =

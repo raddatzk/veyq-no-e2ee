@@ -9,4 +9,5 @@ class RequestContext {
     var user: User? = null
     var tenant: Tenant? = null
     var authentication: AuthenticationRequest? = null
+    var clientIp: String = "unknown"
 }

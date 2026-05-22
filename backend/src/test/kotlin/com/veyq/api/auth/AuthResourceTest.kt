@@ -2,6 +2,7 @@ package com.veyq.api.auth
 
 import com.veyq.api.domain.AccessTokenRepo
 import com.veyq.api.domain.RefreshTokenRepo
+import com.veyq.api.security.RateLimitService
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import org.hamcrest.Matchers.equalTo
@@ -17,9 +18,12 @@ class AuthResourceTest {
     lateinit var accessTokenRepo: AccessTokenRepo
     @Inject
     lateinit var refreshTokenRepo: RefreshTokenRepo
+    @Inject
+    lateinit var rateLimitService: RateLimitService
 
     @BeforeEach
     fun ensureAdmin() {
+        rateLimitService.clearAll()
         val loginResponse = given()
             .contentType("application/json")
             .body("""{"email":"kevin@raddatz.me","password":"admin1234567"}""")
@@ -64,6 +68,27 @@ class AuthResourceTest {
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(401)
+    }
+
+    @Test
+    fun `login failures are rate limited with retry after header`() {
+        repeat(5) {
+            given()
+                .contentType("application/json")
+                .body("""{"email":"kevin@raddatz.me","password":"wrong1234567"}""")
+                .`when`().post("/api/auth/login")
+                .then()
+                .statusCode(401)
+        }
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"kevin@raddatz.me","password":"wrong1234567"}""")
+            .`when`().post("/api/auth/login")
+            .then()
+            .statusCode(429)
+            .header("Retry-After", notNullValue())
+            .body("error", equalTo("Too many requests"))
     }
 
     @Test

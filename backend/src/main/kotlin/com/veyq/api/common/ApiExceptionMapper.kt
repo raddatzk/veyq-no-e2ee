@@ -1,5 +1,6 @@
 package com.veyq.api.common
 
+import com.veyq.api.security.RateLimitExceededException
 import jakarta.ws.rs.WebApplicationException
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
@@ -14,6 +15,13 @@ class ApiExceptionMapper : ExceptionMapper<Throwable> {
     private val log: Logger = Logger.getLogger(ApiExceptionMapper::class.java)
 
     override fun toResponse(exception: Throwable): Response {
+        if (exception is RateLimitExceededException) {
+            return Response.status(429)
+                .type(MediaType.APPLICATION_JSON)
+                .header("Retry-After", exception.retryAfterSeconds.coerceAtLeast(1).toString())
+                .entity(ErrorResponse("Too many requests"))
+                .build()
+        }
         if (exception is WebApplicationException) {
             val message = exception.message ?: "Request failed"
             if (exception.response.status >= 500) {

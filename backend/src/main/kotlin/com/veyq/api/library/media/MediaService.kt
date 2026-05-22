@@ -43,6 +43,7 @@ class MediaService @Inject constructor(
     private val mediaRepo: MediaRepo,
     private val memoryRepo: MemoryRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaTypeDetector: MediaTypeDetector,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
@@ -69,10 +70,8 @@ class MediaService @Inject constructor(
         val uploadPath = upload.uploadedFile()
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty")
-        val mimeType = upload.contentType() ?: Files.probeContentType(uploadPath) ?: ""
-        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
-            throw BadRequestException("Only image and video uploads are supported")
-        }
+        val mediaType = mediaTypeDetector.detect(uploadPath)
+            ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported")
 
         val media = Media().also {
             it.tenant = tenant()
@@ -82,7 +81,7 @@ class MediaService @Inject constructor(
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: upload.fileName()?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                 ?: "Upload"
-            it.mimeType = mimeType
+            it.mimeType = mediaType.mimeType
             it.sizeBytes = size
             it.storageKey = ""
             it.originalFilename = upload.fileName()
@@ -134,6 +133,7 @@ class MediaService @Inject constructor(
                 .header("Content-Length", range.length)
                 .header("Content-Range", "bytes ${range.start}-${range.end}/$size")
                 .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
+                .header("X-Content-Type-Options", "nosniff")
                 .build()
         }
 
@@ -141,6 +141,7 @@ class MediaService @Inject constructor(
             .header("Accept-Ranges", "bytes")
             .header("Content-Length", media.sizeBytes)
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
+            .header("X-Content-Type-Options", "nosniff")
             .build()
     }
 
@@ -157,6 +158,7 @@ class MediaService @Inject constructor(
             .header("Cache-Control", "private, max-age=31536000, immutable")
             .header("Content-Length", Files.size(previewPath))
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(media.publicId)}-preview.jpg\"")
+            .header("X-Content-Type-Options", "nosniff")
             .build()
     }
 

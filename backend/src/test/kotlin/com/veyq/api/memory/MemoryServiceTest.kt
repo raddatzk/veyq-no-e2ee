@@ -34,6 +34,7 @@ import com.veyq.api.library.media.MediaService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
 import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
@@ -58,6 +59,7 @@ class MemoryServiceTest {
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var requestContext: RequestContext
     @Inject lateinit var transaction: UserTransaction
+    @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var memoryService: MemoryService
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var folderService: FolderService
@@ -199,6 +201,9 @@ class MemoryServiceTest {
         val covered = memoryService.setCover(root.id, coverFile("root-cover"), "root-cover.png")
         assertThat(covered.coverMediaId).isNull()
         assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
+        entityManager.clear()
+        val coverResponse = memoryService.coverContent(root.id)
+        assertThat(coverResponse.getHeaderString("X-Content-Type-Options")).isEqualTo("nosniff")
         assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
             memoryService.setCover(root.id, textFile("not-an-image"), "cover.txt")
         }

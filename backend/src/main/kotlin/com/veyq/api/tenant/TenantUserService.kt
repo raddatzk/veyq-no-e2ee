@@ -14,6 +14,7 @@ import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.InviteTenantUserRequest
+import com.veyq.api.generated.model.PublicUserSummary
 import com.veyq.api.generated.model.TenantUserSettingsResponse
 import com.veyq.api.generated.model.TenantUserStatus
 import com.veyq.api.generated.model.TenantUserSummary
@@ -42,7 +43,7 @@ class TenantUserService @Inject constructor(
         TenantUsersSummary(
             tenantMemberRepo.listByTenant(tenant())
                 .sortedWith(compareBy<TenantMember> { it.user.displayName.lowercase() }.thenBy { it.user.email })
-                .map { it.toTenantUserSummary() }
+                .map { it.toTenantUserSummary(includeManagementFields = canManageTenantUsers()) }
         )
 
     @Transactional
@@ -64,7 +65,7 @@ class TenantUserService @Inject constructor(
 
         invitationService.createAndSendInvitation(targetUser, tenant)
 
-        return membership.toTenantUserSummary()
+        return membership.toTenantUserSummary(includeManagementFields = true)
     }
 
     @Transactional
@@ -79,7 +80,7 @@ class TenantUserService @Inject constructor(
         }
 
         invitationService.createAndSendInvitation(targetUser, tenant)
-        return membership.toTenantUserSummary()
+        return membership.toTenantUserSummary(includeManagementFields = true)
     }
 
     @Transactional
@@ -99,7 +100,7 @@ class TenantUserService @Inject constructor(
         }
 
         membership.role = nextRole
-        return membership.toTenantUserSummary()
+        return membership.toTenantUserSummary(includeManagementFields = true)
     }
 
     private fun tenant() = requestContext.tenant!!
@@ -121,13 +122,27 @@ class TenantUserService @Inject constructor(
         email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("email must not be blank")
 
-    private fun TenantMember.toTenantUserSummary(): TenantUserSummary =
+    private fun canManageTenantUsers(): Boolean {
+        if (user().role == ServerRole.ServerOwner) return true
+        return tenantMemberRepo.findByTenantAndUser(tenant(), user())?.role == TenantRole.TenantOwner
+    }
+
+    private fun TenantMember.toTenantUserSummary(includeManagementFields: Boolean): TenantUserSummary =
         TenantUserSummary(
-            user.id,
-            user.email,
-            user.displayName,
-            role.toApiRole(),
-            if (acceptedAt == null) TenantUserStatus.Pending else TenantUserStatus.Active,
+            user.toPublicUserSummary(),
+            if (includeManagementFields) user.email else null,
+            if (includeManagementFields) role.toApiRole() else null,
+            if (includeManagementFields) {
+                if (acceptedAt == null) TenantUserStatus.Pending else TenantUserStatus.Active
+            } else {
+                null
+            },
+        )
+
+    private fun User.toPublicUserSummary(): PublicUserSummary =
+        PublicUserSummary(
+            id,
+            displayName,
         )
 
     private fun TenantRole.toApiRole(): ApiTenantRole =

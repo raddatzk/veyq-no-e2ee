@@ -10,6 +10,7 @@ import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.generated.model.LoginRequest
 import com.veyq.api.generated.model.UserSummary
+import com.veyq.api.security.RateLimitService
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -27,6 +28,7 @@ class AuthService @Inject constructor(
     private val tokenService: TokenService,
     private val cookieService: CookieService,
     private val requestContext: RequestContext,
+    private val rateLimitService: RateLimitService,
 ) {
 
     private fun checkLogin(request: LoginRequest): User {
@@ -50,7 +52,15 @@ class AuthService @Inject constructor(
 
     @Transactional
     fun login(request: LoginRequest): LoginContext {
-        val user = checkLogin(request)
+        val email = request.email.trim().lowercase()
+        rateLimitService.checkLoginAttempt(email)
+        val user = try {
+            checkLogin(request)
+        } catch (exception: UnauthorizedException) {
+            rateLimitService.recordLoginFailure(email)
+            throw exception
+        }
+        rateLimitService.recordLoginSuccess(email)
 
         return login(user)
     }

@@ -37,6 +37,7 @@ export * from './MemoryScopeRequest';
 export * from './MemoryScopeRoot';
 export * from './MemorySummary';
 export * from './MoveFolderRequest';
+export * from './PublicUserSummary';
 export * from './PasskeyAssertionResponse';
 export * from './PasskeyAttestationResponse';
 export * from './PasskeyInvitationOptionsRequest';
