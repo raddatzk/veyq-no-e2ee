@@ -14,6 +14,9 @@ apis/UsersApi.ts
 apis/index.ts
 index.ts
 models/AcceptInvitationRequest.ts
+models/AcceptPasskeyInvitationRequest.ts
+models/AdminPasskeySetupOptionsRequest.ts
+models/AdminPasskeySetupRequest.ts
 models/AdminSetupRequest.ts
 models/BootstrapResponse.ts
 models/ChangePasswordRequest.ts
@@ -22,6 +25,7 @@ models/CreateFolderRequest.ts
 models/CreateGroupRequest.ts
 models/CreateManagedUserRequest.ts
 models/CreateMemoryRequest.ts
+models/CreatePasskeyRequest.ts
 models/CreateTenantRequest.ts
 models/ErrorResponse.ts
 models/ForgotPasswordRequest.ts
@@ -46,6 +50,14 @@ models/MemoryScopeRequest.ts
 models/MemoryScopeRoot.ts
 models/MemorySummary.ts
 models/MoveFolderRequest.ts
+models/PasskeyAssertionResponse.ts
+models/PasskeyAttestationResponse.ts
+models/PasskeyInvitationOptionsRequest.ts
+models/PasskeyLoginOptionsRequest.ts
+models/PasskeyLoginRequest.ts
+models/PasskeyRegistrationRequest.ts
+models/PasskeySummary.ts
+models/PasskeysSummary.ts
 models/ResetPasswordRequest.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts

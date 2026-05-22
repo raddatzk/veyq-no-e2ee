@@ -210,7 +210,8 @@ function addMember() {
           userId: user.userId,
           email: user.email,
           displayName: user.displayName,
-          serverRole: 'ServerMember' as const
+          serverRole: 'ServerMember' as const,
+          passkeyCount: 0
         },
         role: selectedRole.value
       }

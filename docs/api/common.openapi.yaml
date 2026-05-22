@@ -104,6 +104,7 @@ components:
         - email
         - displayName
         - serverRole
+        - passkeyCount
       properties:
         userId:
           type: integer
@@ -116,11 +117,16 @@ components:
           "$ref": "#/components/schemas/ServerRole"
         pendingEmail:
           "$ref": "#/components/schemas/EmailAddress"
+        passkeyCount:
+          type: integer
+          format: int32
+          minimum: 0
       example:
         userId: 1
         email: kevin@example.test
         displayName: Kevin
         serverRole: ServerOwner
+        passkeyCount: 1
 
     EmailAddress:
       type: string

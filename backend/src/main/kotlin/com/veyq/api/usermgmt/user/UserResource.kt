@@ -3,22 +3,30 @@ package com.veyq.api.usermgmt.user
 import com.veyq.api.auth.filterchain.ServerRolesRequired
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.generated.api.UsersApi
+import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.generated.model.AcceptInvitationRequest
+import com.veyq.api.generated.model.AcceptPasskeyInvitationRequest
 import com.veyq.api.generated.model.ChangePasswordRequest
 import com.veyq.api.generated.model.ConfirmEmailChangeRequest
 import com.veyq.api.generated.model.CreateManagedUserRequest
+import com.veyq.api.generated.model.CreatePasskeyRequest
 import com.veyq.api.generated.model.ForgotPasswordRequest
+import com.veyq.api.generated.model.PasskeyInvitationOptionsRequest
 import com.veyq.api.generated.model.ResetPasswordRequest
 import com.veyq.api.generated.model.UpdateManagedUserRoleRequest
 import com.veyq.api.generated.model.UpdateUserSettingsRequest
 import com.veyq.api.usermgmt.ResetPasswordService
+import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 
 @ApplicationScoped
 class UserResource(
     private val userService: UserService,
     private val resetPasswordService: ResetPasswordService,
+    private val passkeyService: PasskeyService,
+    private val routingContext: RoutingContext,
 ) : UsersApi {
 
     override fun me(): Response =
@@ -32,6 +40,20 @@ class UserResource(
 
     override fun changeMyPassword(request: ChangePasswordRequest): Response {
         userService.changeMyPassword(request)
+        return Response.noContent().build()
+    }
+
+    override fun listMyPasskeys(): Response =
+        Response.ok(passkeyService.listMyPasskeys()).build()
+
+    override fun createMyPasskeyOptions(): Response =
+        Response.ok(passkeyService.registrationOptions(routingContext), MediaType.APPLICATION_JSON).build()
+
+    override fun createMyPasskey(request: CreatePasskeyRequest): Response =
+        Response.ok(passkeyService.createMyPasskey(request, routingContext)).build()
+
+    override fun deleteMyPasskey(passkeyId: Long): Response {
+        passkeyService.deleteMyPasskey(passkeyId)
         return Response.noContent().build()
     }
 
@@ -65,6 +87,27 @@ class UserResource(
         request: AcceptInvitationRequest,
     ): Response {
         val (response, accessCookie, refreshCookie) = userService.acceptInvitation(userId, request)
+
+        return Response.ok(response)
+            .cookie(accessCookie, refreshCookie)
+            .build()
+    }
+
+    override fun createInvitationPasskeyOptions(
+        userId: Long,
+        request: PasskeyInvitationOptionsRequest,
+    ): Response =
+        Response.ok(
+            userService.createInvitationPasskeyOptions(userId, request, routingContext),
+            MediaType.APPLICATION_JSON,
+        ).build()
+
+    override fun acceptInvitationWithPasskey(
+        userId: Long,
+        request: AcceptPasskeyInvitationRequest,
+    ): Response {
+        val (response, accessCookie, refreshCookie) =
+            userService.acceptInvitationWithPasskey(userId, request, routingContext)
 
         return Response.ok(response)
             .cookie(accessCookie, refreshCookie)

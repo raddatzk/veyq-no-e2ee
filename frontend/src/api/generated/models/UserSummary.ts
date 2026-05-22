@@ -57,6 +57,12 @@ export interface UserSummary {
      * @memberof UserSummary
      */
     pendingEmail?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof UserSummary
+     */
+    passkeyCount: number;
 }
 
 
@@ -69,6 +75,7 @@ export function instanceOfUserSummary(value: object): value is UserSummary {
     if (!('email' in value) || value['email'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('serverRole' in value) || value['serverRole'] === undefined) return false;
+    if (!('passkeyCount' in value) || value['passkeyCount'] === undefined) return false;
     return true;
 }
 
@@ -87,6 +94,7 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'displayName': json['displayName'],
         'serverRole': ServerRoleFromJSON(json['serverRole']),
         'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
+        'passkeyCount': json['passkeyCount'],
     };
 }
 
@@ -106,6 +114,7 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
         'displayName': value['displayName'],
         'serverRole': ServerRoleToJSON(value['serverRole']),
         'pendingEmail': value['pendingEmail'],
+        'passkeyCount': value['passkeyCount'],
     };
 }
 

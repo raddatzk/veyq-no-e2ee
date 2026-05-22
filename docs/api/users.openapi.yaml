@@ -123,6 +123,111 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: implemented.
+  "/api/users/me/passkeys":
+    get:
+      tags:
+      - Users
+      operationId: listMyPasskeys
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkeys"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigene Passkeys auflisten
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene Passkeys auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+    post:
+      tags:
+      - Users
+      operationId: createMyPasskey
+      requestBody:
+        "$ref": "#/components/requestBodies/CreatePasskey"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkey"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Eigenen Passkey speichern
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.
+      description: |-
+        Eigenen Passkey speichern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys/options":
+    post:
+      tags:
+      - Users
+      operationId: createMyPasskeyOptions
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Passkey-Registrierungs-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passkey-Registrierungs-Challenge erzeugen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys/{passkeyId}":
+    delete:
+      tags:
+      - Users
+      operationId: deleteMyPasskey
+      parameters:
+      - "$ref": "#/components/parameters/PasskeyId"
+      responses:
+        '204':
+          description: Passkey deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenen Passkey loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Passkey muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Eigenen Passkey loeschen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Passkey muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: implemented.
   "/api/users/password/forgot":
     post:
       tags:
@@ -312,6 +417,72 @@ paths:
         - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
 
         Implementierungsstatus: partial.
+  "/api/users/{userId}/invite/passkey/options":
+    post:
+      tags:
+      - Users
+      operationId: createInvitationPasskeyOptions
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyInvitationOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Passkey-Optionen fuer Einladung erzeugen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Passkey-Optionen fuer Einladung erzeugen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/invite/passkey/accept":
+    post:
+      tags:
+      - Users
+      operationId: acceptInvitationWithPasskey
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/AcceptPasskeyInvitation"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Einladung mit Passkey annehmen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Einladung mit Passkey annehmen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: partial.
 components:
   securitySchemes:
     accessTokenCookie:
@@ -328,6 +499,15 @@ components:
         format: int64
       description: Internal ID of the current user
       example: 12345
+    PasskeyId:
+      name: passkeyId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Internal ID of an own passkey
+      example: 12
 
   requestBodies:
     UpdateUserSettings:
@@ -349,6 +529,21 @@ components:
           example:
             currentPassword: admin1234567
             newPassword: new-admin1234567
+    CreatePasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreatePasskeyRequest"
+          example:
+            displayName: MacBook Touch ID
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
 
     ConfirmEmailChange:
       required: true
@@ -406,6 +601,30 @@ components:
             displayName: Invitee
             password: welcome123456
             token: invitation-token
+    PasskeyInvitationOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyInvitationOptionsRequest"
+          example:
+            token: invitation-token
+    AcceptPasskeyInvitation:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AcceptPasskeyInvitationRequest"
+          example:
+            displayName: Invitee
+            token: invitation-token
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
 
   responses:
     ManagedUsers:
@@ -454,6 +673,40 @@ components:
             email: kevin@example.test
             displayName: Kevin
             serverRole: ServerOwner
+            passkeyCount: 1
+    Passkeys:
+      description: Own passkeys.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeysSummary"
+          example:
+            passkeys:
+            - passkeyId: 12
+              displayName: MacBook Touch ID
+              createdAt: "2026-05-22T10:00:00Z"
+              lastUsedAt: "2026-05-22T10:05:00Z"
+    Passkey:
+      description: Own passkey.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeySummary"
+          example:
+            passkeyId: 12
+            displayName: MacBook Touch ID
+            createdAt: "2026-05-22T10:00:00Z"
+            lastUsedAt: null
+    PasskeyRegistrationOptions:
+      description: Passkey registration options.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyRegistrationOptionsResponse"
+          example:
+            challenge: challenge
+            timeout: 300000
+            attestation: none
 
   schemas:
     UserStatus:
@@ -527,6 +780,110 @@ components:
           type: string
       example:
         token: email-change-token
+    PasskeysSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeys
+      properties:
+        passkeys:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PasskeySummary"
+      example:
+        passkeys:
+          - passkeyId: 12
+            displayName: MacBook Touch ID
+            createdAt: "2026-05-22T10:00:00Z"
+            lastUsedAt: "2026-05-22T10:05:00Z"
+    PasskeySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeyId
+        - displayName
+        - createdAt
+      properties:
+        passkeyId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        createdAt:
+          type: string
+        lastUsedAt:
+          type: string
+      example:
+        passkeyId: 12
+        displayName: MacBook Touch ID
+        createdAt: "2026-05-22T10:00:00Z"
+        lastUsedAt: null
+    PasskeyRegistrationOptionsResponse:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialCreationOptions encoded for browser WebAuthn APIs.
+      example:
+        challenge: challenge
+        timeout: 300000
+        attestation: none
+    CreatePasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - credential
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        displayName: MacBook Touch ID
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object
+    PasskeyRegistrationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - rawId
+        - type
+        - response
+      properties:
+        id:
+          type: string
+        rawId:
+          type: string
+        type:
+          type: string
+        response:
+          "$ref": "#/components/schemas/PasskeyAttestationResponse"
+      example:
+        id: credential-id
+        rawId: credential-id
+        type: public-key
+        response:
+          clientDataJSON: client-data
+          attestationObject: attestation-object
+    PasskeyAttestationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - clientDataJSON
+        - attestationObject
+      properties:
+        clientDataJSON:
+          type: string
+        attestationObject:
+          type: string
+      example:
+        clientDataJSON: client-data
+        attestationObject: attestation-object
 
     ManagedUserTenantSummary:
       type: object
@@ -641,3 +998,37 @@ components:
         displayName: Invitee
         password: welcome123456
         token: invitation-token
+    PasskeyInvitationOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: invitation-token
+    AcceptPasskeyInvitationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - token
+        - credential
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        token:
+          type: string
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        displayName: Invitee
+        token: invitation-token
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object

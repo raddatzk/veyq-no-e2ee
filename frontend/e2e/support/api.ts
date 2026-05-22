@@ -5,7 +5,8 @@ export const adminUser = {
   userId: 1,
   email: 'admin@example.test',
   displayName: 'Administrator',
-  serverRole: 'ServerOwner'
+  serverRole: 'ServerOwner',
+  passkeyCount: 0
 }
 
 export const tenant = {

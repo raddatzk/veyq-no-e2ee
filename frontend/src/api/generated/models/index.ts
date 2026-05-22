@@ -1,6 +1,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './AcceptInvitationRequest';
+export * from './AcceptPasskeyInvitationRequest';
+export * from './AdminPasskeySetupOptionsRequest';
+export * from './AdminPasskeySetupRequest';
 export * from './AdminSetupRequest';
 export * from './BootstrapResponse';
 export * from './ChangePasswordRequest';
@@ -9,6 +12,7 @@ export * from './CreateFolderRequest';
 export * from './CreateGroupRequest';
 export * from './CreateManagedUserRequest';
 export * from './CreateMemoryRequest';
+export * from './CreatePasskeyRequest';
 export * from './CreateTenantRequest';
 export * from './ErrorResponse';
 export * from './ForgotPasswordRequest';
@@ -33,6 +37,14 @@ export * from './MemoryScopeRequest';
 export * from './MemoryScopeRoot';
 export * from './MemorySummary';
 export * from './MoveFolderRequest';
+export * from './PasskeyAssertionResponse';
+export * from './PasskeyAttestationResponse';
+export * from './PasskeyInvitationOptionsRequest';
+export * from './PasskeyLoginOptionsRequest';
+export * from './PasskeyLoginRequest';
+export * from './PasskeyRegistrationRequest';
+export * from './PasskeySummary';
+export * from './PasskeysSummary';
 export * from './ResetPasswordRequest';
 export * from './ServerRole';
 export * from './ServerSettingsResponse';

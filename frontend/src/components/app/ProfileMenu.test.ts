@@ -25,7 +25,8 @@ describe('ProfileMenu', () => {
       userId: 1,
       email: 'member@example.com',
       displayName: 'Member',
-      serverRole: 'ServerMember'
+      serverRole: 'ServerMember',
+      passkeyCount: 0
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -47,7 +48,8 @@ describe('ProfileMenu', () => {
       userId: 1,
       email: 'owner@example.com',
       displayName: 'Owner',
-      serverRole: 'ServerOwner'
+      serverRole: 'ServerOwner',
+      passkeyCount: 0
     }
 
     const wrapper = shallowMount(ProfileMenu, {

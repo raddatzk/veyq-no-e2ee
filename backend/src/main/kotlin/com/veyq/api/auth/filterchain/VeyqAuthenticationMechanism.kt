@@ -40,4 +40,6 @@ class VeyqAuthenticationMechanism @Inject constructor(
 
     override fun getCredentialTypes(): Set<Class<out AuthenticationRequest>> =
         setOf(AuthenticationRequest::class.java)
+
+    override fun getPriority(): Int = 2_000
 }

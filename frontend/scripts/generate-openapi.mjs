@@ -116,6 +116,9 @@ function rewriteExternalComponentRefs(value) {
       .replace('./tenants.openapi.yaml#/components/schemas/', '#/components/schemas/')
       .replace('./tenants.openapi.yaml#/components/responses/', '#/components/responses/')
       .replace('./tenants.openapi.yaml#/components/parameters/', '#/components/parameters/')
+      .replace('./users.openapi.yaml#/components/schemas/', '#/components/schemas/')
+      .replace('./users.openapi.yaml#/components/responses/', '#/components/responses/')
+      .replace('./users.openapi.yaml#/components/parameters/', '#/components/parameters/')
   }
 
   if (Array.isArray(value)) {

@@ -161,6 +161,7 @@ private fun User.toGroupMemberSummaryUser(): UserSummary =
         email,
         displayName,
         role.toUsersApiRole(),
+        passkeyCredentials.size,
     )
 
 private fun GroupRole.toGroupsApiRole(): ApiGroupRole =

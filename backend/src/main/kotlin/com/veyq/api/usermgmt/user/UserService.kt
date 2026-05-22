@@ -1,8 +1,10 @@
 package com.veyq.api.usermgmt.user
 
 import com.veyq.api.auth.*
+import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.ServerRole
+import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.User
@@ -15,12 +17,14 @@ import com.veyq.api.usermgmt.ResetPasswordService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import io.vertx.ext.web.RoutingContext
 import java.time.Instant
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 
 @ApplicationScoped
 class UserService @Inject constructor(
     private val userRepo: UserRepo,
+    private val passkeyCredentialRepo: PasskeyCredentialRepo,
     private val requestContext: RequestContext,
     private val passwordService: PasswordService,
     private val tenantMemberRepo: TenantMemberRepo,
@@ -28,9 +32,10 @@ class UserService @Inject constructor(
     private val authService: AuthService,
     private val resetPasswordService: ResetPasswordService,
     private val emailChangeService: EmailChangeService,
+    private val passkeyService: PasskeyService,
 ) {
     fun me(): UserSummary {
-        return requestContext.user!!.toUserSummary(emailChangeService.pendingEmail(requestContext.user!!))
+        return summarize(requestContext.user!!, emailChangeService.pendingEmail(requestContext.user!!))
     }
 
     fun findUser(userId: Long): User {
@@ -55,14 +60,14 @@ class UserService @Inject constructor(
             emailChangeService.pendingEmail(user)
         }
 
-        return user.toUserSummary(pendingEmail)
+        return summarize(user, pendingEmail)
     }
 
     @Transactional
     fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): UserSummary {
         val user = managedUser()
         val confirmedUser = emailChangeService.confirmEmailChange(user, request.token)
-        return confirmedUser.toUserSummary()
+        return summarize(confirmedUser)
     }
 
     @Transactional
@@ -123,7 +128,7 @@ class UserService @Inject constructor(
         if (
             user.role == ServerRole.ServerOwner &&
             nextRole != ServerRole.ServerOwner &&
-            userRepo.countActiveByRole(ServerRole.ServerOwner) <= 1
+            activeServerOwnerCount() <= 1
         ) {
             throw ConflictException("At least one server admin is required")
         }
@@ -134,7 +139,7 @@ class UserService @Inject constructor(
 
     fun sendInvitation(userId: Long): ManagedUserSummary {
         val user = findUser(userId)
-        if (user.passwordSetAt != null) {
+        if (user.isActive()) {
             throw ConflictException("User is already active")
         }
         val tenant = user.tenantMemberships.firstOrNull()?.tenant ?: throw BadRequestException("User has no tenant")
@@ -179,6 +184,60 @@ class UserService @Inject constructor(
         return authService.loginUser(targetUser)
     }
 
+    @Transactional
+    fun createInvitationPasskeyOptions(
+        userId: Long,
+        request: PasskeyInvitationOptionsRequest,
+        routingContext: RoutingContext,
+    ): String {
+        val targetUser = checkPendingInvitation(userId, request.token)
+        return passkeyService.registrationOptionsForUser(targetUser, routingContext)
+    }
+
+    @Transactional
+    fun acceptInvitationWithPasskey(
+        userId: Long,
+        request: AcceptPasskeyInvitationRequest,
+        routingContext: RoutingContext,
+    ): LoginContext {
+        val invitedUser = checkPendingInvitation(userId, request.token)
+        val displayName = request.displayName.trim().takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("displayName must not be blank")
+        val now = Instant.now()
+
+        invitedUser.displayName = displayName
+        passkeyService.createPasskeyForUser(invitedUser, "Passkey", request.credential, routingContext)
+
+        val tenant = invitedUser.tenantMemberships.firstOrNull()?.tenant
+            ?: throw BadRequestException("User has no tenant")
+        val membership = tenantMemberRepo.findByTenantAndUser(tenant, invitedUser)
+            ?: throw BadRequestException("Invitation membership is missing")
+        membership.acceptedAt = now
+
+        invitationService.acceptTokenForUserAndTenant(invitedUser, tenant, now)
+
+        return authService.loginUser(invitedUser)
+    }
+
+    private fun checkPendingInvitation(userId: Long, token: String): User {
+        val targetUser = findUser(userId)
+
+        if (requestContext.user != null && targetUser.id != requestContext.user?.id) {
+            throw ConflictException("You are already logged in with another user")
+        }
+
+        if (targetUser.passwordSetAt != null || passkeyCredentialRepo.countByUser(targetUser) > 0) {
+            throw ConflictException("User is already active")
+        }
+
+        val invitation = invitationService.checkToken(token, Instant.now())
+        if (invitation.user != targetUser) {
+            throw UnauthorizedException("User is already accepted")
+        }
+
+        return targetUser
+    }
+
     private fun normalizeEmail(email: String?): String =
         email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("email must not be blank")
@@ -188,9 +247,25 @@ class UserService @Inject constructor(
     private fun managedUser(): User =
         userRepo.findById(user().id) ?: throw UnauthorizedException("Invalid user")
 
+    private fun activeServerOwnerCount(): Int =
+        userRepo.listByRole(ServerRole.ServerOwner).count { it.isActive() }
+
+    private fun User.isActive(): Boolean =
+        passwordSetAt != null || passkeyCredentialRepo.countByUser(this) > 0
+
+    private fun summarize(user: User, pendingEmail: String? = null): UserSummary =
+        UserSummary(
+            user.id,
+            user.email,
+            user.displayName,
+            user.role.toUsersApiRole(),
+            passkeyCredentialRepo.countByUser(user).toInt(),
+            pendingEmail,
+        )
+
     companion object {
         fun toUserSummary(user: User, pendingEmail: String? = null): UserSummary {
-            return UserSummary(user.id, user.email, user.displayName, user.role.toUsersApiRole(), pendingEmail)
+            return UserSummary(user.id, user.email, user.displayName, user.role.toUsersApiRole(), 0, pendingEmail)
         }
     }
 }
@@ -209,13 +284,13 @@ fun User.toManagedUserSummary(knownTenant: Tenant? = null): ManagedUserSummary {
         email,
         displayName,
         role.toUsersApiRole(),
-        if (passwordSetAt == null) UserStatus.Pending else UserStatus.Active,
+        if (passwordSetAt == null && passkeyCredentials.isEmpty()) UserStatus.Pending else UserStatus.Active,
         tenants,
     )
 }
 
 fun User.toUserSummary(pendingEmail: String? = null): UserSummary {
-    return UserSummary(id, email, displayName, role.toUsersApiRole(), pendingEmail)
+    return UserSummary(id, email, displayName, role.toUsersApiRole(), passkeyCredentials.size, pendingEmail)
 }
 
 fun ServerRole.toUsersApiRole(): ApiServerRole =

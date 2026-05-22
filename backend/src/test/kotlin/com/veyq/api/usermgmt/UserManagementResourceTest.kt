@@ -3,6 +3,8 @@ package com.veyq.api.usermgmt
 import com.veyq.api.auth.PasswordService
 import com.veyq.api.domain.ResetPasswordTokenRepo
 import com.veyq.api.domain.ServerRole
+import com.veyq.api.domain.PasskeyCredential
+import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
 import com.veyq.api.domain.TenantMemberId
@@ -38,6 +40,7 @@ class UserManagementResourceTest {
     @Inject lateinit var invitationRepo: UserInvitationRepo
     @Inject lateinit var emailChangeRepo: UserEmailChangeRepo
     @Inject lateinit var resetPasswordTokenRepo: ResetPasswordTokenRepo
+    @Inject lateinit var passkeyCredentialRepo: PasskeyCredentialRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var entityManager: EntityManager
@@ -245,6 +248,34 @@ class UserManagementResourceTest {
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)
+    }
+
+    @Test
+    fun `user can list and delete own passkeys`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val passkey = createPasskey(currentUser, "Laptop")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users/me/passkeys")
+            .then()
+            .statusCode(200)
+            .body("passkeys.displayName", hasItem("Laptop"))
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users/me")
+            .then()
+            .statusCode(200)
+            .body("passkeyCount", equalTo(1))
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().delete("/api/users/me/passkeys/${passkey.id}")
+            .then()
+            .statusCode(204)
+
+        assertThat(passkeyCredentialRepo.findById(passkey.id)).isNull()
     }
 
     @Test
@@ -649,6 +680,21 @@ class UserManagementResourceTest {
                 tenantMemberRepo.persist(it)
             }
             user
+        }
+
+    private fun createPasskey(user: User, displayName: String): PasskeyCredential =
+        inTransaction {
+            PasskeyCredential().also {
+                it.user = userRepo.findById(user.id)!!
+                it.credentialId = "credential-$runId-${displayName.lowercase()}"
+                it.publicKey = "public-key-$runId".toByteArray()
+                it.publicKeyAlgorithm = -7
+                it.counter = 0
+                it.aaguid = "00000000-0000-0000-0000-000000000000"
+                it.displayName = displayName
+                it.createdAt = Instant.now()
+                passkeyCredentialRepo.persist(it)
+            }
         }
 
     private fun addTenantMember(user: User, tenant: Tenant, role: TenantRole) {

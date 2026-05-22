@@ -37,12 +37,18 @@ class VeyqHttpSecurityPolicy(
 
     private fun isPublic(path: String): Boolean {
         return path == "/api/auth/login" ||
+                path == "/api/auth/passkeys/login/options" ||
+                path == "/api/auth/passkeys/login" ||
                 path.startsWith("/api/invitations/") ||
                 path == "/api/users/password/forgot" ||
                 (path.startsWith("/api/users/") && path.endsWith("/password/reset")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/accept")) ||
+                (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/options")) ||
+                (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/accept")) ||
                 path == "/api/setup" ||
                 (path == "/api/setup/admin" && !serverState.setupCompleted) ||
+                (path == "/api/setup/admin/passkey/options" && !serverState.setupCompleted) ||
+                (path == "/api/setup/admin/passkey" && !serverState.setupCompleted) ||
                 path == "/q/health"
     }
 }

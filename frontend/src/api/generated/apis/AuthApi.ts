@@ -17,6 +17,8 @@ import * as runtime from '../runtime';
 import type {
   ErrorResponse,
   LoginRequest,
+  PasskeyLoginOptionsRequest,
+  PasskeyLoginRequest,
   UserSummary,
 } from '../models/index';
 import {
@@ -24,12 +26,24 @@ import {
     ErrorResponseToJSON,
     LoginRequestFromJSON,
     LoginRequestToJSON,
+    PasskeyLoginOptionsRequestFromJSON,
+    PasskeyLoginOptionsRequestToJSON,
+    PasskeyLoginRequestFromJSON,
+    PasskeyLoginRequestToJSON,
     UserSummaryFromJSON,
     UserSummaryToJSON,
 } from '../models/index';
 
 export interface LoginOperationRequest {
     loginRequest: LoginRequest;
+}
+
+export interface PasskeyLoginOperationRequest {
+    passkeyLoginRequest: PasskeyLoginRequest;
+}
+
+export interface PasskeyLoginOptionsOperationRequest {
+    passkeyLoginOptionsRequest: PasskeyLoginOptionsRequest;
 }
 
 /**
@@ -84,6 +98,54 @@ export interface AuthApiInterface {
      * Aktuelle Sitzung abmelden
      */
     logout(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for passkeyLogin without sending the request
+     * @param {PasskeyLoginRequest} passkeyLoginRequest 
+     * @throws {RequiredError}
+     * @memberof AuthApiInterface
+     */
+    passkeyLoginRequestOpts(requestParameters: PasskeyLoginOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Mit Passkey anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Mit Passkey anmelden und Auth-Cookies setzen
+     * @param {PasskeyLoginRequest} passkeyLoginRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApiInterface
+     */
+    passkeyLoginRaw(requestParameters: PasskeyLoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Mit Passkey anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Mit Passkey anmelden und Auth-Cookies setzen
+     */
+    passkeyLogin(requestParameters: PasskeyLoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+
+    /**
+     * Creates request options for passkeyLoginOptions without sending the request
+     * @param {PasskeyLoginOptionsRequest} passkeyLoginOptionsRequest 
+     * @throws {RequiredError}
+     * @memberof AuthApiInterface
+     */
+    passkeyLoginOptionsRequestOpts(requestParameters: PasskeyLoginOptionsOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Passkey-Login-Challenge erzeugen
+     * @param {PasskeyLoginOptionsRequest} passkeyLoginOptionsRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApiInterface
+     */
+    passkeyLoginOptionsRaw(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
+
+    /**
+     * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Login-Challenge erzeugen
+     */
+    passkeyLoginOptions(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
 
     /**
      * Creates request options for refresh without sending the request
@@ -199,6 +261,104 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      */
     async logout(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.logoutRaw(initOverrides);
+    }
+
+    /**
+     * Creates request options for passkeyLogin without sending the request
+     */
+    async passkeyLoginRequestOpts(requestParameters: PasskeyLoginOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['passkeyLoginRequest'] == null) {
+            throw new runtime.RequiredError(
+                'passkeyLoginRequest',
+                'Required parameter "passkeyLoginRequest" was null or undefined when calling passkeyLogin().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/auth/passkeys/login`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PasskeyLoginRequestToJSON(requestParameters['passkeyLoginRequest']),
+        };
+    }
+
+    /**
+     * Mit Passkey anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Mit Passkey anmelden und Auth-Cookies setzen
+     */
+    async passkeyLoginRaw(requestParameters: PasskeyLoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.passkeyLoginRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Mit Passkey anmelden und Auth-Cookies setzen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Mit Passkey anmelden und Auth-Cookies setzen
+     */
+    async passkeyLogin(requestParameters: PasskeyLoginOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.passkeyLoginRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for passkeyLoginOptions without sending the request
+     */
+    async passkeyLoginOptionsRequestOpts(requestParameters: PasskeyLoginOptionsOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['passkeyLoginOptionsRequest'] == null) {
+            throw new runtime.RequiredError(
+                'passkeyLoginOptionsRequest',
+                'Required parameter "passkeyLoginOptionsRequest" was null or undefined when calling passkeyLoginOptions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/auth/passkeys/login/options`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PasskeyLoginOptionsRequestToJSON(requestParameters['passkeyLoginOptionsRequest']),
+        };
+    }
+
+    /**
+     * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Login-Challenge erzeugen
+     */
+    async passkeyLoginOptionsRaw(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+        const requestOptions = await this.passkeyLoginOptionsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Login-Challenge erzeugen
+     */
+    async passkeyLoginOptions(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+        const response = await this.passkeyLoginOptionsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

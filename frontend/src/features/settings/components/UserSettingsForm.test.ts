@@ -1,25 +1,35 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UserSettingsForm from './UserSettingsForm.vue'
-import { getMySettings, updateMySettings } from '../api'
+import { createMyPasskey, deleteMyPasskey, getMySettings, listMyPasskeys, updateMySettings } from '../api'
 
 vi.mock('../api', () => ({
   changeMyPassword: vi.fn(),
+  createMyPasskey: vi.fn(),
+  deleteMyPasskey: vi.fn(),
   getMySettings: vi.fn(),
+  listMyPasskeys: vi.fn(),
   updateMySettings: vi.fn()
 }))
 
+const createMyPasskeyMock = vi.mocked(createMyPasskey)
+const deleteMyPasskeyMock = vi.mocked(deleteMyPasskey)
 const getMySettingsMock = vi.mocked(getMySettings)
+const listMyPasskeysMock = vi.mocked(listMyPasskeys)
 const updateMySettingsMock = vi.mocked(updateMySettings)
 
 describe('UserSettingsForm', () => {
   afterEach(() => {
+    createMyPasskeyMock.mockReset()
+    deleteMyPasskeyMock.mockReset()
     getMySettingsMock.mockReset()
+    listMyPasskeysMock.mockReset()
     updateMySettingsMock.mockReset()
   })
 
   it('shows pending email and confirmation message after profile save', async () => {
     getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
     updateMySettingsMock.mockResolvedValue(
       userSettings('owner@example.test', 'changed@example.test')
     )
@@ -47,6 +57,7 @@ function userSettings(email: string, pendingEmail?: string) {
     email,
     displayName: 'Owner',
     serverRole: 'ServerOwner',
+    passkeyCount: 0,
     pendingEmail
   } as const
 }

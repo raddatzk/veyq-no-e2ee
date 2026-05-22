@@ -37,6 +37,60 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
+  "/api/auth/passkeys/login/options":
+    post:
+      tags:
+      - Auth
+      operationId: passkeyLoginOptions
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyLoginOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyLoginOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+      summary: Passkey-Login-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passkey-Login-Challenge erzeugen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/auth/passkeys/login":
+    post:
+      tags:
+      - Auth
+      operationId: passkeyLogin
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyLogin"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Mit Passkey anmelden und Auth-Cookies setzen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Mit Passkey anmelden und Auth-Cookies setzen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
   "/api/auth/logout":
     post:
       tags:
@@ -112,6 +166,28 @@ components:
           example:
             email: kevin@example.test
             password: correct horse battery staple
+    PasskeyLoginOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLoginOptionsRequest"
+          example:
+            email: kevin@example.test
+    PasskeyLogin:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLoginRequest"
+          example:
+            id: credential-id
+            rawId: credential-id
+            type: public-key
+            response:
+              clientDataJSON: client-data
+              authenticatorData: authenticator-data
+              signature: signature
 
   schemas:
     LoginRequest:
@@ -128,3 +204,78 @@ components:
       example:
         email: kevin@example.test
         password: correct horse battery staple
+    PasskeyLoginOptionsRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: kevin@example.test
+    PasskeyLoginOptionsResponse:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialRequestOptions encoded for browser WebAuthn APIs.
+      example:
+        challenge: challenge
+        timeout: 300000
+        userVerification: required
+        allowCredentials:
+          - type: public-key
+            id: credential-id
+    PasskeyLoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - rawId
+        - type
+        - response
+      properties:
+        id:
+          type: string
+        rawId:
+          type: string
+        type:
+          type: string
+        response:
+          "$ref": "#/components/schemas/PasskeyAssertionResponse"
+      example:
+        id: credential-id
+        rawId: credential-id
+        type: public-key
+        response:
+          clientDataJSON: client-data
+          authenticatorData: authenticator-data
+          signature: signature
+    PasskeyAssertionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - clientDataJSON
+        - authenticatorData
+        - signature
+      properties:
+        clientDataJSON:
+          type: string
+        authenticatorData:
+          type: string
+        signature:
+          type: string
+        userHandle:
+          type: string
+      example:
+        clientDataJSON: client-data
+        authenticatorData: authenticator-data
+        signature: signature
+  responses:
+    PasskeyLoginOptions:
+      description: Passkey login options.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLoginOptionsResponse"
+          example:
+            challenge: challenge
+            timeout: 300000
+            userVerification: required

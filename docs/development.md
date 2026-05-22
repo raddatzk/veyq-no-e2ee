@@ -71,6 +71,11 @@ Memory stabilization checks currently expected before review:
 - Frontend `npm run generate:api` after API spec edits.
 - Manual `git diff --stat` review for migration, OpenAPI and generated client changes.
 
+Passkey development defaults:
+
+- Local backend accepts WebAuthn origins `http://localhost:5173` and `http://localhost:8080`.
+- Browser passkeys require HTTPS, except for localhost secure-context handling.
+
 ## Docker Compose Development/Test Instance
 
 The Compose setup under `infra/` starts:
@@ -106,6 +111,12 @@ Required reset settings in `infra/.env`:
 - `RESET_USERNAME`: username for the reset page.
 - `RESET_PASSWORD`: password for the reset page.
 - `RESET_TRAEFIK_RULE`: Traefik host rule for the reset UI, for example `Host('reset.example.com')`. In the actual `.env`, use Traefik's backtick syntax as shown in `infra/.env.example`.
+
+Required passkey settings for Compose:
+
+- `WEBAUTHN_ORIGINS`: comma-separated HTTPS origins allowed to use passkeys, for example `https://veyq.example.com`.
+- `WEBAUTHN_RP_ID`: relying-party domain, usually the host without protocol, for example `veyq.example.com`.
+- `WEBAUTHN_RP_NAME`: display name shown by authenticators. Defaults to `Veyq`.
 
 Optional reset setting:
 

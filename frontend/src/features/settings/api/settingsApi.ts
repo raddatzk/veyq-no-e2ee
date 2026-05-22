@@ -10,6 +10,8 @@ import type {
   CreateManagedUserRequest,
   ManagedUserSummary,
   ManagedUsersSummary,
+  PasskeySummary,
+  PasskeysSummary,
   ServerRole,
   ServerSettingsResponse,
   SettingsResponse,
@@ -18,6 +20,7 @@ import type {
   UpdateUserSettingsRequest,
   UserSettingsResponse
 } from './types'
+import { createPasskeyCredential } from '../../../shared/utils/passkeys'
 
 export function getSettings(path: string): Promise<SettingsResponse> {
   return generatedCall(settingsApi.getSettings({ path }))
@@ -41,6 +44,20 @@ export function confirmMyEmailChange(token: string): Promise<UserSettingsRespons
 
 export function changeMyPassword(request: ChangePasswordRequest): Promise<void> {
   return generatedCall(usersApi.changeMyPassword({ changePasswordRequest: request }))
+}
+
+export function listMyPasskeys(): Promise<PasskeysSummary> {
+  return generatedCall(usersApi.listMyPasskeys())
+}
+
+export async function createMyPasskey(displayName: string): Promise<PasskeySummary> {
+  const options = await generatedCall(usersApi.createMyPasskeyOptions())
+  const credential = await createPasskeyCredential(options)
+  return generatedCall(usersApi.createMyPasskey({ createPasskeyRequest: { displayName, credential } }))
+}
+
+export function deleteMyPasskey(passkeyId: number): Promise<void> {
+  return generatedCall(usersApi.deleteMyPasskey({ passkeyId }))
 }
 
 export function getManagedUsers(): Promise<ManagedUsersSummary> {

@@ -32,7 +32,8 @@ describe('EmailConfirmView', () => {
       userId: 1,
       email: 'changed@example.test',
       displayName: 'Owner',
-      serverRole: 'ServerOwner'
+      serverRole: 'ServerOwner',
+      passkeyCount: 0
     })
     tenantsMock.mockResolvedValue([])
 

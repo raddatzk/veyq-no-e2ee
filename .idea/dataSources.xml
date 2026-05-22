@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="lunva@localhost" uuid="8bc0b1e8-fdbf-465e-9ca1-62aeb85960c6">
+    <data-source source="LOCAL" name="veyq@localhost" uuid="aecf2101-ef8b-4623-804d-5fe131faa60a">
       <driver-ref>mariadb</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.mariadb.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mariadb://localhost:3306/lunva</jdbc-url>
+      <jdbc-url>jdbc:mariadb://localhost:3306/veyq</jdbc-url>
       <jdbc-additional-properties>
         <property name="com.intellij.clouds.kubernetes.db.host.port" />
         <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />

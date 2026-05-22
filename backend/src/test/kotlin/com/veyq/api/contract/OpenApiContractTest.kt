@@ -272,6 +272,8 @@ class OpenApiContractTest {
     private companion object {
         val implementedBackendEndpoints = setOf(
             "POST /api/auth/login",
+            "POST /api/auth/passkeys/login/options",
+            "POST /api/auth/passkeys/login",
             "POST /api/auth/logout",
             "POST /api/auth/refresh",
             "GET /api/setup",
@@ -280,6 +282,10 @@ class OpenApiContractTest {
             "PUT /api/users/me",
             "POST /api/users/me/email/confirm",
             "POST /api/users/me/password/change",
+            "GET /api/users/me/passkeys",
+            "POST /api/users/me/passkeys",
+            "POST /api/users/me/passkeys/options",
+            "DELETE /api/users/me/passkeys/{passkeyId}",
             "POST /api/users/password/forgot",
             "POST /api/users/{userId}/password/reset",
             "GET /api/users",

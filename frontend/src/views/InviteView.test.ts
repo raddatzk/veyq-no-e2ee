@@ -2,12 +2,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import InviteView from './InviteView.vue'
-import { acceptInvitation } from '../api/invitationClient'
+import { acceptInvitation, acceptInvitationWithPasskey } from '../api/invitationClient'
 import { bootstrap } from '../api/entrypointClient'
 import { authState } from '../authState'
 
 vi.mock('../api/invitationClient', () => ({
-  acceptInvitation: vi.fn()
+  acceptInvitation: vi.fn(),
+  acceptInvitationWithPasskey: vi.fn()
 }))
 
 vi.mock('../api/entrypointClient', () => ({
@@ -15,11 +16,13 @@ vi.mock('../api/entrypointClient', () => ({
 }))
 
 const acceptInvitationMock = vi.mocked(acceptInvitation)
+const acceptInvitationWithPasskeyMock = vi.mocked(acceptInvitationWithPasskey)
 const bootstrapMock = vi.mocked(bootstrap)
 
 describe('InviteView', () => {
   afterEach(() => {
     acceptInvitationMock.mockReset()
+    acceptInvitationWithPasskeyMock.mockReset()
     bootstrapMock.mockReset()
     authState.isAuthenticated = false
     authState.user = null
@@ -32,7 +35,8 @@ describe('InviteView', () => {
       userId: 42,
       email: 'invitee@example.test',
       displayName: 'Invitee',
-      serverRole: 'ServerMember'
+      serverRole: 'ServerMember',
+      passkeyCount: 0
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
@@ -40,7 +44,8 @@ describe('InviteView', () => {
         userId: 42,
         email: 'invitee@example.test',
         displayName: 'Invitee',
-        serverRole: 'ServerMember'
+        serverRole: 'ServerMember',
+        passkeyCount: 0
       },
       tenants: []
     })
@@ -55,6 +60,7 @@ describe('InviteView', () => {
     await router.isReady()
 
     const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    await wrapper.findAll('button').find((button) => button.text() === 'Passwort')!.trigger('click')
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('Invitee')
     await inputs[1].setValue('welcome123456')
@@ -62,6 +68,44 @@ describe('InviteView', () => {
     await flushPromises()
 
     expect(acceptInvitationMock).toHaveBeenCalledWith(42, 'invite-token', 'welcome123456', 'Invitee')
+  })
+
+  it('accepts invitation with passkey by default', async () => {
+    acceptInvitationWithPasskeyMock.mockResolvedValue({
+      userId: 42,
+      email: 'invitee@example.test',
+      displayName: 'Invitee',
+      serverRole: 'ServerMember',
+      passkeyCount: 1
+    })
+    bootstrapMock.mockResolvedValue({
+      serverId: 'server',
+      user: {
+        userId: 42,
+        email: 'invitee@example.test',
+        displayName: 'Invitee',
+        serverRole: 'ServerMember',
+        passkeyCount: 1
+      },
+      tenants: []
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/invite/:userId', component: InviteView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/invite/42#invite-token')
+    await router.isReady()
+
+    const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    await wrapper.find('input').setValue('Invitee')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(acceptInvitationWithPasskeyMock).toHaveBeenCalledWith(42, 'invite-token', 'Invitee')
+    expect(acceptInvitationMock).not.toHaveBeenCalled()
   })
 })
 

@@ -36,6 +36,9 @@ class User : PanacheEntityBase {
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     var tenantMemberships: MutableSet<TenantMember> = mutableSetOf()
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    var passkeyCredentials: MutableSet<PasskeyCredential> = mutableSetOf()
 }
 
 @ApplicationScoped
@@ -54,6 +57,67 @@ class UserRepo : PanacheRepository<User> {
 
     fun countActiveByRole(role: ServerRole): Long =
         count("role = ?1 and passwordSetAt is not null", role)
+
+    fun listByRole(role: ServerRole): List<User> =
+        list("role", role)
+}
+
+@Entity
+@Table(name = "veyq_passkey_credential")
+class PasskeyCredential : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    lateinit var user: User
+
+    @Column(name = "credential_id", nullable = false, unique = true, length = 512)
+    lateinit var credentialId: String
+
+    @Lob
+    @Column(name = "public_key", nullable = false)
+    lateinit var publicKey: ByteArray
+
+    @Column(name = "public_key_algorithm", nullable = false)
+    var publicKeyAlgorithm: Long = 0
+
+    @Column(nullable = false)
+    var counter: Long = 0
+
+    @Column(nullable = false, length = 36)
+    lateinit var aaguid: String
+
+    @Column
+    var transports: String? = null
+
+    @Column(name = "display_name", nullable = false)
+    lateinit var displayName: String
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @Column(name = "last_used_at")
+    var lastUsedAt: Instant? = null
+}
+
+@ApplicationScoped
+class PasskeyCredentialRepo : PanacheRepository<PasskeyCredential> {
+    fun findByCredentialId(credentialId: String): PasskeyCredential? =
+        find("credentialId", credentialId).firstResult()
+
+    fun listByUser(user: User): List<PasskeyCredential> =
+        list("user = ?1 order by createdAt desc", user)
+
+    fun listByUserId(userId: Long): List<PasskeyCredential> =
+        list("user.id = ?1 order by createdAt desc", userId)
+
+    fun countByUser(user: User): Long =
+        count("user = ?1", user)
+
+    fun findByIdAndUser(id: Long, user: User): PasskeyCredential? =
+        find("id = ?1 and user = ?2", id, user).firstResult()
 }
 
 @Entity

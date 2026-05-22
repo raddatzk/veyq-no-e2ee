@@ -32,6 +32,7 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-security-jpa")
+    implementation("io.quarkus:quarkus-security-webauthn")
     implementation("io.quarkus:quarkus-scheduler")
     implementation("io.quarkus:quarkus-mailer")
     implementation("com.github.wosherco:jnanoid-enhanced:9819c115e7")
@@ -39,6 +40,7 @@ dependencies {
 
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("io.quarkus:quarkus-test-security-webauthn")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")

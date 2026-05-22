@@ -16,13 +16,18 @@
 import * as runtime from '../runtime';
 import type {
   AcceptInvitationRequest,
+  AcceptPasskeyInvitationRequest,
   ChangePasswordRequest,
   ConfirmEmailChangeRequest,
   CreateManagedUserRequest,
+  CreatePasskeyRequest,
   ErrorResponse,
   ForgotPasswordRequest,
   ManagedUserSummary,
   ManagedUsersSummary,
+  PasskeyInvitationOptionsRequest,
+  PasskeySummary,
+  PasskeysSummary,
   ResetPasswordRequest,
   UpdateManagedUserRoleRequest,
   UpdateUserSettingsRequest,
@@ -31,12 +36,16 @@ import type {
 import {
     AcceptInvitationRequestFromJSON,
     AcceptInvitationRequestToJSON,
+    AcceptPasskeyInvitationRequestFromJSON,
+    AcceptPasskeyInvitationRequestToJSON,
     ChangePasswordRequestFromJSON,
     ChangePasswordRequestToJSON,
     ConfirmEmailChangeRequestFromJSON,
     ConfirmEmailChangeRequestToJSON,
     CreateManagedUserRequestFromJSON,
     CreateManagedUserRequestToJSON,
+    CreatePasskeyRequestFromJSON,
+    CreatePasskeyRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     ForgotPasswordRequestFromJSON,
@@ -45,6 +54,12 @@ import {
     ManagedUserSummaryToJSON,
     ManagedUsersSummaryFromJSON,
     ManagedUsersSummaryToJSON,
+    PasskeyInvitationOptionsRequestFromJSON,
+    PasskeyInvitationOptionsRequestToJSON,
+    PasskeySummaryFromJSON,
+    PasskeySummaryToJSON,
+    PasskeysSummaryFromJSON,
+    PasskeysSummaryToJSON,
     ResetPasswordRequestFromJSON,
     ResetPasswordRequestToJSON,
     UpdateManagedUserRoleRequestFromJSON,
@@ -60,6 +75,11 @@ export interface AcceptInvitationOperationRequest {
     acceptInvitationRequest: AcceptInvitationRequest;
 }
 
+export interface AcceptInvitationWithPasskeyRequest {
+    userId: number;
+    acceptPasskeyInvitationRequest: AcceptPasskeyInvitationRequest;
+}
+
 export interface ChangeMyPasswordRequest {
     changePasswordRequest: ChangePasswordRequest;
 }
@@ -68,8 +88,21 @@ export interface ConfirmMyEmailChangeRequest {
     confirmEmailChangeRequest: ConfirmEmailChangeRequest;
 }
 
+export interface CreateInvitationPasskeyOptionsRequest {
+    userId: number;
+    passkeyInvitationOptionsRequest: PasskeyInvitationOptionsRequest;
+}
+
 export interface CreateManagedUserOperationRequest {
     createManagedUserRequest: CreateManagedUserRequest;
+}
+
+export interface CreateMyPasskeyRequest {
+    createPasskeyRequest: CreatePasskeyRequest;
+}
+
+export interface DeleteMyPasskeyRequest {
+    passkeyId: number;
 }
 
 export interface ForgotPasswordOperationRequest {
@@ -124,6 +157,32 @@ export interface UsersApiInterface {
     acceptInvitation(requestParameters: AcceptInvitationOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
+     * Creates request options for acceptInvitationWithPasskey without sending the request
+     * @param {number} userId Internal ID of the current user
+     * @param {AcceptPasskeyInvitationRequest} acceptPasskeyInvitationRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    acceptInvitationWithPasskeyRequestOpts(requestParameters: AcceptInvitationWithPasskeyRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Einladung mit Passkey annehmen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * @summary Einladung mit Passkey annehmen
+     * @param {number} userId Internal ID of the current user
+     * @param {AcceptPasskeyInvitationRequest} acceptPasskeyInvitationRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    acceptInvitationWithPasskeyRaw(requestParameters: AcceptInvitationWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Einladung mit Passkey annehmen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Einladung mit Passkey annehmen
+     */
+    acceptInvitationWithPasskey(requestParameters: AcceptInvitationWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+
+    /**
      * Creates request options for changeMyPassword without sending the request
      * @param {ChangePasswordRequest} changePasswordRequest 
      * @throws {RequiredError}
@@ -172,6 +231,32 @@ export interface UsersApiInterface {
     confirmMyEmailChange(requestParameters: ConfirmMyEmailChangeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
+     * Creates request options for createInvitationPasskeyOptions without sending the request
+     * @param {number} userId Internal ID of the current user
+     * @param {PasskeyInvitationOptionsRequest} passkeyInvitationOptionsRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createInvitationPasskeyOptionsRequestOpts(requestParameters: CreateInvitationPasskeyOptionsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Passkey-Optionen fuer Einladung erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * @summary Passkey-Optionen fuer Einladung erzeugen
+     * @param {number} userId Internal ID of the current user
+     * @param {PasskeyInvitationOptionsRequest} passkeyInvitationOptionsRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createInvitationPasskeyOptionsRaw(requestParameters: CreateInvitationPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
+
+    /**
+     * Passkey-Optionen fuer Einladung erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer Einladung erzeugen
+     */
+    createInvitationPasskeyOptions(requestParameters: CreateInvitationPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
+
+    /**
      * Creates request options for createManagedUser without sending the request
      * @param {CreateManagedUserRequest} createManagedUserRequest 
      * @throws {RequiredError}
@@ -194,6 +279,76 @@ export interface UsersApiInterface {
      * Globalen Pending-User anlegen
      */
     createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary>;
+
+    /**
+     * Creates request options for createMyPasskey without sending the request
+     * @param {CreatePasskeyRequest} createPasskeyRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createMyPasskeyRequestOpts(requestParameters: CreateMyPasskeyRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigenen Passkey speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.  Implementierungsstatus: implemented.
+     * @summary Eigenen Passkey speichern
+     * @param {CreatePasskeyRequest} createPasskeyRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createMyPasskeyRaw(requestParameters: CreateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeySummary>>;
+
+    /**
+     * Eigenen Passkey speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.  Implementierungsstatus: implemented.
+     * Eigenen Passkey speichern
+     */
+    createMyPasskey(requestParameters: CreateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeySummary>;
+
+    /**
+     * Creates request options for createMyPasskeyOptions without sending the request
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createMyPasskeyOptionsRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Passkey-Registrierungs-Challenge erzeugen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Passkey-Registrierungs-Challenge erzeugen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    createMyPasskeyOptionsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
+
+    /**
+     * Passkey-Registrierungs-Challenge erzeugen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Registrierungs-Challenge erzeugen
+     */
+    createMyPasskeyOptions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
+
+    /**
+     * Creates request options for deleteMyPasskey without sending the request
+     * @param {number} passkeyId Internal ID of an own passkey
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    deleteMyPasskeyRequestOpts(requestParameters: DeleteMyPasskeyRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigenen Passkey loeschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * @summary Eigenen Passkey loeschen
+     * @param {number} passkeyId Internal ID of an own passkey
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    deleteMyPasskeyRaw(requestParameters: DeleteMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Eigenen Passkey loeschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey loeschen
+     */
+    deleteMyPasskey(requestParameters: DeleteMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for forgotPassword without sending the request
@@ -240,6 +395,28 @@ export interface UsersApiInterface {
      * Verwaltete Benutzer auflisten
      */
     getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
+
+    /**
+     * Creates request options for listMyPasskeys without sending the request
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    listMyPasskeysRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigene Passkeys auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Eigene Passkeys auflisten
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    listMyPasskeysRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeysSummary>>;
+
+    /**
+     * Eigene Passkeys auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigene Passkeys auflisten
+     */
+    listMyPasskeys(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeysSummary>;
 
     /**
      * Creates request options for me without sending the request
@@ -404,6 +581,63 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
+     * Creates request options for acceptInvitationWithPasskey without sending the request
+     */
+    async acceptInvitationWithPasskeyRequestOpts(requestParameters: AcceptInvitationWithPasskeyRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling acceptInvitationWithPasskey().'
+            );
+        }
+
+        if (requestParameters['acceptPasskeyInvitationRequest'] == null) {
+            throw new runtime.RequiredError(
+                'acceptPasskeyInvitationRequest',
+                'Required parameter "acceptPasskeyInvitationRequest" was null or undefined when calling acceptInvitationWithPasskey().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/{userId}/invite/passkey/accept`;
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AcceptPasskeyInvitationRequestToJSON(requestParameters['acceptPasskeyInvitationRequest']),
+        };
+    }
+
+    /**
+     * Einladung mit Passkey annehmen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Einladung mit Passkey annehmen
+     */
+    async acceptInvitationWithPasskeyRaw(requestParameters: AcceptInvitationWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.acceptInvitationWithPasskeyRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Einladung mit Passkey annehmen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Einladung mit Passkey annehmen
+     */
+    async acceptInvitationWithPasskey(requestParameters: AcceptInvitationWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.acceptInvitationWithPasskeyRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for changeMyPassword without sending the request
      */
     async changeMyPasswordRequestOpts(requestParameters: ChangeMyPasswordRequest): Promise<runtime.RequestOpts> {
@@ -501,6 +735,63 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
+     * Creates request options for createInvitationPasskeyOptions without sending the request
+     */
+    async createInvitationPasskeyOptionsRequestOpts(requestParameters: CreateInvitationPasskeyOptionsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['userId'] == null) {
+            throw new runtime.RequiredError(
+                'userId',
+                'Required parameter "userId" was null or undefined when calling createInvitationPasskeyOptions().'
+            );
+        }
+
+        if (requestParameters['passkeyInvitationOptionsRequest'] == null) {
+            throw new runtime.RequiredError(
+                'passkeyInvitationOptionsRequest',
+                'Required parameter "passkeyInvitationOptionsRequest" was null or undefined when calling createInvitationPasskeyOptions().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/{userId}/invite/passkey/options`;
+        urlPath = urlPath.replace(`{${"userId"}}`, encodeURIComponent(String(requestParameters['userId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: PasskeyInvitationOptionsRequestToJSON(requestParameters['passkeyInvitationOptionsRequest']),
+        };
+    }
+
+    /**
+     * Passkey-Optionen fuer Einladung erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer Einladung erzeugen
+     */
+    async createInvitationPasskeyOptionsRaw(requestParameters: CreateInvitationPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+        const requestOptions = await this.createInvitationPasskeyOptionsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Passkey-Optionen fuer Einladung erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer Einladung erzeugen
+     */
+    async createInvitationPasskeyOptions(requestParameters: CreateInvitationPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+        const response = await this.createInvitationPasskeyOptionsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for createManagedUser without sending the request
      */
     async createManagedUserRequestOpts(requestParameters: CreateManagedUserOperationRequest): Promise<runtime.RequestOpts> {
@@ -547,6 +838,140 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     async createManagedUser(requestParameters: CreateManagedUserOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUserSummary> {
         const response = await this.createManagedUserRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for createMyPasskey without sending the request
+     */
+    async createMyPasskeyRequestOpts(requestParameters: CreateMyPasskeyRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['createPasskeyRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createPasskeyRequest',
+                'Required parameter "createPasskeyRequest" was null or undefined when calling createMyPasskey().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/me/passkeys`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreatePasskeyRequestToJSON(requestParameters['createPasskeyRequest']),
+        };
+    }
+
+    /**
+     * Eigenen Passkey speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.  Implementierungsstatus: implemented.
+     * Eigenen Passkey speichern
+     */
+    async createMyPasskeyRaw(requestParameters: CreateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeySummary>> {
+        const requestOptions = await this.createMyPasskeyRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PasskeySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Eigenen Passkey speichern.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.  Implementierungsstatus: implemented.
+     * Eigenen Passkey speichern
+     */
+    async createMyPasskey(requestParameters: CreateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeySummary> {
+        const response = await this.createMyPasskeyRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createMyPasskeyOptions without sending the request
+     */
+    async createMyPasskeyOptionsRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/passkeys/options`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Passkey-Registrierungs-Challenge erzeugen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Registrierungs-Challenge erzeugen
+     */
+    async createMyPasskeyOptionsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+        const requestOptions = await this.createMyPasskeyOptionsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Passkey-Registrierungs-Challenge erzeugen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Passkey-Registrierungs-Challenge erzeugen
+     */
+    async createMyPasskeyOptions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+        const response = await this.createMyPasskeyOptionsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for deleteMyPasskey without sending the request
+     */
+    async deleteMyPasskeyRequestOpts(requestParameters: DeleteMyPasskeyRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['passkeyId'] == null) {
+            throw new runtime.RequiredError(
+                'passkeyId',
+                'Required parameter "passkeyId" was null or undefined when calling deleteMyPasskey().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/passkeys/{passkeyId}`;
+        urlPath = urlPath.replace(`{${"passkeyId"}}`, encodeURIComponent(String(requestParameters['passkeyId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Eigenen Passkey loeschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey loeschen
+     */
+    async deleteMyPasskeyRaw(requestParameters: DeleteMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteMyPasskeyRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Eigenen Passkey loeschen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey loeschen
+     */
+    async deleteMyPasskey(requestParameters: DeleteMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteMyPasskeyRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -633,6 +1058,45 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.getAllUsersRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listMyPasskeys without sending the request
+     */
+    async listMyPasskeysRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/passkeys`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Eigene Passkeys auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigene Passkeys auflisten
+     */
+    async listMyPasskeysRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeysSummary>> {
+        const requestOptions = await this.listMyPasskeysRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PasskeysSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Eigene Passkeys auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigene Passkeys auflisten
+     */
+    async listMyPasskeys(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeysSummary> {
+        const response = await this.listMyPasskeysRaw(initOverrides);
         return await response.value();
     }
 

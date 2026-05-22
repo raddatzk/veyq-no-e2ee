@@ -12,6 +12,8 @@ export type {
   ManagedUserSummary,
   ManagedUserTenantSummary,
   ManagedUsersSummary,
+  PasskeySummary,
+  PasskeysSummary,
   ServerRole,
   TenantRole,
   TenantUserStatus,

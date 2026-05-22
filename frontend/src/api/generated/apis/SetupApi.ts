@@ -15,12 +15,18 @@
 
 import * as runtime from '../runtime';
 import type {
+  AdminPasskeySetupOptionsRequest,
+  AdminPasskeySetupRequest,
   AdminSetupRequest,
   ErrorResponse,
   SetupStatusSummary,
   UserSummary,
 } from '../models/index';
 import {
+    AdminPasskeySetupOptionsRequestFromJSON,
+    AdminPasskeySetupOptionsRequestToJSON,
+    AdminPasskeySetupRequestFromJSON,
+    AdminPasskeySetupRequestToJSON,
     AdminSetupRequestFromJSON,
     AdminSetupRequestToJSON,
     ErrorResponseFromJSON,
@@ -33,6 +39,14 @@ import {
 
 export interface CreateAdminRequest {
     adminSetupRequest?: AdminSetupRequest;
+}
+
+export interface CreateAdminPasskeyOptionsRequest {
+    adminPasskeySetupOptionsRequest?: AdminPasskeySetupOptionsRequest;
+}
+
+export interface CreateAdminWithPasskeyRequest {
+    adminPasskeySetupRequest?: AdminPasskeySetupRequest;
 }
 
 /**
@@ -65,6 +79,54 @@ export interface SetupApiInterface {
      * Initialen Server-Owner anlegen
      */
     createAdmin(requestParameters: CreateAdminRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+
+    /**
+     * Creates request options for createAdminPasskeyOptions without sending the request
+     * @param {AdminPasskeySetupOptionsRequest} [adminPasskeySetupOptionsRequest] Create passkey setup options for initial admin
+     * @throws {RequiredError}
+     * @memberof SetupApiInterface
+     */
+    createAdminPasskeyOptionsRequestOpts(requestParameters: CreateAdminPasskeyOptionsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * @summary Passkey-Optionen fuer initialen Server-Owner erzeugen
+     * @param {AdminPasskeySetupOptionsRequest} [adminPasskeySetupOptionsRequest] Create passkey setup options for initial admin
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SetupApiInterface
+     */
+    createAdminPasskeyOptionsRaw(requestParameters: CreateAdminPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
+
+    /**
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen
+     */
+    createAdminPasskeyOptions(requestParameters: CreateAdminPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
+
+    /**
+     * Creates request options for createAdminWithPasskey without sending the request
+     * @param {AdminPasskeySetupRequest} [adminPasskeySetupRequest] Create initial admin with passkey
+     * @throws {RequiredError}
+     * @memberof SetupApiInterface
+     */
+    createAdminWithPasskeyRequestOpts(requestParameters: CreateAdminWithPasskeyRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Initialen Server-Owner mit Passkey anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * @summary Initialen Server-Owner mit Passkey anlegen
+     * @param {AdminPasskeySetupRequest} [adminPasskeySetupRequest] Create initial admin with passkey
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SetupApiInterface
+     */
+    createAdminWithPasskeyRaw(requestParameters: CreateAdminWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Initialen Server-Owner mit Passkey anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Initialen Server-Owner mit Passkey anlegen
+     */
+    createAdminWithPasskey(requestParameters: CreateAdminWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
      * Creates request options for status without sending the request
@@ -134,6 +196,90 @@ export class SetupApi extends runtime.BaseAPI implements SetupApiInterface {
      */
     async createAdmin(requestParameters: CreateAdminRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
         const response = await this.createAdminRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createAdminPasskeyOptions without sending the request
+     */
+    async createAdminPasskeyOptionsRequestOpts(requestParameters: CreateAdminPasskeyOptionsRequest): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/setup/admin/passkey/options`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AdminPasskeySetupOptionsRequestToJSON(requestParameters['adminPasskeySetupOptionsRequest']),
+        };
+    }
+
+    /**
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen
+     */
+    async createAdminPasskeyOptionsRaw(requestParameters: CreateAdminPasskeyOptionsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+        const requestOptions = await this.createAdminPasskeyOptionsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse<any>(response);
+    }
+
+    /**
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Passkey-Optionen fuer initialen Server-Owner erzeugen
+     */
+    async createAdminPasskeyOptions(requestParameters: CreateAdminPasskeyOptionsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+        const response = await this.createAdminPasskeyOptionsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createAdminWithPasskey without sending the request
+     */
+    async createAdminWithPasskeyRequestOpts(requestParameters: CreateAdminWithPasskeyRequest): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/setup/admin/passkey`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: AdminPasskeySetupRequestToJSON(requestParameters['adminPasskeySetupRequest']),
+        };
+    }
+
+    /**
+     * Initialen Server-Owner mit Passkey anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Initialen Server-Owner mit Passkey anlegen
+     */
+    async createAdminWithPasskeyRaw(requestParameters: CreateAdminWithPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.createAdminWithPasskeyRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Initialen Server-Owner mit Passkey anlegen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup darf noch nicht abgeschlossen sein.  Implementierungsstatus: partial.
+     * Initialen Server-Owner mit Passkey anlegen
+     */
+    async createAdminWithPasskey(requestParameters: CreateAdminWithPasskeyRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.createAdminWithPasskeyRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

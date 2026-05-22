@@ -4,6 +4,7 @@ import com.veyq.api.auth.cookie.CookieService
 import com.veyq.api.auth.token.TokenService
 import com.veyq.api.domain.RefreshToken
 import com.veyq.api.domain.User
+import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.ServerRole
@@ -21,6 +22,7 @@ data class LogoutContext(val accessCookie: NewCookie, val refreshCookie: NewCook
 @ApplicationScoped
 class AuthService @Inject constructor(
     private val userRepo: UserRepo,
+    private val passkeyCredentialRepo: PasskeyCredentialRepo,
     private val passwordService: PasswordService,
     private val tokenService: TokenService,
     private val cookieService: CookieService,
@@ -86,7 +88,13 @@ class AuthService @Inject constructor(
         val accessCookie = cookieService.createAccessCookie(accessToken)
         val refreshCookie = cookieService.createRefreshCookie(refreshToken)
 
-        val response = UserSummary(user.id, user.email, user.displayName, user.role.toAuthApiRole())
+        val response = UserSummary(
+            user.id,
+            user.email,
+            user.displayName,
+            user.role.toAuthApiRole(),
+            passkeyCredentialRepo.countByUser(user).toInt(),
+        )
 
         return LoginContext(response, accessCookie, refreshCookie)
     }

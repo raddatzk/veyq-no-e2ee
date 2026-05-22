@@ -201,7 +201,8 @@ function userSummary(userId: number, displayName: string) {
     userId,
     email: `${displayName.toLowerCase()}@example.test`,
     displayName,
-    serverRole: 'ServerMember'
+    serverRole: 'ServerMember',
+    passkeyCount: 0
   } as const
 }
 
@@ -219,7 +220,8 @@ function groupSummary(
         userId: member.userId,
         email: `${member.userId}@example.test`,
         displayName: member.userId === 1 ? 'Owner' : 'Member',
-        serverRole: 'ServerMember'
+        serverRole: 'ServerMember',
+        passkeyCount: 0
       },
       role: member.role
     }))

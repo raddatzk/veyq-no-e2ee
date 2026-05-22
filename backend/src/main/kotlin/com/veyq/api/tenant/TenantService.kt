@@ -156,4 +156,4 @@ private fun TenantRole.toTenantsApiRole(): ApiTenantRole =
     }
 
 private fun User.toTenantAdminSummary(): UserSummary =
-    UserSummary(id, email, displayName, role.toUsersApiRole())
+    UserSummary(id, email, displayName, role.toUsersApiRole(), passkeyCredentials.size)

@@ -62,7 +62,7 @@ val openApiSpecs = listOf(
     OpenApiSpec("common", "../docs/api/common.openapi.yaml", generateApi = false),
     OpenApiSpec("settings", "../docs/api/settings.openapi.yaml"),
     OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("setup", "../docs/api/setup.openapi.yaml"),
+    OpenApiSpec("setup", "../docs/api/setup.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("users", "../docs/api/users.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml"),
     OpenApiSpec("groups", "../docs/api/groups.openapi.yaml"),
@@ -96,6 +96,9 @@ fun rewriteExternalComponentRefs(value: Any?): Any? =
             .replace("./tenants.openapi.yaml#/components/schemas/", "#/components/schemas/")
             .replace("./tenants.openapi.yaml#/components/responses/", "#/components/responses/")
             .replace("./tenants.openapi.yaml#/components/parameters/", "#/components/parameters/")
+            .replace("./users.openapi.yaml#/components/schemas/", "#/components/schemas/")
+            .replace("./users.openapi.yaml#/components/responses/", "#/components/responses/")
+            .replace("./users.openapi.yaml#/components/parameters/", "#/components/parameters/")
         is MutableMap<*, *> -> {
             val rewritten = linkedMapOf<String, Any?>()
             value.forEach { (entryKey, entryValue) ->
@@ -123,6 +126,7 @@ fun bundleOpenApiSpec(spec: OpenApiSpec): String {
     val sharedComponentSources = listOf(
         readYamlMap("../docs/api/common.openapi.yaml"),
         readYamlMap("../docs/api/tenants.openapi.yaml"),
+        readYamlMap("../docs/api/users.openapi.yaml"),
     )
     val bundled = rewriteExternalComponentRefs(readYamlMap(spec.specPath)) as MutableMap<String, Any?>
     val bundledComponents = bundled.mutableMapAt("components")

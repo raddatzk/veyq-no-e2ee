@@ -10,6 +10,7 @@ test('initial setup keeps tenant creation outside the workspace shell', async ({
 
   await page.goto('/setup')
 
+  await page.getByRole('tab', { name: 'Passwort' }).click()
   await page.getByLabel('E-Mail').fill(adminUser.email)
   await page.getByLabel('Passwort').fill('correct horse battery staple')
   await page.getByLabel('Anzeigename').fill(adminUser.displayName)

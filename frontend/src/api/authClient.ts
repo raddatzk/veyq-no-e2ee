@@ -1,10 +1,19 @@
 import { authApi, generatedCall, usersApi } from './generatedClient'
 import type { UserSummary } from './generated'
+import { getPasskeyCredential } from '../shared/utils/passkeys'
 
 export type LoginResponse = UserSummary
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   return generatedCall(authApi.login({ loginRequest: { email, password } }))
+}
+
+export async function loginWithPasskey(email?: string): Promise<LoginResponse> {
+  const options = await generatedCall(
+    authApi.passkeyLoginOptions({ passkeyLoginOptionsRequest: { email: email?.trim() || undefined } })
+  )
+  const credential = await getPasskeyCredential(options)
+  return generatedCall(authApi.passkeyLogin({ passkeyLoginRequest: credential }))
 }
 
 export async function forgotPassword(email: string): Promise<void> {

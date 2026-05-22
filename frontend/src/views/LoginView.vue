@@ -6,7 +6,7 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
-import { forgotPassword, login } from '../api/authClient'
+import { forgotPassword, login, loginWithPasskey } from '../api/authClient'
 import { tenants } from '../api/tenantClient'
 import { useAuthState } from '../shared/state/useAuthState'
 import { getErrorMessage } from '../shared/utils/errors'
@@ -18,6 +18,8 @@ const password = ref('')
 const error = ref('')
 const message = ref('')
 const sendingReset = ref(false)
+const passkeyLoading = ref(false)
+const authMethod = ref<'passkey' | 'password'>('passkey')
 
 async function submit() {
   error.value = ''
@@ -29,13 +31,40 @@ async function submit() {
         userId: user.userId,
         email: user.email,
         displayName: user.displayName,
-        serverRole: user.serverRole
+        serverRole: user.serverRole,
+        pendingEmail: user.pendingEmail,
+        passkeyCount: user.passkeyCount
       },
       await tenants()
     )
     await router.push(resolveRedirect())
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, 'Login fehlgeschlagen')
+  }
+}
+
+async function submitPasskey() {
+  error.value = ''
+  message.value = ''
+  passkeyLoading.value = true
+  try {
+    const user = await loginWithPasskey(email.value)
+    setAuthenticated(
+      {
+        userId: user.userId,
+        email: user.email,
+        displayName: user.displayName,
+        serverRole: user.serverRole,
+        pendingEmail: user.pendingEmail,
+        passkeyCount: user.passkeyCount
+      },
+      await tenants()
+    )
+    await router.push(resolveRedirect())
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, 'Passkey-Login fehlgeschlagen')
+  } finally {
+    passkeyLoading.value = false
   }
 }
 
@@ -76,12 +105,37 @@ onMounted(async () => {
   <Card class="login-card">
     <template #title>Login</template>
     <template #content>
-      <form class="form" @submit.prevent="submit">
+      <form class="form" @submit.prevent="authMethod === 'passkey' ? submitPasskey() : submit()">
+        <div class="auth-method-switch" role="tablist" aria-label="Anmeldemethode">
+          <button
+            type="button"
+            :class="{ active: authMethod === 'passkey' }"
+            role="tab"
+            :aria-selected="authMethod === 'passkey'"
+            @click="authMethod = 'passkey'"
+          >
+            Passkey
+          </button>
+          <button
+            type="button"
+            :class="{ active: authMethod === 'password' }"
+            role="tab"
+            :aria-selected="authMethod === 'password'"
+            @click="authMethod = 'password'"
+          >
+            Passwort
+          </button>
+        </div>
         <label>
           E-Mail
-          <InputText v-model="email" type="email" autocomplete="email" required />
+          <InputText
+            v-model="email"
+            type="email"
+            :autocomplete="authMethod === 'passkey' ? 'username webauthn' : 'email'"
+            :required="authMethod === 'password'"
+          />
         </label>
-        <label>
+        <label v-if="authMethod === 'password'">
           Passwort
           <Password
             v-model="password"
@@ -92,8 +146,16 @@ onMounted(async () => {
             fluid
           />
         </label>
-        <Button type="submit" label="Einloggen" icon="pi pi-sign-in" />
         <Button
+          v-if="authMethod === 'passkey'"
+          type="submit"
+          label="Mit Passkey einloggen"
+          icon="pi pi-key"
+          :loading="passkeyLoading"
+        />
+        <Button v-else type="submit" label="Einloggen" icon="pi pi-sign-in" />
+        <Button
+          v-if="authMethod === 'password'"
           type="button"
           label="Passwort vergessen"
           icon="pi pi-envelope"
