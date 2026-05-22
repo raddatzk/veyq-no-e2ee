@@ -64,6 +64,12 @@ export interface MemorySummary {
      */
     coverMediaId?: string;
     /**
+     * URL for the explicit Memory cover image if one is set.
+     * @type {string}
+     * @memberof MemorySummary
+     */
+    coverUrl?: string;
+    /**
      * 
      * @type {number}
      * @memberof MemorySummary
@@ -112,6 +118,7 @@ export function MemorySummaryFromJSONTyped(json: any, ignoreDiscriminator: boole
         'displayName': json['displayName'],
         'path': json['path'],
         'coverMediaId': json['coverMediaId'] == null ? undefined : json['coverMediaId'],
+        'coverUrl': json['coverUrl'] == null ? undefined : json['coverUrl'],
         'childCount': json['childCount'],
         'mediaCount': json['mediaCount'],
         'scope': json['scope'] == null ? undefined : MemoryScopeFromJSON(json['scope']),
@@ -135,6 +142,7 @@ export function MemorySummaryToJSONTyped(value?: MemorySummary | null, ignoreDis
         'displayName': value['displayName'],
         'path': value['path'],
         'coverMediaId': value['coverMediaId'],
+        'coverUrl': value['coverUrl'],
         'childCount': value['childCount'],
         'mediaCount': value['mediaCount'],
         'scope': MemoryScopeToJSON(value['scope']),

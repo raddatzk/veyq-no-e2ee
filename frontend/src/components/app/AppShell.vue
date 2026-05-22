@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, ref } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import { useAuthState } from '../../shared/state/useAuthState'
 import CreateTenantDialog from '../tenant/CreateTenantDialog.vue'
 import TenantSidebar from './TenantSidebar.vue'
@@ -8,10 +8,15 @@ import WorkspaceTopbar from './WorkspaceTopbar.vue'
 
 const createTenantOpen = ref(false)
 const { authState } = useAuthState()
+const route = useRoute()
+const publicRouteNames = new Set(['setup', 'login', 'invite', 'password-reset', 'email-confirm'])
+const showWorkspaceShell = computed(() =>
+  authState.isAuthenticated && !publicRouteNames.has(String(route.name ?? ''))
+)
 </script>
 
 <template>
-  <div v-if="authState.isAuthenticated" class="app-shell">
+  <div v-if="showWorkspaceShell" class="app-shell">
     <TenantSidebar @create-tenant="createTenantOpen = true" />
     <div class="app-workspace">
       <WorkspaceTopbar />

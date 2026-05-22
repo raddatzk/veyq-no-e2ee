@@ -62,6 +62,14 @@ function openContextSettings() {
 function navigateToPath(path: string) {
   void router.push(memoryPathToTenantRoute(tenantName.value, path))
 }
+
+function handleMemoryChanged(updatedMemory: { path: string }) {
+  if (updatedMemory.path !== routePath.value) {
+    navigateToPath(updatedMemory.path)
+    return
+  }
+  void load()
+}
 </script>
 
 <template>
@@ -81,6 +89,8 @@ function navigateToPath(path: string) {
       :media="media"
       @open-memory="navigateToPath($event.path)"
       @create-child-memory="createMemoryOpen = true"
+      @changed="handleMemoryChanged"
+      @deleted="navigateToPath"
     />
 
     <MemoryFolderOverview

@@ -28,7 +28,6 @@ import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
-import com.veyq.api.generated.model.SetMemoryCoverRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaService
@@ -40,7 +39,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 
 @QuarkusTest
@@ -186,7 +188,7 @@ class MemoryServiceTest {
     }
 
     @Test
-    fun `sets covers only from own memory and deletes descendant memories and media`() {
+    fun `uploads standalone covers and deletes descendant memories and media`() {
         val root = memoryService.createMemory(CreateMemoryRequest("root", "Root"))
         val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parentId = root.id))
         val other = memoryService.createMemory(CreateMemoryRequest("other", "Other"))
@@ -194,10 +196,11 @@ class MemoryServiceTest {
         val childMedia = createMedia(owner, memory(child.id), "Child Media")
         val otherMedia = createMedia(owner, memory(other.id), "Other Media")
 
-        assertThat(memoryService.setCover(root.id, SetMemoryCoverRequest(rootMedia.publicId)).coverMediaId)
-            .isEqualTo(rootMedia.publicId)
-        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
-            memoryService.setCover(root.id, SetMemoryCoverRequest(otherMedia.publicId))
+        val covered = memoryService.setCover(root.id, coverFile("root-cover"), "root-cover.png")
+        assertThat(covered.coverMediaId).isNull()
+        assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.setCover(root.id, textFile("not-an-image"), "cover.txt")
         }
 
         memoryService.deleteMemory(root.id)
@@ -207,6 +210,30 @@ class MemoryServiceTest {
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, rootMedia.publicId)).isNull()
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, childMedia.publicId)).isNull()
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, otherMedia.publicId)).isNotNull
+    }
+
+    @Test
+    fun `clears memory cover only for visible memories`() {
+        val ownerMemory = memoryService.createMemory(CreateMemoryRequest("owner-root", "Owner Root"))
+        val outsider = createUser("cover-outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+        val group = createGroup("cover-group-$runId", owner)
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest("group-root", "Group Root", scope = MemoryScopeRequest("GROUP", group.name))
+        )
+
+        assertThat(memoryService.setCover(ownerMemory.id, coverFile("owner-cover"), "owner.png").coverUrl)
+            .isNotBlank()
+        assertThat(memoryService.clearCover(ownerMemory.id).coverMediaId).isNull()
+        assertThat(memoryService.getMemory(ownerMemory.id).coverUrl).isNull()
+        assertThat(memoryService.getMemory(ownerMemory.id).coverMediaId).isNull()
+
+        assertThat(memoryService.setCover(groupMemory.id, coverFile("group-cover"), "group.png").coverUrl)
+            .isNotBlank()
+        useContext(outsider, tenant)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryService.clearCover(groupMemory.id)
+        }
     }
 
     private fun useContext(user: User, tenant: Tenant) {
@@ -317,6 +344,23 @@ class MemoryServiceTest {
                 mediaRepo.persist(it)
             }
         }
+
+    private fun coverFile(prefix: String): Path {
+        val path = Files.createTempFile(prefix, ".png")
+        Files.write(
+            path,
+            Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+            )
+        )
+        return path
+    }
+
+    private fun textFile(prefix: String): Path {
+        val path = Files.createTempFile(prefix, ".txt")
+        Files.writeString(path, "not an image")
+        return path
+    }
 
     private fun <T> inTransaction(block: () -> T): T {
         transaction.begin()

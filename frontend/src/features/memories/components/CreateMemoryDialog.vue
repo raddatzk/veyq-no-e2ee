@@ -32,7 +32,7 @@ const availableGroups = ref<TenantGroup[]>([])
 const scopeValue = ref('TENANT')
 const isChildMemory = computed(() => Boolean(props.parentMemoryId))
 const isTenantRootCreate = computed(() => !isChildMemory.value && (!props.folderPath || props.folderPath === '/'))
-const title = computed(() => (isChildMemory.value ? 'Child Memory erstellen' : 'Memory erstellen'))
+const title = computed(() => (isChildMemory.value ? 'Unter-Memory erstellen' : 'Memory erstellen'))
 const scopeOptions = computed(() => [
   { label: props.tenantDisplayName, value: 'TENANT' },
   ...availableGroups.value.map((group) => ({

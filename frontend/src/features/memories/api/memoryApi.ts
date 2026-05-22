@@ -8,7 +8,6 @@ import {
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
-  SetMemoryCoverRequest as GeneratedSetMemoryCoverRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
@@ -51,8 +50,8 @@ export function listMemories(tenantName: string): Promise<Memory[]> {
 }
 
 export function listMemoriesByFolder(tenantName: string, folderPath: string): Promise<Memory[]> {
-  return generatedCall(memoriesApi.listMemoriesByFolder({ tenantName, folderPath })).then((memories) =>
-    memories.map(normalizeMemory)
+  return generatedCall(memoriesApi.listMemoriesByFolder({ tenantName, folderPath })).then(
+    (memories) => memories.map(normalizeMemory)
   )
 }
 
@@ -106,9 +105,15 @@ export function setMemoryCover(
     memoriesApi.setMemoryCover({
       tenantName,
       memoryId,
-      setMemoryCoverRequest: request as GeneratedSetMemoryCoverRequest
+      file: request.file
     })
   ).then(normalizeMemory)
+}
+
+export function removeMemoryCover(tenantName: string, memoryId: string): Promise<Memory> {
+  return generatedCall(memoriesApi.removeMemoryCover({ tenantName, memoryId })).then(
+    normalizeMemory
+  )
 }
 
 export function listMemoryMedia(
@@ -179,41 +184,47 @@ function updateMemoryRequest(request: UpdateMemoryRequest): GeneratedUpdateMemor
   }
 }
 
-function normalizeMemory(memory: {
-  parentId?: string
-  coverMediaId?: string
-  scope?: Memory['scope']
-} & Omit<Memory, 'parentId' | 'coverMediaId' | 'scope'>): Memory {
+function normalizeMemory(
+  memory: {
+    parentId?: string
+    coverMediaId?: string
+    coverUrl?: string
+    scope?: Memory['scope']
+  } & Omit<Memory, 'parentId' | 'coverMediaId' | 'coverUrl' | 'scope'>
+): Memory {
   return {
     ...memory,
     parentId: memory.parentId ?? null,
     coverMediaId: memory.coverMediaId ?? null,
+    coverUrl: memory.coverUrl ?? null,
     scope: memory.scope ?? null
   }
 }
 
-function normalizeMemoryMedia(media: {
-  capturedAt?: string
-  previewUrl?: string
-  cameraMake?: string
-  cameraModel?: string
-  lensModel?: string
-  imageWidth?: number
-  imageHeight?: number
-  gpsLatitude?: number
-  gpsLongitude?: number
-} & Omit<
-  MemoryMedia,
-  | 'capturedAt'
-  | 'previewUrl'
-  | 'cameraMake'
-  | 'cameraModel'
-  | 'lensModel'
-  | 'imageWidth'
-  | 'imageHeight'
-  | 'gpsLatitude'
-  | 'gpsLongitude'
->): MemoryMedia {
+function normalizeMemoryMedia(
+  media: {
+    capturedAt?: string
+    previewUrl?: string
+    cameraMake?: string
+    cameraModel?: string
+    lensModel?: string
+    imageWidth?: number
+    imageHeight?: number
+    gpsLatitude?: number
+    gpsLongitude?: number
+  } & Omit<
+    MemoryMedia,
+    | 'capturedAt'
+    | 'previewUrl'
+    | 'cameraMake'
+    | 'cameraModel'
+    | 'lensModel'
+    | 'imageWidth'
+    | 'imageHeight'
+    | 'gpsLatitude'
+    | 'gpsLongitude'
+  >
+): MemoryMedia {
   return {
     ...media,
     capturedAt: media.capturedAt ?? null,

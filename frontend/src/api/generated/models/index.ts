@@ -36,7 +36,6 @@ export * from './MoveFolderRequest';
 export * from './ResetPasswordRequest';
 export * from './ServerRole';
 export * from './ServerSettingsResponse';
-export * from './SetMemoryCoverRequest';
 export * from './SettingsBreadcrumb';
 export * from './SettingsLocation';
 export * from './SettingsResponse';

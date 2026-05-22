@@ -18,7 +18,6 @@ import type {
   CreateMemoryRequest,
   ErrorResponse,
   MemorySummary,
-  SetMemoryCoverRequest,
   UpdateMemoryRequest,
 } from '../models/index';
 import {
@@ -28,8 +27,6 @@ import {
     ErrorResponseToJSON,
     MemorySummaryFromJSON,
     MemorySummaryToJSON,
-    SetMemoryCoverRequestFromJSON,
-    SetMemoryCoverRequestToJSON,
     UpdateMemoryRequestFromJSON,
     UpdateMemoryRequestToJSON,
 } from '../models/index';
@@ -68,10 +65,20 @@ export interface ListMemoriesByFolderRequest {
     folderPath?: string;
 }
 
-export interface SetMemoryCoverOperationRequest {
+export interface MemoryCoverContentRequest {
     tenantName: string;
     memoryId: string;
-    setMemoryCoverRequest: SetMemoryCoverRequest;
+}
+
+export interface RemoveMemoryCoverRequest {
+    tenantName: string;
+    memoryId: string;
+}
+
+export interface SetMemoryCoverRequest {
+    tenantName: string;
+    memoryId: string;
+    file: Blob;
 }
 
 export interface UpdateMemoryOperationRequest {
@@ -268,32 +275,84 @@ export interface MemoriesApiInterface {
     listMemoriesByFolder(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
 
     /**
-     * Creates request options for setMemoryCover without sending the request
+     * Creates request options for memoryCoverContent without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
-     * @param {SetMemoryCoverRequest} setMemoryCoverRequest 
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
      */
-    setMemoryCoverRequestOpts(requestParameters: SetMemoryCoverOperationRequest): Promise<runtime.RequestOpts>;
+    memoryCoverContentRequestOpts(requestParameters: MemoryCoverContentRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Sets the Memory cover to media that already belongs directly to the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * @summary Set memory cover media
+     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Stream memory cover image
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
-     * @param {SetMemoryCoverRequest} setMemoryCoverRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
      */
-    setMemoryCoverRaw(requestParameters: SetMemoryCoverOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+    memoryCoverContentRaw(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
 
     /**
-     * Sets the Memory cover to media that already belongs directly to the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Set memory cover media
+     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover image
      */
-    setMemoryCover(requestParameters: SetMemoryCoverOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+    memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for removeMemoryCover without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    removeMemoryCoverRequestOpts(requestParameters: RemoveMemoryCoverRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Removes the explicit cover image from the Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Remove memory cover image
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    removeMemoryCoverRaw(requestParameters: RemoveMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Removes the explicit cover image from the Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove memory cover image
+     */
+    removeMemoryCover(requestParameters: RemoveMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+
+    /**
+     * Creates request options for setMemoryCover without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {Blob} file Cover image file.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    setMemoryCoverRequestOpts(requestParameters: SetMemoryCoverRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Upload memory cover image
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {Blob} file Cover image file.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    setMemoryCoverRaw(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Upload memory cover image
+     */
+    setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
 
     /**
      * Creates request options for updateMemory without sending the request
@@ -708,9 +767,119 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
+     * Creates request options for memoryCoverContent without sending the request
+     */
+    async memoryCoverContentRequestOpts(requestParameters: MemoryCoverContentRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling memoryCoverContent().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling memoryCoverContent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/cover/content`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover image
+     */
+    async memoryCoverContentRaw(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryCoverContentRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover image
+     */
+    async memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryCoverContentRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for removeMemoryCover without sending the request
+     */
+    async removeMemoryCoverRequestOpts(requestParameters: RemoveMemoryCoverRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling removeMemoryCover().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling removeMemoryCover().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/cover`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Removes the explicit cover image from the Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove memory cover image
+     */
+    async removeMemoryCoverRaw(requestParameters: RemoveMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+        const requestOptions = await this.removeMemoryCoverRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemorySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Removes the explicit cover image from the Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove memory cover image
+     */
+    async removeMemoryCover(requestParameters: RemoveMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+        const response = await this.removeMemoryCoverRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for setMemoryCover without sending the request
      */
-    async setMemoryCoverRequestOpts(requestParameters: SetMemoryCoverOperationRequest): Promise<runtime.RequestOpts> {
+    async setMemoryCoverRequestOpts(requestParameters: SetMemoryCoverRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
@@ -725,10 +894,10 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
             );
         }
 
-        if (requestParameters['setMemoryCoverRequest'] == null) {
+        if (requestParameters['file'] == null) {
             throw new runtime.RequiredError(
-                'setMemoryCoverRequest',
-                'Required parameter "setMemoryCoverRequest" was null or undefined when calling setMemoryCover().'
+                'file',
+                'Required parameter "file" was null or undefined when calling setMemoryCover().'
             );
         }
 
@@ -736,7 +905,25 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        headerParameters['Content-Type'] = 'application/json';
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
 
 
         let urlPath = `/api/{tenantName}/memories/{memoryId}/cover`;
@@ -748,15 +935,15 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
-            body: SetMemoryCoverRequestToJSON(requestParameters['setMemoryCoverRequest']),
+            body: formParams,
         };
     }
 
     /**
-     * Sets the Memory cover to media that already belongs directly to the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Set memory cover media
+     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Upload memory cover image
      */
-    async setMemoryCoverRaw(requestParameters: SetMemoryCoverOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+    async setMemoryCoverRaw(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
         const requestOptions = await this.setMemoryCoverRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
@@ -764,10 +951,10 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Sets the Memory cover to media that already belongs directly to the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Set memory cover media
+     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Upload memory cover image
      */
-    async setMemoryCover(requestParameters: SetMemoryCoverOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+    async setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
         const response = await this.setMemoryCoverRaw(requestParameters, initOverrides);
         return await response.value();
     }

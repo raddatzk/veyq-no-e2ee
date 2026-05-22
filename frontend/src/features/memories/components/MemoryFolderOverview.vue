@@ -22,14 +22,18 @@ defineEmits<{
         <h2>Memories</h2>
         <span>{{ memories.length }}</span>
       </div>
-      <div class="memory-card-grid">
+      <div class="memory-card-grid memory-card-grid-memories">
         <MemoryCard
           v-for="memory in memories"
           :key="memory.id"
           :memory="memory"
           @open="$emit('openMemory', $event)"
         />
-        <button class="memory-create-card" type="button" @click="$emit('createMemory')">
+        <button
+          class="memory-create-card memory-create-card-memory"
+          type="button"
+          @click="$emit('createMemory')"
+        >
           <span class="pi pi-plus" />
           <strong>Memory erstellen</strong>
         </button>

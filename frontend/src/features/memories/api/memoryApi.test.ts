@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMemory,
+  deleteMemory,
   getMemoryByPath,
   listMemories,
   listMemoriesByFolder,
   listMemoryMedia,
+  removeMemoryCover,
+  setMemoryCover,
   updateMemory,
   uploadMemoryMedia
 } from './memoryApi'
@@ -16,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   getMemoryByPath: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),
+  deleteMemory: vi.fn(),
+  setMemoryCover: vi.fn(),
+  removeMemoryCover: vi.fn(),
   listMemoryMedia: vi.fn(),
   uploadMemoryMedia: vi.fn()
 }))
@@ -27,7 +33,10 @@ vi.mock('../../../api/generatedClient', () => ({
     listMemoriesByFolder: mocks.listMemoriesByFolder,
     getMemoryByPath: mocks.getMemoryByPath,
     createMemory: mocks.createMemory,
-    updateMemory: mocks.updateMemory
+    updateMemory: mocks.updateMemory,
+    deleteMemory: mocks.deleteMemory,
+    setMemoryCover: mocks.setMemoryCover,
+    removeMemoryCover: mocks.removeMemoryCover
   },
   memoryMediaApi: {
     listMemoryMedia: mocks.listMemoryMedia,
@@ -82,6 +91,7 @@ describe('memoryApi facade', () => {
         path: '/trip',
         parentId: null,
         coverMediaId: null,
+        coverUrl: null,
         childCount: 0,
         mediaCount: 0,
         scope: null
@@ -189,6 +199,34 @@ describe('memoryApi facade', () => {
       file,
       title: undefined
     })
+  })
+
+  it('maps memory delete and cover operations through generated clients', async () => {
+    const file = new File(['cover'], 'cover.jpg', { type: 'image/jpeg' })
+    mocks.deleteMemory.mockResolvedValue(undefined)
+    mocks.setMemoryCover.mockResolvedValue({
+      ...memoryResponse('updated'),
+      coverUrl: '/api/tenant/memories/mem-1/cover/content'
+    })
+    mocks.removeMemoryCover.mockResolvedValue(memoryResponse('updated'))
+
+    await deleteMemory('tenant', 'mem-1')
+    const covered = await setMemoryCover('tenant', 'mem-1', { file })
+    const uncovered = await removeMemoryCover('tenant', 'mem-1')
+
+    expect(mocks.deleteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-1' })
+    expect(mocks.setMemoryCover).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-1',
+      file
+    })
+    expect(mocks.removeMemoryCover).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-1'
+    })
+    expect(covered.coverUrl).toBe('/api/tenant/memories/mem-1/cover/content')
+    expect(uncovered.coverMediaId).toBeNull()
+    expect(uncovered.coverUrl).toBeNull()
   })
 })
 

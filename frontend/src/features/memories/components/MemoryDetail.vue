@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -9,7 +9,10 @@ import Tabs from 'primevue/tabs'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
 import type { Memory, MemoryMedia } from '../api'
+import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
+import EditMemoryDialog from './EditMemoryDialog.vue'
 import MemoryCard from './MemoryCard.vue'
+import MemoryCoverDialog from './MemoryCoverDialog.vue'
 
 const props = defineProps<{
   tenantName: string
@@ -21,7 +24,13 @@ const props = defineProps<{
 defineEmits<{
   openMemory: [memory: Memory]
   createChildMemory: []
+  changed: [memory: Memory]
+  deleted: [parentPath: string]
 }>()
+
+const editOpen = ref(false)
+const coverOpen = ref(false)
+const deleteOpen = ref(false)
 
 const coverMedia = computed(() =>
   props.memory.coverMediaId
@@ -29,6 +38,7 @@ const coverMedia = computed(() =>
     : props.media[0]
 )
 const coverUrl = computed(() => {
+  if (props.memory.coverUrl) return `${API_BASE}${props.memory.coverUrl}`
   const media = coverMedia.value
   if (!media) return ''
   return `${API_BASE}${media.previewUrl || media.contentUrl}`
@@ -37,6 +47,11 @@ const scopeLabel = computed(() => {
   if (props.memory.scope?.type === 'GROUP') return `@${props.memory.scope.groupName}`
   if (props.memory.scope?.type === 'USER') return 'Persönlich'
   return 'Tenant'
+})
+const parentPath = computed(() => {
+  const segments = props.memory.path.split('/').filter(Boolean)
+  if (segments.length <= 1) return '/'
+  return `/${segments.slice(0, -1).join('/')}`
 })
 </script>
 
@@ -54,22 +69,44 @@ const scopeLabel = computed(() => {
             <h1>{{ memory.displayName }}</h1>
           </div>
           <div class="memory-detail-actions">
-            <Button icon="pi pi-filter" label="Filter" severity="secondary" outlined size="small" />
-            <Button icon="pi pi-users" label="Einladen" severity="secondary" outlined size="small" />
+            <Button
+              icon="pi pi-pencil"
+              label="Bearbeiten"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="editOpen = true"
+            />
+            <Button
+              icon="pi pi-image"
+              label="Cover"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="coverOpen = true"
+            />
+            <Button
+              icon="pi pi-trash"
+              label="Löschen"
+              severity="danger"
+              outlined
+              size="small"
+              @click="deleteOpen = true"
+            />
           </div>
         </div>
         <div class="memory-detail-meta">
           <span><i class="pi pi-folder" /> {{ scopeLabel }}</span>
           <span><i class="pi pi-images" /> {{ memory.mediaCount }} Medien</span>
-          <span><i class="pi pi-sitemap" /> {{ memory.childCount }} Child Memories</span>
+          <span><i class="pi pi-sitemap" /> {{ memory.childCount }} Unter-Memories</span>
         </div>
       </div>
     </header>
 
     <Tabs value="gallery" class="memory-tabs">
       <TabList>
-        <Tab value="gallery">Gallery</Tab>
-        <Tab value="children">Child Memories</Tab>
+        <Tab value="gallery">Galerie</Tab>
+        <Tab value="children">Unter-Memories</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
@@ -85,11 +122,30 @@ const scopeLabel = computed(() => {
             />
             <button class="memory-create-card" type="button" @click="$emit('createChildMemory')">
               <span class="pi pi-plus" />
-              <strong>Child Memory erstellen</strong>
+              <strong>Unter-Memory erstellen</strong>
             </button>
           </div>
         </TabPanel>
       </TabPanels>
     </Tabs>
+
+    <EditMemoryDialog
+      v-model:visible="editOpen"
+      :tenant-name="tenantName"
+      :memory="memory"
+      @saved="$emit('changed', $event)"
+    />
+    <MemoryCoverDialog
+      v-model:visible="coverOpen"
+      :tenant-name="tenantName"
+      :memory="memory"
+      @saved="$emit('changed', $event)"
+    />
+    <DeleteMemoryDialog
+      v-model:visible="deleteOpen"
+      :tenant-name="tenantName"
+      :memory="memory"
+      @deleted="$emit('deleted', parentPath)"
+    />
   </div>
 </template>

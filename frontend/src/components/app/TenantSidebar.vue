@@ -81,7 +81,19 @@ function toggleTenantMenu(event: MouseEvent) {
     </RouterLink>
 
     <section class="sidebar-section">
-      <p class="sidebar-section-label">Tenant</p>
+      <div class="sidebar-section-heading">
+        <p class="sidebar-section-label">Tenant</p>
+        <button
+          v-if="canCreateTenant"
+          class="sidebar-section-action"
+          type="button"
+          title="Tenant erstellen"
+          aria-label="Tenant erstellen"
+          @click="emit('createTenant')"
+        >
+          <span class="pi pi-plus" />
+        </button>
+      </div>
       <div class="sidebar-tenant-switcher">
         <div
           v-for="tenant in authState.tenants"
@@ -154,7 +166,7 @@ function toggleTenantMenu(event: MouseEvent) {
       </div>
     </section>
 
-    <section v-if="groupRoots.length" class="sidebar-section">
+    <section v-if="activeTenant" class="sidebar-section">
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">Gruppen</p>
         <RouterLink

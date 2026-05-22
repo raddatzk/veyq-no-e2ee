@@ -13,6 +13,9 @@ create table veyq.veyq_memory
     name             varchar(120)                          not null,
     displayName      varchar(255)                          not null,
     cover_media_id   bigint                                null,
+    cover_storage_key varchar(500)                         null,
+    cover_mime_type  varchar(120)                          null,
+    cover_original_filename varchar(255)                   null,
     created_at       timestamp default current_timestamp() not null,
     updated_at       timestamp default current_timestamp() not null,
     constraint uq_veyq_memory_public_id

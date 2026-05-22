@@ -9,7 +9,6 @@ import type {
   MemorySummary,
   MemoryScopeRoot,
   MoveFolderRequest as GeneratedMoveFolderRequest,
-  SetMemoryCoverRequest as GeneratedSetMemoryCoverRequest,
   UpdateFolderRequest as GeneratedUpdateFolderRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
@@ -23,9 +22,10 @@ export type {
   MemoryScopeRoot,
 }
 
-export type Memory = Omit<MemorySummary, 'parentId' | 'coverMediaId' | 'scope'> & {
+export type Memory = Omit<MemorySummary, 'parentId' | 'coverMediaId' | 'coverUrl' | 'scope'> & {
   parentId: string | null
   coverMediaId: string | null
+  coverUrl: string | null
   scope: MemoryScope | null
 }
 
@@ -67,7 +67,9 @@ export type UpdateMemoryRequest = Omit<
   displayName?: string | null
 }
 
-export type SetMemoryCoverRequest = GeneratedSetMemoryCoverRequest
+export type SetMemoryCoverRequest = {
+  file: File
+}
 
 export type UpdateMemoryMediaMetadataRequest = Omit<
   GeneratedUpdateMemoryMediaMetadataRequest,

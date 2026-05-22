@@ -121,8 +121,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 45%) 45%, transparent 70%),
-    #e2e8f0;
+    linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 45%) 45%, transparent 70%), #e2e8f0;
   background-size: 220% 100%;
   animation: media-grid-shimmer 1.2s linear infinite;
 }
@@ -159,7 +158,9 @@
   border: 0;
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08), 0 6px 18px rgb(15 23 42 / 0.06);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.08),
+    0 6px 18px rgb(15 23 42 / 0.06);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -204,7 +205,9 @@
   border: 1px solid rgb(226 232 240 / 0.78);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08), 0 6px 18px rgb(15 23 42 / 0.04);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.08),
+    0 6px 18px rgb(15 23 42 / 0.04);
 }
 
 .memory-card .p-card-content {
@@ -216,7 +219,7 @@
 
 .memory-card-main {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: 0.8rem;
   width: 100%;
@@ -237,17 +240,15 @@
 
 .memory-card-main strong {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .memory-card-main small {
   display: block;
-  overflow: hidden;
   color: #64748b;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .memory-scope-badge {
@@ -256,16 +257,25 @@
   gap: 0.25rem;
 }
 
+.memory-card-cover,
 .memory-card-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 72px;
+  height: 52px;
   border-radius: 8px;
+  overflow: hidden;
   background: #e8f0ff;
   color: #1e3a8a;
   font-size: 1.5rem;
   line-height: 1;
+}
+
+.memory-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
 }
 
 .memory-card-icon.pi {
@@ -348,12 +358,21 @@
   gap: 1rem;
 }
 
+.memory-card-grid-memories {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 340px));
+  align-items: start;
+}
+
 .memory-card {
+  max-width: 340px;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
   background: #fff;
   box-shadow: var(--app-shadow-sm);
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .memory-card:hover {
@@ -367,7 +386,11 @@
   height: 100%;
 }
 
-.memory-card-main,
+.memory-card .p-card-body,
+.memory-card .p-card-content {
+  padding: 0;
+}
+
 .memory-folder-card,
 .memory-scope-card,
 .memory-create-card {
@@ -385,7 +408,10 @@
   text-align: left;
   cursor: pointer;
   box-shadow: var(--app-shadow-sm);
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .memory-folder-card:hover,
@@ -397,24 +423,55 @@
 }
 
 .memory-card-main {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  min-height: 86px;
   border: 0;
-  padding: 0;
+  padding: 0.65rem 0.75rem;
+  background: transparent;
   box-shadow: none;
   transform: none;
 }
 
-.memory-card-icon,
+.memory-card-cover,
 .memory-folder-card .pi,
 .memory-scope-card-icon,
 .memory-create-card .pi {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 112px;
+  height: 72px;
   border-radius: 10px;
+  overflow: hidden;
   background: var(--app-accent-soft);
   color: var(--app-accent);
   font-size: 1.25rem;
+}
+
+.memory-card-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--app-accent);
+  font-size: 1.6rem;
+}
+
+.memory-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+}
+
+.memory-folder-card .pi,
+.memory-scope-card-icon,
+.memory-create-card .pi {
+  width: 42px;
+  height: 42px;
 }
 
 .memory-folder-card .pi {
@@ -428,6 +485,21 @@
   color: var(--app-muted);
 }
 
+.memory-create-card-memory {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  max-width: 340px;
+  min-height: 86px;
+  padding: 0.9rem;
+}
+
+.memory-create-card-memory .pi {
+  width: 42px;
+  height: 42px;
+  aspect-ratio: auto;
+  border-radius: 10px;
+}
+
 .memory-create-card .pi {
   background: #f4f1ff;
   color: var(--app-accent);
@@ -435,6 +507,11 @@
 
 .memory-create-card strong {
   color: #4b5563;
+}
+
+.memory-create-card-memory strong {
+  padding: 0;
+  white-space: nowrap;
 }
 
 .memory-scope-card-user .memory-scope-card-icon {
@@ -454,13 +531,30 @@
   min-width: 0;
 }
 
-.memory-card-text strong,
+.memory-card-text {
+  align-content: center;
+  padding: 0;
+}
+
 .memory-folder-card strong,
 .memory-scope-card strong,
 .memory-create-card strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.memory-card-text strong {
+  color: var(--app-text);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.memory-card-text small {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .memory-card-text small,
@@ -574,6 +668,62 @@
 .memory-tabs .p-tabpanels {
   padding: 1.25rem 0 0;
   background: transparent;
+}
+
+.memory-dialog-copy {
+  margin: 0;
+  color: #4b5565;
+  line-height: 1.5;
+}
+
+.memory-cover-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 0.75rem;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.memory-cover-option {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+  cursor: pointer;
+}
+
+.memory-cover-option-selected {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.memory-cover-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.memory-cover-option img,
+.memory-cover-option .pi {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--app-radius-sm);
+  background: #f1f5f9;
+  color: var(--app-muted);
+  object-fit: cover;
+}
+
+.memory-cover-option strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {

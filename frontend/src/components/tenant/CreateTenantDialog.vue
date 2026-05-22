@@ -31,7 +31,7 @@ watch(visible, (isVisible) => {
     error.value = ''
     name.value = ''
     displayName.value = ''
-    domain.value = ''
+    domain.value = window.location.host
     permalinkTouched.value = false
   }
 })

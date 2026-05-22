@@ -35,6 +35,7 @@ function memory(overrides: Partial<Memory>): Memory {
     displayName: 'Memory',
     path: '/memory',
     coverMediaId: null,
+    coverUrl: null,
     childCount: 0,
     mediaCount: 0,
     scope: null,

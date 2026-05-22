@@ -9,7 +9,6 @@ import com.veyq.api.generated.model.CreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScope
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MemorySummary
-import com.veyq.api.generated.model.SetMemoryCoverRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
@@ -21,7 +20,9 @@ import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.Comparator
+import jakarta.ws.rs.core.Response
 
 @Singleton
 class MemoryService @Inject constructor(
@@ -114,6 +115,7 @@ class MemoryService @Inject constructor(
         val memories = descendantsAndSelf(memory)
         val media = memories.flatMap { mediaRepo.listByMemory(it) }
         val mediaDirectories = media.map { mediaDirectory(it) }.distinct()
+        val coverDirectories = memories.mapNotNull { it.coverStorageKey?.let(::coverDirectory) }.distinct()
         memories.forEach { candidate ->
             if (candidate.coverMedia?.let { cover -> media.any { it.id == cover.id } } == true) {
                 candidate.coverMedia = null
@@ -124,16 +126,45 @@ class MemoryService @Inject constructor(
         media.forEach { it.delete() }
         mediaRepo.flush()
         mediaDirectories.forEach(::deleteRecursively)
+        coverDirectories.forEach(::deleteRecursively)
         memory.delete()
     }
 
     @Transactional
-    fun setCover(publicId: String, request: SetMemoryCoverRequest): MemorySummary {
+    fun setCover(publicId: String, uploadPath: Path, originalFilename: String?): MemorySummary {
         val memory = resolveVisibleMemory(publicId)
-        val media = mediaRepo.findByTenantAndPublicId(tenant(), request.mediaId)
-            ?: throw NotFoundException("Media not found")
-        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
-        memory.coverMedia = media
+        if (Files.size(uploadPath) <= 0) throw BadRequestException("file must not be empty")
+        val mimeType = detectCoverMimeType(uploadPath)
+        if (!mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported")
+
+        memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
+        val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}/cover"
+        writeFile(uploadPath, storageKey)
+        memory.coverStorageKey = storageKey
+        memory.coverMimeType = mimeType
+        memory.coverOriginalFilename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "cover"
+        return toSummary(memory)
+    }
+
+    fun coverContent(publicId: String): Response {
+        val memory = resolveVisibleMemory(publicId)
+        val storageKey = memory.coverStorageKey ?: throw NotFoundException("Cover not found")
+        val path = storagePath(storageKey)
+        if (!Files.isRegularFile(path)) throw NotFoundException("Cover not found")
+        return Response.ok(path.toFile(), memory.coverMimeType ?: "application/octet-stream")
+            .header("Cache-Control", "private, max-age=31536000, immutable")
+            .header("Content-Length", Files.size(path))
+            .build()
+    }
+
+    @Transactional
+    fun clearCover(publicId: String): MemorySummary {
+        val memory = resolveVisibleMemory(publicId)
+        memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
+        memory.coverStorageKey = null
+        memory.coverMimeType = null
+        memory.coverOriginalFilename = null
+        memory.coverMedia = null
         return toSummary(memory)
     }
 
@@ -184,6 +215,7 @@ class MemoryService @Inject constructor(
             displayName = memory.displayName,
             path = memory.path(),
             coverMediaId = memory.coverMedia?.publicId,
+            coverUrl = memory.coverStorageKey?.let { "/api/${tenant().name}/memories/${memory.publicId}/cover/content" },
             childCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
             mediaCount = mediaRepo.listByMemory(memory).size,
             scope = memory.scope().toApiScope(),
@@ -254,6 +286,45 @@ class MemoryService @Inject constructor(
     private fun mediaDirectory(media: Media): Path {
         val originalPath = storagePath(media.storageKey)
         return originalPath.parent ?: storagePath("tenant-${media.tenant.id}/${media.publicId}")
+    }
+
+    private fun coverDirectory(storageKey: String): Path {
+        val coverPath = storagePath(storageKey)
+        return coverPath.parent ?: coverPath
+    }
+
+    private fun writeFile(source: Path, storageKey: String) {
+        val target = storagePath(storageKey)
+        Files.createDirectories(target.parent)
+        val temp = Files.createTempFile(target.parent, "cover-", ".tmp")
+        try {
+            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+    }
+
+    private fun detectCoverMimeType(path: Path): String {
+        val header = ByteArray(16)
+        val read = Files.newInputStream(path).use { input -> input.read(header) }
+        if (read >= 3 &&
+            header[0] == 0xFF.toByte() &&
+            header[1] == 0xD8.toByte() &&
+            header[2] == 0xFF.toByte()
+        ) {
+            return "image/jpeg"
+        }
+        if (read >= 8 &&
+            header[0] == 0x89.toByte() &&
+            header[1] == 'P'.code.toByte() &&
+            header[2] == 'N'.code.toByte() &&
+            header[3] == 'G'.code.toByte()
+        ) {
+            return "image/png"
+        }
+        return Files.probeContentType(path) ?: ""
     }
 
     private fun storagePath(storageKey: String): Path {

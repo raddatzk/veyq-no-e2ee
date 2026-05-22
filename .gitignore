@@ -192,6 +192,8 @@ node_modules/
 dist/
 npm-debug.log
 yarn-error.log
+playwright-report/
+test-results/
 
 # Local deployment secrets
 infra/.env

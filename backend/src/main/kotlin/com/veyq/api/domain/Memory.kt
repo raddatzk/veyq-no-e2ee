@@ -55,6 +55,15 @@ class Memory : PanacheEntityBase {
     @JoinColumn(name = "cover_media_id")
     var coverMedia: Media? = null
 
+    @Column(name = "cover_storage_key")
+    var coverStorageKey: String? = null
+
+    @Column(name = "cover_mime_type")
+    var coverMimeType: String? = null
+
+    @Column(name = "cover_original_filename")
+    var coverOriginalFilename: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 

@@ -49,7 +49,6 @@ models/MoveFolderRequest.ts
 models/ResetPasswordRequest.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts
-models/SetMemoryCoverRequest.ts
 models/SettingsBreadcrumb.ts
 models/SettingsLocation.ts
 models/SettingsResponse.ts

@@ -483,13 +483,13 @@ paths:
       tags:
         - Memories
       operationId: setMemoryCover
-      summary: Set memory cover media
+      summary: Upload memory cover image
       x-implementation-status: implemented
       x-preconditions:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Sets the Memory cover to media that already belongs directly to the same Memory.
+        Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -500,12 +500,77 @@ paths:
         - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
         - "$ref": "#/components/parameters/MemoryId"
       requestBody:
-        "$ref": "#/components/requestBodies/SetMemoryCover"
+        "$ref": "#/components/requestBodies/UploadMemoryCover"
       responses:
         '200':
           "$ref": "#/components/responses/Memory"
         '400':
           "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - Memories
+      operationId: removeMemoryCover
+      summary: Remove memory cover image
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Removes the explicit cover image from the Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/cover/content":
+    get:
+      tags:
+        - Memories
+      operationId: memoryCoverContent
+      summary: Stream memory cover image
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the explicit Memory cover image when one is set.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          description: Memory cover image bytes.
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+              example: "<binary image bytes>"
         '401':
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
@@ -697,12 +762,20 @@ components:
           example:
             name: summer-trip-2026
             displayName: Summer Trip 2026
-    SetMemoryCover:
+    UploadMemoryCover:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            "$ref": "#/components/schemas/SetMemoryCoverRequest"
+            type: object
+            additionalProperties: false
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: Cover image file.
           example:
             mediaId: med_abc123
     UploadMemoryMedia:
@@ -1023,6 +1096,10 @@ components:
           type: string
           nullable: true
           description: Public id of the cover media if one is set.
+        coverUrl:
+          type: string
+          nullable: true
+          description: URL for the explicit Memory cover image if one is set.
         childCount:
           type: integer
           format: int32
@@ -1093,15 +1170,6 @@ components:
         groupName:
           type: string
           nullable: true
-    SetMemoryCoverRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - mediaId
-      properties:
-        mediaId:
-          type: string
-          description: Public id of media that belongs directly to the Memory.
     UpdateMemoryMediaMetadataRequest:
       type: object
       additionalProperties: false

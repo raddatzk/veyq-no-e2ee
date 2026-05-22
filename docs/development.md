@@ -40,6 +40,20 @@ cd frontend
 npm run check
 ```
 
+Frontend E2E checks:
+
+```bash
+cd frontend
+npm run e2e
+```
+
+The E2E suite uses Playwright and starts the local Vite dev server automatically. On a fresh machine, install the browser runtime once:
+
+```bash
+cd frontend
+npx playwright install chromium
+```
+
 OpenAPI client generation:
 
 ```bash
@@ -53,6 +67,7 @@ Memory stabilization checks currently expected before review:
 
 - Backend check with Java 21 when needed.
 - Frontend `npm run check`.
+- Frontend `npm run e2e` for setup and workspace shell regressions.
 - Frontend `npm run generate:api` after API spec edits.
 - Manual `git diff --stat` review for migration, OpenAPI and generated client changes.
 
