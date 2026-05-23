@@ -489,7 +489,7 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.
+        Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -770,14 +770,48 @@ components:
             type: object
             additionalProperties: false
             required:
-              - file
+              - cropX
+              - cropY
+              - cropWidth
+              - cropHeight
             properties:
               file:
                 type: string
                 format: binary
-                description: Cover image file.
+                description: Cover original image file. Mutually exclusive with `mediaId`.
+              mediaId:
+                type: string
+                description: Existing Memory media id to use as cover source. Mutually exclusive with `file`.
+              cropX:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop x offset.
+              cropY:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop y offset.
+              cropWidth:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop width. Must form a 16:9 rectangle with `cropHeight`.
+              cropHeight:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop height. Must form a 16:9 rectangle with `cropWidth`.
           example:
             mediaId: med_abc123
+            cropX: 0
+            cropY: 0.125
+            cropWidth: 1
+            cropHeight: 0.5625
     UploadMemoryMedia:
       required: true
       content:
@@ -878,6 +912,8 @@ components:
             displayName: Summer Trip
             path: /summer-trip
             coverMediaId: med_abc123
+            startDate: '2026-05-03'
+            endDate: '2026-05-05'
             childCount: 1
             mediaCount: 12
             scope:
@@ -1073,6 +1109,8 @@ components:
         - id
         - name
         - displayName
+        - startDate
+        - endDate
         - path
         - childCount
         - mediaCount
@@ -1099,7 +1137,17 @@ components:
         coverUrl:
           type: string
           nullable: true
-          description: URL for the explicit Memory cover image if one is set.
+          description: URL for the renderable Memory cover source if one is set.
+        coverCrop:
+          "$ref": "#/components/schemas/CoverCrop"
+        startDate:
+          type: string
+          format: date
+          description: User-defined Memory start date.
+        endDate:
+          type: string
+          format: date
+          description: User-defined Memory end date.
         childCount:
           type: integer
           format: int32
@@ -1123,12 +1171,44 @@ components:
         groupName:
           type: string
           nullable: true
+    CoverCrop:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required:
+        - x
+        - y
+        - width
+        - height
+      properties:
+        x:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        y:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        width:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        height:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
     CreateMemoryRequest:
       type: object
       additionalProperties: false
       required:
         - name
         - displayName
+        - startDate
+        - endDate
       properties:
         parentId:
           type: string
@@ -1143,6 +1223,14 @@ components:
           description: URL-safe sibling name.
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        startDate:
+          type: string
+          format: date
+          description: User-defined Memory start date.
+        endDate:
+          type: string
+          format: date
+          description: User-defined Memory end date.
         scope:
           "$ref": "#/components/schemas/MemoryScopeRequest"
           nullable: true
@@ -1161,6 +1249,16 @@ components:
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
           nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+          description: New user-defined Memory start date. When omitted, the current start date is kept.
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          description: New user-defined Memory end date. When omitted, the current end date is kept.
     MemoryScopeRequest:
       type: object
       additionalProperties: false

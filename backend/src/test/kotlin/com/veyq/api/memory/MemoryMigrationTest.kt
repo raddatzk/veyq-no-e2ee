@@ -35,6 +35,26 @@ class MemoryMigrationTest {
                     select column_name
                     from information_schema.columns
                     where table_schema = 'veyq'
+                        and table_name = 'veyq_memory'
+                    """.trimIndent()
+                ).use { rows ->
+                    val columns = mutableListOf<String>()
+                    while (rows.next()) columns += rows.getString("column_name")
+                    assertThat(columns).contains(
+                        "start_date",
+                        "end_date",
+                        "cover_crop_x",
+                        "cover_crop_y",
+                        "cover_crop_width",
+                        "cover_crop_height",
+                    )
+                }
+
+                statement.executeQuery(
+                    """
+                    select column_name
+                    from information_schema.columns
+                    where table_schema = 'veyq'
                         and table_name = 'veyq_media'
                     """.trimIndent()
                 ).use { rows ->

@@ -21,6 +21,7 @@ models/AdminSetupRequest.ts
 models/BootstrapResponse.ts
 models/ChangePasswordRequest.ts
 models/ConfirmEmailChangeRequest.ts
+models/CoverCrop.ts
 models/CreateFolderRequest.ts
 models/CreateGroupRequest.ts
 models/CreateManagedUserRequest.ts

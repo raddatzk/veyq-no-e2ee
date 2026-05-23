@@ -6,6 +6,7 @@ import com.veyq.api.auth.NotFoundException
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryRequest
+import com.veyq.api.generated.model.CoverCrop
 import com.veyq.api.generated.model.MemoryScope
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MemorySummary
@@ -16,15 +17,23 @@ import com.veyq.api.library.LibraryService
 import com.veyq.api.library.ResolvedMemoryLocation
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaKind
+import com.veyq.api.library.media.MediaMetadataExtractor
 import com.veyq.api.library.media.MediaTypeDetector
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
+import jakarta.ws.rs.core.Response
+import org.jboss.logging.Logger
+import java.awt.Dimension
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.time.LocalDate
 import java.util.Comparator
-import jakarta.ws.rs.core.Response
+import java.util.UUID
+import kotlin.math.abs
 
 @Singleton
 class MemoryService @Inject constructor(
@@ -34,9 +43,11 @@ class MemoryService @Inject constructor(
     private val groupRepo: TenantGroupRepo,
     private val memoryGroupMemberRepo: TenantGroupMemberRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val mediaTypeDetector: MediaTypeDetector,
     requestContext: RequestContext,
 ) : LibraryService(folderRepo, groupRepo, memoryGroupMemberRepo, requestContext) {
+    private val log: Logger = Logger.getLogger(MemoryService::class.java)
 
     fun listRootMemories(): List<MemorySummary> =
         memoryRepo.listRoots(tenant())
@@ -74,6 +85,7 @@ class MemoryService @Inject constructor(
         val parentFolder = folderTarget?.parentFolder
         val scope = parent?.scope() ?: folderTarget?.scope ?: resolveRequestedRootScope(request.scope)
         val name = normalizedName(request.name)
+        val dateRange = requiredDateRange(request.startDate, request.endDate)
         validateNoCollision(parent, parentFolder, scope, name)
         val memory = Memory().also {
             it.tenant = tenant()
@@ -83,6 +95,8 @@ class MemoryService @Inject constructor(
             LibraryScopes.apply(it, scope)
             it.name = name
             it.displayName = requiredDisplayName(request.displayName)
+            it.startDate = dateRange.startDate
+            it.endDate = dateRange.endDate
             memoryRepo.persist(it)
         }
         memoryRepo.flush()
@@ -109,6 +123,14 @@ class MemoryService @Inject constructor(
             memory.name = name
         }
         request.displayName?.let { memory.displayName = requiredDisplayName(it) }
+        if (request.startDate != null || request.endDate != null) {
+            val dateRange = requiredDateRange(
+                request.startDate ?: memory.startDate,
+                request.endDate ?: memory.endDate,
+            )
+            memory.startDate = dateRange.startDate
+            memory.endDate = dateRange.endDate
+        }
         return toSummary(memory)
     }
 
@@ -134,19 +156,74 @@ class MemoryService @Inject constructor(
     }
 
     @Transactional
-    fun setCover(publicId: String, uploadPath: Path, originalFilename: String?): MemorySummary {
+    fun setCover(
+        publicId: String,
+        uploadPath: Path?,
+        originalFilename: String?,
+        mediaId: String?,
+        cropX: Double?,
+        cropY: Double?,
+        cropWidth: Double?,
+        cropHeight: Double?,
+        uploadSize: Long? = null,
+        uploadContentType: String? = null,
+    ): MemorySummary {
         val memory = resolveVisibleMemory(publicId)
-        if (Files.size(uploadPath) <= 0) throw BadRequestException("file must not be empty")
-        val mediaType = mediaTypeDetector.detect(uploadPath)
-            ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
-        if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
+        val normalizedMediaId = mediaId?.trim()?.takeIf { it.isNotBlank() }
+        val hasUpload = uploadPath != null
+        val hasMedia = normalizedMediaId != null
+        if (hasUpload && hasMedia) {
+            throw BadRequestException("Exactly one cover source is allowed")
+        }
+        if (!hasUpload && !hasMedia && memory.coverStorageKey == null) {
+            throw BadRequestException("Cover source is required")
+        }
 
-        memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
-        val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}/cover"
-        writeFile(uploadPath, storageKey)
-        memory.coverStorageKey = storageKey
-        memory.coverMimeType = mediaType.mimeType
-        memory.coverOriginalFilename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "cover"
+        val oldCoverStorageKey = memory.coverStorageKey
+        if (uploadPath != null) {
+            val size = uploadSize ?: Files.size(uploadPath)
+            if (size <= 0) throw BadRequestException("file must not be empty")
+            val mediaType = mediaTypeDetector.detect(uploadPath)
+                ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
+            if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
+            val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, imageDimensions(uploadPath, mediaType.mimeType))
+            val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}-${UUID.randomUUID()}/cover-original"
+            writeFile(uploadPath, storageKey)
+            memory.coverStorageKey = storageKey
+            memory.coverMimeType = mediaType.mimeType
+            memory.coverOriginalFilename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "cover"
+            memory.coverMedia = null
+            memory.coverCropX = crop.x
+            memory.coverCropY = crop.y
+            memory.coverCropWidth = crop.width
+            memory.coverCropHeight = crop.height
+            memoryRepo.flush()
+            deleteOldExplicitCover(oldCoverStorageKey, storageKey)
+        } else if (normalizedMediaId != null) {
+            val media = mediaRepo.findByTenantAndPublicId(tenant(), normalizedMediaId)
+                ?: throw NotFoundException("Media not found")
+            if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+            if (!media.mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported")
+            val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, media.imageDimensions())
+            memory.coverStorageKey = null
+            memory.coverMimeType = null
+            memory.coverOriginalFilename = null
+            memory.coverMedia = media
+            memory.coverCropX = crop.x
+            memory.coverCropY = crop.y
+            memory.coverCropWidth = crop.width
+            memory.coverCropHeight = crop.height
+            memoryRepo.flush()
+            deleteOldExplicitCover(oldCoverStorageKey, null)
+        } else {
+            val storageKey = oldCoverStorageKey ?: throw BadRequestException("Cover source is required")
+            val mimeType = memory.coverMimeType ?: throw BadRequestException("Cover source dimensions could not be read")
+            val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, imageDimensions(storagePath(storageKey), mimeType))
+            memory.coverCropX = crop.x
+            memory.coverCropY = crop.y
+            memory.coverCropWidth = crop.width
+            memory.coverCropHeight = crop.height
+        }
         return toSummary(memory)
     }
 
@@ -170,6 +247,10 @@ class MemoryService @Inject constructor(
         memory.coverMimeType = null
         memory.coverOriginalFilename = null
         memory.coverMedia = null
+        memory.coverCropX = null
+        memory.coverCropY = null
+        memory.coverCropWidth = null
+        memory.coverCropHeight = null
         return toSummary(memory)
     }
 
@@ -220,11 +301,63 @@ class MemoryService @Inject constructor(
             displayName = memory.displayName,
             path = memory.path(),
             coverMediaId = memory.coverMedia?.publicId,
-            coverUrl = memory.coverStorageKey?.let { "/api/${tenant().name}/memories/${memory.publicId}/cover/content" },
+            coverUrl = memory.coverUrl(),
+            coverCrop = memory.coverCrop(),
+            startDate = memory.startDate,
+            endDate = memory.endDate,
             childCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
             mediaCount = mediaRepo.listByMemory(memory).size,
             scope = memory.scope().toApiScope(),
         )
+
+    private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): MemoryDateRange {
+        val start = startDate ?: throw BadRequestException("startDate is required")
+        val end = endDate ?: throw BadRequestException("endDate is required")
+        if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate")
+        return MemoryDateRange(start, end)
+    }
+
+    private fun requiredCoverCrop(
+        x: Double?,
+        y: Double?,
+        width: Double?,
+        height: Double?,
+        source: Dimension,
+    ): MemoryCoverCrop {
+        val crop = MemoryCoverCrop(
+            x ?: throw BadRequestException("cropX is required"),
+            y ?: throw BadRequestException("cropY is required"),
+            width ?: throw BadRequestException("cropWidth is required"),
+            height ?: throw BadRequestException("cropHeight is required"),
+        )
+        val values = listOf(crop.x, crop.y, crop.width, crop.height)
+        if (values.any { !it.isFinite() || it < 0.0 || it > 1.0 }) {
+            throw BadRequestException("Cover crop values must be between 0 and 1")
+        }
+        if (crop.width <= 0.0 || crop.height <= 0.0) {
+            throw BadRequestException("Cover crop dimensions must be greater than 0")
+        }
+        if (crop.x + crop.width > 1.000001 || crop.y + crop.height > 1.000001) {
+            throw BadRequestException("Cover crop must fit inside the source image")
+        }
+        val cropAspectRatio = (crop.width * source.width.toDouble()) / (crop.height * source.height.toDouble())
+        if (abs(cropAspectRatio - COVER_ASPECT_RATIO) > COVER_ASPECT_TOLERANCE) {
+            throw BadRequestException("Cover crop must be 16:9")
+        }
+        return crop
+    }
+
+    private fun Memory.coverUrl(): String? =
+        coverStorageKey?.let { "/api/${url(tenant().name)}/memories/${url(publicId)}/cover/content" }
+            ?: coverMedia?.let { media -> media.contentUrl() }
+
+    private fun Memory.coverCrop(): CoverCrop? {
+        val x = coverCropX ?: return null
+        val y = coverCropY ?: return null
+        val width = coverCropWidth ?: return null
+        val height = coverCropHeight ?: return null
+        return CoverCrop(x, y, width, height)
+    }
 
     private fun Memory.path(): String =
         (parentMemory?.path()?.trimEnd('/')
@@ -248,6 +381,11 @@ class MemoryService @Inject constructor(
     private data class MemoryFolderTarget(
         val parentFolder: TenantFolder?,
         val scope: LibraryScopeKey,
+    )
+
+    private data class MemoryDateRange(
+        val startDate: LocalDate,
+        val endDate: LocalDate,
     )
 
     private fun resolveFolderTarget(path: String?): MemoryFolderTarget =
@@ -293,6 +431,27 @@ class MemoryService @Inject constructor(
         return originalPath.parent ?: storagePath("tenant-${media.tenant.id}/${media.publicId}")
     }
 
+    private fun Media.contentUrl(): String =
+        "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"
+
+    private fun Media.imageDimensions(): Dimension =
+        imageWidth?.let { width ->
+            imageHeight?.let { height -> Dimension(width, height) }
+        } ?: imageDimensions(storagePath(storageKey), mimeType)
+
+    private fun imageDimensions(path: Path, mimeType: String): Dimension {
+        val metadata = mediaMetadataExtractor.extract(path, mimeType)
+        val width = metadata.imageWidth
+        val height = metadata.imageHeight
+        if (width == null || height == null || width <= 0 || height <= 0) {
+            throw BadRequestException("Cover source dimensions could not be read")
+        }
+        return Dimension(width, height)
+    }
+
+    private fun url(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+
     private fun coverDirectory(storageKey: String): Path {
         val coverPath = storagePath(storageKey)
         return coverPath.parent ?: coverPath
@@ -311,6 +470,15 @@ class MemoryService @Inject constructor(
         }
     }
 
+    private fun deleteOldExplicitCover(oldStorageKey: String?, newStorageKey: String?) {
+        if (oldStorageKey == null || oldStorageKey == newStorageKey) return
+        try {
+            deleteRecursively(coverDirectory(oldStorageKey))
+        } catch (e: Exception) {
+            log.warn("Could not delete old memory cover $oldStorageKey", e)
+        }
+    }
+
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()
         val path = root.resolve(storageKey).normalize()
@@ -323,5 +491,17 @@ class MemoryService @Inject constructor(
         Files.walk(path).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
+    }
+
+    private data class MemoryCoverCrop(
+        val x: Double,
+        val y: Double,
+        val width: Double,
+        val height: Double,
+    )
+
+    private companion object {
+        private const val COVER_ASPECT_RATIO = 16.0 / 9.0
+        private const val COVER_ASPECT_TOLERANCE = 0.01
     }
 }

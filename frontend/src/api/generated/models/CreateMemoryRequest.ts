@@ -52,6 +52,18 @@ export interface CreateMemoryRequest {
      */
     displayName: string;
     /**
+     * User-defined Memory start date.
+     * @type {string}
+     * @memberof CreateMemoryRequest
+     */
+    startDate: string;
+    /**
+     * User-defined Memory end date.
+     * @type {string}
+     * @memberof CreateMemoryRequest
+     */
+    endDate: string;
+    /**
      * Root scope for new root Memories. Ignored for child Memories because children inherit parent scope.
      * @type {MemoryScopeRequest}
      * @memberof CreateMemoryRequest
@@ -65,6 +77,8 @@ export interface CreateMemoryRequest {
 export function instanceOfCreateMemoryRequest(value: object): value is CreateMemoryRequest {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('startDate' in value) || value['startDate'] === undefined) return false;
+    if (!('endDate' in value) || value['endDate'] === undefined) return false;
     return true;
 }
 
@@ -82,6 +96,8 @@ export function CreateMemoryRequestFromJSONTyped(json: any, ignoreDiscriminator:
         'folderPath': json['folderPath'] == null ? undefined : json['folderPath'],
         'name': json['name'],
         'displayName': json['displayName'],
+        'startDate': json['startDate'],
+        'endDate': json['endDate'],
         'scope': json['scope'] == null ? undefined : MemoryScopeRequestFromJSON(json['scope']),
     };
 }
@@ -101,6 +117,8 @@ export function CreateMemoryRequestToJSONTyped(value?: CreateMemoryRequest | nul
         'folderPath': value['folderPath'],
         'name': value['name'],
         'displayName': value['displayName'],
+        'startDate': value['startDate'],
+        'endDate': value['endDate'],
         'scope': MemoryScopeRequestToJSON(value['scope']),
     };
 }

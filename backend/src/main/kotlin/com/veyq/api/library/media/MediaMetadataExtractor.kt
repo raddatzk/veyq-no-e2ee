@@ -5,6 +5,7 @@ import com.drew.metadata.Metadata
 import com.drew.metadata.exif.ExifIFD0Directory
 import com.drew.metadata.exif.ExifSubIFDDirectory
 import com.drew.metadata.exif.GpsDirectory
+import com.drew.metadata.gif.GifHeaderDirectory
 import com.drew.metadata.jpeg.JpegDirectory
 import com.drew.metadata.png.PngDirectory
 import com.veyq.api.domain.Media
@@ -30,7 +31,7 @@ class MediaMetadataExtractor {
     private val log: Logger = Logger.getLogger(MediaMetadataExtractor::class.java)
 
     fun extract(path: Path, mimeType: String): ExtractedMediaMetadata {
-        if (!mimeType.startsWith("image/") || (!mimeType.startsWith("video/"))) return ExtractedMediaMetadata()
+        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) return ExtractedMediaMetadata()
 
         return try {
             readMetadata(ImageMetadataReader.readMetadata(path.toFile()))
@@ -56,9 +57,10 @@ class MediaMetadataExtractor {
         val ifd0 = metadata.getFirstDirectoryOfType(ExifIFD0Directory::class.java)
         val subIfd = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory::class.java)
         val gps = metadata.getFirstDirectoryOfType(GpsDirectory::class.java)
+        val gif = metadata.getFirstDirectoryOfType(GifHeaderDirectory::class.java)
         val jpeg = metadata.getFirstDirectoryOfType(JpegDirectory::class.java)
         val png = metadata.getFirstDirectoryOfType(PngDirectory::class.java)
-        val dimensions = imageDimensions(subIfd, jpeg, png)
+        val dimensions = imageDimensions(subIfd, gif, jpeg, png)
 
         return ExtractedMediaMetadata(
             capturedAt = capturedAt(subIfd),
@@ -79,13 +81,16 @@ class MediaMetadataExtractor {
 
     private fun imageDimensions(
         subIfd: ExifSubIFDDirectory?,
+        gif: GifHeaderDirectory?,
         jpeg: JpegDirectory?,
         png: PngDirectory?,
     ): Pair<Int, Int>? {
         val width = subIfd?.getInteger(ExifSubIFDDirectory.TAG_EXIF_IMAGE_WIDTH)
+            ?: gif?.getInteger(GifHeaderDirectory.TAG_IMAGE_WIDTH)
             ?: jpeg?.getInteger(JpegDirectory.TAG_IMAGE_WIDTH)
             ?: png?.getInteger(PngDirectory.TAG_IMAGE_WIDTH)
         val height = subIfd?.getInteger(ExifSubIFDDirectory.TAG_EXIF_IMAGE_HEIGHT)
+            ?: gif?.getInteger(GifHeaderDirectory.TAG_IMAGE_HEIGHT)
             ?: jpeg?.getInteger(JpegDirectory.TAG_IMAGE_HEIGHT)
             ?: png?.getInteger(PngDirectory.TAG_IMAGE_HEIGHT)
 

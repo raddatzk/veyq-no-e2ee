@@ -12,6 +12,7 @@ import type { Memory, MemoryMedia } from '../api'
 import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
 import EditMemoryDialog from './EditMemoryDialog.vue'
 import MemoryCard from './MemoryCard.vue'
+import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 
 const props = defineProps<{
@@ -59,7 +60,12 @@ const parentPath = computed(() => {
   <div class="memory-detail">
     <header class="memory-detail-header">
       <div class="memory-detail-cover">
-        <img v-if="coverUrl" :src="coverUrl" :alt="memory.displayName" />
+        <MemoryCoverImage
+          v-if="coverUrl"
+          :src="coverUrl"
+          :alt="memory.displayName"
+          :crop="memory.coverCrop"
+        />
         <span v-else class="pi pi-images" />
       </div>
       <div class="memory-detail-heading">
@@ -113,7 +119,7 @@ const parentPath = computed(() => {
           <MediaGrid :tenant-name="tenantName" :media="media" :streaming="false" />
         </TabPanel>
         <TabPanel value="children">
-          <div class="memory-card-grid">
+          <div class="memory-card-grid memory-card-grid-memories">
             <MemoryCard
               v-for="child in childMemories"
               :key="child.id"
@@ -139,6 +145,7 @@ const parentPath = computed(() => {
       v-model:visible="coverOpen"
       :tenant-name="tenantName"
       :memory="memory"
+      :media="media"
       @saved="$emit('changed', $event)"
     />
     <DeleteMemoryDialog

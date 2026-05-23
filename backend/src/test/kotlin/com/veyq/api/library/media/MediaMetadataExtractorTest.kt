@@ -3,9 +3,23 @@ package com.veyq.api.library.media
 import com.veyq.api.domain.Media
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
+import java.nio.file.Files
 import java.time.Instant
+import javax.imageio.ImageIO
 
 class MediaMetadataExtractorTest {
+    @Test
+    fun `extracts image dimensions from image metadata`() {
+        val image = Files.createTempFile("metadata-dimensions", ".png")
+        ImageIO.write(BufferedImage(16, 9, BufferedImage.TYPE_INT_RGB), "png", image.toFile())
+
+        val metadata = MediaMetadataExtractor().extract(image, "image/png")
+
+        assertThat(metadata.imageWidth).isEqualTo(16)
+        assertThat(metadata.imageHeight).isEqualTo(9)
+    }
+
     @Test
     fun `applies extracted metadata to media`() {
         val media = Media()

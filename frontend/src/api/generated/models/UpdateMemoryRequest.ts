@@ -37,6 +37,18 @@ export interface UpdateMemoryRequest {
      * @memberof UpdateMemoryRequest
      */
     displayName?: string;
+    /**
+     * New user-defined Memory start date. When omitted, the current start date is kept.
+     * @type {string}
+     * @memberof UpdateMemoryRequest
+     */
+    startDate?: string;
+    /**
+     * New user-defined Memory end date. When omitted, the current end date is kept.
+     * @type {string}
+     * @memberof UpdateMemoryRequest
+     */
+    endDate?: string;
 }
 
 /**
@@ -59,6 +71,8 @@ export function UpdateMemoryRequestFromJSONTyped(json: any, ignoreDiscriminator:
         'parentId': json['parentId'] == null ? undefined : json['parentId'],
         'name': json['name'] == null ? undefined : json['name'],
         'displayName': json['displayName'] == null ? undefined : json['displayName'],
+        'startDate': json['startDate'] == null ? undefined : json['startDate'],
+        'endDate': json['endDate'] == null ? undefined : json['endDate'],
     };
 }
 
@@ -76,6 +90,8 @@ export function UpdateMemoryRequestToJSONTyped(value?: UpdateMemoryRequest | nul
         'parentId': value['parentId'],
         'name': value['name'],
         'displayName': value['displayName'],
+        'startDate': value['startDate'],
+        'endDate': value['endDate'],
     };
 }
 

@@ -8,6 +8,7 @@ export * from './AdminSetupRequest';
 export * from './BootstrapResponse';
 export * from './ChangePasswordRequest';
 export * from './ConfirmEmailChangeRequest';
+export * from './CoverCrop';
 export * from './CreateFolderRequest';
 export * from './CreateGroupRequest';
 export * from './CreateManagedUserRequest';

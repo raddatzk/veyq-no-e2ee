@@ -105,7 +105,12 @@ export function setMemoryCover(
     memoriesApi.setMemoryCover({
       tenantName,
       memoryId,
-      file: request.file
+      file: request.file || undefined,
+      mediaId: request.mediaId || undefined,
+      cropX: request.cropX,
+      cropY: request.cropY,
+      cropWidth: request.cropWidth,
+      cropHeight: request.cropHeight
     })
   ).then(normalizeMemory)
 }
@@ -161,6 +166,8 @@ function createMemoryRequest(request: CreateMemoryRequest): GeneratedCreateMemor
   return {
     name: request.name,
     displayName: request.displayName,
+    startDate: request.startDate,
+    endDate: request.endDate,
     parentId: request.parentId ?? undefined,
     folderPath: request.folderPath ?? undefined,
     scope: request.scope ?? undefined
@@ -180,7 +187,9 @@ function updateMemoryRequest(request: UpdateMemoryRequest): GeneratedUpdateMemor
   return {
     parentId: request.parentId ?? undefined,
     name: request.name ?? undefined,
-    displayName: request.displayName ?? undefined
+    displayName: request.displayName ?? undefined,
+    startDate: request.startDate ?? undefined,
+    endDate: request.endDate ?? undefined
   }
 }
 
@@ -189,14 +198,16 @@ function normalizeMemory(
     parentId?: string
     coverMediaId?: string
     coverUrl?: string
+    coverCrop?: Memory['coverCrop']
     scope?: Memory['scope']
-  } & Omit<Memory, 'parentId' | 'coverMediaId' | 'coverUrl' | 'scope'>
+  } & Omit<Memory, 'parentId' | 'coverMediaId' | 'coverUrl' | 'coverCrop' | 'scope'>
 ): Memory {
   return {
     ...memory,
     parentId: memory.parentId ?? null,
     coverMediaId: memory.coverMediaId ?? null,
     coverUrl: memory.coverUrl ?? null,
+    coverCrop: memory.coverCrop ?? null,
     scope: memory.scope ?? null
   }
 }

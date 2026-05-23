@@ -20,6 +20,13 @@ import {
     MemoryScopeToJSON,
     MemoryScopeToJSONTyped,
 } from './MemoryScope';
+import type { CoverCrop } from './CoverCrop';
+import {
+    CoverCropFromJSON,
+    CoverCropFromJSONTyped,
+    CoverCropToJSON,
+    CoverCropToJSONTyped,
+} from './CoverCrop';
 
 /**
  * 
@@ -46,7 +53,7 @@ export interface MemorySummary {
      */
     name: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof MemorySummary
      */
@@ -64,11 +71,29 @@ export interface MemorySummary {
      */
     coverMediaId?: string;
     /**
-     * URL for the explicit Memory cover image if one is set.
+     * URL for the renderable Memory cover source if one is set.
      * @type {string}
      * @memberof MemorySummary
      */
     coverUrl?: string;
+    /**
+     *
+     * @type {CoverCrop}
+     * @memberof MemorySummary
+     */
+    coverCrop?: CoverCrop;
+    /**
+     * User-defined Memory start date.
+     * @type {string}
+     * @memberof MemorySummary
+     */
+    startDate: string;
+    /**
+     * User-defined Memory end date.
+     * @type {string}
+     * @memberof MemorySummary
+     */
+    endDate: string;
     /**
      * 
      * @type {number}
@@ -97,6 +122,8 @@ export function instanceOfMemorySummary(value: object): value is MemorySummary {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('path' in value) || value['path'] === undefined) return false;
+    if (!('startDate' in value) || value['startDate'] === undefined) return false;
+    if (!('endDate' in value) || value['endDate'] === undefined) return false;
     if (!('childCount' in value) || value['childCount'] === undefined) return false;
     if (!('mediaCount' in value) || value['mediaCount'] === undefined) return false;
     return true;
@@ -119,6 +146,9 @@ export function MemorySummaryFromJSONTyped(json: any, ignoreDiscriminator: boole
         'path': json['path'],
         'coverMediaId': json['coverMediaId'] == null ? undefined : json['coverMediaId'],
         'coverUrl': json['coverUrl'] == null ? undefined : json['coverUrl'],
+        'coverCrop': json['coverCrop'] == null ? undefined : CoverCropFromJSON(json['coverCrop']),
+        'startDate': json['startDate'],
+        'endDate': json['endDate'],
         'childCount': json['childCount'],
         'mediaCount': json['mediaCount'],
         'scope': json['scope'] == null ? undefined : MemoryScopeFromJSON(json['scope']),
@@ -143,9 +173,11 @@ export function MemorySummaryToJSONTyped(value?: MemorySummary | null, ignoreDis
         'path': value['path'],
         'coverMediaId': value['coverMediaId'],
         'coverUrl': value['coverUrl'],
+        'coverCrop': CoverCropToJSON(value['coverCrop']),
+        'startDate': value['startDate'],
+        'endDate': value['endDate'],
         'childCount': value['childCount'],
         'mediaCount': value['mediaCount'],
         'scope': MemoryScopeToJSON(value['scope']),
     };
 }
-

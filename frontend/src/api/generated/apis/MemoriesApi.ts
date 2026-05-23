@@ -78,7 +78,12 @@ export interface RemoveMemoryCoverRequest {
 export interface SetMemoryCoverRequest {
     tenantName: string;
     memoryId: string;
-    file: Blob;
+    cropX: number;
+    cropY: number;
+    cropWidth: number;
+    cropHeight: number;
+    file?: Blob;
+    mediaId?: string;
 }
 
 export interface UpdateMemoryOperationRequest {
@@ -330,18 +335,28 @@ export interface MemoriesApiInterface {
      * Creates request options for setMemoryCover without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
-     * @param {Blob} file Cover image file.
+     * @param {number} cropX Normalized crop x offset.
+     * @param {number} cropY Normalized crop y offset.
+     * @param {number} cropWidth Normalized crop width. Must form a 16:9 rectangle with &#x60;cropHeight&#x60;.
+     * @param {number} cropHeight Normalized crop height. Must form a 16:9 rectangle with &#x60;cropWidth&#x60;.
+     * @param {Blob} [file] Cover original image file. Mutually exclusive with &#x60;mediaId&#x60;.
+     * @param {string} [mediaId] Existing Memory media id to use as cover source. Mutually exclusive with &#x60;file&#x60;.
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
      */
     setMemoryCoverRequestOpts(requestParameters: SetMemoryCoverRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
      * @summary Upload memory cover image
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
-     * @param {Blob} file Cover image file.
+     * @param {number} cropX Normalized crop x offset.
+     * @param {number} cropY Normalized crop y offset.
+     * @param {number} cropWidth Normalized crop width. Must form a 16:9 rectangle with &#x60;cropHeight&#x60;.
+     * @param {number} cropHeight Normalized crop height. Must form a 16:9 rectangle with &#x60;cropWidth&#x60;.
+     * @param {Blob} [file] Cover original image file. Mutually exclusive with &#x60;mediaId&#x60;.
+     * @param {string} [mediaId] Existing Memory media id to use as cover source. Mutually exclusive with &#x60;file&#x60;.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
@@ -349,7 +364,7 @@ export interface MemoriesApiInterface {
     setMemoryCoverRaw(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
 
     /**
-     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
      * Upload memory cover image
      */
     setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
@@ -894,10 +909,31 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
             );
         }
 
-        if (requestParameters['file'] == null) {
+        if (requestParameters['cropX'] == null) {
             throw new runtime.RequiredError(
-                'file',
-                'Required parameter "file" was null or undefined when calling setMemoryCover().'
+                'cropX',
+                'Required parameter "cropX" was null or undefined when calling setMemoryCover().'
+            );
+        }
+
+        if (requestParameters['cropY'] == null) {
+            throw new runtime.RequiredError(
+                'cropY',
+                'Required parameter "cropY" was null or undefined when calling setMemoryCover().'
+            );
+        }
+
+        if (requestParameters['cropWidth'] == null) {
+            throw new runtime.RequiredError(
+                'cropWidth',
+                'Required parameter "cropWidth" was null or undefined when calling setMemoryCover().'
+            );
+        }
+
+        if (requestParameters['cropHeight'] == null) {
+            throw new runtime.RequiredError(
+                'cropHeight',
+                'Required parameter "cropHeight" was null or undefined when calling setMemoryCover().'
             );
         }
 
@@ -925,6 +961,26 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
             formParams.append('file', requestParameters['file'] as any);
         }
 
+        if (requestParameters['mediaId'] != null) {
+            formParams.append('mediaId', requestParameters['mediaId'] as any);
+        }
+
+        if (requestParameters['cropX'] != null) {
+            formParams.append('cropX', requestParameters['cropX'] as any);
+        }
+
+        if (requestParameters['cropY'] != null) {
+            formParams.append('cropY', requestParameters['cropY'] as any);
+        }
+
+        if (requestParameters['cropWidth'] != null) {
+            formParams.append('cropWidth', requestParameters['cropWidth'] as any);
+        }
+
+        if (requestParameters['cropHeight'] != null) {
+            formParams.append('cropHeight', requestParameters['cropHeight'] as any);
+        }
+
 
         let urlPath = `/api/{tenantName}/memories/{memoryId}/cover`;
         urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
@@ -940,7 +996,7 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
      * Upload memory cover image
      */
     async setMemoryCoverRaw(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
@@ -951,7 +1007,7 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Uploads an explicit Memory cover image. The cover is stored with the Memory and does not have to exist as a Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
      * Upload memory cover image
      */
     async setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {

@@ -77,6 +77,8 @@ export const weddingMemory = {
   parentId: null,
   coverMediaId: null,
   coverUrl: '/api/friends/memories/memory-wedding/cover/content',
+  startDate: '2026-05-03',
+  endDate: '2026-05-04',
   mediaCount: 0,
   childCount: 1,
   scope: { type: 'TENANT' }
@@ -90,6 +92,8 @@ export const childMemory = {
   parentId: weddingMemory.id,
   coverMediaId: null,
   coverUrl: null,
+  startDate: '2026-05-03',
+  endDate: '2026-05-03',
   mediaCount: 0,
   childCount: 0,
   scope: { type: 'TENANT' }
@@ -221,6 +225,8 @@ export async function mockAuthenticatedOwnerApi(
         parentId: body.parentId ?? null,
         coverMediaId: null,
         coverUrl: null,
+        startDate: body.startDate,
+        endDate: body.endDate,
         mediaCount: 0,
         childCount: 0,
         scope: body.scope ?? { type: 'TENANT' }

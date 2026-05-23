@@ -6,6 +6,7 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
 import java.time.Instant
+import java.time.LocalDate
 
 @Entity
 @Table(name = "veyq_memory")
@@ -63,6 +64,24 @@ class Memory : PanacheEntityBase {
 
     @Column(name = "cover_original_filename")
     var coverOriginalFilename: String? = null
+
+    @Column(name = "cover_crop_x")
+    var coverCropX: Double? = null
+
+    @Column(name = "cover_crop_y")
+    var coverCropY: Double? = null
+
+    @Column(name = "cover_crop_width")
+    var coverCropWidth: Double? = null
+
+    @Column(name = "cover_crop_height")
+    var coverCropHeight: Double? = null
+
+    @Column(name = "start_date", nullable = false)
+    lateinit var startDate: LocalDate
+
+    @Column(name = "end_date", nullable = false)
+    lateinit var endDate: LocalDate
 
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant

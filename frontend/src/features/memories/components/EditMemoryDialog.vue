@@ -7,6 +7,7 @@ import Message from 'primevue/message'
 import { toPermalink } from '../../../composables/usePermalink'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import { updateMemory, type Memory } from '../api'
+import { isValidMemoryDateRange } from '../utils/memoryDateRange'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -19,6 +20,8 @@ const emit = defineEmits<{
 
 const displayName = ref('')
 const name = ref('')
+const startDate = ref('')
+const endDate = ref('')
 const permalinkTouched = ref(false)
 const error = ref('')
 const loading = ref(false)
@@ -34,13 +37,19 @@ watch(displayName, (value) => {
   if (!permalinkTouched.value) name.value = toPermalink(value)
 })
 
-watch(visible, (isVisible) => {
-  if (isVisible) resetForm()
-})
+watch(
+  visible,
+  (isVisible) => {
+    if (isVisible) resetForm()
+  },
+  { immediate: true }
+)
 
 function resetForm() {
   displayName.value = props.memory.displayName
   name.value = props.memory.name
+  startDate.value = props.memory.startDate
+  endDate.value = props.memory.endDate
   permalinkTouched.value = false
   error.value = ''
 }
@@ -53,9 +62,11 @@ function updatePermalink(value: string | undefined) {
 async function submit() {
   const request = {
     displayName: displayName.value.trim(),
-    name: name.value.trim()
+    name: name.value.trim(),
+    startDate: startDate.value,
+    endDate: endDate.value
   }
-  if (!request.name || !request.displayName) return
+  if (!request.name || !request.displayName || !isValidMemoryDateRange(request.startDate, request.endDate)) return
 
   error.value = ''
   loading.value = true
@@ -86,6 +97,14 @@ async function submit() {
           required
           @update:model-value="updatePermalink"
         />
+      </label>
+      <label>
+        Startdatum
+        <InputText v-model="startDate" type="date" required />
+      </label>
+      <label>
+        Enddatum
+        <InputText v-model="endDate" type="date" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">

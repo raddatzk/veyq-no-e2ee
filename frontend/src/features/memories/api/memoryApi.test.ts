@@ -76,6 +76,8 @@ describe('memoryApi facade', () => {
         name: 'trip',
         displayName: 'Trip',
         path: '/trip',
+        startDate: '2026-05-03',
+        endDate: '2026-05-05',
         childCount: 0,
         mediaCount: 0
       }
@@ -92,6 +94,9 @@ describe('memoryApi facade', () => {
         parentId: null,
         coverMediaId: null,
         coverUrl: null,
+        coverCrop: null,
+        startDate: '2026-05-03',
+        endDate: '2026-05-05',
         childCount: 0,
         mediaCount: 0,
         scope: null
@@ -108,6 +113,8 @@ describe('memoryApi facade', () => {
     await createMemory('tenant', {
       name: 'created',
       displayName: 'Created',
+      startDate: '2026-05-03',
+      endDate: '2026-05-05',
       parentId: null,
       folderPath: null,
       scope: null
@@ -115,7 +122,9 @@ describe('memoryApi facade', () => {
     await updateMemory('tenant', 'mem-1', {
       parentId: null,
       name: null,
-      displayName: 'Updated'
+      displayName: 'Updated',
+      startDate: '2026-05-04',
+      endDate: '2026-05-06'
     })
 
     expect(mocks.createMemory).toHaveBeenCalledWith({
@@ -123,6 +132,8 @@ describe('memoryApi facade', () => {
       createMemoryRequest: {
         name: 'created',
         displayName: 'Created',
+        startDate: '2026-05-03',
+        endDate: '2026-05-05',
         parentId: undefined,
         folderPath: undefined,
         scope: undefined
@@ -134,7 +145,9 @@ describe('memoryApi facade', () => {
       updateMemoryRequest: {
         parentId: undefined,
         name: undefined,
-        displayName: 'Updated'
+        displayName: 'Updated',
+        startDate: '2026-05-04',
+        endDate: '2026-05-06'
       }
     })
   })
@@ -211,14 +224,25 @@ describe('memoryApi facade', () => {
     mocks.removeMemoryCover.mockResolvedValue(memoryResponse('updated'))
 
     await deleteMemory('tenant', 'mem-1')
-    const covered = await setMemoryCover('tenant', 'mem-1', { file })
+    const covered = await setMemoryCover('tenant', 'mem-1', {
+      file,
+      cropX: 0,
+      cropY: 0,
+      cropWidth: 1,
+      cropHeight: 0.5625
+    })
     const uncovered = await removeMemoryCover('tenant', 'mem-1')
 
     expect(mocks.deleteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-1' })
     expect(mocks.setMemoryCover).toHaveBeenCalledWith({
       tenantName: 'tenant',
       memoryId: 'mem-1',
-      file
+      file,
+      cropX: 0,
+      cropY: 0,
+      cropWidth: 1,
+      cropHeight: 0.5625,
+      mediaId: undefined
     })
     expect(mocks.removeMemoryCover).toHaveBeenCalledWith({
       tenantName: 'tenant',
@@ -236,6 +260,8 @@ function memoryResponse(name: string) {
     name,
     displayName: name,
     path: `/${name}`,
+    startDate: '2026-05-03',
+    endDate: '2026-05-05',
     childCount: 0,
     mediaCount: 0
   }

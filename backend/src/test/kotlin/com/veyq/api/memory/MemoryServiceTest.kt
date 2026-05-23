@@ -26,7 +26,7 @@ import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
-import com.veyq.api.generated.model.CreateMemoryRequest
+import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.library.folder.FolderService
@@ -40,11 +40,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.Base64
+import java.time.LocalDate
 import java.util.UUID
+import javax.imageio.ImageIO
 
 @QuarkusTest
 class MemoryServiceTest {
@@ -92,6 +94,9 @@ class MemoryServiceTest {
             .containsExactly(rootMedia.publicId)
         assertThat(mediaService.listMemoryMedia(trip.id, includeChildren = true)).extracting("id")
             .containsExactly(childMedia.publicId, rootMedia.publicId)
+        assertThat(memoryService.getMemory(trip.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
+        assertThat(memoryService.getMemory(trip.id).endDate).isEqualTo(LocalDate.parse("2026-05-03"))
+        assertThat(memoryService.getMemory(day.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
     }
 
     @Test
@@ -190,6 +195,51 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `updates and validates memory date range`() {
+        val memory = memoryService.createMemory(CreateMemoryRequest("dated", "Dated"))
+
+        val updated = memoryService.updateMemory(
+            memory.id,
+            UpdateMemoryRequest(
+                startDate = LocalDate.parse("2026-06-01"),
+                endDate = LocalDate.parse("2026-06-07"),
+            )
+        )
+
+        assertThat(updated.startDate).isEqualTo(LocalDate.parse("2026-06-01"))
+        assertThat(updated.endDate).isEqualTo(LocalDate.parse("2026-06-07"))
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.updateMemory(
+                memory.id,
+                UpdateMemoryRequest(
+                    startDate = LocalDate.parse("2026-06-08"),
+                    endDate = LocalDate.parse("2026-06-07"),
+                )
+            )
+        }
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.updateMemory(
+                memory.id,
+                UpdateMemoryRequest(startDate = LocalDate.parse("2026-06-08"))
+            )
+        }
+    }
+
+    @Test
+    fun `rejects memory create with end date before start date`() {
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.createMemory(
+                CreateMemoryRequest(
+                    "invalid-dated",
+                    "Invalid Dated",
+                    startDate = LocalDate.parse("2026-06-08"),
+                    endDate = LocalDate.parse("2026-06-07"),
+                )
+            )
+        }
+    }
+
+    @Test
     fun `uploads standalone covers and deletes descendant memories and media`() {
         val root = memoryService.createMemory(CreateMemoryRequest("root", "Root"))
         val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parentId = root.id))
@@ -198,14 +248,14 @@ class MemoryServiceTest {
         val childMedia = createMedia(owner, memory(child.id), "Child Media")
         val otherMedia = createMedia(owner, memory(other.id), "Other Media")
 
-        val covered = memoryService.setCover(root.id, coverFile("root-cover"), "root-cover.png")
+        val covered = setCover(root.id, coverFile("root-cover"), "root-cover.png")
         assertThat(covered.coverMediaId).isNull()
         assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
         entityManager.clear()
         val coverResponse = memoryService.coverContent(root.id)
         assertThat(coverResponse.getHeaderString("X-Content-Type-Options")).isEqualTo("nosniff")
         assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
-            memoryService.setCover(root.id, textFile("not-an-image"), "cover.txt")
+            setCover(root.id, textFile("not-an-image"), "cover.txt")
         }
 
         memoryService.deleteMemory(root.id)
@@ -218,6 +268,125 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `standalone cover upload clears existing cover media reference`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("cover-root", "Cover Root"))
+        val rootEntity = memory(root.id)
+        val media = createMedia(owner, rootEntity, "Gallery Cover")
+        inTransaction {
+            memory(root.id).coverMedia = media
+        }
+
+        val covered = setCover(root.id, coverFile("standalone-cover"), "cover.png")
+
+        assertThat(covered.coverMediaId).isNull()
+        assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
+        assertThat(memory(root.id).coverMedia).isNull()
+    }
+
+    @Test
+    fun `sets cover from existing memory media with crop metadata`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("media-cover-root", "Media Cover Root"))
+        val media = createMedia(owner, memory(root.id), "Gallery Cover")
+
+        val covered = memoryService.setCover(
+            root.id,
+            uploadPath = null,
+            originalFilename = null,
+            mediaId = media.publicId,
+            cropX = 0.0,
+            cropY = 0.0,
+            cropWidth = 1.0,
+            cropHeight = 1.0,
+        )
+
+        assertThat(covered.coverMediaId).isEqualTo(media.publicId)
+        assertThat(covered.coverUrl).contains("/memory-media/${media.publicId}/content")
+        assertThat(covered.coverCrop?.x).isEqualTo(0.0)
+        assertThat(covered.coverCrop?.width).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `rejects invalid cover crop metadata`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("invalid-cover-root", "Invalid Cover Root"))
+
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.setCover(
+                root.id,
+                coverFile("invalid-cover"),
+                "cover.png",
+                mediaId = null,
+                cropX = 0.0,
+                cropY = 0.0,
+                cropWidth = 0.5,
+                cropHeight = 1.0,
+            )
+        }
+    }
+
+    @Test
+    fun `keeps existing standalone cover when new cover validation fails`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("safe-cover-root", "Safe Cover Root"))
+        setCover(root.id, coverFile("safe-cover"), "cover.png")
+        val existingKey = memory(root.id).coverStorageKey
+
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.setCover(
+                root.id,
+                coverFile("unsafe-cover"),
+                "cover.png",
+                mediaId = null,
+                cropX = 0.0,
+                cropY = 0.0,
+                cropWidth = 0.5,
+                cropHeight = 1.0,
+            )
+        }
+
+        assertThat(memory(root.id).coverStorageKey).isEqualTo(existingKey)
+        assertThat(memoryService.coverContent(root.id).status).isEqualTo(200)
+    }
+
+    @Test
+    fun `updates crop only for existing standalone cover`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("crop-only-root", "Crop Only Root"))
+        setCover(root.id, coverFile("crop-only-cover"), "cover.png")
+        val existingKey = memory(root.id).coverStorageKey
+
+        val updated = memoryService.setCover(
+            root.id,
+            uploadPath = null,
+            originalFilename = null,
+            mediaId = null,
+            cropX = 0.0,
+            cropY = 0.0,
+            cropWidth = 0.5,
+            cropHeight = 0.5,
+        )
+
+        assertThat(memory(root.id).coverStorageKey).isEqualTo(existingKey)
+        assertThat(updated.coverCrop?.width).isEqualTo(0.5)
+        assertThat(updated.coverCrop?.height).isEqualTo(0.5)
+    }
+
+    @Test
+    fun `rejects crop only without existing standalone cover`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("missing-crop-only-root", "Missing Crop Only Root"))
+
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.setCover(
+                root.id,
+                uploadPath = null,
+                originalFilename = null,
+                mediaId = null,
+                cropX = 0.0,
+                cropY = 0.0,
+                cropWidth = 1.0,
+                cropHeight = 1.0,
+            )
+        }
+    }
+
+    @Test
     fun `clears memory cover only for visible memories`() {
         val ownerMemory = memoryService.createMemory(CreateMemoryRequest("owner-root", "Owner Root"))
         val outsider = createUser("cover-outsider-$runId", ServerRole.ServerMember)
@@ -227,13 +396,13 @@ class MemoryServiceTest {
             CreateMemoryRequest("group-root", "Group Root", scope = MemoryScopeRequest("GROUP", group.name))
         )
 
-        assertThat(memoryService.setCover(ownerMemory.id, coverFile("owner-cover"), "owner.png").coverUrl)
+        assertThat(setCover(ownerMemory.id, coverFile("owner-cover"), "owner.png").coverUrl)
             .isNotBlank()
         assertThat(memoryService.clearCover(ownerMemory.id).coverMediaId).isNull()
         assertThat(memoryService.getMemory(ownerMemory.id).coverUrl).isNull()
         assertThat(memoryService.getMemory(ownerMemory.id).coverMediaId).isNull()
 
-        assertThat(memoryService.setCover(groupMemory.id, coverFile("group-cover"), "group.png").coverUrl)
+        assertThat(setCover(groupMemory.id, coverFile("group-cover"), "group.png").coverUrl)
             .isNotBlank()
         useContext(outsider, tenant)
         assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
@@ -325,6 +494,25 @@ class MemoryServiceTest {
         }
     }
 
+    private fun CreateMemoryRequest(
+        name: String,
+        displayName: String,
+        parentId: String? = null,
+        folderPath: String? = null,
+        scope: MemoryScopeRequest? = null,
+        startDate: LocalDate = LocalDate.parse("2026-05-01"),
+        endDate: LocalDate = LocalDate.parse("2026-05-03"),
+    ): ApiCreateMemoryRequest =
+        ApiCreateMemoryRequest(
+            name = name,
+            displayName = displayName,
+            startDate = startDate,
+            endDate = endDate,
+            parentId = parentId,
+            folderPath = folderPath,
+            scope = scope,
+        )
+
     private fun createMedia(
         owner: User,
         memory: Memory,
@@ -346,20 +534,29 @@ class MemoryServiceTest {
                 it.originalFilename = "$title.jpg"
                 it.createdAt = Instant.now()
                 it.capturedAt = capturedAt
+                it.imageWidth = 16
+                it.imageHeight = 9
                 mediaRepo.persist(it)
             }
         }
 
     private fun coverFile(prefix: String): Path {
         val path = Files.createTempFile(prefix, ".png")
-        Files.write(
-            path,
-            Base64.getDecoder().decode(
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
-            )
-        )
+        ImageIO.write(BufferedImage(16, 9, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
         return path
     }
+
+    private fun setCover(memoryId: String, path: Path, filename: String) =
+        memoryService.setCover(
+            memoryId,
+            path,
+            filename,
+            mediaId = null,
+            cropX = 0.0,
+            cropY = 0.0,
+            cropWidth = 1.0,
+            cropHeight = 1.0,
+        )
 
     private fun textFile(prefix: String): Path {
         val path = Files.createTempFile(prefix, ".txt")

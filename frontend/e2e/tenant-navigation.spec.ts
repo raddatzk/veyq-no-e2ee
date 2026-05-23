@@ -73,11 +73,15 @@ test('folder and memory creation live in content tiles, not the topbar', async (
   await page.getByRole('button', { name: 'Memory erstellen' }).click()
   const memoryDialog = page.getByRole('dialog', { name: 'Memory erstellen' })
   await memoryDialog.getByLabel('Name').fill('Sommerreise')
+  await memoryDialog.getByLabel('Startdatum').fill('2026-05-03')
+  await memoryDialog.getByLabel('Enddatum').fill('2026-05-05')
   await memoryDialog.getByRole('button', { name: 'Erstellen' }).click()
 
   await expect.poll(() => createdMemory).toMatchObject({
     displayName: 'Sommerreise',
     name: 'sommerreise',
+    startDate: '2026-05-03',
+    endDate: '2026-05-05',
     folderPath: '/',
     scope: { type: 'TENANT' }
   })

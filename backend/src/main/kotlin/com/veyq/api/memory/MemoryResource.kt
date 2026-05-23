@@ -7,7 +7,9 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response
 import java.io.InputStream
+import java.net.URLConnection
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 @ApplicationScoped
@@ -40,13 +42,38 @@ class MemoryResource @Inject constructor(
     override fun listChildMemories(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.listChildren(memoryId)).build()
 
-    override fun setMemoryCover(tenantName: String, memoryId: String, fileInputStream: InputStream): Response {
-        val temp = Files.createTempFile("veyq-memory-cover-", ".tmp")
+    override fun setMemoryCover(
+        tenantName: String,
+        memoryId: String,
+        cropX: Double?,
+        cropY: Double?,
+        cropWidth: Double?,
+        cropHeight: Double?,
+        fileInputStream: InputStream?,
+        mediaId: String?,
+    ): Response {
+        val temp = fileInputStream?.let { Files.createTempFile("veyq-memory-cover-", ".tmp") }
         return try {
-            fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
-            Response.ok(memoryService.setCover(memoryId, temp, "cover")).build()
+            if (fileInputStream != null && temp != null) {
+                fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            }
+            val upload = temp?.let { GeneratedCoverUpload(it) }
+            Response.ok(
+                memoryService.setCover(
+                    memoryId,
+                    upload?.path,
+                    upload?.fileName(),
+                    mediaId,
+                    cropX,
+                    cropY,
+                    cropWidth,
+                    cropHeight,
+                    upload?.size(),
+                    upload?.contentType(),
+                )
+            ).build()
         } finally {
-            Files.deleteIfExists(temp)
+            if (temp != null) Files.deleteIfExists(temp)
         }
     }
 
@@ -55,4 +82,34 @@ class MemoryResource @Inject constructor(
 
     override fun removeMemoryCover(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.clearCover(memoryId)).build()
+
+    private class GeneratedCoverUpload(val path: Path) {
+        fun fileName(): String = "cover"
+        fun size(): Long = Files.size(path)
+        fun contentType(): String? =
+            detectContentType(path)
+                ?: Files.newInputStream(path).use { input -> URLConnection.guessContentTypeFromStream(input) }
+                ?: Files.probeContentType(path)
+
+        private fun detectContentType(path: Path): String? {
+            val header = ByteArray(16)
+            val read = Files.newInputStream(path).use { input -> input.read(header) }
+            if (read >= 3 &&
+                header[0] == 0xFF.toByte() &&
+                header[1] == 0xD8.toByte() &&
+                header[2] == 0xFF.toByte()
+            ) {
+                return "image/jpeg"
+            }
+            if (read >= 8 &&
+                header[0] == 0x89.toByte() &&
+                header[1] == 'P'.code.toByte() &&
+                header[2] == 'N'.code.toByte() &&
+                header[3] == 'G'.code.toByte()
+            ) {
+                return "image/png"
+            }
+            return null
+        }
+    }
 }
