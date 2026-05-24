@@ -11,6 +11,7 @@ import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
 import type {
   Memory,
+  MemoryHeader,
   MemoryMedia,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataRequest,
@@ -35,12 +36,12 @@ type MemoryDetailCapabilities = {
   canEditMediaMetadata?: boolean
   canDeleteMedia?: boolean
   canDeleteCurrentMemory?: boolean
-  showScope?: boolean
 }
 
 const props = defineProps<{
   tenantName: string
   memory: Memory
+  header?: MemoryHeader | null
   childMemories: Memory[]
   media: MemoryMedia[]
   capabilities?: MemoryDetailCapabilities
@@ -73,32 +74,32 @@ const shareOpen = ref(false)
 const uploadOpen = ref(false)
 const capabilities = computed(() => ({
   canEdit: props.capabilities?.canEdit ?? true,
-  canUpload: props.capabilities?.canUpload ?? false,
+  canUpload: props.capabilities?.canUpload ?? true,
   canCreateChildMemory: props.capabilities?.canCreateChildMemory ?? true,
   canDelete: props.capabilities?.canDelete ?? true,
   canShare: props.capabilities?.canShare ?? true,
   canManageCover: props.capabilities?.canManageCover ?? true,
   canEditMediaMetadata: props.capabilities?.canEditMediaMetadata ?? true,
   canDeleteMedia: props.capabilities?.canDeleteMedia ?? false,
-  canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true,
-  showScope: props.capabilities?.showScope ?? true
+  canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true
 }))
 
-const coverMedia = computed(() =>
-  props.memory.coverMediaId
-    ? props.media.find((media) => media.id === props.memory.coverMediaId) || props.media[0]
-    : props.media[0]
-)
+const detailHeader = computed<MemoryHeader>(() => ({
+  id: props.memory.id,
+  displayName: props.header?.displayName ?? props.memory.displayName,
+  path: props.header?.path ?? props.memory.path,
+  coverUrl: props.header?.coverUrl ?? props.memory.coverUrl,
+  coverCrop: props.header?.coverCrop ?? props.memory.coverCrop,
+  startDate: props.header?.startDate ?? props.memory.startDate,
+  endDate: props.header?.endDate ?? props.memory.endDate,
+  directMediaCount: props.header?.directMediaCount ?? props.memory.mediaCount,
+  descendantMediaCount: props.header?.descendantMediaCount ?? 0,
+  childMemoryCount: props.header?.childMemoryCount ?? props.memory.childCount,
+  scope: props.header?.scope ?? props.memory.scope
+}))
 const coverUrl = computed(() => {
-  if (props.memory.coverUrl) return `${API_BASE}${props.memory.coverUrl}`
-  const media = coverMedia.value
-  if (!media) return ''
-  return `${API_BASE}${media.previewUrl || media.contentUrl}`
-})
-const scopeLabel = computed(() => {
-  if (props.memory.scope?.type === 'GROUP') return `@${props.memory.scope.groupName}`
-  if (props.memory.scope?.type === 'USER') return t('navigation.personal')
-  return t('memory.moveScopeTenant')
+  if (detailHeader.value.coverUrl) return `${API_BASE}${detailHeader.value.coverUrl}`
+  return ''
 })
 const parentPath = computed(() => {
   const segments = props.memory.path.split('/').filter(Boolean)
@@ -106,9 +107,13 @@ const parentPath = computed(() => {
   return `/${segments.slice(0, -1).join('/')}`
 })
 const dateRangeLabel = computed(() => {
-  if (props.memory.startDate === props.memory.endDate) return formatDate(props.memory.startDate)
-  return `${formatDate(props.memory.startDate)} - ${formatDate(props.memory.endDate)}`
+  if (detailHeader.value.startDate === detailHeader.value.endDate) return formatDate(detailHeader.value.startDate)
+  return `${formatDate(detailHeader.value.startDate)} - ${formatDate(detailHeader.value.endDate)}`
 })
+const totalMediaCount = computed(
+  () => detailHeader.value.directMediaCount + detailHeader.value.descendantMediaCount
+)
+const mediaCountLabel = computed(() => `${totalMediaCount.value} ${t('memory.mediaCount')}`)
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', { dateStyle: 'medium' }).format(new Date(value))
@@ -122,8 +127,8 @@ function formatDate(value: string): string {
         <MemoryCoverImage
           v-if="coverUrl"
           :src="coverUrl"
-          :alt="memory.displayName"
-          :crop="memory.coverCrop"
+          :alt="detailHeader.displayName"
+          :crop="detailHeader.coverCrop"
         />
         <span v-else class="pi pi-images" />
       </div>
@@ -131,15 +136,14 @@ function formatDate(value: string): string {
         <div class="memory-detail-title-row">
           <div>
             <p>{{ t('memory.title') }}</p>
-            <h1>{{ memory.displayName }}</h1>
+            <h1>{{ detailHeader.displayName }}</h1>
           </div>
           <div class="memory-detail-actions">
             <Button
               v-if="capabilities.canUpload"
               icon="pi pi-upload"
               :label="t('memory.upload')"
-              severity="secondary"
-              outlined
+              class="memory-upload-action"
               size="small"
               @click="uploadOpen = true"
             />
@@ -182,9 +186,11 @@ function formatDate(value: string): string {
           </div>
         </div>
         <div class="memory-detail-meta">
-          <span v-if="capabilities.showScope"><i class="pi pi-folder" /> {{ scopeLabel }}</span>
-          <span><i class="pi pi-images" /> {{ memory.mediaCount }} {{ t('memory.mediaCount') }}</span>
-          <span><i class="pi pi-sitemap" /> {{ memory.childCount }} {{ t('memory.children') }}</span>
+          <span><i class="pi pi-calendar" /> {{ dateRangeLabel }}</span>
+          <span><i class="pi pi-images" /> {{ mediaCountLabel }}</span>
+          <span v-if="detailHeader.childMemoryCount > 0">
+            <i class="pi pi-sitemap" /> {{ detailHeader.childMemoryCount }} {{ t('memory.children') }}
+          </span>
         </div>
       </div>
     </header>
@@ -232,14 +238,12 @@ function formatDate(value: string): string {
             <dt>{{ t('memory.dateRange') }}</dt>
             <dd>{{ dateRangeLabel }}</dd>
             <dt>{{ t('common.permalink') }}</dt>
-            <dd>{{ memory.path }}</dd>
+            <dd>{{ detailHeader.path }}</dd>
             <dt>{{ t('memory.mediaCount') }}</dt>
-            <dd>{{ memory.mediaCount }}</dd>
-            <dt>{{ t('memory.children') }}</dt>
-            <dd>{{ memory.childCount }}</dd>
-            <template v-if="capabilities.showScope">
-              <dt>{{ t('memory.area') }}</dt>
-              <dd>{{ scopeLabel }}</dd>
+            <dd>{{ totalMediaCount }}</dd>
+            <template v-if="detailHeader.childMemoryCount > 0">
+              <dt>{{ t('memory.children') }}</dt>
+              <dd>{{ detailHeader.childMemoryCount }}</dd>
             </template>
           </dl>
         </TabPanel>

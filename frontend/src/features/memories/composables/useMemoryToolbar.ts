@@ -3,15 +3,16 @@ import type { MenuItem } from 'primevue/menuitem'
 import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../../../composables/useWorkspaceToolbar'
 import type { Memory, MemoryNavigationResponse } from '../api'
 import { i18n } from '../../../i18n'
+import type { MemoryRouteBreadcrumb } from './useMemoryRouteData'
 
 type ToolbarOptions = {
   navigation: Ref<MemoryNavigationResponse | null>
   memory: Ref<Memory | null>
+  memoryBreadcrumbs: Ref<MemoryRouteBreadcrumb[]>
   loading: Ref<boolean>
   tenantName: ComputedRef<string>
   tenantLabel: ComputedRef<string>
   routePath: ComputedRef<string>
-  openUpload: () => void
   openContextSettings: () => void
   navigateToPath: (path: string) => void
 }
@@ -21,6 +22,7 @@ export function useMemoryToolbar(options: ToolbarOptions) {
     [
       options.navigation,
       options.memory,
+      options.memoryBreadcrumbs,
       options.loading,
       options.tenantName,
       options.tenantLabel,
@@ -44,15 +46,13 @@ export function useMemoryToolbar(options: ToolbarOptions) {
     if (options.memory.value) {
       const memory = options.memory.value
       setWorkspaceToolbar(
-        memoryBreadcrumbs(memory, options.tenantLabel.value, options.navigateToPath),
-        [
-          {
-            key: 'upload',
-            label: i18n.global.t('memory.upload'),
-            icon: 'pi pi-upload',
-            command: options.openUpload
-          }
-        ]
+        memoryBreadcrumbs(
+          memory,
+          options.tenantLabel.value,
+          options.navigateToPath,
+          options.memoryBreadcrumbs.value
+        ),
+        []
       )
       return
     }
@@ -64,7 +64,7 @@ export function useMemoryToolbar(options: ToolbarOptions) {
     }
 
     const breadcrumbs = options.navigation.value.breadcrumbs.map((breadcrumb) => ({
-        label: breadcrumb.label,
+      label: breadcrumb.label,
       command: () => options.navigateToPath(breadcrumb.path)
     }))
 
@@ -84,9 +84,11 @@ export function useMemoryToolbar(options: ToolbarOptions) {
 export function memoryBreadcrumbs(
   memory: Memory,
   tenantLabel: string,
-  navigateToPath: (path: string) => void
+  navigateToPath: (path: string) => void,
+  resolvedBreadcrumbs: MemoryRouteBreadcrumb[] = []
 ): MenuItem[] {
   const parts = memory.path.split('/').filter(Boolean)
+  const labelsByPath = new Map(resolvedBreadcrumbs.map((breadcrumb) => [breadcrumb.path, breadcrumb.label]))
   return [
     {
       label: tenantLabel,
@@ -95,7 +97,9 @@ export function memoryBreadcrumbs(
     ...parts.map((part, index) => {
       const path = `/${parts.slice(0, index + 1).join('/')}`
       return {
-        label: index === parts.length - 1 ? memory.displayName : breadcrumbSegmentLabel(part, memory),
+        label:
+          labelsByPath.get(path) ||
+          (index === parts.length - 1 ? memory.displayName : breadcrumbSegmentLabel(part, memory)),
         command: () => navigateToPath(path)
       }
     })

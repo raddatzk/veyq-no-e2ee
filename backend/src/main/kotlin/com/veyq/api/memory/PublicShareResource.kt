@@ -40,6 +40,9 @@ class PublicShareResource @Inject constructor(
     override fun getPublicShareMemoryByPath(shareId: String, path: String): Response =
         Response.ok(memoryShareService.getPublicShareMemoryByPath(shareId, path)).build()
 
+    override fun getPublicShareMemoryHeader(shareId: String, memoryId: String): Response =
+        Response.ok(memoryShareService.getPublicShareMemoryHeader(shareId, memoryId)).build()
+
     override fun listPublicShareChildMemories(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.listPublicShareChildMemories(shareId, memoryId)).build()
 

@@ -610,6 +610,40 @@ class MemoryShareResourceTest {
             .statusCode(403)
     }
 
+    @Test
+    fun `public share memory header exposes subtree counts without scope`() {
+        val child = createMemory("header-day-$runId", "Header Day $runId", memory)
+        createMedia("Root Header Photo", memory)
+        createMedia("Child Header Photo", child)
+        val shareId = createShare("VIEWER")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().get("/api/public-shares/$shareId/memories/${memory.publicId}/header")
+            .then()
+            .statusCode(200)
+            .body("id", equalTo(memory.publicId))
+            .body("displayName", equalTo(memory.displayName))
+            .body("path", equalTo("/"))
+            .body("directMediaCount", equalTo(1))
+            .body("descendantMediaCount", equalTo(1))
+            .body("childMemoryCount", equalTo(1))
+            .body("scope", nullValue())
+    }
+
+    @Test
+    fun `uploader cannot load public share memory header`() {
+        val shareId = createShare("UPLOADER")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().get("/api/public-shares/$shareId/memories/${memory.publicId}/header")
+            .then()
+            .statusCode(403)
+    }
+
     private fun createShare(role: String, password: String? = "share-password123", name: String? = null): String {
         val fields = mutableListOf("\"role\":\"$role\"")
         name?.let { fields += "\"name\":\"$it\"" }
@@ -693,13 +727,13 @@ class MemoryShareResourceTest {
             }
         }
 
-    private fun createMedia(title: String): Media =
+    private fun createMedia(title: String, targetMemory: Memory = memory): Media =
         inTransaction {
             Media().also {
                 it.tenant = tenant
                 it.uploaderUser = owner
                 it.scopeType = LibraryScopeType.Tenant
-                it.memory = memory
+                it.memory = targetMemory
                 it.title = title
                 it.mimeType = "image/jpeg"
                 it.sizeBytes = 10

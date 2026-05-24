@@ -28,6 +28,9 @@ class MemoryResource @Inject constructor(
     override fun getMemory(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.getMemory(memoryId)).build()
 
+    override fun getMemoryHeader(tenantName: String, memoryId: String): Response =
+        Response.ok(memoryService.getMemoryHeader(memoryId)).build()
+
     override fun getMemoryByPath(tenantName: String, path: String): Response =
         Response.ok(memoryService.getMemoryByPath(path)).build()
 

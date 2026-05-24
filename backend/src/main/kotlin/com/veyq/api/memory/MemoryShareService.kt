@@ -16,6 +16,7 @@ import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
 import com.veyq.api.generated.model.MemoryShareSummary
 import com.veyq.api.generated.model.PublicShareCoverCrop
 import com.veyq.api.generated.model.PublicShareLoginRequest
+import com.veyq.api.generated.model.PublicShareMemoryHeaderSummary
 import com.veyq.api.generated.model.PublicShareMemorySummary
 import com.veyq.api.generated.model.PublicShareSummary
 import com.veyq.api.generated.model.PublicShareTreeResponse
@@ -203,6 +204,11 @@ class MemoryShareService @Inject constructor(
     fun getPublicShareMemoryByPath(shareId: String, path: String): PublicShareMemorySummary {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         return toPublicMemorySummary(resolveShareMemoryByPath(access, path), access.share)
+    }
+
+    fun getPublicShareMemoryHeader(shareId: String, memoryId: String): PublicShareMemoryHeaderSummary {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        return toPublicMemoryHeader(resolveShareMemory(access, memoryId), access.share)
     }
 
     fun listPublicShareChildMemories(shareId: String, memoryId: String): List<PublicShareMemorySummary> {
@@ -824,6 +830,22 @@ class MemoryShareService @Inject constructor(
             startDate = memory.startDate,
             endDate = memory.endDate,
         )
+
+    private fun toPublicMemoryHeader(memory: Memory, share: MemoryShare): PublicShareMemoryHeaderSummary {
+        val descendants = subtree(memory).drop(1)
+        return PublicShareMemoryHeaderSummary(
+            id = memory.publicId,
+            displayName = memory.displayName,
+            path = memory.sharePath(share.rootMemory),
+            coverUrl = publicCoverUrl(memory, share.publicId),
+            coverCrop = memory.coverCrop(),
+            startDate = memory.startDate,
+            endDate = memory.endDate,
+            directMediaCount = mediaRepo.listByMemory(memory).size,
+            descendantMediaCount = descendants.sumOf { mediaRepo.listByMemory(it).size },
+            childMemoryCount = memoryRepo.listChildren(memory.tenant, memory).size,
+        )
+    }
 
     private fun publicCoverUrl(memory: Memory, shareId: String): String? =
         memory.coverStorageKey?.let { "/api/public-shares/$shareId/memories/${memory.publicId}/cover/content" }

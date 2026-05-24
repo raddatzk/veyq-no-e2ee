@@ -13,6 +13,7 @@ import type {
   CreateMemoryShareRequest as GeneratedCreateMemoryShareRequest,
   CreatePublicShareMemoryRequest as GeneratedCreatePublicShareMemoryRequest,
   MemoryShareRole,
+  PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareMemorySummary,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
@@ -24,6 +25,7 @@ import type {
   CreateMemoryRequest,
   Memory,
   MemoryFolder,
+  MemoryHeader,
   MemoryMedia,
   MemoryNavigationResponse,
   SetMemoryCoverRequest,
@@ -65,6 +67,12 @@ export function listMemoriesByFolder(tenantName: string, folderPath: string): Pr
 
 export function getMemory(tenantName: string, memoryId: string): Promise<Memory> {
   return generatedCall(memoriesApi.getMemory({ tenantName, memoryId })).then(normalizeMemory)
+}
+
+export function getMemoryHeader(tenantName: string, memoryId: string): Promise<MemoryHeader> {
+  return generatedCall(memoriesApi.getMemoryHeader({ tenantName, memoryId })).then(
+    normalizeMemoryHeader
+  )
 }
 
 export function getMemoryByPath(tenantName: string, path: string): Promise<Memory> {
@@ -263,6 +271,15 @@ export function getPublicShareMemoryByPath(shareId: string, path: string): Promi
   )
 }
 
+export function getPublicShareMemoryHeader(
+  shareId: string,
+  memoryId: string
+): Promise<MemoryHeader> {
+  return generatedCall(publicSharesApi.getPublicShareMemoryHeader({ shareId, memoryId })).then(
+    normalizePublicShareMemoryHeader
+  )
+}
+
 export function listPublicShareChildMemories(
   shareId: string,
   memoryId: string
@@ -447,6 +464,21 @@ function normalizeMemory(
   }
 }
 
+function normalizeMemoryHeader(
+  header: {
+    coverUrl?: string
+    coverCrop?: MemoryHeader['coverCrop']
+    scope?: MemoryHeader['scope']
+  } & Omit<MemoryHeader, 'coverUrl' | 'coverCrop' | 'scope'>
+): MemoryHeader {
+  return {
+    ...header,
+    coverUrl: header.coverUrl ?? null,
+    coverCrop: header.coverCrop ?? null,
+    scope: header.scope ?? null
+  }
+}
+
 function normalizeMemoryMedia(
   media: {
     capturedAt?: string
@@ -493,6 +525,15 @@ function normalizePublicShareMemory(memory: PublicShareMemorySummary): Memory {
     coverUrl: memory.coverUrl,
     coverCrop: memory.coverCrop,
     scope: undefined
+  })
+}
+
+function normalizePublicShareMemoryHeader(header: PublicShareMemoryHeaderSummary): MemoryHeader {
+  return normalizeMemoryHeader({
+    ...header,
+    coverUrl: header.coverUrl,
+    coverCrop: header.coverCrop,
+    scope: null
   })
 }
 

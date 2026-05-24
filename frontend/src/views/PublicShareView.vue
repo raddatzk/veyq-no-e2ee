@@ -14,6 +14,7 @@ import {
   deletePublicShareMedia,
   deletePublicShareMemory,
   getPublicShare,
+  getPublicShareMemoryHeader,
   getPublicShareMemoryByPath,
   listPublicShareChildMemories,
   listPublicShareMemoryMedia,
@@ -26,6 +27,7 @@ import {
   uploadPublicShareMedia,
   uploadPublicShareMemoryMedia,
   type Memory,
+  type MemoryHeader,
   type MemoryMedia,
   type PublicShareSummary
 } from '../features/memories/api'
@@ -38,6 +40,7 @@ const shareId = computed(() => String(route.params.shareId || ''))
 const sharePath = computed(() => routePathToSharePath(route.params.pathMatch))
 const share = ref<PublicShareSummary | null>(null)
 const memory = ref<Memory | null>(null)
+const memoryHeader = ref<MemoryHeader | null>(null)
 const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
 const password = ref('')
@@ -125,6 +128,7 @@ async function login() {
 async function closeShare() {
   await logoutPublicShare(shareId.value)
   memory.value = null
+  memoryHeader.value = null
   childMemories.value = []
   media.value = []
   await loadShare()
@@ -141,8 +145,14 @@ async function loadCurrentMemory() {
   try {
     const current = await getPublicShareMemoryByPath(shareId.value, sharePath.value)
     memory.value = current
-    childMemories.value = await listPublicShareChildMemories(shareId.value, current.id)
-    media.value = await listPublicShareMemoryMedia(shareId.value, current.id)
+    const [header, children, memoryMedia] = await Promise.all([
+      getPublicShareMemoryHeader(shareId.value, current.id),
+      listPublicShareChildMemories(shareId.value, current.id),
+      listPublicShareMemoryMedia(shareId.value, current.id)
+    ])
+    memoryHeader.value = header
+    childMemories.value = children
+    media.value = memoryMedia
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
   } finally {
@@ -265,6 +275,7 @@ function routePathToSharePath(value: unknown): string {
       v-else-if="canShowMemoryDetail && memory"
       tenant-name=""
       :memory="memory"
+      :header="memoryHeader"
       :child-memories="childMemories"
       :media="media"
       :capabilities="capabilities"

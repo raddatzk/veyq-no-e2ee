@@ -85,8 +85,8 @@ export const messages = {
     },
     memory: {
       area: 'Bereich',
-      childCreate: 'Unter-Memory erstellen',
-      children: 'Unter-Memories',
+      childCreate: 'Kapitel erstellen',
+      children: 'Kapitel',
       cover: 'Cover',
       coverChoose: 'Cover wählen',
       coverChooseFile: 'Cover auswählen',
@@ -399,8 +399,8 @@ export const messages = {
     },
     memory: {
       area: 'Scope',
-      childCreate: 'Create child Memory',
-      children: 'Child Memories',
+      childCreate: 'Create chapter',
+      children: 'Chapters',
       cover: 'Cover',
       coverChoose: 'Choose cover',
       coverChooseFile: 'Choose cover',

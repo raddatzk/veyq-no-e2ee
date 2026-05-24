@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMemory,
   deleteMemory,
+  getMemoryHeader,
   getMemoryByPath,
+  getPublicShareMemoryHeader,
   listMemories,
   listMemoriesByFolder,
   listMemoryMedia,
@@ -17,13 +19,15 @@ const mocks = vi.hoisted(() => ({
   listMemories: vi.fn(),
   listMemoriesByFolder: vi.fn(),
   getMemoryByPath: vi.fn(),
+  getMemoryHeader: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),
   deleteMemory: vi.fn(),
   setMemoryCover: vi.fn(),
   removeMemoryCover: vi.fn(),
   listMemoryMedia: vi.fn(),
-  uploadMemoryMedia: vi.fn()
+  uploadMemoryMedia: vi.fn(),
+  getPublicShareMemoryHeader: vi.fn()
 }))
 
 vi.mock('../../../api/generatedClient', () => ({
@@ -32,6 +36,7 @@ vi.mock('../../../api/generatedClient', () => ({
     listMemories: mocks.listMemories,
     listMemoriesByFolder: mocks.listMemoriesByFolder,
     getMemoryByPath: mocks.getMemoryByPath,
+    getMemoryHeader: mocks.getMemoryHeader,
     createMemory: mocks.createMemory,
     updateMemory: mocks.updateMemory,
     deleteMemory: mocks.deleteMemory,
@@ -41,6 +46,9 @@ vi.mock('../../../api/generatedClient', () => ({
   memoryMediaApi: {
     listMemoryMedia: mocks.listMemoryMedia,
     uploadMemoryMedia: mocks.uploadMemoryMedia
+  },
+  publicSharesApi: {
+    getPublicShareMemoryHeader: mocks.getPublicShareMemoryHeader
   }
 }))
 
@@ -104,6 +112,63 @@ describe('memoryApi facade', () => {
     ])
     expect(mocks.listMemories).toHaveBeenCalledWith({ tenantName: 'tenant' })
     expect(mocks.generatedCall).toHaveBeenCalledTimes(1)
+  })
+
+  it('normalizes memory header fields and forwards generated calls', async () => {
+    mocks.getMemoryHeader.mockResolvedValue({
+      id: 'mem-1',
+      displayName: 'Trip',
+      path: '/trip',
+      startDate: '2026-05-03',
+      endDate: '2026-05-05',
+      directMediaCount: 2,
+      descendantMediaCount: 3,
+      childMemoryCount: 1,
+      scope: { type: 'TENANT' }
+    })
+
+    const header = await getMemoryHeader('tenant', 'mem-1')
+
+    expect(header).toEqual({
+      id: 'mem-1',
+      displayName: 'Trip',
+      path: '/trip',
+      coverUrl: null,
+      coverCrop: null,
+      startDate: '2026-05-03',
+      endDate: '2026-05-05',
+      directMediaCount: 2,
+      descendantMediaCount: 3,
+      childMemoryCount: 1,
+      scope: { type: 'TENANT' }
+    })
+    expect(mocks.getMemoryHeader).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-1'
+    })
+  })
+
+  it('normalizes public share memory header without scope', async () => {
+    mocks.getPublicShareMemoryHeader.mockResolvedValue({
+      id: 'mem-1',
+      displayName: 'Trip',
+      path: '/',
+      startDate: '2026-05-03',
+      endDate: '2026-05-05',
+      directMediaCount: 1,
+      descendantMediaCount: 0,
+      childMemoryCount: 0
+    })
+
+    const header = await getPublicShareMemoryHeader('shr-1', 'mem-1')
+
+    expect(header.scope).toBeNull()
+    expect(header.coverUrl).toBeNull()
+    expect(header.directMediaCount).toBe(1)
+    expect(mocks.getPublicShareMemoryHeader).toHaveBeenCalledWith({
+      shareId: 'shr-1',
+      memoryId: 'mem-1'
+    })
   })
 
   it('maps create and update request null values to generated undefined fields', async () => {

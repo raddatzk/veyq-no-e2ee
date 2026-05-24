@@ -3,6 +3,7 @@ import type {
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateFolderRequest as GeneratedCreateFolderRequest,
   MemoryFolder,
+  MemoryHeaderSummary,
   MediaUploader,
   MemoryNavigationResponse,
   MemoryMediaSummary,
@@ -10,6 +11,7 @@ import type {
   MemoryShareSummary,
   MemoryShareRole,
   PublicShareMemorySummary,
+  PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareSummary,
   PublicShareTreeResponse,
@@ -47,6 +49,24 @@ export type Memory = Omit<
   coverUrl: string | null
   coverCrop: CoverCrop | null
   scope: MemoryScope | null
+}
+
+export type MemoryHeader = Omit<
+  MemoryHeaderSummary,
+  'coverUrl' | 'coverCrop' | 'scope'
+> & {
+  coverUrl: string | null
+  coverCrop: CoverCrop | null
+  scope: MemoryScope | null
+}
+
+export type PublicShareMemoryHeader = Omit<
+  PublicShareMemoryHeaderSummary,
+  'coverUrl' | 'coverCrop'
+> & {
+  coverUrl: string | null
+  coverCrop: CoverCrop | null
+  scope: null
 }
 
 export type MemoryMedia = Omit<

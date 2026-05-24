@@ -100,6 +100,26 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `memory header separates direct and descendant media counts`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("header-trip", "Header Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
+        val stop = memoryService.createMemory(CreateMemoryRequest("stop", "Stop", parentId = day.id))
+        createMedia(owner, memory(trip.id), "Root Photo")
+        createMedia(owner, memory(day.id), "Day Photo")
+        createMedia(owner, memory(stop.id), "Stop Photo")
+
+        val header = memoryService.getMemoryHeader(trip.id)
+
+        assertThat(header.id).isEqualTo(trip.id)
+        assertThat(header.displayName).isEqualTo("Header Trip")
+        assertThat(header.path).isEqualTo("/header-trip")
+        assertThat(header.directMediaCount).isEqualTo(1)
+        assertThat(header.descendantMediaCount).isEqualTo(2)
+        assertThat(header.childMemoryCount).isEqualTo(1)
+        assertThat(header.scope.type).isEqualTo(com.veyq.api.generated.model.MemoryScope.Type.TENANT)
+    }
+
+    @Test
     fun `creates and resolves memories by folder path`() {
         folderService.createFolder(CreateFolderRequest("travel", "Travel"))
         folderService.createFolder(CreateFolderRequest("italy", "Italy", parentPath = "/travel"))

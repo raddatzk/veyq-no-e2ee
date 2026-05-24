@@ -47,6 +47,7 @@ models/ManagedUserTenantSummary.ts
 models/ManagedUsersSummary.ts
 models/MediaUploader.ts
 models/MemoryFolder.ts
+models/MemoryHeaderSummary.ts
 models/MemoryMediaSummary.ts
 models/MemoryNavigationBreadcrumb.ts
 models/MemoryNavigationKind.ts
@@ -69,6 +70,7 @@ models/PasskeysSummary.ts
 models/PublicShareCoverCrop.ts
 models/PublicShareLoginRequest.ts
 models/PublicShareMediaSummary.ts
+models/PublicShareMemoryHeaderSummary.ts
 models/PublicShareMemorySummary.ts
 models/PublicShareSummary.ts
 models/PublicShareTreeResponse.ts

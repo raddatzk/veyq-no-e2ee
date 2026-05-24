@@ -9,7 +9,6 @@ import CreateFolderDialog from '../features/memories/components/CreateFolderDial
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import MemoryFolderOverview from '../features/memories/components/MemoryFolderOverview.vue'
-import MemoryUploadDialog from '../features/memories/components/MemoryUploadDialog.vue'
 import { useMemoryRouteData } from '../features/memories/composables/useMemoryRouteData'
 import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
@@ -26,7 +25,6 @@ const tenantTitle = computed(() => tenant.value?.displayName || tenantName.value
 const routePath = computed(() => routePathToMemoryPath(route.params.pathMatch))
 const createFolderOpen = ref(false)
 const createMemoryOpen = ref(false)
-const uploadOpen = ref(false)
 
 const {
   childMemories,
@@ -38,19 +36,19 @@ const {
   media,
   memories,
   memory,
+  memoryBreadcrumbs,
+  memoryHeader,
   navigation
 } = useMemoryRouteData(tenantName, routePath)
 
 useMemoryToolbar({
   navigation,
   memory,
+  memoryBreadcrumbs,
   loading,
   tenantName,
   tenantLabel: tenantTitle,
   routePath,
-  openUpload: () => {
-    uploadOpen.value = true
-  },
   openContextSettings,
   navigateToPath
 })
@@ -87,6 +85,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       v-else-if="isMemoryRoute && memory"
       :tenant-name="tenantName"
       :memory="memory"
+      :header="memoryHeader"
       :child-memories="childMemories"
       :media="media"
       @open-memory="navigateToPath($event.path)"
@@ -128,12 +127,6 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       :tenant-display-name="tenantTitle"
       :folder-path="currentFolderPath"
       :parent-memory-id="memory?.id || null"
-      @saved="load"
-    />
-    <MemoryUploadDialog
-      v-model:visible="uploadOpen"
-      :tenant-name="tenantName"
-      :memory-id="memory?.id || null"
       @saved="load"
     />
   </div>

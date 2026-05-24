@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   CreateMemoryRequest,
   ErrorResponse,
+  MemoryHeaderSummary,
   MemorySummary,
   UpdateMemoryRequest,
 } from '../models/index';
@@ -25,6 +26,8 @@ import {
     CreateMemoryRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    MemoryHeaderSummaryFromJSON,
+    MemoryHeaderSummaryToJSON,
     MemorySummaryFromJSON,
     MemorySummaryToJSON,
     UpdateMemoryRequestFromJSON,
@@ -49,6 +52,11 @@ export interface GetMemoryRequest {
 export interface GetMemoryByPathRequest {
     tenantName: string;
     path: string;
+}
+
+export interface GetMemoryHeaderRequest {
+    tenantName: string;
+    memoryId: string;
 }
 
 export interface ListChildMemoriesRequest {
@@ -202,6 +210,32 @@ export interface MemoriesApiInterface {
      * Get a memory by folder path and memory name
      */
     getMemoryByPath(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+
+    /**
+     * Creates request options for getMemoryHeader without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryHeaderRequestOpts(requestParameters: GetMemoryHeaderRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Get memory header
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryHeaderRaw(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryHeaderSummary>>;
+
+    /**
+     * Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get memory header
+     */
+    getMemoryHeader(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryHeaderSummary>;
 
     /**
      * Creates request options for listChildMemories without sending the request
@@ -625,6 +659,61 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async getMemoryByPath(requestParameters: GetMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
         const response = await this.getMemoryByPathRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getMemoryHeader without sending the request
+     */
+    async getMemoryHeaderRequestOpts(requestParameters: GetMemoryHeaderRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getMemoryHeader().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getMemoryHeader().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/header`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get memory header
+     */
+    async getMemoryHeaderRaw(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryHeaderSummary>> {
+        const requestOptions = await this.getMemoryHeaderRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryHeaderSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Get memory header
+     */
+    async getMemoryHeader(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryHeaderSummary> {
+        const response = await this.getMemoryHeaderRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -381,6 +381,36 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/header":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareMemoryHeader
+      summary: Get public share Memory header
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Returns the detail header for one Memory inside the shared subtree. The response exposes only share-safe fields and separates direct media from descendant media within the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemoryHeader"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/media":
     get:
       tags: [PublicShares]
@@ -950,6 +980,27 @@ components:
             mediaCount: 3
             startDate: "2026-05-03"
             endDate: "2026-05-05"
+    PublicShareMemoryHeader:
+      description: Public share Memory detail header.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareMemoryHeaderSummary"
+          example:
+            id: mem_abc123
+            displayName: Summer Trip
+            path: /
+            coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/content
+            coverCrop:
+              x: 0
+              y: 0
+              width: 1
+              height: 1
+            startDate: "2026-05-03"
+            endDate: "2026-05-05"
+            directMediaCount: 3
+            descendantMediaCount: 5
+            childMemoryCount: 1
     PublicShareMemoryList:
       description: Public share Memories.
       content:
@@ -1157,6 +1208,38 @@ components:
         endDate:
           type: string
           format: date
+    PublicShareMemoryHeaderSummary:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, path, startDate, endDate, directMediaCount, descendantMediaCount, childMemoryCount]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        path:
+          type: string
+        coverUrl:
+          type: string
+          nullable: true
+        coverCrop:
+          "$ref": "#/components/schemas/PublicShareCoverCrop"
+          nullable: true
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        directMediaCount:
+          type: integer
+          format: int32
+        descendantMediaCount:
+          type: integer
+          format: int32
+        childMemoryCount:
+          type: integer
+          format: int32
     PublicShareCoverCrop:
       type: object
       additionalProperties: false

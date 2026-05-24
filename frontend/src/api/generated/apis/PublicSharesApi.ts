@@ -19,6 +19,7 @@ import type {
   ErrorResponse,
   PublicShareLoginRequest,
   PublicShareMediaSummary,
+  PublicShareMemoryHeaderSummary,
   PublicShareMemorySummary,
   PublicShareSummary,
   PublicShareTreeResponse,
@@ -34,6 +35,8 @@ import {
     PublicShareLoginRequestToJSON,
     PublicShareMediaSummaryFromJSON,
     PublicShareMediaSummaryToJSON,
+    PublicShareMemoryHeaderSummaryFromJSON,
+    PublicShareMemoryHeaderSummaryToJSON,
     PublicShareMemorySummaryFromJSON,
     PublicShareMemorySummaryToJSON,
     PublicShareSummaryFromJSON,
@@ -70,6 +73,11 @@ export interface GetPublicShareRequest {
 export interface GetPublicShareMemoryByPathRequest {
     shareId: string;
     path: string;
+}
+
+export interface GetPublicShareMemoryHeaderRequest {
+    shareId: string;
+    memoryId: string;
 }
 
 export interface GetPublicShareTreeRequest {
@@ -299,6 +307,32 @@ export interface PublicSharesApiInterface {
      * Load a Memory in a public share by path
      */
     getPublicShareMemoryByPath(requestParameters: GetPublicShareMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary>;
+
+    /**
+     * Creates request options for getPublicShareMemoryHeader without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryHeaderRequestOpts(requestParameters: GetPublicShareMemoryHeaderRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns the detail header for one Memory inside the shared subtree. The response exposes only share-safe fields and separates direct media from descendant media within the share.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Get public share Memory header
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryHeaderRaw(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMemoryHeaderSummary>>;
+
+    /**
+     * Returns the detail header for one Memory inside the shared subtree. The response exposes only share-safe fields and separates direct media from descendant media within the share.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory header
+     */
+    getPublicShareMemoryHeader(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemoryHeaderSummary>;
 
     /**
      * Creates request options for getPublicShareTree without sending the request
@@ -1024,6 +1058,61 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async getPublicShareMemoryByPath(requestParameters: GetPublicShareMemoryByPathRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary> {
         const response = await this.getPublicShareMemoryByPathRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getPublicShareMemoryHeader without sending the request
+     */
+    async getPublicShareMemoryHeaderRequestOpts(requestParameters: GetPublicShareMemoryHeaderRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling getPublicShareMemoryHeader().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getPublicShareMemoryHeader().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/header`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns the detail header for one Memory inside the shared subtree. The response exposes only share-safe fields and separates direct media from descendant media within the share.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory header
+     */
+    async getPublicShareMemoryHeaderRaw(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMemoryHeaderSummary>> {
+        const requestOptions = await this.getPublicShareMemoryHeaderRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PublicShareMemoryHeaderSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns the detail header for one Memory inside the shared subtree. The response exposes only share-safe fields and separates direct media from descendant media within the share.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory header
+     */
+    async getPublicShareMemoryHeader(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemoryHeaderSummary> {
+        const response = await this.getPublicShareMemoryHeaderRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

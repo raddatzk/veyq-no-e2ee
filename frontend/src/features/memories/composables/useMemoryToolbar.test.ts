@@ -25,6 +25,28 @@ describe('memoryBreadcrumbs', () => {
     breadcrumbs[2].command?.({ originalEvent: new Event('click'), item: breadcrumbs[2] })
     expect(navigateToPath).toHaveBeenCalledWith('/@test/feiern')
   })
+
+  it('uses resolved display names for parent memories', () => {
+    const navigateToPath = vi.fn()
+    const breadcrumbs = memoryBreadcrumbs(
+      memory({
+        displayName: 'Albanien',
+        path: '/korfubaniens/albanien'
+      }),
+      'Friends',
+      navigateToPath,
+      [
+        { path: '/korfubaniens', label: 'Korfubanien' },
+        { path: '/korfubaniens/albanien', label: 'Albanien' }
+      ]
+    )
+
+    expect(breadcrumbs.map((breadcrumb) => breadcrumb.label)).toEqual([
+      'Friends',
+      'Korfubanien',
+      'Albanien'
+    ])
+  })
 })
 
 function memory(overrides: Partial<Memory>): Memory {

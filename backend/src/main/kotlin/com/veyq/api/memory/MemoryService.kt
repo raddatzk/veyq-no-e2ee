@@ -7,6 +7,7 @@ import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryRequest
 import com.veyq.api.generated.model.CoverCrop
+import com.veyq.api.generated.model.MemoryHeaderSummary
 import com.veyq.api.generated.model.MemoryScope
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MemorySummary
@@ -65,6 +66,9 @@ class MemoryService @Inject constructor(
 
     fun getMemory(publicId: String): MemorySummary =
         toSummary(resolveVisibleMemory(publicId))
+
+    fun getMemoryHeader(publicId: String): MemoryHeaderSummary =
+        toHeader(resolveVisibleMemory(publicId))
 
     fun getMemoryByPath(path: String?): MemorySummary =
         toSummary(resolveVisibleMemoryByPath(path))
@@ -312,6 +316,24 @@ class MemoryService @Inject constructor(
             mediaCount = mediaRepo.listByMemory(memory).size,
             scope = memory.scope().toApiScope(),
         )
+
+    private fun toHeader(memory: Memory): MemoryHeaderSummary {
+        val directMediaCount = mediaRepo.listByMemory(memory).size
+        val visibleDescendants = descendantsAndSelf(memory).drop(1).filter(::isMemoryVisible)
+        return MemoryHeaderSummary(
+            id = memory.publicId,
+            displayName = memory.displayName,
+            path = memory.path(),
+            coverUrl = memory.coverUrl(),
+            coverCrop = memory.coverCrop(),
+            startDate = memory.startDate,
+            endDate = memory.endDate,
+            directMediaCount = directMediaCount,
+            descendantMediaCount = visibleDescendants.sumOf { mediaRepo.listByMemory(it).size },
+            childMemoryCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
+            scope = memory.scope().toApiScope(),
+        )
+    }
 
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): MemoryDateRange {
         val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")

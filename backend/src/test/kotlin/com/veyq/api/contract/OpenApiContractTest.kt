@@ -355,6 +355,7 @@ class OpenApiContractTest {
             "PUT /api/{tenantName}/memories/{memoryId}",
             "DELETE /api/{tenantName}/memories/{memoryId}",
             "GET /api/{tenantName}/memories/{memoryId}/children",
+            "GET /api/{tenantName}/memories/{memoryId}/header",
             "GET /api/{tenantName}/memories/{memoryId}/media",
             "POST /api/{tenantName}/memories/{memoryId}/media",
             "PUT /api/{tenantName}/memories/{memoryId}/cover",
@@ -376,6 +377,7 @@ class OpenApiContractTest {
             "PUT /api/public-shares/{shareId}/memories/{memoryId}",
             "DELETE /api/public-shares/{shareId}/memories/{memoryId}",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/children",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/header",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/children",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/media",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/media",
@@ -418,7 +420,7 @@ class OpenApiContractTest {
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
-                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
+                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
@@ -428,7 +430,7 @@ class OpenApiContractTest {
                 "settings.openapi.yaml" -> SettingsApi::class.java
                 "shares.openapi.yaml" -> when (operationId) {
                     "listMemoryShares", "createMemoryShare", "updateMemoryShare" -> MemorySharesApi::class.java
-                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "publicShareMediaContent", "publicShareMediaPreview" -> PublicSharesApi::class.java
+                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "getPublicShareMemoryHeader", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "publicShareMediaContent", "publicShareMediaPreview" -> PublicSharesApi::class.java
                     else -> error("No generated shares interface mapping for $operationId")
                 }
                 else -> error("No generated interface mapping for $specFile")

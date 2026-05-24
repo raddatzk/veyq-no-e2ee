@@ -408,6 +408,36 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/header":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryHeader
+      summary: Get memory header
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryHeader"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/media":
     get:
       tags:
@@ -918,6 +948,29 @@ components:
             mediaCount: 12
             scope:
               type: TENANT
+    MemoryHeader:
+      description: Memory detail header.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryHeaderSummary"
+          example:
+            id: mem_abc123
+            displayName: Summer Trip
+            path: /summer-trip
+            coverUrl: /api/friends/memories/mem_abc123/cover/content
+            coverCrop:
+              x: 0
+              y: 0
+              width: 1
+              height: 1
+            startDate: '2026-05-03'
+            endDate: '2026-05-05'
+            directMediaCount: 12
+            descendantMediaCount: 20
+            childMemoryCount: 3
+            scope:
+              type: TENANT
     MemorySummaries:
       description: Memory summaries.
       content:
@@ -1157,6 +1210,52 @@ components:
         mediaCount:
           type: integer
           format: int32
+        scope:
+          "$ref": "#/components/schemas/MemoryScope"
+    MemoryHeaderSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - displayName
+        - path
+        - startDate
+        - endDate
+        - directMediaCount
+        - descendantMediaCount
+        - childMemoryCount
+        - scope
+      properties:
+        id:
+          type: string
+          description: Public Memory id.
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+        coverUrl:
+          type: string
+          nullable: true
+        coverCrop:
+          "$ref": "#/components/schemas/CoverCrop"
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        directMediaCount:
+          type: integer
+          format: int32
+          description: Media directly assigned to this Memory.
+        descendantMediaCount:
+          type: integer
+          format: int32
+          description: Media assigned to visible descendant Memories.
+        childMemoryCount:
+          type: integer
+          format: int32
+          description: Direct visible child Memories.
         scope:
           "$ref": "#/components/schemas/MemoryScope"
     MemoryScope:
