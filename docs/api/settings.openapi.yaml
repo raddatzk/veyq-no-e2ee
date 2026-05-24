@@ -190,7 +190,16 @@ components:
       type: object
       additionalProperties: false
       required:
+      - code
       - message
       properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          minLength: 1
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          example: BAD_REQUEST
         message:
           type: string
+          description: English fallback message. Frontends should prefer localized text for the code.
+          example: Invalid request

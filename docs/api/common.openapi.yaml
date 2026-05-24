@@ -40,7 +40,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Invalid request
+            code: BAD_REQUEST
+            message: Invalid request
     '401':
       description: Der Request ist nicht authentifiziert.
       content:
@@ -48,7 +49,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Authentication required
+            code: UNAUTHORIZED
+            message: Authentication required
     '403':
       description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
       content:
@@ -56,7 +58,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Insufficient permissions
+            code: FORBIDDEN
+            message: Insufficient permissions
 
     '404':
       description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
@@ -65,7 +68,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Resource not found
+            code: NOT_FOUND
+            message: Resource not found
 
     '409':
       description: Es besteht ein Konflikt mit der bestehenden Ressource
@@ -74,7 +78,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Conflict with existing resource
+            code: CONFLICT
+            message: Conflict with existing resource
 
     '413':
       description: Der Upload ueberschreitet die erlaubte Groesse.
@@ -83,7 +88,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Upload too large
+            code: UPLOAD_TOO_LARGE
+            message: Upload too large
 
     '416':
       description: Der angeforderte Byte-Range ist fuer das Medium nicht erfuellbar.
@@ -92,7 +98,8 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
           example:
-            error: Requested range not satisfiable
+            code: RANGE_NOT_SATISFIABLE
+            message: Requested range not satisfiable
 
   schemas:
     UserSummary:
@@ -221,10 +228,19 @@ components:
       type: object
       additionalProperties: false
       required:
+        - code
         - message
       properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          minLength: 1
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          example: MEMORY_COVER_CROP_INVALID
         message:
           type: string
+          description: English fallback message. Frontends should prefer localized text for the code.
+          example: Cover crop is invalid
 
     ServerRole:
       type: string

@@ -154,6 +154,45 @@ class MemoryShareResourceTest {
             .then()
             .statusCode(429)
             .header("Retry-After", notNullValue())
+            .body("code", equalTo("RATE_LIMITED"))
+    }
+
+    @Test
+    fun `public share upload returns stable code for empty files`() {
+        val shareId = createShare("UPLOADER")
+        val accessCookie = loginShare(shareId)
+        val empty = Files.createTempFile("veyq-empty-upload-", ".png")
+        try {
+            given()
+                .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+                .multiPart("file", empty.toFile(), "image/png")
+                .multiPart("title", "Empty")
+                .`when`().post("/api/public-shares/$shareId/media")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("MEDIA_UPLOAD_EMPTY"))
+        } finally {
+            Files.deleteIfExists(empty)
+        }
+    }
+
+    @Test
+    fun `public share cover returns stable code for invalid crop`() {
+        val media = createMedia("Cover")
+        val shareId = createShare("MANAGER")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .multiPart("mediaId", media.publicId)
+            .multiPart("cropX", "0")
+            .multiPart("cropY", "0")
+            .multiPart("cropWidth", "2")
+            .multiPart("cropHeight", "1")
+            .`when`().put("/api/public-shares/$shareId/memories/${memory.publicId}/cover")
+            .then()
+            .statusCode(400)
+            .body("code", equalTo("MEMORY_COVER_CROP_INVALID"))
     }
 
     @Test

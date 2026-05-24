@@ -113,9 +113,15 @@ abstract class LibraryService(
         }
     }
 
-    fun normalizedName(value: String?): String {
-        val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required")
-        if (name.length > 120 || !name.matches(validName) || name in reservedNames) throw BadRequestException("Invalid name")
+    fun normalizedName(
+        value: String?,
+        requiredCode: String = "BAD_REQUEST",
+        invalidCode: String = "BAD_REQUEST",
+    ): String {
+        val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required", requiredCode)
+        if (name.length > 120 || !name.matches(validName) || name in reservedNames) {
+            throw BadRequestException("Invalid name", invalidCode)
+        }
         return name
     }
 

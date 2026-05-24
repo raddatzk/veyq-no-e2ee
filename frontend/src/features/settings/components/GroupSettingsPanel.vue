@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -30,6 +31,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 const { authState } = useAuthState()
 const groupList = ref<TenantGroup[]>([])
 const tenantUsers = ref<TenantUserSummary[]>([])
@@ -52,10 +54,10 @@ const selectedUserId = ref<number | null>(null)
 const selectedRole = ref<GroupRole>('GroupMember')
 const editingInitialGroupName = ref('')
 
-const roleOptions = [
-  { label: 'Owner', value: 'GroupOwner' },
-  { label: 'Member', value: 'GroupMember' }
-]
+const roleOptions = computed(() => [
+  { label: t('group.roles.GroupOwner'), value: 'GroupOwner' },
+  { label: t('group.roles.GroupMember'), value: 'GroupMember' }
+])
 
 const selectedMembers = computed(() => selectedGroup.value?.members || [])
 const availableTenantUsers = computed(() => {
@@ -108,7 +110,7 @@ async function load() {
       resetEditor()
     }
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Gruppen konnten nicht geladen werden.')
+    error.value = getErrorMessage(caught, t('group.listLoadFailed'))
   } finally {
     loading.value = false
   }
@@ -134,7 +136,7 @@ async function openGroup(groupName: string) {
     }
   } catch (caught) {
     selectedGroup.value = null
-    error.value = getErrorMessage(caught, 'Gruppe konnte nicht geladen werden.')
+    error.value = getErrorMessage(caught, t('group.loadFailed'))
   } finally {
     detailLoading.value = false
   }
@@ -184,12 +186,12 @@ async function submitCreate() {
     name.value = created.name
     permalinkTouched.value = false
     await loadTenantUsers()
-    message.value = 'Gruppe wurde erstellt.'
+    message.value = t('group.created')
   } catch (caught) {
     if (isApiStatus(caught, 409)) {
-      error.value = 'Eine Gruppe mit diesem Permalink existiert bereits.'
+      error.value = t('group.duplicate')
     } else {
-      error.value = getErrorMessage(caught, 'Gruppe konnte nicht erstellt werden.')
+      error.value = getErrorMessage(caught, t('group.createFailed'))
     }
   } finally {
     saving.value = false
@@ -223,7 +225,7 @@ function addMember() {
 function changeRole(member: GroupMemberSummary, role: GroupRole) {
   if (!canManageSelectedGroup.value || !selectedGroup.value) return
   if (member.role === 'GroupOwner' && role !== 'GroupOwner' && ownerCount.value <= 1) {
-    error.value = 'Mindestens ein Owner muss in der Gruppe bleiben.'
+    error.value = t('group.ownerRequired')
     return
   }
   selectedGroup.value = {
@@ -237,7 +239,7 @@ function changeRole(member: GroupMemberSummary, role: GroupRole) {
 function removeMember(member: GroupMemberSummary) {
   if (!canManageSelectedGroup.value || !selectedGroup.value) return
   if (member.role === 'GroupOwner' && ownerCount.value <= 1) {
-    error.value = 'Mindestens ein Owner muss in der Gruppe bleiben.'
+    error.value = t('group.ownerRequired')
     return
   }
   selectedGroup.value = {
@@ -269,9 +271,9 @@ async function saveGroup() {
     selectedGroup.value = saved
     editingInitialGroupName.value = saved.name
     upsertGroup(saved)
-    message.value = 'Gruppe wurde gespeichert.'
+    message.value = t('group.saved')
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Gruppe konnte nicht gespeichert werden.')
+    error.value = getErrorMessage(caught, t('group.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -292,10 +294,10 @@ async function submitDeleteGroup() {
     if (props.groupName) {
       await router.push(`/${props.tenantName}/settings`)
     } else {
-      message.value = 'Gruppe wurde gelöscht.'
+      message.value = t('group.deleted')
     }
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Gruppe konnte nicht gelöscht werden.')
+    error.value = getErrorMessage(caught, t('group.deleteFailed'))
   } finally {
     saving.value = false
   }
@@ -341,26 +343,26 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
 
 <template>
   <section class="settings-panel">
-    <h1>Gruppen</h1>
-    <p>Gemeinsame Bereiche und Mitglieder</p>
+    <h1>{{ t('group.title') }}</h1>
+    <p>{{ t('group.membersAndAreas') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Gruppen werden geladen...</span>
+      <span>{{ t('group.listLoading') }}</span>
     </div>
 
     <template v-else>
       <div v-if="!props.groupName" class="settings-toolbar">
-        <Button label="Gruppe erstellen" icon="pi pi-users" @click="openCreateDialog" />
+        <Button :label="t('group.create')" icon="pi pi-users" @click="openCreateDialog" />
       </div>
 
       <div v-if="!props.groupName" class="settings-table group-list-table">
         <div class="settings-table-row settings-table-head groups-row">
-          <span>Gruppe</span>
-          <span>Permalink</span>
+          <span>{{ t('group.group') }}</span>
+          <span>{{ t('common.permalink') }}</span>
           <span></span>
         </div>
         <div v-for="group in groupList" :key="group.id" class="settings-table-row groups-row">
@@ -370,7 +372,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           </div>
           <span>@{{ group.name }}</span>
           <Button
-            label="Bearbeiten"
+            :label="t('group.edit')"
             icon="pi pi-pencil"
             severity="secondary"
             outlined
@@ -381,7 +383,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
 
       <div v-if="detailLoading" class="memory-loading">
         <ProgressSpinner class="small-spinner" />
-        <span>Gruppe wird geladen...</span>
+        <span>{{ t('group.loading') }}</span>
       </div>
 
       <form
@@ -390,11 +392,11 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         @submit.prevent="saveGroup"
       >
         <label>
-          <span>Name</span>
+          <span>{{ t('common.name') }}</span>
           <InputText v-model="displayName" autocomplete="off" required />
         </label>
         <label>
-          <span>Permalink</span>
+          <span>{{ t('common.permalink') }}</span>
           <InputText
             :model-value="name"
             autocomplete="off"
@@ -418,7 +420,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
               :options="roleOptions"
               option-label="label"
               option-value="value"
-              aria-label="Gruppen-Rolle"
+              :aria-label="t('group.role')"
               @update:model-value="changeRole(member, $event)"
             />
             <div class="management-actions">
@@ -428,8 +430,8 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
                 severity="secondary"
                 outlined
                 size="small"
-                aria-label="Mitglied entfernen"
-                title="Mitglied entfernen"
+                :aria-label="t('group.memberRemove')"
+                :title="t('group.memberRemove')"
                 @click="removeMember(member)"
               />
             </div>
@@ -442,18 +444,18 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
               :options="availableTenantUsers"
               option-label="label"
               option-value="value"
-              placeholder="Tenant-Mitglied auswählen"
+              :placeholder="t('group.memberSelect')"
             />
             <Select
               v-model="selectedRole"
               :options="roleOptions"
               option-label="label"
               option-value="value"
-              aria-label="Neue Gruppen-Rolle"
+              :aria-label="t('group.roleNew')"
             />
             <Button
               type="button"
-              label="Hinzufügen"
+              :label="t('common.add')"
               icon="pi pi-plus"
               severity="secondary"
               outlined
@@ -463,10 +465,10 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </div>
 
         <div class="button-row">
-          <Button type="submit" label="Speichern" icon="pi pi-save" :loading="saving" />
+          <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="saving" />
           <Button
             type="button"
-            label="Gruppe löschen"
+            :label="t('group.delete')"
             icon="pi pi-trash"
             severity="danger"
             outlined
@@ -483,14 +485,14 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
       </div>
     </template>
 
-    <Dialog v-model:visible="createDialogVisible" header="Gruppe erstellen" modal class="tenant-dialog">
+    <Dialog v-model:visible="createDialogVisible" :header="t('group.create')" modal class="tenant-dialog">
       <form class="form" @submit.prevent="submitCreate">
         <label>
-          Name
+          {{ t('common.name') }}
           <InputText v-model="createDisplayName" autocomplete="off" required />
         </label>
         <label>
-          Permalink
+          {{ t('common.permalink') }}
           <InputText
             :model-value="createName"
             autocomplete="off"
@@ -499,10 +501,10 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
         </label>
         <div class="button-row">
-          <Button type="submit" label="Erstellen" icon="pi pi-plus" :loading="saving" />
+          <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="saving" />
           <Button
             type="button"
-            label="Abbrechen"
+            :label="t('common.cancel')"
             severity="secondary"
             outlined
             @click="createDialogVisible = false"
@@ -511,13 +513,13 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
       </form>
     </Dialog>
 
-    <Dialog v-model:visible="deleteDialogVisible" header="Gruppe löschen" modal class="tenant-dialog">
+    <Dialog v-model:visible="deleteDialogVisible" :header="t('group.delete')" modal class="tenant-dialog">
       <div v-if="selectedGroup" class="form">
         <p>
-          <strong>{{ selectedGroup.displayName }}</strong> wirklich rekursiv löschen?
+          {{ t('tenant.deleteConfirm', { name: selectedGroup.displayName }) }}
         </p>
         <label>
-          Display-Name zur Bestätigung
+          {{ t('settings.confirmationDisplayName') }}
           <InputText
             v-model="deleteConfirmation"
             autocomplete="off"
@@ -526,7 +528,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </label>
         <div class="button-row">
           <Button
-            label="Löschen"
+            :label="t('common.delete')"
             icon="pi pi-trash"
             severity="danger"
             :disabled="!canConfirmDeleteGroup"
@@ -535,7 +537,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
           <Button
             type="button"
-            label="Abbrechen"
+            :label="t('common.cancel')"
             severity="secondary"
             outlined
             @click="deleteDialogVisible = false"

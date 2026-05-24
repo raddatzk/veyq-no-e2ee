@@ -13,10 +13,11 @@ export class SetupRequiredError extends Error {
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    readonly code: string,
+    readonly fallbackMessage: string,
     readonly body: unknown
   ) {
-    super(message)
+    super(fallbackMessage)
     this.name = 'ApiError'
   }
 }
@@ -61,11 +62,43 @@ export async function apiFetchUrl(url: string, options: RequestInit = {}): Promi
 }
 
 export async function apiError(response: Response): Promise<Error> {
-  const body = await response.json().catch(() => ({ error: 'Request failed' }))
-  if (response.status === 503 && body.error === 'Setup required') {
+  const body = await response.json().catch(() => null)
+  const code = errorCode(body, response.status)
+  const message = errorMessage(body)
+  if (response.status === 503 && code === 'SETUP_REQUIRED') {
     return new SetupRequiredError()
   }
-  return new ApiError(response.status, body.error || 'Request failed', body)
+  return new ApiError(response.status, code, message, body)
+}
+
+function errorCode(body: unknown, status: number): string {
+  if (isRecord(body) && typeof body.code === 'string' && body.code) return body.code
+  return legacyCode(body, status)
+}
+
+function errorMessage(body: unknown): string {
+  if (isRecord(body) && typeof body.message === 'string' && body.message) return body.message
+  if (isRecord(body) && typeof body.error === 'string' && body.error) return body.error
+  return 'Request failed'
+}
+
+function legacyCode(body: unknown, status: number): string {
+  if (isRecord(body) && body.error === 'Setup required') return 'SETUP_REQUIRED'
+  if (status === 400) return 'BAD_REQUEST'
+  if (status === 401) return 'UNAUTHORIZED'
+  if (status === 403) return 'FORBIDDEN'
+  if (status === 404) return 'NOT_FOUND'
+  if (status === 409) return 'CONFLICT'
+  if (status === 413) return 'UPLOAD_TOO_LARGE'
+  if (status === 416) return 'RANGE_NOT_SATISFIABLE'
+  if (status === 429) return 'RATE_LIMITED'
+  if (status === 503) return 'SERVICE_UNAVAILABLE'
+  if (status >= 500) return 'INTERNAL_SERVER_ERROR'
+  return 'REQUEST_FAILED'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 async function requestUrl(url: string, options: RequestInit = {}): Promise<Response> {

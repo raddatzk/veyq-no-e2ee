@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -25,6 +26,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { t } = useI18n()
 const { authState, setTenants } = useAuthState()
 const users = ref<TenantUserSummary[]>([])
 const loading = ref(false)
@@ -52,10 +54,10 @@ const canConfirmDeleteTenant = computed(
   () => deleteConfirmation.value.trim() === tenantDisplayName.value.trim() && !saving.value
 )
 
-const roleOptions = [
-  { label: 'Admin', value: 'TenantOwner' },
-  { label: 'Member', value: 'TenantMember' }
-]
+const roleOptions = computed(() => [
+  { label: t('tenant.roles.TenantOwner'), value: 'TenantOwner' },
+  { label: t('tenant.roles.TenantMember'), value: 'TenantMember' }
+])
 
 onMounted(load)
 watch(() => props.tenantName, load)
@@ -67,7 +69,7 @@ async function load() {
   try {
     users.value = await getTenantUsers(props.tenantName)
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Mitglieder konnten nicht geladen werden.')
+    error.value = getErrorMessage(caught, t('tenant.membersLoadFailed'))
   } finally {
     loading.value = false
   }
@@ -95,12 +97,12 @@ async function inviteUserByEmail() {
   try {
     upsertUser(await inviteTenantUser(props.tenantName, inviteEmail.value, inviteTenantRole.value))
     inviteDialogVisible.value = false
-    message.value = 'Einladung wurde gesendet.'
+    message.value = t('tenant.inviteSent')
   } catch (caught) {
     if (isApiStatus(caught, 409)) {
-      error.value = 'Der User ist bereits Mitglied oder hat eine offene Einladung in diesem Tenant.'
+      error.value = t('tenant.alreadyMember')
     } else {
-      error.value = getErrorMessage(caught, 'Einladung konnte nicht gesendet werden.')
+      error.value = getErrorMessage(caught, t('tenant.inviteFailed'))
     }
   } finally {
     saving.value = false
@@ -113,9 +115,9 @@ async function reinviteUser(user: TenantUserSummary) {
   message.value = ''
   try {
     upsertUser(await reinviteTenantUser(props.tenantName, user.user.userId))
-    message.value = 'Einladung wurde erneut gesendet.'
+    message.value = t('tenant.inviteResent')
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Einladung konnte nicht erneut gesendet werden.')
+    error.value = getErrorMessage(caught, t('tenant.inviteResendFailed'))
   } finally {
     saving.value = false
   }
@@ -126,9 +128,9 @@ async function changeRole(user: TenantUserSummary, role: TenantRole) {
   message.value = ''
   try {
     upsertUser(await updateTenantUserRole(props.tenantName, user.user.userId, role))
-    message.value = 'Rolle wurde gespeichert.'
+    message.value = t('tenant.roleSaved')
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Rolle konnte nicht gespeichert werden.')
+    error.value = getErrorMessage(caught, t('tenant.roleSaveFailed'))
   }
 }
 
@@ -143,7 +145,7 @@ async function submitDeleteTenant() {
     deleteDialogVisible.value = false
     await router.push('/')
   } catch (caught) {
-    error.value = getErrorMessage(caught, 'Tenant konnte nicht gelöscht werden.')
+    error.value = getErrorMessage(caught, t('tenant.deleteFailed'))
   } finally {
     saving.value = false
   }
@@ -167,20 +169,20 @@ function userSortLabel(user: TenantUserSummary): string {
 
 <template>
   <section class="settings-panel">
-    <h1>Tenant</h1>
-    <p>Mitglieder</p>
+    <h1>{{ t('tenant.title') }}</h1>
+    <p>{{ t('tenant.members') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Mitglieder werden geladen...</span>
+      <span>{{ t('tenant.membersLoading') }}</span>
     </div>
 
     <template v-else>
       <div class="settings-toolbar">
-        <Button label="User einladen" icon="pi pi-user-plus" @click="openInviteDialog" />
+        <Button :label="t('tenant.invite')" icon="pi pi-user-plus" @click="openInviteDialog" />
       </div>
 
       <ManagementList>
@@ -193,7 +195,7 @@ function userSortLabel(user: TenantUserSummary): string {
                 class="management-badge"
                 :class="user.status === 'Active' ? 'success' : 'warning'"
               >
-                {{ user.status === 'Active' ? 'Aktiv' : 'Ausstehend' }}
+                {{ user.status === 'Active' ? t('common.active') : t('common.pending') }}
               </span>
             </div>
           </div>
@@ -203,7 +205,7 @@ function userSortLabel(user: TenantUserSummary): string {
             :options="roleOptions"
             option-label="label"
             option-value="value"
-            aria-label="Tenant-Rolle"
+            :aria-label="t('tenant.role')"
             @update:model-value="changeRole(user, $event)"
           />
           <div class="management-actions">
@@ -213,8 +215,8 @@ function userSortLabel(user: TenantUserSummary): string {
               severity="secondary"
               outlined
               size="small"
-              aria-label="Erneut einladen"
-              title="Erneut einladen"
+              :aria-label="t('tenant.inviteResend')"
+              :title="t('tenant.inviteResend')"
               :loading="saving"
               @click="reinviteUser(user)"
             />
@@ -224,7 +226,7 @@ function userSortLabel(user: TenantUserSummary): string {
 
       <div v-if="canDeleteTenant" class="button-row">
         <Button
-          label="Tenant löschen"
+          :label="t('tenant.delete')"
           icon="pi pi-trash"
           severity="danger"
           outlined
@@ -233,14 +235,14 @@ function userSortLabel(user: TenantUserSummary): string {
       </div>
     </template>
 
-    <Dialog v-model:visible="inviteDialogVisible" header="User einladen" modal class="tenant-dialog">
+    <Dialog v-model:visible="inviteDialogVisible" :header="t('tenant.invite')" modal class="tenant-dialog">
       <form class="form" @submit.prevent="inviteUserByEmail">
         <label>
-          E-Mail
+          {{ t('common.email') }}
           <InputText v-model="inviteEmail" type="email" autocomplete="email" required />
         </label>
         <label>
-          Rolle
+          {{ t('common.role') }}
           <Select
             v-model="inviteTenantRole"
             :options="roleOptions"
@@ -249,10 +251,10 @@ function userSortLabel(user: TenantUserSummary): string {
           />
         </label>
         <div class="button-row">
-          <Button type="submit" label="Einladen" icon="pi pi-send" :loading="saving" />
+          <Button type="submit" :label="t('tenant.invite')" icon="pi pi-send" :loading="saving" />
           <Button
             type="button"
-            label="Abbrechen"
+            :label="t('common.cancel')"
             severity="secondary"
             outlined
             @click="inviteDialogVisible = false"
@@ -261,18 +263,18 @@ function userSortLabel(user: TenantUserSummary): string {
       </form>
     </Dialog>
 
-    <Dialog v-model:visible="deleteDialogVisible" header="Tenant löschen" modal class="tenant-dialog">
+    <Dialog v-model:visible="deleteDialogVisible" :header="t('tenant.delete')" modal class="tenant-dialog">
       <div class="form">
         <p>
-          <strong>{{ tenantDisplayName }}</strong> wirklich rekursiv löschen?
+          {{ t('tenant.deleteConfirm', { name: tenantDisplayName }) }}
         </p>
         <label>
-          Display-Name zur Bestätigung
+          {{ t('settings.confirmationDisplayName') }}
           <InputText v-model="deleteConfirmation" autocomplete="off" :placeholder="tenantDisplayName" />
         </label>
         <div class="button-row">
           <Button
-            label="Löschen"
+            :label="t('common.delete')"
             icon="pi pi-trash"
             severity="danger"
             :disabled="!canConfirmDeleteTenant"
@@ -281,7 +283,7 @@ function userSortLabel(user: TenantUserSummary): string {
           />
           <Button
             type="button"
-            label="Abbrechen"
+            :label="t('common.cancel')"
             severity="secondary"
             outlined
             @click="deleteDialogVisible = false"

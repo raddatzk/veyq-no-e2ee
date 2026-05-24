@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -31,6 +32,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const shareId = computed(() => String(route.params.shareId || ''))
 const sharePath = computed(() => routePathToSharePath(route.params.pathMatch))
@@ -91,7 +93,7 @@ async function loadShare() {
     }
     if (hasShareAccess.value) await loadProtectedContent()
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Share konnte nicht geladen werden')
+    error.value = getErrorMessage(unknownError, t('share.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -114,7 +116,7 @@ async function login() {
     }
     await loadProtectedContent()
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Share konnte nicht geöffnet werden')
+    error.value = getErrorMessage(unknownError, t('share.loginFailed'))
   } finally {
     loading.value = false
   }
@@ -142,7 +144,7 @@ async function loadCurrentMemory() {
     childMemories.value = await listPublicShareChildMemories(shareId.value, current.id)
     media.value = await listPublicShareMemoryMedia(shareId.value, current.id)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Memory konnte nicht geladen werden')
+    error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -179,7 +181,7 @@ async function uploadToRoot() {
     })
     selectedFile.value = null
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Upload fehlgeschlagen')
+    error.value = getErrorMessage(unknownError, t('share.uploadFailed'))
   } finally {
     loading.value = false
   }
@@ -206,7 +208,7 @@ function routePathToSharePath(value: unknown): string {
       </div>
       <Button
         v-if="share?.authenticated"
-        label="Schließen"
+        :label="t('common.close')"
         icon="pi pi-sign-out"
         severity="secondary"
         outlined
@@ -222,16 +224,16 @@ function routePathToSharePath(value: unknown): string {
         v-model="password"
         type="password"
         autocomplete="current-password"
-        placeholder="Passwort"
+        :placeholder="t('common.password')"
       />
       <InputText
         v-if="share?.displayNameRequired"
         v-model="displayName"
         autocomplete="name"
-        placeholder="Anzeigename"
+        :placeholder="t('share.displayNamePlaceholder')"
       />
       <Button
-        label="Öffnen"
+        :label="t('share.open')"
         icon="pi pi-lock-open"
         type="submit"
         :loading="loading"
@@ -241,7 +243,7 @@ function routePathToSharePath(value: unknown): string {
 
     <div v-else-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Share wird geladen...</span>
+      <span>{{ t('share.loading') }}</span>
     </div>
 
     <form
@@ -251,7 +253,7 @@ function routePathToSharePath(value: unknown): string {
     >
       <input type="file" accept="image/*,video/*" @change="selectUpload" />
       <Button
-        label="Hochladen"
+        :label="t('common.upload')"
         icon="pi pi-upload"
         type="submit"
         :loading="loading"

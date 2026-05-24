@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -55,6 +56,7 @@ const props = defineProps<{
   ) => Promise<MemoryMedia>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
 }>()
+const { locale, t } = useI18n()
 
 defineEmits<{
   openMemory: [memory: Memory]
@@ -95,8 +97,8 @@ const coverUrl = computed(() => {
 })
 const scopeLabel = computed(() => {
   if (props.memory.scope?.type === 'GROUP') return `@${props.memory.scope.groupName}`
-  if (props.memory.scope?.type === 'USER') return 'Persönlich'
-  return 'Tenant'
+  if (props.memory.scope?.type === 'USER') return t('navigation.personal')
+  return t('memory.moveScopeTenant')
 })
 const parentPath = computed(() => {
   const segments = props.memory.path.split('/').filter(Boolean)
@@ -109,7 +111,7 @@ const dateRangeLabel = computed(() => {
 })
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(value))
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', { dateStyle: 'medium' }).format(new Date(value))
 }
 </script>
 
@@ -128,14 +130,14 @@ function formatDate(value: string): string {
       <div class="memory-detail-heading">
         <div class="memory-detail-title-row">
           <div>
-            <p>Memory</p>
+            <p>{{ t('memory.title') }}</p>
             <h1>{{ memory.displayName }}</h1>
           </div>
           <div class="memory-detail-actions">
             <Button
               v-if="capabilities.canUpload"
               icon="pi pi-upload"
-              label="Hochladen"
+              :label="t('memory.upload')"
               severity="secondary"
               outlined
               size="small"
@@ -144,7 +146,7 @@ function formatDate(value: string): string {
             <Button
               v-if="capabilities.canEdit"
               icon="pi pi-pencil"
-              label="Bearbeiten"
+              :label="t('common.edit')"
               severity="secondary"
               outlined
               size="small"
@@ -153,7 +155,7 @@ function formatDate(value: string): string {
             <Button
               v-if="capabilities.canManageCover"
               icon="pi pi-image"
-              label="Cover"
+              :label="t('memory.cover')"
               severity="secondary"
               outlined
               size="small"
@@ -162,7 +164,7 @@ function formatDate(value: string): string {
             <Button
               v-if="capabilities.canShare"
               icon="pi pi-share-alt"
-              label="Teilen"
+              :label="t('share.title')"
               severity="secondary"
               outlined
               size="small"
@@ -171,7 +173,7 @@ function formatDate(value: string): string {
             <Button
               v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
               icon="pi pi-trash"
-              label="Löschen"
+              :label="t('common.delete')"
               severity="danger"
               outlined
               size="small"
@@ -181,17 +183,17 @@ function formatDate(value: string): string {
         </div>
         <div class="memory-detail-meta">
           <span v-if="capabilities.showScope"><i class="pi pi-folder" /> {{ scopeLabel }}</span>
-          <span><i class="pi pi-images" /> {{ memory.mediaCount }} Medien</span>
-          <span><i class="pi pi-sitemap" /> {{ memory.childCount }} Unter-Memories</span>
+          <span><i class="pi pi-images" /> {{ memory.mediaCount }} {{ t('memory.mediaCount') }}</span>
+          <span><i class="pi pi-sitemap" /> {{ memory.childCount }} {{ t('memory.children') }}</span>
         </div>
       </div>
     </header>
 
     <Tabs value="gallery" class="memory-tabs">
       <TabList>
-        <Tab value="gallery">Galerie</Tab>
-        <Tab value="children">Unter-Memories</Tab>
-        <Tab value="info">Info</Tab>
+        <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
+        <Tab value="children">{{ t('memory.children') }}</Tab>
+        <Tab value="info">{{ t('memory.info') }}</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
@@ -221,22 +223,22 @@ function formatDate(value: string): string {
               @click="$emit('createChildMemory')"
             >
               <span class="pi pi-plus" />
-              <strong>Unter-Memory erstellen</strong>
+              <strong>{{ t('memory.childCreate') }}</strong>
             </button>
           </div>
         </TabPanel>
         <TabPanel value="info">
           <dl class="memory-info-list">
-            <dt>Zeitraum</dt>
+            <dt>{{ t('memory.dateRange') }}</dt>
             <dd>{{ dateRangeLabel }}</dd>
-            <dt>Permalink</dt>
+            <dt>{{ t('common.permalink') }}</dt>
             <dd>{{ memory.path }}</dd>
-            <dt>Medien</dt>
+            <dt>{{ t('memory.mediaCount') }}</dt>
             <dd>{{ memory.mediaCount }}</dd>
-            <dt>Unter-Memories</dt>
+            <dt>{{ t('memory.children') }}</dt>
             <dd>{{ memory.childCount }}</dd>
             <template v-if="capabilities.showScope">
-              <dt>Bereich</dt>
+              <dt>{{ t('memory.area') }}</dt>
               <dd>{{ scopeLabel }}</dd>
             </template>
           </dl>

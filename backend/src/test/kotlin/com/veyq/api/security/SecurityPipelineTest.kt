@@ -16,6 +16,7 @@ import com.veyq.api.domain.TenantRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
+import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
@@ -36,6 +37,7 @@ class SecurityPipelineTest {
     @Inject lateinit var tenantGroupMemberRepo: TenantGroupMemberRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var transaction: UserTransaction
+    @Inject lateinit var serverState: ServerState
 
     private lateinit var runId: String
     private lateinit var owner: User
@@ -74,6 +76,21 @@ class SecurityPipelineTest {
             .`when`().get("/api/tenants")
             .then()
             .statusCode(401)
+    }
+
+    @Test
+    fun `setup filter returns stable setup required code`() {
+        serverState.setupCompleted = false
+        try {
+            given()
+                .`when`().get("/api/users/me")
+                .then()
+                .statusCode(503)
+                .body("code", equalTo("SETUP_REQUIRED"))
+                .body("message", equalTo("Setup required"))
+        } finally {
+            serverState.markSetupCompleted()
+        }
     }
 
     @Test

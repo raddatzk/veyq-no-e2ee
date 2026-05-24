@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   saved: [memory: Memory]
 }>()
 
+const { t } = useI18n()
 const displayName = ref('')
 const name = ref('')
 const startDate = ref('')
@@ -78,7 +80,7 @@ async function submit() {
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Memory konnte nicht gespeichert werden')
+    error.value = getErrorMessage(unknownError, t('memory.saveFailed'))
   } finally {
     loading.value = false
   }
@@ -86,14 +88,14 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Memory bearbeiten" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('memory.edit')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="submit">
       <label>
-        Name
+        {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
       </label>
       <label>
-        Permalink
+        {{ t('common.permalink') }}
         <InputText
           :model-value="name"
           autocomplete="off"
@@ -102,19 +104,19 @@ async function submit() {
         />
       </label>
       <label>
-        Startdatum
+        {{ t('memory.startDate') }}
         <InputText v-model="startDate" type="date" required />
       </label>
       <label>
-        Enddatum
+        {{ t('memory.endDate') }}
         <InputText v-model="endDate" type="date" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
-        <Button type="submit" label="Speichern" icon="pi pi-check" :loading="loading" />
+        <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="loading" />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="visible = false"

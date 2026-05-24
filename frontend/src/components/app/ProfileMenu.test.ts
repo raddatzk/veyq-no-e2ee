@@ -1,6 +1,7 @@
 import { shallowMount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { authState } from '../../authState'
+import { i18n } from '../../i18n'
 import ProfileMenu from './ProfileMenu.vue'
 
 const push = vi.fn()
@@ -36,9 +37,10 @@ describe('ProfileMenu', () => {
 
     const labels = menuLabels(wrapper)
     expect(labels).toContain('Meine Einstellungen')
-    expect(labels).not.toContain('Server Einstellungen')
+    expect(labels).toContain('Sprache')
+    expect(labels).not.toContain('Einstellungen')
 
-    menuItem(wrapper, 'Meine Einstellungen').command()
+    menuItem(wrapper, 'Meine Einstellungen').command?.()
     expect(push).toHaveBeenCalledWith('/~me')
   })
 
@@ -58,9 +60,33 @@ describe('ProfileMenu', () => {
       global: { stubs: primeVueStubs() }
     })
 
-    expect(menuLabels(wrapper)).toContain('Server Einstellungen')
-    menuItem(wrapper, 'Server Einstellungen').command()
+    expect(menuLabels(wrapper)).toContain('Einstellungen')
+    menuItem(wrapper, 'Einstellungen').command?.()
     expect(push).toHaveBeenCalledWith('/settings')
+  })
+
+  it('shows language choices and switches locale', () => {
+    authState.isAuthenticated = true
+    authState.userLabel = 'Member'
+    authState.user = {
+      userId: 1,
+      email: 'member@example.com',
+      displayName: 'Member',
+      permalink: 'member',
+      serverRole: 'ServerMember',
+      passkeyCount: 0
+    }
+
+    const wrapper = shallowMount(ProfileMenu, {
+      global: { stubs: primeVueStubs() }
+    })
+
+    const languageItem = menuItem(wrapper, 'Sprache') as { items: Array<{ label: string; command: () => void }> }
+    expect(languageItem.items.map((item) => item.label)).toEqual(['Deutsch', 'English'])
+
+    languageItem.items.find((item) => item.label === 'English')!.command()
+
+    expect(i18n.global.locale.value).toBe('en')
   })
 })
 
@@ -76,7 +102,7 @@ function menuItem(wrapper: ReturnType<typeof shallowMount>, label: string) {
   return wrapper
     .findComponent({ name: 'Menu' })
     .props('model')
-    .find((item: { label?: string }) => item.label === label) as { command: () => void }
+    .find((item: { label?: string }) => item.label === label) as { command?: () => void }
 }
 
 function primeVueStubs() {

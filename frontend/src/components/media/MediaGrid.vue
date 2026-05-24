@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ProgressSpinner from 'primevue/progressspinner'
 import MediaLightbox from './MediaLightbox.vue'
 import { calculateJustifiedMediaLayout } from './mediaGridLayout'
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   deleted: [media: MemoryMedia]
 }>()
 
+const { t } = useI18n()
 const selectedIndex = ref<number | null>(null)
 const mediaGrid = ref<HTMLElement | null>(null)
 const containerWidth = ref(0)
@@ -317,7 +319,7 @@ function handleKeydown(event: KeyboardEvent) {
 <template>
   <section class="memory-section">
     <div class="memory-section-header">
-      <h2>Medien</h2>
+      <h2>{{ t('media.title') }}</h2>
       <span>{{ media.length }}</span>
     </div>
     <div
@@ -325,7 +327,7 @@ function handleKeydown(event: KeyboardEvent) {
       ref="mediaGrid"
       class="media-grid"
       :style="{ height: `${layout.height}px` }"
-      aria-label="Mediengalerie"
+      :aria-label="t('media.gallery')"
     >
       <template v-if="canRenderGallery">
         <button
@@ -372,14 +374,14 @@ function handleKeydown(event: KeyboardEvent) {
       </template>
       <div v-else class="media-grid-placeholder">
         <ProgressSpinner class="small-spinner" />
-        <span>{{ streaming ? 'Medien werden geladen...' : 'Medien werden vorbereitet...' }}</span>
+        <span>{{ streaming ? t('media.loading') : t('media.preparing') }}</span>
       </div>
     </div>
     <div v-else-if="streaming" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Medien werden geladen...</span>
+      <span>{{ t('media.loading') }}</span>
     </div>
-    <div v-else class="memory-empty">Keine Medien unter diesem Pfad.</div>
+    <div v-else class="memory-empty">{{ t('media.empty') }}</div>
 
     <MediaLightbox
       v-if="selectedMedia"

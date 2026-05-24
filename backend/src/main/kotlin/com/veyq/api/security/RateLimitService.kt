@@ -1,9 +1,9 @@
 package com.veyq.api.security
 
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.common.ApiException
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import jakarta.ws.rs.WebApplicationException
 import jakarta.ws.rs.core.Response
 import java.time.Clock
 import java.time.Duration
@@ -12,11 +12,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 class RateLimitExceededException(
     val retryAfterSeconds: Long,
-) : WebApplicationException(
+) : ApiException(
+    "RATE_LIMITED",
     "Too many requests",
-    Response.status(429)
-        .header("Retry-After", retryAfterSeconds.coerceAtLeast(1).toString())
-        .build(),
+    Response.Status.TOO_MANY_REQUESTS,
 )
 
 @ApplicationScoped

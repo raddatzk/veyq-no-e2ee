@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import { getMemoryNavigation, type MemoryScopeRoot } from '../../features/memories/api'
 import { useAuthState } from '../../shared/state/useAuthState'
 import ProfileMenu from './ProfileMenu.vue'
 
 const route = useRoute()
+const { t } = useI18n()
 const { authState } = useAuthState()
 const emit = defineEmits<{
   createTenant: []
@@ -26,7 +28,7 @@ const tenantMenuItems = computed(() =>
   canCreateTenant.value
     ? [
         {
-          label: 'Tenant erstellen',
+          label: t('navigation.createTenant'),
           icon: 'pi pi-plus',
           command: () => emit('createTenant')
         }
@@ -48,7 +50,7 @@ async function loadNavigationData() {
     if (sequence !== loadSequence) return
     scopeRoots.value = navigation.scopeRoots
   } catch {
-    if (sequence === loadSequence) sidebarError.value = 'Navigation konnte nicht geladen werden'
+    if (sequence === loadSequence) sidebarError.value = t('navigation.navigationLoadFailed')
   }
 }
 
@@ -61,11 +63,11 @@ function scopeIcon(scopeRoot: MemoryScopeRoot): string {
 }
 
 function scopeLabel(scopeRoot: MemoryScopeRoot): string {
-  return scopeRoot.kind === 'GROUP' ? scopeRoot.displayName : 'Persönlich'
+  return scopeRoot.kind === 'GROUP' ? scopeRoot.displayName : t('navigation.personal')
 }
 
 function scopeMeta(scopeRoot: MemoryScopeRoot): string {
-  return scopeRoot.kind === 'GROUP' ? 'Gruppe' : scopeRoot.displayName
+  return scopeRoot.kind === 'GROUP' ? t('group.group') : scopeRoot.displayName
 }
 
 function toggleTenantMenu(event: MouseEvent) {
@@ -82,13 +84,13 @@ function toggleTenantMenu(event: MouseEvent) {
 
     <section class="sidebar-section">
       <div class="sidebar-section-heading">
-        <p class="sidebar-section-label">Tenant</p>
+        <p class="sidebar-section-label">{{ t('tenant.title') }}</p>
         <button
           v-if="canCreateTenant"
           class="sidebar-section-action"
           type="button"
-          title="Tenant erstellen"
-          aria-label="Tenant erstellen"
+          :title="t('navigation.createTenant')"
+          :aria-label="t('navigation.createTenant')"
           @click="emit('createTenant')"
         >
           <span class="pi pi-plus" />
@@ -114,7 +116,7 @@ function toggleTenantMenu(event: MouseEvent) {
               v-if="tenantMenuItems.length"
               class="sidebar-tenant-menu-button"
               type="button"
-              aria-label="Tenant-Menü öffnen"
+              :aria-label="t('navigation.tenantMenuOpen')"
               @click="toggleTenantMenu"
             >
               <span class="pi pi-chevron-down" />
@@ -137,10 +139,10 @@ function toggleTenantMenu(event: MouseEvent) {
       </div>
     </section>
 
-    <nav v-if="activeTenant" class="sidebar-nav" aria-label="Workspace Navigation">
+    <nav v-if="activeTenant" class="sidebar-nav" :aria-label="t('navigation.workspaceNavigation')">
       <RouterLink :to="`/${activeTenant.name}`" class="sidebar-nav-link">
         <span class="pi pi-home" />
-        <span>Home</span>
+        <span>{{ t('navigation.home') }}</span>
       </RouterLink>
       <RouterLink
         v-if="personalRoot"
@@ -148,17 +150,17 @@ function toggleTenantMenu(event: MouseEvent) {
         class="sidebar-nav-link sidebar-personal-link"
       >
         <span class="pi pi-user" />
-        <span>Persönlich</span>
+        <span>{{ t('navigation.personal') }}</span>
       </RouterLink>
     </nav>
 
     <section class="sidebar-section">
       <div class="sidebar-section-heading">
-        <p class="sidebar-section-label">Favoriten</p>
+        <p class="sidebar-section-label">{{ t('navigation.favorites') }}</p>
         <button
           class="sidebar-section-action"
           type="button"
-          title="Favoriten hinzufügen"
+          :title="t('navigation.addFavorite')"
           disabled
         >
           <span class="pi pi-plus" />
@@ -168,12 +170,12 @@ function toggleTenantMenu(event: MouseEvent) {
 
     <section v-if="activeTenant" class="sidebar-section">
       <div class="sidebar-section-heading">
-        <p class="sidebar-section-label">Gruppen</p>
+        <p class="sidebar-section-label">{{ t('navigation.groups') }}</p>
         <RouterLink
           v-if="activeTenant"
           :to="`/${activeTenant.name}/settings`"
           class="sidebar-section-action"
-          title="Gruppe erstellen"
+          :title="t('navigation.groupCreate')"
         >
           <span class="pi pi-plus" />
         </RouterLink>

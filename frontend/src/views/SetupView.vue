@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -15,6 +16,7 @@ import { useServerState } from '../shared/state/useServerState'
 import { getErrorMessage } from '../shared/utils/errors'
 
 const router = useRouter()
+const { t } = useI18n()
 const { setAuthenticated, setTenants } = useAuthState()
 const { setSetupCompleted } = useServerState()
 const step = ref<'admin' | 'tenant'>('admin')
@@ -67,7 +69,7 @@ async function submitAdmin() {
     setSetupCompleted(true)
     step.value = 'tenant'
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Admin konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('setup.adminCreateFailed'))
   } finally {
     savingAdmin.value = false
     savingAdminWithPasskey.value = false
@@ -90,7 +92,7 @@ async function submitTenant() {
     setTenants(await tenants())
     await router.push(`/${tenant.name}`)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Tenant konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('setup.tenantCreateFailed'))
   }
 }
 
@@ -101,10 +103,10 @@ async function skipTenant() {
 
 <template>
   <Card class="login-card">
-    <template #title>Setup</template>
+    <template #title>{{ t('setup.title') }}</template>
     <template #content>
       <form v-if="step === 'admin'" class="form" @submit.prevent="submitAdmin">
-        <div class="auth-method-switch" role="tablist" aria-label="Setup-Methode">
+        <div class="auth-method-switch" role="tablist" :aria-label="t('setup.method')">
           <button
             type="button"
             :class="{ active: authMethod === 'passkey' }"
@@ -112,7 +114,7 @@ async function skipTenant() {
             :aria-selected="authMethod === 'passkey'"
             @click="authMethod = 'passkey'"
           >
-            Passkey
+            {{ t('auth.passkey') }}
           </button>
           <button
             type="button"
@@ -121,15 +123,15 @@ async function skipTenant() {
             :aria-selected="authMethod === 'password'"
             @click="authMethod = 'password'"
           >
-            Passwort
+            {{ t('common.password') }}
           </button>
         </div>
         <label>
-          E-Mail
+          {{ t('common.email') }}
           <InputText v-model="email" type="email" autocomplete="email" required />
         </label>
         <label v-if="authMethod === 'password'">
-          Passwort
+          {{ t('common.password') }}
           <Password
             v-model="password"
             autocomplete="new-password"
@@ -140,23 +142,23 @@ async function skipTenant() {
           />
         </label>
         <label>
-          Anzeigename
+          {{ t('auth.displayName') }}
           <InputText v-model="displayName" required />
         </label>
         <Message v-if="authMethod === 'passkey'" severity="info" :closable="false">
-          Passkeys sind die empfohlene Anmeldung. Ein Passwort kann spaeter als Fallback gesetzt werden.
+          {{ t('setup.passkeyHint') }}
         </Message>
         <Button
           v-if="authMethod === 'passkey'"
           type="submit"
-          label="Admin mit Passkey erstellen"
+          :label="t('setup.adminCreateWithPasskey')"
           icon="pi pi-key"
           :loading="savingAdminWithPasskey"
         />
         <Button
           v-else
           type="submit"
-          label="Admin erstellen"
+          :label="t('setup.adminCreate')"
           icon="pi pi-user-plus"
           :loading="savingAdmin"
         />
@@ -164,11 +166,11 @@ async function skipTenant() {
 
       <form v-else class="form" @submit.prevent="submitTenant">
         <label>
-          Tenant Name
+          {{ t('setup.tenantName') }}
           <InputText v-model="tenantDisplayName" required />
         </label>
         <label>
-          Permalink
+          {{ t('common.permalink') }}
           <InputText
             :model-value="tenantName"
             autocomplete="off"
@@ -177,14 +179,14 @@ async function skipTenant() {
           />
         </label>
         <label>
-          Domain
+          {{ t('common.domain') }}
           <InputText v-model="tenantDomain" autocomplete="off" required />
         </label>
         <div class="button-row">
-          <Button type="submit" label="Tenant erstellen" icon="pi pi-plus" />
+          <Button type="submit" :label="t('setup.tenantCreate')" icon="pi pi-plus" />
           <Button
             type="button"
-            label="Überspringen"
+            :label="t('setup.skip')"
             severity="secondary"
             outlined
             @click="skipTenant"

@@ -345,7 +345,7 @@ class MemoryShareService @Inject constructor(
                 ?: throw NotFoundException("Media not found")
         } else {
             val normalizedMediaId = mediaId?.trim()?.takeIf { it.isNotBlank() }
-                ?: throw BadRequestException("Cover source is required")
+                ?: throw BadRequestException("Cover source is required", "MEMORY_COVER_SOURCE_REQUIRED")
             mediaRepo.findByTenantAndPublicId(access.share.tenant, normalizedMediaId)
                 ?: throw NotFoundException("Media not found")
         }
@@ -357,10 +357,11 @@ class MemoryShareService @Inject constructor(
         memory.coverMimeType = null
         memory.coverOriginalFilename = null
         memory.coverMedia = media
-        memory.coverCropX = cropX ?: throw BadRequestException("cropX is required")
-        memory.coverCropY = cropY ?: throw BadRequestException("cropY is required")
-        memory.coverCropWidth = cropWidth ?: throw BadRequestException("cropWidth is required")
-        memory.coverCropHeight = cropHeight ?: throw BadRequestException("cropHeight is required")
+        val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight)
+        memory.coverCropX = crop.x
+        memory.coverCropY = crop.y
+        memory.coverCropWidth = crop.width
+        memory.coverCropHeight = crop.height
         return toPublicMemorySummary(memory, access.share)
     }
 
@@ -666,20 +667,20 @@ class MemoryShareService @Inject constructor(
     private fun validateNoChildCollision(parent: Memory?, name: String) {
         if (parent == null) return
         if (memoryRepo.listChildren(parent.tenant, parent).any { it.name == name }) {
-            throw com.veyq.api.auth.ConflictException("Path name already exists")
+            throw com.veyq.api.auth.ConflictException("Path name already exists", "MEMORY_NAME_CONFLICT")
         }
     }
 
     private fun normalizedName(value: String?): String {
-        val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required")
+        val name = value?.trim()?.lowercase() ?: throw BadRequestException("name is required", "MEMORY_NAME_REQUIRED")
         if (name.length !in 1..120 || !name.matches(Regex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$"))) {
-            throw BadRequestException("Invalid name")
+            throw BadRequestException("Invalid name", "MEMORY_NAME_INVALID")
         }
         return name
     }
 
     private fun requiredDisplayName(value: String?): String =
-        value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required")
+        value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required", "MEMORY_DISPLAY_NAME_REQUIRED")
 
     private fun requiredShareDisplayName(value: String?): String {
         val displayName = requiredDisplayName(value)
@@ -688,10 +689,32 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): Pair<LocalDate, LocalDate> {
-        val start = startDate ?: throw BadRequestException("startDate is required")
-        val end = endDate ?: throw BadRequestException("endDate is required")
-        if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate")
+        val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")
+        val end = endDate ?: throw BadRequestException("endDate is required", "MEMORY_DATE_RANGE_REQUIRED")
+        if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate", "MEMORY_DATE_RANGE_INVALID")
         return start to end
+    }
+
+    private fun requiredCoverCrop(
+        x: Double?,
+        y: Double?,
+        width: Double?,
+        height: Double?,
+    ): PublicShareCoverCrop {
+        val crop = PublicShareCoverCrop(
+            x ?: throw BadRequestException("cropX is required", "MEMORY_COVER_CROP_REQUIRED"),
+            y ?: throw BadRequestException("cropY is required", "MEMORY_COVER_CROP_REQUIRED"),
+            width ?: throw BadRequestException("cropWidth is required", "MEMORY_COVER_CROP_REQUIRED"),
+            height ?: throw BadRequestException("cropHeight is required", "MEMORY_COVER_CROP_REQUIRED"),
+        )
+        val values = listOf(crop.x, crop.y, crop.width, crop.height)
+        if (values.any { !it.isFinite() || it < 0.0 || it > 1.0 }) {
+            throw BadRequestException("Cover crop values must be between 0 and 1", "MEMORY_COVER_CROP_INVALID")
+        }
+        if (crop.width <= 0.0 || crop.height <= 0.0 || crop.x + crop.width > 1.000001 || crop.y + crop.height > 1.000001) {
+            throw BadRequestException("Cover crop must fit inside the source image", "MEMORY_COVER_CROP_INVALID")
+        }
+        return crop
     }
 
     private fun deleteMemoryTree(memory: Memory) {
@@ -735,7 +758,7 @@ class MemoryShareService @Inject constructor(
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()
         val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
+        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
         return path
     }
 

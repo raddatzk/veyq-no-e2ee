@@ -88,7 +88,8 @@ class AuthResourceTest {
             .then()
             .statusCode(429)
             .header("Retry-After", notNullValue())
-            .body("error", equalTo("Too many requests"))
+            .body("code", equalTo("RATE_LIMITED"))
+            .body("message", equalTo("Too many requests"))
     }
 
     @Test

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
@@ -12,6 +13,7 @@ import { getErrorMessage } from '../shared/utils/errors'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 
 const loading = ref(true)
@@ -25,7 +27,7 @@ async function confirmEmail() {
   loading.value = true
   error.value = ''
   if (!token.value) {
-    error.value = 'Bestaetigungslink ist ungueltig.'
+    error.value = t('settings.emailConfirmInvalid')
     loading.value = false
     return
   }
@@ -34,7 +36,7 @@ async function confirmEmail() {
     setAuthenticated(user, await tenants())
     confirmedEmail.value = user.email
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Email konnte nicht bestaetigt werden.')
+    error.value = getErrorMessage(unknownError, t('settings.emailConfirmFailed'))
   } finally {
     loading.value = false
   }
@@ -43,22 +45,22 @@ async function confirmEmail() {
 
 <template>
   <Card class="login-card">
-    <template #title>Email bestaetigen</template>
+    <template #title>{{ t('settings.emailConfirmTitle') }}</template>
     <template #content>
       <div v-if="loading" class="memory-loading">
         <ProgressSpinner class="small-spinner" />
-        <span>Email wird bestaetigt...</span>
+        <span>{{ t('settings.emailConfirmLoading') }}</span>
       </div>
       <Message v-else-if="error" severity="error" :closable="false" class="form-message">
         {{ error }}
       </Message>
       <Message v-else severity="success" :closable="false" class="form-message">
-        Email wurde bestaetigt: {{ confirmedEmail }}
+        {{ t('settings.emailConfirmSuccess', { email: confirmedEmail }) }}
       </Message>
       <div class="button-row">
         <Button
           type="button"
-          label="Zu den Einstellungen"
+          :label="t('settings.emailConfirmButton')"
           icon="pi pi-user"
           :disabled="loading || !authState.isAuthenticated"
           @click="router.push('/~me')"

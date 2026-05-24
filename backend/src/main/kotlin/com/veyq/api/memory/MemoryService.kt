@@ -84,7 +84,7 @@ class MemoryService @Inject constructor(
         else null
         val parentFolder = folderTarget?.parentFolder
         val scope = parent?.scope() ?: folderTarget?.scope ?: resolveRequestedRootScope(request.scope)
-        val name = normalizedName(request.name)
+        val name = memoryName(request.name)
         val dateRange = requiredDateRange(request.startDate, request.endDate)
         validateNoCollision(parent, parentFolder, scope, name)
         val memory = Memory().also {
@@ -109,16 +109,16 @@ class MemoryService @Inject constructor(
         request.parentId?.trim()?.takeIf { it.isNotBlank() }?.let { parentId ->
             val parent = resolveVisibleMemory(parentId)
             if (parent.id == memory.id || isDescendantOrSame(parent, memory)) {
-                throw BadRequestException("Cannot move memory into itself")
+                throw BadRequestException("Cannot move memory into itself", "MEMORY_MOVE_INTO_SELF")
             }
             if (!parent.scope().sameAs(memory.scope())) {
-                throw BadRequestException("Cannot move memory between scopes")
+                throw BadRequestException("Cannot move memory between scopes", "MEMORY_SCOPE_INVALID")
             }
             memory.parentMemory = parent
             memory.parentFolder = null
         }
         request.name?.let {
-            val name = normalizedName(it)
+            val name = memoryName(it)
             if (name != memory.name) validateNoCollision(memory.parentMemory, memory.parentFolder, memory.scope(), name)
             memory.name = name
         }
@@ -173,19 +173,19 @@ class MemoryService @Inject constructor(
         val hasUpload = uploadPath != null
         val hasMedia = normalizedMediaId != null
         if (hasUpload && hasMedia) {
-            throw BadRequestException("Exactly one cover source is allowed")
+            throw BadRequestException("Exactly one cover source is allowed", "MEMORY_COVER_SOURCE_INVALID")
         }
         if (!hasUpload && !hasMedia && memory.coverStorageKey == null) {
-            throw BadRequestException("Cover source is required")
+            throw BadRequestException("Cover source is required", "MEMORY_COVER_SOURCE_REQUIRED")
         }
 
         val oldCoverStorageKey = memory.coverStorageKey
         if (uploadPath != null) {
             val size = uploadSize ?: Files.size(uploadPath)
-            if (size <= 0) throw BadRequestException("file must not be empty")
+            if (size <= 0) throw BadRequestException("file must not be empty", "MEDIA_UPLOAD_EMPTY")
             val mediaType = mediaTypeDetector.detect(uploadPath)
-                ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
-            if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported")
+                ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
+            if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
             val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, imageDimensions(uploadPath, mediaType.mimeType))
             val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}-${UUID.randomUUID()}/cover-original"
             writeFile(uploadPath, storageKey)
@@ -203,7 +203,7 @@ class MemoryService @Inject constructor(
             val media = mediaRepo.findByTenantAndPublicId(tenant(), normalizedMediaId)
                 ?: throw NotFoundException("Media not found")
             if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
-            if (!media.mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported")
+            if (!media.mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
             val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, media.imageDimensions())
             memory.coverStorageKey = null
             memory.coverMimeType = null
@@ -216,8 +216,8 @@ class MemoryService @Inject constructor(
             memoryRepo.flush()
             deleteOldExplicitCover(oldCoverStorageKey, null)
         } else {
-            val storageKey = oldCoverStorageKey ?: throw BadRequestException("Cover source is required")
-            val mimeType = memory.coverMimeType ?: throw BadRequestException("Cover source dimensions could not be read")
+            val storageKey = oldCoverStorageKey ?: throw BadRequestException("Cover source is required", "MEMORY_COVER_SOURCE_REQUIRED")
+            val mimeType = memory.coverMimeType ?: throw BadRequestException("Cover source dimensions could not be read", "MEMORY_COVER_DIMENSIONS_UNREADABLE")
             val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, imageDimensions(storagePath(storageKey), mimeType))
             memory.coverCropX = crop.x
             memory.coverCropY = crop.y
@@ -270,19 +270,22 @@ class MemoryService @Inject constructor(
             .any { it.name == name && it.scope().sameAs(scope) }
         val folderCollision = parentMemory == null && folderRepo.listChildren(tenant(), parentFolder)
             .any { it.name == name && it.hasScope(scope) }
-        if (memoryCollision || folderCollision) throw ConflictException("Path name already exists")
+        if (memoryCollision || folderCollision) throw ConflictException("Path name already exists", "MEMORY_NAME_CONFLICT")
     }
+
+    private fun memoryName(value: String?): String =
+        normalizedName(value, requiredCode = "MEMORY_NAME_REQUIRED", invalidCode = "MEMORY_NAME_INVALID")
 
     private fun resolveRequestedRootScope(scope: MemoryScopeRequest?): LibraryScopeKey =
         when (scope?.type?.trim()?.uppercase() ?: "TENANT") {
             "TENANT" -> LibraryScopeKey.Tenant
             "GROUP" -> {
                 val groupName = scope?.groupName?.trim()?.takeIf { it.isNotBlank() }
-                    ?: throw BadRequestException("groupName is required")
+                    ?: throw BadRequestException("groupName is required", "MEMORY_SCOPE_INVALID")
                 LibraryScopeKey.Group(resolveGroup(groupName))
             }
             "USER" -> LibraryScopeKey.User(user())
-            else -> throw BadRequestException("Invalid scope type")
+            else -> throw BadRequestException("Invalid scope type", "MEMORY_SCOPE_INVALID")
         }.also {
             if (!isScopeVisible(it)) throw NotFoundException("Scope not found")
         }
@@ -291,7 +294,7 @@ class MemoryService @Inject constructor(
         groupRepo.findByTenantAndName(tenant(), name) ?: throw NotFoundException("Group not found")
 
     private fun requiredDisplayName(value: String?): String =
-        value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required")
+        value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required", "MEMORY_DISPLAY_NAME_REQUIRED")
 
     private fun toSummary(memory: Memory): MemorySummary =
         MemorySummary(
@@ -311,9 +314,9 @@ class MemoryService @Inject constructor(
         )
 
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): MemoryDateRange {
-        val start = startDate ?: throw BadRequestException("startDate is required")
-        val end = endDate ?: throw BadRequestException("endDate is required")
-        if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate")
+        val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")
+        val end = endDate ?: throw BadRequestException("endDate is required", "MEMORY_DATE_RANGE_REQUIRED")
+        if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate", "MEMORY_DATE_RANGE_INVALID")
         return MemoryDateRange(start, end)
     }
 
@@ -325,24 +328,24 @@ class MemoryService @Inject constructor(
         source: Dimension,
     ): MemoryCoverCrop {
         val crop = MemoryCoverCrop(
-            x ?: throw BadRequestException("cropX is required"),
-            y ?: throw BadRequestException("cropY is required"),
-            width ?: throw BadRequestException("cropWidth is required"),
-            height ?: throw BadRequestException("cropHeight is required"),
+            x ?: throw BadRequestException("cropX is required", "MEMORY_COVER_CROP_REQUIRED"),
+            y ?: throw BadRequestException("cropY is required", "MEMORY_COVER_CROP_REQUIRED"),
+            width ?: throw BadRequestException("cropWidth is required", "MEMORY_COVER_CROP_REQUIRED"),
+            height ?: throw BadRequestException("cropHeight is required", "MEMORY_COVER_CROP_REQUIRED"),
         )
         val values = listOf(crop.x, crop.y, crop.width, crop.height)
         if (values.any { !it.isFinite() || it < 0.0 || it > 1.0 }) {
-            throw BadRequestException("Cover crop values must be between 0 and 1")
+            throw BadRequestException("Cover crop values must be between 0 and 1", "MEMORY_COVER_CROP_INVALID")
         }
         if (crop.width <= 0.0 || crop.height <= 0.0) {
-            throw BadRequestException("Cover crop dimensions must be greater than 0")
+            throw BadRequestException("Cover crop dimensions must be greater than 0", "MEMORY_COVER_CROP_INVALID")
         }
         if (crop.x + crop.width > 1.000001 || crop.y + crop.height > 1.000001) {
-            throw BadRequestException("Cover crop must fit inside the source image")
+            throw BadRequestException("Cover crop must fit inside the source image", "MEMORY_COVER_CROP_INVALID")
         }
         val cropAspectRatio = (crop.width * source.width.toDouble()) / (crop.height * source.height.toDouble())
         if (abs(cropAspectRatio - COVER_ASPECT_RATIO) > COVER_ASPECT_TOLERANCE) {
-            throw BadRequestException("Cover crop must be 16:9")
+            throw BadRequestException("Cover crop must be 16:9", "MEMORY_COVER_CROP_INVALID")
         }
         return crop
     }
@@ -444,7 +447,7 @@ class MemoryService @Inject constructor(
         val width = metadata.imageWidth
         val height = metadata.imageHeight
         if (width == null || height == null || width <= 0 || height <= 0) {
-            throw BadRequestException("Cover source dimensions could not be read")
+            throw BadRequestException("Cover source dimensions could not be read", "MEMORY_COVER_DIMENSIONS_UNREADABLE")
         }
         return Dimension(width, height)
     }
@@ -482,7 +485,7 @@ class MemoryService @Inject constructor(
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()
         val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
+        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
         return path
     }
 

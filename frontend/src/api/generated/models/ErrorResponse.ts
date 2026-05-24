@@ -20,7 +20,13 @@ import { mapValues } from '../runtime';
  */
 export interface ErrorResponse {
     /**
-     * 
+     * Stable machine-readable error code.
+     * @type {string}
+     * @memberof ErrorResponse
+     */
+    code: string;
+    /**
+     * English fallback message. Frontends should prefer localized text for the code.
      * @type {string}
      * @memberof ErrorResponse
      */
@@ -31,6 +37,7 @@ export interface ErrorResponse {
  * Check if a given object implements the ErrorResponse interface.
  */
 export function instanceOfErrorResponse(value: object): value is ErrorResponse {
+    if (!('code' in value) || value['code'] === undefined) return false;
     if (!('message' in value) || value['message'] === undefined) return false;
     return true;
 }
@@ -45,6 +52,7 @@ export function ErrorResponseFromJSONTyped(json: any, ignoreDiscriminator: boole
     }
     return {
         
+        'code': json['code'],
         'message': json['message'],
     };
 }
@@ -60,6 +68,7 @@ export function ErrorResponseToJSONTyped(value?: ErrorResponse | null, ignoreDis
 
     return {
         
+        'code': value['code'],
         'message': value['message'],
     };
 }

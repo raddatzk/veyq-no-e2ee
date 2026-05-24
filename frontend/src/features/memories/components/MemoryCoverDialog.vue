@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   saved: [memory: Memory]
 }>()
 
+const { t } = useI18n()
 const cropWidth = 320
 const cropHeight = 180
 
@@ -85,7 +87,7 @@ async function saveCover() {
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Cover konnte nicht gespeichert werden')
+    error.value = getErrorMessage(unknownError, t('memory.coverSaveFailed'))
   } finally {
     loading.value = false
   }
@@ -242,7 +244,7 @@ function coverSourceRequest() {
   if (selectedFile.value) return { file: selectedFile.value }
   if (selectedMedia.value) return { mediaId: selectedMedia.value.id }
   if (sourceUrl.value && props.memory.coverUrl && !props.memory.coverMediaId) return {}
-  throw new Error('Cover source is missing')
+  throw new Error(t('memory.coverSourceMissing'))
 }
 
 async function removeCover() {
@@ -255,7 +257,7 @@ async function removeCover() {
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Cover konnte nicht entfernt werden')
+    error.value = getErrorMessage(unknownError, t('memory.coverRemoveFailed'))
   } finally {
     loading.value = false
   }
@@ -263,22 +265,21 @@ async function removeCover() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Cover wählen" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('memory.coverChoose')" modal class="tenant-dialog">
     <div class="form">
       <p class="memory-dialog-copy">
-        Wähle ein Bild aus der Galerie oder lade ein neues Bild hoch. Der 16:9-Ausschnitt wird
-        als Cover-Einstellung gespeichert.
+        {{ t('memory.coverCopy') }}
       </p>
       <FileUpload
         mode="basic"
         accept="image/*"
-        choose-label="Bild auswählen"
+        :choose-label="t('memory.coverUpload')"
         custom-upload
         @select="selectCover"
       />
       <strong v-if="sourceName" class="memory-dialog-copy">{{ sourceName }}</strong>
 
-      <div v-if="imageMedia.length" class="memory-cover-picker" aria-label="Bilder aus der Galerie">
+      <div v-if="imageMedia.length" class="memory-cover-picker" :aria-label="t('memory.coverGallery')">
         <button
           v-for="mediaItem in imageMedia"
           :key="mediaItem.id"
@@ -315,7 +316,7 @@ async function removeCover() {
           />
         </div>
         <label class="memory-cover-zoom">
-          <span>Zoom</span>
+          <span>{{ t('memory.zoom') }}</span>
           <input
             type="range"
             min="1"
@@ -332,7 +333,7 @@ async function removeCover() {
       <div class="button-row">
         <Button
           type="button"
-          label="Cover speichern"
+          :label="t('memory.coverSave')"
           icon="pi pi-image"
           :disabled="!imageLoaded"
           :loading="loading"
@@ -340,7 +341,7 @@ async function removeCover() {
         />
         <Button
           type="button"
-          label="Cover entfernen"
+          :label="t('memory.coverRemove')"
           icon="pi pi-times"
           severity="secondary"
           outlined
@@ -350,7 +351,7 @@ async function removeCover() {
         />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           text
           @click="visible = false"

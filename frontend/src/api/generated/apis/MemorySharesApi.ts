@@ -120,7 +120,7 @@ export interface MemorySharesApiInterface {
     updateMemoryShareRequestOpts(requestParameters: UpdateMemoryShareOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
+     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value. Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
      * @summary Update a memory share
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} shareId Public share id.
@@ -132,7 +132,7 @@ export interface MemorySharesApiInterface {
     updateMemoryShareRaw(requestParameters: UpdateMemoryShareOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryShareSummary>>;
 
     /**
-     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
+     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value. Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
      * Update a memory share
      */
     updateMemoryShare(requestParameters: UpdateMemoryShareOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryShareSummary>;
@@ -310,7 +310,7 @@ export class MemorySharesApi extends runtime.BaseAPI implements MemorySharesApiI
     }
 
     /**
-     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
+     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value. Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
      * Update a memory share
      */
     async updateMemoryShareRaw(requestParameters: UpdateMemoryShareOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryShareSummary>> {
@@ -321,7 +321,7 @@ export class MemorySharesApi extends runtime.BaseAPI implements MemorySharesApiI
     }
 
     /**
-     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
+     * Updates public share role, enabled state, internal name or password. Missing `name` or `password` fields leave the current value unchanged. `null` or an empty string removes the corresponding name/password value. Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the share tenant and see the root Memory.
      * Update a memory share
      */
     async updateMemoryShare(requestParameters: UpdateMemoryShareOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryShareSummary> {

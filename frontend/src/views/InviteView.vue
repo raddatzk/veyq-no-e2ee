@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -13,6 +14,7 @@ import { getErrorMessage } from '../shared/utils/errors'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const displayName = ref('')
 const password = ref('')
@@ -26,7 +28,7 @@ const requiresPassword = computed(() => !authState.isAuthenticated)
 async function submit() {
   error.value = ''
   if (!Number.isInteger(userId.value) || !token.value) {
-    error.value = 'Einladungslink ist ungueltig.'
+    error.value = t('auth.invalidInviteLink')
     return
   }
   loading.value = true
@@ -44,11 +46,11 @@ async function submit() {
       await router.push(entrypoint.tenants[0] ? `/${entrypoint.tenants[0].name}` : '/')
     }
   } catch (caught) {
-    if (!authState.isAuthenticated && getErrorMessage(caught, '').includes('logged in')) {
+    if (!authState.isAuthenticated && getErrorMessage(caught, '').includes(t('auth.loggedInRequiredMarker'))) {
       await router.push({ name: 'login', query: { redirect: route.fullPath } })
       return
     }
-    error.value = getErrorMessage(caught, 'Einladung konnte nicht angenommen werden.')
+    error.value = getErrorMessage(caught, t('auth.inviteAcceptFailed'))
   } finally {
     loading.value = false
   }
@@ -57,10 +59,10 @@ async function submit() {
 
 <template>
   <Card class="login-card">
-    <template #title>Einladung annehmen</template>
+    <template #title>{{ t('auth.inviteTitle') }}</template>
     <template #content>
       <form class="form" @submit.prevent="submit">
-        <div v-if="requiresPassword" class="auth-method-switch" role="tablist" aria-label="Anmeldemethode">
+        <div v-if="requiresPassword" class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
           <button
             type="button"
             :class="{ active: authMethod === 'passkey' }"
@@ -68,7 +70,7 @@ async function submit() {
             :aria-selected="authMethod === 'passkey'"
             @click="authMethod = 'passkey'"
           >
-            Passkey
+            {{ t('auth.passkey') }}
           </button>
           <button
             type="button"
@@ -77,15 +79,15 @@ async function submit() {
             :aria-selected="authMethod === 'password'"
             @click="authMethod = 'password'"
           >
-            Passwort
+            {{ t('common.password') }}
           </button>
         </div>
         <label v-if="requiresPassword">
-          Anzeigename
+          {{ t('auth.displayName') }}
           <InputText v-model="displayName" autocomplete="name" required />
         </label>
         <label v-if="requiresPassword && authMethod === 'password'">
-          Passwort
+          {{ t('common.password') }}
           <Password
             v-model="password"
             autocomplete="new-password"
@@ -100,9 +102,9 @@ async function submit() {
           :label="
             requiresPassword
               ? authMethod === 'passkey'
-                ? 'Account mit Passkey erstellen'
-                : 'Passwort setzen'
-              : 'Einladung annehmen'
+                ? t('auth.accountCreateWithPasskey')
+                : t('auth.setPassword')
+              : t('auth.acceptInvite')
           "
           :icon="requiresPassword && authMethod === 'passkey' ? 'pi pi-key' : 'pi pi-sign-in'"
           :loading="loading"

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { Memory, MemoryFolder, MemoryNavigationResponse } from '../api'
 import MemoryCard from './MemoryCard.vue'
+
+const { t } = useI18n()
 
 defineProps<{
   navigation: MemoryNavigationResponse
@@ -19,7 +22,7 @@ defineEmits<{
   <div class="memory-route-surface">
     <section class="memory-section">
       <div class="memory-section-header">
-        <h2>Memories</h2>
+        <h2>{{ t('memory.memories') }}</h2>
         <span>{{ memories.length }}</span>
       </div>
       <div class="memory-card-grid memory-card-grid-memories">
@@ -35,14 +38,14 @@ defineEmits<{
           @click="$emit('createMemory')"
         >
           <span class="pi pi-plus" />
-          <strong>Memory erstellen</strong>
+          <strong>{{ t('memory.create') }}</strong>
         </button>
       </div>
     </section>
 
     <section class="memory-section">
       <div class="memory-section-header">
-        <h2>Ordner</h2>
+        <h2>{{ t('memory.folders') }}</h2>
         <span>{{ navigation.folders.length }}</span>
       </div>
       <div class="memory-card-grid">
@@ -58,7 +61,7 @@ defineEmits<{
         </button>
         <button class="memory-create-card" type="button" @click="$emit('createFolder')">
           <span class="pi pi-plus" />
-          <strong>Ordner erstellen</strong>
+          <strong>{{ t('memory.folderCreate') }}</strong>
         </button>
       </div>
     </section>

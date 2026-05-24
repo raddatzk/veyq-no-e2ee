@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -16,6 +17,7 @@ import { memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const { authState } = useAuthState()
 
 const tenantName = computed(() => String(route.params.tenantName || ''))
@@ -78,7 +80,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
 
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Memories werden geladen...</span>
+      <span>{{ t('memory.loading') }}</span>
     </div>
 
     <MemoryDetail
@@ -105,7 +107,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
 
     <div v-if="navigation || memory" class="memory-refresh">
       <Button
-        label="Aktualisieren"
+        :label="t('memory.refresh')"
         icon="pi pi-refresh"
         severity="secondary"
         outlined

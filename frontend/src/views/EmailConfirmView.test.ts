@@ -50,7 +50,7 @@ describe('EmailConfirmView', () => {
 
     expect(confirmMyEmailChangeMock).toHaveBeenCalledWith('abc123')
     expect(authState.user?.email).toBe('changed@example.test')
-    expect(wrapper.text()).toContain('Email wurde bestaetigt: changed@example.test')
+    expect(wrapper.text()).toContain('E-Mail wurde bestätigt: changed@example.test')
   })
 })
 

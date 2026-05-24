@@ -2,6 +2,7 @@ import { type ComputedRef, onBeforeUnmount, type Ref, watch } from 'vue'
 import type { MenuItem } from 'primevue/menuitem'
 import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../../../composables/useWorkspaceToolbar'
 import type { Memory, MemoryNavigationResponse } from '../api'
+import { i18n } from '../../../i18n'
 
 type ToolbarOptions = {
   navigation: Ref<MemoryNavigationResponse | null>
@@ -23,7 +24,8 @@ export function useMemoryToolbar(options: ToolbarOptions) {
       options.loading,
       options.tenantName,
       options.tenantLabel,
-      options.routePath
+      options.routePath,
+      i18n.global.locale
     ],
     updateToolbar,
     { immediate: true }
@@ -46,7 +48,7 @@ export function useMemoryToolbar(options: ToolbarOptions) {
         [
           {
             key: 'upload',
-            label: 'Hochladen',
+            label: i18n.global.t('memory.upload'),
             icon: 'pi pi-upload',
             command: options.openUpload
           }
@@ -62,14 +64,14 @@ export function useMemoryToolbar(options: ToolbarOptions) {
     }
 
     const breadcrumbs = options.navigation.value.breadcrumbs.map((breadcrumb) => ({
-      label: breadcrumb.label,
+        label: breadcrumb.label,
       command: () => options.navigateToPath(breadcrumb.path)
     }))
 
     setWorkspaceToolbar(breadcrumbs, [
       {
         key: 'settings',
-        label: 'Einstellungen',
+        label: i18n.global.t('settings.title'),
         icon: 'pi pi-cog',
         severity: 'secondary',
         outlined: true,
@@ -102,6 +104,6 @@ export function memoryBreadcrumbs(
 
 function breadcrumbSegmentLabel(segment: string, memory: Memory): string {
   if (segment.startsWith('@')) return segment
-  if (segment.startsWith('~') && memory.scope?.type === 'USER') return 'Persönlich'
+  if (segment.startsWith('~') && memory.scope?.type === 'USER') return i18n.global.t('navigation.personal')
   return segment
 }

@@ -71,7 +71,7 @@ class MediaService @Inject constructor(
     @Transactional
     fun uploadMemoryMedia(memoryId: String, file: FileUpload?, title: String?): MemoryMediaSummary {
         val memory = resolveVisibleMemory(memoryId)
-        val upload = file ?: throw BadRequestException("file is required")
+        val upload = file ?: throw BadRequestException("file is required", "MEDIA_UPLOAD_REQUIRED")
         return uploadMemoryMediaInternal(
             memory = memory,
             uploadPath = upload.uploadedFile(),
@@ -114,9 +114,9 @@ class MediaService @Inject constructor(
         }
 
         val size = Files.size(uploadPath)
-        if (size <= 0) throw BadRequestException("file must not be empty")
+        if (size <= 0) throw BadRequestException("file must not be empty", "MEDIA_UPLOAD_EMPTY")
         val mediaType = mediaTypeDetector.detect(uploadPath)
-            ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported")
+            ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported", "MEDIA_UPLOAD_TYPE_UNSUPPORTED")
 
         val media = Media().also {
             it.tenant = memory.tenant
@@ -358,7 +358,7 @@ class MediaService @Inject constructor(
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()
         val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
+        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
         return path
     }
 

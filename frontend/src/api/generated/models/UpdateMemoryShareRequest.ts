@@ -40,7 +40,7 @@ export interface UpdateMemoryShareRequest {
      */
     role?: MemoryShareRole;
     /**
-     * 
+     * Set to `false` to revoke the share link. Managed share deletion is not supported in V1.
      * @type {boolean}
      * @memberof UpdateMemoryShareRequest
      */

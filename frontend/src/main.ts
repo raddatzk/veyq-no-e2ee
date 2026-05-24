@@ -4,6 +4,7 @@ import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import router from './router'
 import { bootstrap as bootstrapClient } from './api/entrypointClient'
+import { i18n } from './i18n'
 import { SetupRequiredError } from './shared/api/httpClient'
 import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
@@ -41,6 +42,7 @@ async function bootstrap() {
         }
       }
     })
+    .use(i18n)
     .use(router)
 
   router.isReady().then(() => {

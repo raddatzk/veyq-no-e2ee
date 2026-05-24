@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const { t } = useI18n()
 const { authState } = useAuthState()
 const cropWidth = 320
 const cropHeight = 180
@@ -50,7 +52,7 @@ const dragging = ref(false)
 const dragStart = ref({ pointerId: 0, x: 0, y: 0, offsetX: 0, offsetY: 0 })
 const isChildMemory = computed(() => Boolean(props.parentMemoryId))
 const isTenantRootCreate = computed(() => !isChildMemory.value && (!props.folderPath || props.folderPath === '/'))
-const title = computed(() => (isChildMemory.value ? 'Unter-Memory erstellen' : 'Memory erstellen'))
+const title = computed(() => (isChildMemory.value ? t('memory.childCreate') : t('memory.create')))
 const imageLoaded = computed(() => naturalWidth.value > 0 && naturalHeight.value > 0)
 const canSubmit = computed(() =>
   Boolean(displayName.value.trim() && name.value.trim() && isValidMemoryDateRange(startDate.value, endDate.value))
@@ -130,7 +132,7 @@ async function submit() {
     visible.value = false
     emit('saved')
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Memory konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('memory.createFailed'))
   } finally {
     loading.value = false
   }
@@ -252,11 +254,11 @@ function currentCoverCrop() {
   <Dialog v-model:visible="visible" :header="title" modal class="tenant-dialog">
     <form class="form" @submit.prevent="submit">
       <label>
-        Name
+        {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
       </label>
       <label>
-        Permalink
+        {{ t('common.permalink') }}
         <InputText
           :model-value="name"
           autocomplete="off"
@@ -265,15 +267,15 @@ function currentCoverCrop() {
         />
       </label>
       <label>
-        Startdatum
+        {{ t('memory.startDate') }}
         <InputText v-model="startDate" type="date" required />
       </label>
       <label>
-        Enddatum
+        {{ t('memory.endDate') }}
         <InputText v-model="endDate" type="date" required />
       </label>
       <label v-if="isTenantRootCreate">
-        Bereich
+        {{ t('memory.area') }}
         <Select
           v-model="scopeValue"
           :options="scopeOptions"
@@ -283,11 +285,11 @@ function currentCoverCrop() {
         />
       </label>
       <div class="memory-dialog-cover">
-        <span>Cover</span>
+        <span>{{ t('memory.cover') }}</span>
         <FileUpload
           mode="basic"
           accept="image/*"
-          choose-label="Cover auswählen"
+          :choose-label="t('memory.coverChooseFile')"
           custom-upload
           @select="selectCover"
         />
@@ -305,14 +307,14 @@ function currentCoverCrop() {
           <img
             ref="coverImageElement"
             :src="coverSourceUrl"
-            :alt="selectedCoverFile?.name || 'Cover'"
+            :alt="selectedCoverFile?.name || t('memory.cover')"
             :style="displayedCoverStyle"
             draggable="false"
             @load="loadCoverImage"
           />
         </div>
         <label class="memory-cover-zoom">
-          <span>Zoom</span>
+          <span>{{ t('memory.zoom') }}</span>
           <input
             type="range"
             min="1"
@@ -328,14 +330,14 @@ function currentCoverCrop() {
       <div class="button-row">
         <Button
           type="submit"
-          label="Erstellen"
+          :label="t('common.create')"
           icon="pi pi-plus"
           :disabled="!canSubmit"
           :loading="loading"
         />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="visible = false"

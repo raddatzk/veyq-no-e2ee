@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -17,6 +18,7 @@ import {
 } from '../api'
 import { authState } from '../../../authState'
 
+const { locale, t } = useI18n()
 const settings = ref<UserSettingsResponse | null>(null)
 const displayName = ref('')
 const permalink = ref('')
@@ -46,7 +48,7 @@ async function loadSettings() {
     passkeys.value = nextPasskeys.passkeys
   } catch (caught) {
     settings.value = null
-    error.value = caught instanceof Error ? caught.message : 'User-Einstellungen konnten nicht geladen werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.profileLoadFailed')
   } finally {
     loading.value = false
   }
@@ -65,10 +67,10 @@ async function saveProfile() {
     applySettings(nextSettings)
     profileMessage.value =
       nextSettings.pendingEmail && nextSettings.pendingEmail !== nextSettings.email
-        ? 'Profil wurde gespeichert. Bitte bestaetige die neue Email-Adresse.'
-        : 'Profil wurde gespeichert.'
+        ? t('profile.profileSavePendingEmail')
+        : t('profile.profileSaveSuccess')
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : 'Profil konnte nicht gespeichert werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.profileSaveFailed')
   } finally {
     savingProfile.value = false
   }
@@ -85,9 +87,9 @@ async function savePassword() {
     })
     currentPassword.value = ''
     newPassword.value = ''
-    passwordMessage.value = 'Passwort wurde geändert.'
+    passwordMessage.value = t('profile.passwordChangeSuccess')
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : 'Passwort konnte nicht geändert werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.passwordChangeFailed')
   } finally {
     savingPassword.value = false
   }
@@ -107,9 +109,9 @@ async function addPasskey() {
       authState.user.passkeyCount = passkeys.value.length
     }
     passkeyName.value = defaultPasskeyName()
-    passkeyMessage.value = 'Passkey wurde hinzugefügt.'
+    passkeyMessage.value = t('profile.passkeyAddSuccess')
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : 'Passkey konnte nicht hinzugefügt werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.passkeyAddFailed')
   } finally {
     savingPasskey.value = false
   }
@@ -128,9 +130,9 @@ async function removePasskey(passkey: PasskeySummary) {
     if (authState.user) {
       authState.user.passkeyCount = passkeys.value.length
     }
-    passkeyMessage.value = 'Passkey wurde gelöscht.'
+    passkeyMessage.value = t('profile.passkeyDeleteSuccess')
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : 'Passkey konnte nicht gelöscht werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.passkeyDeleteFailed')
   } finally {
     deletingPasskeyId.value = null
   }
@@ -150,81 +152,81 @@ function applySettings(nextSettings: UserSettingsResponse) {
 }
 
 function formatTimestamp(value?: string) {
-  if (!value) return 'Noch nicht verwendet'
-  return new Intl.DateTimeFormat('de-DE', {
+  if (!value) return t('profile.neverUsed')
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(new Date(value))
 }
 
 function defaultPasskeyName() {
-  return 'Dieses Gerät'
+  return t('profile.defaultPasskeyName')
 }
 </script>
 
 <template>
   <section class="settings-panel">
-    <h1>Meine Einstellungen</h1>
-    <p>Profil und Anmeldung</p>
+    <h1>{{ t('profile.mySettings') }}</h1>
+    <p>{{ t('profile.profileAndLogin') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>User-Einstellungen werden geladen...</span>
+      <span>{{ t('settings.loading') }}</span>
     </div>
 
     <template v-else-if="settings">
       <form class="form settings-form" @submit.prevent="saveProfile">
         <label>
-          <span>Anzeigename</span>
+          <span>{{ t('auth.displayName') }}</span>
           <InputText v-model="displayName" autocomplete="name" />
         </label>
         <label>
-          <span>Permalink</span>
+          <span>{{ t('common.permalink') }}</span>
           <InputText v-model="permalink" autocomplete="off" />
         </label>
         <label>
-          <span>Email</span>
+          <span>{{ t('common.email') }}</span>
           <InputText v-model="email" type="email" autocomplete="email" />
         </label>
         <Message v-if="settings.pendingEmail" severity="info" :closable="false">
-          Neue Email wartet auf Bestaetigung: {{ settings.pendingEmail }}
+          {{ t('profile.emailPending', { email: settings.pendingEmail }) }}
         </Message>
         <div class="button-row">
-          <Button type="submit" label="Speichern" icon="pi pi-save" :loading="savingProfile" />
+          <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="savingProfile" />
         </div>
         <Message v-if="profileMessage" severity="success" :closable="false">{{ profileMessage }}</Message>
       </form>
 
       <form class="form settings-form" @submit.prevent="savePassword">
         <label>
-          <span>Aktuelles Passwort</span>
+          <span>{{ t('settings.currentPassword') }}</span>
           <Password v-model="currentPassword" autocomplete="current-password" toggle-mask :feedback="false" />
         </label>
         <label>
-          <span>Neues Passwort</span>
+          <span>{{ t('auth.newPassword') }}</span>
           <Password v-model="newPassword" autocomplete="new-password" toggle-mask />
         </label>
         <div class="button-row">
-          <Button type="submit" label="Passwort ändern" icon="pi pi-key" :loading="savingPassword" />
+          <Button type="submit" :label="t('profile.passwordChange')" icon="pi pi-key" :loading="savingPassword" />
         </div>
         <Message v-if="passwordMessage" severity="success" :closable="false">{{ passwordMessage }}</Message>
       </form>
 
       <section class="form settings-form">
         <div>
-          <h2>Passkeys</h2>
-          <p>Empfohlen</p>
+          <h2>{{ t('profile.passkeys') }}</h2>
+          <p>{{ t('profile.recommended') }}</p>
         </div>
         <Message v-if="passkeys.length === 0" severity="info" :closable="false">
-          Passkeys sind die empfohlene Anmeldung fuer Veyq.
+          {{ t('profile.passkeyHint') }}
         </Message>
         <div v-if="passkeys.length" class="passkey-list">
           <div v-for="passkey in passkeys" :key="passkey.passkeyId" class="passkey-row">
             <div>
               <strong>{{ passkey.displayName }}</strong>
-              <span>Erstellt: {{ formatTimestamp(passkey.createdAt) }}</span>
-              <span>Zuletzt verwendet: {{ formatTimestamp(passkey.lastUsedAt) }}</span>
+              <span>{{ t('profile.createdAt') }}: {{ formatTimestamp(passkey.createdAt) }}</span>
+              <span>{{ t('profile.lastUsedAt') }}: {{ formatTimestamp(passkey.lastUsedAt) }}</span>
             </div>
             <Button
               type="button"
@@ -232,19 +234,19 @@ function defaultPasskeyName() {
               severity="danger"
               text
               :loading="deletingPasskeyId === passkey.passkeyId"
-              aria-label="Passkey löschen"
+              :aria-label="t('profile.deletePasskey')"
               @click="removePasskey(passkey)"
             />
           </div>
         </div>
         <label>
-          <span>Name</span>
+          <span>{{ t('common.name') }}</span>
           <InputText v-model="passkeyName" autocomplete="off" />
         </label>
         <div class="button-row">
           <Button
             type="button"
-            label="Passkey hinzufügen"
+            :label="t('profile.addPasskey')"
             icon="pi pi-key"
             :loading="savingPasskey"
             @click="addPasskey"

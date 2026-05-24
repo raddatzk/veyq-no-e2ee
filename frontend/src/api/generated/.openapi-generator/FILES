@@ -59,11 +59,9 @@ models/MemoryShareRole.ts
 models/MemoryShareSummary.ts
 models/MemorySummary.ts
 models/MoveFolderRequest.ts
-models/PublicUserSummary.ts
 models/PasskeyAssertionResponse.ts
 models/PasskeyAttestationResponse.ts
 models/PasskeyInvitationOptionsRequest.ts
-models/PasskeyLoginOptionsRequest.ts
 models/PasskeyLoginRequest.ts
 models/PasskeyRegistrationRequest.ts
 models/PasskeySummary.ts

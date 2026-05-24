@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   updateMemoryMediaMetadata,
   type MemoryMedia,
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   deleted: [media: MemoryMedia]
 }>()
 
+const { locale, t } = useI18n()
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
 const previewUrl = computed(() =>
   props.media.previewUrl ? `${API_BASE}${props.media.previewUrl}` : null
@@ -79,13 +81,13 @@ const canEditMetadata = computed(() => props.canEditMetadata !== false)
 const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMedia))
 const metadataRows = computed(() =>
   [
-    { label: 'Aufnahmezeit', value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
-    { label: 'Uploadzeit', value: formatDate(props.media.createdAt) },
-    { label: 'Kamera', value: camera.value },
-    { label: 'Objektiv', value: props.media.lensModel || '' },
-    { label: 'Bildgröße', value: dimensions.value },
-    { label: 'Dateigröße', value: formatBytes(props.media.sizeBytes) },
-    { label: 'MIME-Type', value: props.media.mimeType }
+    { label: t('media.capturedAt'), value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
+    { label: t('media.uploadedAt'), value: formatDate(props.media.createdAt) },
+    { label: t('media.camera'), value: camera.value },
+    { label: t('media.lens'), value: props.media.lensModel || '' },
+    { label: t('media.dimensions'), value: dimensions.value },
+    { label: t('media.fileSize'), value: formatBytes(props.media.sizeBytes) },
+    { label: t('media.mimeType'), value: props.media.mimeType }
   ].filter((row) => row.value)
 )
 
@@ -125,14 +127,14 @@ function safeFilename(value: string): string {
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('de-DE', {
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(new Date(value))
 }
 
 function formatBytes(value: number): string {
-  return new Intl.NumberFormat('de-DE', {
+  return new Intl.NumberFormat(locale.value === 'en' ? 'en-US' : 'de-DE', {
     style: 'unit',
     unit: 'byte',
     unitDisplay: 'short'
@@ -167,7 +169,7 @@ async function saveCapturedAt() {
     emit('updated', updated)
     isEditingCapturedAt.value = false
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : 'Aufnahmezeit konnte nicht gespeichert werden'
+    saveError.value = error instanceof Error ? error.message : t('media.capturedAtSaveFailed')
   } finally {
     isSaving.value = false
   }
@@ -181,7 +183,7 @@ async function deleteCurrentMedia() {
     await props.deleteMedia(props.media.id, props.media.memoryId)
     emit('deleted', props.media)
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : 'Medium konnte nicht gelöscht werden'
+    saveError.value = error instanceof Error ? error.message : t('media.deleteFailed')
   } finally {
     isSaving.value = false
   }
@@ -218,14 +220,14 @@ function onSheetPointerUp(event: PointerEvent) {
           class="lightbox-icon-button"
           :href="mediaUrl"
           :download="downloadName"
-          aria-label="Medium herunterladen"
+          :aria-label="t('media.download')"
         >
           <span class="pi pi-download" />
         </a>
         <button
           class="lightbox-icon-button"
           type="button"
-          aria-label="Lightbox schließen"
+          :aria-label="t('media.closeLightbox')"
           @click="$emit('close')"
         >
           <span class="pi pi-times" />
@@ -238,7 +240,7 @@ function onSheetPointerUp(event: PointerEvent) {
         <button
           class="lightbox-nav lightbox-nav-previous"
           type="button"
-          aria-label="Vorheriges Medium"
+          :aria-label="t('media.previous')"
           :disabled="!canShowPrevious"
           @click="$emit('previous')"
         >
@@ -261,7 +263,7 @@ function onSheetPointerUp(event: PointerEvent) {
         <button
           class="lightbox-nav lightbox-nav-next"
           type="button"
-          aria-label="Nächstes Medium"
+          :aria-label="t('media.next')"
           :disabled="!canShowNext"
           @click="$emit('next')"
         >
@@ -279,11 +281,11 @@ function onSheetPointerUp(event: PointerEvent) {
           class="media-lightbox-sheet-handle"
           type="button"
           :aria-expanded="isDetailsOpen"
-          aria-label="Bildinformationen ein- oder ausklappen"
+          :aria-label="t('media.toggleInfo')"
           @click="isDetailsOpen = !isDetailsOpen"
         />
         <div class="media-lightbox-details-header">
-          <h2>Informationen</h2>
+          <h2>{{ t('media.information') }}</h2>
           <button
             v-if="canDeleteMedia"
             class="lightbox-text-button"
@@ -291,7 +293,7 @@ function onSheetPointerUp(event: PointerEvent) {
             :disabled="isSaving"
             @click="deleteCurrentMedia"
           >
-            Löschen
+            {{ t('common.delete') }}
           </button>
           <button
             v-if="canEditMetadata"
@@ -299,16 +301,16 @@ function onSheetPointerUp(event: PointerEvent) {
             type="button"
             @click="startCapturedAtEdit"
           >
-            Aufnahmezeit ändern
+            {{ t('media.capturedAtEdit') }}
           </button>
         </div>
 
         <form v-if="isEditingCapturedAt" class="media-lightbox-date-form" @submit.prevent="saveCapturedAt">
-          <label for="captured-at-input">Aufnahmezeit</label>
+          <label for="captured-at-input">{{ t('media.capturedAt') }}</label>
           <input id="captured-at-input" v-model="capturedAtInput" type="datetime-local" />
           <div class="media-lightbox-date-actions">
             <button class="lightbox-text-button" type="submit" :disabled="isSaving">
-              Speichern
+              {{ t('common.save') }}
             </button>
             <button
               class="lightbox-text-button"
@@ -316,14 +318,14 @@ function onSheetPointerUp(event: PointerEvent) {
               :disabled="isSaving"
               @click="isEditingCapturedAt = false"
             >
-              Abbrechen
+              {{ t('common.cancel') }}
             </button>
           </div>
           <p v-if="saveError" class="media-lightbox-error">{{ saveError }}</p>
         </form>
 
         <dl class="media-lightbox-metadata">
-          <dt>Hochgeladen von</dt>
+          <dt>{{ t('media.uploadedBy') }}</dt>
           <dd class="media-lightbox-uploader">
             <RouterLink v-if="uploaderLink" class="media-lightbox-uploader-link" :to="uploaderLink">
               {{ media.uploader.displayName }}
@@ -335,12 +337,12 @@ function onSheetPointerUp(event: PointerEvent) {
             <dd>{{ row.value }}</dd>
           </template>
           <template v-if="hasGps">
-            <dt>Ort</dt>
+            <dt>{{ t('media.location') }}</dt>
             <dd><a :href="gpsUrl" target="_blank" rel="noreferrer">{{ gpsLabel }}</a></dd>
           </template>
           <template v-if="media.capturedAtOverride">
-            <dt>Status</dt>
-            <dd>Aufnahmezeit korrigiert</dd>
+            <dt>{{ t('common.status') }}</dt>
+            <dd>{{ t('media.capturedAtCorrected') }}</dd>
           </template>
         </dl>
       </aside>

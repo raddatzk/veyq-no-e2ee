@@ -103,6 +103,23 @@ class OpenApiContractTest {
     }
 
     @Test
+    fun `common error response exposes stable codes and fallback messages`() {
+        val document = mapper.readValue(apiDirectory().resolve("common.openapi.yaml").toFile(), Map::class.java) as Map<String, Any?>
+        val components = document["components"] as Map<String, Any?>
+        val schemas = components["schemas"] as Map<String, Any?>
+        val errorResponse = schemas["ErrorResponse"] as Map<String, Any?>
+        val required = errorResponse["required"] as List<String>
+        val properties = errorResponse["properties"] as Map<String, Any?>
+
+        assertThat(required).containsExactlyInAnyOrder("code", "message")
+        assertThat(properties).containsKeys("code", "message")
+        assertThat(properties).doesNotContainKey("error")
+        assertThat(containsKeyRecursively(document, "error"))
+            .describedAs("common error examples must not use legacy error property")
+            .isFalse()
+    }
+
+    @Test
     fun `backend api resources implement their generated openapi interfaces`() {
         generatedInterfaceBindings.forEach { (apiInterface, resourceClass) ->
             assertThat(apiInterface.isAssignableFrom(resourceClass))
@@ -205,6 +222,13 @@ class OpenApiContractTest {
         val cwd = Path.of("").toAbsolutePath()
         return if (cwd.name == "backend") cwd.resolve("../docs/api").normalize() else cwd.resolve("docs/api")
     }
+
+    private fun containsKeyRecursively(value: Any?, key: String): Boolean =
+        when (value) {
+            is Map<*, *> -> value.keys.any { it == key } || value.values.any { containsKeyRecursively(it, key) }
+            is List<*> -> value.any { containsKeyRecursively(it, key) }
+            else -> false
+        }
 
     private fun buildDirectory(): Path {
         val cwd = Path.of("").toAbsolutePath()

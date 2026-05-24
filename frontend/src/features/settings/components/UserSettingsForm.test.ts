@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UserSettingsForm from './UserSettingsForm.vue'
 import { createMyPasskey, deleteMyPasskey, getMySettings, listMyPasskeys, updateMySettings } from '../api'
+import { setLocale } from '../../../i18n'
 
 vi.mock('../api', () => ({
   changeMyPassword: vi.fn(),
@@ -47,8 +48,20 @@ describe('UserSettingsForm', () => {
       permalink: 'owner',
       email: 'changed@example.test'
     })
-    expect(wrapper.text()).toContain('Neue Email wartet auf Bestaetigung: changed@example.test')
-    expect(wrapper.text()).toContain('Bitte bestaetige die neue Email-Adresse.')
+    expect(wrapper.text()).toContain('Neue E-Mail wartet auf Bestätigung: changed@example.test')
+    expect(wrapper.text()).toContain('Bitte bestätige die neue E-Mail-Adresse.')
+  })
+
+  it('renders profile settings labels in English', async () => {
+    setLocale('en')
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('My settings')
+    expect(wrapper.text()).toContain('Profile and login')
   })
 })
 

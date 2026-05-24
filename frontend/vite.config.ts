@@ -9,7 +9,8 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.test.ts']
+    include: ['src/**/*.test.ts'],
+    setupFiles: ['src/test/setup.ts']
   },
   server: {
     host: '127.0.0.1',

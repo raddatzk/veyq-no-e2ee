@@ -53,7 +53,7 @@ class SetupFilter @Inject constructor(
             requestContext.abortWith(
                 Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .type(MediaType.APPLICATION_JSON)
-                    .entity(ErrorResponse("Setup required"))
+                    .entity(ErrorResponse("SETUP_REQUIRED", "Setup required"))
                     .build()
             )
         }

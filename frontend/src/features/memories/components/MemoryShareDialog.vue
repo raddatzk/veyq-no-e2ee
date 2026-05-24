@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -23,6 +24,7 @@ const props = defineProps<{
   memory: Memory
 }>()
 
+const { t } = useI18n()
 const shares = ref<MemoryShareSummary[]>([])
 const name = ref('')
 const role = ref<MemoryShareRole>('VIEWER')
@@ -37,12 +39,12 @@ const editName = ref('')
 const editPasswordEnabled = ref(false)
 const editPassword = ref('')
 
-const roleOptions = [
-  { label: 'Viewer', value: 'VIEWER' },
-  { label: 'Contributor', value: 'CONTRIBUTOR' },
-  { label: 'Manager', value: 'MANAGER' },
-  { label: 'Uploader', value: 'UPLOADER' }
-]
+const roleOptions = computed(() => [
+  { label: t('share.roles.VIEWER'), value: 'VIEWER' },
+  { label: t('share.roles.CONTRIBUTOR'), value: 'CONTRIBUTOR' },
+  { label: t('share.roles.MANAGER'), value: 'MANAGER' },
+  { label: t('share.roles.UPLOADER'), value: 'UPLOADER' }
+])
 const origin = computed(() => window.location.origin)
 
 watch(
@@ -64,7 +66,7 @@ async function loadShares() {
   try {
     shares.value = await listMemoryShares(props.tenantName, props.memory.id)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Shares konnten nicht geladen werden')
+    error.value = getErrorMessage(unknownError, t('share.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -85,7 +87,7 @@ async function createShare() {
     password.value = ''
     await loadShares()
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Share konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('share.createFailed'))
   } finally {
     loading.value = false
   }
@@ -139,7 +141,7 @@ async function updateShare(
     await updateMemoryShare(props.tenantName, share.id, request)
     await loadShares()
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Share konnte nicht aktualisiert werden')
+    error.value = getErrorMessage(unknownError, t('share.updateFailed'))
   } finally {
     loading.value = false
   }
@@ -150,7 +152,7 @@ async function copyShare(share: MemoryShareSummary) {
 }
 
 function shareLabel(share: MemoryShareSummary) {
-  return share.name || share.role
+  return share.name || t(`share.roles.${share.role}`)
 }
 
 const canCreateShare = computed(() => !passwordEnabled.value || Boolean(password.value.trim()))
@@ -163,34 +165,34 @@ const canSavePassword = computed(() => {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Memory teilen" modal class="tenant-dialog share-dialog">
+  <Dialog v-model:visible="visible" :header="t('share.title')" modal class="tenant-dialog share-dialog">
     <div class="form">
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
       <div class="form-grid">
         <label>
-          Name
-          <InputText v-model="name" autocomplete="off" placeholder="Optional" />
+          {{ t('common.name') }}
+          <InputText v-model="name" autocomplete="off" :placeholder="t('common.optional')" />
         </label>
         <label>
-          Rolle
+          {{ t('common.role') }}
           <Select v-model="role" :options="roleOptions" option-label="label" option-value="value" />
         </label>
       </div>
       <label class="toggle-row">
         <span>
-          <strong>Passwortschutz</strong>
-          <small>Share nur mit Passwort öffnen</small>
+          <strong>{{ t('share.passwordProtection') }}</strong>
+          <small>{{ t('share.passwordProtectionHint') }}</small>
         </span>
-        <ToggleSwitch v-model="passwordEnabled" aria-label="Passwortschutz aktivieren" />
+        <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
       </label>
       <label v-if="passwordEnabled">
-        Passwort
+        {{ t('common.password') }}
         <InputText v-model="password" type="password" autocomplete="new-password" required />
       </label>
       <Button
         type="button"
-        label="Share erstellen"
+        :label="t('share.create')"
         icon="pi pi-share-alt"
         :loading="loading"
         :disabled="!canCreateShare"
@@ -207,13 +209,13 @@ const canSavePassword = computed(() => {
                 class="management-badge"
                 :class="share.hasPassword ? 'success' : 'muted'"
               >
-                {{ share.hasPassword ? 'Passwort' : 'Ohne Passwort' }}
+                {{ share.hasPassword ? t('share.hasPassword') : t('share.noPassword') }}
               </span>
               <span
                 class="management-badge"
                 :class="share.enabled ? 'success' : 'warning'"
               >
-                {{ share.enabled ? 'Aktiv' : 'Deaktiviert' }}
+                {{ share.enabled ? t('common.active') : t('common.disabled') }}
               </span>
             </div>
           </div>
@@ -224,7 +226,7 @@ const canSavePassword = computed(() => {
             option-label="label"
             option-value="value"
             size="small"
-            aria-label="Share-Rolle"
+            :aria-label="t('share.role')"
             @update:model-value="setRole(share, $event)"
           />
           <div class="management-actions">
@@ -233,8 +235,8 @@ const canSavePassword = computed(() => {
               severity="secondary"
               outlined
               size="small"
-              aria-label="Share-Link kopieren"
-              title="Share-Link kopieren"
+              :aria-label="t('share.linkCopy')"
+              :title="t('share.linkCopy')"
               @click="copyShare(share)"
             />
             <Button
@@ -242,8 +244,8 @@ const canSavePassword = computed(() => {
               severity="secondary"
               outlined
               size="small"
-              aria-label="Share umbenennen"
-              title="Share umbenennen"
+              :aria-label="t('share.rename')"
+              :title="t('share.rename')"
               @click="openRenameDialog(share)"
             />
             <Button
@@ -251,8 +253,8 @@ const canSavePassword = computed(() => {
               severity="secondary"
               outlined
               size="small"
-              :aria-label="share.enabled ? 'Share deaktivieren' : 'Share aktivieren'"
-              :title="share.enabled ? 'Share deaktivieren' : 'Share aktivieren'"
+              :aria-label="share.enabled ? t('share.toggleDisable') : t('share.toggleEnable')"
+              :title="share.enabled ? t('share.toggleDisable') : t('share.toggleEnable')"
               @click="toggleShare(share)"
             />
             <Button
@@ -260,8 +262,8 @@ const canSavePassword = computed(() => {
               severity="secondary"
               outlined
               size="small"
-              aria-label="Passwort ändern"
-              title="Passwort ändern"
+              :aria-label="t('share.passwordChange')"
+              :title="t('share.passwordChange')"
               @click="openPasswordDialog(share)"
             />
           </div>
@@ -270,17 +272,17 @@ const canSavePassword = computed(() => {
     </div>
   </Dialog>
 
-  <Dialog v-model:visible="renameDialogVisible" header="Share umbenennen" modal class="tenant-dialog">
+  <Dialog v-model:visible="renameDialogVisible" :header="t('share.rename')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="saveName">
       <label>
-        Name
-        <InputText v-model="editName" autocomplete="off" placeholder="Optional" />
+        {{ t('common.name') }}
+        <InputText v-model="editName" autocomplete="off" :placeholder="t('common.optional')" />
       </label>
       <div class="button-row">
-        <Button type="submit" label="Speichern" icon="pi pi-save" :loading="loading" />
+        <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="loading" />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="renameDialogVisible = false"
@@ -289,31 +291,31 @@ const canSavePassword = computed(() => {
     </form>
   </Dialog>
 
-  <Dialog v-model:visible="passwordDialogVisible" header="Passwortschutz" modal class="tenant-dialog">
+  <Dialog v-model:visible="passwordDialogVisible" :header="t('share.passwordProtection')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="savePassword">
       <label class="toggle-row">
         <span>
-          <strong>Passwortschutz</strong>
-          <small>Share nur mit Passwort öffnen</small>
+          <strong>{{ t('share.passwordProtection') }}</strong>
+          <small>{{ t('share.passwordProtectionHint') }}</small>
         </span>
-        <ToggleSwitch v-model="editPasswordEnabled" aria-label="Passwortschutz aktivieren" />
+        <ToggleSwitch v-model="editPasswordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
       </label>
       <label v-if="editPasswordEnabled">
-        Neues Passwort
+        {{ t('auth.newPassword') }}
         <InputText v-model="editPassword" type="password" autocomplete="new-password" required />
       </label>
       <div class="dialog-action-row">
         <div class="dialog-action-group">
           <Button
             type="button"
-            label="Abbrechen"
+            :label="t('common.cancel')"
             severity="secondary"
             text
             @click="passwordDialogVisible = false"
           />
           <Button
             type="submit"
-            label="Speichern"
+            :label="t('common.save')"
             icon="pi pi-save"
             :loading="loading"
             :disabled="!canSavePassword"

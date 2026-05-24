@@ -5,6 +5,7 @@ import LoginView from './LoginView.vue'
 import { forgotPassword, login, loginWithPasskey } from '../api/authClient'
 import { tenants } from '../api/tenantClient'
 import { authState } from '../authState'
+import { setLocale } from '../i18n'
 
 vi.mock('../api/authClient', () => ({
   forgotPassword: vi.fn(),
@@ -46,7 +47,7 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(forgotPasswordMock).toHaveBeenCalledWith('owner@example.test')
-    expect(wrapper.text()).toContain('wurde eine E-Mail zum Zuruecksetzen gesendet')
+    expect(wrapper.text()).toContain('wurde eine E-Mail zum Zurücksetzen gesendet')
   })
 
   it('uses passkey as the initial login method', async () => {
@@ -70,6 +71,17 @@ describe('LoginView', () => {
 
     expect(loginWithPasskeyMock).toHaveBeenCalledWith()
     expect(loginMock).not.toHaveBeenCalled()
+  })
+
+  it('renders authentication labels in English', async () => {
+    setLocale('en')
+    const router = testRouter()
+    await router.push('/login')
+    await router.isReady()
+
+    const wrapper = mount(LoginView, { global: { plugins: [router], stubs: viewStubs() } })
+
+    expect(wrapper.text()).toContain('Log in with passkey')
   })
 })
 

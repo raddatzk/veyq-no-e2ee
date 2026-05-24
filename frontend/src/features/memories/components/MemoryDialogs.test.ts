@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../../../shared/api/httpClient'
 import {
   createMemory,
   createMemoryShare,
@@ -194,6 +195,35 @@ describe('Memory detail dialogs', () => {
     expect(request.cropWidth).toBeGreaterThan(0)
     expect(request.cropHeight).toBeGreaterThan(0)
     expect(saved).toHaveBeenCalledWith(updated)
+  })
+
+  it('shows localized cover error codes', async () => {
+    const file = new File(['cover'], 'cover.jpg', { type: 'image/jpeg' })
+    setMemoryCoverMock.mockRejectedValue(
+      new ApiError(400, 'MEMORY_COVER_CROP_INVALID', 'Cover crop is invalid', {})
+    )
+
+    const wrapper = mount(MemoryCoverDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memory: memory(),
+        media: []
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [file] })
+    await flushPromises()
+    await wrapper.find('.memory-cover-cropper img').trigger('load')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Cover speichern'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Der gewählte Cover-Ausschnitt ist ungültig.')
   })
 
   it('creates a standalone cover from existing memory media', async () => {

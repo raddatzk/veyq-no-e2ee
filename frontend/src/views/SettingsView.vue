@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../composables/useWorkspaceToolbar'
@@ -13,6 +14,7 @@ import { useAuthState } from '../shared/state/useAuthState'
 
 const route = useRoute()
 const router = useRouter()
+const { locale, t } = useI18n()
 const { authState } = useAuthState()
 
 const settingsPath = computed(() => route.path || '/')
@@ -27,7 +29,7 @@ const settings = ref<SettingsResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-watch(settingsPath, loadSettings, { immediate: true })
+watch([settingsPath, locale], loadSettings, { immediate: true })
 
 onBeforeUnmount(() => {
   clearWorkspaceToolbar()
@@ -41,14 +43,14 @@ async function loadSettings() {
     settings.value = response
     setWorkspaceToolbar(
       response.breadcrumbs.map((breadcrumb) => ({
-        label: breadcrumb.label,
+        label: localizeSettingsLabel(breadcrumb.label),
         command: () => navigateToPath(breadcrumb.path)
       })),
       []
     )
   } catch (caught) {
     settings.value = null
-    error.value = caught instanceof Error ? caught.message : 'Einstellungen konnten nicht geladen werden.'
+    error.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
     clearWorkspaceToolbar()
   } finally {
     loading.value = false
@@ -58,6 +60,12 @@ async function loadSettings() {
 function navigateToPath(path: string) {
   void router.push(path)
 }
+
+function localizeSettingsLabel(label: string): string {
+  if (label === 'Einstellungen' || label === 'Settings') return t('settings.title')
+  if (label === 'Server') return t('settings.serverTitle')
+  return label
+}
 </script>
 
 <template>
@@ -66,7 +74,7 @@ function navigateToPath(path: string) {
 
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Einstellungen werden geladen...</span>
+      <span>{{ t('settings.loading') }}</span>
     </div>
 
     <template v-else-if="settings">
@@ -83,7 +91,7 @@ function navigateToPath(path: string) {
       />
       <section v-else class="settings-panel">
         <h1>{{ settings.subject.label }}</h1>
-        <p>Einstellungen</p>
+        <p>{{ t('settings.title') }}</p>
       </section>
     </template>
   </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
@@ -12,6 +13,7 @@ import { useAuthState } from '../shared/state/useAuthState'
 import { getErrorMessage } from '../shared/utils/errors'
 
 const router = useRouter()
+const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const email = ref('')
 const password = ref('')
@@ -40,7 +42,7 @@ async function submit() {
     )
     await router.push(resolveRedirect())
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Login fehlgeschlagen')
+    error.value = getErrorMessage(unknownError, t('auth.loginFailed'))
   }
 }
 
@@ -64,7 +66,7 @@ async function submitPasskey() {
     )
     await router.push(resolveRedirect())
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Passkey-Login fehlgeschlagen')
+    error.value = getErrorMessage(unknownError, t('auth.passkeyLoginFailed'))
   } finally {
     passkeyLoading.value = false
   }
@@ -74,15 +76,15 @@ async function requestPasswordReset() {
   error.value = ''
   message.value = ''
   if (!email.value.trim()) {
-    error.value = 'Bitte gib deine E-Mail-Adresse ein.'
+    error.value = t('auth.passwordRequiredEmail')
     return
   }
   sendingReset.value = true
   try {
     await forgotPassword(email.value)
-    message.value = 'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zuruecksetzen gesendet.'
+    message.value = t('auth.passwordResetRequested')
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Passwort-Reset konnte nicht angefordert werden.')
+    error.value = getErrorMessage(unknownError, t('auth.passwordResetRequestFailed'))
   } finally {
     sendingReset.value = false
   }
@@ -105,10 +107,10 @@ onMounted(async () => {
 
 <template>
   <Card class="login-card">
-    <template #title>Login</template>
+    <template #title>{{ t('auth.login') }}</template>
     <template #content>
       <form class="form" @submit.prevent="authMethod === 'passkey' ? submitPasskey() : submit()">
-        <div class="auth-method-switch" role="tablist" aria-label="Anmeldemethode">
+        <div class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
           <button
             type="button"
             :class="{ active: authMethod === 'passkey' }"
@@ -116,7 +118,7 @@ onMounted(async () => {
             :aria-selected="authMethod === 'passkey'"
             @click="authMethod = 'passkey'"
           >
-            Passkey
+            {{ t('auth.passkey') }}
           </button>
           <button
             type="button"
@@ -125,15 +127,15 @@ onMounted(async () => {
             :aria-selected="authMethod === 'password'"
             @click="authMethod = 'password'"
           >
-            Passwort
+            {{ t('common.password') }}
           </button>
         </div>
         <label v-if="authMethod === 'password'">
-          E-Mail
+          {{ t('common.email') }}
           <InputText v-model="email" type="email" autocomplete="email" required />
         </label>
         <label v-if="authMethod === 'password'">
-          Passwort
+          {{ t('common.password') }}
           <Password
             v-model="password"
             autocomplete="current-password"
@@ -146,15 +148,15 @@ onMounted(async () => {
         <Button
           v-if="authMethod === 'passkey'"
           type="submit"
-          label="Mit Passkey einloggen"
+          :label="t('auth.loginWithPasskey')"
           icon="pi pi-key"
           :loading="passkeyLoading"
         />
-        <Button v-else type="submit" label="Einloggen" icon="pi pi-sign-in" />
+        <Button v-else type="submit" :label="t('auth.login')" icon="pi pi-sign-in" />
         <Button
           v-if="authMethod === 'password'"
           type="button"
-          label="Passwort vergessen"
+          :label="t('auth.forgotPassword')"
           icon="pi pi-envelope"
           severity="secondary"
           text

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const { t } = useI18n()
 const { authState } = useAuthState()
 const displayName = ref('')
 const name = ref('')
@@ -74,7 +76,7 @@ async function submit() {
     visible.value = false
     emit('saved')
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Ordner konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('memory.folderCreateFailed'))
   } finally {
     loading.value = false
   }
@@ -99,14 +101,14 @@ function rootScopeRequest() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Ordner erstellen" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('memory.folderCreate')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="submit">
       <label>
-        Name
+        {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
       </label>
       <label>
-        Permalink
+        {{ t('common.permalink') }}
         <InputText
           :model-value="name"
           autocomplete="off"
@@ -115,7 +117,7 @@ function rootScopeRequest() {
         />
       </label>
       <label v-if="isRootCreate">
-        Bereich
+        {{ t('memory.area') }}
         <Select
           v-model="scopeValue"
           :options="scopeOptions"
@@ -126,10 +128,10 @@ function rootScopeRequest() {
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
-        <Button type="submit" label="Erstellen" icon="pi pi-plus" :loading="loading" />
+        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="visible = false"

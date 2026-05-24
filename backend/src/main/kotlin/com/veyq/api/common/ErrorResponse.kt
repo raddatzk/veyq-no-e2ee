@@ -1,3 +1,6 @@
 package com.veyq.api.common
 
-data class ErrorResponse(val error: String)
+data class ErrorResponse(
+    val code: String,
+    val message: String,
+)

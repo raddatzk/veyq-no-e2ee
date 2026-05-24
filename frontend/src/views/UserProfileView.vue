@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { getUserProfile, type UserProfile } from '../features/profiles/api'
 import { routePathToMemoryPath } from '../shared/utils/paths'
 
 const route = useRoute()
+const { t } = useI18n()
 const tenantName = computed(() => String(route.params.tenantName || ''))
 const profilePermalink = computed(() => {
   const firstSegment = routePathToMemoryPath(route.params.pathMatch).split('/').filter(Boolean)[0] || ''
@@ -26,7 +28,7 @@ async function loadProfile() {
     profile.value = await getUserProfile(tenantName.value, profilePermalink.value)
   } catch (caught) {
     profile.value = null
-    error.value = caught instanceof Error ? caught.message : 'Profil konnte nicht geladen werden.'
+    error.value = caught instanceof Error ? caught.message : t('profile.loadFailed')
   } finally {
     loading.value = false
   }
@@ -38,7 +40,7 @@ async function loadProfile() {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <div v-if="loading" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
-      <span>Profil wird geladen...</span>
+      <span>{{ t('profile.loading') }}</span>
     </div>
     <section v-else-if="profile" class="profile-header">
       <div class="profile-avatar" aria-hidden="true">{{ profile.initials }}</div>

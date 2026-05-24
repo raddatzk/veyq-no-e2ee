@@ -1,24 +1,34 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Avatar from 'primevue/avatar'
 import Menu from 'primevue/menu'
 import { logout } from '../../api/authClient'
+import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n'
 import { useAuthState } from '../../shared/state/useAuthState'
 
 const userMenu = ref()
 const router = useRouter()
+const { locale, t } = useI18n()
 const { authState, setAnonymous } = useAuthState()
 defineProps<{
   showName?: boolean
 }>()
 const profileLabel = computed(() => authState.userLabel.charAt(0).toUpperCase() || 'A')
 const isServerOwner = computed(() => authState.user?.serverRole === 'ServerOwner')
+const languageMenuItems = computed(() =>
+  SUPPORTED_LOCALES.map((nextLocale) => ({
+    label: t(`navigation.locales.${nextLocale}`),
+    icon: locale.value === nextLocale ? 'pi pi-check' : 'pi pi-circle',
+    command: () => setLocale(nextLocale as SupportedLocale)
+  }))
+)
 const menuItems = computed(() => {
   if (!authState.isAuthenticated) {
     return [
       {
-        label: 'Login',
+        label: t('auth.login'),
         icon: 'pi pi-sign-in',
         command: () => {
           void router.push('/login')
@@ -36,7 +46,7 @@ const menuItems = computed(() => {
       separator: true
     },
     {
-      label: 'Meine Einstellungen',
+      label: t('profile.mySettings'),
       icon: 'pi pi-cog',
       command: () => {
         void router.push('/~me')
@@ -45,7 +55,7 @@ const menuItems = computed(() => {
     ...(isServerOwner.value
       ? [
           {
-            label: 'Server Einstellungen',
+            label: t('settings.title'),
             icon: 'pi pi-server',
             command: () => {
               void router.push('/settings')
@@ -54,10 +64,15 @@ const menuItems = computed(() => {
         ]
       : []),
     {
+      label: t('navigation.language'),
+      icon: 'pi pi-language',
+      items: languageMenuItems.value
+    },
+    {
       separator: true
     },
     {
-      label: 'Logout',
+      label: t('auth.logout'),
       icon: 'pi pi-sign-out',
       command: () => {
         void doLogout()

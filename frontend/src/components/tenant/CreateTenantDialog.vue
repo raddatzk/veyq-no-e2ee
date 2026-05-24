@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -12,6 +13,7 @@ import { getErrorMessage } from '../../shared/utils/errors'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const router = useRouter()
+const { t } = useI18n()
 const { setTenants } = useAuthState()
 const name = ref('')
 const displayName = ref('')
@@ -54,7 +56,7 @@ async function submit() {
     visible.value = false
     await router.push(`/${tenant.name}`)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Tenant konnte nicht erstellt werden')
+    error.value = getErrorMessage(unknownError, t('setup.tenantCreateFailed'))
   } finally {
     loading.value = false
   }
@@ -62,14 +64,14 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Tenant erstellen" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('setup.tenantCreate')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="submit">
       <label>
-        Tenant Name
+        {{ t('setup.tenantName') }}
         <InputText v-model="displayName" autocomplete="off" required />
       </label>
       <label>
-        Permalink
+        {{ t('common.permalink') }}
         <InputText
           :model-value="name"
           autocomplete="off"
@@ -78,15 +80,15 @@ async function submit() {
         />
       </label>
       <label>
-        Domain
+        {{ t('common.domain') }}
         <InputText v-model="domain" autocomplete="off" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
-        <Button type="submit" label="Erstellen" icon="pi pi-plus" :loading="loading" />
+        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="visible = false"

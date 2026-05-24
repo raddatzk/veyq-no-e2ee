@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const { t } = useI18n()
 const files = ref<File[]>([])
 const error = ref('')
 const loading = ref(false)
@@ -43,7 +45,7 @@ async function submit() {
     visible.value = false
     emit('saved')
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, 'Upload konnte nicht abgeschlossen werden')
+    error.value = getErrorMessage(unknownError, t('memory.uploadFailed'))
   } finally {
     loading.value = false
   }
@@ -51,24 +53,24 @@ async function submit() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" header="Medien hochladen" modal class="tenant-dialog">
+  <Dialog v-model:visible="visible" :header="t('media.uploadTitle')" modal class="tenant-dialog">
     <form class="form" @submit.prevent="submit">
       <label>
-        Dateien
+        {{ t('media.files') }}
         <input type="file" multiple accept="image/*,video/*" @change="updateFiles" />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button
           type="submit"
-          label="Hochladen"
+          :label="t('common.upload')"
           icon="pi pi-upload"
           :disabled="files.length === 0"
           :loading="loading"
         />
         <Button
           type="button"
-          label="Abbrechen"
+          :label="t('common.cancel')"
           severity="secondary"
           outlined
           @click="visible = false"

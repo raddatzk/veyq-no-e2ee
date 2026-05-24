@@ -30,7 +30,7 @@ describe('ResetPasswordView', () => {
     await flushPromises()
 
     expect(resetPasswordMock).toHaveBeenCalledWith(42, 'reset-token', 'new-password123')
-    expect(wrapper.text()).toContain('Passwort wurde zurueckgesetzt')
+    expect(wrapper.text()).toContain('Passwort wurde zurückgesetzt')
   })
 })
 
