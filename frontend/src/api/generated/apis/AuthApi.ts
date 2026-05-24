@@ -17,7 +17,6 @@ import * as runtime from '../runtime';
 import type {
   ErrorResponse,
   LoginRequest,
-  PasskeyLoginOptionsRequest,
   PasskeyLoginRequest,
   UserSummary,
 } from '../models/index';
@@ -26,8 +25,6 @@ import {
     ErrorResponseToJSON,
     LoginRequestFromJSON,
     LoginRequestToJSON,
-    PasskeyLoginOptionsRequestFromJSON,
-    PasskeyLoginOptionsRequestToJSON,
     PasskeyLoginRequestFromJSON,
     PasskeyLoginRequestToJSON,
     UserSummaryFromJSON,
@@ -40,10 +37,6 @@ export interface LoginOperationRequest {
 
 export interface PasskeyLoginOperationRequest {
     passkeyLoginRequest: PasskeyLoginRequest;
-}
-
-export interface PasskeyLoginOptionsOperationRequest {
-    passkeyLoginOptionsRequest: PasskeyLoginOptionsRequest;
 }
 
 /**
@@ -125,27 +118,25 @@ export interface AuthApiInterface {
 
     /**
      * Creates request options for passkeyLoginOptions without sending the request
-     * @param {PasskeyLoginOptionsRequest} passkeyLoginOptionsRequest 
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    passkeyLoginOptionsRequestOpts(requestParameters: PasskeyLoginOptionsOperationRequest): Promise<runtime.RequestOpts>;
+    passkeyLoginOptionsRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
      * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * @summary Passkey-Login-Challenge erzeugen
-     * @param {PasskeyLoginOptionsRequest} passkeyLoginOptionsRequest 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AuthApiInterface
      */
-    passkeyLoginOptionsRaw(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
+    passkeyLoginOptionsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>>;
 
     /**
      * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Passkey-Login-Challenge erzeugen
      */
-    passkeyLoginOptions(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
+    passkeyLoginOptions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
 
     /**
      * Creates request options for refresh without sending the request
@@ -315,19 +306,10 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
     /**
      * Creates request options for passkeyLoginOptions without sending the request
      */
-    async passkeyLoginOptionsRequestOpts(requestParameters: PasskeyLoginOptionsOperationRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['passkeyLoginOptionsRequest'] == null) {
-            throw new runtime.RequiredError(
-                'passkeyLoginOptionsRequest',
-                'Required parameter "passkeyLoginOptionsRequest" was null or undefined when calling passkeyLoginOptions().'
-            );
-        }
-
+    async passkeyLoginOptionsRequestOpts(): Promise<runtime.RequestOpts> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
 
 
         let urlPath = `/api/auth/passkeys/login/options`;
@@ -337,7 +319,6 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-            body: PasskeyLoginOptionsRequestToJSON(requestParameters['passkeyLoginOptionsRequest']),
         };
     }
 
@@ -345,8 +326,8 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Passkey-Login-Challenge erzeugen
      */
-    async passkeyLoginOptionsRaw(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
-        const requestOptions = await this.passkeyLoginOptionsRequestOpts(requestParameters);
+    async passkeyLoginOptionsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<{ [key: string]: any; }>> {
+        const requestOptions = await this.passkeyLoginOptionsRequestOpts();
         const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse<any>(response);
@@ -356,8 +337,8 @@ export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
      * Passkey-Login-Challenge erzeugen.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
      * Passkey-Login-Challenge erzeugen
      */
-    async passkeyLoginOptions(requestParameters: PasskeyLoginOptionsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
-        const response = await this.passkeyLoginOptionsRaw(requestParameters, initOverrides);
+    async passkeyLoginOptions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }> {
+        const response = await this.passkeyLoginOptionsRaw(initOverrides);
         return await response.value();
     }
 

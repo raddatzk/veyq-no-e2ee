@@ -8,10 +8,8 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return generatedCall(authApi.login({ loginRequest: { email, password } }))
 }
 
-export async function loginWithPasskey(email?: string): Promise<LoginResponse> {
-  const options = await generatedCall(
-    authApi.passkeyLoginOptions({ passkeyLoginOptionsRequest: { email: email?.trim() || undefined } })
-  )
+export async function loginWithPasskey(): Promise<LoginResponse> {
+  const options = await generatedCall(authApi.passkeyLoginOptions())
   const credential = await getPasskeyCredential(options)
   return generatedCall(authApi.passkeyLogin({ passkeyLoginRequest: credential }))
 }

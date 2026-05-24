@@ -14,7 +14,6 @@ import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreatePasskeyRequest
 import com.veyq.api.generated.model.PasskeyAssertionResponse
 import com.veyq.api.generated.model.PasskeyAttestationResponse
-import com.veyq.api.generated.model.PasskeyLoginOptionsRequest
 import com.veyq.api.generated.model.PasskeyLoginRequest
 import com.veyq.api.generated.model.PasskeyRegistrationRequest
 import com.veyq.api.generated.model.PasskeySummary
@@ -36,18 +35,8 @@ class PasskeyService @Inject constructor(
     private val authService: AuthService,
     private val webAuthnSecurity: WebAuthnSecurity,
 ) {
-    fun loginOptions(request: PasskeyLoginOptionsRequest, routingContext: RoutingContext): String {
-        val username = request.email
-            ?.trim()
-            ?.lowercase()
-            ?.takeIf { it.isNotBlank() }
-            ?.let { email ->
-                val user = userRepo.findByEmail(email)
-                    ?: throw UnauthorizedException("Invalid passkey")
-                user.id.toString()
-            }
-
-        val options = webAuthnSecurity.getLoginChallenge(username, routingContext).await().indefinitely()
+    fun loginOptions(routingContext: RoutingContext): String {
+        val options = webAuthnSecurity.getLoginChallenge(null, routingContext).await().indefinitely()
         return webAuthnSecurity.toJsonString(options)
     }
 

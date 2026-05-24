@@ -64,11 +64,11 @@ describe('LoginView', () => {
     await router.isReady()
 
     const wrapper = mount(LoginView, { global: { plugins: [router], stubs: viewStubs() } })
-    await wrapper.find('input[type="email"]').setValue('owner@example.test')
+    expect(wrapper.find('input[type="email"]').exists()).toBe(false)
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(loginWithPasskeyMock).toHaveBeenCalledWith('owner@example.test')
+    expect(loginWithPasskeyMock).toHaveBeenCalledWith()
     expect(loginMock).not.toHaveBeenCalled()
   })
 })

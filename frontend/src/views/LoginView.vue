@@ -49,7 +49,7 @@ async function submitPasskey() {
   message.value = ''
   passkeyLoading.value = true
   try {
-    const user = await loginWithPasskey(email.value)
+    const user = await loginWithPasskey()
     setAuthenticated(
       {
         userId: user.userId,
@@ -128,14 +128,9 @@ onMounted(async () => {
             Passwort
           </button>
         </div>
-        <label>
+        <label v-if="authMethod === 'password'">
           E-Mail
-          <InputText
-            v-model="email"
-            type="email"
-            :autocomplete="authMethod === 'passkey' ? 'username webauthn' : 'email'"
-            :required="authMethod === 'password'"
-          />
+          <InputText v-model="email" type="email" autocomplete="email" required />
         </label>
         <label v-if="authMethod === 'password'">
           Passwort

@@ -43,8 +43,6 @@ paths:
       - Auth
       operationId: passkeyLoginOptions
       security: []
-      requestBody:
-        "$ref": "#/components/requestBodies/PasskeyLoginOptions"
       responses:
         '200':
           "$ref": "#/components/responses/PasskeyLoginOptions"
@@ -166,14 +164,6 @@ components:
           example:
             email: kevin@example.test
             password: correct horse battery staple
-    PasskeyLoginOptions:
-      required: true
-      content:
-        application/json:
-          schema:
-            "$ref": "#/components/schemas/PasskeyLoginOptionsRequest"
-          example:
-            email: kevin@example.test
     PasskeyLogin:
       required: true
       content:
@@ -204,14 +194,6 @@ components:
       example:
         email: kevin@example.test
         password: correct horse battery staple
-    PasskeyLoginOptionsRequest:
-      type: object
-      additionalProperties: false
-      properties:
-        email:
-          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
-      example:
-        email: kevin@example.test
     PasskeyLoginOptionsResponse:
       type: object
       additionalProperties: true

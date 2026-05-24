@@ -2,7 +2,6 @@ package com.veyq.api.auth
 
 import com.veyq.api.generated.api.AuthApi
 import com.veyq.api.generated.model.LoginRequest
-import com.veyq.api.generated.model.PasskeyLoginOptionsRequest
 import com.veyq.api.generated.model.PasskeyLoginRequest
 import com.veyq.api.auth.passkey.PasskeyService
 import io.vertx.ext.web.RoutingContext
@@ -25,8 +24,8 @@ class AuthResource @Inject constructor(
             .build()
     }
 
-    override fun passkeyLoginOptions(request: PasskeyLoginOptionsRequest): Response =
-        Response.ok(passkeyService.loginOptions(request, routingContext), MediaType.APPLICATION_JSON).build()
+    override fun passkeyLoginOptions(): Response =
+        Response.ok(passkeyService.loginOptions(routingContext), MediaType.APPLICATION_JSON).build()
 
     override fun passkeyLogin(request: PasskeyLoginRequest): Response {
         val (response, accessCookie, refreshCookie) = passkeyService.login(request, routingContext)
