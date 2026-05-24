@@ -99,10 +99,31 @@ export const childMemory = {
   scope: { type: 'TENANT' }
 }
 
+export const publicShareRootMemory = {
+  id: weddingMemory.id,
+  name: weddingMemory.name,
+  displayName: weddingMemory.displayName,
+  path: '/',
+  parentId: null,
+  coverMediaId: null,
+  coverUrl: null,
+  coverCrop: null,
+  startDate: weddingMemory.startDate,
+  endDate: weddingMemory.endDate,
+  mediaCount: 0,
+  childCount: 1
+}
+
 type AuthenticatedOwnerApiOptions = {
   folderMemories?: unknown[]
   onCreateFolder?: (body: unknown) => void
   onCreateMemory?: (body: unknown) => void
+}
+
+type MemoryDetailApiOptions = {
+  shares?: unknown[]
+  onCreateShare?: (body: unknown) => void
+  onUpdateShare?: (body: unknown) => void
 }
 
 export function fulfillJson(route: Route, json: unknown, status = 200) {
@@ -257,7 +278,7 @@ export async function mockAuthenticatedOwnerWithoutTenants(page: Page) {
   })
 }
 
-export async function mockMemoryDetailApi(page: Page) {
+export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOptions = {}) {
   await page.route('**://*/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -290,6 +311,102 @@ export async function mockMemoryDetailApi(page: Page) {
     }
 
     if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/media`) {
+      await fulfillJson(route, [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/shares`) {
+      await fulfillJson(route, options.shares ?? [])
+      return
+    }
+
+    if (method === 'POST' && url.pathname === `/api/friends/memories/${weddingMemory.id}/shares`) {
+      const body = request.postDataJSON()
+      options.onCreateShare?.(body)
+      await fulfillJson(route, {
+        id: 'shr-e2e',
+        memoryId: weddingMemory.id,
+        name: body.name ?? null,
+        role: body.role,
+        enabled: true,
+        shareUrl: '/s/shr-e2e',
+        hasPassword: Boolean(body.password),
+        createdAt: '2026-05-24T10:00:00Z',
+        updatedAt: '2026-05-24T10:00:00Z'
+      })
+      return
+    }
+
+    if (method === 'PUT' && url.pathname === '/api/friends/memory-shares/shr-e2e') {
+      const body = request.postDataJSON()
+      options.onUpdateShare?.(body)
+      await fulfillJson(route, {
+        id: 'shr-e2e',
+        memoryId: weddingMemory.id,
+        name: 'Familie',
+        role: body.role ?? 'VIEWER',
+        enabled: body.enabled ?? true,
+        shareUrl: '/s/shr-e2e',
+        hasPassword: body.password !== '',
+        createdAt: '2026-05-24T10:00:00Z',
+        updatedAt: '2026-05-24T10:00:00Z'
+      })
+      return
+    }
+
+    await fulfillUnhandled(route, method, url.pathname)
+  })
+}
+
+export async function mockPublicViewerShareApi(page: Page) {
+  await page.route('**://*/api/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const method = request.method()
+
+    if (method === 'GET' && url.pathname === '/api/frontend/bootstrap') {
+      await fulfillJson(route, {
+        serverId: 'e2e',
+        user: null,
+        tenants: []
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/public-shares/shr-e2e') {
+      await fulfillJson(route, {
+        id: 'shr-e2e',
+        role: 'VIEWER',
+        authenticated: false,
+        passwordRequired: false,
+        displayNameRequired: false,
+        canViewGallery: true,
+        canUpload: false,
+        canEdit: false,
+        canDelete: false,
+        rootMemory: publicShareRootMemory
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/public-shares/shr-e2e/memories/by-path') {
+      await fulfillJson(route, publicShareRootMemory)
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/children`) {
+      await fulfillJson(route, [
+        {
+          ...childMemory,
+          path: '/abendessen',
+          scope: undefined,
+          coverCrop: null
+        }
+      ])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media`) {
       await fulfillJson(route, [])
       return
     }

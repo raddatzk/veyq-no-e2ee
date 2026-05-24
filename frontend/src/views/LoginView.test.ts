@@ -54,6 +54,7 @@ describe('LoginView', () => {
       userId: 1,
       email: 'owner@example.test',
       displayName: 'Owner',
+      permalink: 'owner',
       serverRole: 'ServerOwner',
       passkeyCount: 1
     })

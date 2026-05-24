@@ -6,13 +6,14 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { toPermalink } from '../../../composables/usePermalink'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { updateMemory, type Memory } from '../api'
+import { updateMemory, type Memory, type UpdateMemoryRequest } from '../api'
 import { isValidMemoryDateRange } from '../utils/memoryDateRange'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memory: Memory
+  saveMemory?: (memoryId: string, request: UpdateMemoryRequest) => Promise<Memory>
 }>()
 const emit = defineEmits<{
   saved: [memory: Memory]
@@ -71,7 +72,9 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    const updated = await updateMemory(props.tenantName, props.memory.id, request)
+    const updated = props.saveMemory
+      ? await props.saveMemory(props.memory.id, request)
+      : await updateMemory(props.tenantName, props.memory.id, request)
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {

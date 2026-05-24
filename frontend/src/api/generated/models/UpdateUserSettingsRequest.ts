@@ -26,6 +26,12 @@ export interface UpdateUserSettingsRequest {
      */
     displayName: string;
     /**
+     * URL-safe stable permalink segment.
+     * @type {string}
+     * @memberof UpdateUserSettingsRequest
+     */
+    permalink: string;
+    /**
      * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
      * @memberof UpdateUserSettingsRequest
@@ -38,6 +44,7 @@ export interface UpdateUserSettingsRequest {
  */
 export function instanceOfUpdateUserSettingsRequest(value: object): value is UpdateUserSettingsRequest {
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('permalink' in value) || value['permalink'] === undefined) return false;
     if (!('email' in value) || value['email'] === undefined) return false;
     return true;
 }
@@ -53,6 +60,7 @@ export function UpdateUserSettingsRequestFromJSONTyped(json: any, ignoreDiscrimi
     return {
         
         'displayName': json['displayName'],
+        'permalink': json['permalink'],
         'email': json['email'],
     };
 }
@@ -69,6 +77,7 @@ export function UpdateUserSettingsRequestToJSONTyped(value?: UpdateUserSettingsR
     return {
         
         'displayName': value['displayName'],
+        'permalink': value['permalink'],
         'email': value['email'],
     };
 }

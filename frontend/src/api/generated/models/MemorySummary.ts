@@ -53,7 +53,7 @@ export interface MemorySummary {
      */
     name: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof MemorySummary
      */
@@ -77,7 +77,7 @@ export interface MemorySummary {
      */
     coverUrl?: string;
     /**
-     *
+     * 
      * @type {CoverCrop}
      * @memberof MemorySummary
      */
@@ -181,3 +181,4 @@ export function MemorySummaryToJSONTyped(value?: MemorySummary | null, ignoreDis
         'scope': MemoryScopeToJSON(value['scope']),
     };
 }
+

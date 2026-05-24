@@ -24,6 +24,9 @@ class User : PanacheEntityBase {
     @Column(name = "display_name", nullable = false)
     lateinit var displayName: String
 
+    @Column(name = "permalink", nullable = false, unique = true, length = 120)
+    lateinit var permalink: String
+
     @Column(name = "email", nullable = false, unique = true)
     lateinit var email: String
 
@@ -46,6 +49,9 @@ class UserRepo : PanacheRepository<User> {
     fun findByEmail(email: String): User? {
         return find("email", email).firstResult()
     }
+
+    fun findByPermalink(permalink: String): User? =
+        find("permalink", permalink).firstResult()
 
     fun listAllOrderByEmail(): List<User> =
         list("order by email")

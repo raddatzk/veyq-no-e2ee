@@ -10,7 +10,7 @@ import { groups, type TenantGroup } from '../../../api/groupClient'
 import { toPermalink } from '../../../composables/usePermalink'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { createMemory, setMemoryCover } from '../api'
+import { createMemory, setMemoryCover, type CreateMemoryRequest, type Memory, type SetMemoryCoverRequest } from '../api'
 import { isValidMemoryDateRange } from '../utils/memoryDateRange'
 
 const visible = defineModel<boolean>('visible', { required: true })
@@ -19,6 +19,8 @@ const props = defineProps<{
   tenantDisplayName: string
   folderPath?: string
   parentMemoryId?: string | null
+  createMemoryOverride?: (request: CreateMemoryRequest) => Promise<Memory>
+  setCoverOverride?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
 }>()
 const emit = defineEmits<{
   saved: []
@@ -112,9 +114,15 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    const created = await createMemory(props.tenantName, request)
+    const created = props.createMemoryOverride
+      ? await props.createMemoryOverride(request)
+      : await createMemory(props.tenantName, request)
     if (selectedCoverFile.value && imageLoaded.value) {
-      await setMemoryCover(props.tenantName, created.id, {
+      const saveCover = props.setCoverOverride
+        ? props.setCoverOverride
+        : (memoryId: string, coverRequest: SetMemoryCoverRequest) =>
+            setMemoryCover(props.tenantName, memoryId, coverRequest)
+      await saveCover(created.id, {
         file: selectedCoverFile.value,
         ...currentCoverCrop()
       })

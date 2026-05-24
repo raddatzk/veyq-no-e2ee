@@ -9,7 +9,14 @@ import WorkspaceTopbar from './WorkspaceTopbar.vue'
 const createTenantOpen = ref(false)
 const { authState } = useAuthState()
 const route = useRoute()
-const publicRouteNames = new Set(['setup', 'login', 'invite', 'password-reset', 'email-confirm'])
+const publicRouteNames = new Set([
+  'setup',
+  'login',
+  'invite',
+  'public-share',
+  'password-reset',
+  'email-confirm'
+])
 const showWorkspaceShell = computed(() =>
   authState.isAuthenticated && !publicRouteNames.has(String(route.name ?? ''))
 )

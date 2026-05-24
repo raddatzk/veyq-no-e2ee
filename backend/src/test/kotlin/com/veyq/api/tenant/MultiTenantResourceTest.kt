@@ -15,6 +15,7 @@ import com.veyq.api.domain.TenantRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
+import com.veyq.api.security.RateLimitService
 import com.veyq.api.setup.ServerState
 import com.veyq.api.setup.SetupFilter
 import io.quarkus.test.junit.QuarkusTest
@@ -38,6 +39,7 @@ class MultiTenantResourceTest {
     @Inject lateinit var tenantGroupRepo: TenantGroupRepo
     @Inject lateinit var tenantGroupMemberRepo: TenantGroupMemberRepo
     @Inject lateinit var passwordService: PasswordService
+    @Inject lateinit var rateLimitService: RateLimitService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var transaction: UserTransaction
 
@@ -47,6 +49,7 @@ class MultiTenantResourceTest {
 
     @BeforeEach
     fun createOwner() {
+        rateLimitService.clearAll()
         runId = UUID.randomUUID().toString().take(8)
         ownerEmail = "owner-$runId@example.com"
         ownerPassword = "admin1234567"
@@ -283,6 +286,7 @@ class MultiTenantResourceTest {
             User().also {
                 it.passwordHash = passwordService.hash(password)
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = role
                 it.passwordSetAt = Instant.now()

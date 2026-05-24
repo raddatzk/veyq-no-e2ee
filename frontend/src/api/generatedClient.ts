@@ -8,6 +8,9 @@ import {
   MemoriesApi,
   MemoryMediaApi,
   MemoryNavigationApi,
+  MemorySharesApi,
+  ProfilesApi,
+  PublicSharesApi,
   ServerApi,
   SettingsApi,
   SetupApi,
@@ -27,6 +30,9 @@ export const foldersApi = new FoldersApi(generatedConfiguration)
 export const memoriesApi = new MemoriesApi(generatedConfiguration)
 export const memoryMediaApi = new MemoryMediaApi(generatedConfiguration)
 export const memoryNavigationApi = new MemoryNavigationApi(generatedConfiguration)
+export const memorySharesApi = new MemorySharesApi(generatedConfiguration)
+export const profilesApi = new ProfilesApi(generatedConfiguration)
+export const publicSharesApi = new PublicSharesApi(generatedConfiguration)
 export const serverApi = new ServerApi(generatedConfiguration)
 export const settingsApi = new SettingsApi(generatedConfiguration)
 export const frontendApi = new FrontendApi(generatedConfiguration)

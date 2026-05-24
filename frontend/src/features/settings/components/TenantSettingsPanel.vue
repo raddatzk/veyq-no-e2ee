@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
+import ManagementList from '../../../shared/components/ManagementList.vue'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
 import { deleteTenant as deleteTenantApi, tenants as loadTenantSummaries } from '../../../api/tenantClient'
 import { useAuthState } from '../../../shared/state/useAuthState'
@@ -182,20 +183,22 @@ function userSortLabel(user: TenantUserSummary): string {
         <Button label="User einladen" icon="pi pi-user-plus" @click="openInviteDialog" />
       </div>
 
-      <div class="settings-table">
-        <div class="settings-table-row settings-table-head tenant-users-row">
-          <span>User</span>
-          <span>Status</span>
-          <span>Rolle</span>
-          <span></span>
-        </div>
-        <div v-for="user in users" :key="user.user.userId" class="settings-table-row tenant-users-row">
-          <div>
-            <strong>{{ user.user.displayName }}</strong>
-            <span v-if="user.email">{{ user.email }}</span>
+      <ManagementList>
+        <div v-for="user in users" :key="user.user.userId" class="management-row">
+          <div class="management-row-main">
+            <strong class="management-row-title">{{ user.user.displayName }}</strong>
+            <span v-if="user.email" class="management-row-subtitle">{{ user.email }}</span>
+            <div class="management-row-meta">
+              <span
+                class="management-badge"
+                :class="user.status === 'Active' ? 'success' : 'warning'"
+              >
+                {{ user.status === 'Active' ? 'Aktiv' : 'Ausstehend' }}
+              </span>
+            </div>
           </div>
-          <span>{{ user.status === 'Active' ? 'Aktiv' : 'Ausstehend' }}</span>
           <Select
+            class="management-control"
             :model-value="user.role"
             :options="roleOptions"
             option-label="label"
@@ -203,18 +206,21 @@ function userSortLabel(user: TenantUserSummary): string {
             aria-label="Tenant-Rolle"
             @update:model-value="changeRole(user, $event)"
           />
-          <Button
-            v-if="user.status === 'Pending'"
-            label="Erneut einladen"
-            icon="pi pi-send"
-            severity="secondary"
-            outlined
-            :loading="saving"
-            @click="reinviteUser(user)"
-          />
-          <span v-else></span>
+          <div class="management-actions">
+            <Button
+              v-if="user.status === 'Pending'"
+              icon="pi pi-send"
+              severity="secondary"
+              outlined
+              size="small"
+              aria-label="Erneut einladen"
+              title="Erneut einladen"
+              :loading="saving"
+              @click="reinviteUser(user)"
+            />
+          </div>
         </div>
-      </div>
+      </ManagementList>
 
       <div v-if="canDeleteTenant" class="button-row">
         <Button

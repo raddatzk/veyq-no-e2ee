@@ -69,7 +69,7 @@ describe('TenantSettingsPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text().includes('Erneut einladen'))!.trigger('click')
+    await wrapper.find('button[aria-label="Erneut einladen"]').trigger('click')
     await flushPromises()
 
     expect(reinviteTenantUserMock).toHaveBeenCalledWith('friends', 2)
@@ -103,7 +103,7 @@ function mountPanel() {
     global: {
       stubs: {
         Button: {
-          template: '<button :disabled="disabled" @click="$emit(\'click\', $event)"><slot />{{ label }}</button>',
+          template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><slot />{{ label }}</button>',
           props: ['disabled', 'label']
         },
         Dialog: {
@@ -136,7 +136,8 @@ function tenantUser(
   return {
     user: {
       userId,
-      displayName
+      displayName,
+      permalink: displayName.toLowerCase()
     },
     email,
     role,

@@ -3,6 +3,7 @@ package com.veyq.api.usermgmt.user
 import com.veyq.api.auth.*
 import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.common.Permalinks
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.Tenant
@@ -45,17 +46,37 @@ class UserService @Inject constructor(
             ?: throw NotFoundException("User $userId not found")
     }
 
+    fun getUserProfile(userPermalink: String): UserProfileSummary {
+        val permalink = normalizePermalink(userPermalink)
+        val profileUser = userRepo.findByPermalink(permalink)
+            ?: throw NotFoundException("Profile not found")
+        tenantMemberRepo.findByTenantAndUser(requestContext.tenant!!, profileUser)
+            ?: throw NotFoundException("Profile not found")
+        return UserProfileSummary(
+            displayName = profileUser.displayName,
+            permalink = profileUser.permalink,
+            initials = initials(profileUser.displayName),
+            avatarUrl = null,
+        )
+    }
+
     @Transactional
     fun updateMySettings(request: UpdateUserSettingsRequest): UserSummary {
         val user = managedUser()
         val displayName = request.displayName.trim()
+        val permalink = normalizePermalink(request.permalink)
         val email = request.email.trim().lowercase()
         val emailOwner = userRepo.findByEmail(email)
         if (emailOwner != null && emailOwner.id != user.id) {
             throw ConflictException("Email already exists")
         }
+        val permalinkOwner = userRepo.findByPermalink(permalink)
+        if (permalinkOwner != null && permalinkOwner.id != user.id) {
+            throw ConflictException("Permalink already exists")
+        }
 
         user.displayName = displayName
+        user.permalink = permalink
         val pendingEmail = if (email != user.email) {
             emailChangeService.requestEmailChange(user, email)
         } else {
@@ -107,6 +128,7 @@ class UserService @Inject constructor(
         val user = User().also {
             it.email = email
             it.displayName = email.substringBefore("@").ifBlank { email }
+            it.permalink = uniquePermalink(it.displayName)
             it.role = ServerRole.ServerMember
             it.passwordHash = passwordService.randomPasswordHash()
             it.passwordSetAt = null
@@ -209,6 +231,9 @@ class UserService @Inject constructor(
             val rawPassword = request.password
                 ?: throw BadRequestException("password must not be blank")
             invitedUser.displayName = displayName
+            if (invitedUser.permalink.startsWith("user-")) {
+                invitedUser.permalink = uniquePermalink(displayName, invitedUser)
+            }
             passwordService.setPassword(invitedUser, rawPassword, now)
         } else if (requestContext.user?.id != invitedUser.id) {
             throw UnauthorizedException("User must be logged in to accept this invitation")
@@ -246,6 +271,9 @@ class UserService @Inject constructor(
         val now = Instant.now()
 
         invitedUser.displayName = displayName
+        if (invitedUser.permalink.startsWith("user-")) {
+            invitedUser.permalink = uniquePermalink(displayName, invitedUser)
+        }
         passkeyService.createPasskeyForUser(invitedUser, "Passkey", request.credential, routingContext)
 
         val tenant = invitedUser.tenantMemberships.firstOrNull()?.tenant
@@ -282,6 +310,34 @@ class UserService @Inject constructor(
         email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("email must not be blank")
 
+    private fun normalizePermalink(value: String?): String {
+        val permalink = value?.let(Permalinks::normalize)?.takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("permalink must not be blank")
+        if (!Permalinks.isValid(permalink) || permalink == "me") throw BadRequestException("Invalid permalink")
+        return permalink
+    }
+
+    private fun uniquePermalink(displayName: String, currentUser: User? = null): String {
+        val base = Permalinks.normalize(displayName).takeIf { it.isNotBlank() && it != "me" } ?: "user"
+        var candidate = base
+        var suffix = 2
+        while (true) {
+            val owner = userRepo.findByPermalink(candidate)
+            if (owner == null || owner.id == currentUser?.id) return candidate
+            val nextSuffix = "-${suffix++}"
+            candidate = base.take(120 - nextSuffix.length).trimEnd('-') + nextSuffix
+        }
+    }
+
+    private fun initials(displayName: String): String =
+        displayName
+            .trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .take(2)
+            .joinToString("") { it.first().uppercaseChar().toString() }
+            .ifBlank { "?" }
+
     private fun user(): User = requestContext.user!!
 
     private fun managedUser(): User =
@@ -298,6 +354,7 @@ class UserService @Inject constructor(
             user.id,
             user.email,
             user.displayName,
+            user.permalink,
             user.role.toUsersApiRole(),
             passkeyCredentialRepo.countByUser(user).toInt(),
             pendingEmail,
@@ -305,7 +362,7 @@ class UserService @Inject constructor(
 
     companion object {
         fun toUserSummary(user: User, pendingEmail: String? = null): UserSummary {
-            return UserSummary(user.id, user.email, user.displayName, user.role.toUsersApiRole(), 0, pendingEmail)
+            return UserSummary(user.id, user.email, user.displayName, user.permalink, user.role.toUsersApiRole(), 0, pendingEmail)
         }
     }
 }
@@ -330,7 +387,7 @@ fun User.toManagedUserSummary(knownTenant: Tenant? = null): ManagedUserSummary {
 }
 
 fun User.toUserSummary(pendingEmail: String? = null): UserSummary {
-    return UserSummary(id, email, displayName, role.toUsersApiRole(), passkeyCredentials.size, pendingEmail)
+    return UserSummary(id, email, displayName, permalink, role.toUsersApiRole(), passkeyCredentials.size, pendingEmail)
 }
 
 fun ServerRole.toUsersApiRole(): ApiServerRole =

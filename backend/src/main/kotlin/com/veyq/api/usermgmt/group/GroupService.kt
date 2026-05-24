@@ -169,6 +169,7 @@ private fun User.toGroupMemberSummaryUser(): PublicUserSummary =
     PublicUserSummary(
         id,
         displayName,
+        permalink,
     )
 
 private fun GroupRole.toGroupsApiRole(): ApiGroupRole =

@@ -4,7 +4,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import MediaLightbox from './MediaLightbox.vue'
 import { calculateJustifiedMediaLayout } from './mediaGridLayout'
 import type { MediaGridLayoutResult, MediaGridLayoutTile } from './mediaGridLayout'
-import type { MemoryMedia } from '../../features/memories/api'
+import type { MemoryMedia, UpdateMemoryMediaMetadataRequest } from '../../features/memories/api'
 import { API_BASE } from '../../api/httpClient'
 
 type GalleryItem = {
@@ -22,6 +22,17 @@ const props = defineProps<{
   tenantName: string
   media: MemoryMedia[]
   streaming: boolean
+  canEditMetadata?: boolean
+  canDeleteMedia?: boolean
+  updateMetadata?: (
+    mediaId: string,
+    memoryId: string,
+    request: UpdateMemoryMediaMetadataRequest
+  ) => Promise<MemoryMedia>
+  deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+}>()
+const emit = defineEmits<{
+  deleted: [media: MemoryMedia]
 }>()
 
 const selectedIndex = ref<number | null>(null)
@@ -270,6 +281,14 @@ function updateMedia(media: MemoryMedia) {
   mediaOverrides.value = { ...mediaOverrides.value, [media.id]: media }
 }
 
+function removeMedia(media: MemoryMedia) {
+  mediaOverrides.value = Object.fromEntries(
+    Object.entries(mediaOverrides.value).filter(([mediaId]) => mediaId !== media.id)
+  )
+  closeLightbox()
+  emit('deleted', media)
+}
+
 function closeLightbox() {
   selectedIndex.value = null
 }
@@ -368,10 +387,15 @@ function handleKeydown(event: KeyboardEvent) {
       :media="selectedMedia"
       :can-show-previous="canShowPrevious"
       :can-show-next="canShowNext"
+      :can-edit-metadata="canEditMetadata"
+      :can-delete="canDeleteMedia"
+      :update-metadata="updateMetadata"
+      :delete-media="deleteMedia"
       @close="closeLightbox"
       @previous="showPrevious"
       @next="showNext"
       @updated="updateMedia"
+      @deleted="removeMedia"
     />
   </section>
 </template>

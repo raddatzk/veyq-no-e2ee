@@ -6,6 +6,7 @@ import com.veyq.api.auth.LoginContext
 import com.veyq.api.auth.AuthService
 import com.veyq.api.auth.PasswordService
 import com.veyq.api.auth.passkey.PasskeyService
+import com.veyq.api.common.Permalinks
 import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.User
@@ -79,6 +80,7 @@ class SetupService @Inject constructor(
             ?: throw BadRequestException("Passkey setup was not started")
         user.email = email
         user.displayName = request.displayName.trim()
+        user.permalink = profilePermalink(user.displayName)
         passkeyService.createPasskeyForUser(user, "Setup Passkey", request.credential, routingContext)
         serverState.markSetupCompleted()
 
@@ -91,10 +93,12 @@ class SetupService @Inject constructor(
             it.role = ServerRole.ServerOwner
             it.email = email
             it.displayName = displayName
+            it.permalink = profilePermalink(displayName)
             userRepo.persist(it)
         }
         user.email = email
         user.displayName = displayName
+        user.permalink = profilePermalink(displayName)
         return user
     }
 
@@ -110,11 +114,15 @@ class SetupService @Inject constructor(
         email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("email must not be blank")
 
+    private fun profilePermalink(displayName: String): String =
+        Permalinks.normalize(displayName).takeIf { it.isNotBlank() && it != "me" } ?: "admin"
+
     private fun User.toSetupSummary(): UserSummary =
         UserSummary(
             id,
             email,
             displayName,
+            permalink,
             ApiServerRole.ServerOwner,
             passkeyCredentialRepo.countByUser(this).toInt(),
         )

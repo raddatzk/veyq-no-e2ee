@@ -18,6 +18,7 @@ const domains = [
   'tenants',
   'groups',
   'memories',
+  'shares',
   'server',
   'frontend'
 ]
@@ -119,6 +120,10 @@ function rewriteExternalComponentRefs(value) {
       .replace('./users.openapi.yaml#/components/schemas/', '#/components/schemas/')
       .replace('./users.openapi.yaml#/components/responses/', '#/components/responses/')
       .replace('./users.openapi.yaml#/components/parameters/', '#/components/parameters/')
+      .replace('./memories.openapi.yaml#/components/schemas/', '#/components/schemas/')
+      .replace('./memories.openapi.yaml#/components/responses/', '#/components/responses/')
+      .replace('./memories.openapi.yaml#/components/requestBodies/', '#/components/requestBodies/')
+      .replace('./memories.openapi.yaml#/components/parameters/', '#/components/parameters/')
   }
 
   if (Array.isArray(value)) {

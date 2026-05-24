@@ -133,7 +133,7 @@ class UserManagementResourceTest {
         given()
             .contentType("application/json")
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
-            .body("""{"displayName":"Changed Owner","email":"$pendingEmail"}""")
+            .body("""{"displayName":"Changed Owner","permalink":"mgmt-owner-$runId","email":"$pendingEmail"}""")
             .`when`().put("/api/users/me")
             .then()
             .statusCode(200)
@@ -191,7 +191,7 @@ class UserManagementResourceTest {
         given()
             .contentType("application/json")
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
-            .body("""{"displayName":"Display Only","email":"$currentEmail"}""")
+            .body("""{"displayName":"Display Only","permalink":"mgmt-owner-$runId","email":"$currentEmail"}""")
             .`when`().put("/api/users/me")
             .then()
             .statusCode(200)
@@ -200,6 +200,76 @@ class UserManagementResourceTest {
             .body("pendingEmail", nullValue())
 
         assertThat(mailbox.getMailMessagesSentTo(currentEmail)).isEmpty()
+    }
+
+    @Test
+    fun `user settings can change permalink independently from display name`() {
+        val currentEmail = "mgmt-owner-$runId@example.com"
+        val nextPermalink = "kevin-$runId"
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Display Only","permalink":"$nextPermalink","email":"$currentEmail"}""")
+            .`when`().put("/api/users/me")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Display Only"))
+            .body("permalink", equalTo(nextPermalink))
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/${tenant.name}/profiles/$nextPermalink")
+            .then()
+            .statusCode(200)
+            .body("displayName", equalTo("Display Only"))
+            .body("permalink", equalTo(nextPermalink))
+            .body("initials", equalTo("DO"))
+    }
+
+    @Test
+    fun `user settings rejects duplicate and reserved permalinks`() {
+        val other = createUser("other-user-$runId", "admin1234567", ServerRole.ServerMember)
+        val currentEmail = "mgmt-owner-$runId@example.com"
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Owner","permalink":"${other.permalink}","email":"$currentEmail"}""")
+            .`when`().put("/api/users/me")
+            .then()
+            .statusCode(409)
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Owner","permalink":"me","email":"$currentEmail"}""")
+            .`when`().put("/api/users/me")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
+    fun `profile endpoint returns only public header fields`() {
+        @Suppress("UNCHECKED_CAST")
+        val response = given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/${tenant.name}/profiles/mgmt-owner-$runId")
+            .then()
+            .statusCode(200)
+            .extract()
+            .`as`(Map::class.java) as Map<String, Any?>
+
+        assertThat(response).containsEntry("displayName", "mgmt-owner-$runId")
+        assertThat(response).containsEntry("permalink", "mgmt-owner-$runId")
+        assertThat(response).containsEntry("initials", "M")
+        assertThat(response).doesNotContainKeys("userId", "email", "memories")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/${tenant.name}/profiles/unknown-$runId")
+            .then()
+            .statusCode(404)
     }
 
     @Test
@@ -680,7 +750,7 @@ class UserManagementResourceTest {
         given()
             .contentType("application/json")
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
-            .body("""{"displayName":"Owner","email":"$pendingEmail"}""")
+            .body("""{"displayName":"Owner","permalink":"mgmt-owner-$runId","email":"$pendingEmail"}""")
             .`when`().put("/api/users/me")
             .then()
             .statusCode(200)
@@ -713,6 +783,7 @@ class UserManagementResourceTest {
             User().also {
                 it.passwordHash = passwordService.hash(password)
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = role
                 it.passwordSetAt = Instant.now()
@@ -730,6 +801,7 @@ class UserManagementResourceTest {
             User().also {
                 it.passwordHash = passwordService.hash("admin1234567")
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = ServerRole.ServerOwner
                 it.passwordSetAt = Instant.now()
@@ -744,6 +816,7 @@ class UserManagementResourceTest {
             val user = User().also {
                 it.passwordHash = passwordService.hash("pending-password")
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = ServerRole.ServerOwner
                 it.passwordSetAt = null

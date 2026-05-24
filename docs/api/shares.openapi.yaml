@@ -1,0 +1,1237 @@
+---
+openapi: 3.1.0
+info:
+  title: Veyq Public Shares API
+  version: 0.1.0
+  description: Password-protected public Memory subtree sharing.
+servers:
+  - url: /
+security:
+  - accessTokenCookie: []
+tags:
+  - name: MemoryShares
+  - name: PublicShares
+paths:
+  "/api/{tenantName}/memories/{memoryId}/shares":
+    get:
+      tags: [MemoryShares]
+      operationId: listMemoryShares
+      summary: List shares for a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant and see the addressed Memory.
+      description: |-
+        Lists public shares created for the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant and see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/MemoryShares"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags: [MemoryShares]
+      operationId: createMemoryShare
+      summary: Create a memory share
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant and see the addressed Memory.
+      description: |-
+        Creates a public share for the addressed Memory subtree. Password protection is optional.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant and see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryShare"
+      responses:
+        "200":
+          "$ref": "#/components/responses/MemoryShare"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-shares/{shareId}":
+    put:
+      tags: [MemoryShares]
+      operationId: updateMemoryShare
+      summary: Update a memory share
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant and see the addressed Memory.
+      description: |-
+        Updates public share role, enabled state, internal name or password.
+        Missing `name` or `password` fields leave the current value unchanged.
+        `null` or an empty string removes the corresponding name/password value.
+        Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the share tenant and see the root Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/ShareId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryShare"
+      responses:
+        "200":
+          "$ref": "#/components/responses/MemoryShare"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShare
+      summary: Resolve public share state
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Resolves a public share and reports whether protected Memory content can be loaded.
+        Protected unauthenticated shares intentionally omit Memory metadata.
+
+        Vorbedingungen:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShare"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/login":
+    post:
+      tags: [PublicShares]
+      operationId: loginPublicShare
+      summary: Open a public share identity session
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - The request provides a display name for the anonymous share identity.
+      description: |-
+        Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.
+
+        Vorbedingungen:
+        - The share id exists and the share is enabled.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      requestBody:
+        "$ref": "#/components/requestBodies/PublicShareLogin"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShare"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/logout":
+    post:
+      tags: [PublicShares]
+      operationId: logoutPublicShare
+      summary: Close a public share identity session
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access- or refresh-token cookie may be present.
+      description: |-
+        Revokes the current share access-/refresh-token cookies for this share.
+
+        Vorbedingungen:
+        - The share id exists.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      responses:
+        "204":
+          description: Share session revoked.
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/refresh":
+    post:
+      tags: [PublicShares]
+      operationId: refreshPublicShare
+      summary: Refresh a public share identity session
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share refresh-token cookie must be present.
+      description: |-
+        Rotates the public share refresh token and sets a new public share access-token cookie.
+
+        Vorbedingungen:
+        - The share id exists and the share is enabled.
+        - A valid share refresh-token cookie must be present.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShare"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/tree":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareTree
+      summary: Load public share memory tree
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Loads the Memory subtree visible through the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareTree"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/by-path":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareMemoryByPath
+      summary: Load a Memory in a public share by path
+      security: []
+      x-implementation-status: implemented
+      x-preconditions: &publicShareReadPreconditions
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Loads one Memory from the shared subtree by share-relative path.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryPath"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemory"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}":
+    put:
+      tags: [PublicShares]
+      operationId: updatePublicShareMemory
+      summary: Update a Memory through a public share
+      security: []
+      x-implementation-status: implemented
+      x-preconditions: &publicShareEditPreconditions
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Updates display metadata for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePublicShareMemory"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemory"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags: [PublicShares]
+      operationId: deletePublicShareMemory
+      summary: Delete a submemory through a public share
+      security: []
+      x-implementation-status: implemented
+      x-preconditions: &publicShareDeletePreconditions
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree and is not the share root.
+      description: |-
+        Deletes a submemory inside the shared subtree. The share root cannot be deleted through the share.
+
+        Vorbedingungen:
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree and is not the share root.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "204":
+          description: Public share submemory deleted.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/children":
+    get:
+      tags: [PublicShares]
+      operationId: listPublicShareChildMemories
+      summary: List child Memories in a public share
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Lists child Memories for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemoryList"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags: [PublicShares]
+      operationId: createPublicShareChildMemory
+      summary: Create a child Memory through a public share
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Creates a child Memory below one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The parent Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreatePublicShareMemory"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemory"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media":
+    get:
+      tags: [PublicShares]
+      operationId: listPublicShareMemoryMedia
+      summary: List media for one public share Memory
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Lists media for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMediaList"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags: [PublicShares]
+      operationId: uploadPublicShareMemoryMedia
+      summary: Upload media to one public share Memory
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Uploads media into one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadPublicShareMedia"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/cover":
+    put:
+      tags: [PublicShares]
+      operationId: setPublicShareMemoryCover
+      summary: Set public share Memory cover
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Sets the cover for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/SetPublicShareMemoryCover"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemory"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags: [PublicShares]
+      operationId: removePublicShareMemoryCover
+      summary: Remove public share Memory cover
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Removes the cover for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMemory"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/cover/content":
+    get:
+      tags: [PublicShares]
+      operationId: publicShareMemoryCoverContent
+      summary: Stream explicit public share Memory cover
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Streams an explicit cover upload for one Memory inside the shared subtree.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          description: Cover bytes.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/metadata":
+    patch:
+      tags: [PublicShares]
+      operationId: updatePublicShareMediaMetadata
+      summary: Correct public share media metadata
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Corrects media metadata for one media item inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The media belongs to the requested Memory inside the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePublicShareMediaMetadata"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}":
+    delete:
+      tags: [PublicShares]
+      operationId: deletePublicShareMedia
+      summary: Delete media through a public share
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The media belongs to the requested Memory inside the shared subtree.
+      description: |-
+        Deletes one media item inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The media belongs to the requested Memory inside the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        "204":
+          description: Public share media deleted.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media":
+    get:
+      tags: [PublicShares]
+      operationId: listPublicShareMedia
+      summary: List public share media
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Lists media visible through the share role. `UPLOADER` identities only receive their own uploads.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMediaList"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags: [PublicShares]
+      operationId: uploadPublicShareMedia
+      summary: Upload public share media
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Legacy/root upload endpoint for uploader-only shares. Normal Memory share views upload to a concrete Memory endpoint.
+        Anonymous uploads are attributed to the current share identity.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadPublicShareMedia"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/{mediaId}/content":
+    get:
+      tags: [PublicShares]
+      operationId: publicShareMediaContent
+      summary: Stream public share media
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Streams original media bytes for media visible through the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - The media belongs to the shared Memory subtree and is visible for the share role.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MediaId"
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Media bytes.
+        "206":
+          description: Partial media bytes.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        "416":
+          "$ref": "./common.openapi.yaml#/components/responses/416"
+  "/api/public-shares/{shareId}/media/{mediaId}/preview":
+    get:
+      tags: [PublicShares]
+      operationId: publicShareMediaPreview
+      summary: Stream public share media preview
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Streams a generated media preview for media visible through the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - The media belongs to the shared Memory subtree and is visible for the share role.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: JPEG preview bytes.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+components:
+  parameters:
+    MemoryId:
+      in: path
+      required: true
+      name: memoryId
+      description: Public Memory id.
+      schema:
+        type: string
+      example: mem_abc123
+    ShareId:
+      in: path
+      required: true
+      name: shareId
+      description: Public share id.
+      schema:
+        type: string
+      example: shr_abc123
+    MediaId:
+      in: path
+      required: true
+      name: mediaId
+      description: Public media id.
+      schema:
+        type: string
+      example: med_abc123
+    MemoryPath:
+      in: query
+      required: true
+      name: path
+      description: Share-relative Memory path. `/` resolves to the share root.
+      schema:
+        type: string
+      example: /day-1
+  requestBodies:
+    CreateMemoryShare:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryShareRequest"
+          example:
+            name: Family review
+            role: VIEWER
+            password: share-password123
+    UpdateMemoryShare:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryShareRequest"
+          example:
+            name: Family uploads
+            role: CONTRIBUTOR
+            enabled: true
+    PublicShareLogin:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareLoginRequest"
+          example:
+            password: share-password123
+            displayName: Alex
+    UploadPublicShareMedia:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file]
+            properties:
+              file:
+                type: string
+                format: binary
+              title:
+                type: string
+          example:
+            title: Ceremony
+    CreatePublicShareMemory:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreatePublicShareMemoryRequest"
+          example:
+            name: day-2
+            displayName: Day 2
+            startDate: "2026-05-04"
+            endDate: "2026-05-04"
+    UpdatePublicShareMemory:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdatePublicShareMemoryRequest"
+          example:
+            name: day-2
+            displayName: Day 2
+            startDate: "2026-05-04"
+            endDate: "2026-05-04"
+    UpdatePublicShareMediaMetadata:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaMetadataRequest"
+          example:
+            capturedAt: "2026-05-04T18:30:00Z"
+    SetPublicShareMemoryCover:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+              mediaId:
+                type: string
+              cropX:
+                type: number
+                format: double
+              cropY:
+                type: number
+                format: double
+              cropWidth:
+                type: number
+                format: double
+              cropHeight:
+                type: number
+                format: double
+          example:
+            mediaId: med_abc123
+            cropX: 0.1
+            cropY: 0.05
+            cropWidth: 0.8
+            cropHeight: 0.8
+  responses:
+    MemoryShare:
+      description: Managed public share.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryShareSummary"
+          example:
+            id: shr_abc123
+            memoryId: mem_abc123
+            role: VIEWER
+            enabled: true
+            shareUrl: /s/shr_abc123
+            name: Family review
+            hasPassword: true
+            createdAt: "2026-05-24T10:00:00Z"
+            updatedAt: "2026-05-24T10:00:00Z"
+    MemoryShares:
+      description: Managed public shares.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryShareSummary"
+          example:
+            - id: shr_abc123
+              memoryId: mem_abc123
+              role: VIEWER
+              enabled: true
+              shareUrl: /s/shr_abc123
+              name: Family review
+              hasPassword: true
+              createdAt: "2026-05-24T10:00:00Z"
+              updatedAt: "2026-05-24T10:00:00Z"
+    PublicShare:
+      description: Public share state.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareSummary"
+          example:
+            id: shr_abc123
+            role: VIEWER
+            authenticated: true
+            passwordRequired: true
+            displayNameRequired: false
+            canViewGallery: true
+            canUpload: false
+            canEdit: false
+            canDelete: false
+            rootMemory:
+              id: mem_abc123
+              name: summer-trip
+              displayName: Summer Trip
+              path: /
+              parentId: null
+              childCount: 1
+              mediaCount: 3
+              startDate: "2026-05-03"
+              endDate: "2026-05-05"
+    PublicShareTree:
+      description: Public Memory subtree.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareTreeResponse"
+          example:
+            root:
+              id: mem_abc123
+              name: summer-trip
+              displayName: Summer Trip
+              path: /
+              parentId: null
+              childCount: 1
+              mediaCount: 3
+              startDate: "2026-05-03"
+              endDate: "2026-05-05"
+            memories: []
+    PublicShareMemory:
+      description: Public share Memory.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareMemorySummary"
+          example:
+            id: mem_abc123
+            name: summer-trip
+            displayName: Summer Trip
+            path: /
+            parentId: null
+            childCount: 1
+            mediaCount: 3
+            startDate: "2026-05-03"
+            endDate: "2026-05-05"
+    PublicShareMemoryList:
+      description: Public share Memories.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/PublicShareMemorySummary"
+          example:
+            - id: mem_child123
+              name: day-1
+              displayName: Day 1
+              path: /day-1
+              parentId: mem_abc123
+              childCount: 0
+              mediaCount: 2
+              startDate: "2026-05-03"
+              endDate: "2026-05-03"
+    PublicShareMedia:
+      description: Public media summary.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareMediaSummary"
+          example:
+            id: med_abc123
+            memoryId: mem_abc123
+            title: Ceremony
+            uploader:
+              type: ANONYMOUS
+              displayName: Alex
+            createdAt: "2026-05-24T10:00:00Z"
+            capturedAtOverride: false
+            mimeType: image/jpeg
+            sizeBytes: 1000
+            contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+    PublicShareMediaList:
+      description: Public media summaries.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/PublicShareMediaSummary"
+          example:
+            - id: med_abc123
+              memoryId: mem_abc123
+              title: Ceremony
+              uploader:
+                type: ANONYMOUS
+                displayName: Alex
+              createdAt: "2026-05-24T10:00:00Z"
+              capturedAtOverride: false
+              mimeType: image/jpeg
+              sizeBytes: 1000
+              contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+  schemas:
+    MemoryShareRole:
+      type: string
+      enum: [VIEWER, CONTRIBUTOR, MANAGER, UPLOADER]
+    CreateMemoryShareRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+        role:
+          "$ref": "#/components/schemas/MemoryShareRole"
+        password:
+          type: string
+          nullable: true
+          minLength: 0
+    UpdateMemoryShareRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 120
+        role:
+          "$ref": "#/components/schemas/MemoryShareRole"
+        enabled:
+          type: boolean
+          description: Set to `false` to revoke the share link. Managed share deletion is not supported in V1.
+        password:
+          type: string
+          nullable: true
+          minLength: 0
+    PublicShareLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        password:
+          type: string
+          nullable: true
+          minLength: 0
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+    MemoryShareSummary:
+      type: object
+      additionalProperties: false
+      required: [id, memoryId, role, enabled, shareUrl, hasPassword, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        name:
+          type: string
+          nullable: true
+        role:
+          "$ref": "#/components/schemas/MemoryShareRole"
+        enabled:
+          type: boolean
+        shareUrl:
+          type: string
+        hasPassword:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PublicShareSummary:
+      type: object
+      additionalProperties: false
+      required: [id, role, authenticated, passwordRequired, displayNameRequired, canViewGallery, canUpload, canEdit, canDelete]
+      properties:
+        id:
+          type: string
+        role:
+          "$ref": "#/components/schemas/MemoryShareRole"
+        authenticated:
+          type: boolean
+        passwordRequired:
+          type: boolean
+        displayNameRequired:
+          type: boolean
+        canViewGallery:
+          type: boolean
+        canUpload:
+          type: boolean
+        canEdit:
+          type: boolean
+        canDelete:
+          type: boolean
+        redirectUrl:
+          type: string
+          nullable: true
+        rootMemory:
+          description: Present only when the caller already has public or authenticated access to Memory details.
+          "$ref": "#/components/schemas/PublicShareMemorySummary"
+          nullable: true
+    PublicShareTreeResponse:
+      type: object
+      additionalProperties: false
+      required: [root, memories]
+      properties:
+        root:
+          "$ref": "#/components/schemas/PublicShareMemorySummary"
+        memories:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PublicShareMemorySummary"
+    PublicShareMemorySummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, displayName, path, parentId, childCount, mediaCount, startDate, endDate]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        path:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+        childCount:
+          type: integer
+          format: int32
+        mediaCount:
+          type: integer
+          format: int32
+        coverUrl:
+          type: string
+          nullable: true
+        coverMediaId:
+          type: string
+          nullable: true
+        coverCrop:
+          "$ref": "#/components/schemas/PublicShareCoverCrop"
+          nullable: true
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+    PublicShareCoverCrop:
+      type: object
+      additionalProperties: false
+      required: [x, y, width, height]
+      properties:
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        width:
+          type: number
+          format: double
+        height:
+          type: number
+          format: double
+    CreatePublicShareMemoryRequest:
+      type: object
+      additionalProperties: false
+      required: [name, displayName, startDate, endDate]
+      properties:
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+    UpdatePublicShareMemoryRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+    PublicShareMediaSummary:
+      type: object
+      additionalProperties: false
+      required: [id, memoryId, title, uploader, createdAt, capturedAtOverride, mimeType, sizeBytes, contentUrl]
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        title:
+          type: string
+        uploader:
+          "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
+        createdAt:
+          type: string
+          format: date-time
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+        capturedAtOverride:
+          type: boolean
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentUrl:
+          type: string
+        previewUrl:
+          type: string
+          nullable: true

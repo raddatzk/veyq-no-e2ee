@@ -35,6 +35,7 @@ describe('InviteView', () => {
       userId: 42,
       email: 'invitee@example.test',
       displayName: 'Invitee',
+      permalink: 'invitee',
       serverRole: 'ServerMember',
       passkeyCount: 0
     })
@@ -44,6 +45,7 @@ describe('InviteView', () => {
         userId: 42,
         email: 'invitee@example.test',
         displayName: 'Invitee',
+        permalink: 'invitee',
         serverRole: 'ServerMember',
         passkeyCount: 0
       },
@@ -75,6 +77,7 @@ describe('InviteView', () => {
       userId: 42,
       email: 'invitee@example.test',
       displayName: 'Invitee',
+      permalink: 'invitee',
       serverRole: 'ServerMember',
       passkeyCount: 1
     })
@@ -84,6 +87,7 @@ describe('InviteView', () => {
         userId: 42,
         email: 'invitee@example.test',
         displayName: 'Invitee',
+        permalink: 'invitee',
         serverRole: 'ServerMember',
         passkeyCount: 1
       },

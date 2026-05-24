@@ -1,6 +1,7 @@
 export const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 let refreshRequest: Promise<void> | null = null
+const shareRefreshRequests = new Map<string, Promise<void>>()
 
 export class SetupRequiredError extends Error {
   constructor() {
@@ -39,7 +40,15 @@ export async function apiFetchUrl(url: string, options: RequestInit = {}): Promi
   const path = pathFromUrl(url)
   let response = await requestUrl(url, options)
 
-  if (response.status === 401 && shouldTryRefresh(path)) {
+  if (response.status === 401 && shouldTryShareRefresh(path)) {
+    const shareId = publicShareId(path)
+    try {
+      await refreshShareLogin(shareId)
+      response = await requestUrl(url, options)
+    } catch {
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  } else if (response.status === 401 && shouldTryRefresh(path)) {
     try {
       await refreshLogin()
       response = await requestUrl(url, options)
@@ -75,6 +84,26 @@ async function requestUrl(url: string, options: RequestInit = {}): Promise<Respo
   })
 }
 
+async function refreshShareLogin(shareId: string): Promise<void> {
+  const existing = shareRefreshRequests.get(shareId)
+  if (existing) return existing
+
+  const request = requestUrl(`${API_BASE}/api/public-shares/${encodeURIComponent(shareId)}/refresh`, {
+    method: 'POST'
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw await apiError(response)
+      }
+    })
+    .finally(() => {
+      shareRefreshRequests.delete(shareId)
+    })
+
+  shareRefreshRequests.set(shareId, request)
+  return request
+}
+
 async function refreshLogin(): Promise<void> {
   refreshRequest ||= requestUrl(`${API_BASE}/api/auth/refresh`, { method: 'POST' })
     .then(async (response) => {
@@ -95,8 +124,23 @@ function pathFromUrl(url: string): string {
   return new URL(url).pathname
 }
 
+function publicShareId(path: string): string {
+  return path.match(/^\/api\/public-shares\/([^/]+)/)?.[1] || ''
+}
+
+function shouldTryShareRefresh(path: string): boolean {
+  return (
+    path.startsWith('/api/public-shares/') &&
+    !path.endsWith('/login') &&
+    !path.endsWith('/logout') &&
+    !path.endsWith('/refresh') &&
+    publicShareId(path) !== ''
+  )
+}
+
 function shouldTryRefresh(path: string): boolean {
   return (
+    !path.startsWith('/api/public-shares/') &&
     path !== '/api/auth/login' &&
     path !== '/api/auth/logout' &&
     path !== '/api/auth/refresh' &&

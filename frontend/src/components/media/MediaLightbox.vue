@@ -1,19 +1,34 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { updateMemoryMediaMetadata, type MemoryMedia } from '../../features/memories/api'
+import { RouterLink } from 'vue-router'
+import {
+  updateMemoryMediaMetadata,
+  type MemoryMedia,
+  type UpdateMemoryMediaMetadataRequest
+} from '../../features/memories/api'
 import { API_BASE } from '../../api/httpClient'
+import { memoryPathToTenantRoute } from '../../shared/utils/paths'
 
 const props = defineProps<{
   tenantName: string
   media: MemoryMedia
   canShowPrevious: boolean
   canShowNext: boolean
+  canEditMetadata?: boolean
+  canDelete?: boolean
+  updateMetadata?: (
+    mediaId: string,
+    memoryId: string,
+    request: UpdateMemoryMediaMetadataRequest
+  ) => Promise<MemoryMedia>
+  deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
 }>()
 const emit = defineEmits<{
   close: []
   previous: []
   next: []
   updated: [media: MemoryMedia]
+  deleted: [media: MemoryMedia]
 }>()
 
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
@@ -55,11 +70,17 @@ const gpsUrl = computed(() =>
     ? `https://www.google.com/maps/search/?api=1&query=${props.media.gpsLatitude},${props.media.gpsLongitude}`
     : ''
 )
+const uploaderLink = computed(() =>
+  props.tenantName && props.media.uploader.type === 'USER' && props.media.uploader.permalink
+    ? memoryPathToTenantRoute(props.tenantName, `/~${props.media.uploader.permalink}`)
+    : ''
+)
+const canEditMetadata = computed(() => props.canEditMetadata !== false)
+const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMedia))
 const metadataRows = computed(() =>
   [
     { label: 'Aufnahmezeit', value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
     { label: 'Uploadzeit', value: formatDate(props.media.createdAt) },
-    { label: 'Hochgeladen von', value: props.media.uploaderDisplayName || String(props.media.ownerUserId) },
     { label: 'Kamera', value: camera.value },
     { label: 'Objektiv', value: props.media.lensModel || '' },
     { label: 'Bildgröße', value: dimensions.value },
@@ -139,18 +160,28 @@ async function saveCapturedAt() {
   isSaving.value = true
   saveError.value = ''
   try {
-    const updated = await updateMemoryMediaMetadata(
-      props.tenantName,
-      props.media.memoryId,
-      props.media.id,
-      {
-        capturedAt: datetimeLocalToIso(capturedAtInput.value)
-      }
-    )
+    const request = { capturedAt: datetimeLocalToIso(capturedAtInput.value) }
+    const updated = props.updateMetadata
+      ? await props.updateMetadata(props.media.id, props.media.memoryId, request)
+      : await updateMemoryMediaMetadata(props.tenantName, props.media.memoryId, props.media.id, request)
     emit('updated', updated)
     isEditingCapturedAt.value = false
   } catch (error) {
     saveError.value = error instanceof Error ? error.message : 'Aufnahmezeit konnte nicht gespeichert werden'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function deleteCurrentMedia() {
+  if (!props.deleteMedia) return
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    await props.deleteMedia(props.media.id, props.media.memoryId)
+    emit('deleted', props.media)
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : 'Medium konnte nicht gelöscht werden'
   } finally {
     isSaving.value = false
   }
@@ -254,6 +285,16 @@ function onSheetPointerUp(event: PointerEvent) {
         <div class="media-lightbox-details-header">
           <h2>Informationen</h2>
           <button
+            v-if="canDeleteMedia"
+            class="lightbox-text-button"
+            type="button"
+            :disabled="isSaving"
+            @click="deleteCurrentMedia"
+          >
+            Löschen
+          </button>
+          <button
+            v-if="canEditMetadata"
             class="lightbox-text-button"
             type="button"
             @click="startCapturedAtEdit"
@@ -282,6 +323,13 @@ function onSheetPointerUp(event: PointerEvent) {
         </form>
 
         <dl class="media-lightbox-metadata">
+          <dt>Hochgeladen von</dt>
+          <dd class="media-lightbox-uploader">
+            <RouterLink v-if="uploaderLink" class="media-lightbox-uploader-link" :to="uploaderLink">
+              {{ media.uploader.displayName }}
+            </RouterLink>
+            <span v-else>{{ media.uploader.displayName }}</span>
+          </dd>
           <template v-for="row in metadataRows" :key="row.label">
             <dt>{{ row.label }}</dt>
             <dd>{{ row.value }}</dd>
@@ -299,3 +347,35 @@ function onSheetPointerUp(event: PointerEvent) {
     </main>
   </div>
 </template>
+
+<style scoped>
+.media-lightbox-uploader {
+  display: grid;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.media-lightbox-uploader-link {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-width: 0;
+  color: var(--app-text);
+  font: inherit;
+  line-height: 1.2;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--app-text) 30%, transparent);
+  text-underline-offset: 0.18em;
+}
+
+.media-lightbox-uploader-link:hover,
+.media-lightbox-uploader-link:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+.media-lightbox-uploader-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+</style>

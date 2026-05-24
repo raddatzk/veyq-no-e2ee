@@ -38,12 +38,13 @@ describe('UserSettingsForm', () => {
     await flushPromises()
 
     const inputs = wrapper.findAll('input')
-    await inputs[1].setValue('changed@example.test')
+    await inputs[2].setValue('changed@example.test')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(updateMySettingsMock).toHaveBeenCalledWith({
       displayName: 'Owner',
+      permalink: 'owner',
       email: 'changed@example.test'
     })
     expect(wrapper.text()).toContain('Neue Email wartet auf Bestaetigung: changed@example.test')
@@ -56,6 +57,7 @@ function userSettings(email: string, pendingEmail?: string) {
     userId: 1,
     email,
     displayName: 'Owner',
+    permalink: 'owner',
     serverRole: 'ServerOwner',
     passkeyCount: 0,
     pendingEmail

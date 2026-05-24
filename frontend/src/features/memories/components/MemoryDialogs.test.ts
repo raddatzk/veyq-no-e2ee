@@ -1,24 +1,43 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemory, deleteMemory, removeMemoryCover, setMemoryCover, updateMemory, type Memory, type MemoryMedia } from '../api'
+import {
+  createMemory,
+  createMemoryShare,
+  deleteMemory,
+  listMemoryShares,
+  removeMemoryCover,
+  setMemoryCover,
+  updateMemory,
+  updateMemoryShare,
+  type Memory,
+  type MemoryMedia,
+  type MemoryShareSummary
+} from '../api'
 import CreateMemoryDialog from './CreateMemoryDialog.vue'
 import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
 import EditMemoryDialog from './EditMemoryDialog.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
+import MemoryShareDialog from './MemoryShareDialog.vue'
 
 vi.mock('../api', () => ({
   createMemory: vi.fn(),
+  createMemoryShare: vi.fn(),
   deleteMemory: vi.fn(),
+  listMemoryShares: vi.fn(),
   removeMemoryCover: vi.fn(),
   setMemoryCover: vi.fn(),
-  updateMemory: vi.fn()
+  updateMemory: vi.fn(),
+  updateMemoryShare: vi.fn()
 }))
 
 const createMemoryMock = vi.mocked(createMemory)
+const createMemoryShareMock = vi.mocked(createMemoryShare)
 const deleteMemoryMock = vi.mocked(deleteMemory)
+const listMemorySharesMock = vi.mocked(listMemoryShares)
 const removeMemoryCoverMock = vi.mocked(removeMemoryCover)
 const setMemoryCoverMock = vi.mocked(setMemoryCover)
 const updateMemoryMock = vi.mocked(updateMemory)
+const updateMemoryShareMock = vi.mocked(updateMemoryShare)
 
 describe('Memory detail dialogs', () => {
   beforeEach(() => {
@@ -317,13 +336,85 @@ describe('Memory detail dialogs', () => {
     expect(removeMemoryCoverMock).toHaveBeenCalledWith('tenant', 'mem-1')
     expect(saved).toHaveBeenCalledWith(updated)
   })
+
+  it('manages existing shares through compact row actions', async () => {
+    listMemorySharesMock.mockResolvedValue([
+      share({ id: 'shr-1', name: 'Family', role: 'VIEWER', hasPassword: true })
+    ])
+    createMemoryShareMock.mockResolvedValue(share({ id: 'shr-2', hasPassword: false }))
+    updateMemoryShareMock.mockResolvedValue(share({ id: 'shr-1', name: 'Family' }))
+
+    const wrapper = mount(MemoryShareDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memory: memory()
+      },
+      global: { stubs: dialogStubs() }
+    })
+    await flushPromises()
+
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
+    expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      name: null,
+      role: 'VIEWER',
+      password: null
+    })
+
+    await wrapper.find('input[aria-label="Passwortschutz aktivieren"]').setValue(true)
+    await flushPromises()
+    const createButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Share erstellen'))!
+    expect(createButton.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('input[autocomplete="new-password"]').setValue('share-password123')
+    await createButton.trigger('click')
+    await flushPromises()
+    expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      name: null,
+      role: 'VIEWER',
+      password: 'share-password123'
+    })
+
+    await wrapper.find('.management-control').setValue('CONTRIBUTOR')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { role: 'CONTRIBUTOR' })
+
+    await wrapper.find('button[aria-label="Share umbenennen"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input').at(-1)!.setValue('Friends')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { name: 'Friends' })
+
+    await wrapper.find('button[aria-label="Passwort ändern"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input').at(-1)!.setValue('new-share-password123')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', {
+      password: 'new-share-password123'
+    })
+
+    expect(wrapper.find('button[aria-label="Passwortschutz entfernen"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Passwort entfernen"]').exists()).toBe(false)
+
+    await wrapper.find('button[aria-label="Passwort ändern"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input[aria-label="Passwortschutz aktivieren"]').at(-1)!.setValue(false)
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { password: '' })
+  })
 })
 
 function dialogStubs() {
   return {
     Button: {
       template:
-        '<button :type="type || \'button\'" :disabled="disabled" @click="$emit(\'click\', $event)">{{ label }}</button>',
+        '<button v-bind="$attrs" :type="type || \'button\'" :disabled="disabled" @click="$emit(\'click\', $event)">{{ label }}</button>',
       emits: ['click'],
       props: ['disabled', 'label', 'type']
     },
@@ -333,7 +424,7 @@ function dialogStubs() {
     },
     InputText: {
       template:
-        '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
       props: ['modelValue']
     },
     FileUpload: {
@@ -341,7 +432,19 @@ function dialogStubs() {
       template: '<button type="button">Bild auswählen</button>',
       emits: ['select']
     },
-    Message: { template: '<div><slot /></div>' }
+    Message: { template: '<div><slot /></div>' },
+    Select: {
+      props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
+      emits: ['update:modelValue'],
+      template:
+        '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option[optionValue]" :value="option[optionValue]">{{ option[optionLabel] }}</option></select>'
+    },
+    ToggleSwitch: {
+      props: ['modelValue', 'ariaLabel'],
+      emits: ['update:modelValue'],
+      template:
+        '<input type="checkbox" :aria-label="ariaLabel || $attrs[\'aria-label\']" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />'
+    }
   }
 }
 
@@ -369,8 +472,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     id: 'media-1',
     memoryId: 'mem-1',
     title: 'Beach',
-    ownerUserId: 1,
-    uploaderDisplayName: 'Owner',
+    uploader: { type: 'USER', displayName: 'Owner', userId: 1 },
     createdAt: '2026-05-01T12:00:00Z',
     mimeType: 'image/jpeg',
     sizeBytes: 12,
@@ -385,6 +487,21 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: 600,
     gpsLatitude: null,
     gpsLongitude: null,
+    ...overrides
+  }
+}
+
+function share(overrides: Partial<MemoryShareSummary> = {}): MemoryShareSummary {
+  return {
+    id: 'shr-1',
+    memoryId: 'mem-1',
+    name: undefined,
+    role: 'VIEWER',
+    enabled: true,
+    shareUrl: '/s/shr-1',
+    hasPassword: true,
+    createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
     ...overrides
   }
 }

@@ -938,8 +938,11 @@ components:
             id: med_abc123
             memoryId: mem_abc123
             title: Beach
-            ownerUserId: 1
-            uploaderDisplayName: Kevin
+            uploader:
+              type: USER
+              displayName: Kevin
+              permalink: kevin
+              userId: 1
             createdAt: '2026-05-03T12:00:00Z'
             capturedAt: '2026-05-03T11:45:00Z'
             capturedAtOverride: false
@@ -1284,8 +1287,7 @@ components:
         - id
         - memoryId
         - title
-        - ownerUserId
-        - uploaderDisplayName
+        - uploader
         - createdAt
         - capturedAtOverride
         - mimeType
@@ -1299,11 +1301,8 @@ components:
           description: Public id of the Memory that owns this media.
         title:
           type: string
-        ownerUserId:
-          type: integer
-          format: int64
-        uploaderDisplayName:
-          type: string
+        uploader:
+          "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
         createdAt:
           type: string
           format: date-time

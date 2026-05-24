@@ -423,6 +423,7 @@ class MemoryServiceTest {
             User().also {
                 it.passwordHash = passwordService.hash("password1234")
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = role
                 it.passwordSetAt = Instant.now()
@@ -522,7 +523,7 @@ class MemoryServiceTest {
         inTransaction {
             Media().also {
                 it.tenant = tenant
-                it.owner = owner
+                it.uploaderUser = owner
                 it.scopeType = memory.scopeType
                 it.scopeGroup = memory.scopeGroup
                 it.scopeUser = memory.scopeUser

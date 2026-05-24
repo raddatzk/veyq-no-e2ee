@@ -21,10 +21,6 @@ class Media : PanacheEntityBase {
     @JoinColumn(name = "tenant_id", nullable = false)
     lateinit var tenant: Tenant
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_user_id", nullable = false)
-    lateinit var owner: User
-
     @Enumerated(EnumType.STRING)
     @Column(name = "scope_type", nullable = false)
     lateinit var scopeType: LibraryScopeType
@@ -55,6 +51,14 @@ class Media : PanacheEntityBase {
 
     @Column(name = "original_filename")
     var originalFilename: String? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uploader_user_id")
+    var uploaderUser: User? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "share_identity_id")
+    var shareIdentity: MemoryShareIdentity? = null
 
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant

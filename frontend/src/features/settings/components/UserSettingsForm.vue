@@ -19,6 +19,7 @@ import { authState } from '../../../authState'
 
 const settings = ref<UserSettingsResponse | null>(null)
 const displayName = ref('')
+const permalink = ref('')
 const email = ref('')
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -56,7 +57,11 @@ async function saveProfile() {
   error.value = ''
   profileMessage.value = ''
   try {
-    const nextSettings = await updateMySettings({ displayName: displayName.value, email: email.value })
+    const nextSettings = await updateMySettings({
+      displayName: displayName.value,
+      permalink: permalink.value,
+      email: email.value
+    })
     applySettings(nextSettings)
     profileMessage.value =
       nextSettings.pendingEmail && nextSettings.pendingEmail !== nextSettings.email
@@ -134,9 +139,11 @@ async function removePasskey(passkey: PasskeySummary) {
 function applySettings(nextSettings: UserSettingsResponse) {
   settings.value = nextSettings
   displayName.value = nextSettings.displayName
+  permalink.value = nextSettings.permalink
   email.value = nextSettings.email
   if (authState.user?.userId === nextSettings.userId) {
     authState.user.displayName = nextSettings.displayName
+    authState.user.permalink = nextSettings.permalink
     authState.user.email = nextSettings.email
     authState.userLabel = nextSettings.displayName || nextSettings.email
   }
@@ -171,6 +178,10 @@ function defaultPasskeyName() {
         <label>
           <span>Anzeigename</span>
           <InputText v-model="displayName" autocomplete="name" />
+        </label>
+        <label>
+          <span>Permalink</span>
+          <InputText v-model="permalink" autocomplete="off" />
         </label>
         <label>
           <span>Email</span>

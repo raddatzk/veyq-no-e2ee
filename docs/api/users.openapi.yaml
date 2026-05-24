@@ -11,6 +11,7 @@ security:
 - accessTokenCookie: []
 tags:
 - name: Users
+- name: Profiles
 paths:
   "/api/users/me":
     get:
@@ -286,6 +287,38 @@ paths:
         - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
 
         Implementierungsstatus: implemented.
+  "/api/{tenantName}/profiles/{userPermalink}":
+    get:
+      tags:
+        - Profiles
+      operationId: getUserProfile
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/UserPermalink"
+      responses:
+        '200':
+          "$ref": "#/components/responses/UserProfile"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Öffentliches User-Profil im Tenant abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+      description: |-
+        Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+
+        Implementierungsstatus: implemented.
   "/api/users":
     get:
       tags:
@@ -508,6 +541,14 @@ components:
         format: int64
       description: Internal ID of an own passkey
       example: 12
+    UserPermalink:
+      name: userPermalink
+      in: path
+      required: true
+      schema:
+        "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+      description: Public user profile permalink.
+      example: kevin
 
   requestBodies:
     UpdateUserSettings:
@@ -518,6 +559,7 @@ components:
             "$ref": "#/components/schemas/UpdateUserSettingsRequest"
           example:
             displayName: Kevin Raddatz
+            permalink: kevin
             email: kevin@example.test
 
     ChangePassword:
@@ -672,8 +714,19 @@ components:
             userId: 1
             email: kevin@example.test
             displayName: Kevin
+            permalink: kevin
             serverRole: ServerOwner
             passkeyCount: 1
+    UserProfile:
+      description: Public user profile.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UserProfileSummary"
+          example:
+            displayName: Kevin
+            permalink: kevin
+            initials: KR
     Passkeys:
       description: Own passkeys.
       content:
@@ -745,15 +798,43 @@ components:
       additionalProperties: false
       required:
         - displayName
+        - permalink
         - email
       properties:
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
         email:
           "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
       example:
         displayName: Kevin Raddatz
+        permalink: kevin
         email: kevin@example.test
+
+    UserProfileSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - permalink
+        - initials
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+        initials:
+          type: string
+          minLength: 1
+          maxLength: 4
+        avatarUrl:
+          type: string
+          nullable: true
+      example:
+        displayName: Kevin
+        permalink: kevin
+        initials: K
 
     ChangePasswordRequest:
       type: object

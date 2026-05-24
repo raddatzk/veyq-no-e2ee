@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { MediaUploader } from './MediaUploader';
+import {
+    MediaUploaderFromJSON,
+    MediaUploaderFromJSONTyped,
+    MediaUploaderToJSON,
+    MediaUploaderToJSONTyped,
+} from './MediaUploader';
+
 /**
  * 
  * @export
@@ -39,16 +47,10 @@ export interface MemoryMediaSummary {
     title: string;
     /**
      * 
-     * @type {number}
+     * @type {MediaUploader}
      * @memberof MemoryMediaSummary
      */
-    ownerUserId: number;
-    /**
-     * 
-     * @type {string}
-     * @memberof MemoryMediaSummary
-     */
-    uploaderDisplayName: string;
+    uploader: MediaUploader;
     /**
      * 
      * @type {string}
@@ -142,8 +144,7 @@ export function instanceOfMemoryMediaSummary(value: object): value is MemoryMedi
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('memoryId' in value) || value['memoryId'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
-    if (!('ownerUserId' in value) || value['ownerUserId'] === undefined) return false;
-    if (!('uploaderDisplayName' in value) || value['uploaderDisplayName'] === undefined) return false;
+    if (!('uploader' in value) || value['uploader'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('capturedAtOverride' in value) || value['capturedAtOverride'] === undefined) return false;
     if (!('mimeType' in value) || value['mimeType'] === undefined) return false;
@@ -165,8 +166,7 @@ export function MemoryMediaSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'id': json['id'],
         'memoryId': json['memoryId'],
         'title': json['title'],
-        'ownerUserId': json['ownerUserId'],
-        'uploaderDisplayName': json['uploaderDisplayName'],
+        'uploader': MediaUploaderFromJSON(json['uploader']),
         'createdAt': json['createdAt'],
         'capturedAt': json['capturedAt'] == null ? undefined : json['capturedAt'],
         'capturedAtOverride': json['capturedAtOverride'],
@@ -198,8 +198,7 @@ export function MemoryMediaSummaryToJSONTyped(value?: MemoryMediaSummary | null,
         'id': value['id'],
         'memoryId': value['memoryId'],
         'title': value['title'],
-        'ownerUserId': value['ownerUserId'],
-        'uploaderDisplayName': value['uploaderDisplayName'],
+        'uploader': MediaUploaderToJSON(value['uploader']),
         'createdAt': value['createdAt'],
         'capturedAt': value['capturedAt'],
         'capturedAtOverride': value['capturedAtOverride'],

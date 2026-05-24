@@ -32,6 +32,7 @@ describe('EmailConfirmView', () => {
       userId: 1,
       email: 'changed@example.test',
       displayName: 'Owner',
+      permalink: 'owner',
       serverRole: 'ServerOwner',
       passkeyCount: 0
     })

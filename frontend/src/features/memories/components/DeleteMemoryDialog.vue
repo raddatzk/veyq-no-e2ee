@@ -10,6 +10,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memory: Memory
+  deleteMemoryOverride?: (memoryId: string) => Promise<void>
 }>()
 const emit = defineEmits<{
   deleted: []
@@ -26,7 +27,8 @@ async function confirmDelete() {
   error.value = ''
   loading.value = true
   try {
-    await deleteMemory(props.tenantName, props.memory.id)
+    if (props.deleteMemoryOverride) await props.deleteMemoryOverride(props.memory.id)
+    else await deleteMemory(props.tenantName, props.memory.id)
     visible.value = false
     emit('deleted')
   } catch (unknownError) {

@@ -19,6 +19,30 @@
   width: min(420px, calc(100vw - 2rem));
 }
 
+.share-dialog {
+  width: min(720px, calc(100vw - 2rem));
+}
+
+.tenant-dialog .p-dialog-header-actions .p-button,
+.tenant-dialog .p-dialog-header-icon {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tenant-dialog .p-dialog-header-actions .p-button:hover,
+.tenant-dialog .p-dialog-header-icon:hover {
+  border: 0;
+  background: var(--app-surface-muted);
+}
+
+.tenant-dialog .p-dialog-header-actions .p-button:focus-visible,
+.tenant-dialog .p-dialog-header-icon:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
 .form {
   display: grid;
   gap: 1rem;
@@ -39,6 +63,42 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+
+.toggle-row span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.toggle-row small {
+  color: var(--app-muted);
+}
+
+.dialog-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dialog-action-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .auth-method-switch {
@@ -144,5 +204,20 @@
   .inline-form,
   .inline-form.compact {
     grid-template-columns: 1fr;
+  }
+
+  .dialog-action-row,
+  .dialog-action-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .dialog-action-group {
+    margin-left: 0;
+  }
+
+  .toggle-row {
+    align-items: flex-start;
   }
 }

@@ -68,6 +68,7 @@ val openApiSpecs = listOf(
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml"),
     OpenApiSpec("groups", "../docs/api/groups.openapi.yaml"),
     OpenApiSpec("memories", "../docs/api/memories.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("shares", "../docs/api/shares.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("server", "../docs/api/server.openapi.yaml"),
     OpenApiSpec("frontend", "../docs/api/frontend.openapi.yaml"),
 )
@@ -100,6 +101,10 @@ fun rewriteExternalComponentRefs(value: Any?): Any? =
             .replace("./users.openapi.yaml#/components/schemas/", "#/components/schemas/")
             .replace("./users.openapi.yaml#/components/responses/", "#/components/responses/")
             .replace("./users.openapi.yaml#/components/parameters/", "#/components/parameters/")
+            .replace("./memories.openapi.yaml#/components/schemas/", "#/components/schemas/")
+            .replace("./memories.openapi.yaml#/components/responses/", "#/components/responses/")
+            .replace("./memories.openapi.yaml#/components/requestBodies/", "#/components/requestBodies/")
+            .replace("./memories.openapi.yaml#/components/parameters/", "#/components/parameters/")
         is MutableMap<*, *> -> {
             val rewritten = linkedMapOf<String, Any?>()
             value.forEach { (entryKey, entryValue) ->
@@ -128,11 +133,12 @@ fun bundleOpenApiSpec(spec: OpenApiSpec): String {
         readYamlMap("../docs/api/common.openapi.yaml"),
         readYamlMap("../docs/api/tenants.openapi.yaml"),
         readYamlMap("../docs/api/users.openapi.yaml"),
+        readYamlMap("../docs/api/memories.openapi.yaml"),
     )
     val bundled = rewriteExternalComponentRefs(readYamlMap(spec.specPath)) as MutableMap<String, Any?>
     val bundledComponents = bundled.mutableMapAt("components")
 
-    listOf("schemas", "responses", "parameters").forEach { componentKey ->
+    listOf("schemas", "responses", "parameters", "requestBodies").forEach { componentKey ->
         val targetComponents = bundledComponents.mutableMapAt(componentKey)
         sharedComponentSources.forEach { source ->
             val sourceComponents = source.mutableMapAt("components")[componentKey] as? Map<String, Any?> ?: emptyMap()

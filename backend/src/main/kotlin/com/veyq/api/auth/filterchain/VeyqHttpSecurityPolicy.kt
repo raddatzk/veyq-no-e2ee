@@ -45,6 +45,7 @@ class VeyqHttpSecurityPolicy(
                 (path.startsWith("/api/users/") && path.endsWith("/invite/accept")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/options")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/accept")) ||
+                path.startsWith("/api/public-shares/") ||
                 path == "/api/setup" ||
                 (path == "/api/setup/admin" && !serverState.setupCompleted) ||
                 (path == "/api/setup/admin/passkey/options" && !serverState.setupCompleted) ||

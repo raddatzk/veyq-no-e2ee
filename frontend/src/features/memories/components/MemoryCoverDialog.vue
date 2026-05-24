@@ -6,13 +6,21 @@ import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import Message from 'primevue/message'
 import { API_BASE } from '../../../shared/api/httpClient'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { removeMemoryCover, setMemoryCover, type Memory, type MemoryMedia } from '../api'
+import {
+  removeMemoryCover,
+  setMemoryCover,
+  type Memory,
+  type MemoryMedia,
+  type SetMemoryCoverRequest
+} from '../api'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memory: Memory
   media: MemoryMedia[]
+  setCoverOverride?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
+  removeCoverOverride?: (memoryId: string) => Promise<Memory>
 }>()
 const emit = defineEmits<{
   saved: [memory: Memory]
@@ -70,7 +78,10 @@ async function saveCover() {
   try {
     const crop = currentCoverCrop()
     const source = await coverSourceRequest()
-    const updated = await setMemoryCover(props.tenantName, props.memory.id, { ...source, ...crop })
+    const request = { ...source, ...crop }
+    const updated = props.setCoverOverride
+      ? await props.setCoverOverride(props.memory.id, request)
+      : await setMemoryCover(props.tenantName, props.memory.id, request)
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {
@@ -238,7 +249,9 @@ async function removeCover() {
   error.value = ''
   loading.value = true
   try {
-    const updated = await removeMemoryCover(props.tenantName, props.memory.id)
+    const updated = props.removeCoverOverride
+      ? await props.removeCoverOverride(props.memory.id)
+      : await removeMemoryCover(props.tenantName, props.memory.id)
     visible.value = false
     emit('saved', updated)
   } catch (unknownError) {

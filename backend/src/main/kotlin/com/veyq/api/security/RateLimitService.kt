@@ -39,6 +39,19 @@ class RateLimitService @Inject constructor(
         clear("auth:login:email:${normalize(email)}:ip:${clientKey()}")
     }
 
+    fun checkShareLoginAttempt(shareId: String) {
+        consume("share:login:ip:${clientKey()}", 60, Duration.ofMinutes(15))
+        check("share:login:${normalize(shareId)}:ip:${clientKey()}", 5, Duration.ofMinutes(15))
+    }
+
+    fun recordShareLoginFailure(shareId: String) {
+        consume("share:login:${normalize(shareId)}:ip:${clientKey()}", 5, Duration.ofMinutes(15))
+    }
+
+    fun recordShareLoginSuccess(shareId: String) {
+        clear("share:login:${normalize(shareId)}:ip:${clientKey()}")
+    }
+
     fun checkForgotPassword(email: String) {
         consume("auth:forgot:email:${normalize(email)}", 3, Duration.ofHours(1))
         consume("auth:forgot:ip:${clientKey()}", 10, Duration.ofHours(1))

@@ -31,6 +31,7 @@ async function submit() {
         userId: user.userId,
         email: user.email,
         displayName: user.displayName,
+        permalink: user.permalink,
         serverRole: user.serverRole,
         pendingEmail: user.pendingEmail,
         passkeyCount: user.passkeyCount
@@ -54,6 +55,7 @@ async function submitPasskey() {
         userId: user.userId,
         email: user.email,
         displayName: user.displayName,
+        permalink: user.permalink,
         serverRole: user.serverRole,
         pendingEmail: user.pendingEmail,
         passkeyCount: user.passkeyCount

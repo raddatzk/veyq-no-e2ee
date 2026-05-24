@@ -5,6 +5,7 @@ import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.auth.PasswordService
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.common.Permalinks
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
@@ -111,6 +112,7 @@ class TenantUserService @Inject constructor(
         return userRepo.findByEmail(normalizedEmail) ?: User().also {
             it.email = normalizedEmail
             it.displayName = normalizedEmail.substringBefore("@").ifBlank { normalizedEmail }
+            it.permalink = uniquePermalink(it.displayName)
             it.role = ServerRole.ServerMember
             it.passwordHash = passwordService.randomPasswordHash()
             it.passwordSetAt = null
@@ -121,6 +123,17 @@ class TenantUserService @Inject constructor(
     private fun normalizeEmail(email: String?): String =
         email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             ?: throw BadRequestException("email must not be blank")
+
+    private fun uniquePermalink(displayName: String): String {
+        val base = Permalinks.normalize(displayName).takeIf { it.isNotBlank() && it != "me" } ?: "user"
+        var candidate = base
+        var suffix = 2
+        while (userRepo.findByPermalink(candidate) != null) {
+            val nextSuffix = "-${suffix++}"
+            candidate = base.take(120 - nextSuffix.length).trimEnd('-') + nextSuffix
+        }
+        return candidate
+    }
 
     private fun canManageTenantUsers(): Boolean {
         if (user().role == ServerRole.ServerOwner) return true
@@ -143,6 +156,7 @@ class TenantUserService @Inject constructor(
         PublicUserSummary(
             id,
             displayName,
+            permalink,
         )
 
     private fun TenantRole.toApiRole(): ApiTenantRole =

@@ -19,6 +19,7 @@ class RequestContextFilter @Inject constructor(
     private val userRepo: UserRepo,
     private val requestContext: RequestContext,
     private val routingContext: RoutingContext,
+    private val clientIpResolver: ClientIpResolver,
 ) : ContainerRequestFilter {
     override fun filter(context: ContainerRequestContext) {
         requestContext.clientIp = clientIp(context)
@@ -35,13 +36,9 @@ class RequestContextFilter @Inject constructor(
     }
 
     private fun clientIp(context: ContainerRequestContext): String {
-        val forwardedFor = context.getHeaderString("X-Forwarded-For")
-            ?.split(",")
-            ?.firstOrNull()
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-        return forwardedFor
-            ?: routingContext.request().remoteAddress()?.host()
-            ?: "unknown"
+        return clientIpResolver.resolve(
+            context.getHeaderString("X-Forwarded-For"),
+            routingContext.request().remoteAddress()?.host(),
+        )
     }
 }

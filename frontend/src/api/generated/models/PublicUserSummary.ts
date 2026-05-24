@@ -31,6 +31,12 @@ export interface PublicUserSummary {
      * @memberof PublicUserSummary
      */
     displayName: string;
+    /**
+     * URL-safe stable permalink segment.
+     * @type {string}
+     * @memberof PublicUserSummary
+     */
+    permalink: string;
 }
 
 /**
@@ -39,6 +45,7 @@ export interface PublicUserSummary {
 export function instanceOfPublicUserSummary(value: object): value is PublicUserSummary {
     if (!('userId' in value) || value['userId'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('permalink' in value) || value['permalink'] === undefined) return false;
     return true;
 }
 
@@ -54,6 +61,7 @@ export function PublicUserSummaryFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'userId': json['userId'],
         'displayName': json['displayName'],
+        'permalink': json['permalink'],
     };
 }
 
@@ -70,6 +78,7 @@ export function PublicUserSummaryToJSONTyped(value?: PublicUserSummary | null, i
         
         'userId': value['userId'],
         'displayName': value['displayName'],
+        'permalink': value['permalink'],
     };
 }
 

@@ -102,6 +102,7 @@ class AuthService @Inject constructor(
             user.id,
             user.email,
             user.displayName,
+            user.permalink,
             user.role.toAuthApiRole(),
             passkeyCredentialRepo.countByUser(user).toInt(),
         )

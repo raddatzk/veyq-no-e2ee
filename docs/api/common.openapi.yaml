@@ -103,6 +103,7 @@ components:
         - userId
         - email
         - displayName
+        - permalink
         - serverRole
         - passkeyCount
       properties:
@@ -113,6 +114,8 @@ components:
           "$ref": "#/components/schemas/EmailAddress"
         displayName:
           "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
         serverRole:
           "$ref": "#/components/schemas/ServerRole"
         pendingEmail:
@@ -125,6 +128,7 @@ components:
         userId: 1
         email: kevin@example.test
         displayName: Kevin
+        permalink: kevin
         serverRole: ServerOwner
         passkeyCount: 1
 
@@ -135,15 +139,58 @@ components:
       required:
         - userId
         - displayName
+        - permalink
       properties:
         userId:
           type: integer
           format: int64
         displayName:
           "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
       example:
         userId: 1
         displayName: Kevin
+        permalink: kevin
+
+    MediaUploader:
+      description: Privacy-preserving uploader attribution generated from a registered user or anonymous share identity.
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - displayName
+      properties:
+        type:
+          type: string
+          enum:
+            - USER
+            - ANONYMOUS
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
+          nullable: true
+        userId:
+          type: integer
+          format: int64
+          nullable: true
+      example:
+        type: USER
+        displayName: Kevin
+        permalink: kevin
+        userId: 1
+
+    Permalink:
+      type: string
+      description: URL-safe stable permalink segment.
+      minLength: 1
+      maxLength: 120
+      pattern: '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+      example: kevin
+      x-normalization:
+        - trim
+        - lowercase
 
     EmailAddress:
       type: string

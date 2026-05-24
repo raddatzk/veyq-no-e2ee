@@ -6,14 +6,19 @@ import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
+import com.veyq.api.domain.MemoryShareIdentity
 import com.veyq.api.domain.MemoryRepo
 import com.veyq.api.domain.TenantFolderRepo
 import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
+import com.veyq.api.domain.User
+import com.veyq.api.generated.model.MediaUploader
 import com.veyq.api.generated.model.MemoryMediaSummary
+import com.veyq.api.generated.model.PublicShareMediaSummary
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryService
+import com.veyq.api.library.LibraryScopes
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -67,35 +72,76 @@ class MediaService @Inject constructor(
     fun uploadMemoryMedia(memoryId: String, file: FileUpload?, title: String?): MemoryMediaSummary {
         val memory = resolveVisibleMemory(memoryId)
         val upload = file ?: throw BadRequestException("file is required")
-        val uploadPath = upload.uploadedFile()
+        return uploadMemoryMediaInternal(
+            memory = memory,
+            uploadPath = upload.uploadedFile(),
+            originalFilename = upload.fileName(),
+            title = title,
+            uploaderUser = user(),
+            shareIdentity = null,
+        ).toMemorySummary()
+    }
+
+    @Transactional
+    fun uploadPublicShareMedia(
+        shareId: String,
+        memory: Memory,
+        uploadPath: Path,
+        originalFilename: String?,
+        title: String?,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): PublicShareMediaSummary =
+        uploadMemoryMediaInternal(
+            memory = memory,
+            uploadPath = uploadPath,
+            originalFilename = originalFilename,
+            title = title,
+            uploaderUser = uploaderUser,
+            shareIdentity = shareIdentity,
+        ).toPublicShareSummary(shareId)
+
+    private fun uploadMemoryMediaInternal(
+        memory: Memory,
+        uploadPath: Path,
+        originalFilename: String?,
+        title: String?,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): Media {
+        if ((uploaderUser == null) == (shareIdentity == null)) {
+            throw BadRequestException("Exactly one uploader source is required")
+        }
+
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty")
         val mediaType = mediaTypeDetector.detect(uploadPath)
             ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported")
 
         val media = Media().also {
-            it.tenant = tenant()
-            it.owner = user()
-            applyScope(it, memory.scope())
+            it.tenant = memory.tenant
+            applyScope(it, LibraryScopes.scope(memory))
             it.memory = memory
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
-                ?: upload.fileName()?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
+                ?: originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                 ?: "Upload"
             it.mimeType = mediaType.mimeType
             it.sizeBytes = size
             it.storageKey = ""
-            it.originalFilename = upload.fileName()
+            it.originalFilename = originalFilename
+            it.uploaderUser = uploaderUser
+            it.shareIdentity = shareIdentity
             mediaRepo.persist(it)
         }
         mediaRepo.flush()
 
-        val storageKey = "tenant-${tenant().id}/${media.publicId}/original"
+        val storageKey = "tenant-${memory.tenant.id}/${media.publicId}/original"
         writeMediaFile(uploadPath, storageKey)
         media.storageKey = storageKey
         mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
         generatePreviewIfSupported(media)
 
-        return media.toMemorySummary()
+        return media
     }
 
     @Transactional
@@ -112,6 +158,10 @@ class MediaService @Inject constructor(
 
     fun mediaContent(publicId: String, rangeHeader: String?): Response {
         val media = resolveAccessibleMedia(publicId)
+        return streamOriginal(media, rangeHeader)
+    }
+
+    fun streamOriginal(media: Media, rangeHeader: String?): Response {
         val path = storagePath(media.storageKey)
         if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
         val filename = media.originalFilename?.takeIf { it.isNotBlank() } ?: "${media.publicId}.bin"
@@ -147,6 +197,10 @@ class MediaService @Inject constructor(
 
     fun mediaPreview(publicId: String): Response {
         val media = resolveAccessibleMedia(publicId)
+        return streamPreview(media)
+    }
+
+    fun streamPreview(media: Media): Response {
         if (!canGeneratePreview(media)) throw NotFoundException("Media not found")
 
         val previewPath = previewPath(media)
@@ -161,6 +215,9 @@ class MediaService @Inject constructor(
             .header("X-Content-Type-Options", "nosniff")
             .build()
     }
+
+    fun publicShareSummary(media: Media, shareId: String): PublicShareMediaSummary =
+        media.toPublicShareSummary(shareId)
 
     private fun resolveAccessibleMedia(publicId: String): Media {
         val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
@@ -352,8 +409,7 @@ class MediaService @Inject constructor(
             id = publicId,
             memoryId = memory?.publicId ?: "",
             title = title,
-            ownerUserId = owner.id,
-            uploaderDisplayName = owner.displayName,
+            uploader = uploader(),
             createdAt = createdAt.toApiOffsetDateTime(),
             capturedAt = capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = capturedAtOverride,
@@ -369,6 +425,46 @@ class MediaService @Inject constructor(
             gpsLatitude = gpsLatitude,
             gpsLongitude = gpsLongitude,
         )
+
+    private fun Media.toPublicShareSummary(shareId: String): PublicShareMediaSummary =
+        PublicShareMediaSummary(
+            id = publicId,
+            memoryId = memory?.publicId ?: "",
+            title = title,
+            uploader = uploader(),
+            createdAt = createdAt.toApiOffsetDateTime(),
+            capturedAt = capturedAt?.toApiOffsetDateTime(),
+            capturedAtOverride = capturedAtOverride,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            contentUrl = "/api/public-shares/${url(shareId)}/media/${url(publicId)}/content",
+            previewUrl = if (canGeneratePreview(this)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
+        )
+
+    private fun Media.uploader(): MediaUploader {
+        uploaderUser?.let { user ->
+            return MediaUploader(
+                type = MediaUploader.Type.USER,
+                displayName = user.displayName,
+                permalink = user.permalink,
+                userId = user.id,
+            )
+        }
+        shareIdentity?.let { identity ->
+            return MediaUploader(
+                type = MediaUploader.Type.ANONYMOUS,
+                displayName = identity.displayName,
+                permalink = null,
+                userId = null,
+            )
+        }
+        return MediaUploader(
+            type = MediaUploader.Type.ANONYMOUS,
+            displayName = "Unbekannt",
+            permalink = null,
+            userId = null,
+        )
+    }
 
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"

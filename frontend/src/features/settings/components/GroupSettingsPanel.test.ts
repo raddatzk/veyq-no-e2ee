@@ -106,7 +106,7 @@ describe('GroupSettingsPanel', () => {
     const wrapper = mountPanel('family')
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text().includes('Entfernen'))!.trigger('click')
+    await wrapper.find('button[aria-label="Mitglied entfernen"]').trigger('click')
 
     expect(wrapper.text()).toContain('Mindestens ein Owner muss in der Gruppe bleiben.')
   })
@@ -163,7 +163,7 @@ function mountPanel(groupName?: string) {
     global: {
       stubs: {
         Button: {
-          template: '<button :disabled="disabled" @click="$emit(\'click\', $event)"><slot />{{ label }}</button>',
+          template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><slot />{{ label }}</button>',
           props: ['disabled', 'label']
         },
         Dialog: {
@@ -190,7 +190,8 @@ function tenantUser(userId: number, displayName: string) {
   return {
     user: {
       userId,
-      displayName
+      displayName,
+      permalink: displayName.toLowerCase()
     },
     email: `${displayName.toLowerCase()}@example.test`,
     role: 'TenantMember',
@@ -203,6 +204,7 @@ function userSummary(userId: number, displayName: string) {
     userId,
     email: `${displayName.toLowerCase()}@example.test`,
     displayName,
+    permalink: displayName.toLowerCase(),
     serverRole: 'ServerMember',
     passkeyCount: 0
   } as const
@@ -220,7 +222,8 @@ function groupSummary(
     members: members.map((member) => ({
       user: {
         userId: member.userId,
-        displayName: member.userId === 1 ? 'Owner' : 'Member'
+        displayName: member.userId === 1 ? 'Owner' : 'Member',
+        permalink: member.userId === 1 ? 'owner' : 'member'
       },
       role: member.role
     }))

@@ -168,6 +168,7 @@ class SecurityPipelineTest {
             User().also {
                 it.passwordHash = passwordService.hash("password1234")
                 it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
                 it.email = "$name@example.com"
                 it.role = role
                 it.passwordSetAt = Instant.now()

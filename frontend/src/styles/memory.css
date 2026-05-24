@@ -700,6 +700,26 @@
   background: transparent;
 }
 
+.memory-info-list {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  gap: 0.75rem 1.25rem;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+}
+
+.memory-info-list dt {
+  color: var(--app-muted);
+}
+
+.memory-info-list dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--app-text);
+  overflow-wrap: anywhere;
+}
+
 .memory-dialog-copy {
   margin: 0;
   color: #4b5565;
@@ -818,6 +838,64 @@
   width: 100%;
 }
 
+.public-share-view {
+  display: grid;
+  gap: 1.5rem;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+}
+
+.public-share-header,
+.public-share-login,
+.public-share-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.public-share-header {
+  justify-content: space-between;
+}
+
+.public-share-header p {
+  margin: 0 0 0.25rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.public-share-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+}
+
+.public-share-login,
+.public-share-upload {
+  flex-wrap: wrap;
+}
+
+.public-share-children {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.public-share-child {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--app-radius-sm);
+}
+
+.public-share-child span {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 520px) {
   .memory-card-grid-memories {
     grid-template-columns: 1fr;
@@ -881,4 +959,5 @@
   .memory-detail-actions {
     justify-content: flex-start;
   }
+
 }

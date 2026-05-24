@@ -9,6 +9,9 @@ import com.veyq.api.generated.api.FoldersApi
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.api.MemoryMediaApi
 import com.veyq.api.generated.api.MemoryNavigationApi
+import com.veyq.api.generated.api.MemorySharesApi
+import com.veyq.api.generated.api.ProfilesApi
+import com.veyq.api.generated.api.PublicSharesApi
 import com.veyq.api.generated.api.ServerApi
 import com.veyq.api.generated.api.SettingsApi
 import com.veyq.api.generated.api.SetupApi
@@ -18,11 +21,14 @@ import com.veyq.api.library.folder.FolderResource
 import com.veyq.api.memory.MemoryMediaResource
 import com.veyq.api.memory.MemoryNavigationResource
 import com.veyq.api.memory.MemoryResource
+import com.veyq.api.memory.MemoryShareResource
+import com.veyq.api.memory.PublicShareResource
 import com.veyq.api.settings.SettingsNavigationResource
 import com.veyq.api.settings.SettingsResource
 import com.veyq.api.setup.SetupResource
 import com.veyq.api.tenant.TenantResource
 import com.veyq.api.usermgmt.group.GroupResource
+import com.veyq.api.usermgmt.user.ProfileResource
 import com.veyq.api.usermgmt.user.UserResource
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -333,12 +339,38 @@ class OpenApiContractTest {
             "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata",
             "GET /api/{tenantName}/memory-media/{mediaId}/content",
             "GET /api/{tenantName}/memory-media/{mediaId}/preview",
+            "GET /api/{tenantName}/profiles/{userPermalink}",
+            "GET /api/{tenantName}/memories/{memoryId}/shares",
+            "POST /api/{tenantName}/memories/{memoryId}/shares",
+            "PUT /api/{tenantName}/memory-shares/{shareId}",
+            "GET /api/public-shares/{shareId}",
+            "POST /api/public-shares/{shareId}/login",
+            "POST /api/public-shares/{shareId}/logout",
+            "POST /api/public-shares/{shareId}/refresh",
+            "GET /api/public-shares/{shareId}/tree",
+            "GET /api/public-shares/{shareId}/memories/by-path",
+            "PUT /api/public-shares/{shareId}/memories/{memoryId}",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/children",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/children",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/media",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/media",
+            "PUT /api/public-shares/{shareId}/memories/{memoryId}/cover",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}/cover",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/cover/content",
+            "PATCH /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/metadata",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}",
+            "GET /api/public-shares/{shareId}/media",
+            "POST /api/public-shares/{shareId}/media",
+            "GET /api/public-shares/{shareId}/media/{mediaId}/content",
+            "GET /api/public-shares/{shareId}/media/{mediaId}/preview",
         )
 
         val generatedInterfaceBindings = mapOf(
             AuthApi::class.java to AuthResource::class.java,
             SetupApi::class.java to SetupResource::class.java,
             UsersApi::class.java to UserResource::class.java,
+            ProfilesApi::class.java to ProfileResource::class.java,
             TenantsApi::class.java to TenantResource::class.java,
             GroupsApi::class.java to GroupResource::class.java,
             ServerApi::class.java to SettingsResource::class.java,
@@ -347,13 +379,18 @@ class OpenApiContractTest {
             MemoryNavigationApi::class.java to MemoryNavigationResource::class.java,
             MemoriesApi::class.java to MemoryResource::class.java,
             MemoryMediaApi::class.java to MemoryMediaResource::class.java,
+            MemorySharesApi::class.java to MemoryShareResource::class.java,
+            PublicSharesApi::class.java to PublicShareResource::class.java,
         )
 
         fun generatedInterface(specFile: String, operationId: String): Class<*> =
             when (specFile) {
                 "auth.openapi.yaml" -> AuthApi::class.java
                 "setup.openapi.yaml" -> SetupApi::class.java
-                "users.openapi.yaml" -> UsersApi::class.java
+                "users.openapi.yaml" -> when (operationId) {
+                    "getUserProfile" -> ProfilesApi::class.java
+                    else -> UsersApi::class.java
+                }
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
@@ -365,6 +402,11 @@ class OpenApiContractTest {
                 }
                 "server.openapi.yaml" -> ServerApi::class.java
                 "settings.openapi.yaml" -> SettingsApi::class.java
+                "shares.openapi.yaml" -> when (operationId) {
+                    "listMemoryShares", "createMemoryShare", "updateMemoryShare" -> MemorySharesApi::class.java
+                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "publicShareMediaContent", "publicShareMediaPreview" -> PublicSharesApi::class.java
+                    else -> error("No generated shares interface mapping for $operationId")
+                }
                 else -> error("No generated interface mapping for $specFile")
             }
     }

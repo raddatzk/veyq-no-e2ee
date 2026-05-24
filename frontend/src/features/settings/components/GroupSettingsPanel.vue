@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
+import ManagementList from '../../../shared/components/ManagementList.vue'
 import {
   createGroup,
   deleteGroup as deleteGroupApi,
@@ -208,7 +209,8 @@ function addMember() {
       {
         user: {
           userId: user.user.userId,
-          displayName: user.user.displayName
+          displayName: user.user.displayName,
+          permalink: user.user.permalink
         },
         role: selectedRole.value
       }
@@ -401,21 +403,17 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
         </label>
 
-        <div class="settings-table">
-          <div class="settings-table-row settings-table-head group-members-row">
-            <span>User</span>
-            <span>Rolle</span>
-            <span></span>
-          </div>
+        <ManagementList>
           <div
             v-for="member in selectedGroup.members"
             :key="member.user.userId"
-            class="settings-table-row group-members-row"
+            class="management-row"
           >
-            <div>
-              <strong>{{ member.user.displayName }}</strong>
+            <div class="management-row-main">
+              <strong class="management-row-title">{{ member.user.displayName }}</strong>
             </div>
             <Select
+              class="management-control"
               :model-value="member.role"
               :options="roleOptions"
               option-label="label"
@@ -423,16 +421,22 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
               aria-label="Gruppen-Rolle"
               @update:model-value="changeRole(member, $event)"
             />
-            <Button
-              type="button"
-              label="Entfernen"
-              icon="pi pi-times"
-              severity="secondary"
-              outlined
-              @click="removeMember(member)"
-            />
+            <div class="management-actions">
+              <Button
+                type="button"
+                icon="pi pi-times"
+                severity="secondary"
+                outlined
+                size="small"
+                aria-label="Mitglied entfernen"
+                title="Mitglied entfernen"
+                @click="removeMember(member)"
+              />
+            </div>
           </div>
-          <div class="settings-table-row group-members-row group-add-row">
+        </ManagementList>
+
+        <div class="management-add-row">
             <Select
               v-model="selectedUserId"
               :options="availableTenantUsers"
@@ -456,7 +460,6 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
               :disabled="selectedUserId === null"
               @click="addMember"
             />
-          </div>
         </div>
 
         <div class="button-row">

@@ -105,6 +105,7 @@ class UserTokenCleanupTest {
         return User().also {
             it.passwordHash = "\$2y\$10\$2bNfOGM2k9b8CKi85z9LqekdJp5EJk4j7n4JrTxf2j2Ff0cRImwR6"
             it.displayName = "User Token Cleanup $unique"
+            it.permalink = "user-token-cleanup-$unique"
             it.email = "user-token-cleanup-$unique@example.com"
             it.role = ServerRole.ServerOwner
             it.passwordSetAt = Instant.now()

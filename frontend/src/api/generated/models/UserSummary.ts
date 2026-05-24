@@ -46,6 +46,12 @@ export interface UserSummary {
      */
     displayName: string;
     /**
+     * URL-safe stable permalink segment.
+     * @type {string}
+     * @memberof UserSummary
+     */
+    permalink: string;
+    /**
      * 
      * @type {ServerRole}
      * @memberof UserSummary
@@ -74,6 +80,7 @@ export function instanceOfUserSummary(value: object): value is UserSummary {
     if (!('userId' in value) || value['userId'] === undefined) return false;
     if (!('email' in value) || value['email'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('permalink' in value) || value['permalink'] === undefined) return false;
     if (!('serverRole' in value) || value['serverRole'] === undefined) return false;
     if (!('passkeyCount' in value) || value['passkeyCount'] === undefined) return false;
     return true;
@@ -92,6 +99,7 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'userId': json['userId'],
         'email': json['email'],
         'displayName': json['displayName'],
+        'permalink': json['permalink'],
         'serverRole': ServerRoleFromJSON(json['serverRole']),
         'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
         'passkeyCount': json['passkeyCount'],
@@ -112,6 +120,7 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
         'userId': value['userId'],
         'email': value['email'],
         'displayName': value['displayName'],
+        'permalink': value['permalink'],
         'serverRole': ServerRoleToJSON(value['serverRole']),
         'pendingEmail': value['pendingEmail'],
         'passkeyCount': value['passkeyCount'],

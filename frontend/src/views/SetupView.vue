@@ -55,6 +55,7 @@ async function submitAdmin() {
       userId: user.userId,
       email: user.email,
       displayName: user.displayName,
+      permalink: user.permalink,
       serverRole: user.serverRole,
       pendingEmail: user.pendingEmail,
       passkeyCount: user.passkeyCount

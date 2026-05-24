@@ -6,6 +6,9 @@ apis/GroupsApi.ts
 apis/MemoriesApi.ts
 apis/MemoryMediaApi.ts
 apis/MemoryNavigationApi.ts
+apis/MemorySharesApi.ts
+apis/ProfilesApi.ts
+apis/PublicSharesApi.ts
 apis/ServerApi.ts
 apis/SettingsApi.ts
 apis/SetupApi.ts
@@ -26,7 +29,9 @@ models/CreateFolderRequest.ts
 models/CreateGroupRequest.ts
 models/CreateManagedUserRequest.ts
 models/CreateMemoryRequest.ts
+models/CreateMemoryShareRequest.ts
 models/CreatePasskeyRequest.ts
+models/CreatePublicShareMemoryRequest.ts
 models/CreateTenantRequest.ts
 models/ErrorResponse.ts
 models/ForgotPasswordRequest.ts
@@ -40,6 +45,7 @@ models/LoginRequest.ts
 models/ManagedUserSummary.ts
 models/ManagedUserTenantSummary.ts
 models/ManagedUsersSummary.ts
+models/MediaUploader.ts
 models/MemoryFolder.ts
 models/MemoryMediaSummary.ts
 models/MemoryNavigationBreadcrumb.ts
@@ -49,9 +55,10 @@ models/MemoryNavigationResponse.ts
 models/MemoryScope.ts
 models/MemoryScopeRequest.ts
 models/MemoryScopeRoot.ts
+models/MemoryShareRole.ts
+models/MemoryShareSummary.ts
 models/MemorySummary.ts
 models/MoveFolderRequest.ts
-models/PublicUserSummary.ts
 models/PasskeyAssertionResponse.ts
 models/PasskeyAttestationResponse.ts
 models/PasskeyInvitationOptionsRequest.ts
@@ -60,6 +67,13 @@ models/PasskeyLoginRequest.ts
 models/PasskeyRegistrationRequest.ts
 models/PasskeySummary.ts
 models/PasskeysSummary.ts
+models/PublicShareCoverCrop.ts
+models/PublicShareLoginRequest.ts
+models/PublicShareMediaSummary.ts
+models/PublicShareMemorySummary.ts
+models/PublicShareSummary.ts
+models/PublicShareTreeResponse.ts
+models/PublicUserSummary.ts
 models/ResetPasswordRequest.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts
@@ -85,9 +99,12 @@ models/UpdateGroupSettingsRequest.ts
 models/UpdateManagedUserRoleRequest.ts
 models/UpdateMemoryMediaMetadataRequest.ts
 models/UpdateMemoryRequest.ts
+models/UpdateMemoryShareRequest.ts
+models/UpdatePublicShareMemoryRequest.ts
 models/UpdateTenantSettingsRequest.ts
 models/UpdateTenantUserRoleRequest.ts
 models/UpdateUserSettingsRequest.ts
+models/UserProfileSummary.ts
 models/UserStatus.ts
 models/UserSummary.ts
 models/index.ts

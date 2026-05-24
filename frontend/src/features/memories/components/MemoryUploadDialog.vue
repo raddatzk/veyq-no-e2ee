@@ -4,12 +4,13 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { uploadMemoryMedia } from '../api'
+import { uploadMemoryMedia, type MemoryMedia, type UploadMemoryMediaRequest } from '../api'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memoryId: string | null
+  uploadMedia?: (memoryId: string, request: UploadMemoryMediaRequest) => Promise<MemoryMedia>
 }>()
 const emit = defineEmits<{
   saved: []
@@ -36,7 +37,8 @@ async function submit() {
   loading.value = true
   try {
     for (const file of files.value) {
-      await uploadMemoryMedia(props.tenantName, props.memoryId, { file })
+      if (props.uploadMedia) await props.uploadMedia(props.memoryId, { file })
+      else await uploadMemoryMedia(props.tenantName, props.memoryId, { file })
     }
     visible.value = false
     emit('saved')

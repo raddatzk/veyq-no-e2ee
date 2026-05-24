@@ -5,7 +5,7 @@ This document turns the Memory product context into follow-up topics for develop
 ## Needs ADRs
 
 - Decide sync semantics: last-write-wins now, ETags or conflict resolution later.
-- Decide privacy model for public Memory shares and person/participant pages.
+- Decide privacy model for person/participant pages.
 - Decide license strategy: AGPL, trademark policy, community/commercial split.
 - Decide optional central services: push gateway, managed hosting, update/license services.
 - Decide E2E encryption stance for V1 and what metadata remains server-visible.
@@ -18,8 +18,8 @@ This document turns the Memory product context into follow-up topics for develop
 - Track model and relationship to map views.
 - Weather metadata model.
 - Participant/person model with optional user linkage.
-- Public share links and permission grants.
-- Anonymous uploader identity and virtual uploader buckets.
+- Explicit Memory participation and profile visibility rules.
+- Virtual uploader buckets beyond the current anonymous share identity.
 - Live Photo asset representation.
 
 ## Needs API Design
@@ -31,8 +31,7 @@ This document turns the Memory product context into follow-up topics for develop
 - Journal read/update endpoint.
 - Playlist attach/update/remove endpoints.
 - Track upload/list/detail endpoints.
-- Public share resolution and permission-aware views.
-- Public upload-link flow.
+- Standalone public upload-link flow beyond Memory shares.
 - Person/participant endpoints that avoid cross-Memory graph leakage.
 - Instance branding metadata for native apps and deep links.
 - Keep API-first contracts complete with preconditions, examples, error cases and `x-implementation-status`.
@@ -46,9 +45,9 @@ This document turns the Memory product context into follow-up topics for develop
 - Parent Memory aggregation indicators.
 - Wrong-upload recovery flow when assets are not movable.
 - Timestamp correction UI.
-- Public share pages.
-- Public upload-link flow for anonymous contributors.
-- Uploader attribution and privacy modes.
+- Public share UX polish beyond the baseline Memory view.
+- Standalone public upload-link flow for anonymous contributors.
+- Richer uploader attribution and privacy modes.
 - Tenant switcher.
 - Demo Memory and empty-state strategy.
 - "Open in App" banner and universal link behavior.
@@ -73,6 +72,7 @@ This document turns the Memory product context into follow-up topics for develop
 - Semantic search architecture under privacy constraints.
 - Push gateway design for APNS/FCM with self-hosted instances.
 - Federation and remote share bookmarking.
+- Soft-delete lifecycle for managed shares if share lists need long-term cleanup without losing anonymous upload attribution.
 
 ## V1 Guardrails
 
@@ -93,6 +93,7 @@ This document turns the Memory product context into follow-up topics for develop
 - Memory UI v1 is the active library surface.
 - Memory navigation, folder navigation, Memory CRUD and direct child traversal exist as API-first backend layers.
 - Memory-scoped media upload, listing and timestamp correction exist.
+- Public Memory sharing exists with optional passwords, anonymous identities and share roles.
 - `includeChildren=true` aggregates media from descendant Memories while preserving direct asset ownership.
 - Album/Explorer APIs, frontend flows and database tables have been removed.
 - ADRs already capture Memory terminology, direct asset ownership, basic tree invariants and the Album removal cut.

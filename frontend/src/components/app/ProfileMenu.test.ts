@@ -25,6 +25,7 @@ describe('ProfileMenu', () => {
       userId: 1,
       email: 'member@example.com',
       displayName: 'Member',
+      permalink: 'member',
       serverRole: 'ServerMember',
       passkeyCount: 0
     }
@@ -48,6 +49,7 @@ describe('ProfileMenu', () => {
       userId: 1,
       email: 'owner@example.com',
       displayName: 'Owner',
+      permalink: 'owner',
       serverRole: 'ServerOwner',
       passkeyCount: 0
     }
