@@ -12,6 +12,11 @@ import { getTenantUsers } from '../api'
 import { authState } from '../../../authState'
 import GroupSettingsPanel from './GroupSettingsPanel.vue'
 
+const routeState = vi.hoisted(() => ({
+  path: '/friends/settings',
+  query: {} as Record<string, string>
+}))
+
 vi.mock('../../../api/groupClient', () => ({
   createGroup: vi.fn(),
   deleteGroup: vi.fn(),
@@ -21,8 +26,10 @@ vi.mock('../../../api/groupClient', () => ({
 }))
 
 const pushMock = vi.fn()
+const replaceMock = vi.fn()
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: pushMock })
+  useRoute: () => routeState,
+  useRouter: () => ({ push: pushMock, replace: replaceMock })
 }))
 
 vi.mock('../api', () => ({
@@ -40,6 +47,9 @@ describe('GroupSettingsPanel', () => {
   afterEach(() => {
     vi.resetAllMocks()
     pushMock.mockReset()
+    replaceMock.mockReset()
+    routeState.path = '/friends/settings'
+    routeState.query = {}
     authState.user = null
   })
 
@@ -95,6 +105,35 @@ describe('GroupSettingsPanel', () => {
         { id: 2, role: 'GroupMember' }
       ])
     })
+  })
+
+  it('opens the create dialog from the sidebar query trigger', async () => {
+    authState.user = userSummary(1, 'Owner')
+    routeState.query = { createGroup: '1' }
+    groupsMock.mockResolvedValue([])
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Gruppe erstellen')
+    expect(replaceMock).toHaveBeenCalledWith({ path: '/friends/settings', query: {} })
+  })
+
+  it('opens group management when a group row is clicked', async () => {
+    authState.user = userSummary(1, 'Owner')
+    groupsMock.mockResolvedValue([{ id: 99, name: 'family', displayName: 'Family' }])
+    getTenantUsersMock.mockResolvedValue([tenantUser(1, 'Owner')])
+    getGroupMock.mockResolvedValue(groupSummary('family', 'Family', [{ userId: 1, role: 'GroupOwner' }]))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.find('.group-list-row').trigger('click')
+    await flushPromises()
+
+    expect(getGroupMock).toHaveBeenCalledWith('friends', 'family')
+    expect(wrapper.text()).toContain('Family verwalten')
+    expect(wrapper.text()).toContain('Speichern')
   })
 
   it('prevents removing the last owner', async () => {
@@ -167,8 +206,8 @@ function mountPanel(groupName?: string) {
           props: ['disabled', 'label']
         },
         Dialog: {
-          template: '<div v-if="visible"><slot /></div>',
-          props: ['visible']
+          template: '<div v-if="visible"><h2>{{ header }}</h2><slot /></div>',
+          props: ['visible', 'header']
         },
         InputText: {
           template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',

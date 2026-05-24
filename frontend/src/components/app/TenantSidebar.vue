@@ -173,9 +173,10 @@ function toggleTenantMenu(event: MouseEvent) {
         <p class="sidebar-section-label">{{ t('navigation.groups') }}</p>
         <RouterLink
           v-if="activeTenant"
-          :to="`/${activeTenant.name}/settings`"
+          :to="`/${activeTenant.name}/settings?createGroup=1`"
           class="sidebar-section-action"
           :title="t('navigation.groupCreate')"
+          :aria-label="t('navigation.groupCreate')"
         >
           <span class="pi pi-plus" />
         </RouterLink>

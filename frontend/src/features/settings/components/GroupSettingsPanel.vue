@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -30,6 +30,7 @@ const props = defineProps<{
   groupName?: string
 }>()
 
+const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { authState } = useAuthState()
@@ -42,6 +43,7 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const createDialogVisible = ref(false)
+const detailDialogVisible = ref(false)
 const deleteDialogVisible = ref(false)
 const deleteConfirmation = ref('')
 const createDisplayName = ref('')
@@ -82,6 +84,7 @@ const canConfirmDeleteGroup = computed(
     deleteConfirmation.value.trim() === selectedGroup.value!.displayName.trim() &&
     !saving.value
 )
+const shouldOpenCreateDialog = computed(() => route.query.createGroup === '1')
 
 watch(displayName, (value) => {
   if (!permalinkTouched.value) name.value = toPermalink(value)
@@ -93,6 +96,9 @@ watch(createDisplayName, (value) => {
 
 watch(() => props.tenantName, load, { immediate: false })
 watch(() => props.groupName, load, { immediate: false })
+watch(shouldOpenCreateDialog, (shouldOpen) => {
+  if (shouldOpen) openCreateDialog()
+})
 onMounted(load)
 
 async function load() {
@@ -108,6 +114,7 @@ async function load() {
     } else {
       selectedGroup.value = null
       resetEditor()
+      if (shouldOpenCreateDialog.value) openCreateDialog()
     }
   } catch (caught) {
     error.value = getErrorMessage(caught, t('group.listLoadFailed'))
@@ -129,6 +136,7 @@ async function openGroup(groupName: string) {
     permalinkTouched.value = false
     selectedUserId.value = null
     selectedRole.value = 'GroupMember'
+    detailDialogVisible.value = true
     if (isCurrentUserGroupOwner(group)) {
       await loadTenantUsers()
     } else {
@@ -149,6 +157,7 @@ function openCreateDialog() {
   error.value = ''
   message.value = ''
   createDialogVisible.value = true
+  clearCreateGroupQuery()
 }
 
 function openDeleteDialog() {
@@ -186,6 +195,7 @@ async function submitCreate() {
     name.value = created.name
     permalinkTouched.value = false
     await loadTenantUsers()
+    detailDialogVisible.value = true
     message.value = t('group.created')
   } catch (caught) {
     if (isApiStatus(caught, 409)) {
@@ -290,6 +300,7 @@ async function submitDeleteGroup() {
     groupList.value = groupList.value.filter((group) => group.name !== deletedGroupName)
     selectedGroup.value = null
     resetEditor()
+    detailDialogVisible.value = false
     deleteDialogVisible.value = false
     if (props.groupName) {
       await router.push(`/${props.tenantName}/settings`)
@@ -326,6 +337,20 @@ function resetEditor() {
   editingInitialGroupName.value = ''
   selectedUserId.value = null
   selectedRole.value = 'GroupMember'
+}
+
+function closeDetailDialog() {
+  detailDialogVisible.value = false
+  if (props.groupName) {
+    void router.push(`/${props.tenantName}/settings`)
+  }
+}
+
+function clearCreateGroupQuery() {
+  if (!shouldOpenCreateDialog.value) return
+  const query = { ...route.query }
+  delete query.createGroup
+  void router.replace({ path: route.path, query })
 }
 
 async function loadTenantUsers() {
@@ -365,22 +390,36 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           <span>{{ t('common.permalink') }}</span>
           <span></span>
         </div>
-        <div v-for="group in groupList" :key="group.id" class="settings-table-row groups-row">
+        <button
+          v-for="group in groupList"
+          :key="group.id"
+          class="settings-table-row groups-row group-list-row"
+          type="button"
+          @click="openGroup(group.name)"
+        >
           <div>
             <strong>{{ group.displayName }}</strong>
             <span>@{{ group.displayName }}</span>
           </div>
           <span>@{{ group.name }}</span>
-          <Button
-            :label="t('group.edit')"
-            icon="pi pi-pencil"
-            severity="secondary"
-            outlined
-            @click="openGroup(group.name)"
-          />
-        </div>
+          <span class="pi pi-chevron-right" aria-hidden="true"></span>
+        </button>
       </div>
 
+      <div v-if="props.groupName && detailLoading" class="memory-loading">
+        <ProgressSpinner class="small-spinner" />
+        <span>{{ t('group.loading') }}</span>
+      </div>
+    </template>
+
+    <Dialog
+      :visible="detailDialogVisible"
+      :header="selectedGroup ? t('group.manageNamed', { name: selectedGroup.displayName }) : t('group.manage')"
+      modal
+      class="tenant-dialog group-detail-dialog"
+      @update:visible="detailDialogVisible = $event"
+      @hide="closeDetailDialog"
+    >
       <div v-if="detailLoading" class="memory-loading">
         <ProgressSpinner class="small-spinner" />
         <span>{{ t('group.loading') }}</span>
@@ -439,29 +478,29 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </ManagementList>
 
         <div class="management-add-row">
-            <Select
-              v-model="selectedUserId"
-              :options="availableTenantUsers"
-              option-label="label"
-              option-value="value"
-              :placeholder="t('group.memberSelect')"
-            />
-            <Select
-              v-model="selectedRole"
-              :options="roleOptions"
-              option-label="label"
-              option-value="value"
-              :aria-label="t('group.roleNew')"
-            />
-            <Button
-              type="button"
-              :label="t('common.add')"
-              icon="pi pi-plus"
-              severity="secondary"
-              outlined
-              :disabled="selectedUserId === null"
-              @click="addMember"
-            />
+          <Select
+            v-model="selectedUserId"
+            :options="availableTenantUsers"
+            option-label="label"
+            option-value="value"
+            :placeholder="t('group.memberSelect')"
+          />
+          <Select
+            v-model="selectedRole"
+            :options="roleOptions"
+            option-label="label"
+            option-value="value"
+            :aria-label="t('group.roleNew')"
+          />
+          <Button
+            type="button"
+            :label="t('common.add')"
+            icon="pi pi-plus"
+            severity="secondary"
+            outlined
+            :disabled="selectedUserId === null"
+            @click="addMember"
+          />
         </div>
 
         <div class="button-row">
@@ -483,7 +522,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </div>
         <i class="pi pi-users"></i>
       </div>
-    </template>
+    </Dialog>
 
     <Dialog v-model:visible="createDialogVisible" :header="t('group.create')" modal class="tenant-dialog">
       <form class="form" @submit.prevent="submitCreate">
