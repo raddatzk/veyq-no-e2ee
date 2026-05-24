@@ -24,6 +24,7 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Needs API Design
 
+- Tenant domain change flow, including ownership/permission rules, validation, invite-link impact and reverse-proxy assumptions.
 - Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
 - Cover selection and cover removal flows for Memories.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.
