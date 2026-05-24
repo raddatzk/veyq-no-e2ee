@@ -26,6 +26,7 @@ import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -349,6 +350,20 @@ class UserManagementResourceTest {
             .statusCode(204)
 
         assertThat(passkeyCredentialRepo.findById(passkey.id)).isNull()
+    }
+
+    @Test
+    fun `passkey registration options use email as username`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/users/me/passkeys/options")
+            .then()
+            .statusCode(200)
+            .body("user.name", equalTo(currentUser.email))
+            .body("user.displayName", equalTo(currentUser.displayName))
+            .body("user.id", not(equalTo(currentUser.email)))
     }
 
     @Test

@@ -65,7 +65,7 @@ class PasskeyService @Inject constructor(
 
     fun registrationOptionsForUser(user: User, routingContext: RoutingContext): String {
         val options = webAuthnSecurity
-            .getRegisterChallenge(user.id.toString(), user.displayName, routingContext)
+            .getRegisterChallenge(user.email, user.displayName, routingContext)
             .await()
             .indefinitely()
         return webAuthnSecurity.toJsonString(options)
