@@ -5,6 +5,7 @@ import com.veyq.api.domain.RefreshTokenRepo
 import com.veyq.api.security.RateLimitService
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
+import io.restassured.filter.cookie.CookieFilter
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.notNullValue
 import jakarta.inject.Inject
@@ -90,6 +91,31 @@ class AuthResourceTest {
             .header("Retry-After", notNullValue())
             .body("code", equalTo("RATE_LIMITED"))
             .body("message", equalTo("Too many requests"))
+    }
+
+    @Test
+    fun `passkey login options rotate challenge in the same cookie context`() {
+        val cookieFilter = CookieFilter()
+
+        val firstChallenge = given()
+            .filter(cookieFilter)
+            .`when`().post("/api/auth/passkeys/login/options")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<String>("challenge")
+
+        val secondChallenge = given()
+            .filter(cookieFilter)
+            .`when`().post("/api/auth/passkeys/login/options")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<String>("challenge")
+
+        assertThat(firstChallenge).isNotBlank()
+        assertThat(secondChallenge).isNotBlank()
+        assertThat(secondChallenge).isNotEqualTo(firstChallenge)
     }
 
     @Test

@@ -205,6 +205,8 @@ class MemoryShareResourceTest {
             .`when`().post("/api/public-shares/$shareId/login")
             .then()
             .statusCode(200)
+            .body("canUpload", equalTo(true))
+            .body("rootMemory", nullValue())
             .extract()
         val accessCookie = response.cookie("VEYQ_SHARE_ACCESS_TOKEN")
         val refreshCookie = response.cookie("VEYQ_SHARE_REFRESH_TOKEN")
@@ -240,6 +242,8 @@ class MemoryShareResourceTest {
             .`when`().post("/api/public-shares/$shareId/refresh")
             .then()
             .statusCode(200)
+            .body("canUpload", equalTo(true))
+            .body("rootMemory", nullValue())
             .extract()
             .cookie("VEYQ_SHARE_ACCESS_TOKEN")
 

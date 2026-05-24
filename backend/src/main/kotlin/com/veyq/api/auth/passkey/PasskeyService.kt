@@ -19,6 +19,7 @@ import com.veyq.api.generated.model.PasskeyRegistrationRequest
 import com.veyq.api.generated.model.PasskeySummary
 import com.veyq.api.generated.model.PasskeysSummary
 import io.quarkus.security.webauthn.WebAuthnCredentialRecord
+import io.quarkus.security.webauthn.WebAuthnRunTimeConfig
 import io.quarkus.security.webauthn.WebAuthnSecurity
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.RoutingContext
@@ -34,8 +35,10 @@ class PasskeyService @Inject constructor(
     private val requestContext: RequestContext,
     private val authService: AuthService,
     private val webAuthnSecurity: WebAuthnSecurity,
+    private val webAuthnConfig: WebAuthnRunTimeConfig,
 ) {
     fun loginOptions(routingContext: RoutingContext): String {
+        resetChallenge(routingContext)
         val options = webAuthnSecurity.getLoginChallenge(null, routingContext).await().indefinitely()
         return webAuthnSecurity.toJsonString(options)
     }
@@ -64,6 +67,7 @@ class PasskeyService @Inject constructor(
     }
 
     fun registrationOptionsForUser(user: User, routingContext: RoutingContext): String {
+        resetChallenge(routingContext)
         val options = webAuthnSecurity
             .getRegisterChallenge(user.email, user.displayName, routingContext)
             .await()
@@ -130,6 +134,12 @@ class PasskeyService @Inject constructor(
 
     private fun currentManagedUser(): User =
         userRepo.findById(currentUser().id) ?: throw UnauthorizedException("Invalid user")
+
+    private fun resetChallenge(routingContext: RoutingContext) {
+        val cookieName = webAuthnConfig.challengeCookieName()
+        routingContext.request().cookies().removeIf { it.name == cookieName }
+        routingContext.response().removeCookie(cookieName)
+    }
 }
 
 fun PasskeyCredential.toCredentialRecord(): WebAuthnCredentialRecord =

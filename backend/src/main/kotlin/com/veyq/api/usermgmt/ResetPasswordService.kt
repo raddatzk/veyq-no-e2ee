@@ -67,7 +67,7 @@ class ResetPasswordService @Inject constructor(
             ?: throw ForbiddenException("incorrect token")
 
         if (targetToken.revokedAt != null || targetToken.acceptedAt != null || !targetToken.expiresAt.isAfter(now)) {
-            throw BadRequestException("Invitation is no longer valid")
+            throw BadRequestException("Password reset token is no longer valid")
         }
         if (targetToken.user != user) {
             throw ForbiddenException("incorrect token")

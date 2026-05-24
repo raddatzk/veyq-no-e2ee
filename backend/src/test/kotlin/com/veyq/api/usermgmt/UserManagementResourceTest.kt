@@ -20,6 +20,7 @@ import com.veyq.api.setup.ServerState
 import io.quarkus.mailer.MockMailbox
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
+import io.restassured.filter.cookie.CookieFilter
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.UserTransaction
@@ -355,15 +356,33 @@ class UserManagementResourceTest {
     @Test
     fun `passkey registration options use email as username`() {
         val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val cookieFilter = CookieFilter()
 
-        given()
+        val firstChallenge = given()
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .filter(cookieFilter)
             .`when`().post("/api/users/me/passkeys/options")
             .then()
             .statusCode(200)
             .body("user.name", equalTo(currentUser.email))
             .body("user.displayName", equalTo(currentUser.displayName))
             .body("user.id", not(equalTo(currentUser.email)))
+            .extract()
+            .path<String>("challenge")
+
+        val secondChallenge = given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .filter(cookieFilter)
+            .`when`().post("/api/users/me/passkeys/options")
+            .then()
+            .statusCode(200)
+            .body("user.name", equalTo(currentUser.email))
+            .body("user.displayName", equalTo(currentUser.displayName))
+            .body("user.id", not(equalTo(currentUser.email)))
+            .extract()
+            .path<String>("challenge")
+
+        assertThat(secondChallenge).isNotEqualTo(firstChallenge)
     }
 
     @Test
@@ -431,6 +450,36 @@ class UserManagementResourceTest {
             .then()
             .statusCode(429)
             .header("Retry-After", org.hamcrest.Matchers.notNullValue())
+    }
+
+    @Test
+    fun `used reset password token returns password reset error`() {
+        val currentEmail = "mgmt-owner-$runId@example.com"
+        val userId = userRepo.findByEmail(currentEmail)!!.id
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"$currentEmail"}""")
+            .`when`().post("/api/users/password/forgot")
+            .then()
+            .statusCode(204)
+        val token = resetPasswordTokenFromMailbox(currentEmail)
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"new-admin1234567","token":"$token"}""")
+            .`when`().post("/api/users/$userId/password/reset")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"another-admin1234567","token":"$token"}""")
+            .`when`().post("/api/users/$userId/password/reset")
+            .then()
+            .statusCode(400)
+            .body("code", equalTo("BAD_REQUEST"))
+            .body("message", equalTo("Password reset token is no longer valid"))
     }
 
     @Test

@@ -930,7 +930,8 @@ class MemoryShareService @Inject constructor(
         routingContext.get<Set<String>>(UpdateMemoryShareRequestReader.PRESENT_FIELDS_KEY)?.contains(field) == true
 
     private fun canExposePublicRootMemory(access: ShareAccess): Boolean =
-        access.authenticatedUser != null || access.shareIdentity != null || access.canViewGallery
+        access.share.role != MemoryShareRole.UPLOADER &&
+            (access.authenticatedUser != null || access.shareIdentity != null || access.canViewGallery)
 
     private fun com.veyq.api.generated.model.MemoryShareRole.toDomain(): MemoryShareRole =
         MemoryShareRole.valueOf(value)
