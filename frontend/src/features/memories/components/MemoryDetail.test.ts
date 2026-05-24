@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import type { Memory, MemoryHeader } from '../api'
+import type { Memory, MemoryHeader, MemoryMedia } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
 describe('MemoryDetail', () => {
@@ -65,11 +65,46 @@ describe('MemoryDetail', () => {
 
     expect(wrapper.text()).not.toContain('0 Kapitel')
   })
+
+  it('does not use the first media item as an implicit cover', () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory({ coverUrl: null, mediaCount: 1 }),
+        header: header({ coverUrl: null }),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.find('.memory-detail-cover img').exists()).toBe(false)
+    expect(wrapper.find('.memory-detail-cover .pi-images').exists()).toBe(true)
+  })
+
+  it('renders an explicit cover image', () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ coverUrl: '/api/tenant/memories/mem-1/cover/content' }),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.find('.memory-detail-cover img').exists()).toBe(true)
+    expect(wrapper.find('.memory-detail-cover .pi-images').exists()).toBe(false)
+  })
 })
 
 function detailStubs() {
   return {
-    Button: { template: '<button><slot />{{ label }}</button>', props: ['label'] },
+    Button: {
+      props: ['label', 'icon'],
+      template: '<button type="button"><span v-if="icon" :class="icon" />{{ label }}</button>'
+    },
     Tabs: { template: '<section><slot /></section>' },
     TabList: { template: '<div><slot /></div>' },
     Tab: { template: '<button><slot /></button>' },
@@ -118,6 +153,30 @@ function header(overrides: Partial<MemoryHeader> = {}): MemoryHeader {
     descendantMediaCount: 0,
     childMemoryCount: 0,
     scope: { type: 'TENANT' },
+    ...overrides
+  }
+}
+
+function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
+  return {
+    id: 'media-1',
+    memoryId: 'mem-1',
+    title: 'First upload',
+    uploader: { type: 'USER', displayName: 'Kevin' },
+    createdAt: '2026-05-24T16:30:00Z',
+    capturedAtOverride: false,
+    mimeType: 'image/jpeg',
+    sizeBytes: 12,
+    contentUrl: '/api/tenant/media/media-1/content',
+    previewUrl: '/api/tenant/media/media-1/preview',
+    capturedAt: null,
+    cameraMake: null,
+    cameraModel: null,
+    lensModel: null,
+    imageWidth: null,
+    imageHeight: null,
+    gpsLatitude: null,
+    gpsLongitude: null,
     ...overrides
   }
 }

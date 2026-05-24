@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -45,7 +46,8 @@ const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
 const password = ref('')
 const displayName = ref('')
-const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([])
+const uploadPicker = ref<{ clear: () => void } | null>(null)
 const createMemoryOpen = ref(false)
 const error = ref('')
 const loading = ref(false)
@@ -176,20 +178,31 @@ function handleMemoryDeleted(parentPath: string) {
   void router.replace(publicShareRoute(parentPath))
 }
 
-function selectUpload(event: Event) {
-  selectedFile.value = (event.target as HTMLInputElement).files?.[0] || null
+function selectUpload(event: FileUploadSelectEvent) {
+  selectedFiles.value = event.files
+}
+
+function selectUploadFallback(event: Event) {
+  selectedFiles.value = Array.from((event.target as HTMLInputElement).files || [])
+}
+
+function clearUploadSelection() {
+  selectedFiles.value = []
+  uploadPicker.value?.clear()
 }
 
 async function uploadToRoot() {
-  if (!selectedFile.value) return
+  if (!selectedFiles.value.length) return
   error.value = ''
   loading.value = true
   try {
-    await uploadPublicShareMedia(shareId.value, {
-      file: selectedFile.value,
-      title: selectedFile.value.name
-    })
-    selectedFile.value = null
+    for (const file of selectedFiles.value) {
+      await uploadPublicShareMedia(shareId.value, {
+        file,
+        title: file.name
+      })
+    }
+    clearUploadSelection()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.uploadFailed'))
   } finally {
@@ -261,13 +274,31 @@ function routePathToSharePath(value: unknown): string {
       class="public-share-upload"
       @submit.prevent="uploadToRoot"
     >
-      <input type="file" accept="image/*,video/*" @change="selectUpload" />
+      <div class="memory-upload-picker">
+        <FileUpload
+          ref="uploadPicker"
+          mode="basic"
+          accept="image/*,video/*"
+          choose-label="Medien auswählen"
+          custom-upload
+          multiple
+          @select="selectUpload"
+        />
+        <input class="memory-upload-native-fallback" type="file" multiple accept="image/*,video/*" @change="selectUploadFallback" />
+        <span>{{ selectedFiles.length ? `${selectedFiles.length} ausgewählt` : 'Keine Medien ausgewählt' }}</span>
+      </div>
+      <ul v-if="selectedFiles.length" class="memory-upload-file-list">
+        <li v-for="file in selectedFiles" :key="`${file.name}-${file.size}`">
+          <span class="pi pi-file" />
+          <span>{{ file.name }}</span>
+        </li>
+      </ul>
       <Button
         :label="t('common.upload')"
         icon="pi pi-upload"
         type="submit"
         :loading="loading"
-        :disabled="!selectedFile"
+        :disabled="!selectedFiles.length"
       />
     </form>
 

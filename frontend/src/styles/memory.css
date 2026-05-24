@@ -607,7 +607,7 @@
 
 .memory-detail-header {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 164px minmax(0, 1fr);
   align-items: center;
   gap: 1.25rem;
   padding-bottom: 1.15rem;
@@ -617,8 +617,9 @@
 .memory-detail-cover {
   display: grid;
   place-items: center;
-  width: 92px;
-  height: 92px;
+  width: 164px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: var(--app-radius);
   background: linear-gradient(135deg, #ecebff, #f7f4ff);
@@ -654,6 +655,17 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.55rem;
+}
+
+.memory-upload-action.p-button {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.memory-upload-action.p-button:not(:disabled):hover {
+  background: #115e59;
+  border-color: #115e59;
 }
 
 .memory-detail-header p {
@@ -838,6 +850,55 @@
   width: 100%;
 }
 
+.memory-upload-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.memory-upload-picker > span {
+  color: var(--app-muted);
+  font-size: 0.92rem;
+}
+
+.memory-upload-native-fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.memory-upload-file-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.memory-upload-file-list li {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #f8fafc;
+  color: var(--app-text);
+}
+
+.memory-upload-file-list li span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .public-share-view {
   display: grid;
   gap: 1.5rem;
@@ -875,6 +936,15 @@
 .public-share-login,
 .public-share-upload {
   flex-wrap: wrap;
+}
+
+.public-share-upload {
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: #fff;
+  box-shadow: var(--app-shadow-sm);
 }
 
 .public-share-children {

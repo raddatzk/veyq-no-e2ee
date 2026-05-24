@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import { deleteMemory, type Memory } from '../api'
@@ -20,12 +21,19 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const error = ref('')
 const loading = ref(false)
+const deleteConfirmation = ref('')
+const canConfirmDelete = computed(
+  () => deleteConfirmation.value.trim() === props.memory.displayName.trim() && !loading.value
+)
 
 watch(visible, (isVisible) => {
-  if (isVisible) error.value = ''
+  if (!isVisible) return
+  error.value = ''
+  deleteConfirmation.value = ''
 })
 
 async function confirmDelete() {
+  if (!canConfirmDelete.value) return
   error.value = ''
   loading.value = true
   try {
@@ -47,6 +55,14 @@ async function confirmDelete() {
       <p class="memory-dialog-copy">
         {{ t('memory.deleteCopy', { name: memory.displayName }) }}
       </p>
+      <label>
+        {{ t('settings.confirmationDisplayName') }}
+        <InputText
+          v-model="deleteConfirmation"
+          autocomplete="off"
+          :placeholder="memory.displayName"
+        />
+      </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button
@@ -54,6 +70,7 @@ async function confirmDelete() {
           :label="t('memory.delete')"
           icon="pi pi-trash"
           severity="danger"
+          :disabled="!canConfirmDelete"
           :loading="loading"
           @click="confirmDelete"
         />

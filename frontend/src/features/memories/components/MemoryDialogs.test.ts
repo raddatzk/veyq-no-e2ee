@@ -152,6 +152,10 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
+    const deleteButton = () =>
+      wrapper.findAll('button').find((button) => button.text().includes('Memory löschen'))!
+    expect(deleteButton().attributes('disabled')).toBeDefined()
+    await wrapper.find('input').setValue('Trip')
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Memory löschen'))!

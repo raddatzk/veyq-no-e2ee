@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { deleteTenant, tenants } from '../../../api/tenantClient'
 import { authState } from '../../../authState'
 import {
   getTenantUsers,
@@ -30,6 +31,8 @@ const getTenantUsersMock = vi.mocked(getTenantUsers)
 const inviteTenantUserMock = vi.mocked(inviteTenantUser)
 const reinviteTenantUserMock = vi.mocked(reinviteTenantUser)
 const updateTenantUserRoleMock = vi.mocked(updateTenantUserRole)
+const deleteTenantMock = vi.mocked(deleteTenant)
+const tenantsMock = vi.mocked(tenants)
 
 describe('TenantSettingsPanel', () => {
   afterEach(() => {
@@ -92,6 +95,52 @@ describe('TenantSettingsPanel', () => {
 
     expect(updateTenantUserRoleMock).toHaveBeenCalledWith('friends', 2, 'TenantOwner')
     expect(wrapper.text()).toContain('Rolle wurde gespeichert.')
+  })
+
+  it('requires the tenant display name before deleting a tenant', async () => {
+    const owner = {
+      userId: 1,
+      email: 'owner@example.test',
+      displayName: 'Owner',
+      permalink: 'owner',
+      serverRole: 'ServerMember' as const,
+      passkeyCount: 0
+    }
+    authState.user = owner
+    authState.tenants = [
+      {
+        id: 10,
+        name: 'friends',
+        displayName: 'Friends',
+        domain: 'friends.test',
+        role: 'TenantOwner',
+        admins: [owner]
+      }
+    ]
+    getTenantUsersMock.mockResolvedValue([
+      tenantUser(1, 'Owner', 'owner@example.test', 'TenantOwner')
+    ])
+    deleteTenantMock.mockResolvedValue()
+    tenantsMock.mockResolvedValue([])
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Tenant löschen'))!
+      .trigger('click')
+    const deleteButton = () =>
+      wrapper.findAll('button').find((button) => button.text() === 'Löschen')!
+    expect(deleteButton().attributes('disabled')).toBeDefined()
+
+    await wrapper.findAll('input').at(-1)!.setValue('Friends')
+    await deleteButton().trigger('click')
+    await flushPromises()
+
+    expect(deleteTenantMock).toHaveBeenCalledWith('friends')
+    expect(tenantsMock).toHaveBeenCalled()
+    expect(pushMock).toHaveBeenCalledWith('/')
   })
 })
 
