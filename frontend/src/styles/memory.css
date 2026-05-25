@@ -605,6 +605,11 @@
   background: #fff;
 }
 
+.memory-empty-inline {
+  min-height: 82px;
+  align-self: stretch;
+}
+
 .memory-detail-header {
   display: grid;
   grid-template-columns: 164px minmax(0, 1fr);
@@ -910,8 +915,7 @@
 .public-share-header,
 .public-share-login,
 .public-share-upload {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 0.75rem;
 }
 
@@ -935,16 +939,42 @@
 
 .public-share-login,
 .public-share-upload {
-  flex-wrap: wrap;
+  align-items: start;
 }
 
 .public-share-upload {
-  align-items: flex-start;
   padding: 1rem;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
   background: #fff;
   box-shadow: var(--app-shadow-sm);
+}
+
+.public-share-login {
+  grid-template-columns: minmax(16rem, 1fr) minmax(12rem, auto) minmax(12rem, auto) auto;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: #fff;
+  box-shadow: var(--app-shadow-sm);
+}
+
+.public-share-copy,
+.public-share-upload-copy p {
+  margin: 0;
+  color: var(--app-muted);
+  line-height: 1.5;
+}
+
+.public-share-upload-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.public-share-upload-copy h2 {
+  margin: 0;
+  font-size: 1.05rem;
 }
 
 .public-share-children {
@@ -1028,6 +1058,10 @@
 
   .memory-detail-actions {
     justify-content: flex-start;
+  }
+
+  .public-share-login {
+    grid-template-columns: 1fr;
   }
 
 }

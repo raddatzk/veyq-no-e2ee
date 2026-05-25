@@ -26,6 +26,9 @@ defineEmits<{
         <span>{{ memories.length }}</span>
       </div>
       <div class="memory-card-grid memory-card-grid-memories">
+        <p v-if="!memories.length" class="memory-empty memory-empty-inline">
+          {{ t('media.empty') }}
+        </p>
         <MemoryCard
           v-for="memory in memories"
           :key="memory.id"
@@ -49,6 +52,9 @@ defineEmits<{
         <span>{{ navigation.folders.length }}</span>
       </div>
       <div class="memory-card-grid">
+        <p v-if="!navigation.folders.length" class="memory-empty memory-empty-inline">
+          {{ t('memory.folderEmpty') }}
+        </p>
         <button
           v-for="folder in navigation.folders"
           :key="folder.path"

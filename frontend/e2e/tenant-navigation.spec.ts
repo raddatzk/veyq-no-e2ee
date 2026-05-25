@@ -17,7 +17,7 @@ test('tenant home renders memory navigation without legacy areas', async ({ page
   await expect(page.getByText('Favoriten')).toBeVisible()
   await expect(page.getByText('Gruppen')).toBeVisible()
   await expect(page.getByRole('link', { name: /Travel Gruppe/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Bereiche' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Alben' })).toHaveCount(0)
 })
 
 test('sidebar scope links navigate to personal and group roots', async ({ page }) => {

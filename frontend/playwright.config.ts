@@ -6,6 +6,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: 'http://127.0.0.1:8081',
+    locale: 'de-DE',
     trace: 'on-first-retry'
   },
   webServer: {

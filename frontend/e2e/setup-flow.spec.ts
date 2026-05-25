@@ -18,10 +18,10 @@ test('initial setup keeps tenant creation outside the workspace shell', async ({
 
   await expect(page.locator('.app-shell')).toHaveCount(0)
   await expect(page.locator('.public-shell')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Tenant erstellen' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Bereich erstellen' })).toBeVisible()
   await expect(page.getByLabel('Domain')).toHaveValue(new URL(page.url()).host)
 
-  await page.getByRole('button', { name: 'Tenant erstellen' }).click()
+  await page.getByRole('button', { name: 'Bereich erstellen' }).click()
 
   await expect(page).toHaveURL(/\/friends$/)
   await expect(page.locator('.app-shell')).toBeVisible()
@@ -34,10 +34,10 @@ test('server owners can create a tenant from an empty workspace shell', async ({
   await page.goto('/')
 
   await expect(page.locator('.app-shell')).toBeVisible()
-  await expect(page.getByText("Currently, you don't have any tenants")).toBeVisible()
+  await expect(page.getByText('Du hast aktuell noch keinen Bereich für deine Memories.')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Tenant erstellen' }).click()
+  await page.getByRole('button', { name: 'Bereich erstellen' }).click()
 
-  await expect(page.getByRole('dialog', { name: 'Tenant erstellen' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Bereich erstellen' })).toBeVisible()
   await expect(page.getByLabel('Domain')).toHaveValue(new URL(page.url()).host)
 })

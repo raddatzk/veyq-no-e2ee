@@ -226,8 +226,8 @@ function routePathToSharePath(value: unknown): string {
   <section class="public-share-view">
     <header class="public-share-header">
       <div>
-        <p>Veyq Share</p>
-        <h1>{{ memory?.displayName || share?.rootMemory?.displayName || 'Memory Share' }}</h1>
+        <p>{{ t('share.intro') }}</p>
+        <h1>{{ memory?.displayName || share?.rootMemory?.displayName || t('share.intro') }}</h1>
       </div>
       <Button
         v-if="share?.authenticated"
@@ -242,6 +242,7 @@ function routePathToSharePath(value: unknown): string {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
     <form v-if="canShowLogin" class="public-share-login" @submit.prevent="login">
+      <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
       <InputText
         v-if="share?.passwordRequired"
         v-model="password"
@@ -274,18 +275,22 @@ function routePathToSharePath(value: unknown): string {
       class="public-share-upload"
       @submit.prevent="uploadToRoot"
     >
+      <div class="public-share-upload-copy">
+        <h2>{{ t('share.uploadTitle') }}</h2>
+        <p>{{ t('share.uploadCopy') }}</p>
+      </div>
       <div class="memory-upload-picker">
         <FileUpload
           ref="uploadPicker"
           mode="basic"
           accept="image/*,video/*"
-          choose-label="Medien auswählen"
+          :choose-label="t('media.chooseFiles')"
           custom-upload
           multiple
           @select="selectUpload"
         />
         <input class="memory-upload-native-fallback" type="file" multiple accept="image/*,video/*" @change="selectUploadFallback" />
-        <span>{{ selectedFiles.length ? `${selectedFiles.length} ausgewählt` : 'Keine Medien ausgewählt' }}</span>
+        <span>{{ selectedFiles.length ? t('media.selectedCount', { count: selectedFiles.length }) : t('share.uploadEmpty') }}</span>
       </div>
       <ul v-if="selectedFiles.length" class="memory-upload-file-list">
         <li v-for="file in selectedFiles" :key="`${file.name}-${file.size}`">
@@ -328,7 +333,7 @@ function routePathToSharePath(value: unknown): string {
       v-if="memory"
       v-model:visible="createMemoryOpen"
       tenant-name=""
-      tenant-display-name="Share"
+      :tenant-display-name="t('share.intro')"
       :parent-memory-id="memory.id"
       :create-memory-override="(request) => createPublicShareChildMemory(shareId, memory!.id, request)"
       :set-cover-override="(memoryId, request) => setPublicShareMemoryCover(shareId, memoryId, request)"

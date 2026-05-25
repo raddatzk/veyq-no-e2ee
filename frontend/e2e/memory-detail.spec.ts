@@ -12,22 +12,20 @@ test('memory detail renders breadcrumb context and memory tabs', async ({ page }
   await expect(page.locator('.app-breadcrumb')).toContainText(weddingMemory.displayName)
 
   await expect(page.getByRole('tab', { name: 'Galerie' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Unter-Memories' })).toBeVisible()
-  await expect(page.getByText('1 Unter-Memories')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Kapitel' })).toBeVisible()
+  await expect(page.getByText('1 Kapitel')).toBeVisible()
 
-  await page.getByRole('tab', { name: 'Unter-Memories' }).click()
+  await page.getByRole('tab', { name: 'Kapitel' }).click()
   await expect(page.getByRole('button', { name: /Abendessen/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Unter-Memory erstellen' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Kapitel erstellen' })).toBeVisible()
 })
 
-test('memory topbar exposes upload as icon action without text label', async ({ page }) => {
+test('memory detail exposes upload as a primary memory action', async ({ page }) => {
   await mockMemoryDetailApi(page)
 
   await page.goto(`/friends${weddingMemory.path}`)
 
-  const topbar = page.locator('.workspace-topbar')
-  await expect(topbar.getByRole('button', { name: 'Hochladen' })).toBeVisible()
-  await expect(topbar).not.toContainText('Hochladen')
+  await expect(page.locator('.memory-detail-actions').getByRole('button', { name: 'Hochladen' })).toBeVisible()
 })
 
 test('share dialog manages password protection with a toggle', async ({ page }) => {
@@ -56,22 +54,22 @@ test('share dialog manages password protection with a toggle', async ({ page }) 
   })
 
   await page.goto(`/friends${weddingMemory.path}`)
-  await page.getByRole('button', { name: 'Teilen' }).click()
+  await page.getByRole('button', { name: 'Memory teilen' }).click()
 
   const shareDialog = page.getByRole('dialog', { name: 'Memory teilen' })
   await expect(shareDialog).toBeVisible()
   await expect(shareDialog.getByText('http://127.0.0.1:8081/s/shr-e2e')).toBeVisible()
 
-  await shareDialog.getByRole('button', { name: 'Share erstellen' }).click()
+  await shareDialog.getByRole('button', { name: 'Link erstellen' }).click()
   await expect.poll(() => createdShare).toMatchObject({
     role: 'VIEWER',
     password: null
   })
 
   await shareDialog.getByLabel('Passwortschutz aktivieren').check()
-  await expect(shareDialog.getByRole('button', { name: 'Share erstellen' })).toBeDisabled()
+  await expect(shareDialog.getByRole('button', { name: 'Link erstellen' })).toBeDisabled()
   await shareDialog.getByRole('textbox', { name: 'Passwort' }).fill('share-password123')
-  await shareDialog.getByRole('button', { name: 'Share erstellen' }).click()
+  await shareDialog.getByRole('button', { name: 'Link erstellen' }).click()
   await expect.poll(() => createdShare).toMatchObject({
     role: 'VIEWER',
     password: 'share-password123'
@@ -95,8 +93,8 @@ test('public share route renders the shared memory view under /s', async ({ page
   await expect(page).toHaveURL(/\/s\/shr-e2e$/)
   await expect(page.getByRole('heading', { name: weddingMemory.displayName })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Galerie' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Unter-Memories' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Kapitel' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Info' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Teilen' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Memory teilen' })).toHaveCount(0)
 })

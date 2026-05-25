@@ -400,7 +400,7 @@ describe('Memory detail dialogs', () => {
     await flushPromises()
     const createButton = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Share erstellen'))!
+      .find((button) => button.text().includes('Link erstellen'))!
     expect(createButton.attributes('disabled')).toBeDefined()
 
     await wrapper.find('input[autocomplete="new-password"]').setValue('share-password123')
@@ -416,7 +416,7 @@ describe('Memory detail dialogs', () => {
     await flushPromises()
     expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { role: 'CONTRIBUTOR' })
 
-    await wrapper.find('button[aria-label="Share umbenennen"]').trigger('click')
+    await wrapper.find('button[aria-label="Freigabe umbenennen"]').trigger('click')
     await flushPromises()
     await wrapper.findAll('input').at(-1)!.setValue('Friends')
     await wrapper.findAll('form').at(-1)!.trigger('submit')

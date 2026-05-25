@@ -128,7 +128,7 @@ describe('TenantSettingsPanel', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Tenant löschen'))!
+      .find((button) => button.text().includes('Bereich löschen'))!
       .trigger('click')
     const deleteButton = () =>
       wrapper.findAll('button').find((button) => button.text() === 'Löschen')!

@@ -5,6 +5,7 @@ export const adminUser = {
   userId: 1,
   email: 'admin@example.test',
   displayName: 'Administrator',
+  permalink: 'administrator',
   serverRole: 'ServerOwner',
   passkeyCount: 0
 }
@@ -301,7 +302,32 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
 
     if (method === 'GET' && url.pathname === '/api/friends/memories/by-path') {
       const path = url.searchParams.get('path')
-      await fulfillJson(route, path === weddingMemory.path ? weddingMemory : childMemory)
+      if (path === weddingMemory.path) {
+        await fulfillJson(route, weddingMemory)
+        return
+      }
+      if (path === childMemory.path) {
+        await fulfillJson(route, childMemory)
+        return
+      }
+      await fulfillJson(route, { error: 'Memory not found' }, 404)
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/header`) {
+      await fulfillJson(route, {
+        id: weddingMemory.id,
+        displayName: weddingMemory.displayName,
+        path: weddingMemory.path,
+        coverUrl: weddingMemory.coverUrl,
+        coverCrop: null,
+        startDate: weddingMemory.startDate,
+        endDate: weddingMemory.endDate,
+        directMediaCount: weddingMemory.mediaCount,
+        descendantMediaCount: 0,
+        childMemoryCount: weddingMemory.childCount,
+        scope: weddingMemory.scope
+      })
       return
     }
 
@@ -394,6 +420,23 @@ export async function mockPublicViewerShareApi(page: Page) {
       return
     }
 
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/header`) {
+      await fulfillJson(route, {
+        id: publicShareRootMemory.id,
+        displayName: publicShareRootMemory.displayName,
+        path: publicShareRootMemory.path,
+        coverUrl: publicShareRootMemory.coverUrl,
+        coverCrop: publicShareRootMemory.coverCrop,
+        startDate: publicShareRootMemory.startDate,
+        endDate: publicShareRootMemory.endDate,
+        directMediaCount: publicShareRootMemory.mediaCount,
+        descendantMediaCount: 0,
+        childMemoryCount: publicShareRootMemory.childCount,
+        scope: null
+      })
+      return
+    }
+
     if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/children`) {
       await fulfillJson(route, [
         {
@@ -416,8 +459,12 @@ export async function mockPublicViewerShareApi(page: Page) {
 }
 
 export function navigationForPath(path: string) {
-  if (path === personalScopeRoot.path) return personalNavigation
-  if (path === groupScopeRoot.path) return groupNavigation
+  if (path === personalScopeRoot.path || path.startsWith(`${personalScopeRoot.path}/`)) {
+    return personalNavigation
+  }
+  if (path === groupScopeRoot.path || path.startsWith(`${groupScopeRoot.path}/`)) {
+    return groupNavigation
+  }
   if (path === folderNavigation.location.path) return folderNavigation
   return rootNavigation
 }
