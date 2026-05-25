@@ -13,9 +13,11 @@ import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.User
 import com.veyq.api.generated.model.MediaUploader
+import com.veyq.api.generated.model.MemoryMediaBatchResponse
 import com.veyq.api.generated.model.MemoryMediaSummary
 import com.veyq.api.generated.model.PublicShareMediaSummary
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.LibraryScopes
@@ -154,6 +156,27 @@ class MediaService @Inject constructor(
         media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
         return media.toMemorySummary()
+    }
+
+    @Transactional
+    fun updateMemoryMediaMetadataBatch(
+        memoryId: String,
+        request: UpdateMemoryMediaMetadataBatchRequest,
+    ): MemoryMediaBatchResponse {
+        val memory = resolveVisibleMemory(memoryId)
+        val mediaIds = request.mediaIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (mediaIds.isEmpty()) throw BadRequestException("mediaIds must not be empty", "MEDIA_BATCH_EMPTY")
+
+        val updated = mediaIds.map { publicId ->
+            val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
+                ?: throw NotFoundException("Media not found")
+            if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+
+            media.capturedAt = (media.capturedAt ?: media.createdAt).plusSeconds(request.capturedAtOffsetSeconds)
+            media.capturedAtOverride = true
+            media
+        }
+        return MemoryMediaBatchResponse(media = updated.map { it.toMemorySummary() })
     }
 
     fun mediaContent(publicId: String, rangeHeader: String?): Response {

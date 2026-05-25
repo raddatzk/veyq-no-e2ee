@@ -2,6 +2,7 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoryMediaApi
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.media.MediaService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -43,6 +44,13 @@ class MemoryMediaResource @Inject constructor(
         request: UpdateMemoryMediaMetadataRequest,
     ): Response =
         Response.ok(mediaService.updateMemoryMediaMetadata(memoryId, mediaId, request)).build()
+
+    override fun updateMemoryMediaMetadataBatch(
+        tenantName: String,
+        memoryId: String,
+        request: UpdateMemoryMediaMetadataBatchRequest,
+    ): Response =
+        Response.ok(mediaService.updateMemoryMediaMetadataBatch(memoryId, request)).build()
 
     override fun memoryMediaContent(tenantName: String, mediaId: String, range: String?): Response =
         mediaService.mediaContent(mediaId, range)

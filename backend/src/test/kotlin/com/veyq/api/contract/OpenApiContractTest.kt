@@ -362,6 +362,7 @@ class OpenApiContractTest {
             "DELETE /api/{tenantName}/memories/{memoryId}/cover",
             "GET /api/{tenantName}/memories/{memoryId}/cover/content",
             "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata",
+            "PATCH /api/{tenantName}/memories/{memoryId}/media/metadata-batch",
             "GET /api/{tenantName}/memory-media/{mediaId}/content",
             "GET /api/{tenantName}/memory-media/{mediaId}/preview",
             "GET /api/{tenantName}/profiles/{userPermalink}",
@@ -421,7 +422,7 @@ class OpenApiContractTest {
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
                     "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
-                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
+                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
                     else -> error("No generated memories interface mapping for $operationId")

@@ -16,6 +16,7 @@ import type {
   PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareMemorySummary,
+  UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest,
   UpdatePublicShareMemoryRequest as GeneratedUpdatePublicShareMemoryRequest
@@ -29,6 +30,7 @@ import type {
   MemoryMedia,
   MemoryNavigationResponse,
   SetMemoryCoverRequest,
+  UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
   UploadMemoryMediaRequest
@@ -176,6 +178,21 @@ export function updateMemoryMediaMetadata(
       updateMemoryMediaMetadataRequest: request as GeneratedUpdateMemoryMediaMetadataRequest
     })
   ).then(normalizeMemoryMedia)
+}
+
+export function updateMemoryMediaMetadataBatch(
+  tenantName: string,
+  memoryId: string,
+  request: UpdateMemoryMediaMetadataBatchRequest
+): Promise<MemoryMedia[]> {
+  return generatedCall(
+    memoryMediaApi.updateMemoryMediaMetadataBatch({
+      tenantName,
+      memoryId,
+      updateMemoryMediaMetadataBatchRequest:
+        request as GeneratedUpdateMemoryMediaMetadataBatchRequest
+    })
+  ).then((response) => response.media.map(normalizeMemoryMedia))
 }
 
 export function listMemoryShares(tenantName: string, memoryId: string) {

@@ -16,14 +16,20 @@
 import * as runtime from '../runtime';
 import type {
   ErrorResponse,
+  MemoryMediaBatchResponse,
   MemoryMediaSummary,
+  UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest,
 } from '../models/index';
 import {
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    MemoryMediaBatchResponseFromJSON,
+    MemoryMediaBatchResponseToJSON,
     MemoryMediaSummaryFromJSON,
     MemoryMediaSummaryToJSON,
+    UpdateMemoryMediaMetadataBatchRequestFromJSON,
+    UpdateMemoryMediaMetadataBatchRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
     UpdateMemoryMediaMetadataRequestToJSON,
 } from '../models/index';
@@ -50,6 +56,12 @@ export interface UpdateMemoryMediaMetadataOperationRequest {
     memoryId: string;
     mediaId: string;
     updateMemoryMediaMetadataRequest: UpdateMemoryMediaMetadataRequest;
+}
+
+export interface UpdateMemoryMediaMetadataBatchOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    updateMemoryMediaMetadataBatchRequest: UpdateMemoryMediaMetadataBatchRequest;
 }
 
 export interface UploadMemoryMediaRequest {
@@ -177,6 +189,34 @@ export interface MemoryMediaApiInterface {
      * Correct memory media metadata
      */
     updateMemoryMediaMetadata(requestParameters: UpdateMemoryMediaMetadataOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
+
+    /**
+     * Creates request options for updateMemoryMediaMetadataBatch without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryMediaMetadataBatchRequest} updateMemoryMediaMetadataBatchRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    updateMemoryMediaMetadataBatchRequestOpts(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Applies a capture timestamp offset to selected media that belongs directly to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Correct memory media metadata in batches
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryMediaMetadataBatchRequest} updateMemoryMediaMetadataBatchRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    updateMemoryMediaMetadataBatchRaw(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>>;
+
+    /**
+     * Applies a capture timestamp offset to selected media that belongs directly to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Correct memory media metadata in batches
+     */
+    updateMemoryMediaMetadataBatch(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse>;
 
     /**
      * Creates request options for uploadMemoryMedia without sending the request
@@ -458,6 +498,71 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async updateMemoryMediaMetadata(requestParameters: UpdateMemoryMediaMetadataOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary> {
         const response = await this.updateMemoryMediaMetadataRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateMemoryMediaMetadataBatch without sending the request
+     */
+    async updateMemoryMediaMetadataBatchRequestOpts(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling updateMemoryMediaMetadataBatch().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updateMemoryMediaMetadataBatch().'
+            );
+        }
+
+        if (requestParameters['updateMemoryMediaMetadataBatchRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryMediaMetadataBatchRequest',
+                'Required parameter "updateMemoryMediaMetadataBatchRequest" was null or undefined when calling updateMemoryMediaMetadataBatch().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/metadata-batch`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryMediaMetadataBatchRequestToJSON(requestParameters['updateMemoryMediaMetadataBatchRequest']),
+        };
+    }
+
+    /**
+     * Applies a capture timestamp offset to selected media that belongs directly to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Correct memory media metadata in batches
+     */
+    async updateMemoryMediaMetadataBatchRaw(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>> {
+        const requestOptions = await this.updateMemoryMediaMetadataBatchRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBatchResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Applies a capture timestamp offset to selected media that belongs directly to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Correct memory media metadata in batches
+     */
+    async updateMemoryMediaMetadataBatch(requestParameters: UpdateMemoryMediaMetadataBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse> {
+        const response = await this.updateMemoryMediaMetadataBatchRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

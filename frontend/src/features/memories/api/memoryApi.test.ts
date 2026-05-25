@@ -11,6 +11,7 @@ import {
   removeMemoryCover,
   setMemoryCover,
   updateMemory,
+  updateMemoryMediaMetadataBatch,
   uploadMemoryMedia
 } from './memoryApi'
 
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   setMemoryCover: vi.fn(),
   removeMemoryCover: vi.fn(),
   listMemoryMedia: vi.fn(),
+  updateMemoryMediaMetadataBatch: vi.fn(),
   uploadMemoryMedia: vi.fn(),
   getPublicShareMemoryHeader: vi.fn()
 }))
@@ -45,6 +47,7 @@ vi.mock('../../../api/generatedClient', () => ({
   },
   memoryMediaApi: {
     listMemoryMedia: mocks.listMemoryMedia,
+    updateMemoryMediaMetadataBatch: mocks.updateMemoryMediaMetadataBatch,
     uploadMemoryMedia: mocks.uploadMemoryMedia
   },
   publicSharesApi: {
@@ -274,6 +277,44 @@ describe('memoryApi facade', () => {
       memoryId: 'mem-1',
       file,
       title: undefined
+    })
+  })
+
+  it('updates memory media metadata in batches and normalizes returned media', async () => {
+    mocks.updateMemoryMediaMetadataBatch.mockResolvedValue({
+      media: [
+        {
+          id: 'media-1',
+          memoryId: 'mem-1',
+          title: 'Photo',
+          uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
+          createdAt: '2026-01-01T00:00:00Z',
+          capturedAt: '2026-01-01T01:00:00Z',
+          capturedAtOverride: true,
+          mimeType: 'image/jpeg',
+          sizeBytes: 12,
+          contentUrl: '/content'
+        }
+      ]
+    })
+
+    const media = await updateMemoryMediaMetadataBatch('tenant', 'mem-1', {
+      mediaIds: ['media-1'],
+      capturedAtOffsetSeconds: 3600
+    })
+
+    expect(media[0]).toMatchObject({
+      id: 'media-1',
+      capturedAt: '2026-01-01T01:00:00Z',
+      previewUrl: null
+    })
+    expect(mocks.updateMemoryMediaMetadataBatch).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-1',
+      updateMemoryMediaMetadataBatchRequest: {
+        mediaIds: ['media-1'],
+        capturedAtOffsetSeconds: 3600
+      }
     })
   })
 

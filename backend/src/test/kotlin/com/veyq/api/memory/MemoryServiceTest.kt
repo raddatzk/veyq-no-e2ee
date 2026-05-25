@@ -29,6 +29,7 @@ import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaService
 import com.veyq.api.setup.ServerState
@@ -97,6 +98,88 @@ class MemoryServiceTest {
         assertThat(memoryService.getMemory(trip.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
         assertThat(memoryService.getMemory(trip.id).endDate).isEqualTo(LocalDate.parse("2026-05-03"))
         assertThat(memoryService.getMemory(day.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
+    }
+
+    @Test
+    fun `batch media metadata offset shifts captured time and marks override`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("batch-trip", "Batch Trip"))
+        val first = createMedia(
+            owner,
+            memory(trip.id),
+            "First Photo",
+            capturedAt = Instant.parse("2026-01-02T10:00:00Z"),
+        )
+        val second = createMedia(
+            owner,
+            memory(trip.id),
+            "Second Photo",
+            capturedAt = Instant.parse("2026-01-02T11:00:00Z"),
+        )
+
+        val response = mediaService.updateMemoryMediaMetadataBatch(
+            trip.id,
+            UpdateMemoryMediaMetadataBatchRequest(
+                mediaIds = listOf(first.publicId, second.publicId),
+                capturedAtOffsetSeconds = 7200,
+            ),
+        )
+
+        assertThat(response.media).extracting("id").containsExactly(first.publicId, second.publicId)
+        assertThat(response.media).extracting("capturedAtOverride").containsOnly(true)
+        assertThat(response.media.map { it.capturedAt?.toInstant() })
+            .containsExactly(
+                Instant.parse("2026-01-02T12:00:00Z"),
+                Instant.parse("2026-01-02T13:00:00Z"),
+            )
+    }
+
+    @Test
+    fun `batch media metadata offset uses created time when captured time is missing`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("batch-fallback-trip", "Batch Fallback Trip"))
+        val createdAt = Instant.parse("2026-01-02T10:00:00Z")
+        val media = createMedia(owner, memory(trip.id), "Fallback Photo", createdAt = createdAt)
+
+        val response = mediaService.updateMemoryMediaMetadataBatch(
+            trip.id,
+            UpdateMemoryMediaMetadataBatchRequest(
+                mediaIds = listOf(media.publicId),
+                capturedAtOffsetSeconds = -3600,
+            ),
+        )
+
+        assertThat(response.media.single().capturedAt?.toInstant()).isEqualTo(Instant.parse("2026-01-02T09:00:00Z"))
+        assertThat(response.media.single().capturedAtOverride).isTrue()
+    }
+
+    @Test
+    fun `batch media metadata offset rejects empty selection`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("batch-empty-trip", "Batch Empty Trip"))
+
+        assertThatExceptionOfType(BadRequestException::class.java)
+            .isThrownBy {
+                mediaService.updateMemoryMediaMetadataBatch(
+                    trip.id,
+                    UpdateMemoryMediaMetadataBatchRequest(mediaIds = emptyList(), capturedAtOffsetSeconds = 60),
+                )
+            }
+    }
+
+    @Test
+    fun `batch media metadata offset rejects media outside addressed memory`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("batch-scope-trip", "Batch Scope Trip"))
+        val other = memoryService.createMemory(CreateMemoryRequest("other-trip", "Other Trip"))
+        val media = createMedia(owner, memory(other.id), "Other Photo")
+
+        assertThatExceptionOfType(NotFoundException::class.java)
+            .isThrownBy {
+                mediaService.updateMemoryMediaMetadataBatch(
+                    trip.id,
+                    UpdateMemoryMediaMetadataBatchRequest(
+                        mediaIds = listOf(media.publicId),
+                        capturedAtOffsetSeconds = 60,
+                    ),
+                )
+            }
     }
 
     @Test
@@ -539,6 +622,7 @@ class MemoryServiceTest {
         memory: Memory,
         title: String,
         capturedAt: Instant? = null,
+        createdAt: Instant = Instant.now(),
     ): Media =
         inTransaction {
             Media().also {
@@ -553,7 +637,7 @@ class MemoryServiceTest {
                 it.sizeBytes = 12
                 it.storageKey = "tenant-${tenant.id}/test-${title.lowercase().replace(" ", "-")}/original"
                 it.originalFilename = "$title.jpg"
-                it.createdAt = Instant.now()
+                it.createdAt = createdAt
                 it.capturedAt = capturedAt
                 it.imageWidth = 16
                 it.imageHeight = 9

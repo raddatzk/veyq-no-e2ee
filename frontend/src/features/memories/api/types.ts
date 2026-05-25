@@ -20,6 +20,7 @@ import type {
   MemoryScopeRoot,
   MoveFolderRequest as GeneratedMoveFolderRequest,
   UpdateFolderRequest as GeneratedUpdateFolderRequest,
+  UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
@@ -124,6 +125,8 @@ export type UpdateMemoryMediaMetadataRequest = Omit<
 > & {
   capturedAt?: string | null
 }
+
+export type UpdateMemoryMediaMetadataBatchRequest = GeneratedUpdateMemoryMediaMetadataBatchRequest
 
 export type UploadMemoryMediaRequest = {
   file: File

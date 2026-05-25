@@ -9,17 +9,20 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
+import { updateMemoryMediaMetadata, updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch } from '../api'
 import type {
   Memory,
   MemoryHeader,
   MemoryMedia,
   SetMemoryCoverRequest,
+  UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
   UploadMemoryMediaRequest
 } from '../api'
 import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
 import EditMemoryDialog from './EditMemoryDialog.vue'
+import MemoryAssetBuckets from './MemoryAssetBuckets.vue'
 import MemoryCard from './MemoryCard.vue'
 import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
@@ -55,6 +58,10 @@ const props = defineProps<{
     memoryId: string,
     request: UpdateMemoryMediaMetadataRequest
   ) => Promise<MemoryMedia>
+  updateMediaMetadataBatch?: (
+    memoryId: string,
+    request: UpdateMemoryMediaMetadataBatchRequest
+  ) => Promise<MemoryMedia[]>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
 }>()
 const { locale, t } = useI18n()
@@ -72,6 +79,7 @@ const coverOpen = ref(false)
 const deleteOpen = ref(false)
 const shareOpen = ref(false)
 const uploadOpen = ref(false)
+const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 const capabilities = computed(() => ({
   canEdit: props.capabilities?.canEdit ?? true,
   canUpload: props.capabilities?.canUpload ?? true,
@@ -114,9 +122,44 @@ const totalMediaCount = computed(
   () => detailHeader.value.directMediaCount + detailHeader.value.descendantMediaCount
 )
 const mediaCountLabel = computed(() => `${totalMediaCount.value} ${t('memory.mediaCount')}`)
+const visibleMedia = computed(() => props.media.map((media) => mediaOverrides.value[media.id] || media))
+const canBatchUpdateMediaMetadata = computed(() => Boolean(props.updateMediaMetadataBatch || props.tenantName))
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', { dateStyle: 'medium' }).format(new Date(value))
+}
+
+async function updateSingleMediaMetadata(
+  mediaId: string,
+  memoryId: string,
+  request: UpdateMemoryMediaMetadataRequest
+): Promise<MemoryMedia> {
+  const updated = props.updateMediaMetadata
+    ? await props.updateMediaMetadata(mediaId, memoryId, request)
+    : await updateMemoryMediaMetadata(props.tenantName, memoryId, mediaId, request)
+  mergeUpdatedMedia([updated])
+  return updated
+}
+
+async function submitMediaMetadataBatch(
+  memoryId: string,
+  mediaIds: string[],
+  capturedAtOffsetSeconds: number
+): Promise<MemoryMedia[]> {
+  const request = { mediaIds, capturedAtOffsetSeconds }
+  if (!props.updateMediaMetadataBatch && !props.tenantName) throw new Error(t('media.batchSaveFailed'))
+  const updated = props.updateMediaMetadataBatch
+    ? await props.updateMediaMetadataBatch(memoryId, request)
+    : await updateTenantMediaMetadataBatch(props.tenantName, memoryId, request)
+  mergeUpdatedMedia(updated)
+  return updated
+}
+
+function mergeUpdatedMedia(updated: MemoryMedia[]) {
+  mediaOverrides.value = {
+    ...mediaOverrides.value,
+    ...Object.fromEntries(updated.map((media) => [media.id, media]))
+  }
 }
 </script>
 
@@ -198,6 +241,7 @@ function formatDate(value: string): string {
     <Tabs value="gallery" class="memory-tabs">
       <TabList>
         <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
+        <Tab value="buckets">{{ t('media.buckets') }}</Tab>
         <Tab value="children">{{ t('memory.children') }}</Tab>
         <Tab value="info">{{ t('memory.info') }}</Tab>
       </TabList>
@@ -205,13 +249,22 @@ function formatDate(value: string): string {
         <TabPanel value="gallery">
           <MediaGrid
             :tenant-name="tenantName"
-            :media="media"
+            :media="visibleMedia"
             :streaming="false"
             :can-edit-metadata="capabilities.canEditMediaMetadata"
             :can-delete-media="capabilities.canDeleteMedia"
-            :update-metadata="updateMediaMetadata"
+            :update-metadata="updateSingleMediaMetadata"
             :delete-media="deleteMedia"
             @deleted="$emit('mediaDeleted', $event)"
+          />
+        </TabPanel>
+        <TabPanel value="buckets">
+          <MemoryAssetBuckets
+            :tenant-name="tenantName"
+            :memory-id="memory.id"
+            :media="visibleMedia"
+            :update-metadata-batch="canBatchUpdateMediaMetadata ? submitMediaMetadataBatch : undefined"
+            @updated="mergeUpdatedMedia"
           />
         </TabPanel>
         <TabPanel value="children">
@@ -261,7 +314,7 @@ function formatDate(value: string): string {
       v-model:visible="coverOpen"
       :tenant-name="tenantName"
       :memory="memory"
-      :media="media"
+      :media="visibleMedia"
       :set-cover-override="setCover"
       :remove-cover-override="removeCover"
       @saved="$emit('changed', $event)"

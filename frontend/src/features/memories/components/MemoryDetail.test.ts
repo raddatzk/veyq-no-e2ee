@@ -111,6 +111,7 @@ function detailStubs() {
     TabPanels: { template: '<div><slot /></div>' },
     TabPanel: { template: '<div><slot /></div>' },
     MediaGrid: { template: '<div />' },
+    MemoryAssetBuckets: { template: '<div />' },
     MemoryCard: { template: '<article />' },
     MemoryCoverImage: { template: '<img :alt="alt" />', props: ['alt'] },
     DeleteMemoryDialog: { template: '<div />' },
