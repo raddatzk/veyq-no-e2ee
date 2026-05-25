@@ -82,18 +82,16 @@ class PasskeyService @Inject constructor(
     @Transactional
     fun createMyPasskey(request: CreatePasskeyRequest, routingContext: RoutingContext): PasskeySummary {
         val user = currentManagedUser()
-        val displayName = requiredPasskeyDisplayName(request.displayName)
-        return createPasskeyForUser(user, displayName, request.credential, routingContext)
+        return createPasskeyForUser(user, request.displayName, request.credential, routingContext)
     }
 
     @Transactional
     fun createPasskeyForUser(
         user: User,
-        displayName: String,
+        displayName: String?,
         credentialRequest: PasskeyRegistrationRequest,
         routingContext: RoutingContext,
     ): PasskeySummary {
-        val credentialDisplayName = requiredPasskeyDisplayName(displayName)
         val credentialRecord = try {
             webAuthnSecurity
                 .register(user.id.toString(), credentialRequest.toJsonObject(), routingContext)
@@ -109,14 +107,15 @@ class PasskeyService @Inject constructor(
 
         val credential = PasskeyCredential().also {
             val persisted = credentialRecord.requiredPersistedData
+            val aaguid = persisted.aaguid().toString()
             it.user = user
             it.credentialId = persisted.credentialId()
             it.publicKey = persisted.publicKey()
             it.publicKeyAlgorithm = persisted.publicKeyAlgorithm()
             it.counter = persisted.counter()
-            it.aaguid = persisted.aaguid().toString()
+            it.aaguid = aaguid
             it.transports = credentialRecord.transports?.joinToString(",") { transport -> transport.value }
-            it.displayName = credentialDisplayName
+            it.displayName = optionalPasskeyDisplayName(displayName) ?: suggestedPasskeyDisplayName(aaguid)
             it.createdAt = Instant.now()
             it.persistAndFlush()
         }
@@ -175,6 +174,22 @@ fun PasskeyCredential.toSummary(): PasskeySummary =
 internal fun requiredPasskeyDisplayName(value: String): String =
     value.trim().takeIf { it.isNotBlank() }
         ?: throw BadRequestException("displayName must not be blank")
+
+internal fun optionalPasskeyDisplayName(value: String?): String? =
+    value?.trim()?.takeIf { it.isNotBlank() }
+
+internal fun suggestedPasskeyDisplayName(aaguid: String): String =
+    when (aaguid.lowercase()) {
+        "fbfc3007-154e-4ecc-8c0b-6e020557d7bd" -> "Apple Passwords"
+        "bada5566-a7aa-401f-bd96-45619a55120d" -> "1Password"
+        "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4" -> "Google Password Manager"
+        "d548826e-79b4-db40-a3d8-11116f7e8349" -> "Bitwarden"
+        "f8a011f3-8c0a-4d15-8006-17111f9edc7d",
+        "d7781e5d-e353-46aa-afe2-3ca49f13332a",
+        "2fc0579f-8113-47ea-b116-bb5a8db9202a",
+        "a25342c0-3cdc-4414-8e46-f4807fca511c" -> "YubiKey"
+        else -> "Passkey"
+    }
 
 private fun PasskeyLoginRequest.toJsonObject(): JsonObject =
     JsonObject()

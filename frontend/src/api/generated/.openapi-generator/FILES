@@ -48,8 +48,8 @@ models/ManagedUsersSummary.ts
 models/MediaUploader.ts
 models/MemoryFolder.ts
 models/MemoryHeaderSummary.ts
-models/MemoryMediaBatchResponse.ts
 models/MemoryJournalSummary.ts
+models/MemoryMediaBatchResponse.ts
 models/MemoryMediaSummary.ts
 models/MemoryNavigationBreadcrumb.ts
 models/MemoryNavigationKind.ts
@@ -100,8 +100,8 @@ models/UpdateFolderRequest.ts
 models/UpdateGroupRequest.ts
 models/UpdateGroupSettingsRequest.ts
 models/UpdateManagedUserRoleRequest.ts
-models/UpdateMemoryMediaMetadataBatchRequest.ts
 models/UpdateMemoryJournalRequest.ts
+models/UpdateMemoryMediaMetadataBatchRequest.ts
 models/UpdateMemoryMediaMetadataRequest.ts
 models/UpdateMemoryRequest.ts
 models/UpdateMemoryShareRequest.ts

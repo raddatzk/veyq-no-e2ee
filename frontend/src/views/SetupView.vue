@@ -7,9 +7,11 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
+import PasskeyNameDialog from '../components/auth/PasskeyNameDialog.vue'
 import { login } from '../api/authClient'
 import { setupAdmin, setupAdminWithPasskey } from '../api/setupClient'
 import { createTenant, tenants } from '../api/tenantClient'
+import { listMyPasskeys, updateMyPasskey, type PasskeySummary } from '../features/settings/api'
 import { toPermalink } from '../composables/usePermalink'
 import { useAuthState } from '../shared/state/useAuthState'
 import { useServerState } from '../shared/state/useServerState'
@@ -26,11 +28,12 @@ const tenantDomain = ref(window.location.host)
 const tenantPermalinkTouched = ref(false)
 const password = ref('')
 const displayName = ref('Administrator')
-const passkeyDisplayName = ref(t('profile.defaultPasskeyName'))
 const email = ref('')
 const error = ref('')
 const savingAdmin = ref(false)
 const savingAdminWithPasskey = ref(false)
+const savingPasskeyName = ref(false)
+const namingPasskey = ref<PasskeySummary | null>(null)
 const authMethod = ref<'passkey' | 'password'>('passkey')
 
 watch(tenantDisplayName, (value) => {
@@ -53,16 +56,11 @@ async function submitAdmin() {
     return
   }
   const withPasskey = authMethod.value === 'passkey'
-  const adminPasskeyDisplayName = passkeyDisplayName.value.trim()
-  if (withPasskey && !adminPasskeyDisplayName) {
-    error.value = t('auth.passkeyDisplayNameRequired')
-    return
-  }
   savingAdmin.value = !withPasskey
   savingAdminWithPasskey.value = withPasskey
   try {
     const user = withPasskey
-      ? await setupAdminWithPasskey(email.value, adminDisplayName, adminPasskeyDisplayName)
+      ? await setupAdminWithPasskey(email.value, adminDisplayName)
       : await setupAdminWithPassword()
     const authenticatedUser = {
       userId: user.userId,
@@ -78,13 +76,48 @@ async function submitAdmin() {
       await tenants()
     )
     setSetupCompleted(true)
-    step.value = 'tenant'
+    if (withPasskey) {
+      await showLatestPasskeyNameDialog()
+    } else {
+      step.value = 'tenant'
+    }
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('setup.adminCreateFailed'))
   } finally {
     savingAdmin.value = false
     savingAdminWithPasskey.value = false
   }
+}
+
+async function showLatestPasskeyNameDialog() {
+  try {
+    const summary = await listMyPasskeys()
+    namingPasskey.value = summary.passkeys[0] ?? null
+  } catch {
+    namingPasskey.value = null
+  }
+  if (!namingPasskey.value) step.value = 'tenant'
+}
+
+async function saveSetupPasskeyName(displayName: string) {
+  if (!namingPasskey.value) return
+  savingPasskeyName.value = true
+  error.value = ''
+  try {
+    await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
+    namingPasskey.value = null
+    step.value = 'tenant'
+  } catch (unknownError) {
+    error.value = getErrorMessage(unknownError, t('profile.passkeyRenameFailed'))
+  } finally {
+    savingPasskeyName.value = false
+  }
+}
+
+function skipSetupPasskeyName() {
+  if (!namingPasskey.value) return
+  namingPasskey.value = null
+  step.value = 'tenant'
 }
 
 async function setupAdminWithPassword() {
@@ -156,10 +189,6 @@ async function skipTenant() {
           {{ t('auth.displayName') }}
           <InputText v-model="displayName" required />
         </label>
-        <label v-if="authMethod === 'passkey'">
-          {{ t('auth.passkeyDisplayName') }}
-          <InputText v-model="passkeyDisplayName" autocomplete="off" required />
-        </label>
         <Message v-if="authMethod === 'passkey'" severity="info" :closable="false">
           {{ t('setup.passkeyHint') }}
         </Message>
@@ -178,8 +207,16 @@ async function skipTenant() {
           :loading="savingAdmin"
         />
       </form>
+      <PasskeyNameDialog
+        :visible="Boolean(namingPasskey)"
+        :passkey="namingPasskey"
+        :saving="savingPasskeyName"
+        @update:visible="(visible) => { if (!visible) skipSetupPasskeyName() }"
+        @save="saveSetupPasskeyName"
+        @skip="skipSetupPasskeyName"
+      />
 
-      <form v-else class="form" @submit.prevent="submitTenant">
+      <form v-if="step === 'tenant'" class="form" @submit.prevent="submitTenant">
         <label>
           {{ t('setup.tenantName') }}
           <InputText v-model="tenantDisplayName" required />

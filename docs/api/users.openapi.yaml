@@ -951,7 +951,6 @@ components:
       type: object
       additionalProperties: false
       required:
-        - displayName
         - credential
       properties:
         displayName:
@@ -959,7 +958,6 @@ components:
         credential:
           "$ref": "#/components/schemas/PasskeyRegistrationRequest"
       example:
-        displayName: MacBook Touch ID
         credential:
           id: credential-id
           rawId: credential-id
@@ -1144,7 +1142,6 @@ components:
       additionalProperties: false
       required:
         - displayName
-        - passkeyDisplayName
         - token
         - credential
       properties:
@@ -1158,7 +1155,6 @@ components:
           "$ref": "#/components/schemas/PasskeyRegistrationRequest"
       example:
         displayName: Invitee
-        passkeyDisplayName: MacBook Touch ID
         token: invitation-token
         credential:
           id: credential-id

@@ -315,6 +315,7 @@ class OpenApiContractTest {
             "GET /api/users/me/passkeys",
             "POST /api/users/me/passkeys",
             "POST /api/users/me/passkeys/options",
+            "PUT /api/users/me/passkeys/{passkeyId}",
             "DELETE /api/users/me/passkeys/{passkeyId}",
             "POST /api/users/password/forgot",
             "POST /api/users/{userId}/password/reset",

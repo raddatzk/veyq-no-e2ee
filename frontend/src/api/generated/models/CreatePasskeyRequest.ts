@@ -32,7 +32,7 @@ export interface CreatePasskeyRequest {
      * @type {string}
      * @memberof CreatePasskeyRequest
      */
-    displayName: string;
+    displayName?: string;
     /**
      * 
      * @type {PasskeyRegistrationRequest}
@@ -45,7 +45,6 @@ export interface CreatePasskeyRequest {
  * Check if a given object implements the CreatePasskeyRequest interface.
  */
 export function instanceOfCreatePasskeyRequest(value: object): value is CreatePasskeyRequest {
-    if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('credential' in value) || value['credential'] === undefined) return false;
     return true;
 }
@@ -60,7 +59,7 @@ export function CreatePasskeyRequestFromJSONTyped(json: any, ignoreDiscriminator
     }
     return {
         
-        'displayName': json['displayName'],
+        'displayName': json['displayName'] == null ? undefined : json['displayName'],
         'credential': PasskeyRegistrationRequestFromJSON(json['credential']),
     };
 }

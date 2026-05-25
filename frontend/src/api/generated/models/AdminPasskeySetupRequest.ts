@@ -38,7 +38,7 @@ export interface AdminPasskeySetupRequest {
      * @type {string}
      * @memberof AdminPasskeySetupRequest
      */
-    passkeyDisplayName: string;
+    passkeyDisplayName?: string;
     /**
      * Email address. The backend trims whitespace and stores it lowercase.
      * @type {string}
@@ -58,7 +58,6 @@ export interface AdminPasskeySetupRequest {
  */
 export function instanceOfAdminPasskeySetupRequest(value: object): value is AdminPasskeySetupRequest {
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
-    if (!('passkeyDisplayName' in value) || value['passkeyDisplayName'] === undefined) return false;
     if (!('email' in value) || value['email'] === undefined) return false;
     if (!('credential' in value) || value['credential'] === undefined) return false;
     return true;
@@ -75,7 +74,7 @@ export function AdminPasskeySetupRequestFromJSONTyped(json: any, ignoreDiscrimin
     return {
         
         'displayName': json['displayName'],
-        'passkeyDisplayName': json['passkeyDisplayName'],
+        'passkeyDisplayName': json['passkeyDisplayName'] == null ? undefined : json['passkeyDisplayName'],
         'email': json['email'],
         'credential': PasskeyRegistrationRequestFromJSON(json['credential']),
     };

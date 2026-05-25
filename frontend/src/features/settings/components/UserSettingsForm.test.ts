@@ -75,20 +75,28 @@ describe('UserSettingsForm', () => {
     expect(wrapper.text()).toContain('Profile and login')
   })
 
-  it('requires a passkey name before adding a passkey', async () => {
+  it('adds a passkey and asks to confirm the suggested name', async () => {
     getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
     listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+    createMyPasskeyMock.mockResolvedValue(passkey(9, 'Apple Passwords'))
+    updateMyPasskeyMock.mockResolvedValue(passkey(9, 'MacBook Touch ID'))
 
     const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
     await flushPromises()
 
-    const inputs = wrapper.findAll('input')
-    await inputs[inputs.length - 1].setValue('   ')
-    await wrapper.findAll('button').at(-1)!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === 'Passkey hinzufügen')!.trigger('click')
     await flushPromises()
 
-    expect(createMyPasskeyMock).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Bitte gib einen Passkey-Namen ein.')
+    expect(createMyPasskeyMock).toHaveBeenCalledWith()
+    expect(wrapper.text()).toContain('Passkey benennen')
+    expect(wrapper.text()).toContain('Der Name hilft dir später')
+
+    await wrapper.findAll('input').at(-1)!.setValue('  MacBook Touch ID  ')
+    await wrapper.findAll('button').filter((button) => button.text() === 'Speichern').at(-1)!.trigger('click')
+    await flushPromises()
+
+    expect(updateMyPasskeyMock).toHaveBeenCalledWith(9, 'MacBook Touch ID')
+    expect(wrapper.text()).toContain('Passkey-Name wurde gespeichert.')
   })
 
   it('renders existing passkey names as editable fields', async () => {
@@ -169,6 +177,10 @@ function formStubs() {
       props: ['modelValue']
     },
     Message: { template: '<div><slot /></div>' },
+    Dialog: {
+      template: '<div v-if="visible">{{ header }}<slot /></div>',
+      props: ['visible', 'header']
+    },
     Password: {
       template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
       props: ['modelValue']

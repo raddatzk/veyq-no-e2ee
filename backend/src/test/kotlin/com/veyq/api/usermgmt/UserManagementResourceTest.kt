@@ -354,7 +354,7 @@ class UserManagementResourceTest {
     }
 
     @Test
-    fun `creating passkey requires display name`() {
+    fun `creating passkey does not require display name`() {
         given()
             .contentType("application/json")
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
@@ -369,7 +369,7 @@ class UserManagementResourceTest {
             .`when`().post("/api/users/me/passkeys")
             .then()
             .statusCode(400)
-            .body("message", equalTo("displayName must not be blank"))
+            .body("message", equalTo("Invalid passkey registration"))
     }
 
     @Test
@@ -621,7 +621,7 @@ class UserManagementResourceTest {
     }
 
     @Test
-    fun `accepting invitation with passkey requires passkey display name`() {
+    fun `accepting invitation with passkey does not require passkey display name`() {
         val invitedUserId = given()
             .contentType("application/json")
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
@@ -653,7 +653,6 @@ class UserManagementResourceTest {
                 """
                 {
                   "displayName": "Invitee",
-                  "passkeyDisplayName": "   ",
                   "token": "$token",
                   "credential": ${passkeyRegistrationJson()}
                 }
@@ -662,7 +661,7 @@ class UserManagementResourceTest {
             .`when`().post("/api/users/$invitedUserId/invite/passkey/accept")
             .then()
             .statusCode(400)
-            .body("message", equalTo("displayName must not be blank"))
+            .body("message", equalTo("Invalid passkey registration"))
     }
 
     @Test

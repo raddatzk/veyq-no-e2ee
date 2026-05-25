@@ -50,10 +50,10 @@ export function listMyPasskeys(): Promise<PasskeysSummary> {
   return generatedCall(usersApi.listMyPasskeys())
 }
 
-export async function createMyPasskey(displayName: string): Promise<PasskeySummary> {
+export async function createMyPasskey(): Promise<PasskeySummary> {
   const options = await generatedCall(usersApi.createMyPasskeyOptions())
   const credential = await createPasskeyCredential(options)
-  return generatedCall(usersApi.createMyPasskey({ createPasskeyRequest: { displayName, credential } }))
+  return generatedCall(usersApi.createMyPasskey({ createPasskeyRequest: { credential } }))
 }
 
 export function updateMyPasskey(passkeyId: number, displayName: string): Promise<PasskeySummary> {

@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import ProgressSpinner from 'primevue/progressspinner'
+import PasskeyNameDialog from '../../../components/auth/PasskeyNameDialog.vue'
 import {
   changeMyPassword,
   createMyPasskey,
@@ -28,11 +29,12 @@ const currentPassword = ref('')
 const newPassword = ref('')
 const passkeys = ref<PasskeySummary[]>([])
 const passkeyNames = ref<Record<number, string>>({})
-const passkeyName = ref(defaultPasskeyName())
+const namingPasskey = ref<PasskeySummary | null>(null)
 const loading = ref(false)
 const savingProfile = ref(false)
 const savingPassword = ref(false)
 const savingPasskey = ref(false)
+const savingPasskeyName = ref(false)
 const savingPasskeyId = ref<number | null>(null)
 const deletingPasskeyId = ref<number | null>(null)
 const error = ref('')
@@ -100,16 +102,11 @@ async function savePassword() {
 }
 
 async function addPasskey() {
-  const nextPasskeyName = passkeyName.value.trim()
-  if (!nextPasskeyName) {
-    error.value = t('auth.passkeyDisplayNameRequired')
-    return
-  }
   savingPasskey.value = true
   error.value = ''
   passkeyMessage.value = ''
   try {
-    const passkey = await createMyPasskey(nextPasskeyName)
+    const passkey = await createMyPasskey()
     passkeys.value = [passkey, ...passkeys.value]
     applyPasskeyNames(passkeys.value)
     if (settings.value) {
@@ -118,13 +115,36 @@ async function addPasskey() {
     if (authState.user) {
       authState.user.passkeyCount = passkeys.value.length
     }
-    passkeyName.value = defaultPasskeyName()
-    passkeyMessage.value = t('profile.passkeyAddSuccess')
+    namingPasskey.value = passkey
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : t('profile.passkeyAddFailed')
   } finally {
     savingPasskey.value = false
   }
+}
+
+async function saveCreatedPasskeyName(displayName: string) {
+  if (!namingPasskey.value) return
+  savingPasskeyName.value = true
+  error.value = ''
+  passkeyMessage.value = ''
+  try {
+    const renamed = await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
+    passkeys.value = passkeys.value.map((item) => item.passkeyId === renamed.passkeyId ? renamed : item)
+    passkeyNames.value = { ...passkeyNames.value, [renamed.passkeyId]: renamed.displayName }
+    namingPasskey.value = null
+    passkeyMessage.value = t('profile.passkeyNameSaveSuccess')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('profile.passkeyRenameFailed')
+  } finally {
+    savingPasskeyName.value = false
+  }
+}
+
+function keepCreatedPasskeyName() {
+  if (!namingPasskey.value) return
+  namingPasskey.value = null
+  passkeyMessage.value = t('profile.passkeyAddSuccess')
 }
 
 async function renamePasskey(passkey: PasskeySummary) {
@@ -197,9 +217,6 @@ function formatTimestamp(value?: string) {
   }).format(new Date(value))
 }
 
-function defaultPasskeyName() {
-  return t('profile.defaultPasskeyName')
-}
 </script>
 
 <template>
@@ -288,10 +305,6 @@ function defaultPasskeyName() {
             />
           </div>
         </div>
-        <label>
-          <span>{{ t('auth.passkeyDisplayName') }}</span>
-          <InputText v-model="passkeyName" autocomplete="off" required />
-        </label>
         <div class="button-row">
           <Button
             type="button"
@@ -303,6 +316,14 @@ function defaultPasskeyName() {
         </div>
         <Message v-if="passkeyMessage" severity="success" :closable="false">{{ passkeyMessage }}</Message>
       </section>
+      <PasskeyNameDialog
+        :visible="Boolean(namingPasskey)"
+        :passkey="namingPasskey"
+        :saving="savingPasskeyName"
+        @update:visible="(visible) => { if (!visible) keepCreatedPasskeyName() }"
+        @save="saveCreatedPasskeyName"
+        @skip="keepCreatedPasskeyName"
+      />
     </template>
   </section>
 </template>

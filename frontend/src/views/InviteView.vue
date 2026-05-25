@@ -7,8 +7,10 @@ import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
+import PasskeyNameDialog from '../components/auth/PasskeyNameDialog.vue'
 import { acceptInvitation, acceptInvitationWithPasskey } from '../api/invitationClient'
 import { bootstrap } from '../api/entrypointClient'
+import { listMyPasskeys, updateMyPasskey, type PasskeySummary } from '../features/settings/api'
 import { useAuthState } from '../shared/state/useAuthState'
 import { getErrorMessage } from '../shared/utils/errors'
 
@@ -17,10 +19,12 @@ const router = useRouter()
 const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const displayName = ref('')
-const passkeyDisplayName = ref(t('profile.defaultPasskeyName'))
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const savingPasskeyName = ref(false)
+const namingPasskey = ref<PasskeySummary | null>(null)
+const pendingRedirect = ref('/')
 const authMethod = ref<'passkey' | 'password'>('passkey')
 const userId = computed(() => Number(route.params.userId))
 const token = computed(() => route.hash.replace(/^#/, ''))
@@ -37,24 +41,25 @@ async function submit() {
     error.value = t('auth.displayNameRequired')
     return
   }
-  const invitePasskeyDisplayName = passkeyDisplayName.value.trim()
-  if (requiresPassword.value && authMethod.value === 'passkey' && !invitePasskeyDisplayName) {
-    error.value = t('auth.passkeyDisplayNameRequired')
-    return
-  }
+  const withPasskey = requiresPassword.value && authMethod.value === 'passkey'
   loading.value = true
   try {
     if (!requiresPassword.value) {
       await acceptInvitation(userId.value, token.value)
-    } else if (authMethod.value === 'passkey') {
-      await acceptInvitationWithPasskey(userId.value, token.value, inviteDisplayName, invitePasskeyDisplayName)
+    } else if (withPasskey) {
+      await acceptInvitationWithPasskey(userId.value, token.value, inviteDisplayName)
     } else {
       await acceptInvitation(userId.value, token.value, password.value, inviteDisplayName)
     }
     const entrypoint = await bootstrap()
     if (entrypoint.user) {
       setAuthenticated(entrypoint.user, entrypoint.tenants)
-      await router.push(entrypoint.tenants[0] ? `/${entrypoint.tenants[0].name}` : '/')
+      pendingRedirect.value = entrypoint.tenants[0] ? `/${entrypoint.tenants[0].name}` : '/'
+      if (withPasskey) {
+        await showLatestPasskeyNameDialog()
+      } else {
+        await finishInvite()
+      }
     }
   } catch (caught) {
     if (!authState.isAuthenticated && getErrorMessage(caught, '').includes(t('auth.loggedInRequiredMarker'))) {
@@ -65,6 +70,41 @@ async function submit() {
   } finally {
     loading.value = false
   }
+}
+
+async function showLatestPasskeyNameDialog() {
+  try {
+    const summary = await listMyPasskeys()
+    namingPasskey.value = summary.passkeys[0] ?? null
+  } catch {
+    namingPasskey.value = null
+  }
+  if (!namingPasskey.value) await finishInvite()
+}
+
+async function saveInvitePasskeyName(displayName: string) {
+  if (!namingPasskey.value) return
+  savingPasskeyName.value = true
+  error.value = ''
+  try {
+    await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
+    namingPasskey.value = null
+    await finishInvite()
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('profile.passkeyRenameFailed'))
+  } finally {
+    savingPasskeyName.value = false
+  }
+}
+
+async function skipInvitePasskeyName() {
+  if (!namingPasskey.value) return
+  namingPasskey.value = null
+  await finishInvite()
+}
+
+async function finishInvite() {
+  await router.push(pendingRedirect.value)
 }
 </script>
 
@@ -97,10 +137,6 @@ async function submit() {
           {{ t('auth.displayName') }}
           <InputText v-model="displayName" autocomplete="name" required />
         </label>
-        <label v-if="requiresPassword && authMethod === 'passkey'">
-          {{ t('auth.passkeyDisplayName') }}
-          <InputText v-model="passkeyDisplayName" autocomplete="off" required />
-        </label>
         <label v-if="requiresPassword && authMethod === 'password'">
           {{ t('common.password') }}
           <Password
@@ -128,6 +164,14 @@ async function submit() {
       <Message v-if="error" severity="error" :closable="false" class="form-message">
         {{ error }}
       </Message>
+      <PasskeyNameDialog
+        :visible="Boolean(namingPasskey)"
+        :passkey="namingPasskey"
+        :saving="savingPasskeyName"
+        @update:visible="(visible) => { if (!visible) skipInvitePasskeyName() }"
+        @save="saveInvitePasskeyName"
+        @skip="skipInvitePasskeyName"
+      />
     </template>
   </Card>
 </template>
