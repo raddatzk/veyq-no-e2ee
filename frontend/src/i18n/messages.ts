@@ -80,6 +80,12 @@ export const messages = {
       navigationLoadFailed: 'Navigation konnte nicht geladen werden',
       personal: 'Persönlich',
       searchPlaceholder: 'Suche in allem, worauf du Zugriff hast...',
+      theme: 'Darstellung',
+      themes: {
+        dark: 'Dunkel',
+        light: 'Hell',
+        system: 'System'
+      },
       tenantMenuOpen: 'Bereichsmenü öffnen',
       workspaceNavigation: 'Workspace Navigation'
     },
@@ -460,6 +466,12 @@ export const messages = {
       navigationLoadFailed: 'Navigation could not be loaded',
       personal: 'Personal',
       searchPlaceholder: 'Search everything you can access...',
+      theme: 'Appearance',
+      themes: {
+        dark: 'Dark',
+        light: 'Light',
+        system: 'System'
+      },
       tenantMenuOpen: 'Open space menu',
       workspaceNavigation: 'Workspace navigation'
     },

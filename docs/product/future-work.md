@@ -42,7 +42,6 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Needs UX Design
 
-- Dark mode, including theme tokens, media-heavy view contrast and system preference behavior.
 - Download-all-images action for internal Memory views and eligible public share views, hidden for uploader-only shares.
 - Memory detail next pass with `Journal`, `Map`, `Tracks` and richer `Unter-Memories` tabs.
 - Memory header with cover, time range, places, weather, playlist, participants and track summary.
@@ -96,6 +95,7 @@ This document turns the Memory product context into follow-up topics for develop
 ## Implemented Baseline To Build On
 
 - Memory UI v1 is the active library surface.
+- Appearance can be set to system, light or dark; app tokens and PrimeVue theme behavior stay aligned.
 - Memory navigation, folder navigation, Memory CRUD and direct child traversal exist as API-first backend layers.
 - Memory-scoped media upload, listing and timestamp correction exist.
 - Public Memory sharing exists with optional passwords, anonymous identities and share roles.

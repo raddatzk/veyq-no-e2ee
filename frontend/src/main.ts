@@ -8,12 +8,14 @@ import { i18n } from './i18n'
 import { SetupRequiredError } from './shared/api/httpClient'
 import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
+import { initializeTheme } from './shared/state/useThemeState'
 import './style.css'
 import 'primeicons/primeicons.css'
 
 async function bootstrap() {
+  initializeTheme()
   const { finishLoading, setAnonymous, setAuthenticated } = useAuthState()
-  const { setSetupCompleted, setServerId} = useServerState()
+  const { setSetupCompleted, setServerId } = useServerState()
 
   try {
     const entrypoint = await bootstrapClient()
@@ -38,7 +40,7 @@ async function bootstrap() {
       theme: {
         preset: Aura,
         options: {
-          darkModeSelector: false
+          darkModeSelector: '.veyq-dark'
         }
       }
     })

@@ -1,0 +1,282 @@
+.veyq-dark {
+  body {
+    background: var(--app-bg);
+    color: var(--app-text);
+  }
+
+  .tenant-sidebar,
+  .workspace-topbar {
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .app-breadcrumb.p-breadcrumb,
+  .app-breadcrumb .p-breadcrumb {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .sidebar-tenant-link,
+  .sidebar-nav-link,
+  .sidebar-memory-link,
+  .sidebar-scope-link,
+  .profile-button,
+  .memory-card-main,
+  .settings-table-row.group-list-row,
+  .suggest-row {
+    color: var(--app-text);
+  }
+
+  .sidebar-section-action:hover,
+  .sidebar-tenant-link:hover,
+  .sidebar-nav-link:hover,
+  .sidebar-memory-link:hover,
+  .sidebar-scope-link:hover,
+  .sidebar-tenant-link-active,
+  .sidebar-nav-link.router-link-active,
+  .sidebar-memory-link.router-link-active,
+  .sidebar-scope-link.router-link-active,
+  .sidebar-tenant-menu-button:hover,
+  .profile-button:hover,
+  .lightbox-icon-button:hover,
+  .lightbox-nav:not(:disabled):hover,
+  .lightbox-text-button:hover:not(:disabled),
+  .asset-card-options-button:hover,
+  .suggest-row:hover {
+    background: var(--app-hover);
+    color: var(--app-text);
+  }
+
+  .workspace-topbar-center,
+  .empty-home-card,
+  .login-card,
+  .tenant-row,
+  .tenant-stats div,
+  .memory-scope-root-card,
+  .memory-card,
+  .memory-folder-card,
+  .memory-scope-card,
+  .memory-journal-help,
+  .memory-journal-link,
+  .memory-journal-context,
+  .memory-journal-unavailable,
+  .memory-journal-empty,
+  .memory-journal-media-option,
+  .asset-bucket-button,
+  .asset-camera-chip,
+  .asset-selection-toolbar,
+  .asset-selection-toolbar button,
+  .asset-batch-form button,
+  .asset-card-options-button,
+  .asset-bucket-media-item,
+  .memory-cover-option,
+  .memory-upload-file-list li,
+  .public-share-login,
+  .public-share-upload,
+  .settings-panel,
+  .passkey-row,
+  .settings-entry,
+  .suggest-panel,
+  .suggest-row,
+  .management-row,
+  .lightbox-icon-button,
+  .lightbox-nav,
+  .lightbox-text-button,
+  .media-lightbox-details,
+  .media-lightbox-date-form input,
+  .memory-empty,
+  .memory-loading {
+    background: var(--app-surface);
+    color: var(--app-text);
+  }
+
+  .memory-create-card {
+    background: color-mix(in srgb, var(--app-surface) 72%, transparent);
+  }
+
+  .auth-method-switch,
+  .toggle-row,
+  .settings-table-head,
+  .management-badge,
+  .asset-reference-media,
+  .upload-dropzone,
+  .media-thumb,
+  .media-grid-tile,
+  .memory-journal-help code,
+  .memory-cover-option img,
+  .memory-cover-option .pi,
+  .asset-bucket-media-item img,
+  .asset-bucket-media-item > .pi,
+  .asset-reference-media img,
+  .asset-reference-media > .pi,
+  .asset-selection-toolbar button:disabled,
+  .asset-batch-form button:disabled {
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+  }
+
+  .auth-method-switch button {
+    color: var(--app-muted);
+  }
+
+  .auth-method-switch button.active {
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .workspace-topbar-center kbd {
+    border-color: var(--app-line);
+    background: var(--app-surface-muted);
+    color: var(--app-muted);
+  }
+
+  .sidebar-tenant-avatar,
+  .sidebar-nav-link > .pi,
+  .sidebar-scope-icon,
+  .sidebar-memory-thumb,
+  .memory-scope-root-icon,
+  .memory-card-cover,
+  .memory-card-icon,
+  .memory-folder-card .pi,
+  .memory-scope-card-icon,
+  .memory-create-card .pi,
+  .memory-detail-cover,
+  .profile-avatar,
+  .empty-state-icon {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+  }
+
+  .sidebar-tenant-link-active .sidebar-tenant-avatar {
+    background: linear-gradient(135deg, #8b7cff, #6d5dfc);
+    color: #fff;
+  }
+
+  .sidebar-scope-icon.pi-users,
+  .memory-scope-card-group .memory-scope-card-icon {
+    background: #3a2f18;
+    color: #facc15;
+  }
+
+  .sidebar-scope-icon.pi-user,
+  .memory-scope-card-user .memory-scope-card-icon {
+    background: #133429;
+    color: #34d399;
+  }
+
+  .sidebar-memory-thumb,
+  .memory-folder-card .pi {
+    background: #1d3340;
+    color: #67e8f9;
+  }
+
+  .memory-detail-cover {
+    background: linear-gradient(135deg, #2a2541, #182631);
+  }
+
+  .memory-titlebar p,
+  .memory-section-header span,
+  .memory-card-main small,
+  .memory-detail-meta,
+  .memory-dialog-copy,
+  .memory-dialog-cover,
+  .memory-cover-zoom,
+  .public-share-header p,
+  .public-share-child span,
+  .tenant-row small,
+  .tenant-stats span,
+  .settings-table-head,
+  .management-badge,
+  .memory-journal-field,
+  .memory-journal-help h4 {
+    color: var(--app-muted);
+  }
+
+  .media-grid-tile-placeholder {
+    background:
+      linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 8%) 45%, transparent 70%),
+      #25303a;
+  }
+
+  .media-lightbox {
+    background: var(--app-bg);
+    color: var(--app-text);
+  }
+
+  .media-lightbox-topbar {
+    background: var(--app-overlay);
+  }
+
+  .media-lightbox-viewer {
+    background: #0b0f14;
+  }
+
+  .memory-journal-rendered a,
+  .memory-journal-media-option-check,
+  .asset-batch-form button,
+  .media-lightbox-metadata a,
+  .media-lightbox-stage a {
+    color: var(--app-success);
+  }
+
+  .memory-upload-action.p-button,
+  .asset-batch-form button {
+    background: #0f766e;
+    border-color: #0f766e;
+    color: #fff;
+  }
+
+  .memory-upload-action.p-button:not(:disabled):hover {
+    background: #115e59;
+    border-color: #115e59;
+  }
+
+  .memory-journal-media-option:hover,
+  .memory-journal-media-option-selected {
+    border-color: var(--app-success);
+    background: #102f2d;
+  }
+
+  .asset-bucket-button-active,
+  .asset-camera-chip-active,
+  .asset-bucket-media-item-selected,
+  .memory-cover-option-selected {
+    border-color: var(--app-accent);
+    background: #242642;
+  }
+
+  .management-badge.success {
+    border-color: #14532d;
+    background: #132b21;
+    color: #86efac;
+  }
+
+  .management-badge.warning {
+    border-color: #713f12;
+    background: #2f2413;
+    color: #fde68a;
+  }
+
+  .memory-card:hover,
+  .memory-folder-card:hover,
+  .memory-scope-card:hover,
+  .memory-create-card:hover {
+    border-color: #4d5b6c;
+  }
+
+  .media-card:focus-visible,
+  .media-grid-tile:focus-visible,
+  .settings-table-row.group-list-row:focus-visible,
+  .tenant-dialog .p-dialog-header-actions .p-button:focus-visible,
+  .tenant-dialog .p-dialog-header-icon:focus-visible {
+    outline-color: var(--app-focus);
+  }
+
+  .sidebar-error,
+  .media-lightbox-error,
+  .upload-error,
+  .asset-batch-error {
+    color: var(--app-danger) !important;
+  }
+}

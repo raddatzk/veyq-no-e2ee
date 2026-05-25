@@ -7,11 +7,13 @@ import Menu from 'primevue/menu'
 import { logout } from '../../api/authClient'
 import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n'
 import { useAuthState } from '../../shared/state/useAuthState'
+import { useThemeState, type ThemePreference } from '../../shared/state/useThemeState'
 
 const userMenu = ref()
 const router = useRouter()
 const { locale, t } = useI18n()
 const { authState, setAnonymous } = useAuthState()
+const { themePreference, setThemePreference } = useThemeState()
 defineProps<{
   showName?: boolean
 }>()
@@ -22,6 +24,13 @@ const languageMenuItems = computed(() =>
     label: t(`navigation.locales.${nextLocale}`),
     icon: locale.value === nextLocale ? 'pi pi-check' : 'pi pi-circle',
     command: () => setLocale(nextLocale as SupportedLocale)
+  }))
+)
+const themeMenuItems = computed(() =>
+  (['system', 'light', 'dark'] as ThemePreference[]).map((preference) => ({
+    label: t(`navigation.themes.${preference}`),
+    icon: themePreference.value === preference ? 'pi pi-check' : 'pi pi-circle',
+    command: () => setThemePreference(preference)
   }))
 )
 const menuItems = computed(() => {
@@ -67,6 +76,11 @@ const menuItems = computed(() => {
       label: t('navigation.language'),
       icon: 'pi pi-language',
       items: languageMenuItems.value
+    },
+    {
+      label: t('navigation.theme'),
+      icon: 'pi pi-palette',
+      items: themeMenuItems.value
     },
     {
       separator: true

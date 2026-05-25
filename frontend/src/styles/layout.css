@@ -284,6 +284,14 @@
   border: 0;
   padding: 0;
   background: transparent;
+  box-shadow: none;
+}
+
+.app-breadcrumb.p-breadcrumb,
+.app-breadcrumb .p-breadcrumb {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .app-breadcrumb .p-breadcrumb-list {

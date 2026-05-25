@@ -7,6 +7,12 @@
   --app-line: #dce2ec;
   --app-accent: #5b4df5;
   --app-accent-soft: #f0eeff;
+  --app-success: #0f766e;
+  --app-success-strong: #115e59;
+  --app-danger: #b42318;
+  --app-hover: #f3f5fa;
+  --app-overlay: rgba(255, 255, 255, 0.9);
+  --app-focus: #2563eb;
   --app-radius: 12px;
   --app-radius-sm: 10px;
   --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
@@ -26,6 +32,40 @@
     var(--app-bg);
   --app-sidebar-width: 304px;
   --app-topbar-height: 72px;
+  color-scheme: light;
+}
+
+:root.veyq-dark {
+  --app-bg: #101418;
+  --app-surface: #171c22;
+  --app-surface-muted: #20262e;
+  --app-text: #eef3f8;
+  --app-muted: #9aa7b5;
+  --app-line: #333d49;
+  --app-accent: #9b8cff;
+  --app-accent-soft: #2a2541;
+  --app-success: #2dd4bf;
+  --app-success-strong: #5eead4;
+  --app-danger: #f87171;
+  --app-hover: #242b34;
+  --app-overlay: rgba(23, 28, 34, 0.92);
+  --app-focus: #93c5fd;
+  --app-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.26);
+  --app-shadow-md: 0 18px 50px rgb(0 0 0 / 0.34);
+  --app-background-pattern:
+    radial-gradient(circle at 18% 12%, rgba(155, 140, 255, 0.16), transparent 28rem),
+    radial-gradient(circle at 82% 24%, rgba(45, 212, 191, 0.08), transparent 30rem),
+    var(--app-bg);
+  --app-background-pattern-subtle:
+    radial-gradient(circle at 20% 8%, rgba(155, 140, 255, 0.095), transparent 38rem),
+    radial-gradient(circle at 84% 22%, rgba(45, 212, 191, 0.055), transparent 42rem),
+    var(--app-bg);
+  --app-chrome-pattern:
+    linear-gradient(rgba(23, 28, 34, 0.86), rgba(23, 28, 34, 0.86)),
+    radial-gradient(circle at 12% 8%, rgba(155, 140, 255, 0.15), transparent 18rem),
+    radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.08), transparent 20rem),
+    var(--app-bg);
+  color-scheme: dark;
 }
 
 * {
