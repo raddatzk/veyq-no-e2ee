@@ -40,6 +40,7 @@ This document turns the Memory product context into follow-up topics for develop
 
 ## Needs UX Design
 
+- Dark mode, including theme tokens, media-heavy view contrast and system preference behavior.
 - Memory detail next pass with `Journal`, `Map`, `Tracks` and richer `Unter-Memories` tabs.
 - Memory header with cover, time range, places, weather, playlist, participants and track summary.
 - Child Memory navigation without file-system feel.
