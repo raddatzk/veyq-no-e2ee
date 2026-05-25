@@ -2,6 +2,7 @@ package com.veyq.api.library.media
 
 import io.quarkus.runtime.configuration.MemorySize
 import io.smallrye.config.ConfigMapping
+import io.smallrye.config.WithDefault
 import io.smallrye.config.WithName
 import java.nio.file.Path
 
@@ -18,6 +19,10 @@ interface MediaConfig {
 
     @get:WithName("upload-session-cleanup-cron")
     val uploadSessionCleanupCron: String
+
+    @get:WithName("archive.batch-size")
+    @get:WithDefault("500")
+    val archiveBatchSize: Int
 
     @get:WithName("ffmpeg-path")
     val ffmpegPath: String

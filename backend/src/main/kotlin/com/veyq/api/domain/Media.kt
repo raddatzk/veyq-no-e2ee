@@ -4,6 +4,7 @@ import com.soundicly.jnanoidenhanced.jnanoid.NanoIdUtils
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import jakarta.persistence.*
 import java.time.Instant
 
@@ -101,11 +102,79 @@ class Media : PanacheEntityBase {
     }
 }
 
+data class ArchiveMediaRow(
+    val id: Long,
+    val publicId: String,
+    val storageKey: String,
+    val originalFilename: String?,
+    val title: String,
+    val sortTime: Instant,
+    val createdAt: Instant,
+    val memoryId: Long,
+)
+
+data class ArchiveMediaKeyset(
+    val sortTime: Instant,
+    val createdAt: Instant,
+    val id: Long,
+)
+
 @ApplicationScoped
 class MediaRepo : PanacheRepository<Media> {
+    @Inject lateinit var archiveEntityManager: EntityManager
+
     fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Media? =
         find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
 
     fun listByMemory(memory: Memory): List<Media> =
         list("memory = ?1 order by coalesce(capturedAt, createdAt), createdAt", memory)
+
+    fun listByMemoriesOrdered(memories: List<Memory>): List<Media> {
+        if (memories.isEmpty()) return emptyList()
+        return list("memory in ?1 order by coalesce(capturedAt, createdAt), createdAt", memories)
+    }
+
+    fun listArchiveRowsByMemoryIds(memoryIds: Collection<Long>, after: ArchiveMediaKeyset?, limit: Int): List<ArchiveMediaRow> {
+        if (memoryIds.isEmpty() || limit <= 0) return emptyList()
+
+        val keysetFilter = if (after == null) {
+            ""
+        } else {
+            """
+            and (
+                coalesce(m.capturedAt, m.createdAt) > :lastSortTime
+                or (coalesce(m.capturedAt, m.createdAt) = :lastSortTime and m.createdAt > :lastCreatedAt)
+                or (coalesce(m.capturedAt, m.createdAt) = :lastSortTime and m.createdAt = :lastCreatedAt and m.id > :lastId)
+            )
+            """.trimIndent()
+        }
+
+        val query = archiveEntityManager.createQuery(
+            """
+            select new com.veyq.api.domain.ArchiveMediaRow(
+                m.id,
+                m.publicId,
+                m.storageKey,
+                m.originalFilename,
+                m.title,
+                coalesce(m.capturedAt, m.createdAt),
+                m.createdAt,
+                m.memory.id
+            )
+            from Media m
+            where m.memory.id in :memoryIds
+            $keysetFilter
+            order by coalesce(m.capturedAt, m.createdAt), m.createdAt, m.id
+            """.trimIndent(),
+            ArchiveMediaRow::class.java,
+        )
+        query.setParameter("memoryIds", memoryIds)
+        if (after != null) {
+            query.setParameter("lastSortTime", after.sortTime)
+            query.setParameter("lastCreatedAt", after.createdAt)
+            query.setParameter("lastId", after.id)
+        }
+        query.maxResults = limit
+        return query.resultList.also { archiveEntityManager.clear() }
+    }
 }

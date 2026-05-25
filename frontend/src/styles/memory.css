@@ -673,6 +673,44 @@
   border-color: #115e59;
 }
 
+.memory-download-options {
+  display: grid;
+  gap: 0.75rem;
+  min-width: min(28rem, 82vw);
+}
+
+.memory-download-option {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  color: var(--app-text);
+  text-decoration: none;
+  background: var(--app-surface);
+}
+
+.memory-download-option:hover {
+  border-color: #0f766e;
+}
+
+.memory-download-option .pi {
+  color: #0f766e;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.memory-download-option span:last-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.memory-download-option small {
+  color: var(--app-muted);
+}
+
 .memory-detail-header p {
   margin: 0 0 0.35rem;
   color: var(--app-muted);

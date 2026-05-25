@@ -2,6 +2,7 @@ package com.veyq.api.memory
 
 import com.veyq.api.auth.PasswordService
 import com.veyq.api.domain.*
+import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.security.RateLimitService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
@@ -16,11 +17,13 @@ import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import javax.imageio.ImageIO
+import java.util.zip.ZipInputStream
 
 @QuarkusTest
 class MemoryShareResourceTest {
@@ -30,6 +33,7 @@ class MemoryShareResourceTest {
     @Inject lateinit var memoryRepo: MemoryRepo
     @Inject lateinit var mediaRepo: MediaRepo
     @Inject lateinit var passwordService: PasswordService
+    @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var rateLimitService: RateLimitService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var transaction: UserTransaction
@@ -301,6 +305,42 @@ class MemoryShareResourceTest {
             .then()
             .statusCode(200)
             .body("", hasSize<Any>(1))
+    }
+
+    @Test
+    fun `viewer share can download visible original media as zip and uploader share cannot`() {
+        val child = createMemory("day-$runId", "Day $runId", parent = memory)
+        val rootMedia = createMedia("Root Download", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        val childMedia = createMedia("Child Download", child, createdAt = Instant.parse("2026-01-03T10:00:00Z"))
+        writeStoredMedia(rootMedia, "root-share-original")
+        writeStoredMedia(childMedia, "child-share-original")
+
+        val viewerShareId = createShare("VIEWER")
+        val viewerAccessCookie = loginShare(viewerShareId)
+        val archive = given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .queryParam("includeChildren", true)
+            .queryParam("locale", "de")
+            .`when`().get("/api/public-shares/$viewerShareId/memories/${memory.publicId}/download")
+            .then()
+            .statusCode(200)
+            .contentType("application/zip")
+            .header("Content-Disposition", org.hamcrest.Matchers.containsString("Trip $runId-mit-kapiteln.zip"))
+            .extract()
+            .asByteArray()
+
+        assertThat(zipEntries(archive)).containsExactly(
+            "Trip $runId/2026-01-02 10-00-00 Root Download.jpg" to "root-share-original",
+            "Trip $runId/Day $runId/2026-01-03 10-00-00 Child Download.jpg" to "child-share-original",
+        )
+
+        val uploaderShareId = createShare("UPLOADER")
+        val uploaderAccessCookie = loginShare(uploaderShareId)
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", uploaderAccessCookie)
+            .`when`().get("/api/public-shares/$uploaderShareId/memories/${memory.publicId}/download")
+            .then()
+            .statusCode(403)
     }
 
     @Test
@@ -779,7 +819,11 @@ class MemoryShareResourceTest {
             }
         }
 
-    private fun createMedia(title: String, targetMemory: Memory = memory): Media =
+    private fun createMedia(
+        title: String,
+        targetMemory: Memory = memory,
+        createdAt: Instant = Instant.now(),
+    ): Media =
         inTransaction {
             Media().also {
                 it.tenant = tenant
@@ -789,8 +833,9 @@ class MemoryShareResourceTest {
                 it.title = title
                 it.mimeType = "image/jpeg"
                 it.sizeBytes = 10
-                it.storageKey = "tenant-${tenant.id}/test-${title.lowercase()}/original"
+                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
                 it.originalFilename = "$title.jpg"
+                it.createdAt = createdAt
                 mediaRepo.persist(it)
             }
         }
@@ -799,6 +844,24 @@ class MemoryShareResourceTest {
         Files.createTempFile("veyq-share-upload-", ".png").also {
             ImageIO.write(BufferedImage(16, 9, BufferedImage.TYPE_INT_RGB), "png", it.toFile())
         }
+
+    private fun writeStoredMedia(media: Media, content: String) {
+        val path = mediaConfig.storageDir.resolve(media.storageKey)
+        Files.createDirectories(path.parent)
+        Files.writeString(path, content)
+    }
+
+    private fun zipEntries(bytes: ByteArray): List<Pair<String, String>> {
+        val entries = mutableListOf<Pair<String, String>>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries += entry.name to zip.readBytes().toString(Charsets.UTF_8)
+                zip.closeEntry()
+            }
+        }
+        return entries
+    }
 
     private fun <T> inTransaction(block: () -> T): T {
         transaction.begin()

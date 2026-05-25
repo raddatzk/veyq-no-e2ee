@@ -72,6 +72,13 @@ export interface DeletePublicShareMemoryRequest {
     memoryId: string;
 }
 
+export interface DownloadPublicShareMemoryMediaRequest {
+    shareId: string;
+    memoryId: string;
+    includeChildren?: boolean;
+    locale?: DownloadPublicShareMemoryMediaLocaleEnum;
+}
+
 export interface GetPublicShareRequest {
     shareId: string;
 }
@@ -274,6 +281,36 @@ export interface PublicSharesApiInterface {
      * Delete a submemory through a public share
      */
     deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for downloadPublicShareMemoryMedia without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include original media assigned to descendant Memories inside the shared subtree.
+     * @param {'de' | 'en'} [locale] Preferred UI locale for the generated ZIP filename.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    downloadPublicShareMemoryMediaRequestOpts(requestParameters: DownloadPublicShareMemoryMediaRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams a ZIP archive containing original media files visible through the public share. `UPLOADER` shares are excluded because they do not have full Memory gallery access. When `includeChildren=true`, original media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Download public share Memory media originals
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include original media assigned to descendant Memories inside the shared subtree.
+     * @param {'de' | 'en'} [locale] Preferred UI locale for the generated ZIP filename.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    downloadPublicShareMemoryMediaRaw(requestParameters: DownloadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams a ZIP archive containing original media files visible through the public share. `UPLOADER` shares are excluded because they do not have full Memory gallery access. When `includeChildren=true`, original media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Download public share Memory media originals
+     */
+    downloadPublicShareMemoryMedia(requestParameters: DownloadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for getPublicShare without sending the request
@@ -1025,6 +1062,69 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deletePublicShareMemoryRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for downloadPublicShareMemoryMedia without sending the request
+     */
+    async downloadPublicShareMemoryMediaRequestOpts(requestParameters: DownloadPublicShareMemoryMediaRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling downloadPublicShareMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling downloadPublicShareMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['includeChildren'] != null) {
+            queryParameters['includeChildren'] = requestParameters['includeChildren'];
+        }
+
+        if (requestParameters['locale'] != null) {
+            queryParameters['locale'] = requestParameters['locale'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/download`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams a ZIP archive containing original media files visible through the public share. `UPLOADER` shares are excluded because they do not have full Memory gallery access. When `includeChildren=true`, original media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Download public share Memory media originals
+     */
+    async downloadPublicShareMemoryMediaRaw(requestParameters: DownloadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.downloadPublicShareMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams a ZIP archive containing original media files visible through the public share. `UPLOADER` shares are excluded because they do not have full Memory gallery access. When `includeChildren=true`, original media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Download public share Memory media originals
+     */
+    async downloadPublicShareMemoryMedia(requestParameters: DownloadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.downloadPublicShareMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -2283,3 +2383,12 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
 }
+
+/**
+ * @export
+ */
+export const DownloadPublicShareMemoryMediaLocaleEnum = {
+    De: 'de',
+    En: 'en'
+} as const;
+export type DownloadPublicShareMemoryMediaLocaleEnum = typeof DownloadPublicShareMemoryMediaLocaleEnum[keyof typeof DownloadPublicShareMemoryMediaLocaleEnum];

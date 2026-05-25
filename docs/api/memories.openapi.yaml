@@ -575,6 +575,61 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/download":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: downloadMemoryMedia
+      summary: Download memory media originals
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include original media assigned to visible descendant Memories.
+        - in: query
+          name: locale
+          required: false
+          schema:
+            type: string
+            enum: [de, en]
+          description: Preferred UI locale for the generated ZIP filename.
+      responses:
+        '200':
+          description: ZIP archive with original media files.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename for the generated ZIP archive.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: "<binary zip archive>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/cover":
     put:
       tags:

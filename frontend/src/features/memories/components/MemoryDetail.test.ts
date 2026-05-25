@@ -98,6 +98,51 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-detail-cover .pi-images').exists()).toBe(false)
   })
 
+  it('shows download choices for direct and subtree original archives', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({
+          directMediaCount: 1,
+          descendantMediaCount: 2
+        }),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await findButton(wrapper, 'Herunterladen').trigger('click')
+    const links = wrapper.findAll('.memory-download-option')
+
+    expect(links).toHaveLength(2)
+    expect(links[0].attributes('href')).toBe('/api/tenant/memories/mem-1/download?includeChildren=false&locale=de')
+    expect(links[0].text()).toContain('1 Originale')
+    expect(links[1].attributes('href')).toBe('/api/tenant/memories/mem-1/download?includeChildren=true&locale=de')
+    expect(links[1].text()).toContain('3 Originale')
+  })
+
+  it('uses public share download urls and can hide the download action', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: '',
+        memory: memory(),
+        header: header({ directMediaCount: 1 }),
+        childMemories: [],
+        media: [media()],
+        downloadUrl: (memoryId, includeChildren) => `/share/${memoryId}/download?children=${includeChildren}`
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await findButton(wrapper, 'Herunterladen').trigger('click')
+    expect(wrapper.find('.memory-download-option').attributes('href')).toBe('/share/mem-1/download?children=false')
+
+    await wrapper.setProps({ capabilities: { canDownload: false } })
+    expect(wrapper.text()).not.toContain('Herunterladen')
+  })
+
   it('renders journal markdown and media embeds', () => {
     const wrapper = mount(MemoryDetail, {
       props: {

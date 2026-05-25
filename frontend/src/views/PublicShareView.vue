@@ -9,6 +9,7 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
+import { API_BASE } from '../shared/api/httpClient'
 import { getErrorMessage } from '../shared/utils/errors'
 import {
   createPublicShareChildMemory,
@@ -38,7 +39,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
 const shareId = computed(() => String(route.params.shareId || ''))
 const sharePath = computed(() => routePathToSharePath(route.params.pathMatch))
@@ -80,7 +81,8 @@ const capabilities = computed(() => ({
   canEditMediaMetadata: Boolean(share.value?.canEdit),
   canDeleteMedia: Boolean(share.value?.canDelete),
   canDeleteCurrentMemory: Boolean(share.value?.canDelete && memory.value?.id !== share.value.rootMemory?.id),
-  showScope: false
+  showScope: false,
+  canDownload: Boolean(share.value?.canViewGallery && !isUploaderOnly.value)
 }))
 
 onMounted(loadShare)
@@ -228,6 +230,10 @@ function routePathToSharePath(value: unknown): string {
   if (typeof value === 'string' && value) return `/${value}`
   return '/'
 }
+
+function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): string {
+  return `${API_BASE}/api/public-shares/${encodeURIComponent(shareId.value)}/memories/${encodeURIComponent(memoryId)}/download?includeChildren=${includeChildren}&locale=${encodeURIComponent(locale.value)}`
+}
 </script>
 
 <template>
@@ -332,6 +338,7 @@ function routePathToSharePath(value: unknown): string {
       :delete-memory="(memoryId) => deletePublicShareMemory(shareId, memoryId)"
       :update-media-metadata="(mediaId, memoryId, request) => updatePublicShareMediaMetadata(shareId, memoryId, mediaId, request)"
       :delete-media="(mediaId, memoryId) => deletePublicShareMedia(shareId, memoryId, mediaId)"
+      :download-url="publicShareDownloadUrl"
       @open-memory="openMemory"
       @create-child-memory="createMemoryOpen = true"
       @changed="handleMemoryChanged"

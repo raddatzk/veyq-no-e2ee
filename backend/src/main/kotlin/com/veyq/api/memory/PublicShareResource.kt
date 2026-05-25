@@ -77,6 +77,9 @@ class PublicShareResource @Inject constructor(
     override fun listPublicShareMemoryMedia(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.listPublicShareMemoryMedia(shareId, memoryId)).build()
 
+    override fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean?, locale: String?): Response =
+        memoryShareService.downloadPublicShareMemoryMedia(shareId, memoryId, includeChildren ?: false, locale)
+
     override fun listPublicShareMedia(shareId: String): Response =
         Response.ok(memoryShareService.listPublicShareMedia(shareId)).build()
 

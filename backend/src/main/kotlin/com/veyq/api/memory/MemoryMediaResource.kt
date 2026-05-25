@@ -22,6 +22,9 @@ class MemoryMediaResource @Inject constructor(
     override fun listMemoryMedia(tenantName: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(mediaService.listMemoryMedia(memoryId, includeChildren ?: false)).build()
 
+    override fun downloadMemoryMedia(tenantName: String, memoryId: String, includeChildren: Boolean?, locale: String?): Response =
+        mediaService.downloadMemoryMedia(memoryId, includeChildren ?: false, locale)
+
     override fun uploadMemoryMedia(
         tenantName: String,
         memoryId: String,

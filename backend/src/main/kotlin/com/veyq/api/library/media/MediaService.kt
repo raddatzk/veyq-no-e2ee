@@ -2,6 +2,8 @@ package com.veyq.api.library.media
 
 import com.veyq.api.auth.BadRequestException
 import com.veyq.api.auth.NotFoundException
+import com.veyq.api.domain.ArchiveMediaKeyset
+import com.veyq.api.domain.ArchiveMediaRow
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.MediaRepo
@@ -38,11 +40,15 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.text.Normalizer
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Comparator
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import javax.imageio.ImageIO
 
 @Singleton
@@ -68,6 +74,62 @@ class MediaService @Inject constructor(
             .distinctBy { it.id }
             .sortedWith(compareBy<Media> { it.capturedAt ?: it.createdAt }.thenBy { it.createdAt })
             .map { it.toMemorySummary() }
+    }
+
+    fun downloadMemoryMedia(memoryId: String, includeChildren: Boolean, locale: String?): Response {
+        val memory = resolveVisibleMemory(memoryId)
+        val memories = if (includeChildren) descendantsAndSelf(memory).filter(::isMemoryVisible) else listOf(memory)
+        return archiveResponse(
+            memoryDirectories = archiveMemoryDirectories(memory, memories),
+            archiveName = archiveFilename(memory, includeChildren, locale),
+            locale = locale,
+        )
+    }
+
+    fun archiveResponse(memoryDirectories: Map<Long, String>, archiveName: String, locale: String?): Response {
+        val memoryIds = memoryDirectories.keys
+        val output = StreamingOutput { stream ->
+            try {
+                ZipOutputStream(stream).use { zip ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    val usedNames = mutableMapOf<String, Int>()
+                    var after: ArchiveMediaKeyset? = null
+                    while (true) {
+                        val rows = mediaRepo.listArchiveRowsByMemoryIds(memoryIds, after, mediaConfig.archiveBatchSize)
+                        if (rows.isEmpty()) break
+
+                        rows.forEach { row ->
+                            val path = storagePath(row.storageKey)
+                            if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
+                            val zipEntry = ZipEntry(archiveEntryName(memoryDirectories, row, locale, usedNames))
+                            zipEntry.time = row.sortTime.toEpochMilli()
+                            zip.putNextEntry(zipEntry)
+                            Files.newInputStream(path).use { input ->
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read == -1) break
+                                    zip.write(buffer, 0, read)
+                                }
+                            }
+                            zip.closeEntry()
+                        }
+                        val last = rows.last()
+                        after = ArchiveMediaKeyset(last.sortTime, last.createdAt, last.id)
+                    }
+                }
+            } catch (e: IOException) {
+                if (isClientAbort(e)) {
+                    log.debug("Media archive stream ended because the client closed the connection")
+                    return@StreamingOutput
+                }
+                throw e
+            }
+        }
+
+        return Response.ok(output, "application/zip")
+            .header("Content-Disposition", "attachment; filename=\"${safeHeaderFilename(archiveName)}\"")
+            .header("X-Content-Type-Options", "nosniff")
+            .build()
     }
 
     @Transactional
@@ -266,6 +328,90 @@ class MediaService @Inject constructor(
     private fun descendantsAndSelf(root: Memory): List<Memory> =
         listOf(root) + memoryRepo.list("tenant", tenant())
             .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+
+    fun archiveMemoryDirectories(rootMemory: Memory, memories: List<Memory>): Map<Long, String> =
+        memories.associate { memory -> memory.id to memoryPath(rootMemory, memory).joinToString("/") }
+
+    private fun archiveEntryName(
+        memoryDirectories: Map<Long, String>,
+        media: ArchiveMediaRow,
+        locale: String?,
+        usedNames: MutableMap<String, Int>,
+    ): String {
+        val directory = memoryDirectories[media.memoryId] ?: throw NotFoundException("Media not found")
+        val baseFilename = mediaFilename(media, locale)
+        return uniqueArchiveName("$directory/$baseFilename", usedNames)
+    }
+
+    private fun memoryPath(rootMemory: Memory, memory: Memory): List<String> {
+        val path = generateSequence(memory) { it.parentMemory }
+            .takeWhile { it.id != rootMemory.parentMemory?.id }
+            .toList()
+            .asReversed()
+        return path.map { safeZipSegment(it.displayName) }
+    }
+
+    private fun mediaFilename(media: ArchiveMediaRow, locale: String?): String {
+        val fallback = fallbackMediaFilename(media, locale)
+        val name = media.originalFilename?.takeIf { it.isNotBlank() }?.let { safeZipSegment(it, fallback) }
+            ?: media.title.takeIf { it.isNotBlank() }?.let { safeZipSegment(it, fallback) }
+            ?: fallback
+        return "${ARCHIVE_TIMESTAMP_FORMAT.format(media.sortTime)} $name"
+    }
+
+    private fun fallbackMediaFilename(media: ArchiveMediaRow, locale: String?): String =
+        when (normalizedLocale(locale)) {
+            "en" -> "file-${media.publicId}.bin"
+            else -> "datei-${media.publicId}.bin"
+        }
+
+    private fun uniqueArchiveName(candidate: String, usedNames: MutableMap<String, Int>): String {
+        val key = archiveNameKey(candidate)
+        val count = usedNames.getOrDefault(key, 0)
+        usedNames[key] = count + 1
+        if (count == 0) return candidate
+
+        val slashIndex = candidate.lastIndexOf('/')
+        val directory = candidate.substring(0, slashIndex + 1)
+        val filename = candidate.substring(slashIndex + 1)
+        val dotIndex = filename.lastIndexOf('.').takeIf { it > 0 }
+        val stem = dotIndex?.let { filename.substring(0, it) } ?: filename
+        val extension = dotIndex?.let { filename.substring(it) } ?: ""
+        val deduplicated = "$directory$stem-${count + 1}$extension"
+        return uniqueArchiveName(deduplicated, usedNames)
+    }
+
+    private fun archiveNameKey(value: String): String =
+        Normalizer.normalize(value, Normalizer.Form.NFC).lowercase()
+
+    private fun archiveFilename(memory: Memory, includeChildren: Boolean, locale: String?): String {
+        val name = safeZipSegment(memory.displayName, archiveFallbackName(locale))
+        val suffix = when (normalizedLocale(locale)) {
+            "en" -> if (includeChildren) "-with-chapters" else ""
+            else -> if (includeChildren) "-mit-kapiteln" else ""
+        }
+        return "$name$suffix.zip"
+    }
+
+    private fun archiveFallbackName(locale: String?): String =
+        when (normalizedLocale(locale)) {
+            "en" -> "memory"
+            else -> "erinnerung"
+        }
+
+    fun normalizedLocale(locale: String?): String =
+        locale?.trim()?.lowercase()?.substringBefore('-')?.takeIf { it == "en" } ?: "de"
+
+    private fun safeZipSegment(value: String, fallback: String = "untitled"): String =
+        value
+            .replace("\\", "-")
+            .replace("/", "-")
+            .replace(Regex("[\\x00-\\x1F\\x7F:*?\"<>|]+"), "-")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .trim('.')
+            .takeIf { it.isNotBlank() }
+            ?: fallback
 
     private fun writeMediaFile(source: Path, storageKey: String) {
         val target = storagePath(storageKey)
@@ -511,5 +657,7 @@ class MediaService @Inject constructor(
         OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
     companion object {
         private const val PREVIEW_MAX_EDGE = 720
+        private val ARCHIVE_TIMESTAMP_FORMAT: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss").withZone(ZoneOffset.UTC)
     }
 }

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -45,6 +46,7 @@ type MemoryDetailCapabilities = {
   canDeleteMedia?: boolean
   canDeleteCurrentMemory?: boolean
   canEditJournal?: boolean
+  canDownload?: boolean
 }
 
 type MediaInsertRange = {
@@ -78,6 +80,7 @@ const props = defineProps<{
     request: UpdateMemoryMediaMetadataBatchRequest
   ) => Promise<MemoryMedia[]>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+  downloadUrl?: (memoryId: string, includeChildren: boolean) => string
 }>()
 const { locale, t } = useI18n()
 
@@ -94,6 +97,7 @@ const coverOpen = ref(false)
 const deleteOpen = ref(false)
 const shareOpen = ref(false)
 const uploadOpen = ref(false)
+const downloadOpen = ref(false)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 const journalEditing = ref(false)
 const journalSaving = ref(false)
@@ -116,7 +120,8 @@ const capabilities = computed(() => ({
   canEditMediaMetadata: props.capabilities?.canEditMediaMetadata ?? true,
   canDeleteMedia: props.capabilities?.canDeleteMedia ?? false,
   canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true,
-  canEditJournal: props.capabilities?.canEditJournal ?? props.capabilities?.canEdit ?? true
+  canEditJournal: props.capabilities?.canEditJournal ?? props.capabilities?.canEdit ?? true,
+  canDownload: props.capabilities?.canDownload ?? true
 }))
 
 const detailHeader = computed<MemoryHeader>(() => ({
@@ -150,6 +155,11 @@ const totalMediaCount = computed(
 )
 const mediaCountLabel = computed(() => `${totalMediaCount.value} ${t('memory.mediaCount')}`)
 const visibleMedia = computed(() => props.media.map((media) => mediaOverrides.value[media.id] || media))
+const canDownloadMemory = computed(() =>
+  capabilities.value.canDownload && totalMediaCount.value > 0 && Boolean(props.downloadUrl || props.tenantName)
+)
+const directDownloadUrl = computed(() => memoryDownloadUrl(false))
+const subtreeDownloadUrl = computed(() => memoryDownloadUrl(true))
 const canBatchUpdateMediaMetadata = computed(() => Boolean(props.updateMediaMetadataBatch || props.tenantName))
 const journalMarkdown = computed(() => props.journal?.markdown ?? '')
 const journalHasContent = computed(() => journalMarkdown.value.trim().length > 0)
@@ -164,6 +174,13 @@ watch(
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', { dateStyle: 'medium' }).format(new Date(value))
+}
+
+function memoryDownloadUrl(includeChildren: boolean): string {
+  if (props.downloadUrl) return props.downloadUrl(props.memory.id, includeChildren)
+  const tenant = encodeURIComponent(props.tenantName)
+  const memoryId = encodeURIComponent(props.memory.id)
+  return `${API_BASE}/api/${tenant}/memories/${memoryId}/download?includeChildren=${includeChildren}&locale=${encodeURIComponent(locale.value)}`
 }
 
 async function updateSingleMediaMetadata(
@@ -359,6 +376,15 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               class="memory-upload-action"
               size="small"
               @click="uploadOpen = true"
+            />
+            <Button
+              v-if="canDownloadMemory"
+              icon="pi pi-download"
+              :label="t('memory.download')"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="downloadOpen = true"
             />
             <Button
               v-if="capabilities.canEdit"
@@ -637,6 +663,29 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       :upload-media="uploadMedia"
       @saved="$emit('changed', memory)"
     />
+    <Dialog
+      v-model:visible="downloadOpen"
+      modal
+      :header="t('memory.download')"
+      class="memory-download-dialog"
+    >
+      <div class="memory-download-options">
+        <a class="memory-download-option" :href="directDownloadUrl" @click="downloadOpen = false">
+          <span class="pi pi-download" />
+          <span>
+            <strong>{{ t('memory.downloadDirect') }}</strong>
+            <small>{{ t('memory.downloadDirectCopy', { count: detailHeader.directMediaCount }) }}</small>
+          </span>
+        </a>
+        <a class="memory-download-option" :href="subtreeDownloadUrl" @click="downloadOpen = false">
+          <span class="pi pi-sitemap" />
+          <span>
+            <strong>{{ t('memory.downloadSubtree') }}</strong>
+            <small>{{ t('memory.downloadSubtreeCopy', { count: totalMediaCount }) }}</small>
+          </span>
+        </a>
+      </div>
+    </Dialog>
     <JournalMediaPickerDialog
       v-model:visible="mediaPickerOpen"
       :media="media"

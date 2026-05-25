@@ -34,6 +34,13 @@ import {
     UpdateMemoryMediaMetadataRequestToJSON,
 } from '../models/index';
 
+export interface DownloadMemoryMediaRequest {
+    tenantName: string;
+    memoryId: string;
+    includeChildren?: boolean;
+    locale?: DownloadMemoryMediaLocaleEnum;
+}
+
 export interface ListMemoryMediaRequest {
     tenantName: string;
     memoryId: string;
@@ -78,6 +85,36 @@ export interface UploadMemoryMediaRequest {
  * @interface MemoryMediaApiInterface
  */
 export interface MemoryMediaApiInterface {
+    /**
+     * Creates request options for downloadMemoryMedia without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include original media assigned to visible descendant Memories.
+     * @param {'de' | 'en'} [locale] Preferred UI locale for the generated ZIP filename.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    downloadMemoryMediaRequestOpts(requestParameters: DownloadMemoryMediaRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Download memory media originals
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include original media assigned to visible descendant Memories.
+     * @param {'de' | 'en'} [locale] Preferred UI locale for the generated ZIP filename.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    downloadMemoryMediaRaw(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Download memory media originals
+     */
+    downloadMemoryMedia(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
     /**
      * Creates request options for listMemoryMedia without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
@@ -254,6 +291,69 @@ export interface MemoryMediaApiInterface {
  * 
  */
 export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInterface {
+
+    /**
+     * Creates request options for downloadMemoryMedia without sending the request
+     */
+    async downloadMemoryMediaRequestOpts(requestParameters: DownloadMemoryMediaRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling downloadMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling downloadMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['includeChildren'] != null) {
+            queryParameters['includeChildren'] = requestParameters['includeChildren'];
+        }
+
+        if (requestParameters['locale'] != null) {
+            queryParameters['locale'] = requestParameters['locale'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/download`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Download memory media originals
+     */
+    async downloadMemoryMediaRaw(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.downloadMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Download memory media originals
+     */
+    async downloadMemoryMedia(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.downloadMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for listMemoryMedia without sending the request
@@ -654,3 +754,12 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
 }
+
+/**
+ * @export
+ */
+export const DownloadMemoryMediaLocaleEnum = {
+    De: 'de',
+    En: 'en'
+} as const;
+export type DownloadMemoryMediaLocaleEnum = typeof DownloadMemoryMediaLocaleEnum[keyof typeof DownloadMemoryMediaLocaleEnum];

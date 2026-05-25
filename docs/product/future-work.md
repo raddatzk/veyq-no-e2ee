@@ -26,6 +26,7 @@ This document turns the Memory product context into follow-up topics for develop
 
 - Tenant domain change flow, including ownership/permission rules, validation, invite-link impact and reverse-proxy assumptions.
 - Bulk image download for internal Memory views and non-uploader public shares, including authorization, subtree scope, ZIP/streaming behavior and media visibility rules.
+- Localized download timestamps for Memory ZIPs, including whether to store a user time zone in the profile or pass one per download, plus fallback behavior for public shares without an authenticated user.
 - Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
 - Cover selection and cover removal flows for Memories.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.

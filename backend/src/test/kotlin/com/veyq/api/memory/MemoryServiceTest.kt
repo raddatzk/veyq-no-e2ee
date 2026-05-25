@@ -31,6 +31,7 @@ import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.folder.FolderService
+import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
@@ -42,12 +43,16 @@ import org.assertj.core.api.Assertions.assertThatExceptionOfType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import javax.imageio.ImageIO
+import jakarta.ws.rs.core.StreamingOutput
+import java.util.zip.ZipInputStream
 
 @QuarkusTest
 class MemoryServiceTest {
@@ -66,6 +71,7 @@ class MemoryServiceTest {
     @Inject lateinit var memoryService: MemoryService
     @Inject lateinit var memoryJournalService: MemoryJournalService
     @Inject lateinit var mediaService: MediaService
+    @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var folderService: FolderService
 
     private lateinit var runId: String
@@ -99,6 +105,85 @@ class MemoryServiceTest {
         assertThat(memoryService.getMemory(trip.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
         assertThat(memoryService.getMemory(trip.id).endDate).isEqualTo(LocalDate.parse("2026-05-03"))
         assertThat(memoryService.getMemory(day.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
+    }
+
+    @Test
+    fun `downloads original media as zip with optional descendants and unique filenames`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("download-trip", "Download Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
+        val otherUploader = createUser("memory-uploader-$runId", ServerRole.ServerMember)
+        val rootCaptured = createMedia(
+            owner,
+            memory(trip.id),
+            "Captured Photo",
+            capturedAt = Instant.parse("2026-01-01T09:00:00Z"),
+            createdAt = Instant.parse("2026-01-05T10:00:00Z"),
+        )
+        val rootMedia = createMedia(
+            owner,
+            memory(trip.id),
+            "Same Name",
+            createdAt = Instant.parse("2026-01-02T10:00:00Z"),
+            cameraMake = "Canon",
+            cameraModel = "R6",
+        )
+        val rootDuplicate = createMedia(
+            otherUploader,
+            memory(trip.id),
+            "Same Name",
+            createdAt = Instant.parse("2026-01-02T10:00:00Z"),
+            cameraMake = "Nikon",
+            cameraModel = "Z6",
+        )
+        val rootCaseDuplicate = createMedia(
+            owner,
+            memory(trip.id),
+            "same name",
+            createdAt = Instant.parse("2026-01-02T10:00:00Z"),
+            cameraMake = "Sony",
+            cameraModel = "A7",
+        )
+        val rootExistingSuffix = createMedia(owner, memory(trip.id), "Same Name-2", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        val rootFallback = createMedia(
+            owner,
+            memory(trip.id),
+            " ",
+            createdAt = Instant.parse("2026-01-02T11:00:00Z"),
+            originalFilename = null,
+        )
+        val childMedia = createMedia(owner, memory(day.id), "Same Name", createdAt = Instant.parse("2026-01-03T10:00:00Z"))
+        writeStoredMedia(rootCaptured, "root-captured-original")
+        writeStoredMedia(rootMedia, "root-original")
+        writeStoredMedia(rootDuplicate, "root-duplicate-original")
+        writeStoredMedia(rootCaseDuplicate, "root-case-duplicate-original")
+        writeStoredMedia(rootExistingSuffix, "root-existing-suffix-original")
+        writeStoredMedia(rootFallback, "root-fallback-original")
+        writeStoredMedia(childMedia, "child-original")
+
+        val directResponse = mediaService.downloadMemoryMedia(trip.id, includeChildren = false, locale = "de")
+        assertThat(directResponse.getHeaderString("Content-Disposition")).contains("Download Trip.zip")
+        val directEntries = zipEntries(directResponse.entity)
+        assertThat(directEntries).containsExactly(
+            "Download Trip/2026-01-01 09-00-00 Captured Photo.jpg" to "root-captured-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name.jpg" to "root-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name-2.jpg" to "root-duplicate-original",
+            "Download Trip/2026-01-02 10-00-00 same name-3.jpg" to "root-case-duplicate-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name-2-2.jpg" to "root-existing-suffix-original",
+            "Download Trip/2026-01-02 11-00-00 datei-${rootFallback.publicId}.bin" to "root-fallback-original",
+        )
+
+        val subtreeResponse = mediaService.downloadMemoryMedia(trip.id, includeChildren = true, locale = "en")
+        assertThat(subtreeResponse.getHeaderString("Content-Disposition")).contains("Download Trip-with-chapters.zip")
+        val subtreeEntries = zipEntries(subtreeResponse.entity)
+        assertThat(subtreeEntries).containsExactly(
+            "Download Trip/2026-01-01 09-00-00 Captured Photo.jpg" to "root-captured-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name.jpg" to "root-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name-2.jpg" to "root-duplicate-original",
+            "Download Trip/2026-01-02 10-00-00 same name-3.jpg" to "root-case-duplicate-original",
+            "Download Trip/2026-01-02 10-00-00 Same Name-2-2.jpg" to "root-existing-suffix-original",
+            "Download Trip/2026-01-02 11-00-00 file-${rootFallback.publicId}.bin" to "root-fallback-original",
+            "Download Trip/Day One/2026-01-03 10-00-00 Same Name.jpg" to "child-original",
+        )
     }
 
     @Test
@@ -685,6 +770,9 @@ class MemoryServiceTest {
         title: String,
         capturedAt: Instant? = null,
         createdAt: Instant = Instant.now(),
+        originalFilename: String? = "$title.jpg",
+        cameraMake: String? = null,
+        cameraModel: String? = null,
     ): Media =
         inTransaction {
             Media().also {
@@ -697,12 +785,14 @@ class MemoryServiceTest {
                 it.title = title
                 it.mimeType = "image/jpeg"
                 it.sizeBytes = 12
-                it.storageKey = "tenant-${tenant.id}/test-${title.lowercase().replace(" ", "-")}/original"
-                it.originalFilename = "$title.jpg"
+                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
+                it.originalFilename = originalFilename
                 it.createdAt = createdAt
                 it.capturedAt = capturedAt
                 it.imageWidth = 16
                 it.imageHeight = 9
+                it.cameraMake = cameraMake
+                it.cameraModel = cameraModel
                 mediaRepo.persist(it)
             }
         }
@@ -729,6 +819,26 @@ class MemoryServiceTest {
         val path = Files.createTempFile(prefix, ".txt")
         Files.writeString(path, "not an image")
         return path
+    }
+
+    private fun writeStoredMedia(media: Media, content: String) {
+        val path = mediaConfig.storageDir.resolve(media.storageKey)
+        Files.createDirectories(path.parent)
+        Files.writeString(path, content)
+    }
+
+    private fun zipEntries(entity: Any): List<Pair<String, String>> {
+        val output = ByteArrayOutputStream()
+        (entity as StreamingOutput).write(output)
+        val entries = mutableListOf<Pair<String, String>>()
+        ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries += entry.name to zip.readBytes().toString(Charsets.UTF_8)
+                zip.closeEntry()
+            }
+        }
+        return entries
     }
 
     private fun <T> inTransaction(block: () -> T): T {

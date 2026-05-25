@@ -310,6 +310,21 @@ class MemoryShareService @Inject constructor(
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
     }
 
+    fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean, locale: String?): Response {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val memories = if (includeChildren) {
+            subtree(memory).filter { isDescendantOrSelf(it, access.share.rootMemory) }
+        } else {
+            listOf(memory)
+        }
+        return mediaService.archiveResponse(
+            memoryDirectories = mediaService.archiveMemoryDirectories(memory, memories),
+            archiveName = publicShareArchiveFilename(memory, includeChildren, locale),
+            locale = locale,
+        )
+    }
+
     fun listPublicShareMedia(shareId: String): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
         val access = requireAccess(resolveEnabledShare(shareId))
         if (!access.canViewGallery) {
@@ -730,6 +745,23 @@ class MemoryShareService @Inject constructor(
         val end = endDate ?: throw BadRequestException("endDate is required", "MEMORY_DATE_RANGE_REQUIRED")
         if (end.isBefore(start)) throw BadRequestException("endDate must not be before startDate", "MEMORY_DATE_RANGE_INVALID")
         return start to end
+    }
+
+    private fun publicShareArchiveFilename(memory: Memory, includeChildren: Boolean, locale: String?): String {
+        val suffix = when (mediaService.normalizedLocale(locale)) {
+            "en" -> if (includeChildren) "-with-chapters" else ""
+            else -> if (includeChildren) "-mit-kapiteln" else ""
+        }
+        val name = memory.displayName
+            .replace("\\", "-")
+            .replace("/", "-")
+            .replace(Regex("[\\x00-\\x1F\\x7F:*?\"<>|]+"), "-")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .trim('.')
+            .takeIf { it.isNotBlank() }
+            ?: "memory"
+        return "$name$suffix.zip"
     }
 
     private fun requiredCoverCrop(

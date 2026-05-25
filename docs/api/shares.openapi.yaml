@@ -537,6 +537,63 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/download":
+    get:
+      tags: [PublicShares]
+      operationId: downloadPublicShareMemoryMedia
+      summary: Download public share Memory media originals
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - The share role is `VIEWER`, `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Streams a ZIP archive containing original media files visible through the public share. `UPLOADER` shares are excluded because they do not have full Memory gallery access. When `includeChildren=true`, original media from descendant Memories inside the shared subtree is included.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - The share role allows full Memory gallery access.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include original media assigned to descendant Memories inside the shared subtree.
+        - in: query
+          name: locale
+          required: false
+          schema:
+            type: string
+            enum: [de, en]
+          description: Preferred UI locale for the generated ZIP filename.
+      responses:
+        "200":
+          description: ZIP archive with original media files.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename for the generated ZIP archive.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: "<binary zip archive>"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/cover":
     put:
       tags: [PublicShares]
