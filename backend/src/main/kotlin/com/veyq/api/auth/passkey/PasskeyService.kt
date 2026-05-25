@@ -18,6 +18,7 @@ import com.veyq.api.generated.model.PasskeyLoginRequest
 import com.veyq.api.generated.model.PasskeyRegistrationRequest
 import com.veyq.api.generated.model.PasskeySummary
 import com.veyq.api.generated.model.PasskeysSummary
+import com.veyq.api.generated.model.UpdatePasskeyRequest
 import io.quarkus.security.webauthn.WebAuthnCredentialRecord
 import io.quarkus.security.webauthn.WebAuthnRunTimeConfig
 import io.quarkus.security.webauthn.WebAuthnSecurity
@@ -81,7 +82,7 @@ class PasskeyService @Inject constructor(
     @Transactional
     fun createMyPasskey(request: CreatePasskeyRequest, routingContext: RoutingContext): PasskeySummary {
         val user = currentManagedUser()
-        val displayName = request.displayName.trim().ifBlank { "Passkey" }
+        val displayName = requiredPasskeyDisplayName(request.displayName)
         return createPasskeyForUser(user, displayName, request.credential, routingContext)
     }
 
@@ -92,6 +93,7 @@ class PasskeyService @Inject constructor(
         credentialRequest: PasskeyRegistrationRequest,
         routingContext: RoutingContext,
     ): PasskeySummary {
+        val credentialDisplayName = requiredPasskeyDisplayName(displayName)
         val credentialRecord = try {
             webAuthnSecurity
                 .register(user.id.toString(), credentialRequest.toJsonObject(), routingContext)
@@ -114,7 +116,7 @@ class PasskeyService @Inject constructor(
             it.counter = persisted.counter()
             it.aaguid = persisted.aaguid().toString()
             it.transports = credentialRecord.transports?.joinToString(",") { transport -> transport.value }
-            it.displayName = displayName.trim().ifBlank { "Passkey" }
+            it.displayName = credentialDisplayName
             it.createdAt = Instant.now()
             it.persistAndFlush()
         }
@@ -127,6 +129,14 @@ class PasskeyService @Inject constructor(
         val credential = passkeyCredentialRepo.findByIdAndUser(passkeyId, currentManagedUser())
             ?: throw NotFoundException("Passkey not found")
         credential.delete()
+    }
+
+    @Transactional
+    fun updateMyPasskey(passkeyId: Long, request: UpdatePasskeyRequest): PasskeySummary {
+        val credential = passkeyCredentialRepo.findByIdAndUser(passkeyId, currentManagedUser())
+            ?: throw NotFoundException("Passkey not found")
+        credential.displayName = requiredPasskeyDisplayName(request.displayName)
+        return credential.toSummary()
     }
 
     private fun currentUser(): User =
@@ -161,6 +171,10 @@ fun PasskeyCredential.toSummary(): PasskeySummary =
         createdAt.toString(),
         lastUsedAt?.toString(),
     )
+
+internal fun requiredPasskeyDisplayName(value: String): String =
+    value.trim().takeIf { it.isNotBlank() }
+        ?: throw BadRequestException("displayName must not be blank")
 
 private fun PasskeyLoginRequest.toJsonObject(): JsonObject =
     JsonObject()

@@ -14,6 +14,7 @@ import com.veyq.api.generated.model.ForgotPasswordRequest
 import com.veyq.api.generated.model.PasskeyInvitationOptionsRequest
 import com.veyq.api.generated.model.ResetPasswordRequest
 import com.veyq.api.generated.model.UpdateManagedUserRoleRequest
+import com.veyq.api.generated.model.UpdatePasskeyRequest
 import com.veyq.api.generated.model.UpdateUserSettingsRequest
 import com.veyq.api.usermgmt.ResetPasswordService
 import io.vertx.ext.web.RoutingContext
@@ -51,6 +52,9 @@ class UserResource(
 
     override fun createMyPasskey(request: CreatePasskeyRequest): Response =
         Response.ok(passkeyService.createMyPasskey(request, routingContext)).build()
+
+    override fun updateMyPasskey(passkeyId: Long, request: UpdatePasskeyRequest): Response =
+        Response.ok(passkeyService.updateMyPasskey(passkeyId, request)).build()
 
     override fun deleteMyPasskey(passkeyId: Long): Response {
         passkeyService.deleteMyPasskey(passkeyId)

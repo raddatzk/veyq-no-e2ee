@@ -56,6 +56,10 @@ export async function createMyPasskey(displayName: string): Promise<PasskeySumma
   return generatedCall(usersApi.createMyPasskey({ createPasskeyRequest: { displayName, credential } }))
 }
 
+export function updateMyPasskey(passkeyId: number, displayName: string): Promise<PasskeySummary> {
+  return generatedCall(usersApi.updateMyPasskey({ passkeyId, updatePasskeyRequest: { displayName } }))
+}
+
 export function deleteMyPasskey(passkeyId: number): Promise<void> {
   return generatedCall(usersApi.deleteMyPasskey({ passkeyId }))
 }

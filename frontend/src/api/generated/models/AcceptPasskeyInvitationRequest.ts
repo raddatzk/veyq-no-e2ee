@@ -38,6 +38,12 @@ export interface AcceptPasskeyInvitationRequest {
      * @type {string}
      * @memberof AcceptPasskeyInvitationRequest
      */
+    passkeyDisplayName: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof AcceptPasskeyInvitationRequest
+     */
     token: string;
     /**
      * 
@@ -52,6 +58,7 @@ export interface AcceptPasskeyInvitationRequest {
  */
 export function instanceOfAcceptPasskeyInvitationRequest(value: object): value is AcceptPasskeyInvitationRequest {
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('passkeyDisplayName' in value) || value['passkeyDisplayName'] === undefined) return false;
     if (!('token' in value) || value['token'] === undefined) return false;
     if (!('credential' in value) || value['credential'] === undefined) return false;
     return true;
@@ -68,6 +75,7 @@ export function AcceptPasskeyInvitationRequestFromJSONTyped(json: any, ignoreDis
     return {
         
         'displayName': json['displayName'],
+        'passkeyDisplayName': json['passkeyDisplayName'],
         'token': json['token'],
         'credential': PasskeyRegistrationRequestFromJSON(json['credential']),
     };
@@ -85,6 +93,7 @@ export function AcceptPasskeyInvitationRequestToJSONTyped(value?: AcceptPasskeyI
     return {
         
         'displayName': value['displayName'],
+        'passkeyDisplayName': value['passkeyDisplayName'],
         'token': value['token'],
         'credential': PasskeyRegistrationRequestToJSON(value['credential']),
     };

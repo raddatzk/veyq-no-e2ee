@@ -13,6 +13,7 @@ import {
   getMySettings,
   listMyPasskeys,
   updateMySettings,
+  updateMyPasskey,
   type PasskeySummary,
   type UserSettingsResponse
 } from '../api'
@@ -26,11 +27,13 @@ const email = ref('')
 const currentPassword = ref('')
 const newPassword = ref('')
 const passkeys = ref<PasskeySummary[]>([])
+const passkeyNames = ref<Record<number, string>>({})
 const passkeyName = ref(defaultPasskeyName())
 const loading = ref(false)
 const savingProfile = ref(false)
 const savingPassword = ref(false)
 const savingPasskey = ref(false)
+const savingPasskeyId = ref<number | null>(null)
 const deletingPasskeyId = ref<number | null>(null)
 const error = ref('')
 const profileMessage = ref('')
@@ -46,6 +49,7 @@ async function loadSettings() {
     const [nextSettings, nextPasskeys] = await Promise.all([getMySettings(), listMyPasskeys()])
     applySettings(nextSettings)
     passkeys.value = nextPasskeys.passkeys
+    applyPasskeyNames(nextPasskeys.passkeys)
   } catch (caught) {
     settings.value = null
     error.value = caught instanceof Error ? caught.message : t('profile.profileLoadFailed')
@@ -96,12 +100,18 @@ async function savePassword() {
 }
 
 async function addPasskey() {
+  const nextPasskeyName = passkeyName.value.trim()
+  if (!nextPasskeyName) {
+    error.value = t('auth.passkeyDisplayNameRequired')
+    return
+  }
   savingPasskey.value = true
   error.value = ''
   passkeyMessage.value = ''
   try {
-    const passkey = await createMyPasskey(passkeyName.value || defaultPasskeyName())
+    const passkey = await createMyPasskey(nextPasskeyName)
     passkeys.value = [passkey, ...passkeys.value]
+    applyPasskeyNames(passkeys.value)
     if (settings.value) {
       settings.value = { ...settings.value, passkeyCount: passkeys.value.length }
     }
@@ -117,6 +127,27 @@ async function addPasskey() {
   }
 }
 
+async function renamePasskey(passkey: PasskeySummary) {
+  const nextPasskeyName = passkeyNames.value[passkey.passkeyId]?.trim() ?? ''
+  if (!nextPasskeyName) {
+    error.value = t('auth.passkeyDisplayNameRequired')
+    return
+  }
+  savingPasskeyId.value = passkey.passkeyId
+  error.value = ''
+  passkeyMessage.value = ''
+  try {
+    const renamed = await updateMyPasskey(passkey.passkeyId, nextPasskeyName)
+    passkeys.value = passkeys.value.map((item) => item.passkeyId === renamed.passkeyId ? renamed : item)
+    passkeyNames.value = { ...passkeyNames.value, [renamed.passkeyId]: renamed.displayName }
+    passkeyMessage.value = t('profile.passkeyRenameSuccess')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('profile.passkeyRenameFailed')
+  } finally {
+    savingPasskeyId.value = null
+  }
+}
+
 async function removePasskey(passkey: PasskeySummary) {
   deletingPasskeyId.value = passkey.passkeyId
   error.value = ''
@@ -124,6 +155,7 @@ async function removePasskey(passkey: PasskeySummary) {
   try {
     await deleteMyPasskey(passkey.passkeyId)
     passkeys.value = passkeys.value.filter((item) => item.passkeyId !== passkey.passkeyId)
+    applyPasskeyNames(passkeys.value)
     if (settings.value) {
       settings.value = { ...settings.value, passkeyCount: passkeys.value.length }
     }
@@ -136,6 +168,12 @@ async function removePasskey(passkey: PasskeySummary) {
   } finally {
     deletingPasskeyId.value = null
   }
+}
+
+function applyPasskeyNames(nextPasskeys: PasskeySummary[]) {
+  passkeyNames.value = Object.fromEntries(
+    nextPasskeys.map((passkey) => [passkey.passkeyId, passkey.displayName])
+  )
 }
 
 function applySettings(nextSettings: UserSettingsResponse) {
@@ -224,10 +262,21 @@ function defaultPasskeyName() {
         <div v-if="passkeys.length" class="passkey-list">
           <div v-for="passkey in passkeys" :key="passkey.passkeyId" class="passkey-row">
             <div>
-              <strong>{{ passkey.displayName }}</strong>
+              <label>
+                <span>{{ t('auth.passkeyDisplayName') }}</span>
+                <InputText v-model="passkeyNames[passkey.passkeyId]" autocomplete="off" required />
+              </label>
               <span>{{ t('profile.createdAt') }}: {{ formatTimestamp(passkey.createdAt) }}</span>
               <span>{{ t('profile.lastUsedAt') }}: {{ formatTimestamp(passkey.lastUsedAt) }}</span>
             </div>
+            <Button
+              type="button"
+              icon="pi pi-save"
+              text
+              :loading="savingPasskeyId === passkey.passkeyId"
+              :aria-label="t('profile.renamePasskey')"
+              @click="renamePasskey(passkey)"
+            />
             <Button
               type="button"
               icon="pi pi-trash"
@@ -240,8 +289,8 @@ function defaultPasskeyName() {
           </div>
         </div>
         <label>
-          <span>{{ t('common.name') }}</span>
-          <InputText v-model="passkeyName" autocomplete="off" />
+          <span>{{ t('auth.passkeyDisplayName') }}</span>
+          <InputText v-model="passkeyName" autocomplete="off" required />
         </label>
         <div class="button-row">
           <Button

@@ -13,7 +13,11 @@ export async function setupAdmin(request: AdminSetupRequest): Promise<void> {
   await generatedCall(setupApi.createAdmin({ adminSetupRequest: request }))
 }
 
-export async function setupAdminWithPasskey(email: string, displayName: string) {
+export async function setupAdminWithPasskey(
+  email: string,
+  displayName: string,
+  passkeyDisplayName: string
+) {
   const options = await generatedCall(
     setupApi.createAdminPasskeyOptions({
       adminPasskeySetupOptionsRequest: { email, displayName }
@@ -22,7 +26,7 @@ export async function setupAdminWithPasskey(email: string, displayName: string) 
   const credential = await createPasskeyCredential(options)
   return generatedCall(
     setupApi.createAdminWithPasskey({
-      adminPasskeySetupRequest: { email, displayName, credential }
+      adminPasskeySetupRequest: { email, displayName, passkeyDisplayName, credential }
     })
   )
 }

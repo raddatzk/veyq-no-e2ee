@@ -44,7 +44,7 @@ class SetupService @Inject constructor(
         }
 
         val email = request.email.trim().lowercase()
-        val user = setupUser(email, request.displayName.trim())
+        val user = setupUser(email, requiredSetupDisplayName(request.displayName))
         passwordService.setPassword(user, request.password, Instant.now())
         userRepo.flush()
         serverState.markSetupCompleted()
@@ -61,7 +61,7 @@ class SetupService @Inject constructor(
             throw ConflictException("Admin setup has already been completed")
         }
 
-        val user = setupUser(normalizeEmail(request.email), request.displayName.trim())
+        val user = setupUser(normalizeEmail(request.email), requiredSetupDisplayName(request.displayName))
         userRepo.flush()
         return passkeyService.registrationOptionsForUser(user, routingContext)
     }
@@ -79,9 +79,9 @@ class SetupService @Inject constructor(
         val user = pendingServerOwner()
             ?: throw BadRequestException("Passkey setup was not started")
         user.email = email
-        user.displayName = request.displayName.trim()
+        user.displayName = requiredSetupDisplayName(request.displayName)
         user.permalink = profilePermalink(user.displayName)
-        passkeyService.createPasskeyForUser(user, "Setup Passkey", request.credential, routingContext)
+        passkeyService.createPasskeyForUser(user, request.passkeyDisplayName, request.credential, routingContext)
         serverState.markSetupCompleted()
 
         return authService.loginUser(user)
@@ -127,3 +127,7 @@ class SetupService @Inject constructor(
             passkeyCredentialRepo.countByUser(this).toInt(),
         )
 }
+
+internal fun requiredSetupDisplayName(value: String): String =
+    value.trim().takeIf { it.isNotBlank() }
+        ?: throw BadRequestException("displayName must not be blank")

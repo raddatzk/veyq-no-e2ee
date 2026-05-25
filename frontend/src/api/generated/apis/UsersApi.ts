@@ -30,6 +30,7 @@ import type {
   PasskeysSummary,
   ResetPasswordRequest,
   UpdateManagedUserRoleRequest,
+  UpdatePasskeyRequest,
   UpdateUserSettingsRequest,
   UserSummary,
 } from '../models/index';
@@ -64,6 +65,8 @@ import {
     ResetPasswordRequestToJSON,
     UpdateManagedUserRoleRequestFromJSON,
     UpdateManagedUserRoleRequestToJSON,
+    UpdatePasskeyRequestFromJSON,
+    UpdatePasskeyRequestToJSON,
     UpdateUserSettingsRequestFromJSON,
     UpdateUserSettingsRequestToJSON,
     UserSummaryFromJSON,
@@ -117,6 +120,11 @@ export interface ResetMyPasswordRequest {
 export interface UpdateManagedUserRequest {
     userId: number;
     updateManagedUserRoleRequest: UpdateManagedUserRoleRequest;
+}
+
+export interface UpdateMyPasskeyRequest {
+    passkeyId: number;
+    updatePasskeyRequest: UpdatePasskeyRequest;
 }
 
 export interface UpdateMySettingsRequest {
@@ -491,6 +499,32 @@ export interface UsersApiInterface {
      * Server-Rolle eines Benutzers ändern
      */
     updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
+
+    /**
+     * Creates request options for updateMyPasskey without sending the request
+     * @param {number} passkeyId Internal ID of an own passkey
+     * @param {UpdatePasskeyRequest} updatePasskeyRequest 
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    updateMyPasskeyRequestOpts(requestParameters: UpdateMyPasskeyRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Eigenen Passkey umbenennen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * @summary Eigenen Passkey umbenennen
+     * @param {number} passkeyId Internal ID of an own passkey
+     * @param {UpdatePasskeyRequest} updatePasskeyRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    updateMyPasskeyRaw(requestParameters: UpdateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeySummary>>;
+
+    /**
+     * Eigenen Passkey umbenennen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey umbenennen
+     */
+    updateMyPasskey(requestParameters: UpdateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeySummary>;
 
     /**
      * Creates request options for updateMySettings without sending the request
@@ -1249,6 +1283,63 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.updateManagedUserRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateMyPasskey without sending the request
+     */
+    async updateMyPasskeyRequestOpts(requestParameters: UpdateMyPasskeyRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['passkeyId'] == null) {
+            throw new runtime.RequiredError(
+                'passkeyId',
+                'Required parameter "passkeyId" was null or undefined when calling updateMyPasskey().'
+            );
+        }
+
+        if (requestParameters['updatePasskeyRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updatePasskeyRequest',
+                'Required parameter "updatePasskeyRequest" was null or undefined when calling updateMyPasskey().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/users/me/passkeys/{passkeyId}`;
+        urlPath = urlPath.replace(`{${"passkeyId"}}`, encodeURIComponent(String(requestParameters['passkeyId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdatePasskeyRequestToJSON(requestParameters['updatePasskeyRequest']),
+        };
+    }
+
+    /**
+     * Eigenen Passkey umbenennen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey umbenennen
+     */
+    async updateMyPasskeyRaw(requestParameters: UpdateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PasskeySummary>> {
+        const requestOptions = await this.updateMyPasskeyRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PasskeySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Eigenen Passkey umbenennen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der Passkey muss dem aktuellen Benutzer gehoeren.  Implementierungsstatus: implemented.
+     * Eigenen Passkey umbenennen
+     */
+    async updateMyPasskey(requestParameters: UpdateMyPasskeyRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PasskeySummary> {
+        const response = await this.updateMyPasskeyRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

@@ -17,6 +17,7 @@ const router = useRouter()
 const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const displayName = ref('')
+const passkeyDisplayName = ref(t('profile.defaultPasskeyName'))
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -31,14 +32,24 @@ async function submit() {
     error.value = t('auth.invalidInviteLink')
     return
   }
+  const inviteDisplayName = displayName.value.trim()
+  if (requiresPassword.value && !inviteDisplayName) {
+    error.value = t('auth.displayNameRequired')
+    return
+  }
+  const invitePasskeyDisplayName = passkeyDisplayName.value.trim()
+  if (requiresPassword.value && authMethod.value === 'passkey' && !invitePasskeyDisplayName) {
+    error.value = t('auth.passkeyDisplayNameRequired')
+    return
+  }
   loading.value = true
   try {
     if (!requiresPassword.value) {
       await acceptInvitation(userId.value, token.value)
     } else if (authMethod.value === 'passkey') {
-      await acceptInvitationWithPasskey(userId.value, token.value, displayName.value)
+      await acceptInvitationWithPasskey(userId.value, token.value, inviteDisplayName, invitePasskeyDisplayName)
     } else {
-      await acceptInvitation(userId.value, token.value, password.value, displayName.value)
+      await acceptInvitation(userId.value, token.value, password.value, inviteDisplayName)
     }
     const entrypoint = await bootstrap()
     if (entrypoint.user) {
@@ -85,6 +96,10 @@ async function submit() {
         <label v-if="requiresPassword">
           {{ t('auth.displayName') }}
           <InputText v-model="displayName" autocomplete="name" required />
+        </label>
+        <label v-if="requiresPassword && authMethod === 'passkey'">
+          {{ t('auth.passkeyDisplayName') }}
+          <InputText v-model="passkeyDisplayName" autocomplete="off" required />
         </label>
         <label v-if="requiresPassword && authMethod === 'password'">
           {{ t('common.password') }}

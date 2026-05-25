@@ -354,6 +354,73 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `creating passkey requires display name`() {
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body(
+                """
+                {
+                  "displayName": "   ",
+                  "credential": ${passkeyRegistrationJson()}
+                }
+                """.trimIndent(),
+            )
+            .`when`().post("/api/users/me/passkeys")
+            .then()
+            .statusCode(400)
+            .body("message", equalTo("displayName must not be blank"))
+    }
+
+    @Test
+    fun `user can rename own passkey`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val passkey = createPasskey(currentUser, "Laptop")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"  MacBook Touch ID  "}""")
+            .`when`().put("/api/users/me/passkeys/${passkey.id}")
+            .then()
+            .statusCode(200)
+            .body("passkeyId", equalTo(passkey.id.toInt()))
+            .body("displayName", equalTo("MacBook Touch ID"))
+
+        entityManager.clear()
+        assertThat(passkeyCredentialRepo.findById(passkey.id)!!.displayName).isEqualTo("MacBook Touch ID")
+    }
+
+    @Test
+    fun `renaming passkey requires display name`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val passkey = createPasskey(currentUser, "Laptop")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"   "}""")
+            .`when`().put("/api/users/me/passkeys/${passkey.id}")
+            .then()
+            .statusCode(400)
+            .body("message", equalTo("displayName must not be blank"))
+    }
+
+    @Test
+    fun `user cannot rename another users passkey`() {
+        val other = createUser("passkey-other-$runId", "admin1234567", ServerRole.ServerMember)
+        val passkey = createPasskey(other, "Other Laptop")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"displayName":"Owner Laptop"}""")
+            .`when`().put("/api/users/me/passkeys/${passkey.id}")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
     fun `passkey registration options use email as username`() {
         val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
         val cookieFilter = CookieFilter()
@@ -551,6 +618,51 @@ class UserManagementResourceTest {
         val acceptedUser = userRepo.findById(existingUser.id)!!
         assertThat(acceptedUser.displayName).isEqualTo("searchable-$runId")
         assertThat(tenantMemberRepo.findByTenantAndUser(tenant, acceptedUser)!!.acceptedAt).isNotNull
+    }
+
+    @Test
+    fun `accepting invitation with passkey requires passkey display name`() {
+        val invitedUserId = given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"email":"passkey-invitee-$runId@example.com"}""")
+            .`when`().post("/api/users")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<Number>("userId")
+            .toLong()
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"email":"passkey-invitee-$runId@example.com","role":"TenantMember"}""")
+            .`when`().post("/api/tenants/${tenant.name}/users/invite")
+            .then()
+            .statusCode(200)
+
+        val token = mailbox.getMailMessagesSentTo("passkey-invitee-$runId@example.com")
+            .single()
+            .text
+            .substringAfter("/invite/$invitedUserId#")
+            .trim()
+
+        given()
+            .contentType("application/json")
+            .body(
+                """
+                {
+                  "displayName": "Invitee",
+                  "passkeyDisplayName": "   ",
+                  "token": "$token",
+                  "credential": ${passkeyRegistrationJson()}
+                }
+                """.trimIndent(),
+            )
+            .`when`().post("/api/users/$invitedUserId/invite/passkey/accept")
+            .then()
+            .statusCode(400)
+            .body("message", equalTo("displayName must not be blank"))
     }
 
     @Test
@@ -912,6 +1024,19 @@ class UserManagementResourceTest {
                 passkeyCredentialRepo.persist(it)
             }
         }
+
+    private fun passkeyRegistrationJson(): String =
+        """
+        {
+          "id": "credential-id",
+          "rawId": "credential-id",
+          "type": "public-key",
+          "response": {
+            "clientDataJSON": "client-data",
+            "attestationObject": "attestation-object"
+          }
+        }
+        """.trimIndent()
 
     private fun addTenantMember(user: User, tenant: Tenant, role: TenantRole) {
         inTransaction {

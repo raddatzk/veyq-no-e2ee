@@ -108,8 +108,57 @@ describe('InviteView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    expect(acceptInvitationWithPasskeyMock).toHaveBeenCalledWith(42, 'invite-token', 'Invitee')
+    expect(acceptInvitationWithPasskeyMock).toHaveBeenCalledWith(
+      42,
+      'invite-token',
+      'Invitee',
+      'Dieses Gerät'
+    )
     expect(acceptInvitationMock).not.toHaveBeenCalled()
+  })
+
+  it('requires a display name before starting passkey invitation acceptance', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/invite/:userId', component: InviteView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/invite/42#invite-token')
+    await router.isReady()
+
+    const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    await wrapper.find('input').setValue('   ')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(acceptInvitationWithPasskeyMock).not.toHaveBeenCalled()
+    expect(acceptInvitationMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Bitte gib einen Anzeigenamen ein.')
+  })
+
+  it('requires a passkey name before starting passkey invitation acceptance', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/invite/:userId', component: InviteView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/invite/42#invite-token')
+    await router.isReady()
+
+    const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('Invitee')
+    await inputs[1].setValue('   ')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(acceptInvitationWithPasskeyMock).not.toHaveBeenCalled()
+    expect(acceptInvitationMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Bitte gib einen Passkey-Namen ein.')
   })
 })
 

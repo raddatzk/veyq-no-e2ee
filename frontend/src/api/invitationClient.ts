@@ -19,7 +19,8 @@ export async function acceptInvitation(
 export async function acceptInvitationWithPasskey(
   userId: number,
   token: string,
-  displayName: string
+  displayName: string,
+  passkeyDisplayName: string
 ): Promise<LoginResponse> {
   const options = await generatedCall(
     usersApi.createInvitationPasskeyOptions({
@@ -31,7 +32,7 @@ export async function acceptInvitationWithPasskey(
   return generatedCall(
     usersApi.acceptInvitationWithPasskey({
       userId,
-      acceptPasskeyInvitationRequest: { displayName, token, credential }
+      acceptPasskeyInvitationRequest: { displayName, passkeyDisplayName, token, credential }
     })
   )
 }

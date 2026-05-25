@@ -26,6 +26,7 @@ const tenantDomain = ref(window.location.host)
 const tenantPermalinkTouched = ref(false)
 const password = ref('')
 const displayName = ref('Administrator')
+const passkeyDisplayName = ref(t('profile.defaultPasskeyName'))
 const email = ref('')
 const error = ref('')
 const savingAdmin = ref(false)
@@ -46,12 +47,22 @@ function updateTenantPermalink(value: string | undefined) {
 async function submitAdmin() {
   error.value = ''
   if (savingAdmin.value || savingAdminWithPasskey.value) return
+  const adminDisplayName = displayName.value.trim()
+  if (!adminDisplayName) {
+    error.value = t('auth.displayNameRequired')
+    return
+  }
   const withPasskey = authMethod.value === 'passkey'
+  const adminPasskeyDisplayName = passkeyDisplayName.value.trim()
+  if (withPasskey && !adminPasskeyDisplayName) {
+    error.value = t('auth.passkeyDisplayNameRequired')
+    return
+  }
   savingAdmin.value = !withPasskey
   savingAdminWithPasskey.value = withPasskey
   try {
     const user = withPasskey
-      ? await setupAdminWithPasskey(email.value, displayName.value)
+      ? await setupAdminWithPasskey(email.value, adminDisplayName, adminPasskeyDisplayName)
       : await setupAdminWithPassword()
     const authenticatedUser = {
       userId: user.userId,
@@ -79,7 +90,7 @@ async function submitAdmin() {
 async function setupAdminWithPassword() {
   await setupAdmin({
     password: password.value,
-    displayName: displayName.value,
+    displayName: displayName.value.trim(),
     email: email.value
   })
   return login(email.value, password.value)
@@ -144,6 +155,10 @@ async function skipTenant() {
         <label>
           {{ t('auth.displayName') }}
           <InputText v-model="displayName" required />
+        </label>
+        <label v-if="authMethod === 'passkey'">
+          {{ t('auth.passkeyDisplayName') }}
+          <InputText v-model="passkeyDisplayName" autocomplete="off" required />
         </label>
         <Message v-if="authMethod === 'passkey'" severity="info" :closable="false">
           {{ t('setup.passkeyHint') }}

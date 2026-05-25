@@ -30,6 +30,7 @@ export const messages = {
       acceptInvite: 'Einladung annehmen',
       authMethod: 'Anmeldemethode',
       displayName: 'Anzeigename',
+      displayNameRequired: 'Bitte gib einen Anzeigenamen ein.',
       forgotPassword: 'Passwort vergessen',
       invalidInviteLink: 'Einladungslink ist ungültig.',
       invalidResetLink: 'Reset-Link ist ungültig.',
@@ -42,6 +43,8 @@ export const messages = {
       loginWithPasskey: 'Mit Passkey einloggen',
       newPassword: 'Neues Passwort',
       passkey: 'Passkey',
+      passkeyDisplayName: 'Passkey-Name',
+      passkeyDisplayNameRequired: 'Bitte gib einen Passkey-Namen ein.',
       passkeyLoginFailed: 'Passkey-Login fehlgeschlagen',
       passwordResetRequestFailed: 'Passwort-Reset konnte nicht angefordert werden.',
       passwordResetRequested: 'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zurücksetzen gesendet.',
@@ -284,6 +287,8 @@ export const messages = {
       passkeyDeleteFailed: 'Passkey konnte nicht gelöscht werden.',
       passkeyDeleteSuccess: 'Passkey wurde gelöscht.',
       passkeyHint: 'Passkeys sind die empfohlene Anmeldung für Veyq.',
+      passkeyRenameFailed: 'Passkey konnte nicht umbenannt werden.',
+      passkeyRenameSuccess: 'Passkey wurde umbenannt.',
       passkeys: 'Passkeys',
       passwordChange: 'Passwort ändern',
       passwordChangeFailed: 'Passwort konnte nicht geändert werden.',
@@ -294,7 +299,8 @@ export const messages = {
       profileSaveFailed: 'Profil konnte nicht gespeichert werden.',
       profileSavePendingEmail: 'Profil wurde gespeichert. Bitte bestätige die neue E-Mail-Adresse.',
       profileSaveSuccess: 'Profil wurde gespeichert.',
-      recommended: 'Empfohlen'
+      recommended: 'Empfohlen',
+      renamePasskey: 'Passkey umbenennen'
     },
     tenant: {
       alreadyMember: 'Der User ist bereits Mitglied oder hat eine offene Einladung in diesem Bereich.',
@@ -416,6 +422,7 @@ export const messages = {
       acceptInvite: 'Accept invitation',
       authMethod: 'Authentication method',
       displayName: 'Display name',
+      displayNameRequired: 'Please enter a display name.',
       forgotPassword: 'Forgot password',
       invalidInviteLink: 'Invitation link is invalid.',
       invalidResetLink: 'Reset link is invalid.',
@@ -428,6 +435,8 @@ export const messages = {
       loginWithPasskey: 'Log in with passkey',
       newPassword: 'New password',
       passkey: 'Passkey',
+      passkeyDisplayName: 'Passkey name',
+      passkeyDisplayNameRequired: 'Please enter a passkey name.',
       passkeyLoginFailed: 'Passkey login failed',
       passwordResetRequestFailed: 'Password reset could not be requested.',
       passwordResetRequested: 'If an active account exists, an email to reset the password has been sent.',
@@ -670,6 +679,8 @@ export const messages = {
       passkeyDeleteFailed: 'Passkey could not be deleted.',
       passkeyDeleteSuccess: 'Passkey has been deleted.',
       passkeyHint: 'Passkeys are the recommended sign-in method for Veyq.',
+      passkeyRenameFailed: 'Passkey could not be renamed.',
+      passkeyRenameSuccess: 'Passkey has been renamed.',
       passkeys: 'Passkeys',
       passwordChange: 'Change password',
       passwordChangeFailed: 'Password could not be changed.',
@@ -680,7 +691,8 @@ export const messages = {
       profileSaveFailed: 'Profile could not be saved.',
       profileSavePendingEmail: 'Profile saved. Please confirm the new email address.',
       profileSaveSuccess: 'Profile saved.',
-      recommended: 'Recommended'
+      recommended: 'Recommended',
+      renamePasskey: 'Rename passkey'
     },
     tenant: {
       alreadyMember: 'The user is already a member or has an open invitation in this space.',

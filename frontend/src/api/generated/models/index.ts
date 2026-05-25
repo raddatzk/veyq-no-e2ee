@@ -89,6 +89,7 @@ export * from './UpdateMemoryJournalRequest';
 export * from './UpdateMemoryMediaMetadataRequest';
 export * from './UpdateMemoryRequest';
 export * from './UpdateMemoryShareRequest';
+export * from './UpdatePasskeyRequest';
 export * from './UpdatePublicShareMemoryRequest';
 export * from './UpdateTenantSettingsRequest';
 export * from './UpdateTenantUserRoleRequest';

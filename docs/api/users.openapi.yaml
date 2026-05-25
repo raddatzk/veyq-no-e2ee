@@ -201,6 +201,38 @@ paths:
 
         Implementierungsstatus: implemented.
   "/api/users/me/passkeys/{passkeyId}":
+    put:
+      tags:
+      - Users
+      operationId: updateMyPasskey
+      parameters:
+      - "$ref": "#/components/parameters/PasskeyId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePasskey"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkey"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenen Passkey umbenennen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Passkey muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Eigenen Passkey umbenennen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Passkey muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: implemented.
     delete:
       tags:
       - Users
@@ -586,6 +618,14 @@ components:
               response:
                 clientDataJSON: client-data
                 attestationObject: attestation-object
+    UpdatePasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdatePasskeyRequest"
+          example:
+            displayName: MacBook Touch ID
 
     ConfirmEmailChange:
       required: true
@@ -927,6 +967,16 @@ components:
           response:
             clientDataJSON: client-data
             attestationObject: attestation-object
+    UpdatePasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        displayName: MacBook Touch ID
     PasskeyRegistrationRequest:
       type: object
       additionalProperties: false
@@ -1094,10 +1144,13 @@ components:
       additionalProperties: false
       required:
         - displayName
+        - passkeyDisplayName
         - token
         - credential
       properties:
         displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        passkeyDisplayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         token:
           type: string
@@ -1105,6 +1158,7 @@ components:
           "$ref": "#/components/schemas/PasskeyRegistrationRequest"
       example:
         displayName: Invitee
+        passkeyDisplayName: MacBook Touch ID
         token: invitation-token
         credential:
           id: credential-id

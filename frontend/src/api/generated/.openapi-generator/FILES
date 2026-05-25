@@ -105,6 +105,7 @@ models/UpdateMemoryJournalRequest.ts
 models/UpdateMemoryMediaMetadataRequest.ts
 models/UpdateMemoryRequest.ts
 models/UpdateMemoryShareRequest.ts
+models/UpdatePasskeyRequest.ts
 models/UpdatePublicShareMemoryRequest.ts
 models/UpdateTenantSettingsRequest.ts
 models/UpdateTenantUserRoleRequest.ts

@@ -274,7 +274,7 @@ class UserService @Inject constructor(
         if (invitedUser.permalink.startsWith("user-")) {
             invitedUser.permalink = uniquePermalink(displayName, invitedUser)
         }
-        passkeyService.createPasskeyForUser(invitedUser, "Passkey", request.credential, routingContext)
+        passkeyService.createPasskeyForUser(invitedUser, request.passkeyDisplayName, request.credential, routingContext)
 
         val tenant = invitedUser.tenantMemberships.firstOrNull()?.tenant
             ?: throw BadRequestException("User has no tenant")

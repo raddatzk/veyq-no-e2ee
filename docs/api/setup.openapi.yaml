@@ -230,10 +230,13 @@ components:
       additionalProperties: false
       required:
       - displayName
+      - passkeyDisplayName
       - email
       - credential
       properties:
         displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        passkeyDisplayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         email:
           "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
@@ -242,6 +245,7 @@ components:
       example:
         email: admin@example.test
         displayName: Administrator
+        passkeyDisplayName: MacBook Touch ID
         credential:
           id: credential-id
           rawId: credential-id
