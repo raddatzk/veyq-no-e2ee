@@ -1,6 +1,6 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import type { Memory, MemoryHeader, MemoryMedia } from '../api'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
 describe('MemoryDetail', () => {
@@ -97,14 +97,324 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-detail-cover img').exists()).toBe(true)
     expect(wrapper.find('.memory-detail-cover .pi-images').exists()).toBe(false)
   })
+
+  it('renders journal markdown and media embeds', () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal({ markdown: '# Beach\n\n![Sunset](veyq:media/media-1)' }),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.text()).toContain('Journal')
+    expect(wrapper.find('.memory-journal-rendered h1').text()).toBe('Beach')
+    expect(wrapper.find('.memory-journal-media img').exists()).toBe(true)
+  })
+
+  it('renders comma-separated media embeds as a carousel with unavailable placeholders', () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal({ markdown: '![Trip set](veyq:media/media-1,missing-media)' }),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.find('.memory-journal-carousel').exists()).toBe(true)
+    expect(wrapper.find('.memory-journal-carousel img').exists()).toBe(true)
+    expect(wrapper.find('.p-carousel').attributes('data-autoplay-interval')).toBeUndefined()
+    expect(wrapper.find('.memory-journal-unavailable').text()).toContain('Trip set')
+  })
+
+  it('changes journal carousel pages with native navigators', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal({ markdown: '![Trip set](veyq:media/media-1,media-2)' }),
+        childMemories: [],
+        media: [media(), media({ id: 'media-2', title: 'Second upload' })]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('0')
+    await wrapper.find('.p-carousel-next-button').trigger('click')
+    expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('1')
+    await wrapper.find('.p-carousel-prev-button').trigger('click')
+    expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('0')
+  })
+
+  it('emits changed after saving the journal', async () => {
+    const saveJournal = vi.fn().mockResolvedValue(journal({ markdown: 'Updated' }))
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [],
+        saveJournal
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    await wrapper.find('.memory-journal-field textarea').setValue('Updated')
+    await wrapper.find('.memory-journal-editor-actions button').trigger('click')
+    await flushPromises()
+
+    expect(saveJournal).toHaveBeenCalledWith('mem-1', { markdown: 'Updated' })
+    expect(wrapper.emitted('changed')?.[0]).toEqual([memory()])
+  })
+
+  it('shows markdown and Veyq embed help while editing the journal', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+
+    expect(wrapper.find('.memory-journal-help').text()).toContain('Markdown-Hilfe')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:media/mediaId')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:media/media1,media2')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('Doppelklick auf ein Media-Tag')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:map?lat=52.5&lng=13.4&zoom=12')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:track?url=...')
+  })
+
+  it('opens the media picker from the editor button and inserts selected media markdown', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media(), media({ id: 'media-2', title: 'Second upload' })]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('Intro\n')
+    ;(textarea.element as HTMLTextAreaElement).setSelectionRange(6, 6)
+    await findButton(wrapper, 'Medium einfügen').trigger('click')
+    await wrapper.findAll('.memory-journal-media-option')[0].trigger('click')
+    await wrapper.findAll('.memory-journal-media-option')[1].trigger('click')
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('Intro\n![Galerie](veyq:media/media-1,media-2)')
+  })
+
+  it('opens the media picker when typing veyq media target and replaces the trigger', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('veyq:media/')
+    expect(wrapper.find('.memory-journal-media-picker').exists()).toBe(true)
+
+    await wrapper.find('.memory-journal-media-option').trigger('click')
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('![First upload](veyq:media/media-1)')
+  })
+
+  it('replaces an incomplete markdown image media target without nesting markdown', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('![](veyq:media/')
+    expect(wrapper.find('.memory-journal-media-picker').exists()).toBe(true)
+
+    await wrapper.find('.memory-journal-media-option').trigger('click')
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('![First upload](veyq:media/media-1)')
+  })
+
+  it('preserves an existing markdown image caption when replacing a media target', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('![Cover](veyq:media/')
+    await wrapper.find('.memory-journal-media-option').trigger('click')
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('![Cover](veyq:media/media-1)')
+  })
+
+  it('opens the media picker from an existing media tag double-click and replaces that tag', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media(), media({ id: 'media-2', title: 'Second upload' })]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('Intro ![Cover](veyq:media/media-1) outro')
+    ;(textarea.element as HTMLTextAreaElement).setSelectionRange(18, 18)
+    await textarea.trigger('dblclick')
+
+    expect(wrapper.find('.memory-journal-media-picker').exists()).toBe(true)
+    expect((wrapper.find('.memory-journal-media-picker input').element as HTMLInputElement).value).toBe('Cover')
+    expect(wrapper.findAll('.memory-journal-media-option-selected')).toHaveLength(1)
+
+    await wrapper.findAll('.memory-journal-media-option')[1].trigger('click')
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('Intro ![Cover](veyq:media/media-1,media-2) outro')
+  })
+
+  it('opens the media picker from an existing carousel tag with media order preserved', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media(), media({ id: 'media-2', title: 'Second upload' })]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('![Set](veyq:media/media-2,media-1)')
+    ;(textarea.element as HTMLTextAreaElement).setSelectionRange(10, 10)
+    await textarea.trigger('dblclick')
+
+    expect(wrapper.findAll('.memory-journal-media-option-selected')).toHaveLength(2)
+    await findButton(wrapper, 'Medium einfügen', 1).trigger('click')
+
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('![Set](veyq:media/media-2,media-1)')
+  })
+
+  it('does not open the media picker when double-clicking outside a media tag', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media()]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    await textarea.setValue('Plain journal text')
+    ;(textarea.element as HTMLTextAreaElement).setSelectionRange(5, 5)
+    await textarea.trigger('dblclick')
+
+    expect(wrapper.find('.memory-journal-media-picker').exists()).toBe(false)
+  })
 })
 
 function detailStubs() {
   return {
     Button: {
-      props: ['label', 'icon'],
-      template: '<button type="button"><span v-if="icon" :class="icon" />{{ label }}</button>'
+      props: ['label', 'icon', 'disabled'],
+      emits: ['click'],
+      template: '<button type="button" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
     },
+    Carousel: {
+      props: ['value', 'autoplayInterval', 'page', 'showNavigators'],
+      emits: ['update:page'],
+      template: `
+        <div class="p-carousel" :data-autoplay-interval="autoplayInterval" :data-page="page">
+          <div class="p-carousel-content">
+            <button
+              v-if="showNavigators"
+              type="button"
+              class="p-carousel-prev-button"
+              @click="$emit('update:page', ((page || 0) + value.length - 1) % value.length)"
+            />
+            <div v-for="item in value" :key="item.id"><slot name="item" :data="item" /></div>
+            <button
+              v-if="showNavigators"
+              type="button"
+              class="p-carousel-next-button"
+              @click="$emit('update:page', ((page || 0) + 1) % value.length)"
+            />
+          </div>
+        </div>
+      `
+    },
+    Dialog: {
+      props: ['visible'],
+      emits: ['update:visible', 'hide'],
+      template: '<div v-if="visible"><slot /><slot name="footer" /></div>'
+    },
+    InputText: {
+      props: ['modelValue', 'placeholder'],
+      emits: ['update:modelValue', 'input'],
+      template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value); $emit(\'input\', $event)" />'
+    },
+    Message: { template: '<div><slot /></div>' },
     Tabs: { template: '<section><slot /></section>' },
     TabList: { template: '<div><slot /></div>' },
     Tab: { template: '<button><slot /></button>' },
@@ -119,6 +429,21 @@ function detailStubs() {
     MemoryCoverDialog: { template: '<div />' },
     MemoryShareDialog: { template: '<div />' },
     MemoryUploadDialog: { template: '<div />' }
+  }
+}
+
+function findButton(wrapper: ReturnType<typeof mount>, label: string, occurrence = 0) {
+  const button = wrapper.findAll('button').filter((candidate) => candidate.text().includes(label))[occurrence]
+  if (!button) throw new Error(`Button not found: ${label}`)
+  return button
+}
+
+function journal(overrides: Partial<MemoryJournal> = {}): MemoryJournal {
+  return {
+    memoryId: 'mem-1',
+    markdown: '',
+    updatedAt: '2026-05-24T10:00:00Z',
+    ...overrides
   }
 }
 

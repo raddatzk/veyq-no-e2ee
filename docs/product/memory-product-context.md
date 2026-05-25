@@ -100,6 +100,8 @@ Each Memory has exactly one journal.
 
 The journal should be Markdown-based with a lightweight Veyq-specific embed syntax. It should support references to assets, playlists and other contextual elements without turning into a heavy CMS.
 
+The supported Markdown and `veyq:` embed syntax are documented in [Journal Markdown](journal-markdown.md).
+
 ## Music and Playlists
 
 Veyq should store external streaming references only, not self-hosted MP3 files.

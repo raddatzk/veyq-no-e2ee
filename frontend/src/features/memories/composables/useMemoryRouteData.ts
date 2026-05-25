@@ -2,12 +2,14 @@ import { computed, ref, watch, type ComputedRef } from 'vue'
 import {
   getMemoryByPath,
   getMemoryHeader,
+  getMemoryJournal,
   getMemoryNavigation,
   listChildMemories,
   listMemoriesByFolder,
   listMemoryMedia,
   type Memory,
   type MemoryHeader,
+  type MemoryJournal,
   type MemoryMedia,
   type MemoryNavigationResponse
 } from '../api'
@@ -28,6 +30,7 @@ export function useMemoryRouteData(
   const memories = ref<Memory[]>([])
   const memory = ref<Memory | null>(null)
   const memoryHeader = ref<MemoryHeader | null>(null)
+  const memoryJournal = ref<MemoryJournal | null>(null)
   const memoryBreadcrumbs = ref<MemoryRouteBreadcrumb[]>([])
   const childMemories = ref<Memory[]>([])
   const media = ref<MemoryMedia[]>([])
@@ -55,6 +58,7 @@ export function useMemoryRouteData(
     memories.value = []
     memory.value = null
     memoryHeader.value = null
+    memoryJournal.value = null
     memoryBreadcrumbs.value = []
     childMemories.value = []
     media.value = []
@@ -79,14 +83,16 @@ export function useMemoryRouteData(
       if (sequence !== loadSequence) return true
       kind.value = 'memory'
       memory.value = loadedMemory
-      const [header, breadcrumbs, children, memoryMedia] = await Promise.all([
+      const [header, journal, breadcrumbs, children, memoryMedia] = await Promise.all([
         getMemoryHeader(tenantName.value, loadedMemory.id),
+        getMemoryJournal(tenantName.value, loadedMemory.id),
         loadMemoryBreadcrumbs(loadedMemory),
         listChildMemories(tenantName.value, loadedMemory.id),
         listMemoryMedia(tenantName.value, loadedMemory.id, false)
       ])
       if (sequence !== loadSequence) return true
       memoryHeader.value = header
+      memoryJournal.value = journal
       memoryBreadcrumbs.value = breadcrumbs
       childMemories.value = children
       media.value = memoryMedia
@@ -138,6 +144,7 @@ export function useMemoryRouteData(
     memories,
     memory,
     memoryBreadcrumbs,
+    memoryJournal,
     memoryHeader
   }
 }

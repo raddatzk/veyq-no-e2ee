@@ -2,6 +2,7 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.model.CreateMemoryRequest
+import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -15,6 +16,7 @@ import java.nio.file.StandardCopyOption
 @ApplicationScoped
 class MemoryResource @Inject constructor(
     private val memoryService: MemoryService,
+    private val memoryJournalService: MemoryJournalService,
 ) : MemoriesApi {
     override fun listMemories(tenantName: String): Response =
         Response.ok(memoryService.listRootMemories()).build()
@@ -31,11 +33,27 @@ class MemoryResource @Inject constructor(
     override fun getMemoryHeader(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.getMemoryHeader(memoryId)).build()
 
+    override fun getMemoryJournal(tenantName: String, memoryId: String): Response {
+        val memory = memoryService.resolveVisibleMemory(memoryId)
+        return Response.ok(memoryJournalService.getJournal(memory)).build()
+    }
+
     override fun getMemoryByPath(tenantName: String, path: String): Response =
         Response.ok(memoryService.getMemoryByPath(path)).build()
 
     override fun updateMemory(tenantName: String, memoryId: String, request: UpdateMemoryRequest): Response =
         Response.ok(memoryService.updateMemory(memoryId, request)).build()
+
+    override fun updateMemoryJournal(tenantName: String, memoryId: String, updateMemoryJournalRequest: UpdateMemoryJournalRequest): Response {
+        val memory = memoryService.resolveVisibleMemory(memoryId)
+        return Response.ok(
+            memoryJournalService.updateJournal(
+                memory,
+                updateMemoryJournalRequest.markdown,
+                MemoryJournalService.JournalValidationContext(memory),
+            )
+        ).build()
+    }
 
     override fun deleteMemory(tenantName: String, memoryId: String): Response {
         memoryService.deleteMemory(memoryId)

@@ -64,6 +64,7 @@ class MemoryServiceTest {
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var memoryService: MemoryService
+    @Inject lateinit var memoryJournalService: MemoryJournalService
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var folderService: FolderService
 
@@ -324,6 +325,67 @@ class MemoryServiceTest {
             memoryService.updateMemory(
                 memory.id,
                 UpdateMemoryRequest(startDate = LocalDate.parse("2026-06-08"))
+            )
+        }
+    }
+
+    @Test
+    fun `reads empty journal and updates markdown with visible embeds`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("journal-trip", "Journal Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
+        val media = createMedia(owner, memory(trip.id), "Journal Photo")
+        val secondMedia = createMedia(owner, memory(trip.id), "Journal Photo 2")
+
+        val empty = memoryJournalService.getJournal(memory(trip.id))
+        assertThat(empty.memoryId).isEqualTo(trip.id)
+        assertThat(empty.markdown).isEmpty()
+
+        val updated = memoryJournalService.updateJournal(
+            memory(trip.id),
+            """
+            # Journal
+
+            ![Photo](veyq:media/${media.publicId})
+            ![Carousel](veyq:media/${media.publicId},${secondMedia.publicId})
+            [Day One](veyq:memory/${day.id})
+            [Map](veyq:map?lat=52.5&lng=13.4&zoom=12)
+            """.trimIndent(),
+            MemoryJournalService.JournalValidationContext(memory(trip.id)),
+        )
+
+        assertThat(updated.memoryId).isEqualTo(trip.id)
+        assertThat(updated.markdown).contains("veyq:media/${media.publicId}")
+        assertThat(updated.markdown).contains("veyq:media/${media.publicId},${secondMedia.publicId}")
+        assertThat(memoryJournalService.getJournal(memory(trip.id)).markdown).isEqualTo(updated.markdown)
+    }
+
+    @Test
+    fun `rejects journal media embeds outside the current memory`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("journal-private-trip", "Journal Private Trip"))
+        val other = memoryService.createMemory(CreateMemoryRequest("journal-other-trip", "Journal Other Trip"))
+        val otherMedia = createMedia(owner, memory(other.id), "Other Journal Photo")
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryJournalService.updateJournal(
+                memory(trip.id),
+                "![Other](veyq:media/${otherMedia.publicId})",
+                MemoryJournalService.JournalValidationContext(memory(trip.id)),
+            )
+        }
+    }
+
+    @Test
+    fun `rejects journal carousel embeds when any media is outside the current memory`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("journal-carousel-trip", "Journal Carousel Trip"))
+        val other = memoryService.createMemory(CreateMemoryRequest("journal-carousel-other", "Journal Carousel Other"))
+        val visibleMedia = createMedia(owner, memory(trip.id), "Visible Journal Photo")
+        val otherMedia = createMedia(owner, memory(other.id), "Other Journal Photo")
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryJournalService.updateJournal(
+                memory(trip.id),
+                "![Carousel](veyq:media/${visibleMedia.publicId},${otherMedia.publicId})",
+                MemoryJournalService.JournalValidationContext(memory(trip.id)),
             )
         }
     }

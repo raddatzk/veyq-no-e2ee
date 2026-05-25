@@ -18,7 +18,9 @@ import type {
   CreateMemoryRequest,
   ErrorResponse,
   MemoryHeaderSummary,
+  MemoryJournalSummary,
   MemorySummary,
+  UpdateMemoryJournalRequest,
   UpdateMemoryRequest,
 } from '../models/index';
 import {
@@ -28,8 +30,12 @@ import {
     ErrorResponseToJSON,
     MemoryHeaderSummaryFromJSON,
     MemoryHeaderSummaryToJSON,
+    MemoryJournalSummaryFromJSON,
+    MemoryJournalSummaryToJSON,
     MemorySummaryFromJSON,
     MemorySummaryToJSON,
+    UpdateMemoryJournalRequestFromJSON,
+    UpdateMemoryJournalRequestToJSON,
     UpdateMemoryRequestFromJSON,
     UpdateMemoryRequestToJSON,
 } from '../models/index';
@@ -55,6 +61,11 @@ export interface GetMemoryByPathRequest {
 }
 
 export interface GetMemoryHeaderRequest {
+    tenantName: string;
+    memoryId: string;
+}
+
+export interface GetMemoryJournalRequest {
     tenantName: string;
     memoryId: string;
 }
@@ -98,6 +109,12 @@ export interface UpdateMemoryOperationRequest {
     tenantName: string;
     memoryId: string;
     updateMemoryRequest: UpdateMemoryRequest;
+}
+
+export interface UpdateMemoryJournalOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    updateMemoryJournalRequest: UpdateMemoryJournalRequest;
 }
 
 /**
@@ -236,6 +253,32 @@ export interface MemoriesApiInterface {
      * Get memory header
      */
     getMemoryHeader(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryHeaderSummary>;
+
+    /**
+     * Creates request options for getMemoryJournal without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryJournalRequestOpts(requestParameters: GetMemoryJournalRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * @summary Get memory journal
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryJournalRaw(requestParameters: GetMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
+
+    /**
+     * Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Get memory journal
+     */
+    getMemoryJournal(requestParameters: GetMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
 
     /**
      * Creates request options for listChildMemories without sending the request
@@ -430,6 +473,34 @@ export interface MemoriesApiInterface {
      * Update a memory
      */
     updateMemory(requestParameters: UpdateMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+
+    /**
+     * Creates request options for updateMemoryJournal without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryJournalRequest} updateMemoryJournalRequest 
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    updateMemoryJournalRequestOpts(requestParameters: UpdateMemoryJournalOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * @summary Update memory journal
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryJournalRequest} updateMemoryJournalRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    updateMemoryJournalRaw(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
+
+    /**
+     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Update memory journal
+     */
+    updateMemoryJournal(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
 
 }
 
@@ -714,6 +785,61 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async getMemoryHeader(requestParameters: GetMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryHeaderSummary> {
         const response = await this.getMemoryHeaderRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getMemoryJournal without sending the request
+     */
+    async getMemoryJournalRequestOpts(requestParameters: GetMemoryJournalRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getMemoryJournal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/journal`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Get memory journal
+     */
+    async getMemoryJournalRaw(requestParameters: GetMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
+        const requestOptions = await this.getMemoryJournalRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryJournalSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Get memory journal
+     */
+    async getMemoryJournal(requestParameters: GetMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
+        const response = await this.getMemoryJournalRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1166,6 +1292,71 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async updateMemory(requestParameters: UpdateMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
         const response = await this.updateMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateMemoryJournal without sending the request
+     */
+    async updateMemoryJournalRequestOpts(requestParameters: UpdateMemoryJournalOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling updateMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updateMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['updateMemoryJournalRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryJournalRequest',
+                'Required parameter "updateMemoryJournalRequest" was null or undefined when calling updateMemoryJournal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/journal`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryJournalRequestToJSON(requestParameters['updateMemoryJournalRequest']),
+        };
+    }
+
+    /**
+     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Update memory journal
+     */
+    async updateMemoryJournalRaw(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
+        const requestOptions = await this.updateMemoryJournalRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryJournalSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Update memory journal
+     */
+    async updateMemoryJournal(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
+        const response = await this.updateMemoryJournalRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

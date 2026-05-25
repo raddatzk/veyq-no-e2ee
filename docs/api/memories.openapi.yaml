@@ -438,6 +438,73 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/journal":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryJournal
+      summary: Get memory journal
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryJournal"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    put:
+      tags:
+        - Memories
+      operationId: updateMemoryJournal
+      summary: Update memory journal
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryJournal"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryJournal"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/media":
     get:
       tags:
@@ -912,6 +979,20 @@ components:
               - med_abc123
               - med_def456
             capturedAtOffsetSeconds: 7200
+    UpdateMemoryJournal:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryJournalRequest"
+          example:
+            markdown: |-
+              # Beach day
+
+              We started early.
+
+              ![Sunset](veyq:media/med_abc123)
+              ![Highlights](veyq:media/med_abc123,med_def456)
     CreateFolder:
       required: true
       content:
@@ -1016,6 +1097,22 @@ components:
             childMemoryCount: 3
             scope:
               type: TENANT
+    MemoryJournal:
+      description: Memory journal.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryJournalSummary"
+          example:
+            memoryId: mem_abc123
+            markdown: |-
+              # Beach day
+
+              We started early.
+
+              ![Sunset](veyq:media/med_abc123)
+              ![Highlights](veyq:media/med_abc123,med_def456)
+            updatedAt: '2026-05-24T10:00:00Z'
     MemorySummaries:
       description: Memory summaries.
       content:
@@ -1312,6 +1409,34 @@ components:
           description: Direct visible child Memories.
         scope:
           "$ref": "#/components/schemas/MemoryScope"
+    MemoryJournalSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - memoryId
+        - markdown
+        - updatedAt
+      properties:
+        memoryId:
+          type: string
+          description: Public Memory id that owns this journal.
+        markdown:
+          type: string
+          description: Markdown journal body with optional Veyq embed links.
+          maxLength: 200000
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateMemoryJournalRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - markdown
+      properties:
+        markdown:
+          type: string
+          description: Complete replacement Markdown journal body.
+          maxLength: 200000
     MemoryScope:
       type: object
       additionalProperties: false

@@ -196,6 +196,54 @@ class MemoryShareResourceTest {
     }
 
     @Test
+    fun `public share journal is readable by viewers and writable only by managers`() {
+        val media = createMedia("Journal Cover")
+        val secondMedia = createMedia("Journal Carousel")
+        val managerShareId = createShare("MANAGER")
+        val managerAccessCookie = loginShare(managerShareId)
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", managerAccessCookie)
+            .body("""{"markdown":"# Ceremony\n\n![Cover](veyq:media/${media.publicId})\n\n![Carousel](veyq:media/${media.publicId},${secondMedia.publicId})"}""")
+            .`when`().put("/api/public-shares/$managerShareId/memories/${memory.publicId}/journal")
+            .then()
+            .statusCode(200)
+            .body("memoryId", equalTo(memory.publicId))
+            .body("markdown", equalTo("# Ceremony\n\n![Cover](veyq:media/${media.publicId})\n\n![Carousel](veyq:media/${media.publicId},${secondMedia.publicId})"))
+
+        val viewerShareId = createShare("VIEWER")
+        val viewerAccessCookie = loginShare(viewerShareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .`when`().get("/api/public-shares/$viewerShareId/memories/${memory.publicId}/journal")
+            .then()
+            .statusCode(200)
+            .body("markdown", equalTo("# Ceremony\n\n![Cover](veyq:media/${media.publicId})\n\n![Carousel](veyq:media/${media.publicId},${secondMedia.publicId})"))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .body("""{"markdown":"Viewer edit"}""")
+            .`when`().put("/api/public-shares/$viewerShareId/memories/${memory.publicId}/journal")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `uploader only share cannot read journal`() {
+        val shareId = createShare("UPLOADER")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().get("/api/public-shares/$shareId/memories/${memory.publicId}/journal")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
     fun `uploader share sees only own uploaded media`() {
         createMedia("Existing")
         val shareId = createShare("UPLOADER")

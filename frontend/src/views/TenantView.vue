@@ -9,6 +9,7 @@ import CreateFolderDialog from '../features/memories/components/CreateFolderDial
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import MemoryFolderOverview from '../features/memories/components/MemoryFolderOverview.vue'
+import { updateMemoryJournal } from '../features/memories/api'
 import { useMemoryRouteData } from '../features/memories/composables/useMemoryRouteData'
 import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
@@ -37,6 +38,7 @@ const {
   memories,
   memory,
   memoryBreadcrumbs,
+  memoryJournal,
   memoryHeader,
   navigation
 } = useMemoryRouteData(tenantName, routePath)
@@ -86,8 +88,10 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       :tenant-name="tenantName"
       :memory="memory"
       :header="memoryHeader"
+      :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :save-journal="(memoryId, request) => updateMemoryJournal(tenantName, memoryId, request)"
       @open-memory="navigateToPath($event.path)"
       @create-child-memory="createMemoryOpen = true"
       @changed="handleMemoryChanged"

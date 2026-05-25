@@ -27,10 +27,12 @@ import type {
   Memory,
   MemoryFolder,
   MemoryHeader,
+  MemoryJournal,
   MemoryMedia,
   MemoryNavigationResponse,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataBatchRequest,
+  UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
   UploadMemoryMediaRequest
@@ -77,6 +79,10 @@ export function getMemoryHeader(tenantName: string, memoryId: string): Promise<M
   )
 }
 
+export function getMemoryJournal(tenantName: string, memoryId: string): Promise<MemoryJournal> {
+  return generatedCall(memoriesApi.getMemoryJournal({ tenantName, memoryId }))
+}
+
 export function getMemoryByPath(tenantName: string, path: string): Promise<Memory> {
   return generatedCall(memoriesApi.getMemoryByPath({ tenantName, path })).then(normalizeMemory)
 }
@@ -106,6 +112,20 @@ export function updateMemory(
 
 export function deleteMemory(tenantName: string, memoryId: string): Promise<void> {
   return generatedCall(memoriesApi.deleteMemory({ tenantName, memoryId }))
+}
+
+export function updateMemoryJournal(
+  tenantName: string,
+  memoryId: string,
+  request: UpdateMemoryJournalRequest
+): Promise<MemoryJournal> {
+  return generatedCall(
+    memoriesApi.updateMemoryJournal({
+      tenantName,
+      memoryId,
+      updateMemoryJournalRequest: request
+    })
+  )
 }
 
 export function listChildMemories(tenantName: string, memoryId: string): Promise<Memory[]> {
@@ -297,6 +317,13 @@ export function getPublicShareMemoryHeader(
   )
 }
 
+export function getPublicShareMemoryJournal(
+  shareId: string,
+  memoryId: string
+): Promise<MemoryJournal> {
+  return generatedCall(publicSharesApi.getPublicShareMemoryJournal({ shareId, memoryId }))
+}
+
 export function listPublicShareChildMemories(
   shareId: string,
   memoryId: string
@@ -338,6 +365,20 @@ export function updatePublicShareMemory(
 
 export function deletePublicShareMemory(shareId: string, memoryId: string): Promise<void> {
   return generatedCall(publicSharesApi.deletePublicShareMemory({ shareId, memoryId }))
+}
+
+export function updatePublicShareMemoryJournal(
+  shareId: string,
+  memoryId: string,
+  request: UpdateMemoryJournalRequest
+): Promise<MemoryJournal> {
+  return generatedCall(
+    publicSharesApi.updatePublicShareMemoryJournal({
+      shareId,
+      memoryId,
+      updateMemoryJournalRequest: request
+    })
+  )
 }
 
 export function listPublicShareMemoryMedia(

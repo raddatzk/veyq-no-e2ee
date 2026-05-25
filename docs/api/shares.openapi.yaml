@@ -411,6 +411,71 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/journal":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareMemoryJournal
+      summary: Get public share Memory journal
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The share role allows full Memory viewing.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Returns the Markdown journal for one Memory inside the shared subtree. Uploader-only shares cannot read journals.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The share role allows full Memory viewing.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/MemoryJournal"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    put:
+      tags: [PublicShares]
+      operationId: updatePublicShareMemoryJournal
+      summary: Update public share Memory journal
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.
+
+        Vorbedingungen:
+        - The share role is `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryJournal"
+      responses:
+        "200":
+          "$ref": "#/components/responses/MemoryJournal"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/media":
     get:
       tags: [PublicShares]
@@ -855,6 +920,18 @@ components:
             "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaMetadataRequest"
           example:
             capturedAt: "2026-05-04T18:30:00Z"
+    UpdateMemoryJournal:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryJournalRequest"
+          example:
+            markdown: |-
+              # Ceremony
+
+              ![First dance](veyq:media/med_abc123)
+              ![Reception](veyq:media/med_abc123,med_def456)
     SetPublicShareMemoryCover:
       required: true
       content:
@@ -1001,6 +1078,20 @@ components:
             directMediaCount: 3
             descendantMediaCount: 5
             childMemoryCount: 1
+    MemoryJournal:
+      description: Public share Memory journal.
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/MemoryJournalSummary"
+          example:
+            memoryId: mem_abc123
+            markdown: |-
+              # Ceremony
+
+              ![First dance](veyq:media/med_abc123)
+              ![Reception](veyq:media/med_abc123,med_def456)
+            updatedAt: "2026-05-24T10:00:00Z"
     PublicShareMemoryList:
       description: Public share Memories.
       content:

@@ -16,6 +16,7 @@ import {
   deletePublicShareMemory,
   getPublicShare,
   getPublicShareMemoryHeader,
+  getPublicShareMemoryJournal,
   getPublicShareMemoryByPath,
   listPublicShareChildMemories,
   listPublicShareMemoryMedia,
@@ -25,10 +26,12 @@ import {
   setPublicShareMemoryCover,
   updatePublicShareMediaMetadata,
   updatePublicShareMemory,
+  updatePublicShareMemoryJournal,
   uploadPublicShareMedia,
   uploadPublicShareMemoryMedia,
   type Memory,
   type MemoryHeader,
+  type MemoryJournal,
   type MemoryMedia,
   type PublicShareSummary
 } from '../features/memories/api'
@@ -42,6 +45,7 @@ const sharePath = computed(() => routePathToSharePath(route.params.pathMatch))
 const share = ref<PublicShareSummary | null>(null)
 const memory = ref<Memory | null>(null)
 const memoryHeader = ref<MemoryHeader | null>(null)
+const memoryJournal = ref<MemoryJournal | null>(null)
 const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
 const password = ref('')
@@ -72,6 +76,7 @@ const capabilities = computed(() => ({
   canDelete: Boolean(share.value?.canDelete),
   canShare: false,
   canManageCover: Boolean(share.value?.canEdit),
+  canEditJournal: Boolean(share.value?.canDelete),
   canEditMediaMetadata: Boolean(share.value?.canEdit),
   canDeleteMedia: Boolean(share.value?.canDelete),
   canDeleteCurrentMemory: Boolean(share.value?.canDelete && memory.value?.id !== share.value.rootMemory?.id),
@@ -131,6 +136,7 @@ async function closeShare() {
   await logoutPublicShare(shareId.value)
   memory.value = null
   memoryHeader.value = null
+  memoryJournal.value = null
   childMemories.value = []
   media.value = []
   await loadShare()
@@ -147,12 +153,14 @@ async function loadCurrentMemory() {
   try {
     const current = await getPublicShareMemoryByPath(shareId.value, sharePath.value)
     memory.value = current
-    const [header, children, memoryMedia] = await Promise.all([
+    const [header, journal, children, memoryMedia] = await Promise.all([
       getPublicShareMemoryHeader(shareId.value, current.id),
+      getPublicShareMemoryJournal(shareId.value, current.id),
       listPublicShareChildMemories(shareId.value, current.id),
       listPublicShareMemoryMedia(shareId.value, current.id)
     ])
     memoryHeader.value = header
+    memoryJournal.value = journal
     childMemories.value = children
     media.value = memoryMedia
   } catch (unknownError) {
@@ -312,10 +320,12 @@ function routePathToSharePath(value: unknown): string {
       tenant-name=""
       :memory="memory"
       :header="memoryHeader"
+      :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
       :capabilities="capabilities"
       :save-memory="(memoryId, request) => updatePublicShareMemory(shareId, memoryId, request)"
+      :save-journal="(memoryId, request) => updatePublicShareMemoryJournal(shareId, memoryId, request)"
       :set-cover="(memoryId, request) => setPublicShareMemoryCover(shareId, memoryId, request)"
       :remove-cover="(memoryId) => removePublicShareMemoryCover(shareId, memoryId)"
       :upload-media="(memoryId, request) => uploadPublicShareMemoryMedia(shareId, memoryId, request)"

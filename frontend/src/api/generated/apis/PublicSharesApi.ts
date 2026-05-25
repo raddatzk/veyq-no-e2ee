@@ -17,12 +17,14 @@ import * as runtime from '../runtime';
 import type {
   CreatePublicShareMemoryRequest,
   ErrorResponse,
+  MemoryJournalSummary,
   PublicShareLoginRequest,
   PublicShareMediaSummary,
   PublicShareMemoryHeaderSummary,
   PublicShareMemorySummary,
   PublicShareSummary,
   PublicShareTreeResponse,
+  UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdatePublicShareMemoryRequest,
 } from '../models/index';
@@ -31,6 +33,8 @@ import {
     CreatePublicShareMemoryRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    MemoryJournalSummaryFromJSON,
+    MemoryJournalSummaryToJSON,
     PublicShareLoginRequestFromJSON,
     PublicShareLoginRequestToJSON,
     PublicShareMediaSummaryFromJSON,
@@ -43,6 +47,8 @@ import {
     PublicShareSummaryToJSON,
     PublicShareTreeResponseFromJSON,
     PublicShareTreeResponseToJSON,
+    UpdateMemoryJournalRequestFromJSON,
+    UpdateMemoryJournalRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
     UpdateMemoryMediaMetadataRequestToJSON,
     UpdatePublicShareMemoryRequestFromJSON,
@@ -76,6 +82,11 @@ export interface GetPublicShareMemoryByPathRequest {
 }
 
 export interface GetPublicShareMemoryHeaderRequest {
+    shareId: string;
+    memoryId: string;
+}
+
+export interface GetPublicShareMemoryJournalRequest {
     shareId: string;
     memoryId: string;
 }
@@ -154,6 +165,12 @@ export interface UpdatePublicShareMemoryOperationRequest {
     shareId: string;
     memoryId: string;
     updatePublicShareMemoryRequest: UpdatePublicShareMemoryRequest;
+}
+
+export interface UpdatePublicShareMemoryJournalRequest {
+    shareId: string;
+    memoryId: string;
+    updateMemoryJournalRequest: UpdateMemoryJournalRequest;
 }
 
 export interface UploadPublicShareMediaRequest {
@@ -333,6 +350,32 @@ export interface PublicSharesApiInterface {
      * Get public share Memory header
      */
     getPublicShareMemoryHeader(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemoryHeaderSummary>;
+
+    /**
+     * Creates request options for getPublicShareMemoryJournal without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryJournalRequestOpts(requestParameters: GetPublicShareMemoryJournalRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Returns the Markdown journal for one Memory inside the shared subtree. Uploader-only shares cannot read journals.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The share role allows full Memory viewing. - The requested Memory belongs to the shared subtree.
+     * @summary Get public share Memory journal
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryJournalRaw(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
+
+    /**
+     * Returns the Markdown journal for one Memory inside the shared subtree. Uploader-only shares cannot read journals.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The share role allows full Memory viewing. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory journal
+     */
+    getPublicShareMemoryJournal(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
 
     /**
      * Creates request options for getPublicShareTree without sending the request
@@ -709,6 +752,34 @@ export interface PublicSharesApiInterface {
      * Update a Memory through a public share
      */
     updatePublicShareMemory(requestParameters: UpdatePublicShareMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary>;
+
+    /**
+     * Creates request options for updatePublicShareMemoryJournal without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryJournalRequest} updateMemoryJournalRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryJournalRequestOpts(requestParameters: UpdatePublicShareMemoryJournalRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Update public share Memory journal
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {UpdateMemoryJournalRequest} updateMemoryJournalRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryJournalRaw(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
+
+    /**
+     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Update public share Memory journal
+     */
+    updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
 
     /**
      * Creates request options for uploadPublicShareMedia without sending the request
@@ -1113,6 +1184,61 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async getPublicShareMemoryHeader(requestParameters: GetPublicShareMemoryHeaderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemoryHeaderSummary> {
         const response = await this.getPublicShareMemoryHeaderRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getPublicShareMemoryJournal without sending the request
+     */
+    async getPublicShareMemoryJournalRequestOpts(requestParameters: GetPublicShareMemoryJournalRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling getPublicShareMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getPublicShareMemoryJournal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/journal`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Returns the Markdown journal for one Memory inside the shared subtree. Uploader-only shares cannot read journals.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The share role allows full Memory viewing. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory journal
+     */
+    async getPublicShareMemoryJournalRaw(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
+        const requestOptions = await this.getPublicShareMemoryJournalRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryJournalSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Returns the Markdown journal for one Memory inside the shared subtree. Uploader-only shares cannot read journals.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The share role allows full Memory viewing. - The requested Memory belongs to the shared subtree.
+     * Get public share Memory journal
+     */
+    async getPublicShareMemoryJournal(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
+        const response = await this.getPublicShareMemoryJournalRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1922,6 +2048,71 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async updatePublicShareMemory(requestParameters: UpdatePublicShareMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary> {
         const response = await this.updatePublicShareMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updatePublicShareMemoryJournal without sending the request
+     */
+    async updatePublicShareMemoryJournalRequestOpts(requestParameters: UpdatePublicShareMemoryJournalRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling updatePublicShareMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updatePublicShareMemoryJournal().'
+            );
+        }
+
+        if (requestParameters['updateMemoryJournalRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryJournalRequest',
+                'Required parameter "updateMemoryJournalRequest" was null or undefined when calling updatePublicShareMemoryJournal().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/journal`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryJournalRequestToJSON(requestParameters['updateMemoryJournalRequest']),
+        };
+    }
+
+    /**
+     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Update public share Memory journal
+     */
+    async updatePublicShareMemoryJournalRaw(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
+        const requestOptions = await this.updatePublicShareMemoryJournalRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryJournalSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Update public share Memory journal
+     */
+    async updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
+        const response = await this.updatePublicShareMemoryJournalRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

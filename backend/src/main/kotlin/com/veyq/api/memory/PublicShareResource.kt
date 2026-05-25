@@ -3,6 +3,7 @@ package com.veyq.api.memory
 import com.veyq.api.generated.api.PublicSharesApi
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
 import com.veyq.api.generated.model.PublicShareLoginRequest
+import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
 import jakarta.enterprise.context.ApplicationScoped
@@ -42,6 +43,16 @@ class PublicShareResource @Inject constructor(
 
     override fun getPublicShareMemoryHeader(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.getPublicShareMemoryHeader(shareId, memoryId)).build()
+
+    override fun getPublicShareMemoryJournal(shareId: String, memoryId: String): Response =
+        Response.ok(memoryShareService.getPublicShareMemoryJournal(shareId, memoryId)).build()
+
+    override fun updatePublicShareMemoryJournal(
+        shareId: String,
+        memoryId: String,
+        updateMemoryJournalRequest: UpdateMemoryJournalRequest,
+    ): Response =
+        Response.ok(memoryShareService.updatePublicShareMemoryJournal(shareId, memoryId, updateMemoryJournalRequest)).build()
 
     override fun listPublicShareChildMemories(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.listPublicShareChildMemories(shareId, memoryId)).build()

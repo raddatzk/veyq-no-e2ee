@@ -20,6 +20,7 @@ import com.veyq.api.generated.model.PublicShareMemoryHeaderSummary
 import com.veyq.api.generated.model.PublicShareMemorySummary
 import com.veyq.api.generated.model.PublicShareSummary
 import com.veyq.api.generated.model.PublicShareTreeResponse
+import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryShareRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
@@ -58,6 +59,7 @@ class MemoryShareService @Inject constructor(
     private val groupMemberRepo: TenantGroupMemberRepo,
     private val passwordService: PasswordService,
     private val mediaService: MediaService,
+    private val memoryJournalService: MemoryJournalService,
     private val mediaConfig: MediaConfig,
     private val requestContext: RequestContext,
     private val routingContext: RoutingContext,
@@ -209,6 +211,30 @@ class MemoryShareService @Inject constructor(
     fun getPublicShareMemoryHeader(shareId: String, memoryId: String): PublicShareMemoryHeaderSummary {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         return toPublicMemoryHeader(resolveShareMemory(access, memoryId), access.share)
+    }
+
+    fun getPublicShareMemoryJournal(shareId: String, memoryId: String): com.veyq.api.generated.model.MemoryJournalSummary {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        return memoryJournalService.getJournal(resolveShareMemory(access, memoryId))
+    }
+
+    @Transactional
+    fun updatePublicShareMemoryJournal(
+        shareId: String,
+        memoryId: String,
+        request: UpdateMemoryJournalRequest,
+    ): com.veyq.api.generated.model.MemoryJournalSummary {
+        val access = requireJournalEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return memoryJournalService.updateJournal(
+            memory,
+            request.markdown,
+            MemoryJournalService.JournalValidationContext(
+                memory = memory,
+                shareRoot = access.share.rootMemory,
+                allowShareSubtreeMedia = true,
+            ),
+        )
     }
 
     fun listPublicShareChildMemories(shareId: String, memoryId: String): List<PublicShareMemorySummary> {
@@ -480,6 +506,11 @@ class MemoryShareService @Inject constructor(
     private fun requireDeleteAccess(share: MemoryShare): ShareAccess =
         requireFullAccess(share).also {
             if (!it.canDelete) throw ForbiddenException("Share does not allow deleting")
+        }
+
+    private fun requireJournalEditAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!it.canDelete) throw ForbiddenException("Share does not allow journal editing")
         }
 
     private fun currentAccess(share: MemoryShare): ShareAccess? {

@@ -77,6 +77,7 @@ Keep new public API behavior documented in the relevant OpenAPI spec before or a
 - [`docs/development.md`](docs/development.md): local development, Docker Compose and reset sidecar.
 - [`docs/architecture.md`](docs/architecture.md): current system architecture and implemented domain model.
 - [`docs/product/memory-product-context.md`](docs/product/memory-product-context.md): product vision and Memory context.
+- [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and Veyq embed syntax.
 - [`docs/product/future-work.md`](docs/product/future-work.md): ADR, API, UX and spike candidates.
 - [`docs/adr/README.md`](docs/adr/README.md): Architecture Decision Record process and template.
 - [`docs/api`](docs/api): OpenAPI contracts.

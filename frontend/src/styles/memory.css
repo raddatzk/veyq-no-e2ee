@@ -737,6 +737,400 @@
   overflow-wrap: anywhere;
 }
 
+.memory-journal {
+  display: grid;
+  gap: 1rem;
+  max-width: 920px;
+}
+
+.memory-journal-toolbar,
+.memory-journal-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.memory-journal-toolbar h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.1rem;
+}
+
+.memory-journal-toolbar p {
+  margin: 0.25rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.86rem;
+}
+
+.memory-journal-actions,
+.memory-journal-editor-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.memory-journal-editor {
+  display: grid;
+  gap: 1rem;
+}
+
+.memory-journal-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.memory-journal-field {
+  display: grid;
+  gap: 0.45rem;
+  color: #334155;
+  font-weight: 650;
+}
+
+.memory-journal-field textarea {
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  padding: 0.85rem;
+  color: var(--app-text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.memory-journal-help {
+  display: grid;
+  gap: 0.9rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  padding: 0.85rem;
+  background: #fff;
+  color: var(--app-text);
+}
+
+.memory-journal-help h3,
+.memory-journal-help h4,
+.memory-journal-help p,
+.memory-journal-help ul,
+.memory-journal-help dl,
+.memory-journal-help dd {
+  margin: 0;
+}
+
+.memory-journal-help h3 {
+  font-size: 0.98rem;
+  letter-spacing: 0;
+}
+
+.memory-journal-help h4 {
+  color: #334155;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+}
+
+.memory-journal-help p {
+  margin-top: 0.25rem;
+  color: var(--app-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.memory-journal-help ul,
+.memory-journal-help dl {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
+.memory-journal-help ul {
+  padding-left: 1.1rem;
+}
+
+.memory-journal-help dl {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 0.65rem;
+}
+
+.memory-journal-help dt {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+}
+
+.memory-journal-help code {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.32rem;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.memory-journal-preview {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.2rem;
+}
+
+.memory-journal-rendered {
+  color: var(--app-text);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.memory-journal-rendered > :first-child {
+  margin-top: 0;
+}
+
+.memory-journal-rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.memory-journal-rendered h1,
+.memory-journal-rendered h2,
+.memory-journal-rendered h3 {
+  color: var(--app-text);
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.memory-journal-rendered a {
+  color: #0f766e;
+  font-weight: 650;
+}
+
+.memory-journal-media,
+.memory-journal-carousel {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1.1rem 0;
+}
+
+.memory-journal-media img,
+.memory-journal-media video,
+.memory-journal-carousel-item img,
+.memory-journal-carousel-item video {
+  width: min(100%, 720px);
+  max-height: 520px;
+  border-radius: var(--app-radius);
+  background: transparent;
+  object-fit: contain;
+}
+
+.memory-journal-media figcaption,
+.memory-journal-carousel figcaption {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.memory-journal-carousel {
+  max-width: 760px;
+}
+
+.memory-journal-carousel-frame {
+  position: relative;
+  max-width: 760px;
+}
+
+.memory-journal-carousel-item {
+  display: grid;
+  justify-items: center;
+  padding: 0.25rem;
+}
+
+.memory-journal-carousel .p-carousel-content {
+  align-items: center;
+  position: relative;
+}
+
+.memory-journal-carousel-frame .p-carousel-prev-button,
+.memory-journal-carousel-frame .p-carousel-next-button {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.memory-journal-carousel-frame .p-carousel-prev-button:hover,
+.memory-journal-carousel-frame .p-carousel-prev-button:focus-visible,
+.memory-journal-carousel-frame .p-carousel-next-button:hover,
+.memory-journal-carousel-frame .p-carousel-next-button:focus-visible {
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.memory-journal-carousel-frame:hover .p-carousel-prev-button,
+.memory-journal-carousel-frame:hover .p-carousel-next-button,
+.memory-journal-carousel-frame:focus-within .p-carousel-prev-button,
+.memory-journal-carousel-frame:focus-within .p-carousel-next-button {
+  opacity: 1;
+}
+
+.memory-journal-carousel-frame .p-carousel-prev-button {
+  left: 0.65rem;
+}
+
+.memory-journal-carousel-frame .p-carousel-next-button {
+  right: 0.65rem;
+}
+
+.memory-journal-link,
+.memory-journal-context,
+.memory-journal-unavailable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+  margin: 0.15rem 0;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  padding: 0.45rem 0.65rem;
+  background: #fff;
+  color: var(--app-text);
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.memory-journal-link {
+  cursor: pointer;
+}
+
+.memory-journal-context small {
+  color: var(--app-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-journal-unavailable {
+  color: var(--app-muted);
+  border-style: dashed;
+}
+
+.memory-journal-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px dashed var(--app-line);
+  border-radius: var(--app-radius);
+  background: #fff;
+  color: var(--app-muted);
+}
+
+.memory-journal-empty p {
+  margin: 0;
+}
+
+.memory-journal-media-dialog {
+  width: min(920px, calc(100vw - 2rem));
+}
+
+.memory-journal-media-picker {
+  display: grid;
+  gap: 1rem;
+}
+
+.memory-journal-media-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.memory-journal-media-option {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 24px;
+  gap: 0.65rem;
+  align-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  padding: 0.5rem;
+  background: #fff;
+  color: var(--app-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.memory-journal-media-option:hover,
+.memory-journal-media-option-selected {
+  border-color: #0f766e;
+  background: #f0fdfa;
+}
+
+.memory-journal-media-option-thumb {
+  display: block;
+  width: 72px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 0.45rem;
+  background: #0f172a;
+}
+
+.memory-journal-media-option-thumb img,
+.memory-journal-media-option-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memory-journal-media-option-body {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.memory-journal-media-option-body strong,
+.memory-journal-media-option-body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-journal-media-option-body small {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+}
+
+.memory-journal-media-option-check {
+  display: grid;
+  place-items: center;
+  color: #0f766e;
+}
+
+@media (max-width: 900px) {
+  .memory-journal-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-journal-help dl {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) {
+  .memory-journal-carousel-frame .p-carousel-prev-button,
+  .memory-journal-carousel-frame .p-carousel-next-button {
+    opacity: 1;
+  }
+}
+
 .asset-bucket-layout {
   display: grid;
   grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);

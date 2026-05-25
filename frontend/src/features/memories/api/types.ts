@@ -4,6 +4,7 @@ import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
   MemoryFolder,
   MemoryHeaderSummary,
+  MemoryJournalSummary,
   MediaUploader,
   MemoryNavigationResponse,
   MemoryMediaSummary,
@@ -21,6 +22,7 @@ import type {
   MoveFolderRequest as GeneratedMoveFolderRequest,
   UpdateFolderRequest as GeneratedUpdateFolderRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
+  UpdateMemoryJournalRequest as GeneratedUpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
@@ -39,6 +41,7 @@ export type {
   PublicShareMediaSummary,
   PublicShareSummary,
   PublicShareTreeResponse,
+  MemoryJournalSummary,
 }
 
 export type Memory = Omit<
@@ -69,6 +72,8 @@ export type PublicShareMemoryHeader = Omit<
   coverCrop: CoverCrop | null
   scope: null
 }
+
+export type MemoryJournal = MemoryJournalSummary
 
 export type MemoryMedia = Omit<
   MemoryMediaSummary,
@@ -109,6 +114,8 @@ export type UpdateMemoryRequest = Omit<
   startDate?: string | null
   endDate?: string | null
 }
+
+export type UpdateMemoryJournalRequest = GeneratedUpdateMemoryJournalRequest
 
 export type SetMemoryCoverRequest = {
   file?: File | Blob | null
