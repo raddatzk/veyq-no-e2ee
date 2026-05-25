@@ -144,6 +144,13 @@ class MemoryServiceTest {
             cameraModel = "A7",
         )
         val rootExistingSuffix = createMedia(owner, memory(trip.id), "Same Name-2", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        val rootWithoutExtension = createMedia(
+            owner,
+            memory(trip.id),
+            "Browser Upload",
+            createdAt = Instant.parse("2026-01-02T10:30:00Z"),
+            originalFilename = "Browser Upload",
+        )
         val rootFallback = createMedia(
             owner,
             memory(trip.id),
@@ -157,8 +164,12 @@ class MemoryServiceTest {
         writeStoredMedia(rootDuplicate, "root-duplicate-original")
         writeStoredMedia(rootCaseDuplicate, "root-case-duplicate-original")
         writeStoredMedia(rootExistingSuffix, "root-existing-suffix-original")
+        writeStoredMedia(rootWithoutExtension, "root-without-extension-original")
         writeStoredMedia(rootFallback, "root-fallback-original")
         writeStoredMedia(childMedia, "child-original")
+
+        val originalResponse = mediaService.streamOriginal(rootWithoutExtension, rangeHeader = null)
+        assertThat(originalResponse.getHeaderString("Content-Disposition")).contains("Browser Upload.jpg")
 
         val directResponse = mediaService.downloadMemoryMedia(trip.id, includeChildren = false, locale = "de")
         assertThat(directResponse.getHeaderString("Content-Disposition")).contains("Download Trip.zip")
@@ -169,7 +180,8 @@ class MemoryServiceTest {
             "Download Trip/2026-01-02 10-00-00 Same Name-2.jpg" to "root-duplicate-original",
             "Download Trip/2026-01-02 10-00-00 same name-3.jpg" to "root-case-duplicate-original",
             "Download Trip/2026-01-02 10-00-00 Same Name-2-2.jpg" to "root-existing-suffix-original",
-            "Download Trip/2026-01-02 11-00-00 datei-${rootFallback.publicId}.bin" to "root-fallback-original",
+            "Download Trip/2026-01-02 10-30-00 Browser Upload.jpg" to "root-without-extension-original",
+            "Download Trip/2026-01-02 11-00-00 datei-${rootFallback.publicId}.jpg" to "root-fallback-original",
         )
 
         val subtreeResponse = mediaService.downloadMemoryMedia(trip.id, includeChildren = true, locale = "en")
@@ -181,7 +193,8 @@ class MemoryServiceTest {
             "Download Trip/2026-01-02 10-00-00 Same Name-2.jpg" to "root-duplicate-original",
             "Download Trip/2026-01-02 10-00-00 same name-3.jpg" to "root-case-duplicate-original",
             "Download Trip/2026-01-02 10-00-00 Same Name-2-2.jpg" to "root-existing-suffix-original",
-            "Download Trip/2026-01-02 11-00-00 file-${rootFallback.publicId}.bin" to "root-fallback-original",
+            "Download Trip/2026-01-02 10-30-00 Browser Upload.jpg" to "root-without-extension-original",
+            "Download Trip/2026-01-02 11-00-00 file-${rootFallback.publicId}.jpg" to "root-fallback-original",
             "Download Trip/Day One/2026-01-03 10-00-00 Same Name.jpg" to "child-original",
         )
     }

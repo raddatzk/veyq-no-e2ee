@@ -50,8 +50,9 @@ async function submit() {
   loading.value = true
   try {
     for (const file of files.value) {
-      if (props.uploadMedia) await props.uploadMedia(props.memoryId, { file })
-      else await uploadMemoryMedia(props.tenantName, props.memoryId, { file })
+      const request = { file, title: file.name }
+      if (props.uploadMedia) await props.uploadMedia(props.memoryId, request)
+      else await uploadMemoryMedia(props.tenantName, props.memoryId, request)
     }
     visible.value = false
     clearFiles()

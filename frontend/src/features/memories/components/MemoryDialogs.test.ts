@@ -10,6 +10,7 @@ import {
   setMemoryCover,
   updateMemory,
   updateMemoryShare,
+  uploadMemoryMedia,
   type Memory,
   type MemoryMedia,
   type MemoryShareSummary
@@ -19,6 +20,7 @@ import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
 import EditMemoryDialog from './EditMemoryDialog.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryShareDialog from './MemoryShareDialog.vue'
+import MemoryUploadDialog from './MemoryUploadDialog.vue'
 
 vi.mock('../api', () => ({
   createMemory: vi.fn(),
@@ -28,7 +30,8 @@ vi.mock('../api', () => ({
   removeMemoryCover: vi.fn(),
   setMemoryCover: vi.fn(),
   updateMemory: vi.fn(),
-  updateMemoryShare: vi.fn()
+  updateMemoryShare: vi.fn(),
+  uploadMemoryMedia: vi.fn()
 }))
 
 const createMemoryMock = vi.mocked(createMemory)
@@ -39,6 +42,7 @@ const removeMemoryCoverMock = vi.mocked(removeMemoryCover)
 const setMemoryCoverMock = vi.mocked(setMemoryCover)
 const updateMemoryMock = vi.mocked(updateMemory)
 const updateMemoryShareMock = vi.mocked(updateMemoryShare)
+const uploadMemoryMediaMock = vi.mocked(uploadMemoryMedia)
 
 describe('Memory detail dialogs', () => {
   beforeEach(() => {
@@ -199,6 +203,60 @@ describe('Memory detail dialogs', () => {
     expect(request.cropWidth).toBeGreaterThan(0)
     expect(request.cropHeight).toBeGreaterThan(0)
     expect(saved).toHaveBeenCalledWith(updated)
+  })
+
+  it('uploads selected media files with their file names as titles', async () => {
+    const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
+    const second = new File(['second'], 'clip.mov', { type: 'video/quicktime' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
+      file: first,
+      title: 'beach.jpg'
+    })
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
+      file: second,
+      title: 'clip.mov'
+    })
+  })
+
+  it('passes file names to injected share media upload handlers', async () => {
+    const file = new File(['first'], 'shared.jpg', { type: 'image/jpeg' })
+    const uploadMedia = vi.fn().mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        uploadMedia
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [file] })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadMedia).toHaveBeenCalledWith('mem-1', {
+      file,
+      title: 'shared.jpg'
+    })
   })
 
   it('shows localized cover error codes', async () => {

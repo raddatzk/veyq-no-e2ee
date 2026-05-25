@@ -108,6 +108,7 @@ data class ArchiveMediaRow(
     val storageKey: String,
     val originalFilename: String?,
     val title: String,
+    val mimeType: String,
     val sortTime: Instant,
     val createdAt: Instant,
     val memoryId: Long,
@@ -157,6 +158,7 @@ class MediaRepo : PanacheRepository<Media> {
                 m.storageKey,
                 m.originalFilename,
                 m.title,
+                m.mimeType,
                 coalesce(m.capturedAt, m.createdAt),
                 m.createdAt,
                 m.memory.id

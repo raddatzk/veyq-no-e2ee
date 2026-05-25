@@ -249,7 +249,10 @@ class MediaService @Inject constructor(
     fun streamOriginal(media: Media, rangeHeader: String?): Response {
         val path = storagePath(media.storageKey)
         if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
-        val filename = media.originalFilename?.takeIf { it.isNotBlank() } ?: "${media.publicId}.bin"
+        val filename = downloadFilename(
+            media.originalFilename?.takeIf { it.isNotBlank() } ?: media.publicId,
+            media.mimeType,
+        )
         val size = Files.size(path)
         val range = MediaRanges.parse(rangeHeader, size)
 
@@ -356,13 +359,30 @@ class MediaService @Inject constructor(
         val name = media.originalFilename?.takeIf { it.isNotBlank() }?.let { safeZipSegment(it, fallback) }
             ?: media.title.takeIf { it.isNotBlank() }?.let { safeZipSegment(it, fallback) }
             ?: fallback
-        return "${ARCHIVE_TIMESTAMP_FORMAT.format(media.sortTime)} $name"
+        return "${ARCHIVE_TIMESTAMP_FORMAT.format(media.sortTime)} ${downloadFilename(name, media.mimeType)}"
     }
 
     private fun fallbackMediaFilename(media: ArchiveMediaRow, locale: String?): String =
         when (normalizedLocale(locale)) {
-            "en" -> "file-${media.publicId}.bin"
-            else -> "datei-${media.publicId}.bin"
+            "en" -> downloadFilename("file-${media.publicId}", media.mimeType)
+            else -> downloadFilename("datei-${media.publicId}", media.mimeType)
+        }
+
+    private fun downloadFilename(name: String, mimeType: String): String {
+        val filename = name.trim().takeIf { it.isNotBlank() } ?: "file"
+        if (filename.substringAfterLast('/').contains('.')) return filename
+        val extension = extensionForMimeType(mimeType) ?: return filename
+        return "$filename.$extension"
+    }
+
+    private fun extensionForMimeType(mimeType: String): String? =
+        when (mimeType.lowercase()) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/gif" -> "gif"
+            "video/mp4" -> "mp4"
+            "video/quicktime" -> "mov"
+            else -> null
         }
 
     private fun uniqueArchiveName(candidate: String, usedNames: MutableMap<String, Int>): String {
