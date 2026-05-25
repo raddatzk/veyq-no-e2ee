@@ -9,6 +9,80 @@ import jakarta.persistence.*
 import java.time.Instant
 
 @Entity
+@Table(
+    name = "veyq_media_blob",
+    uniqueConstraints = [
+        UniqueConstraint(name = "uq_veyq_media_blob_tenant_sha256", columnNames = ["tenant_id", "content_sha256"]),
+    ],
+)
+class MediaBlob : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    lateinit var tenant: Tenant
+
+    @Column(name = "content_sha256", nullable = false, length = 64, updatable = false)
+    lateinit var contentSha256: String
+
+    @Column(name = "storage_key", nullable = false, length = 512)
+    lateinit var storageKey: String
+
+    @Column(name = "preview_storage_key", length = 512)
+    var previewStorageKey: String? = null
+
+    @Column(name = "mime_type", nullable = false)
+    lateinit var mimeType: String
+
+    @Column(name = "size_bytes", nullable = false)
+    var sizeBytes: Long = 0
+
+    @Column(name = "captured_at")
+    var capturedAt: Instant? = null
+
+    @Column(name = "camera_make")
+    var cameraMake: String? = null
+
+    @Column(name = "camera_model")
+    var cameraModel: String? = null
+
+    @Column(name = "lens_model")
+    var lensModel: String? = null
+
+    @Column(name = "image_width")
+    var imageWidth: Int? = null
+
+    @Column(name = "image_height")
+    var imageHeight: Int? = null
+
+    @Column(name = "gps_latitude")
+    var gpsLatitude: Double? = null
+
+    @Column(name = "gps_longitude")
+    var gpsLongitude: Double? = null
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @Column(name = "updated_at", nullable = false)
+    lateinit var updatedAt: Instant
+
+    @PrePersist
+    fun assignTimestamps() {
+        val now = Instant.now()
+        if (!::createdAt.isInitialized) createdAt = now
+        if (!::updatedAt.isInitialized) updatedAt = now
+    }
+
+    @PreUpdate
+    fun updateTimestamp() {
+        updatedAt = Instant.now()
+    }
+}
+
+@Entity
 @Table(name = "veyq_media")
 class Media : PanacheEntityBase {
     @Id
@@ -41,14 +115,9 @@ class Media : PanacheEntityBase {
     @Column(nullable = false)
     lateinit var title: String
 
-    @Column(name = "mime_type", nullable = false)
-    lateinit var mimeType: String
-
-    @Column(name = "size_bytes", nullable = false)
-    var sizeBytes: Long = 0
-
-    @Column(name = "storage_key", nullable = false, length = 512)
-    lateinit var storageKey: String
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "media_blob_id", nullable = false)
+    lateinit var blob: MediaBlob
 
     @Column(name = "original_filename")
     var originalFilename: String? = null
@@ -70,27 +139,6 @@ class Media : PanacheEntityBase {
     @Column(name = "captured_at_override", nullable = false)
     var capturedAtOverride: Boolean = false
 
-    @Column(name = "camera_make")
-    var cameraMake: String? = null
-
-    @Column(name = "camera_model")
-    var cameraModel: String? = null
-
-    @Column(name = "lens_model")
-    var lensModel: String? = null
-
-    @Column(name = "image_width")
-    var imageWidth: Int? = null
-
-    @Column(name = "image_height")
-    var imageHeight: Int? = null
-
-    @Column(name = "gps_latitude")
-    var gpsLatitude: Double? = null
-
-    @Column(name = "gps_longitude")
-    var gpsLongitude: Double? = null
-
     @PrePersist
     fun assignPublicId() {
         if (!::publicId.isInitialized) {
@@ -100,6 +148,12 @@ class Media : PanacheEntityBase {
             createdAt = Instant.now()
         }
     }
+}
+
+@ApplicationScoped
+class MediaBlobRepo : PanacheRepository<MediaBlob> {
+    fun findByTenantAndSha256(tenant: Tenant, sha256: String): MediaBlob? =
+        find("tenant = ?1 and contentSha256 = ?2", tenant, sha256).firstResult()
 }
 
 data class ArchiveMediaRow(
@@ -155,10 +209,10 @@ class MediaRepo : PanacheRepository<Media> {
             select new com.veyq.api.domain.ArchiveMediaRow(
                 m.id,
                 m.publicId,
-                m.storageKey,
+                m.blob.storageKey,
                 m.originalFilename,
                 m.title,
-                m.mimeType,
+                m.blob.mimeType,
                 coalesce(m.capturedAt, m.createdAt),
                 m.createdAt,
                 m.memory.id

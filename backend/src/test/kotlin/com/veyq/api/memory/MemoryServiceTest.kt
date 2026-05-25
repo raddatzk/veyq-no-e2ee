@@ -8,6 +8,7 @@ import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.GroupRole
 import com.veyq.api.domain.LibraryScopeType
 import com.veyq.api.domain.Media
+import com.veyq.api.domain.MediaBlob
 import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
 import com.veyq.api.domain.MemoryRepo
@@ -29,6 +30,7 @@ import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaConfig
@@ -38,8 +40,11 @@ import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.UserTransaction
+import jakarta.ws.rs.core.MultivaluedHashMap
+import jakarta.ws.rs.core.MultivaluedMap
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
+import org.jboss.resteasy.reactive.multipart.FileUpload
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
@@ -279,6 +284,86 @@ class MemoryServiceTest {
                     ),
                 )
             }
+    }
+
+    @Test
+    fun `duplicate uploads in same tenant reuse blob but keep separate media assets`() {
+        val firstMemory = memoryService.createMemory(CreateMemoryRequest("dedupe-one", "Dedupe One"))
+        val secondMemory = memoryService.createMemory(CreateMemoryRequest("dedupe-two", "Dedupe Two"))
+        val upload = imageFile("dedupe-same-tenant")
+
+        val first = mediaService.uploadMemoryMedia(firstMemory.id, TestFileUpload(upload, "same.png"), "First")
+        val second = mediaService.uploadMemoryMedia(secondMemory.id, TestFileUpload(upload, "same.png"), "Second")
+
+        val firstMedia = mediaRepo.findByTenantAndPublicId(tenant, first.id)!!
+        val secondMedia = mediaRepo.findByTenantAndPublicId(tenant, second.id)!!
+        assertThat(firstMedia.id).isNotEqualTo(secondMedia.id)
+        assertThat(firstMedia.blob.id).isEqualTo(secondMedia.blob.id)
+        assertThat(blobCount(tenant)).isEqualTo(1)
+    }
+
+    @Test
+    fun `duplicate uploads across tenants do not share blobs`() {
+        val firstMemory = memoryService.createMemory(CreateMemoryRequest("tenant-dedupe-one", "Tenant Dedupe One"))
+        val otherOwner = createUser("other-tenant-owner-$runId", ServerRole.ServerOwner)
+        val otherTenant = createTenant("other-memory-$runId", "Other Memory $runId", otherOwner, TenantRole.TenantOwner)
+        val upload = imageFile("dedupe-cross-tenant")
+        val first = mediaService.uploadMemoryMedia(firstMemory.id, TestFileUpload(upload, "same.png"), "First")
+
+        useContext(otherOwner, otherTenant)
+        val secondMemory = memoryService.createMemory(CreateMemoryRequest("tenant-dedupe-two", "Tenant Dedupe Two"))
+        val second = mediaService.uploadMemoryMedia(secondMemory.id, TestFileUpload(upload, "same.png"), "Second")
+
+        val firstMedia = mediaRepo.findByTenantAndPublicId(tenant, first.id)!!
+        val secondMedia = mediaRepo.findByTenantAndPublicId(otherTenant, second.id)!!
+        assertThat(firstMedia.blob.id).isNotEqualTo(secondMedia.blob.id)
+    }
+
+    @Test
+    fun `deleting duplicate media keeps blob until final reference is gone`() {
+        val firstMemory = memoryService.createMemory(CreateMemoryRequest("delete-dedupe-one", "Delete Dedupe One"))
+        val secondMemory = memoryService.createMemory(CreateMemoryRequest("delete-dedupe-two", "Delete Dedupe Two"))
+        val upload = imageFile("delete-dedupe")
+        val first = mediaService.uploadMemoryMedia(firstMemory.id, TestFileUpload(upload, "same.png"), "First")
+        val second = mediaService.uploadMemoryMedia(secondMemory.id, TestFileUpload(upload, "same.png"), "Second")
+        val blob = mediaRepo.findByTenantAndPublicId(tenant, first.id)!!.blob
+        val originalPath = mediaConfig.storageDir.resolve(blob.storageKey)
+        val previewPath = mediaConfig.storageDir.resolve(blob.previewStorageKey!!)
+
+        memoryService.deleteMemory(firstMemory.id)
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, first.id)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.id)).isNotNull
+        assertThat(Files.exists(originalPath)).isTrue()
+        assertThat(Files.exists(previewPath)).isTrue()
+
+        memoryService.deleteMemory(secondMemory.id)
+
+        assertThat(Files.exists(originalPath)).isFalse()
+        assertThat(Files.exists(previewPath)).isFalse()
+    }
+
+    @Test
+    fun `captured at override stays media specific and does not mutate blob metadata`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("blob-captured-at", "Blob Captured At"))
+        val media = createMedia(
+            owner,
+            memory(trip.id),
+            "Captured",
+            capturedAt = Instant.parse("2026-01-01T10:00:00Z"),
+        )
+
+        mediaService.updateMemoryMediaMetadata(
+            trip.id,
+            media.publicId,
+            UpdateMemoryMediaMetadataRequest(
+                capturedAt = java.time.OffsetDateTime.parse("2026-01-02T10:00:00Z"),
+            ),
+        )
+
+        val updated = mediaRepo.findByTenantAndPublicId(tenant, media.publicId)!!
+        assertThat(updated.capturedAt).isEqualTo(Instant.parse("2026-01-02T10:00:00Z"))
+        assertThat(updated.blob.capturedAt).isEqualTo(Instant.parse("2026-01-01T10:00:00Z"))
     }
 
     @Test
@@ -788,6 +873,19 @@ class MemoryServiceTest {
         cameraModel: String? = null,
     ): Media =
         inTransaction {
+            val blob = MediaBlob().also {
+                it.tenant = tenant
+                it.contentSha256 = "${UUID.randomUUID().toString().replace("-", "")}${UUID.randomUUID().toString().replace("-", "")}"
+                it.mimeType = "image/jpeg"
+                it.sizeBytes = 12
+                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
+                it.capturedAt = capturedAt
+                it.imageWidth = 16
+                it.imageHeight = 9
+                it.cameraMake = cameraMake
+                it.cameraModel = cameraModel
+                it.persist()
+            }
             Media().also {
                 it.tenant = tenant
                 it.uploaderUser = owner
@@ -796,21 +894,21 @@ class MemoryServiceTest {
                 it.scopeUser = memory.scopeUser
                 it.memory = memory
                 it.title = title
-                it.mimeType = "image/jpeg"
-                it.sizeBytes = 12
-                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
+                it.blob = blob
                 it.originalFilename = originalFilename
                 it.createdAt = createdAt
                 it.capturedAt = capturedAt
-                it.imageWidth = 16
-                it.imageHeight = 9
-                it.cameraMake = cameraMake
-                it.cameraModel = cameraModel
                 mediaRepo.persist(it)
             }
         }
 
     private fun coverFile(prefix: String): Path {
+        val path = Files.createTempFile(prefix, ".png")
+        ImageIO.write(BufferedImage(16, 9, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
+        return path
+    }
+
+    private fun imageFile(prefix: String): Path {
         val path = Files.createTempFile(prefix, ".png")
         ImageIO.write(BufferedImage(16, 9, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
         return path
@@ -835,10 +933,17 @@ class MemoryServiceTest {
     }
 
     private fun writeStoredMedia(media: Media, content: String) {
-        val path = mediaConfig.storageDir.resolve(media.storageKey)
+        val path = mediaConfig.storageDir.resolve(media.blob.storageKey)
         Files.createDirectories(path.parent)
         Files.writeString(path, content)
     }
+
+    private fun blobCount(tenant: Tenant): Long =
+        entityManager
+            .createQuery("select count(b) from MediaBlob b where b.tenant = :tenant", Long::class.javaObjectType)
+            .setParameter("tenant", tenant)
+            .singleResult
+            .toLong()
 
     private fun zipEntries(entity: Any): List<Pair<String, String>> {
         val output = ByteArrayOutputStream()
@@ -864,5 +969,18 @@ class MemoryServiceTest {
             transaction.rollback()
             throw e
         }
+    }
+
+    private class TestFileUpload(
+        private val path: Path,
+        private val filename: String,
+    ) : FileUpload {
+        override fun name(): String = "file"
+        override fun filePath(): Path = path
+        override fun fileName(): String = filename
+        override fun size(): Long = Files.size(path)
+        override fun contentType(): String? = null
+        override fun charSet(): String? = null
+        override fun getHeaders(): MultivaluedMap<String, String> = MultivaluedHashMap()
     }
 }

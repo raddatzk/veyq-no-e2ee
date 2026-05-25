@@ -19,6 +19,7 @@ import com.veyq.api.library.ResolvedMemoryLocation
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaKind
 import com.veyq.api.library.media.MediaMetadataExtractor
+import com.veyq.api.library.media.MediaService
 import com.veyq.api.library.media.MediaTypeDetector
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -44,6 +45,7 @@ class MemoryService @Inject constructor(
     private val groupRepo: TenantGroupRepo,
     private val memoryGroupMemberRepo: TenantGroupMemberRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaService: MediaService,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val mediaTypeDetector: MediaTypeDetector,
     requestContext: RequestContext,
@@ -143,7 +145,6 @@ class MemoryService @Inject constructor(
         val memory = resolveVisibleMemory(publicId)
         val memories = descendantsAndSelf(memory)
         val media = memories.flatMap { mediaRepo.listByMemory(it) }
-        val mediaDirectories = media.map { mediaDirectory(it) }.distinct()
         val coverDirectories = memories.mapNotNull { it.coverStorageKey?.let(::coverDirectory) }.distinct()
         memories.forEach { candidate ->
             if (candidate.coverMedia?.let { cover -> media.any { it.id == cover.id } } == true) {
@@ -152,9 +153,10 @@ class MemoryService @Inject constructor(
         }
         memoryRepo.update("coverMedia = null where coverMedia in ?1", media)
         memoryRepo.flush()
+        val blobs = media.map { it.blob }.distinctBy { it.id }
         media.forEach { it.delete() }
         mediaRepo.flush()
-        mediaDirectories.forEach(::deleteRecursively)
+        blobs.forEach(mediaService::deleteBlobIfUnreferenced)
         coverDirectories.forEach(::deleteRecursively)
         memory.delete()
     }
@@ -207,7 +209,7 @@ class MemoryService @Inject constructor(
             val media = mediaRepo.findByTenantAndPublicId(tenant(), normalizedMediaId)
                 ?: throw NotFoundException("Media not found")
             if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
-            if (!media.mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
+            if (!media.blob.mimeType.startsWith("image/")) throw BadRequestException("Only image covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
             val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, media.imageDimensions())
             memory.coverStorageKey = null
             memory.coverMimeType = null
@@ -451,18 +453,13 @@ class MemoryService @Inject constructor(
     private fun List<String>.toPathOrNull(): String? =
         if (isEmpty()) null else "/" + joinToString("/")
 
-    private fun mediaDirectory(media: Media): Path {
-        val originalPath = storagePath(media.storageKey)
-        return originalPath.parent ?: storagePath("tenant-${media.tenant.id}/${media.publicId}")
-    }
-
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"
 
     private fun Media.imageDimensions(): Dimension =
-        imageWidth?.let { width ->
-            imageHeight?.let { height -> Dimension(width, height) }
-        } ?: imageDimensions(storagePath(storageKey), mimeType)
+        blob.imageWidth?.let { width ->
+            blob.imageHeight?.let { height -> Dimension(width, height) }
+        } ?: imageDimensions(storagePath(blob.storageKey), blob.mimeType)
 
     private fun imageDimensions(path: Path, mimeType: String): Dimension {
         val metadata = mediaMetadataExtractor.extract(path, mimeType)

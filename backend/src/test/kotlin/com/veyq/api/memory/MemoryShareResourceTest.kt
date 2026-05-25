@@ -825,15 +825,23 @@ class MemoryShareResourceTest {
         createdAt: Instant = Instant.now(),
     ): Media =
         inTransaction {
+            val blob = MediaBlob().also {
+                it.tenant = tenant
+                it.contentSha256 = "${UUID.randomUUID().toString().replace("-", "")}${UUID.randomUUID().toString().replace("-", "")}"
+                it.mimeType = "image/jpeg"
+                it.sizeBytes = 10
+                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
+                it.imageWidth = 16
+                it.imageHeight = 9
+                it.persist()
+            }
             Media().also {
                 it.tenant = tenant
                 it.uploaderUser = owner
                 it.scopeType = LibraryScopeType.Tenant
                 it.memory = targetMemory
                 it.title = title
-                it.mimeType = "image/jpeg"
-                it.sizeBytes = 10
-                it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
+                it.blob = blob
                 it.originalFilename = "$title.jpg"
                 it.createdAt = createdAt
                 mediaRepo.persist(it)
@@ -846,7 +854,7 @@ class MemoryShareResourceTest {
         }
 
     private fun writeStoredMedia(media: Media, content: String) {
-        val path = mediaConfig.storageDir.resolve(media.storageKey)
+        val path = mediaConfig.storageDir.resolve(media.blob.storageKey)
         Files.createDirectories(path.parent)
         Files.writeString(path, content)
     }

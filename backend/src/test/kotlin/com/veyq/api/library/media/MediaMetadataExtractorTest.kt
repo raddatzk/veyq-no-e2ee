@@ -1,6 +1,6 @@
 package com.veyq.api.library.media
 
-import com.veyq.api.domain.Media
+import com.veyq.api.domain.MediaBlob
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
@@ -21,12 +21,12 @@ class MediaMetadataExtractorTest {
     }
 
     @Test
-    fun `applies extracted metadata to media`() {
-        val media = Media()
+    fun `applies extracted metadata to media blob`() {
+        val blob = MediaBlob()
         val capturedAt = Instant.parse("2026-01-02T03:04:05Z")
 
         MediaMetadataExtractor().apply(
-            media,
+            blob,
             ExtractedMediaMetadata(
                 capturedAt = capturedAt,
                 cameraMake = "Canon",
@@ -39,14 +39,13 @@ class MediaMetadataExtractorTest {
             )
         )
 
-        assertThat(media.capturedAt).isEqualTo(capturedAt)
-        assertThat(media.capturedAtOverride).isFalse()
-        assertThat(media.cameraMake).isEqualTo("Canon")
-        assertThat(media.cameraModel).isEqualTo("R6")
-        assertThat(media.lensModel).isEqualTo("RF 35mm")
-        assertThat(media.imageWidth).isEqualTo(6000)
-        assertThat(media.imageHeight).isEqualTo(4000)
-        assertThat(media.gpsLatitude).isEqualTo(52.52)
-        assertThat(media.gpsLongitude).isEqualTo(13.405)
+        assertThat(blob.capturedAt).isEqualTo(capturedAt)
+        assertThat(blob.cameraMake).isEqualTo("Canon")
+        assertThat(blob.cameraModel).isEqualTo("R6")
+        assertThat(blob.lensModel).isEqualTo("RF 35mm")
+        assertThat(blob.imageWidth).isEqualTo(6000)
+        assertThat(blob.imageHeight).isEqualTo(4000)
+        assertThat(blob.gpsLatitude).isEqualTo(52.52)
+        assertThat(blob.gpsLongitude).isEqualTo(13.405)
     }
 }

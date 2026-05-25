@@ -6,6 +6,8 @@ import com.veyq.api.domain.ArchiveMediaKeyset
 import com.veyq.api.domain.ArchiveMediaRow
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.Media
+import com.veyq.api.domain.MediaBlob
+import com.veyq.api.domain.MediaBlobRepo
 import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
 import com.veyq.api.domain.MemoryShareIdentity
@@ -34,12 +36,12 @@ import java.awt.Color
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.IOException
-import java.io.OutputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.text.Normalizer
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -54,6 +56,7 @@ import javax.imageio.ImageIO
 @Singleton
 class MediaService @Inject constructor(
     private val mediaRepo: MediaRepo,
+    private val mediaBlobRepo: MediaBlobRepo,
     private val memoryRepo: MemoryRepo,
     private val mediaConfig: MediaConfig,
     private val mediaTypeDetector: MediaTypeDetector,
@@ -181,6 +184,9 @@ class MediaService @Inject constructor(
         if (size <= 0) throw BadRequestException("file must not be empty", "MEDIA_UPLOAD_EMPTY")
         val mediaType = mediaTypeDetector.detect(uploadPath)
             ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported", "MEDIA_UPLOAD_TYPE_UNSUPPORTED")
+        val contentSha256 = sha256(uploadPath)
+        val blob = mediaBlobRepo.findByTenantAndSha256(memory.tenant, contentSha256)
+            ?: createMediaBlob(memory, uploadPath, mediaType.mimeType, size, contentSha256)
 
         val media = Media().also {
             it.tenant = memory.tenant
@@ -189,23 +195,38 @@ class MediaService @Inject constructor(
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                 ?: "Upload"
-            it.mimeType = mediaType.mimeType
-            it.sizeBytes = size
-            it.storageKey = ""
+            it.blob = blob
             it.originalFilename = originalFilename
             it.uploaderUser = uploaderUser
             it.shareIdentity = shareIdentity
+            it.capturedAt = blob.capturedAt
+            it.capturedAtOverride = false
             mediaRepo.persist(it)
         }
-        mediaRepo.flush()
-
-        val storageKey = "tenant-${memory.tenant.id}/${media.publicId}/original"
-        writeMediaFile(uploadPath, storageKey)
-        media.storageKey = storageKey
-        mediaMetadataExtractor.apply(media, mediaMetadataExtractor.extract(storagePath(storageKey), media.mimeType))
-        generatePreviewIfSupported(media)
 
         return media
+    }
+
+    private fun createMediaBlob(
+        memory: Memory,
+        uploadPath: Path,
+        mimeType: String,
+        size: Long,
+        contentSha256: String,
+    ): MediaBlob {
+        val storageKey = "tenant-${memory.tenant.id}/blobs/$contentSha256/original"
+        writeMediaFile(uploadPath, storageKey)
+        return MediaBlob().also {
+            it.tenant = memory.tenant
+            it.contentSha256 = contentSha256
+            it.storageKey = storageKey
+            it.mimeType = mimeType
+            it.sizeBytes = size
+            mediaMetadataExtractor.apply(it, mediaMetadataExtractor.extract(storagePath(storageKey), mimeType))
+            mediaBlobRepo.persist(it)
+            mediaBlobRepo.flush()
+            generatePreviewIfSupported(it)
+        }
     }
 
     @Transactional
@@ -247,11 +268,11 @@ class MediaService @Inject constructor(
     }
 
     fun streamOriginal(media: Media, rangeHeader: String?): Response {
-        val path = storagePath(media.storageKey)
+        val path = storagePath(media.blob.storageKey)
         if (!Files.isRegularFile(path)) throw NotFoundException("Media file not found")
         val filename = downloadFilename(
             media.originalFilename?.takeIf { it.isNotBlank() } ?: media.publicId,
-            media.mimeType,
+            media.blob.mimeType,
         )
         val size = Files.size(path)
         val range = MediaRanges.parse(rangeHeader, size)
@@ -265,7 +286,7 @@ class MediaService @Inject constructor(
 
         if (range != null) {
             return Response.status(Response.Status.PARTIAL_CONTENT)
-                .type(media.mimeType)
+                .type(media.blob.mimeType)
                 .entity(streamRange(path, range))
                 .header("Accept-Ranges", "bytes")
                 .header("Content-Length", range.length)
@@ -275,9 +296,9 @@ class MediaService @Inject constructor(
                 .build()
         }
 
-        return Response.ok(path.toFile(), media.mimeType)
+        return Response.ok(path.toFile(), media.blob.mimeType)
             .header("Accept-Ranges", "bytes")
-            .header("Content-Length", media.sizeBytes)
+            .header("Content-Length", media.blob.sizeBytes)
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
             .header("X-Content-Type-Options", "nosniff")
             .build()
@@ -289,11 +310,11 @@ class MediaService @Inject constructor(
     }
 
     fun streamPreview(media: Media): Response {
-        if (!canGeneratePreview(media)) throw NotFoundException("Media not found")
+        if (!canGeneratePreview(media.blob)) throw NotFoundException("Media not found")
 
-        val previewPath = previewPath(media)
+        val previewPath = previewPath(media.blob)
         if (!Files.isRegularFile(previewPath)) {
-            if (!generatePreview(media, throwOnFailure = false)) throw NotFoundException("Media preview not found")
+            if (!generatePreview(media.blob, throwOnFailure = false)) throw NotFoundException("Media preview not found")
         }
 
         return Response.ok(previewPath.toFile(), "image/jpeg")
@@ -306,6 +327,14 @@ class MediaService @Inject constructor(
 
     fun publicShareSummary(media: Media, shareId: String): PublicShareMediaSummary =
         media.toPublicShareSummary(shareId)
+
+    fun deleteBlobIfUnreferenced(blob: MediaBlob) {
+        if (mediaRepo.count("blob", blob) > 0) return
+        val directory = blobDirectory(blob)
+        blob.delete()
+        mediaBlobRepo.flush()
+        deleteRecursively(directory)
+    }
 
     private fun resolveAccessibleMedia(publicId: String): Media {
         val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
@@ -446,23 +475,36 @@ class MediaService @Inject constructor(
         }
     }
 
-    private fun generatePreviewIfSupported(media: Media) {
-        if (!canGeneratePreview(media)) return
-        generatePreview(media, throwOnFailure = false)
+    private fun sha256(path: Path): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        Files.newInputStream(path).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read == -1) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun generatePreview(media: Media, throwOnFailure: Boolean): Boolean {
-        val originalPath = storagePath(media.storageKey)
+    private fun generatePreviewIfSupported(blob: MediaBlob) {
+        if (!canGeneratePreview(blob)) return
+        generatePreview(blob, throwOnFailure = false)
+    }
+
+    private fun generatePreview(blob: MediaBlob, throwOnFailure: Boolean): Boolean {
+        val originalPath = storagePath(blob.storageKey)
         if (!Files.isRegularFile(originalPath)) return false
         return when {
-            media.mimeType.startsWith("image/") -> generateImagePreview(media, originalPath, throwOnFailure)
-            media.mimeType.startsWith("video/") -> generateVideoPreview(media, originalPath, throwOnFailure)
+            blob.mimeType.startsWith("image/") -> generateImagePreview(blob, originalPath, throwOnFailure)
+            blob.mimeType.startsWith("video/") -> generateVideoPreview(blob, originalPath, throwOnFailure)
             else -> false
         }
     }
 
-    private fun generateImagePreview(media: Media, originalPath: Path, throwOnFailure: Boolean): Boolean {
-        val previewPath = previewPath(media)
+    private fun generateImagePreview(blob: MediaBlob, originalPath: Path, throwOnFailure: Boolean): Boolean {
+        val previewPath = previewPath(blob)
         Files.createDirectories(previewPath.parent)
         val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
         try {
@@ -484,18 +526,19 @@ class MediaService @Inject constructor(
             }
             if (!ImageIO.write(preview, "jpg", temp.toFile())) return false
             Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            blob.previewStorageKey = previewStorageKey(blob)
             return true
         } catch (e: Exception) {
             if (throwOnFailure) throw e
-            log.warn("Failed to generate media preview for ${media.publicId}: ${e.message}")
+            log.warn("Failed to generate media preview for blob ${blob.id}: ${e.message}")
             return false
         } finally {
             Files.deleteIfExists(temp)
         }
     }
 
-    private fun generateVideoPreview(media: Media, originalPath: Path, throwOnFailure: Boolean): Boolean {
-        val previewPath = previewPath(media)
+    private fun generateVideoPreview(blob: MediaBlob, originalPath: Path, throwOnFailure: Boolean): Boolean {
+        val previewPath = previewPath(blob)
         Files.createDirectories(previewPath.parent)
         val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
         val logFile = Files.createTempFile(previewPath.parent, "preview-", ".log")
@@ -533,10 +576,11 @@ class MediaService @Inject constructor(
             }
             if (!Files.isRegularFile(temp) || Files.size(temp) <= 0) return false
             Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            blob.previewStorageKey = previewStorageKey(blob)
             return true
         } catch (e: Exception) {
             if (throwOnFailure) throw e
-            log.warn("Failed to generate media preview for ${media.publicId}: ${e.message}")
+            log.warn("Failed to generate media preview for blob ${blob.id}: ${e.message}")
             return false
         } finally {
             Files.deleteIfExists(temp)
@@ -549,6 +593,18 @@ class MediaService @Inject constructor(
         val path = root.resolve(storageKey).normalize()
         if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
         return path
+    }
+
+    private fun blobDirectory(blob: MediaBlob): Path {
+        val originalPath = storagePath(blob.storageKey)
+        return originalPath.parent ?: storagePath("tenant-${blob.tenant.id}/blobs/${blob.contentSha256}")
+    }
+
+    private fun deleteRecursively(path: Path) {
+        if (!Files.exists(path)) return
+        Files.walk(path).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        }
     }
 
     private fun streamRange(path: Path, range: ContentRange): StreamingOutput =
@@ -602,17 +658,17 @@ class MediaService @Inject constructor(
             createdAt = createdAt.toApiOffsetDateTime(),
             capturedAt = capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = capturedAtOverride,
-            mimeType = mimeType,
-            sizeBytes = sizeBytes,
+            mimeType = blob.mimeType,
+            sizeBytes = blob.sizeBytes,
             contentUrl = contentUrl(),
             previewUrl = previewUrl(),
-            cameraMake = cameraMake,
-            cameraModel = cameraModel,
-            lensModel = lensModel,
-            imageWidth = imageWidth,
-            imageHeight = imageHeight,
-            gpsLatitude = gpsLatitude,
-            gpsLongitude = gpsLongitude,
+            cameraMake = blob.cameraMake,
+            cameraModel = blob.cameraModel,
+            lensModel = blob.lensModel,
+            imageWidth = blob.imageWidth,
+            imageHeight = blob.imageHeight,
+            gpsLatitude = blob.gpsLatitude,
+            gpsLongitude = blob.gpsLongitude,
         )
 
     private fun Media.toPublicShareSummary(shareId: String): PublicShareMediaSummary =
@@ -624,10 +680,10 @@ class MediaService @Inject constructor(
             createdAt = createdAt.toApiOffsetDateTime(),
             capturedAt = capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = capturedAtOverride,
-            mimeType = mimeType,
-            sizeBytes = sizeBytes,
+            mimeType = blob.mimeType,
+            sizeBytes = blob.sizeBytes,
             contentUrl = "/api/public-shares/${url(shareId)}/media/${url(publicId)}/content",
-            previewUrl = if (canGeneratePreview(this)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
+            previewUrl = if (canGeneratePreview(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
         )
 
     private fun Media.uploader(): MediaUploader {
@@ -659,13 +715,16 @@ class MediaService @Inject constructor(
         "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"
 
     private fun Media.previewUrl(): String? =
-        if (canGeneratePreview(this)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/preview" else null
+        if (canGeneratePreview(blob)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/preview" else null
 
-    private fun canGeneratePreview(media: Media): Boolean =
-        media.mimeType.startsWith("image/") || media.mimeType.startsWith("video/")
+    private fun canGeneratePreview(blob: MediaBlob): Boolean =
+        blob.mimeType.startsWith("image/") || blob.mimeType.startsWith("video/")
 
-    private fun previewPath(media: Media): Path =
-        storagePath("tenant-${media.tenant.id}/${media.publicId}/preview.jpg")
+    private fun previewPath(blob: MediaBlob): Path =
+        storagePath(blob.previewStorageKey ?: previewStorageKey(blob))
+
+    private fun previewStorageKey(blob: MediaBlob): String =
+        "tenant-${blob.tenant.id}/blobs/${blob.contentSha256}/preview.jpg"
 
     private fun url(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")

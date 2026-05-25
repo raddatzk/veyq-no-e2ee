@@ -26,7 +26,7 @@ class MemoryMigrationTest {
                 ).use { rows ->
                     val tables = mutableListOf<String>()
                     while (rows.next()) tables += rows.getString("table_name")
-                    assertThat(tables).contains("veyq_memory", "veyq_media", "veyq_tenant_folder")
+                    assertThat(tables).contains("veyq_memory", "veyq_media", "veyq_media_blob", "veyq_tenant_folder")
                     assertThat(tables).doesNotContain("veyq_tenant_album", "veyq_album_media")
                 }
 
@@ -60,7 +60,35 @@ class MemoryMigrationTest {
                 ).use { rows ->
                     val columns = mutableListOf<String>()
                     while (rows.next()) columns += rows.getString("column_name")
-                    assertThat(columns).contains("memory_id")
+                    assertThat(columns).contains("memory_id", "media_blob_id", "captured_at", "captured_at_override")
+                    assertThat(columns).doesNotContain("storage_key", "mime_type", "size_bytes", "camera_make")
+                }
+
+                statement.executeQuery(
+                    """
+                    select column_name
+                    from information_schema.columns
+                    where table_schema = 'veyq'
+                        and table_name = 'veyq_media_blob'
+                    """.trimIndent()
+                ).use { rows ->
+                    val columns = mutableListOf<String>()
+                    while (rows.next()) columns += rows.getString("column_name")
+                    assertThat(columns).contains(
+                        "tenant_id",
+                        "content_sha256",
+                        "storage_key",
+                        "preview_storage_key",
+                        "mime_type",
+                        "size_bytes",
+                        "captured_at",
+                        "camera_make",
+                        "camera_model",
+                        "image_width",
+                        "image_height",
+                        "gps_latitude",
+                        "gps_longitude",
+                    )
                 }
             }
         }

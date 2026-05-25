@@ -396,7 +396,7 @@ class MemoryShareService @Inject constructor(
             mediaRepo.findByTenantAndPublicId(access.share.tenant, normalizedMediaId)
                 ?: throw NotFoundException("Media not found")
         }
-        if (media.memory?.id != memory.id || !media.mimeType.startsWith("image/")) {
+        if (media.memory?.id != memory.id || !media.blob.mimeType.startsWith("image/")) {
             throw NotFoundException("Media not found")
         }
         memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
@@ -796,28 +796,23 @@ class MemoryShareService @Inject constructor(
         }
         memoryRepo.update("coverMedia = null where coverMedia in ?1", media)
         memoryRepo.flush()
-        val mediaDirectories = media.map { mediaDirectory(it) }.distinct()
+        val blobs = media.map { it.blob }.distinctBy { it.id }
         media.forEach { it.delete() }
         mediaRepo.flush()
-        mediaDirectories.forEach(::deleteRecursively)
+        blobs.forEach(mediaService::deleteBlobIfUnreferenced)
         memories.sortedByDescending { descendantDepth(it) }.forEach { it.delete() }
     }
 
     private fun deleteMedia(media: Media) {
         memoryRepo.update("coverMedia = null where coverMedia = ?1", media)
-        val directory = mediaDirectory(media)
+        val blob = media.blob
         media.delete()
         mediaRepo.flush()
-        deleteRecursively(directory)
+        mediaService.deleteBlobIfUnreferenced(blob)
     }
 
     private fun descendantDepth(memory: Memory): Int =
         generateSequence(memory.parentMemory) { it.parentMemory }.count()
-
-    private fun mediaDirectory(media: Media): Path {
-        val originalPath = storagePath(media.storageKey)
-        return originalPath.parent ?: storagePath("tenant-${media.tenant.id}/${media.publicId}")
-    }
 
     private fun coverDirectory(storageKey: String): Path {
         val coverPath = storagePath(storageKey)

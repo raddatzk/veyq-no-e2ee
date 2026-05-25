@@ -29,8 +29,10 @@ Veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Do
   - Gruppen innerhalb eines Tenants
 - `veyq_tenant_group_member`
   - Gruppenmitgliedschaft mit `GroupOwner` oder `GroupMember`
+- `veyq_media_blob`
+  - tenant-scoped, content-addressed Originale und Previews mit internem SHA-256, Storage-Key, Preview-Storage-Key, MIME-Type, Byte-Größe und extrahierten Kamera-/GPS-/Dimensionsdaten
 - `veyq_media`
-  - Medien mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Ersteller, Zugriffsscope und optionaler Memory-Zuordnung
+  - Memory-spezifische Medien-Assets mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Uploader oder Share-Identität, Zugriffsscope, direkter Memory-Zuordnung, Titel, Originaldateiname und Referenz auf `veyq_media_blob`
 - `veyq_memory`
   - neue Memory-Zielstruktur mit öffentlicher `public_id`, Parent-Memory, Zugriffsscope, Cover-Media und direkter Media-Zuordnung
 - `veyq_config`
@@ -118,15 +120,17 @@ Ordner, Memories und Medien haben einen eindeutigen Zugriffsscope:
 
 Child-Ordner und root-level Memories in Ordnern erben den Scope ihres Parent-Ordners. Child-Memories erben den Scope ihres Parent-Memory. Medien übernehmen den Scope der Memory, in die sie hochgeladen werden. Tenant-Membership ist Voraussetzung für jede Tenant-API; innerhalb eines sichtbaren Scopes dürfen Mitglieder lesen und schreiben.
 
-Medien werden über `publicId` adressiert. Memory-Media-Listen laufen über `/api/{tenantName}/memories/{memoryId}/media`; Binärcontent und Previews laufen über `/api/{tenantName}/memory-media/{mediaId}/...` und unterstützen Range-Requests für Originalcontent.
+Medien werden öffentlich über `Media.publicId` adressiert. Memory-Media-Listen laufen über `/api/{tenantName}/memories/{memoryId}/media`; Binärcontent und Previews laufen über `/api/{tenantName}/memory-media/{mediaId}/...` und unterstützen Range-Requests für Originalcontent. Intern liest Content über `Media.blob.storageKey`; Hashes, Blob-IDs und Storage-Keys werden nicht über öffentliche APIs exponiert.
 
 ## Memory-Schicht
 
 Memory UI v1 und die Memory APIs sind die aktive fachliche Ebene. Tenant Home, persönliche Bereiche, Gruppenbereiche, Ordner und Memory-Details werden über Memory-Navigation, Folder- und Memory-Endpunkte abgebildet.
 
-Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder User-Scope. Child-Memories erben den Scope ihres Parent-Memory. Neue Memory-Media-Uploads schreiben die direkte `memory_id` an `veyq_media`; ein Asset gehört im Memory-Modell genau zu einem Memory. `includeChildren=true` bei Memory-Media-Listen aggregiert Medien aus sichtbaren Descendant-Memories, ohne die direkte Ownership zu verändern.
+Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder User-Scope. Child-Memories erben den Scope ihres Parent-Memory. Neue Memory-Media-Uploads schreiben die direkte `memory_id` an `veyq_media`; ein Asset gehört im Memory-Modell genau zu einem Memory. Identische Uploads innerhalb eines Tenants können denselben `veyq_media_blob` wiederverwenden, bleiben aber getrennte `veyq_media`-Assets. `includeChildren=true` bei Memory-Media-Listen aggregiert Medien aus sichtbaren Descendant-Memories, ohne die direkte Ownership zu verändern.
 
-Die Migration `V2__memory_model.sql` legt die Memory-Tabelle und die direkte `memory_id`-Zuordnung auf Medien an. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
+Originale und Previews gehören zu `veyq_media_blob`. Previews werden pro Blob gespeichert und wiederverwendet. Beim Löschen eines Media-Assets wird der Blob erst entfernt, wenn kein weiteres Media mehr darauf zeigt. Explizite Memory-Cover-Uploads bleiben davon getrennte Memory-Dateien; Cover können alternativ auf ein bestehendes Memory-Media-Asset zeigen.
+
+Die Migration `V2__memory_model.sql` legt die Memory-Tabelle und die direkte `memory_id`-Zuordnung auf Medien an. `V10__media_blobs.sql` trennt tenant-scoped Blob-Speicher von Memory-spezifischen Media-Assets. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
 
 ## Testing
 

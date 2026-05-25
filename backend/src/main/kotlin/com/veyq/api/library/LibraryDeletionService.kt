@@ -15,6 +15,7 @@ import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.TenantRepo
 import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaService
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import java.nio.file.Files
@@ -30,6 +31,7 @@ class LibraryDeletionService @Inject constructor(
     private val folderRepo: TenantFolderRepo,
     private val memoryRepo: MemoryRepo,
     private val mediaRepo: MediaRepo,
+    private val mediaService: MediaService,
     private val mediaConfig: MediaConfig,
 ) {
     fun deleteTenant(tenant: Tenant) {
@@ -83,21 +85,16 @@ class LibraryDeletionService @Inject constructor(
         if (distinctMedia.isEmpty()) return
 
         memoryRepo.update("coverMedia = null where coverMedia in ?1", distinctMedia)
-        val mediaDirectories = distinctMedia.map { mediaDirectory(it) }.distinct()
+        val blobs = distinctMedia.map { it.blob }.distinctBy { it.id }
         distinctMedia.forEach { it.delete() }
         mediaRepo.flush()
-        mediaDirectories.forEach(::deleteRecursively)
+        blobs.forEach(mediaService::deleteBlobIfUnreferenced)
     }
 
     private fun descendants(root: TenantFolder): List<TenantFolder> =
         folderRepo.listByTenant(root.tenant).filter { folder ->
             generateSequence(folder) { it.parentFolder }.any { it.id == root.id }
         }
-
-    private fun mediaDirectory(media: Media): Path {
-        val originalPath = storagePath(media.storageKey)
-        return originalPath.parent ?: storagePath("tenant-${media.tenant.id}/${media.publicId}")
-    }
 
     private fun storagePath(storageKey: String): Path {
         val root = mediaConfig.storageDir.toAbsolutePath().normalize()

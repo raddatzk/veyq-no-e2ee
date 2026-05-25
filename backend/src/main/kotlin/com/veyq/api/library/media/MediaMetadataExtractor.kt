@@ -8,7 +8,7 @@ import com.drew.metadata.exif.GpsDirectory
 import com.drew.metadata.gif.GifHeaderDirectory
 import com.drew.metadata.jpeg.JpegDirectory
 import com.drew.metadata.png.PngDirectory
-import com.veyq.api.domain.Media
+import com.veyq.api.domain.MediaBlob
 import jakarta.inject.Singleton
 import org.jboss.logging.Logger
 import java.nio.file.Path
@@ -41,16 +41,15 @@ class MediaMetadataExtractor {
         }
     }
 
-    fun apply(media: Media, metadata: ExtractedMediaMetadata) {
-        media.capturedAt = metadata.capturedAt
-        media.capturedAtOverride = false
-        media.cameraMake = metadata.cameraMake
-        media.cameraModel = metadata.cameraModel
-        media.lensModel = metadata.lensModel
-        media.imageWidth = metadata.imageWidth
-        media.imageHeight = metadata.imageHeight
-        media.gpsLatitude = metadata.gpsLatitude
-        media.gpsLongitude = metadata.gpsLongitude
+    fun apply(blob: MediaBlob, metadata: ExtractedMediaMetadata) {
+        blob.capturedAt = metadata.capturedAt
+        blob.cameraMake = metadata.cameraMake
+        blob.cameraModel = metadata.cameraModel
+        blob.lensModel = metadata.lensModel
+        blob.imageWidth = metadata.imageWidth
+        blob.imageHeight = metadata.imageHeight
+        blob.gpsLatitude = metadata.gpsLatitude
+        blob.gpsLongitude = metadata.gpsLongitude
     }
 
     private fun readMetadata(metadata: Metadata): ExtractedMediaMetadata {
