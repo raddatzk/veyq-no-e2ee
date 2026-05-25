@@ -25,6 +25,7 @@ This document turns the Memory product context into follow-up topics for develop
 ## Needs API Design
 
 - Tenant domain change flow, including ownership/permission rules, validation, invite-link impact and reverse-proxy assumptions.
+- Bulk image download for internal Memory views and non-uploader public shares, including authorization, subtree scope, ZIP/streaming behavior and media visibility rules.
 - Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
 - Cover selection and cover removal flows for Memories.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.
@@ -41,6 +42,7 @@ This document turns the Memory product context into follow-up topics for develop
 ## Needs UX Design
 
 - Dark mode, including theme tokens, media-heavy view contrast and system preference behavior.
+- Download-all-images action for internal Memory views and eligible public share views, hidden for uploader-only shares.
 - Memory detail next pass with `Journal`, `Map`, `Tracks` and richer `Unter-Memories` tabs.
 - Memory header with cover, time range, places, weather, playlist, participants and track summary.
 - Child Memory navigation without file-system feel.
