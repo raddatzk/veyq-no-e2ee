@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import CreateFolderDialog from '../features/memories/components/CreateFolderDialog.vue'
@@ -107,16 +106,6 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       @create-folder="createFolderOpen = true"
       @create-memory="createMemoryOpen = true"
     />
-
-    <div v-if="navigation || memory" class="memory-refresh">
-      <Button
-        :label="t('memory.refresh')"
-        icon="pi pi-refresh"
-        severity="secondary"
-        outlined
-        @click="load"
-      />
-    </div>
 
     <CreateFolderDialog
       v-model:visible="createFolderOpen"

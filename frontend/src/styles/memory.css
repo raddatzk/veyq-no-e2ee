@@ -1,11 +1,11 @@
 .memory-page {
+  container: memory-page / inline-size;
   display: grid;
   gap: 1.35rem;
-}
-
-.memory-page {
+  width: min(100%, 1280px);
   max-width: 1280px;
-  margin: 0 auto;
+  min-width: 0;
+  margin-inline: auto;
 }
 
 .memory-titlebar {
@@ -42,7 +42,7 @@
 
 .memory-section-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 1rem;
 }
@@ -53,8 +53,16 @@
 }
 
 .memory-section-header span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  min-height: 1.55rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--app-surface-muted);
   color: #64748b;
   font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .memory-list {
@@ -322,11 +330,6 @@
   flex-wrap: wrap;
 }
 
-.memory-refresh {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .memory-route-surface,
 .memory-detail {
   display: grid;
@@ -341,7 +344,7 @@
 .memory-section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
