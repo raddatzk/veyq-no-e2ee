@@ -87,7 +87,7 @@ export const messages = {
       searchFailed: 'Suche konnte nicht geladen werden.',
       searchLoading: 'Suche läuft...',
       searchMinLength: 'Gib mindestens zwei Zeichen ein.',
-      searchPlaceholder: 'Suche in allem, worauf du Zugriff hast...',
+      searchPlaceholder: 'Suche einfach überall...',
       theme: 'Darstellung',
       themes: {
         dark: 'Dunkel',
@@ -528,7 +528,7 @@ export const messages = {
       searchFailed: 'Search could not be loaded.',
       searchLoading: 'Searching...',
       searchMinLength: 'Enter at least two characters.',
-      searchPlaceholder: 'Search everything you can access...',
+      searchPlaceholder: 'Search simply everywhere...',
       theme: 'Appearance',
       themes: {
         dark: 'Dark',
