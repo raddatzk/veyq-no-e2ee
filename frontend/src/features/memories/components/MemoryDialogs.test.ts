@@ -449,7 +449,7 @@ describe('Memory detail dialogs', () => {
         tenantName: 'tenant',
         memory: memory()
       },
-      global: { stubs: dialogStubs() }
+      global: dialogGlobal()
     })
     await flushPromises()
 
@@ -457,6 +457,25 @@ describe('Memory detail dialogs', () => {
     expect(wrapper.text()).not.toContain('Drop Zone')
     expect(wrapper.find('.form-grid select').text()).not.toContain('Uploader')
     expect(wrapper.find('.management-control').text()).not.toContain('Uploader')
+    expect(wrapper.find('[aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
+    expect(
+      wrapper.find('[aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').attributes('title')
+    ).toBeUndefined()
+    expect(
+      wrapper
+        .find(
+          '[aria-label="Contributor: Kann zusätzlich Metadaten bearbeiten, Medien hochladen und Kapitel anlegen, aber nicht löschen."]'
+        )
+        .exists()
+    ).toBe(true)
+    expect(
+      wrapper
+        .find(
+          '[aria-label="Manager: Kann zusätzlich Medien und Unter-Memories löschen, aber nicht die geteilte Root-Memory."]'
+        )
+        .exists()
+    ).toBe(true)
+    expect(wrapper.find('.management-row [aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
 
     await wrapper.find('button').trigger('click')
     await flushPromises()
@@ -614,16 +633,49 @@ function dialogStubs() {
     },
     Message: { template: '<div><slot /></div>' },
     Select: {
+      inheritAttrs: false,
       props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
       emits: ['update:modelValue'],
-      template:
-        '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option[optionValue]" :value="option[optionValue]">{{ option[optionLabel] }}</option></select>'
+      template: `
+        <div>
+          <select
+            v-bind="$attrs"
+            :value="modelValue"
+            @change="$emit('update:modelValue', $event.target.value)"
+          >
+            <option
+              v-for="option in options"
+              :key="option[optionValue]"
+              :value="option[optionValue]"
+            >
+              {{ option[optionLabel] }}
+            </option>
+          </select>
+          <div class="select-value-slot">
+            <slot name="value" :value="modelValue" />
+          </div>
+          <div class="select-option-slots">
+            <div v-for="option in options" :key="option[optionValue]">
+              <slot name="option" :option="option" />
+            </div>
+          </div>
+        </div>
+      `
     },
     ToggleSwitch: {
       props: ['modelValue', 'ariaLabel'],
       emits: ['update:modelValue'],
       template:
         '<input type="checkbox" :aria-label="ariaLabel || $attrs[\'aria-label\']" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />'
+    }
+  }
+}
+
+function dialogGlobal() {
+  return {
+    stubs: dialogStubs(),
+    directives: {
+      tooltip: {}
     }
   }
 }

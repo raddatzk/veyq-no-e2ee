@@ -239,6 +239,11 @@ export const messages = {
       passwordProtectionHint: 'Freigabe nur mit Passwort öffnen',
       rename: 'Freigabe umbenennen',
       role: 'Freigabe-Rolle',
+      roleDescriptions: {
+        VIEWER: 'Kann die geteilte Memory und ihre Medien ansehen.',
+        CONTRIBUTOR: 'Kann zusätzlich Metadaten bearbeiten, Medien hochladen und Kapitel anlegen, aber nicht löschen.',
+        MANAGER: 'Kann zusätzlich Medien und Unter-Memories löschen, aber nicht die geteilte Root-Memory.'
+      },
       roles: {
         VIEWER: 'Viewer',
         CONTRIBUTOR: 'Contributor',
@@ -640,6 +645,11 @@ export const messages = {
       passwordProtectionHint: 'Open share only with password',
       rename: 'Rename share',
       role: 'Share role',
+      roleDescriptions: {
+        VIEWER: 'Can view the shared Memory and its media.',
+        CONTRIBUTOR: 'Can also edit metadata, upload media, and create chapters, but cannot delete.',
+        MANAGER: 'Can also delete media and child Memories, but not the shared root Memory.'
+      },
       roles: {
         VIEWER: 'Viewer',
         CONTRIBUTOR: 'Contributor',

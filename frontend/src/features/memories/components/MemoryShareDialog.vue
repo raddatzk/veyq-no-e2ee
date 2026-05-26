@@ -18,6 +18,12 @@ import {
   type MemoryShareSummary
 } from '../api'
 
+type ShareRoleOption = {
+  label: string
+  value: Exclude<MemoryShareRole, 'UPLOADER'>
+  description: string
+}
+
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
@@ -39,10 +45,22 @@ const editName = ref('')
 const editPasswordEnabled = ref(false)
 const editPassword = ref('')
 
-const roleOptions = computed(() => [
-  { label: t('share.roles.VIEWER'), value: 'VIEWER' },
-  { label: t('share.roles.CONTRIBUTOR'), value: 'CONTRIBUTOR' },
-  { label: t('share.roles.MANAGER'), value: 'MANAGER' }
+const roleOptions = computed<ShareRoleOption[]>(() => [
+  {
+    label: t('share.roles.VIEWER'),
+    value: 'VIEWER',
+    description: t('share.roleDescriptions.VIEWER')
+  },
+  {
+    label: t('share.roles.CONTRIBUTOR'),
+    value: 'CONTRIBUTOR',
+    description: t('share.roleDescriptions.CONTRIBUTOR')
+  },
+  {
+    label: t('share.roles.MANAGER'),
+    value: 'MANAGER',
+    description: t('share.roleDescriptions.MANAGER')
+  }
 ])
 const origin = computed(() => window.location.origin)
 const visibleShares = computed(() => shares.value.filter((share) => share.role !== 'UPLOADER'))
@@ -155,6 +173,20 @@ function shareLabel(share: MemoryShareSummary) {
   return share.name || t(`share.roles.${share.role}`)
 }
 
+function roleOptionByValue(value: unknown): ShareRoleOption | null {
+  const roleValue =
+    typeof value === 'string'
+      ? value
+      : value && typeof value === 'object' && 'value' in value
+        ? String(value.value)
+        : ''
+  return roleOptions.value.find((option) => option.value === roleValue) ?? null
+}
+
+function roleInfoLabel(option: ShareRoleOption) {
+  return `${option.label}: ${option.description}`
+}
+
 const canCreateShare = computed(() => !passwordEnabled.value || Boolean(password.value.trim()))
 
 const canSavePassword = computed(() => {
@@ -176,7 +208,34 @@ const canSavePassword = computed(() => {
         </label>
         <label>
           {{ t('common.role') }}
-          <Select v-model="role" :options="roleOptions" option-label="label" option-value="value" />
+          <Select v-model="role" :options="roleOptions" option-label="label" option-value="value">
+            <template #value="{ value }">
+              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
+                <span>{{ roleOptionByValue(value)?.label }}</span>
+                <span
+                  v-tooltip="roleOptionByValue(value)?.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <span class="share-role-option">
+                <span>{{ option.label }}</span>
+                <span
+                  v-tooltip="option.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(option)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+          </Select>
         </label>
       </div>
       <label class="toggle-row">
@@ -228,7 +287,34 @@ const canSavePassword = computed(() => {
             size="small"
             :aria-label="t('share.role')"
             @update:model-value="setRole(share, $event)"
-          />
+          >
+            <template #value="{ value }">
+              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
+                <span>{{ roleOptionByValue(value)?.label }}</span>
+                <span
+                  v-tooltip="roleOptionByValue(value)?.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <span class="share-role-option">
+                <span>{{ option.label }}</span>
+                <span
+                  v-tooltip="option.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(option)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+          </Select>
           <div class="management-actions">
             <Button
               icon="pi pi-copy"
