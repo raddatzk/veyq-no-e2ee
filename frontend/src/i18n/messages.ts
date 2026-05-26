@@ -249,10 +249,15 @@ export const messages = {
       toggleDisable: 'Freigabe deaktivieren',
       toggleEnable: 'Freigabe aktivieren',
       updateFailed: 'Freigabe konnte nicht aktualisiert werden',
+      uploadRequest: 'Upload anfragen',
       uploadCopy: 'Füge Fotos oder Videos zu dieser Erinnerung hinzu. Die Auswahl wird nach dem Hochladen zurückgesetzt.',
       uploadEmpty: 'Noch keine Medien ausgewählt.',
       uploadFailed: 'Medien konnten nicht hinzugefügt werden',
-      uploadTitle: 'Zur Erinnerung beitragen'
+      uploadTitle: 'Zur Erinnerung beitragen',
+      uploaderCreate: 'Uploader-Link erstellen',
+      uploaderDefaultName: 'Uploader-Link',
+      uploaderDialogCopy: 'Erstelle einen Upload-Link für Menschen, die nur Medien zu dieser Memory beitragen sollen.',
+      uploaderTitle: 'Upload anfragen'
     },
     settings: {
       confirmationDisplayName: 'Display-Name zur Bestätigung',
@@ -645,10 +650,15 @@ export const messages = {
       toggleDisable: 'Disable share',
       toggleEnable: 'Enable share',
       updateFailed: 'Share could not be updated',
+      uploadRequest: 'Request upload',
       uploadCopy: 'Add photos or videos to this Memory. Your selection is cleared after the upload.',
       uploadEmpty: 'No media selected yet.',
       uploadFailed: 'Media could not be added',
-      uploadTitle: 'Contribute to this Memory'
+      uploadTitle: 'Contribute to this Memory',
+      uploaderCreate: 'Create uploader link',
+      uploaderDefaultName: 'Uploader link',
+      uploaderDialogCopy: 'Create an upload link for people who should only contribute media to this Memory.',
+      uploaderTitle: 'Request upload'
     },
     settings: {
       confirmationDisplayName: 'Display name for confirmation',

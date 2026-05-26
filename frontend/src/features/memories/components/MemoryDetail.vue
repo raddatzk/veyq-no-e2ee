@@ -33,6 +33,7 @@ import MemoryCard from './MemoryCard.vue'
 import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryShareDialog from './MemoryShareDialog.vue'
+import MemoryUploaderShareDialog from './MemoryUploaderShareDialog.vue'
 import MemoryUploadDialog from './MemoryUploadDialog.vue'
 
 type MemoryDetailCapabilities = {
@@ -96,6 +97,7 @@ const editOpen = ref(false)
 const coverOpen = ref(false)
 const deleteOpen = ref(false)
 const shareOpen = ref(false)
+const uploaderShareOpen = ref(false)
 const uploadOpen = ref(false)
 const downloadOpen = ref(false)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
@@ -406,6 +408,15 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canShare"
+              icon="pi pi-user-plus"
+              :label="t('share.uploadRequest')"
+              severity="secondary"
+              outlined
+              size="small"
+              @click="uploaderShareOpen = true"
+            />
+            <Button
+              v-if="capabilities.canShare"
               icon="pi pi-share-alt"
               :label="t('share.title')"
               severity="secondary"
@@ -656,6 +667,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       @deleted="$emit('deleted', parentPath)"
     />
     <MemoryShareDialog v-model:visible="shareOpen" :tenant-name="tenantName" :memory="memory" />
+    <MemoryUploaderShareDialog v-model:visible="uploaderShareOpen" :tenant-name="tenantName" :memory="memory" />
     <MemoryUploadDialog
       v-model:visible="uploadOpen"
       :tenant-name="tenantName"

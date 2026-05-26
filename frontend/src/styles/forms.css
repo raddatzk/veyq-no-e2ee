@@ -24,7 +24,7 @@
 }
 
 .share-dialog {
-  width: min(720px, calc(100vw - 2rem));
+  width: min(560px, calc(100vw - 2rem));
 }
 
 .tenant-dialog .p-dialog-header-actions .p-button,
@@ -50,6 +50,12 @@
 .form {
   display: grid;
   gap: 1rem;
+}
+
+.form-copy {
+  margin: 0;
+  color: var(--app-muted);
+  line-height: 1.5;
 }
 
 .form .p-inputtext,

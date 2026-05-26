@@ -42,10 +42,10 @@ const editPassword = ref('')
 const roleOptions = computed(() => [
   { label: t('share.roles.VIEWER'), value: 'VIEWER' },
   { label: t('share.roles.CONTRIBUTOR'), value: 'CONTRIBUTOR' },
-  { label: t('share.roles.MANAGER'), value: 'MANAGER' },
-  { label: t('share.roles.UPLOADER'), value: 'UPLOADER' }
+  { label: t('share.roles.MANAGER'), value: 'MANAGER' }
 ])
 const origin = computed(() => window.location.origin)
+const visibleShares = computed(() => shares.value.filter((share) => share.role !== 'UPLOADER'))
 
 watch(
   visible,
@@ -200,7 +200,7 @@ const canSavePassword = computed(() => {
       />
 
       <ManagementList>
-        <div v-for="share in shares" :key="share.id" class="management-row">
+        <div v-for="share in visibleShares" :key="share.id" class="management-row">
           <div class="management-row-main">
             <strong class="management-row-title">{{ shareLabel(share) }}</strong>
             <span class="management-row-subtitle">{{ origin }}{{ share.shareUrl }}</span>

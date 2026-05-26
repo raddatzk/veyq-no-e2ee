@@ -117,6 +117,54 @@ class MultiTenantResourceTest {
     }
 
     @Test
+    fun `tenant owner can delete tenant with memory share state`() {
+        val ownerCookie = login(ownerEmail, ownerPassword)
+        val tenantName = "friends-$runId"
+        ensureTenant(ownerCookie, tenantName, "Friends")
+
+        val memoryId = given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"trip","displayName":"Trip","startDate":"2026-05-01","endDate":"2026-05-02"}""")
+            .`when`().post("/api/$tenantName/memories")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<String>("id")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"markdown":"# Trip"}""")
+            .`when`().put("/api/$tenantName/memories/$memoryId/journal")
+            .then()
+            .statusCode(200)
+
+        val shareId = given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"role":"VIEWER","password":"share-password123"}""")
+            .`when`().post("/api/$tenantName/memories/$memoryId/shares")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<String>("id")
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"share-password123","displayName":"Alex"}""")
+            .`when`().post("/api/public-shares/$shareId/login")
+            .then()
+            .statusCode(200)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().delete("/api/tenants/$tenantName")
+            .then()
+            .statusCode(204)
+    }
+
+    @Test
     fun `tenant filter protects tenant routes`() {
         val ownerCookie = login(ownerEmail, ownerPassword)
         ensureTenant(ownerCookie, "friends-$runId", "Friends")

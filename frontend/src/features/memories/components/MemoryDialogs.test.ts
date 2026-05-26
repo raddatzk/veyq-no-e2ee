@@ -21,6 +21,7 @@ import EditMemoryDialog from './EditMemoryDialog.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
 import MemoryShareDialog from './MemoryShareDialog.vue'
 import MemoryUploadDialog from './MemoryUploadDialog.vue'
+import MemoryUploaderShareDialog from './MemoryUploaderShareDialog.vue'
 
 vi.mock('../api', () => ({
   createMemory: vi.fn(),
@@ -46,6 +47,11 @@ const uploadMemoryMediaMock = vi.mocked(uploadMemoryMedia)
 
 describe('Memory detail dialogs', () => {
   beforeEach(() => {
+    vi.stubGlobal('navigator', {
+      clipboard: {
+        writeText: vi.fn()
+      }
+    })
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:cover-source'),
       revokeObjectURL: vi.fn()
@@ -431,7 +437,8 @@ describe('Memory detail dialogs', () => {
 
   it('manages existing shares through compact row actions', async () => {
     listMemorySharesMock.mockResolvedValue([
-      share({ id: 'shr-1', name: 'Family', role: 'VIEWER', hasPassword: true })
+      share({ id: 'shr-1', name: 'Family', role: 'VIEWER', hasPassword: true }),
+      share({ id: 'shr-upload', name: 'Drop Zone', role: 'UPLOADER', hasPassword: false })
     ])
     createMemoryShareMock.mockResolvedValue(share({ id: 'shr-2', hasPassword: false }))
     updateMemoryShareMock.mockResolvedValue(share({ id: 'shr-1', name: 'Family' }))
@@ -445,6 +452,11 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
     await flushPromises()
+
+    expect(wrapper.text()).toContain('Family')
+    expect(wrapper.text()).not.toContain('Drop Zone')
+    expect(wrapper.find('.form-grid select').text()).not.toContain('Uploader')
+    expect(wrapper.find('.management-control').text()).not.toContain('Uploader')
 
     await wrapper.find('button').trigger('click')
     await flushPromises()
@@ -499,6 +511,82 @@ describe('Memory detail dialogs', () => {
     await wrapper.findAll('form').at(-1)!.trigger('submit')
     await flushPromises()
     expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { password: '' })
+  })
+
+  it('manages uploader shares separately from memory shares', async () => {
+    listMemorySharesMock.mockResolvedValue([
+      share({ id: 'shr-view', name: 'Family', role: 'VIEWER', hasPassword: true }),
+      share({
+        id: 'shr-upload',
+        name: 'Drop Zone',
+        role: 'UPLOADER',
+        hasPassword: true,
+        shareUrl: '/s/shr-upload'
+      })
+    ])
+    createMemoryShareMock.mockResolvedValue(share({ id: 'shr-new', role: 'UPLOADER', hasPassword: false }))
+    updateMemoryShareMock.mockResolvedValue(share({ id: 'shr-upload', role: 'UPLOADER', name: 'Drop Zone' }))
+
+    const wrapper = mount(MemoryUploaderShareDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memory: memory()
+      },
+      global: { stubs: dialogStubs() }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Drop Zone')
+    expect(wrapper.text()).not.toContain('Family')
+
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
+    expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      name: null,
+      role: 'UPLOADER',
+      password: null
+    })
+
+    await wrapper.find('input[aria-label="Passwortschutz aktivieren"]').setValue(true)
+    await flushPromises()
+    const createButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Uploader-Link erstellen'))!
+    expect(createButton.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('input[autocomplete="new-password"]').setValue('upload-password123')
+    await createButton.trigger('click')
+    await flushPromises()
+    expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      name: null,
+      role: 'UPLOADER',
+      password: 'upload-password123'
+    })
+
+    await wrapper.find('button[aria-label="Freigabe-Link kopieren"]').trigger('click')
+    await flushPromises()
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/s/shr-upload'))
+
+    await wrapper.find('button[aria-label="Freigabe umbenennen"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input').at(-1)!.setValue('Guest uploads')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-upload', { name: 'Guest uploads' })
+
+    await wrapper.find('button[aria-label="Freigabe deaktivieren"]').trigger('click')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-upload', { enabled: false })
+
+    await wrapper.find('button[aria-label="Passwort ändern"]').trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input').at(-1)!.setValue('new-upload-password123')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-upload', {
+      password: 'new-upload-password123'
+    })
   })
 })
 

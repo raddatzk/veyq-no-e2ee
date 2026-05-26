@@ -143,6 +143,23 @@ describe('MemoryDetail', () => {
     expect(wrapper.text()).not.toContain('Herunterladen')
   })
 
+  it('opens uploader share requests from the header action', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await findButton(wrapper, 'Upload anfragen').trigger('click')
+
+    expect(wrapper.find('[data-testid="uploader-share-dialog"]').exists()).toBe(true)
+  })
+
   it('renders journal markdown and media embeds', () => {
     const wrapper = mount(MemoryDetail, {
       props: {
@@ -473,6 +490,10 @@ function detailStubs() {
     EditMemoryDialog: { template: '<div />' },
     MemoryCoverDialog: { template: '<div />' },
     MemoryShareDialog: { template: '<div />' },
+    MemoryUploaderShareDialog: {
+      props: ['visible'],
+      template: '<div v-if="visible" data-testid="uploader-share-dialog" />'
+    },
     MemoryUploadDialog: { template: '<div />' }
   }
 }
