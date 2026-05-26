@@ -29,6 +29,7 @@ models/CoverCrop.ts
 models/CreateFolderRequest.ts
 models/CreateGroupRequest.ts
 models/CreateManagedUserRequest.ts
+models/CreateMemoryMediaUploadRequest.ts
 models/CreateMemoryRequest.ts
 models/CreateMemoryShareRequest.ts
 models/CreatePasskeyRequest.ts
@@ -52,6 +53,7 @@ models/MemoryHeaderSummary.ts
 models/MemoryJournalSummary.ts
 models/MemoryMediaBatchResponse.ts
 models/MemoryMediaSummary.ts
+models/MemoryMediaUploadSession.ts
 models/MemoryNavigationBreadcrumb.ts
 models/MemoryNavigationKind.ts
 models/MemoryNavigationLocation.ts
@@ -70,6 +72,7 @@ models/PasskeyLoginRequest.ts
 models/PasskeyRegistrationRequest.ts
 models/PasskeySummary.ts
 models/PasskeysSummary.ts
+models/PendingMemoryMediaUploadSession.ts
 models/PublicShareCoverCrop.ts
 models/PublicShareLoginRequest.ts
 models/PublicShareMediaSummary.ts

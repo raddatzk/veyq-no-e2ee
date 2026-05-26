@@ -15,9 +15,12 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateMemoryMediaUploadRequest,
   CreatePublicShareMemoryRequest,
   ErrorResponse,
   MemoryJournalSummary,
+  MemoryMediaUploadSession,
+  PendingMemoryMediaUploadSession,
   PublicShareLoginRequest,
   PublicShareMediaSummary,
   PublicShareMemoryHeaderSummary,
@@ -29,12 +32,18 @@ import type {
   UpdatePublicShareMemoryRequest,
 } from '../models/index';
 import {
+    CreateMemoryMediaUploadRequestFromJSON,
+    CreateMemoryMediaUploadRequestToJSON,
     CreatePublicShareMemoryRequestFromJSON,
     CreatePublicShareMemoryRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     MemoryJournalSummaryFromJSON,
     MemoryJournalSummaryToJSON,
+    MemoryMediaUploadSessionFromJSON,
+    MemoryMediaUploadSessionToJSON,
+    PendingMemoryMediaUploadSessionFromJSON,
+    PendingMemoryMediaUploadSessionToJSON,
     PublicShareLoginRequestFromJSON,
     PublicShareLoginRequestToJSON,
     PublicShareMediaSummaryFromJSON,
@@ -55,10 +64,43 @@ import {
     UpdatePublicShareMemoryRequestToJSON,
 } from '../models/index';
 
+export interface AbortPublicShareMediaUploadRequest {
+    shareId: string;
+    uploadId: string;
+}
+
+export interface AbortPublicShareMemoryMediaUploadRequest {
+    shareId: string;
+    memoryId: string;
+    uploadId: string;
+}
+
+export interface CompletePublicShareMediaUploadRequest {
+    shareId: string;
+    uploadId: string;
+}
+
+export interface CompletePublicShareMemoryMediaUploadRequest {
+    shareId: string;
+    memoryId: string;
+    uploadId: string;
+}
+
 export interface CreatePublicShareChildMemoryRequest {
     shareId: string;
     memoryId: string;
     createPublicShareMemoryRequest: CreatePublicShareMemoryRequest;
+}
+
+export interface CreatePublicShareMediaUploadRequest {
+    shareId: string;
+    createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
+}
+
+export interface CreatePublicShareMemoryMediaUploadRequest {
+    shareId: string;
+    memoryId: string;
+    createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
 }
 
 export interface DeletePublicShareMediaRequest {
@@ -83,6 +125,11 @@ export interface GetPublicShareRequest {
     shareId: string;
 }
 
+export interface GetPublicShareMediaUploadRequest {
+    shareId: string;
+    uploadId: string;
+}
+
 export interface GetPublicShareMemoryByPathRequest {
     shareId: string;
     path: string;
@@ -96,6 +143,12 @@ export interface GetPublicShareMemoryHeaderRequest {
 export interface GetPublicShareMemoryJournalRequest {
     shareId: string;
     memoryId: string;
+}
+
+export interface GetPublicShareMemoryMediaUploadRequest {
+    shareId: string;
+    memoryId: string;
+    uploadId: string;
 }
 
 export interface GetPublicShareTreeRequest {
@@ -186,11 +239,26 @@ export interface UploadPublicShareMediaRequest {
     title?: string;
 }
 
+export interface UploadPublicShareMediaChunkRequest {
+    shareId: string;
+    uploadId: string;
+    chunkIndex: number;
+    body: Blob;
+}
+
 export interface UploadPublicShareMemoryMediaRequest {
     shareId: string;
     memoryId: string;
     file: Blob;
     title?: string;
+}
+
+export interface UploadPublicShareMemoryMediaChunkRequest {
+    shareId: string;
+    memoryId: string;
+    uploadId: string;
+    chunkIndex: number;
+    body: Blob;
 }
 
 /**
@@ -200,6 +268,110 @@ export interface UploadPublicShareMemoryMediaRequest {
  * @interface PublicSharesApiInterface
  */
 export interface PublicSharesApiInterface {
+    /**
+     * Creates request options for abortPublicShareMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    abortPublicShareMediaUploadRequestOpts(requestParameters: AbortPublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Abort a resumable public share root media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    abortPublicShareMediaUploadRaw(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Abort a resumable public share root media upload session
+     */
+    abortPublicShareMediaUpload(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for abortPublicShareMemoryMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    abortPublicShareMemoryMediaUploadRequestOpts(requestParameters: AbortPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Abort a resumable public share Memory media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    abortPublicShareMemoryMediaUploadRaw(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Abort a resumable public share Memory media upload session
+     */
+    abortPublicShareMemoryMediaUpload(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for completePublicShareMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    completePublicShareMediaUploadRequestOpts(requestParameters: CompletePublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Complete a resumable public share root media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    completePublicShareMediaUploadRaw(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>>;
+
+    /**
+     * Complete a resumable public share root media upload session
+     */
+    completePublicShareMediaUpload(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
+
+    /**
+     * Creates request options for completePublicShareMemoryMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    completePublicShareMemoryMediaUploadRequestOpts(requestParameters: CompletePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Complete a resumable public share Memory media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    completePublicShareMemoryMediaUploadRaw(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>>;
+
+    /**
+     * Complete a resumable public share Memory media upload session
+     */
+    completePublicShareMemoryMediaUpload(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
+
     /**
      * Creates request options for createPublicShareChildMemory without sending the request
      * @param {string} shareId Public share id.
@@ -227,6 +399,58 @@ export interface PublicSharesApiInterface {
      * Create a child Memory through a public share
      */
     createPublicShareChildMemory(requestParameters: CreatePublicShareChildMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary>;
+
+    /**
+     * Creates request options for createPublicShareMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMediaUploadRequestOpts(requestParameters: CreatePublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Create a resumable public share root media upload session
+     * @param {string} shareId Public share id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMediaUploadRaw(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
+
+    /**
+     * Create a resumable public share root media upload session
+     */
+    createPublicShareMediaUpload(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
+
+    /**
+     * Creates request options for createPublicShareMemoryMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryMediaUploadRequestOpts(requestParameters: CreatePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Create a resumable public share Memory media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryMediaUploadRaw(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
+
+    /**
+     * Create a resumable public share Memory media upload session
+     */
+    createPublicShareMemoryMediaUpload(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
 
     /**
      * Creates request options for deletePublicShareMedia without sending the request
@@ -337,6 +561,31 @@ export interface PublicSharesApiInterface {
     getPublicShare(requestParameters: GetPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareSummary>;
 
     /**
+     * Creates request options for getPublicShareMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMediaUploadRequestOpts(requestParameters: GetPublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Get a resumable public share root media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMediaUploadRaw(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
+
+    /**
+     * Get a resumable public share root media upload session
+     */
+    getPublicShareMediaUpload(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
+
+    /**
      * Creates request options for getPublicShareMemoryByPath without sending the request
      * @param {string} shareId Public share id.
      * @param {string} path Canonical Memory UI path with folder segments followed by one or more Memory name segments.
@@ -413,6 +662,33 @@ export interface PublicSharesApiInterface {
      * Get public share Memory journal
      */
     getPublicShareMemoryJournal(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
+
+    /**
+     * Creates request options for getPublicShareMemoryMediaUpload without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryMediaUploadRequestOpts(requestParameters: GetPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Get a resumable public share Memory media upload session
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    getPublicShareMemoryMediaUploadRaw(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
+
+    /**
+     * Get a resumable public share Memory media upload session
+     */
+    getPublicShareMemoryMediaUpload(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
 
     /**
      * Creates request options for getPublicShareTree without sending the request
@@ -847,6 +1123,35 @@ export interface PublicSharesApiInterface {
     uploadPublicShareMedia(requestParameters: UploadPublicShareMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
 
     /**
+     * Creates request options for uploadPublicShareMediaChunk without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMediaChunkRequestOpts(requestParameters: UploadPublicShareMediaChunkRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Upload one public share root media chunk
+     * @param {string} shareId Public share id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMediaChunkRaw(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Upload one public share root media chunk
+     */
+    uploadPublicShareMediaChunk(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
      * Creates request options for uploadPublicShareMemoryMedia without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -876,12 +1181,269 @@ export interface PublicSharesApiInterface {
      */
     uploadPublicShareMemoryMedia(requestParameters: UploadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
 
+    /**
+     * Creates request options for uploadPublicShareMemoryMediaChunk without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMemoryMediaChunkRequestOpts(requestParameters: UploadPublicShareMemoryMediaChunkRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Upload one public share Memory media chunk
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMemoryMediaChunkRaw(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Upload one public share Memory media chunk
+     */
+    uploadPublicShareMemoryMediaChunk(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
 }
 
 /**
  * 
  */
 export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiInterface {
+
+    /**
+     * Creates request options for abortPublicShareMediaUpload without sending the request
+     */
+    async abortPublicShareMediaUploadRequestOpts(requestParameters: AbortPublicShareMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling abortPublicShareMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling abortPublicShareMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Abort a resumable public share root media upload session
+     */
+    async abortPublicShareMediaUploadRaw(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.abortPublicShareMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Abort a resumable public share root media upload session
+     */
+    async abortPublicShareMediaUpload(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.abortPublicShareMediaUploadRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for abortPublicShareMemoryMediaUpload without sending the request
+     */
+    async abortPublicShareMemoryMediaUploadRequestOpts(requestParameters: AbortPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling abortPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling abortPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling abortPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Abort a resumable public share Memory media upload session
+     */
+    async abortPublicShareMemoryMediaUploadRaw(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.abortPublicShareMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Abort a resumable public share Memory media upload session
+     */
+    async abortPublicShareMemoryMediaUpload(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.abortPublicShareMemoryMediaUploadRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for completePublicShareMediaUpload without sending the request
+     */
+    async completePublicShareMediaUploadRequestOpts(requestParameters: CompletePublicShareMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling completePublicShareMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling completePublicShareMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/uploads/{uploadId}/complete`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Complete a resumable public share root media upload session
+     */
+    async completePublicShareMediaUploadRaw(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>> {
+        const requestOptions = await this.completePublicShareMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PublicShareMediaSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Complete a resumable public share root media upload session
+     */
+    async completePublicShareMediaUpload(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
+        const response = await this.completePublicShareMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for completePublicShareMemoryMediaUpload without sending the request
+     */
+    async completePublicShareMemoryMediaUploadRequestOpts(requestParameters: CompletePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling completePublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling completePublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling completePublicShareMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/complete`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Complete a resumable public share Memory media upload session
+     */
+    async completePublicShareMemoryMediaUploadRaw(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>> {
+        const requestOptions = await this.completePublicShareMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PublicShareMediaSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Complete a resumable public share Memory media upload session
+     */
+    async completePublicShareMemoryMediaUpload(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
+        const response = await this.completePublicShareMemoryMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for createPublicShareChildMemory without sending the request
@@ -945,6 +1507,124 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async createPublicShareChildMemory(requestParameters: CreatePublicShareChildMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMemorySummary> {
         const response = await this.createPublicShareChildMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createPublicShareMediaUpload without sending the request
+     */
+    async createPublicShareMediaUploadRequestOpts(requestParameters: CreatePublicShareMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling createPublicShareMediaUpload().'
+            );
+        }
+
+        if (requestParameters['createMemoryMediaUploadRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryMediaUploadRequest',
+                'Required parameter "createMemoryMediaUploadRequest" was null or undefined when calling createPublicShareMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/uploads`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryMediaUploadRequestToJSON(requestParameters['createMemoryMediaUploadRequest']),
+        };
+    }
+
+    /**
+     * Create a resumable public share root media upload session
+     */
+    async createPublicShareMediaUploadRaw(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
+        const requestOptions = await this.createPublicShareMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a resumable public share root media upload session
+     */
+    async createPublicShareMediaUpload(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
+        const response = await this.createPublicShareMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createPublicShareMemoryMediaUpload without sending the request
+     */
+    async createPublicShareMemoryMediaUploadRequestOpts(requestParameters: CreatePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling createPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling createPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['createMemoryMediaUploadRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryMediaUploadRequest',
+                'Required parameter "createMemoryMediaUploadRequest" was null or undefined when calling createPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/uploads`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryMediaUploadRequestToJSON(requestParameters['createMemoryMediaUploadRequest']),
+        };
+    }
+
+    /**
+     * Create a resumable public share Memory media upload session
+     */
+    async createPublicShareMemoryMediaUploadRaw(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
+        const requestOptions = await this.createPublicShareMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a resumable public share Memory media upload session
+     */
+    async createPublicShareMemoryMediaUpload(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
+        const response = await this.createPublicShareMemoryMediaUploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1175,6 +1855,59 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates request options for getPublicShareMediaUpload without sending the request
+     */
+    async getPublicShareMediaUploadRequestOpts(requestParameters: GetPublicShareMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling getPublicShareMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling getPublicShareMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Get a resumable public share root media upload session
+     */
+    async getPublicShareMediaUploadRaw(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
+        const requestOptions = await this.getPublicShareMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PendingMemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Get a resumable public share root media upload session
+     */
+    async getPublicShareMediaUpload(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
+        const response = await this.getPublicShareMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for getPublicShareMemoryByPath without sending the request
      */
     async getPublicShareMemoryByPathRequestOpts(requestParameters: GetPublicShareMemoryByPathRequest): Promise<runtime.RequestOpts> {
@@ -1339,6 +2072,67 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async getPublicShareMemoryJournal(requestParameters: GetPublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
         const response = await this.getPublicShareMemoryJournalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getPublicShareMemoryMediaUpload without sending the request
+     */
+    async getPublicShareMemoryMediaUploadRequestOpts(requestParameters: GetPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling getPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling getPublicShareMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Get a resumable public share Memory media upload session
+     */
+    async getPublicShareMemoryMediaUploadRaw(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
+        const requestOptions = await this.getPublicShareMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PendingMemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Get a resumable public share Memory media upload session
+     */
+    async getPublicShareMemoryMediaUpload(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
+        const response = await this.getPublicShareMemoryMediaUploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -2296,6 +3090,76 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates request options for uploadPublicShareMediaChunk without sending the request
+     */
+    async uploadPublicShareMediaChunkRequestOpts(requestParameters: UploadPublicShareMediaChunkRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling uploadPublicShareMediaChunk().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling uploadPublicShareMediaChunk().'
+            );
+        }
+
+        if (requestParameters['chunkIndex'] == null) {
+            throw new runtime.RequiredError(
+                'chunkIndex',
+                'Required parameter "chunkIndex" was null or undefined when calling uploadPublicShareMediaChunk().'
+            );
+        }
+
+        if (requestParameters['body'] == null) {
+            throw new runtime.RequiredError(
+                'body',
+                'Required parameter "body" was null or undefined when calling uploadPublicShareMediaChunk().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/octet-stream';
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/uploads/{uploadId}/chunks/{chunkIndex}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+        urlPath = urlPath.replace(`{${"chunkIndex"}}`, encodeURIComponent(String(requestParameters['chunkIndex'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['body'] as any,
+        };
+    }
+
+    /**
+     * Upload one public share root media chunk
+     */
+    async uploadPublicShareMediaChunkRaw(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.uploadPublicShareMediaChunkRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Upload one public share root media chunk
+     */
+    async uploadPublicShareMediaChunk(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.uploadPublicShareMediaChunkRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * Creates request options for uploadPublicShareMemoryMedia without sending the request
      */
     async uploadPublicShareMemoryMediaRequestOpts(requestParameters: UploadPublicShareMemoryMediaRequest): Promise<runtime.RequestOpts> {
@@ -2380,6 +3244,84 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     async uploadPublicShareMemoryMedia(requestParameters: UploadPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
         const response = await this.uploadPublicShareMemoryMediaRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for uploadPublicShareMemoryMediaChunk without sending the request
+     */
+    async uploadPublicShareMemoryMediaChunkRequestOpts(requestParameters: UploadPublicShareMemoryMediaChunkRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling uploadPublicShareMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling uploadPublicShareMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling uploadPublicShareMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['chunkIndex'] == null) {
+            throw new runtime.RequiredError(
+                'chunkIndex',
+                'Required parameter "chunkIndex" was null or undefined when calling uploadPublicShareMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['body'] == null) {
+            throw new runtime.RequiredError(
+                'body',
+                'Required parameter "body" was null or undefined when calling uploadPublicShareMemoryMediaChunk().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/octet-stream';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+        urlPath = urlPath.replace(`{${"chunkIndex"}}`, encodeURIComponent(String(requestParameters['chunkIndex'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['body'] as any,
+        };
+    }
+
+    /**
+     * Upload one public share Memory media chunk
+     */
+    async uploadPublicShareMemoryMediaChunkRaw(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.uploadPublicShareMemoryMediaChunkRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Upload one public share Memory media chunk
+     */
+    async uploadPublicShareMemoryMediaChunk(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.uploadPublicShareMemoryMediaChunkRaw(requestParameters, initOverrides);
     }
 
 }

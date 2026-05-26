@@ -308,6 +308,60 @@ class MemoryShareResourceTest {
     }
 
     @Test
+    fun `uploader share can complete root resumable media upload`() {
+        val shareId = createShare("UPLOADER")
+        val accessCookie = loginShare(shareId)
+        val image = Files.readAllBytes(imageFile())
+
+        val uploadId = given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .contentType("application/json")
+            .body("""{"filename":"chunk.png","mimeType":"image/png","sizeBytes":${image.size},"title":"Chunk Upload"}""")
+            .`when`().post("/api/public-shares/$shareId/media/uploads")
+            .then()
+            .statusCode(200)
+            .body("uploadId", notNullValue())
+            .body("chunkSizeBytes", equalTo(4))
+            .extract()
+            .path<String>("uploadId")
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .contentType("application/octet-stream")
+            .body(image.copyOfRange(0, 4))
+            .`when`().put("/api/public-shares/$shareId/media/uploads/$uploadId/chunks/0")
+            .then()
+            .statusCode(204)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().get("/api/public-shares/$shareId/media/uploads/$uploadId")
+            .then()
+            .statusCode(200)
+            .body("uploadedChunks", equalTo(listOf(0)))
+            .body("uploadedBytes", equalTo(4))
+
+        for (offset in 4 until image.size step 4) {
+            given()
+                .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+                .contentType("application/octet-stream")
+                .body(image.copyOfRange(offset, (offset + 4).coerceAtMost(image.size)))
+                .`when`().put("/api/public-shares/$shareId/media/uploads/$uploadId/chunks/${offset / 4}")
+                .then()
+                .statusCode(204)
+        }
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().post("/api/public-shares/$shareId/media/uploads/$uploadId/complete")
+            .then()
+            .statusCode(200)
+            .body("title", equalTo("Chunk Upload"))
+            .body("uploader.displayName", equalTo("Alex"))
+            .body("uploader.type", equalTo("ANONYMOUS"))
+    }
+
+    @Test
     fun `viewer share can download visible original media as zip and uploader share cannot`() {
         val child = createMemory("day-$runId", "Day $runId", parent = memory)
         val rootMedia = createMedia("Root Download", createdAt = Instant.parse("2026-01-02T10:00:00Z"))

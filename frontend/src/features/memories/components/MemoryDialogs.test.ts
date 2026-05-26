@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../shared/api/httpClient'
+import { clearUploadQueue, useUploadQueue } from '../composables/useUploadQueue'
 import {
   createMemory,
   createMemoryShare,
@@ -69,6 +70,7 @@ describe('Memory detail dialogs', () => {
   afterEach(() => {
     vi.resetAllMocks()
     vi.unstubAllGlobals()
+    clearUploadQueue()
   })
 
   it('updates memory display metadata and emits the updated memory', async () => {
@@ -233,11 +235,53 @@ describe('Memory detail dialogs', () => {
     expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
       file: first,
       title: 'beach.jpg'
-    })
+    }, expect.any(Object))
     expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
       file: second,
       title: 'clip.mov'
+    }, expect.any(Object))
+  })
+
+  it('removes individual selected media files and clears the full selection', async () => {
+    const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
+    const second = new File(['second'], 'clip.mov', { type: 'video/quicktime' })
+    const third = new File(['third'], 'mountain.jpg', { type: 'image/jpeg' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
     })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await flushPromises()
+    await wrapper.find('button[aria-label="beach.jpg aus Auswahl entfernen"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('beach.jpg')
+    expect(wrapper.text()).toContain('clip.mov')
+    expect(wrapper.text()).toContain('1 Medien ausgewählt')
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second, third] })
+    await flushPromises()
+    await wrapper.find('.memory-upload-clear-button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Keine Medien ausgewählt')
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [third] })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(1)
+    expect(uploadMemoryMediaMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      file: third,
+      title: 'mountain.jpg'
+    }, expect.any(Object))
   })
 
   it('passes file names to injected share media upload handlers', async () => {
@@ -262,7 +306,35 @@ describe('Memory detail dialogs', () => {
     expect(uploadMedia).toHaveBeenCalledWith('mem-1', {
       file,
       title: 'shared.jpg'
+    }, expect.any(Object))
+  })
+
+  it('starts a background upload batch and closes the dialog', async () => {
+    const first = new File(['first-file'], 'beach.jpg', { type: 'image/jpeg' })
+    const uploadMedia = vi.fn().mockResolvedValue(media())
+    const saved = vi.fn()
+    const { visibleBatches } = useUploadQueue()
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        uploadMedia,
+        onSaved: saved
+      },
+      global: { stubs: dialogStubs() }
     })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first] })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(visibleBatches.value[0].files[0].name).toBe('beach.jpg')
+    expect(uploadMedia).toHaveBeenCalledWith('mem-1', { file: first, title: 'beach.jpg' }, expect.any(Object))
+    expect(wrapper.emitted('update:visible')?.at(-1)).toEqual([false])
+    expect(saved).toHaveBeenCalled()
   })
 
   it('shows localized cover error codes', async () => {

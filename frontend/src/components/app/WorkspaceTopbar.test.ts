@@ -1,5 +1,8 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
+import { clearUploadQueue, startUploadBatch } from '../../features/memories/composables/useUploadQueue'
+import { UploadCancelledError } from '../../shared/api/httpClient'
 import WorkspaceTopbar from './WorkspaceTopbar.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -31,6 +34,7 @@ describe('WorkspaceTopbar', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    clearUploadQueue()
   })
 
   it('opens search from the topbar and navigates to a result', async () => {
@@ -104,6 +108,124 @@ describe('WorkspaceTopbar', () => {
 
     expect(mocks.push).toHaveBeenCalledWith('/friends/beach-day')
   })
+
+  it('shows active uploads next to search and can cancel all', async () => {
+    const uploadFile = vi.fn(
+      (_file: File, options: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.signal?.addEventListener('abort', () => reject(new UploadCancelledError()))
+        })
+    )
+    startUploadBatch({
+      label: '2 Medien',
+      files: [new File(['first'], 'first.jpg'), new File(['second'], 'second.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile
+    })
+    const wrapper = mountTopbar()
+    await nextTick()
+
+    expect(wrapper.find('.upload-status-trigger').exists()).toBe(true)
+    expect(wrapper.find('.upload-status-badge').text()).toBe('2')
+
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    expect(wrapper.text()).toContain('first.jpg')
+    expect(wrapper.text()).toContain('second.jpg')
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Alle abbrechen'))!.trigger('click')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Abgebrochen')
+  })
+
+  it('updates the open upload popover when a new upload starts', async () => {
+    const wrapper = mountTopbar()
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    expect(wrapper.text()).toContain('Keine aktiven Uploads')
+
+    let capturedProgress: ((progress: { loaded: number; total: number | null }) => void) | undefined
+    startUploadBatch({
+      label: '1 Medium',
+      files: [new File(['first-file'], 'live.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile: (_file, options) =>
+        new Promise((_resolve, reject) => {
+          capturedProgress = options.onProgress
+          options.signal?.addEventListener('abort', () => reject(new UploadCancelledError()))
+        })
+    })
+    await nextTick()
+    await flushPromises()
+    capturedProgress?.({ loaded: 5, total: 10 })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('live.jpg')
+    expect(wrapper.text()).toContain('50%')
+  })
+
+  it('updates the open upload popover and badge as uploads finish', async () => {
+    const resolvers: Array<() => void> = []
+    const progressCallbacks: Array<(progress: { loaded: number; total: number | null }) => void> = []
+    const uploadFile = vi.fn(
+      (_file: File, options: { onProgress?: (progress: { loaded: number; total: number | null }) => void }) =>
+        new Promise<void>((resolve) => {
+          progressCallbacks.push((progress) => options.onProgress?.(progress))
+          resolvers.push(resolve)
+        })
+    )
+
+    startUploadBatch({
+      label: '2 Medien',
+      files: [new File(['first-file'], 'first.jpg'), new File(['second-file'], 'second.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile
+    })
+    const wrapper = mountTopbar()
+    await nextTick()
+    await flushPromises()
+
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    expect(wrapper.find('.upload-status-badge').text()).toBe('2')
+    expect(wrapper.text()).toContain('first.jpg')
+
+    progressCallbacks[0]?.({ loaded: 5, total: 10 })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('50%')
+
+    resolvers[0]()
+    await flushPromises()
+    await nextTick()
+
+    expect(wrapper.find('.upload-status-badge').text()).toBe('1')
+    expect(wrapper.text()).toContain('Fertig')
+    expect(wrapper.text()).toContain('second.jpg')
+  })
+
+  it('closes the upload popover with escape and outside click', async () => {
+    startUploadBatch({
+      label: '1 Medium',
+      files: [new File(['first-file'], 'first.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile: () => new Promise(() => undefined)
+    })
+    const wrapper = mountTopbar()
+    await nextTick()
+
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    expect(wrapper.find('.upload-status-panel').exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+    expect(wrapper.find('.upload-status-panel').exists()).toBe(false)
+
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    expect(wrapper.find('.upload-status-panel').exists()).toBe(true)
+
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await nextTick()
+    expect(wrapper.find('.upload-status-panel').exists()).toBe(false)
+  })
 })
 
 function mountTopbar() {
@@ -111,7 +233,11 @@ function mountTopbar() {
     global: {
       stubs: {
         Breadcrumb: { template: '<nav />' },
-        Button: { template: '<button />' }
+        Button: {
+          template: '<button v-bind="$attrs" type="button" @click="$emit(\'click\', $event)">{{ label }}</button>',
+          props: ['label'],
+          emits: ['click']
+        }
       }
     }
   })

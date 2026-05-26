@@ -9,6 +9,7 @@ import { memoryPathToTenantRoute } from '../../shared/utils/paths'
 import { useBreadcrumbs } from '../../composables/useBreadcrumbs'
 import { workspaceToolbar } from '../../composables/useWorkspaceToolbar'
 import { searchTenant, type SearchResultSummary } from '../../features/memories/api'
+import UploadStatusMenu from '../../features/memories/components/UploadStatusMenu.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -221,17 +222,20 @@ function isMacPlatform(): boolean {
         </div>
       </div>
     </div>
-    <div class="workspace-actions">
-      <Button
-        v-for="action in actions"
-        :key="action.key"
-        :icon="action.icon"
-        :aria-label="action.label"
-        :severity="action.severity"
-        :outlined="action.outlined"
-        size="small"
-        @click="action.command"
-      />
+    <div class="workspace-topbar-actions">
+      <UploadStatusMenu />
+      <div v-if="actions.length" class="workspace-actions">
+        <Button
+          v-for="action in actions"
+          :key="action.key"
+          :icon="action.icon"
+          :aria-label="action.label"
+          :severity="action.severity"
+          :outlined="action.outlined"
+          size="small"
+          @click="action.command"
+        />
+      </div>
     </div>
   </header>
 </template>

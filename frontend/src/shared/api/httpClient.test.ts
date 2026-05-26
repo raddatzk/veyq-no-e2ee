@@ -1,5 +1,49 @@
-import { describe, expect, it } from 'vitest'
-import { ApiError, SetupRequiredError, apiError } from './httpClient'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, SetupRequiredError, UploadCancelledError, apiError, uploadBlob, uploadFormDataJson } from './httpClient'
+
+class MockXMLHttpRequest {
+  static instances: MockXMLHttpRequest[] = []
+
+  upload = {
+    onprogress: null as ((event: ProgressEvent) => void) | null
+  }
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  onabort: (() => void) | null = null
+  responseText = ''
+  responseType = ''
+  status = 200
+  statusText = 'OK'
+  withCredentials = false
+  method = ''
+  url = ''
+  body: FormData | Blob | null = null
+  headers = new Map<string, string>()
+  abort = vi.fn(() => {
+    this.onabort?.()
+  })
+
+  constructor() {
+    MockXMLHttpRequest.instances.push(this)
+  }
+
+  open(method: string, url: string) {
+    this.method = method
+    this.url = url
+  }
+
+  setRequestHeader(name: string, value: string) {
+    this.headers.set(name, value)
+  }
+
+  send(body: FormData | Blob) {
+    this.body = body
+  }
+
+  getAllResponseHeaders() {
+    return 'content-type: application/json'
+  }
+}
 
 describe('apiError', () => {
   it('parses stable error response codes', async () => {
@@ -45,3 +89,116 @@ describe('apiError', () => {
   })
 })
 
+describe('uploadFormDataJson', () => {
+  beforeEach(() => {
+    MockXMLHttpRequest.instances = []
+    vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('posts multipart form data with cookies and returns parsed JSON', async () => {
+    const body = new FormData()
+    const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
+    body.append('file', file)
+
+    const request = uploadFormDataJson<{ id: string }>('/api/tenant/memories/mem-1/media', body)
+    const xhr = MockXMLHttpRequest.instances[0]
+    xhr.responseText = JSON.stringify({ id: 'media-1' })
+    xhr.onload?.()
+
+    await expect(request).resolves.toEqual({ id: 'media-1' })
+    expect(xhr.method).toBe('POST')
+    expect(xhr.url).toBe('/api/tenant/memories/mem-1/media')
+    expect(xhr.withCredentials).toBe(true)
+    expect(xhr.body).toBe(body)
+  })
+
+  it('maps JSON error responses through ApiError', async () => {
+    const request = uploadFormDataJson('/api/tenant/memories/mem-1/media', new FormData())
+    const xhr = MockXMLHttpRequest.instances[0]
+    xhr.status = 413
+    xhr.statusText = 'Payload Too Large'
+    xhr.responseText = JSON.stringify({ code: 'UPLOAD_TOO_LARGE', message: 'Too large' })
+    xhr.onload?.()
+
+    await expect(request).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 413,
+      code: 'UPLOAD_TOO_LARGE',
+      message: 'Too large'
+    })
+  })
+
+  it('emits upload progress callbacks', async () => {
+    const onProgress = vi.fn()
+    const request = uploadFormDataJson('/api/tenant/memories/mem-1/media', new FormData(), onProgress)
+    const xhr = MockXMLHttpRequest.instances[0]
+
+    xhr.upload.onprogress?.({ loaded: 25, total: 100, lengthComputable: true } as ProgressEvent)
+    xhr.responseText = JSON.stringify({ id: 'media-1' })
+    xhr.onload?.()
+
+    await request
+    expect(onProgress).toHaveBeenCalledWith({ loaded: 25, total: 100 })
+  })
+
+  it('aborts uploads through AbortSignal with a cancellation error', async () => {
+    const controller = new AbortController()
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener')
+    const request = uploadFormDataJson('/api/tenant/memories/mem-1/media', new FormData(), undefined, controller.signal)
+    const xhr = MockXMLHttpRequest.instances[0]
+
+    controller.abort()
+
+    expect(xhr.abort).toHaveBeenCalled()
+    await expect(request).rejects.toMatchObject({ name: 'UploadCancelledError' })
+    expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function))
+  })
+
+  it('keeps cancellation when an upload is aborted during auth refresh', async () => {
+    const controller = new AbortController()
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))))
+    const request = uploadBlob(
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/chunks/0',
+      new Blob(['chunk']),
+      'application/octet-stream',
+      undefined,
+      controller.signal
+    )
+    const xhr = MockXMLHttpRequest.instances[0]
+    xhr.status = 401
+    xhr.responseText = JSON.stringify({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+    xhr.onload?.()
+
+    controller.abort()
+
+    await expect(request).rejects.toBeInstanceOf(UploadCancelledError)
+    expect(MockXMLHttpRequest.instances).toHaveLength(1)
+  })
+
+  it('uploads binary chunks with content type, cookies and progress', async () => {
+    const onProgress = vi.fn()
+    const chunk = new Blob(['chunk'], { type: 'application/octet-stream' })
+    const request = uploadBlob(
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/chunks/0',
+      chunk,
+      'application/octet-stream',
+      onProgress
+    )
+    const xhr = MockXMLHttpRequest.instances[0]
+
+    xhr.upload.onprogress?.({ loaded: 5, total: 5, lengthComputable: true } as ProgressEvent)
+    xhr.status = 204
+    xhr.onload?.()
+
+    await request
+    expect(xhr.method).toBe('PUT')
+    expect(xhr.withCredentials).toBe(true)
+    expect(xhr.body).toBe(chunk)
+    expect(xhr.headers.get('Content-Type')).toBe('application/octet-stream')
+    expect(onProgress).toHaveBeenCalledWith({ loaded: 5, total: 5 })
+  })
+})

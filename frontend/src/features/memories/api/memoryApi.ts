@@ -10,10 +10,14 @@ import {
 } from '../../../api/generatedClient'
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
+  CreateMemoryMediaUploadRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateMemoryShareRequest as GeneratedCreateMemoryShareRequest,
   CreatePublicShareMemoryRequest as GeneratedCreatePublicShareMemoryRequest,
+  MemoryMediaSummary,
+  MemoryMediaUploadSession,
   MemoryShareRole,
+  PendingMemoryMediaUploadSession,
   PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareMemorySummary,
@@ -22,6 +26,7 @@ import type {
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest,
   UpdatePublicShareMemoryRequest as GeneratedUpdatePublicShareMemoryRequest
 } from '../../../api/generated'
+import { callApi, uploadBlob } from '../../../shared/api/httpClient'
 import type {
   CreateFolderRequest,
   CreateMemoryRequest,
@@ -37,6 +42,7 @@ import type {
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
+  UploadMediaOptions,
   UploadMemoryMediaRequest
 } from './types'
 
@@ -195,15 +201,14 @@ export function listMemoryMedia(
 export function uploadMemoryMedia(
   tenantName: string,
   memoryId: string,
-  request: UploadMemoryMediaRequest
+  request: UploadMemoryMediaRequest,
+  options: UploadMediaOptions = {}
 ): Promise<MemoryMedia> {
-  return generatedCall(
-    memoryMediaApi.uploadMemoryMedia({
-      tenantName,
-      memoryId,
-      file: request.file,
-      title: request.title ?? undefined
-    })
+  const basePath = `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/uploads`
+  return uploadChunkedMedia<MemoryMediaSummary>(
+    basePath,
+    request,
+    options,
   ).then(normalizeMemoryMedia)
 }
 
@@ -314,14 +319,14 @@ export function listPublicShareMedia(shareId: string) {
 
 export function uploadPublicShareMedia(
   shareId: string,
-  request: { file: File; title?: string | null }
+  request: { file: File; title?: string | null },
+  options: UploadMediaOptions = {}
 ) {
-  return generatedCall(
-    publicSharesApi.uploadPublicShareMedia({
-      shareId,
-      file: request.file,
-      title: request.title ?? undefined
-    })
+  const basePath = `/api/public-shares/${encodeURIComponent(shareId)}/media/uploads`
+  return uploadChunkedMedia<PublicShareMediaSummary>(
+    basePath,
+    request,
+    options,
   ).then(normalizePublicShareMedia)
 }
 
@@ -416,15 +421,14 @@ export function listPublicShareMemoryMedia(
 export function uploadPublicShareMemoryMedia(
   shareId: string,
   memoryId: string,
-  request: UploadMemoryMediaRequest
+  request: UploadMemoryMediaRequest,
+  options: UploadMediaOptions = {}
 ): Promise<MemoryMedia> {
-  return generatedCall(
-    publicSharesApi.uploadPublicShareMemoryMedia({
-      shareId,
-      memoryId,
-      file: request.file,
-      title: request.title ?? undefined
-    })
+  const basePath = `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/uploads`
+  return uploadChunkedMedia<PublicShareMediaSummary>(
+    basePath,
+    request,
+    options,
   ).then(normalizePublicShareMedia)
 }
 
@@ -475,6 +479,98 @@ export function deletePublicShareMedia(
   mediaId: string
 ): Promise<void> {
   return generatedCall(publicSharesApi.deletePublicShareMedia({ shareId, memoryId, mediaId }))
+}
+
+export function abortMemoryMediaUploadSession(
+  tenantName: string,
+  memoryId: string,
+  uploadId: string
+): Promise<void> {
+  return callApi<void>(
+    `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/uploads/${encodeURIComponent(uploadId)}`,
+    { method: 'DELETE' }
+  )
+}
+
+export function abortPublicShareMediaUploadSession(shareId: string, uploadId: string): Promise<void> {
+  return callApi<void>(
+    `/api/public-shares/${encodeURIComponent(shareId)}/media/uploads/${encodeURIComponent(uploadId)}`,
+    { method: 'DELETE' }
+  )
+}
+
+export function abortPublicShareMemoryMediaUploadSession(
+  shareId: string,
+  memoryId: string,
+  uploadId: string
+): Promise<void> {
+  return callApi<void>(
+    `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/uploads/${encodeURIComponent(uploadId)}`,
+    { method: 'DELETE' }
+  )
+}
+
+async function uploadChunkedMedia<T>(
+  basePath: string,
+  request: { file: File; title?: string | null },
+  options: UploadMediaOptions
+): Promise<T> {
+  const session = await callApi<MemoryMediaUploadSession>(basePath, {
+    method: 'POST',
+    body: JSON.stringify(createUploadSessionRequest(request))
+  })
+  options.onSession?.(session)
+
+  const pendingSession = isPendingUploadSession(session)
+    ? session
+    : await callApi<PendingMemoryMediaUploadSession>(`${basePath}/${encodeURIComponent(session.uploadId)}`)
+  options.onSession?.(pendingSession)
+
+  const uploadedChunks = new Set(pendingSession.uploadedChunks)
+  let uploadedBytes = pendingSession.uploadedBytes
+  options.onProgress?.({ loaded: uploadedBytes, total: request.file.size })
+
+  for (let start = 0, index = 0; start < request.file.size; start += pendingSession.chunkSizeBytes, index += 1) {
+    const end = Math.min(start + pendingSession.chunkSizeBytes, request.file.size)
+    if (uploadedChunks.has(index)) {
+      uploadedBytes = Math.max(uploadedBytes, end)
+      options.onProgress?.({ loaded: uploadedBytes, total: request.file.size })
+      continue
+    }
+
+    const chunk = request.file.slice(start, end)
+    await uploadBlob(
+      `${basePath}/${encodeURIComponent(session.uploadId)}/chunks/${index}`,
+      chunk,
+      'application/octet-stream',
+      ({ loaded }) => {
+        options.onProgress?.({
+          loaded: Math.min(start + loaded, request.file.size),
+          total: request.file.size
+        })
+      },
+      options.signal
+    )
+    uploadedBytes = end
+    options.onProgress?.({ loaded: uploadedBytes, total: request.file.size })
+  }
+
+  return callApi<T>(`${basePath}/${encodeURIComponent(session.uploadId)}/complete`, { method: 'POST' })
+}
+
+function createUploadSessionRequest(request: { file: File; title?: string | null }): CreateMemoryMediaUploadRequest {
+  return {
+    filename: request.file.name || 'Upload',
+    mimeType: request.file.type || 'application/octet-stream',
+    sizeBytes: request.file.size,
+    title: request.title ?? undefined
+  }
+}
+
+function isPendingUploadSession(
+  session: MemoryMediaUploadSession | PendingMemoryMediaUploadSession
+): session is PendingMemoryMediaUploadSession {
+  return 'uploadedChunks' in session
 }
 
 function createMemoryRequest(request: CreateMemoryRequest): GeneratedCreateMemoryRequest {

@@ -537,6 +537,115 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads":
+    post:
+      tags: [PublicShares]
+      operationId: createPublicShareMemoryMediaUpload
+      summary: Create a resumable public share Memory media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "./memories.openapi.yaml#/components/requestBodies/CreateMemoryMediaUpload"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaUploadSession"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareMemoryMediaUpload
+      summary: Get a resumable public share Memory media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/PendingMemoryMediaUploadSession"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags: [PublicShares]
+      operationId: abortPublicShareMemoryMediaUpload
+      summary: Abort a resumable public share Memory media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+      responses:
+        "204":
+          description: Upload session aborted.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}":
+    put:
+      tags: [PublicShares]
+      operationId: uploadPublicShareMemoryMediaChunk
+      summary: Upload one public share Memory media chunk
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/ChunkIndex"
+      requestBody:
+        "$ref": "./memories.openapi.yaml#/components/requestBodies/UploadMediaChunk"
+      responses:
+        "204":
+          description: Upload chunk stored.
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/complete":
+    post:
+      tags: [PublicShares]
+      operationId: completePublicShareMemoryMediaUpload
+      summary: Complete a resumable public share Memory media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/download":
     get:
       tags: [PublicShares]
@@ -796,6 +905,106 @@ paths:
         - "$ref": "#/components/parameters/ShareId"
       requestBody:
         "$ref": "#/components/requestBodies/UploadPublicShareMedia"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+  "/api/public-shares/{shareId}/media/uploads":
+    post:
+      tags: [PublicShares]
+      operationId: createPublicShareMediaUpload
+      summary: Create a resumable public share root media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+      requestBody:
+        "$ref": "./memories.openapi.yaml#/components/requestBodies/CreateMemoryMediaUpload"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaUploadSession"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/uploads/{uploadId}":
+    get:
+      tags: [PublicShares]
+      operationId: getPublicShareMediaUpload
+      summary: Get a resumable public share root media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/PendingMemoryMediaUploadSession"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags: [PublicShares]
+      operationId: abortPublicShareMediaUpload
+      summary: Abort a resumable public share root media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+      responses:
+        "204":
+          description: Upload session aborted.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/uploads/{uploadId}/chunks/{chunkIndex}":
+    put:
+      tags: [PublicShares]
+      operationId: uploadPublicShareMediaChunk
+      summary: Upload one public share root media chunk
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/ChunkIndex"
+      requestBody:
+        "$ref": "./memories.openapi.yaml#/components/requestBodies/UploadMediaChunk"
+      responses:
+        "204":
+          description: Upload chunk stored.
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/uploads/{uploadId}/complete":
+    post:
+      tags: [PublicShares]
+      operationId: completePublicShareMediaUpload
+      summary: Complete a resumable public share root media upload session
+      security: []
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/UploadId"
       responses:
         "200":
           "$ref": "#/components/responses/PublicShareMedia"

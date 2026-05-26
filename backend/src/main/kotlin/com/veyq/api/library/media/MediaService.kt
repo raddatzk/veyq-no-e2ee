@@ -11,20 +11,27 @@ import com.veyq.api.domain.MediaBlobRepo
 import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
 import com.veyq.api.domain.MemoryShareIdentity
+import com.veyq.api.domain.MemoryShareIdentityRepo
 import com.veyq.api.domain.MemoryRepo
 import com.veyq.api.domain.TenantFolderRepo
 import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.User
+import com.veyq.api.domain.UserRepo
+import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.MediaUploader
+import com.veyq.api.generated.model.MemoryMediaUploadSession
 import com.veyq.api.generated.model.MemoryMediaBatchResponse
 import com.veyq.api.generated.model.MemoryMediaSummary
+import com.veyq.api.generated.model.PendingMemoryMediaUploadSession
 import com.veyq.api.generated.model.PublicShareMediaSummary
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.LibraryScopes
+import io.quarkus.scheduler.Scheduled
+import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -48,6 +55,8 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Comparator
+import java.util.Properties
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -58,15 +67,48 @@ class MediaService @Inject constructor(
     private val mediaRepo: MediaRepo,
     private val mediaBlobRepo: MediaBlobRepo,
     private val memoryRepo: MemoryRepo,
+    private val userRepo: UserRepo,
+    private val shareIdentityRepo: MemoryShareIdentityRepo,
     private val mediaConfig: MediaConfig,
     private val mediaTypeDetector: MediaTypeDetector,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val mediaGroupMemberRepo: TenantGroupMemberRepo,
-    requestContext: RequestContext
+    requestContext: RequestContext,
+    private val self: Instance<MediaService>,
 ) : LibraryService(folderRepo, groupRepo, mediaGroupMemberRepo, requestContext) {
     private val log: Logger = Logger.getLogger(MediaService::class.java)
+
+    private data class UploadSession(
+        val uploadId: String,
+        val tenantId: Long,
+        val memoryId: Long,
+        val memoryPublicId: String,
+        val filename: String,
+        val mimeType: String,
+        val sizeBytes: Long,
+        val title: String?,
+        val uploaderUserId: Long?,
+        val shareIdentityId: Long?,
+        val shareId: String?,
+        val createdAt: Instant,
+        val updatedAt: Instant,
+    )
+
+    data class PreparedMemoryUpload(
+        val tenantId: Long,
+        val memoryId: Long,
+        val originalFilename: String?,
+        val title: String?,
+        val uploaderUserId: Long?,
+        val shareIdentityId: Long?,
+        val sizeBytes: Long,
+        val mimeType: String,
+        val contentSha256: String,
+        val storageKey: String,
+        val metadata: ExtractedMediaMetadata,
+    )
 
     fun listMemoryMedia(memoryId: String, includeChildren: Boolean): List<MemoryMediaSummary> {
         val memory = resolveVisibleMemory(memoryId)
@@ -168,6 +210,179 @@ class MediaService @Inject constructor(
             shareIdentity = shareIdentity,
         ).toPublicShareSummary(shareId)
 
+    fun createMemoryMediaUpload(memoryId: String, request: CreateMemoryMediaUploadRequest): MemoryMediaUploadSession {
+        val memory = resolveVisibleMemory(memoryId)
+        return createUploadSession(
+            memory = memory,
+            request = request,
+            uploaderUser = user(),
+            shareIdentity = null,
+            shareId = null,
+        )
+    }
+
+    fun createPublicShareMediaUpload(
+        shareId: String,
+        memory: Memory,
+        request: CreateMemoryMediaUploadRequest,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): MemoryMediaUploadSession =
+        createUploadSession(memory, request, uploaderUser, shareIdentity, shareId)
+
+    fun memoryMediaUploadStatus(memoryId: String, uploadId: String): PendingMemoryMediaUploadSession {
+        val memory = resolveVisibleMemory(memoryId)
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, user(), null, null)
+        return session.toPendingSummary()
+    }
+
+    fun publicShareMediaUploadStatus(
+        shareId: String,
+        memory: Memory,
+        uploadId: String,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): PendingMemoryMediaUploadSession {
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, uploaderUser, shareIdentity, shareId)
+        return session.toPendingSummary()
+    }
+
+    fun uploadMemoryMediaChunk(memoryId: String, uploadId: String, chunkIndex: Int, chunk: Path) {
+        val memory = resolveVisibleMemory(memoryId)
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, user(), null, null)
+        uploadChunk(session, chunkIndex, chunk)
+    }
+
+    fun uploadPublicShareMediaChunk(
+        shareId: String,
+        memory: Memory,
+        uploadId: String,
+        chunkIndex: Int,
+        chunk: Path,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ) {
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, uploaderUser, shareIdentity, shareId)
+        uploadChunk(session, chunkIndex, chunk)
+    }
+
+    fun completeMemoryMediaUpload(memoryId: String, uploadId: String): MemoryMediaSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val session = loadUploadSession(uploadId)
+        val uploaderUser = user()
+        requireUploadSessionAccess(session, memory, uploaderUser, null, null)
+        val temp = assembleUploadSession(session)
+        var completed = false
+        try {
+            val prepared = prepareMemoryUpload(
+                tenantId = memory.tenant.id,
+                memoryId = memory.id,
+                uploadPath = temp,
+                originalFilename = session.filename,
+                title = session.title,
+                uploaderUserId = uploaderUser.id,
+                shareIdentityId = null,
+            )
+            val summary = self.get().persistPreparedMemoryUpload(prepared).toMemorySummary()
+            completed = true
+            return summary
+        } finally {
+            Files.deleteIfExists(temp)
+            if (completed) deleteUploadSession(uploadId, "complete")
+        }
+    }
+
+    fun completePublicShareMediaUpload(
+        shareId: String,
+        memory: Memory,
+        uploadId: String,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): PublicShareMediaSummary {
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, uploaderUser, shareIdentity, shareId)
+        val temp = assembleUploadSession(session)
+        var completed = false
+        try {
+            val prepared = prepareMemoryUpload(
+                tenantId = memory.tenant.id,
+                memoryId = memory.id,
+                uploadPath = temp,
+                originalFilename = session.filename,
+                title = session.title,
+                uploaderUserId = uploaderUser?.id,
+                shareIdentityId = shareIdentity?.id,
+            )
+            val summary = self.get().persistPreparedMemoryUpload(prepared).toPublicShareSummary(shareId)
+            completed = true
+            return summary
+        } finally {
+            Files.deleteIfExists(temp)
+            if (completed) deleteUploadSession(uploadId, "complete")
+        }
+    }
+
+    fun abortMemoryMediaUpload(memoryId: String, uploadId: String) {
+        val memory = resolveVisibleMemory(memoryId)
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, user(), null, null)
+        deleteUploadSession(uploadId, "abort")
+    }
+
+    fun abortPublicShareMediaUpload(
+        shareId: String,
+        memory: Memory,
+        uploadId: String,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ) {
+        val session = loadUploadSession(uploadId)
+        requireUploadSessionAccess(session, memory, uploaderUser, shareIdentity, shareId)
+        deleteUploadSession(uploadId, "abort")
+    }
+
+    fun deleteUploadSessionsForMemoryTree(tenantId: Long, memoryIds: Collection<Long>) {
+        val memoryIdSet = memoryIds.toSet()
+        if (memoryIdSet.isEmpty()) return
+        deleteUploadSessions("memory tree") { session ->
+            session.tenantId == tenantId && session.memoryId in memoryIdSet
+        }
+    }
+
+    fun deleteUploadSessionsForTenant(tenantId: Long) {
+        deleteUploadSessions("tenant $tenantId") { session -> session.tenantId == tenantId }
+    }
+
+    @Scheduled(cron = "{veyq.media.upload-session-cleanup-cron}")
+    fun cleanupUploadSessions() {
+        val expiresBefore = Instant.now().minusSeconds(mediaConfig.uploadSessionTtlHours * 60 * 60)
+        uploadSessions()
+            .filter { it.updatedAt.isBefore(expiresBefore) }
+            .forEach { session ->
+                deleteUploadSession(session.uploadId, "ttl cleanup")
+            }
+    }
+
+    private fun deleteUploadSessions(reason: String, predicate: (UploadSession) -> Boolean) {
+        uploadSessions()
+            .filter(predicate)
+            .forEach { session ->
+                deleteUploadSession(session.uploadId, reason)
+            }
+    }
+
+    private fun deleteUploadSession(uploadId: String, reason: String) {
+        try {
+            deleteRecursively(uploadDirectory(uploadId))
+        } catch (e: Exception) {
+            log.warn("Failed to delete upload session $uploadId for $reason", e)
+        }
+    }
+
     private fun uploadMemoryMediaInternal(
         memory: Memory,
         uploadPath: Path,
@@ -207,6 +422,87 @@ class MediaService @Inject constructor(
         return media
     }
 
+    private fun prepareMemoryUpload(
+        tenantId: Long,
+        memoryId: Long,
+        uploadPath: Path,
+        originalFilename: String?,
+        title: String?,
+        uploaderUserId: Long?,
+        shareIdentityId: Long?,
+    ): PreparedMemoryUpload {
+        if ((uploaderUserId == null) == (shareIdentityId == null)) {
+            throw BadRequestException("Exactly one uploader source is required")
+        }
+
+        val size = Files.size(uploadPath)
+        if (size <= 0) throw BadRequestException("file must not be empty", "MEDIA_UPLOAD_EMPTY")
+        val mediaType = mediaTypeDetector.detect(uploadPath)
+            ?: throw BadRequestException("Only JPEG, PNG, GIF, MP4 and QuickTime uploads are supported", "MEDIA_UPLOAD_TYPE_UNSUPPORTED")
+        val contentSha256 = sha256(uploadPath)
+        val storageKey = storageKeyForBlob(tenantId, contentSha256)
+        if (!Files.isRegularFile(storagePath(storageKey))) {
+            writeMediaFile(uploadPath, storageKey)
+        }
+        val metadata = mediaMetadataExtractor.extract(storagePath(storageKey), mediaType.mimeType)
+
+        return PreparedMemoryUpload(
+            tenantId = tenantId,
+            memoryId = memoryId,
+            originalFilename = originalFilename,
+            title = title,
+            uploaderUserId = uploaderUserId,
+            shareIdentityId = shareIdentityId,
+            sizeBytes = size,
+            mimeType = mediaType.mimeType,
+            contentSha256 = contentSha256,
+            storageKey = storageKey,
+            metadata = metadata,
+        )
+    }
+
+    @Transactional
+    fun persistPreparedMemoryUpload(prepared: PreparedMemoryUpload): Media {
+        val memory = memoryRepo.findById(prepared.memoryId) ?: throw NotFoundException("Memory not found")
+        if (memory.tenant.id != prepared.tenantId) throw NotFoundException("Memory not found")
+        val uploaderUser = prepared.uploaderUserId?.let { userRepo.findById(it) ?: throw NotFoundException("User not found") }
+        val shareIdentity = prepared.shareIdentityId?.let { shareIdentityRepo.findById(it) ?: throw NotFoundException("Share identity not found") }
+        if ((uploaderUser == null) == (shareIdentity == null)) {
+            throw BadRequestException("Exactly one uploader source is required")
+        }
+
+        val blob = mediaBlobRepo.findByTenantAndSha256(memory.tenant, prepared.contentSha256)
+            ?: createPreparedMediaBlob(memory, prepared)
+
+        return Media().also {
+            it.tenant = memory.tenant
+            applyScope(it, LibraryScopes.scope(memory))
+            it.memory = memory
+            it.title = prepared.title?.trim()?.takeIf { value -> value.isNotBlank() }
+                ?: prepared.originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
+                ?: "Upload"
+            it.blob = blob
+            it.originalFilename = prepared.originalFilename
+            it.uploaderUser = uploaderUser
+            it.shareIdentity = shareIdentity
+            it.capturedAt = blob.capturedAt
+            it.capturedAtOverride = false
+            mediaRepo.persist(it)
+        }
+    }
+
+    private fun createPreparedMediaBlob(memory: Memory, prepared: PreparedMemoryUpload): MediaBlob =
+        MediaBlob().also {
+            it.tenant = memory.tenant
+            it.contentSha256 = prepared.contentSha256
+            it.storageKey = prepared.storageKey
+            it.mimeType = prepared.mimeType
+            it.sizeBytes = prepared.sizeBytes
+            mediaMetadataExtractor.apply(it, prepared.metadata)
+            mediaBlobRepo.persist(it)
+            mediaBlobRepo.flush()
+        }
+
     private fun createMediaBlob(
         memory: Memory,
         uploadPath: Path,
@@ -214,7 +510,7 @@ class MediaService @Inject constructor(
         size: Long,
         contentSha256: String,
     ): MediaBlob {
-        val storageKey = "tenant-${memory.tenant.id}/blobs/$contentSha256/original"
+        val storageKey = storageKeyForBlob(memory.tenant.id, contentSha256)
         writeMediaFile(uploadPath, storageKey)
         return MediaBlob().also {
             it.tenant = memory.tenant
@@ -228,6 +524,244 @@ class MediaService @Inject constructor(
             generatePreviewIfSupported(it)
         }
     }
+
+    private fun storageKeyForBlob(tenantId: Long, contentSha256: String): String =
+        "tenant-$tenantId/blobs/$contentSha256/original"
+
+    private fun createUploadSession(
+        memory: Memory,
+        request: CreateMemoryMediaUploadRequest,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+        shareId: String?,
+    ): MemoryMediaUploadSession {
+        if ((uploaderUser == null) == (shareIdentity == null)) {
+            throw BadRequestException("Exactly one uploader source is required")
+        }
+        val filename = request.filename.trim().takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("filename is required", "MEDIA_UPLOAD_FILENAME_REQUIRED")
+        val mimeType = request.mimeType.trim().takeIf { it.isNotBlank() }
+            ?: throw BadRequestException("mimeType is required", "MEDIA_UPLOAD_TYPE_REQUIRED")
+        if (request.sizeBytes <= 0) throw BadRequestException("file must not be empty", "MEDIA_UPLOAD_EMPTY")
+
+        val now = Instant.now()
+        val session = UploadSession(
+            uploadId = UUID.randomUUID().toString(),
+            tenantId = memory.tenant.id,
+            memoryId = memory.id,
+            memoryPublicId = memory.publicId,
+            filename = filename,
+            mimeType = mimeType,
+            sizeBytes = request.sizeBytes,
+            title = request.title?.trim()?.takeIf { it.isNotBlank() },
+            uploaderUserId = uploaderUser?.id,
+            shareIdentityId = shareIdentity?.id,
+            shareId = shareId,
+            createdAt = now,
+            updatedAt = now,
+        )
+        Files.createDirectories(uploadDirectory(session.uploadId).resolve("chunks"))
+        saveUploadSession(session)
+        return MemoryMediaUploadSession(uploadId = session.uploadId, chunkSizeBytes = mediaConfig.chunkSizeBytes)
+    }
+
+    private fun uploadChunk(session: UploadSession, chunkIndex: Int, source: Path) {
+        if (chunkIndex < 0) throw BadRequestException("chunkIndex must not be negative", "MEDIA_UPLOAD_CHUNK_INVALID")
+        val chunkSize = Files.size(source)
+        if (chunkSize <= 0) throw BadRequestException("chunk must not be empty", "MEDIA_UPLOAD_CHUNK_EMPTY")
+        val chunkCount = uploadChunkCount(session)
+        if (chunkIndex >= chunkCount) throw BadRequestException("chunkIndex is outside upload range", "MEDIA_UPLOAD_CHUNK_INVALID")
+        val maxChunkSize = if (chunkIndex == chunkCount - 1) {
+            session.sizeBytes - (chunkIndex.toLong() * mediaConfig.chunkSizeBytes)
+        } else {
+            mediaConfig.chunkSizeBytes
+        }
+        if (chunkSize > maxChunkSize) throw BadRequestException("chunk is too large", "MEDIA_UPLOAD_CHUNK_TOO_LARGE")
+
+        val chunks = uploadDirectory(session.uploadId).resolve("chunks")
+        Files.createDirectories(chunks)
+        val target = chunks.resolve("$chunkIndex.part")
+        val temp = Files.createTempFile(chunks, "$chunkIndex-", ".tmp")
+        try {
+            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            updateUploadSessionTimestamp(session.uploadId)
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+    }
+
+    private fun assembleUploadSession(session: UploadSession): Path {
+        val chunkCount = uploadChunkCount(session)
+        val temp = Files.createTempFile("veyq-memory-upload-assemble-", ".tmp")
+        try {
+            Files.newOutputStream(temp).use { output ->
+                for (index in 0 until chunkCount) {
+                    val chunk = uploadDirectory(session.uploadId).resolve("chunks").resolve("$index.part")
+                    if (!Files.isRegularFile(chunk)) {
+                        throw BadRequestException("Missing upload chunk $index", "MEDIA_UPLOAD_CHUNK_MISSING")
+                    }
+                    Files.newInputStream(chunk).use { input ->
+                        while (true) {
+                            val read = input.readNBytes(DEFAULT_BUFFER_SIZE)
+                            if (read.isEmpty()) break
+                            output.write(read)
+                        }
+                    }
+                }
+            }
+            if (Files.size(temp) != session.sizeBytes) {
+                throw BadRequestException("Upload size mismatch", "MEDIA_UPLOAD_SIZE_MISMATCH")
+            }
+            return temp
+        } catch (e: Exception) {
+            Files.deleteIfExists(temp)
+            throw e
+        }
+    }
+
+    private fun saveUploadSession(session: UploadSession) {
+        val properties = Properties().also {
+            it["uploadId"] = session.uploadId
+            it["tenantId"] = session.tenantId.toString()
+            it["memoryId"] = session.memoryId.toString()
+            it["memoryPublicId"] = session.memoryPublicId
+            it["filename"] = session.filename
+            it["mimeType"] = session.mimeType
+            it["sizeBytes"] = session.sizeBytes.toString()
+            it["createdAt"] = session.createdAt.toString()
+            it["updatedAt"] = session.updatedAt.toString()
+            session.title?.let { title -> it["title"] = title }
+            session.uploaderUserId?.let { userId -> it["uploaderUserId"] = userId.toString() }
+            session.shareIdentityId?.let { identityId -> it["shareIdentityId"] = identityId.toString() }
+            session.shareId?.let { shareId -> it["shareId"] = shareId }
+        }
+        Files.createDirectories(uploadDirectory(session.uploadId))
+        Files.newOutputStream(uploadDirectory(session.uploadId).resolve("session.properties")).use { output ->
+            properties.store(output, null)
+        }
+    }
+
+    private fun updateUploadSessionTimestamp(uploadId: String) {
+        val path = uploadDirectory(uploadId).resolve("session.properties")
+        if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
+        val properties = Properties()
+        Files.newInputStream(path).use { input -> properties.load(input) }
+        properties["updatedAt"] = Instant.now().toString()
+        Files.newOutputStream(path).use { output -> properties.store(output, null) }
+    }
+
+    private fun loadUploadSession(uploadId: String): UploadSession {
+        if (!uploadId.matches(Regex("^[0-9a-fA-F-]{36}$"))) throw NotFoundException("Upload not found")
+        val path = uploadDirectory(uploadId).resolve("session.properties")
+        if (!Files.isRegularFile(path)) throw NotFoundException("Upload not found")
+        return try {
+            loadUploadSession(path)
+        } catch (e: Exception) {
+            log.warn("Ignoring invalid upload session $path: ${e.message}")
+            throw NotFoundException("Upload not found")
+        }
+    }
+
+    private fun loadUploadSession(path: Path): UploadSession {
+        val properties = Properties()
+        Files.newInputStream(path).use { input -> properties.load(input) }
+        val updatedAt = properties.getProperty("updatedAt")?.let(Instant::parse)
+            ?: Files.getLastModifiedTime(path).toInstant()
+        val createdAt = properties.getProperty("createdAt")?.let(Instant::parse) ?: updatedAt
+        return UploadSession(
+            uploadId = properties.getProperty("uploadId"),
+            tenantId = properties.getProperty("tenantId").toLong(),
+            memoryId = properties.getProperty("memoryId").toLong(),
+            memoryPublicId = properties.getProperty("memoryPublicId"),
+            filename = properties.getProperty("filename"),
+            mimeType = properties.getProperty("mimeType"),
+            sizeBytes = properties.getProperty("sizeBytes").toLong(),
+            title = properties.getProperty("title"),
+            uploaderUserId = properties.getProperty("uploaderUserId")?.toLong(),
+            shareIdentityId = properties.getProperty("shareIdentityId")?.toLong(),
+            shareId = properties.getProperty("shareId"),
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
+    }
+
+    private fun uploadSessions(): List<UploadSession> {
+        val root = storagePath("_uploads")
+        if (!Files.isDirectory(root)) return emptyList()
+        return Files.list(root).use { stream ->
+            stream
+                .filter { Files.isDirectory(it) }
+                .map { it.resolve("session.properties") }
+                .filter { Files.isRegularFile(it) }
+                .toList()
+                .mapNotNull { path ->
+                    try {
+                        loadUploadSession(path)
+                    } catch (e: Exception) {
+                        log.warn("Ignoring invalid upload session $path: ${e.message}")
+                        null
+                    }
+                }
+        }
+    }
+
+    private fun requireUploadSessionAccess(
+        session: UploadSession,
+        memory: Memory,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+        shareId: String?,
+    ) {
+        if (session.tenantId != memory.tenant.id || session.memoryId != memory.id) {
+            throw NotFoundException("Upload not found")
+        }
+        if (session.shareId != shareId) throw NotFoundException("Upload not found")
+        if (session.uploaderUserId != uploaderUser?.id) throw NotFoundException("Upload not found")
+        if (session.shareIdentityId != shareIdentity?.id) throw NotFoundException("Upload not found")
+    }
+
+    private fun UploadSession.toPendingSummary(): PendingMemoryMediaUploadSession {
+        val uploadedChunks = uploadedChunks(uploadId)
+        val uploadedBytes = uploadedChunks.sumOf { index ->
+            Files.size(uploadDirectory(uploadId).resolve("chunks").resolve("$index.part"))
+        }.coerceAtMost(sizeBytes)
+        return PendingMemoryMediaUploadSession(
+            uploadId = uploadId,
+            memoryId = memoryPublicId,
+            filename = filename,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            title = title,
+            chunkSizeBytes = mediaConfig.chunkSizeBytes,
+            uploadedChunks = uploadedChunks,
+            uploadedBytes = uploadedBytes,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            updatedAt = updatedAt.toApiOffsetDateTime(),
+        )
+    }
+
+    private fun uploadedChunks(uploadId: String): List<Int> {
+        val chunks = uploadDirectory(uploadId).resolve("chunks")
+        if (!Files.isDirectory(chunks)) return emptyList()
+        return Files.list(chunks).use { stream ->
+            stream
+                .filter { Files.isRegularFile(it) }
+                .toList()
+                .mapNotNull { path ->
+                    val name = path.fileName.toString()
+                    if (name.endsWith(".part")) name.removeSuffix(".part").toIntOrNull() else null
+                }
+                .sorted()
+        }
+    }
+
+    private fun uploadDirectory(uploadId: String): Path =
+        storagePath("_uploads/$uploadId")
+
+    private fun uploadChunkCount(session: UploadSession): Int =
+        ((session.sizeBytes + mediaConfig.chunkSizeBytes - 1) / mediaConfig.chunkSizeBytes).toInt()
 
     @Transactional
     fun updateMemoryMediaMetadata(memoryId: String, publicId: String, request: UpdateMemoryMediaMetadataRequest): MemoryMediaSummary {

@@ -15,30 +15,63 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateMemoryMediaUploadRequest,
   ErrorResponse,
   MemoryMediaBatchResponse,
   MemoryMediaSummary,
+  MemoryMediaUploadSession,
+  PendingMemoryMediaUploadSession,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest,
 } from '../models/index';
 import {
+    CreateMemoryMediaUploadRequestFromJSON,
+    CreateMemoryMediaUploadRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     MemoryMediaBatchResponseFromJSON,
     MemoryMediaBatchResponseToJSON,
     MemoryMediaSummaryFromJSON,
     MemoryMediaSummaryToJSON,
+    MemoryMediaUploadSessionFromJSON,
+    MemoryMediaUploadSessionToJSON,
+    PendingMemoryMediaUploadSessionFromJSON,
+    PendingMemoryMediaUploadSessionToJSON,
     UpdateMemoryMediaMetadataBatchRequestFromJSON,
     UpdateMemoryMediaMetadataBatchRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
     UpdateMemoryMediaMetadataRequestToJSON,
 } from '../models/index';
 
+export interface AbortMemoryMediaUploadRequest {
+    tenantName: string;
+    memoryId: string;
+    uploadId: string;
+}
+
+export interface CompleteMemoryMediaUploadRequest {
+    tenantName: string;
+    memoryId: string;
+    uploadId: string;
+}
+
+export interface CreateMemoryMediaUploadOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
+}
+
 export interface DownloadMemoryMediaRequest {
     tenantName: string;
     memoryId: string;
     includeChildren?: boolean;
     locale?: DownloadMemoryMediaLocaleEnum;
+}
+
+export interface GetMemoryMediaUploadRequest {
+    tenantName: string;
+    memoryId: string;
+    uploadId: string;
 }
 
 export interface ListMemoryMediaRequest {
@@ -78,6 +111,14 @@ export interface UploadMemoryMediaRequest {
     title?: string;
 }
 
+export interface UploadMemoryMediaChunkRequest {
+    tenantName: string;
+    memoryId: string;
+    uploadId: string;
+    chunkIndex: number;
+    body: Blob;
+}
+
 /**
  * MemoryMediaApi - interface
  * 
@@ -85,6 +126,87 @@ export interface UploadMemoryMediaRequest {
  * @interface MemoryMediaApiInterface
  */
 export interface MemoryMediaApiInterface {
+    /**
+     * Creates request options for abortMemoryMediaUpload without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    abortMemoryMediaUploadRequestOpts(requestParameters: AbortMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Abort a resumable media upload session
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    abortMemoryMediaUploadRaw(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Abort a resumable media upload session
+     */
+    abortMemoryMediaUpload(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for completeMemoryMediaUpload without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    completeMemoryMediaUploadRequestOpts(requestParameters: CompleteMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Complete a resumable media upload session
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    completeMemoryMediaUploadRaw(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>>;
+
+    /**
+     * Complete a resumable media upload session
+     */
+    completeMemoryMediaUpload(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
+
+    /**
+     * Creates request options for createMemoryMediaUpload without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    createMemoryMediaUploadRequestOpts(requestParameters: CreateMemoryMediaUploadOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Create a resumable media upload session
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    createMemoryMediaUploadRaw(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
+
+    /**
+     * Create a resumable media upload session
+     */
+    createMemoryMediaUpload(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
+
     /**
      * Creates request options for downloadMemoryMedia without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
@@ -114,6 +236,33 @@ export interface MemoryMediaApiInterface {
      * Download memory media originals
      */
     downloadMemoryMedia(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for getMemoryMediaUpload without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    getMemoryMediaUploadRequestOpts(requestParameters: GetMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Get a resumable media upload session
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    getMemoryMediaUploadRaw(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
+
+    /**
+     * Get a resumable media upload session
+     */
+    getMemoryMediaUpload(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
 
     /**
      * Creates request options for listMemoryMedia without sending the request
@@ -285,12 +434,227 @@ export interface MemoryMediaApiInterface {
      */
     uploadMemoryMedia(requestParameters: UploadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
 
+    /**
+     * Creates request options for uploadMemoryMediaChunk without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    uploadMemoryMediaChunkRequestOpts(requestParameters: UploadMemoryMediaChunkRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * 
+     * @summary Upload one media chunk
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} uploadId Resumable upload session id.
+     * @param {number} chunkIndex Zero-based upload chunk index.
+     * @param {Blob} body 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    uploadMemoryMediaChunkRaw(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Upload one media chunk
+     */
+    uploadMemoryMediaChunk(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
 }
 
 /**
  * 
  */
 export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInterface {
+
+    /**
+     * Creates request options for abortMemoryMediaUpload without sending the request
+     */
+    async abortMemoryMediaUploadRequestOpts(requestParameters: AbortMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling abortMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling abortMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling abortMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Abort a resumable media upload session
+     */
+    async abortMemoryMediaUploadRaw(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.abortMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Abort a resumable media upload session
+     */
+    async abortMemoryMediaUpload(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.abortMemoryMediaUploadRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for completeMemoryMediaUpload without sending the request
+     */
+    async completeMemoryMediaUploadRequestOpts(requestParameters: CompleteMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling completeMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling completeMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling completeMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/complete`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Complete a resumable media upload session
+     */
+    async completeMemoryMediaUploadRaw(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>> {
+        const requestOptions = await this.completeMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Complete a resumable media upload session
+     */
+    async completeMemoryMediaUpload(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary> {
+        const response = await this.completeMemoryMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createMemoryMediaUpload without sending the request
+     */
+    async createMemoryMediaUploadRequestOpts(requestParameters: CreateMemoryMediaUploadOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling createMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling createMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['createMemoryMediaUploadRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryMediaUploadRequest',
+                'Required parameter "createMemoryMediaUploadRequest" was null or undefined when calling createMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/uploads`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryMediaUploadRequestToJSON(requestParameters['createMemoryMediaUploadRequest']),
+        };
+    }
+
+    /**
+     * Create a resumable media upload session
+     */
+    async createMemoryMediaUploadRaw(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
+        const requestOptions = await this.createMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Create a resumable media upload session
+     */
+    async createMemoryMediaUpload(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
+        const response = await this.createMemoryMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for downloadMemoryMedia without sending the request
@@ -352,6 +716,67 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async downloadMemoryMedia(requestParameters: DownloadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.downloadMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getMemoryMediaUpload without sending the request
+     */
+    async getMemoryMediaUploadRequestOpts(requestParameters: GetMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling getMemoryMediaUpload().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling getMemoryMediaUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Get a resumable media upload session
+     */
+    async getMemoryMediaUploadRaw(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
+        const requestOptions = await this.getMemoryMediaUploadRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PendingMemoryMediaUploadSessionFromJSON(jsonValue));
+    }
+
+    /**
+     * Get a resumable media upload session
+     */
+    async getMemoryMediaUpload(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
+        const response = await this.getMemoryMediaUploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -751,6 +1176,84 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     async uploadMemoryMedia(requestParameters: UploadMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary> {
         const response = await this.uploadMemoryMediaRaw(requestParameters, initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for uploadMemoryMediaChunk without sending the request
+     */
+    async uploadMemoryMediaChunkRequestOpts(requestParameters: UploadMemoryMediaChunkRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling uploadMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling uploadMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['uploadId'] == null) {
+            throw new runtime.RequiredError(
+                'uploadId',
+                'Required parameter "uploadId" was null or undefined when calling uploadMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['chunkIndex'] == null) {
+            throw new runtime.RequiredError(
+                'chunkIndex',
+                'Required parameter "chunkIndex" was null or undefined when calling uploadMemoryMediaChunk().'
+            );
+        }
+
+        if (requestParameters['body'] == null) {
+            throw new runtime.RequiredError(
+                'body',
+                'Required parameter "body" was null or undefined when calling uploadMemoryMediaChunk().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/octet-stream';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"uploadId"}}`, encodeURIComponent(String(requestParameters['uploadId'])));
+        urlPath = urlPath.replace(`{${"chunkIndex"}}`, encodeURIComponent(String(requestParameters['chunkIndex'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: requestParameters['body'] as any,
+        };
+    }
+
+    /**
+     * Upload one media chunk
+     */
+    async uploadMemoryMediaChunkRaw(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.uploadMemoryMediaChunkRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Upload one media chunk
+     */
+    async uploadMemoryMediaChunk(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.uploadMemoryMediaChunkRaw(requestParameters, initOverrides);
     }
 
 }

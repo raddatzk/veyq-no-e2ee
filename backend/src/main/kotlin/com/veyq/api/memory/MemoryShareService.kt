@@ -12,8 +12,11 @@ import com.veyq.api.common.HashingService
 import com.veyq.api.common.UpdateMemoryShareRequestReader
 import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryShareRequest
+import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
+import com.veyq.api.generated.model.MemoryMediaUploadSession
 import com.veyq.api.generated.model.MemoryShareSummary
+import com.veyq.api.generated.model.PendingMemoryMediaUploadSession
 import com.veyq.api.generated.model.PublicShareCoverCrop
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.PublicShareMemoryHeaderSummary
@@ -370,6 +373,154 @@ class MemoryShareService @Inject constructor(
         val access = requireUploadAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         return uploadPublicShareMedia(access, memory, uploadPath, originalFilename, title)
+    }
+
+    fun createPublicShareMediaUpload(
+        shareId: String,
+        request: CreateMemoryMediaUploadRequest,
+    ): MemoryMediaUploadSession {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        return mediaService.createPublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = access.share.rootMemory,
+            request = request,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun createPublicShareMemoryMediaUpload(
+        shareId: String,
+        memoryId: String,
+        request: CreateMemoryMediaUploadRequest,
+    ): MemoryMediaUploadSession {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return mediaService.createPublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = memory,
+            request = request,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun publicShareMediaUploadStatus(shareId: String, uploadId: String): PendingMemoryMediaUploadSession {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        return mediaService.publicShareMediaUploadStatus(
+            shareId = access.share.publicId,
+            memory = access.share.rootMemory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun publicShareMemoryMediaUploadStatus(
+        shareId: String,
+        memoryId: String,
+        uploadId: String,
+    ): PendingMemoryMediaUploadSession {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return mediaService.publicShareMediaUploadStatus(
+            shareId = access.share.publicId,
+            memory = memory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun uploadPublicShareMediaChunk(shareId: String, uploadId: String, chunkIndex: Int, chunk: Path) {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        mediaService.uploadPublicShareMediaChunk(
+            shareId = access.share.publicId,
+            memory = access.share.rootMemory,
+            uploadId = uploadId,
+            chunkIndex = chunkIndex,
+            chunk = chunk,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun uploadPublicShareMemoryMediaChunk(
+        shareId: String,
+        memoryId: String,
+        uploadId: String,
+        chunkIndex: Int,
+        chunk: Path,
+    ) {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        mediaService.uploadPublicShareMediaChunk(
+            shareId = access.share.publicId,
+            memory = memory,
+            uploadId = uploadId,
+            chunkIndex = chunkIndex,
+            chunk = chunk,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun completePublicShareMediaUpload(
+        shareId: String,
+        uploadId: String,
+    ): com.veyq.api.generated.model.PublicShareMediaSummary {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        return mediaService.completePublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = access.share.rootMemory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun completePublicShareMemoryMediaUpload(
+        shareId: String,
+        memoryId: String,
+        uploadId: String,
+    ): com.veyq.api.generated.model.PublicShareMediaSummary {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return mediaService.completePublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = memory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun abortPublicShareMediaUpload(shareId: String, uploadId: String) {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        mediaService.abortPublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = access.share.rootMemory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    fun abortPublicShareMemoryMediaUpload(shareId: String, memoryId: String, uploadId: String) {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        mediaService.abortPublicShareMediaUpload(
+            shareId = access.share.publicId,
+            memory = memory,
+            uploadId = uploadId,
+            uploaderUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
     }
 
     @Transactional

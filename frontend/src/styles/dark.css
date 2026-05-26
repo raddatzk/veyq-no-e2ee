@@ -48,6 +48,9 @@
   }
 
   .workspace-topbar-center,
+  .upload-status-trigger,
+  .upload-status-panel,
+  .upload-status-inline,
   .empty-home-card,
   .login-card,
   .tenant-row,
@@ -260,22 +263,34 @@
     color: var(--app-success);
   }
 
-  .memory-upload-action.p-button,
   .asset-batch-form button {
     background: #0f766e;
     border-color: #0f766e;
     color: #fff;
   }
 
-  .memory-upload-action.p-button:not(:disabled):hover {
-    background: #115e59;
-    border-color: #115e59;
-  }
-
   .memory-journal-media-option:hover,
   .memory-journal-media-option-selected {
     border-color: var(--app-success);
     background: #102f2d;
+  }
+
+  .memory-upload-progress-track {
+    background: #1f2937;
+  }
+
+  .memory-upload-progress-track span {
+    background: var(--app-success);
+  }
+
+  .memory-upload-file-remove:hover:not(:disabled) {
+    background: #3b1d24;
+    color: #fca5a5;
+  }
+
+  .upload-status-badge {
+    background: var(--app-success);
+    color: #06221b;
   }
 
   .asset-bucket-button-active,

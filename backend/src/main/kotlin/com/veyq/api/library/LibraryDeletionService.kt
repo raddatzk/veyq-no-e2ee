@@ -44,6 +44,7 @@ class LibraryDeletionService @Inject constructor(
         tenantRepo.delete(tenant)
         tenantRepo.flush()
         deleteRecursively(storagePath("tenant-${tenant.id}"))
+        mediaService.deleteUploadSessionsForTenant(tenant.id)
     }
 
     fun deleteGroup(group: TenantGroup) {

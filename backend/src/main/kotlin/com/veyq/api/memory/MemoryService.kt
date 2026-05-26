@@ -174,6 +174,7 @@ class MemoryService @Inject constructor(
     fun deleteMemory(publicId: String) {
         val memory = resolveVisibleMemory(publicId)
         val memories = descendantsAndSelf(memory)
+        val memoryIds = memories.map { it.id }
         val media = memories.flatMap { mediaRepo.listByMemory(it) }
         val coverDirectories = memories.mapNotNull { it.coverStorageKey?.let(::coverDirectory) }.distinct()
         memories.forEach { candidate ->
@@ -189,6 +190,7 @@ class MemoryService @Inject constructor(
         blobs.forEach(mediaService::deleteBlobIfUnreferenced)
         coverDirectories.forEach(::deleteRecursively)
         memory.delete()
+        mediaService.deleteUploadSessionsForMemoryTree(memory.tenant.id, memoryIds)
     }
 
     @Transactional

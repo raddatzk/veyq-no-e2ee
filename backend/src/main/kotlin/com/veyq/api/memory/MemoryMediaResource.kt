@@ -1,6 +1,7 @@
 package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoryMediaApi
+import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.media.MediaService
@@ -10,6 +11,7 @@ import jakarta.ws.rs.core.MultivaluedHashMap
 import jakarta.ws.rs.core.MultivaluedMap
 import jakarta.ws.rs.core.Response
 import org.jboss.resteasy.reactive.multipart.FileUpload
+import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -60,6 +62,35 @@ class MemoryMediaResource @Inject constructor(
 
     override fun memoryMediaPreview(tenantName: String, mediaId: String): Response =
         mediaService.mediaPreview(mediaId)
+
+    override fun createMemoryMediaUpload(
+        tenantName: String,
+        memoryId: String,
+        createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest,
+    ): Response =
+        Response.ok(mediaService.createMemoryMediaUpload(memoryId, createMemoryMediaUploadRequest)).build()
+
+    override fun getMemoryMediaUpload(tenantName: String, memoryId: String, uploadId: String): Response =
+        Response.ok(mediaService.memoryMediaUploadStatus(memoryId, uploadId)).build()
+
+    override fun uploadMemoryMediaChunk(
+        tenantName: String,
+        memoryId: String,
+        uploadId: String,
+        chunkIndex: Int,
+        body: File,
+    ): Response {
+        mediaService.uploadMemoryMediaChunk(memoryId, uploadId, chunkIndex, body.toPath())
+        return Response.noContent().build()
+    }
+
+    override fun completeMemoryMediaUpload(tenantName: String, memoryId: String, uploadId: String): Response =
+        Response.ok(mediaService.completeMemoryMediaUpload(memoryId, uploadId)).build()
+
+    override fun abortMemoryMediaUpload(tenantName: String, memoryId: String, uploadId: String): Response {
+        mediaService.abortMemoryMediaUpload(memoryId, uploadId)
+        return Response.noContent().build()
+    }
 
     private class GeneratedFileUpload(
         private val path: Path,

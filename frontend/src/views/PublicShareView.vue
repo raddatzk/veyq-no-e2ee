@@ -9,6 +9,8 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
+import UploadStatusMenu from '../features/memories/components/UploadStatusMenu.vue'
+import { startUploadBatch, useUploadQueue } from '../features/memories/composables/useUploadQueue'
 import { API_BASE } from '../shared/api/httpClient'
 import { getErrorMessage } from '../shared/utils/errors'
 import {
@@ -57,6 +59,7 @@ const createMemoryOpen = ref(false)
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
+const { visibleBatches } = useUploadQueue()
 
 const isUploaderOnly = computed(() => share.value?.role === 'UPLOADER')
 const hasShareAccess = computed(() => Boolean(share.value?.authenticated || share.value?.canViewGallery))
@@ -71,6 +74,11 @@ const canSubmitLogin = computed(() =>
   )
 )
 const canShowMemoryDetail = computed(() => Boolean(hasShareAccess.value && memory.value && !isUploaderOnly.value))
+const publicShareUploadBatches = computed(() =>
+  visibleBatches.value.filter(
+    (batch) => batch.context.type === 'public-share-root' && batch.context.shareId === shareId.value
+  )
+)
 const capabilities = computed(() => ({
   canEdit: Boolean(share.value?.canEdit),
   canUpload: Boolean(share.value?.canUpload),
@@ -193,16 +201,13 @@ function handleMemoryDeleted(parentPath: string) {
 }
 
 function selectUpload(event: FileUploadSelectEvent) {
+  if (loading.value) return
   selectedFiles.value = event.files
 }
 
 function selectUploadFallback(event: Event) {
+  if (loading.value) return
   selectedFiles.value = Array.from((event.target as HTMLInputElement).files || [])
-}
-
-function clearUploadSelection() {
-  selectedFiles.value = []
-  uploadPicker.value?.clear()
 }
 
 async function uploadToRoot() {
@@ -212,14 +217,25 @@ async function uploadToRoot() {
   loading.value = true
   try {
     const uploadCount = selectedFiles.value.length
-    for (const file of selectedFiles.value) {
-      await uploadPublicShareMedia(shareId.value, {
-        file,
-        title: file.name
-      })
-    }
-    clearUploadSelection()
-    message.value = t('share.uploadComplete', { count: uploadCount })
+    startUploadBatch({
+      label: t('media.uploadBatchTitle', { count: uploadCount }),
+      files: [...selectedFiles.value],
+      context: { type: 'public-share-root', shareId: shareId.value },
+      uploadFile: (file, options) =>
+        uploadPublicShareMedia(
+          shareId.value,
+          {
+            file,
+            title: file.name
+          },
+          options
+        ),
+      onComplete: async () => {
+        message.value = t('share.uploadComplete', { count: uploadCount })
+      }
+    })
+    selectedFiles.value = []
+    uploadPicker.value?.clear()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.uploadFailed'))
   } finally {
@@ -310,9 +326,19 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
           :choose-label="t('media.chooseFiles')"
           custom-upload
           multiple
+          :disabled="loading"
           @select="selectUpload"
+        >
+          <template #filelabel />
+        </FileUpload>
+        <input
+          class="memory-upload-native-fallback"
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          :disabled="loading"
+          @change="selectUploadFallback"
         />
-        <input class="memory-upload-native-fallback" type="file" multiple accept="image/*,video/*" @change="selectUploadFallback" />
         <span>{{ selectedFiles.length ? t('media.selectedCount', { count: selectedFiles.length }) : t('share.uploadEmpty') }}</span>
       </div>
       <ul v-if="selectedFiles.length" class="memory-upload-file-list">
@@ -321,12 +347,13 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
           <span>{{ file.name }}</span>
         </li>
       </ul>
+      <UploadStatusMenu v-if="publicShareUploadBatches.length" inline :batches="publicShareUploadBatches" />
       <Button
         :label="t('common.upload')"
         icon="pi pi-upload"
         type="submit"
         :loading="loading"
-        :disabled="!selectedFiles.length"
+        :disabled="!selectedFiles.length || loading"
       />
     </form>
 
@@ -343,7 +370,7 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       :save-journal="(memoryId, request) => updatePublicShareMemoryJournal(shareId, memoryId, request)"
       :set-cover="(memoryId, request) => setPublicShareMemoryCover(shareId, memoryId, request)"
       :remove-cover="(memoryId) => removePublicShareMemoryCover(shareId, memoryId)"
-      :upload-media="(memoryId, request) => uploadPublicShareMemoryMedia(shareId, memoryId, request)"
+      :upload-media="(memoryId, request, options) => uploadPublicShareMemoryMedia(shareId, memoryId, request, options)"
       :delete-memory="(memoryId) => deletePublicShareMemory(shareId, memoryId)"
       :update-media-metadata="(mediaId, memoryId, request) => updatePublicShareMediaMetadata(shareId, memoryId, mediaId, request)"
       :delete-media="(mediaId, memoryId) => deletePublicShareMedia(shareId, memoryId, mediaId)"

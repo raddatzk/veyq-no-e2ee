@@ -1,10 +1,12 @@
 import type {
   CoverCrop,
+  CreateMemoryMediaUploadRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateFolderRequest as GeneratedCreateFolderRequest,
   MemoryFolder,
   MemoryHeaderSummary,
   MemoryJournalSummary,
+  MemoryMediaUploadSession,
   MediaUploader,
   MemoryNavigationResponse as GeneratedMemoryNavigationResponse,
   MemoryMediaSummary,
@@ -16,6 +18,7 @@ import type {
   PublicShareMediaSummary,
   PublicShareSummary,
   PublicShareTreeResponse,
+  PendingMemoryMediaUploadSession,
   SearchResultSummary,
   MemoryScopeRequest,
   MemorySummary,
@@ -43,6 +46,9 @@ export type {
   PublicShareTreeResponse,
   SearchResultSummary,
   MemoryJournalSummary,
+  MemoryMediaUploadSession,
+  PendingMemoryMediaUploadSession,
+  CreateMemoryMediaUploadRequest,
 }
 
 export type Memory = Omit<
@@ -143,6 +149,17 @@ export type UpdateMemoryMediaMetadataBatchRequest = GeneratedUpdateMemoryMediaMe
 export type UploadMemoryMediaRequest = {
   file: File
   title?: string | null
+}
+
+export type UploadMediaProgress = {
+  loaded: number
+  total: number | null
+}
+
+export type UploadMediaOptions = {
+  onProgress?: (progress: UploadMediaProgress) => void
+  onSession?: (session: MemoryMediaUploadSession | PendingMemoryMediaUploadSession) => void
+  signal?: AbortSignal
 }
 
 export type CreateFolderRequest = Omit<GeneratedCreateFolderRequest, 'parentPath' | 'scope'> & {

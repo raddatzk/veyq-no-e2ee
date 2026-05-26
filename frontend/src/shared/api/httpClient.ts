@@ -22,6 +22,13 @@ export class ApiError extends Error {
   }
 }
 
+export class UploadCancelledError extends Error {
+  constructor() {
+    super('Upload cancelled')
+    this.name = 'UploadCancelledError'
+  }
+}
+
 export async function callApi<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await apiFetch(path, options)
 
@@ -59,6 +66,78 @@ export async function apiFetchUrl(url: string, options: RequestInit = {}): Promi
   }
 
   return response
+}
+
+export type UploadProgress = {
+  loaded: number
+  total: number | null
+}
+
+export async function uploadFormDataJson<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal
+): Promise<T> {
+  const url = `${API_BASE}${path}`
+  let response = await requestUploadUrl('POST', url, body, undefined, onProgress, signal)
+
+  if (response.status === 401 && shouldTryShareRefresh(path)) {
+    try {
+      await refreshShareLogin(publicShareId(path))
+      response = await requestUploadUrl('POST', url, body, undefined, onProgress, signal)
+    } catch (error) {
+      if (error instanceof UploadCancelledError) throw error
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  } else if (response.status === 401 && shouldTryRefresh(path)) {
+    try {
+      await refreshLogin()
+      response = await requestUploadUrl('POST', url, body, undefined, onProgress, signal)
+    } catch (error) {
+      if (error instanceof UploadCancelledError) throw error
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  }
+
+  if (!response.ok) {
+    throw await apiError(response)
+  }
+
+  return response.json()
+}
+
+export async function uploadBlob(
+  path: string,
+  body: Blob,
+  contentType: string,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const url = `${API_BASE}${path}`
+  let response = await requestUploadUrl('PUT', url, body, contentType, onProgress, signal)
+
+  if (response.status === 401 && shouldTryShareRefresh(path)) {
+    try {
+      await refreshShareLogin(publicShareId(path))
+      response = await requestUploadUrl('PUT', url, body, contentType, onProgress, signal)
+    } catch (error) {
+      if (error instanceof UploadCancelledError) throw error
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  } else if (response.status === 401 && shouldTryRefresh(path)) {
+    try {
+      await refreshLogin()
+      response = await requestUploadUrl('PUT', url, body, contentType, onProgress, signal)
+    } catch (error) {
+      if (error instanceof UploadCancelledError) throw error
+      // Keep the original 401 semantics for callers when refresh is not possible.
+    }
+  }
+
+  if (!response.ok) {
+    throw await apiError(response)
+  }
 }
 
 export async function apiError(response: Response): Promise<Error> {
@@ -115,6 +194,90 @@ async function requestUrl(url: string, options: RequestInit = {}): Promise<Respo
     ...options,
     headers
   })
+}
+
+function requestUploadUrl(
+  method: 'POST' | 'PUT',
+  url: string,
+  body: FormData | Blob,
+  contentType?: string,
+  onProgress?: (progress: UploadProgress) => void,
+  signal?: AbortSignal
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new UploadCancelledError())
+      return
+    }
+
+    const request = new XMLHttpRequest()
+    let abortedBySignal = false
+    request.open(method, url)
+    request.withCredentials = true
+    request.responseType = 'text'
+    if (contentType) {
+      request.setRequestHeader('Content-Type', contentType)
+    }
+
+    request.upload.onprogress = (event) => {
+      onProgress?.({
+        loaded: event.loaded,
+        total: event.lengthComputable ? event.total : null
+      })
+    }
+
+    request.onload = () => {
+      cleanup()
+      try {
+        resolve(
+          new Response(responseBody(request), {
+            status: request.status,
+            statusText: request.statusText,
+            headers: parseResponseHeaders(request.getAllResponseHeaders())
+          })
+        )
+      } catch (error) {
+        reject(error)
+      }
+    }
+
+    const abortUpload = () => {
+      abortedBySignal = true
+      request.abort()
+    }
+    const cleanup = () => {
+      signal?.removeEventListener('abort', abortUpload)
+    }
+
+    signal?.addEventListener('abort', abortUpload, { once: true })
+    request.onerror = () => {
+      cleanup()
+      reject(new Error('Request failed'))
+    }
+    request.onabort = () => {
+      cleanup()
+      reject(abortedBySignal ? new UploadCancelledError() : new Error('Request aborted'))
+    }
+    request.send(body)
+  })
+}
+
+function responseBody(request: XMLHttpRequest): BodyInit | null {
+  return [204, 205, 304].includes(request.status) ? null : request.responseText
+}
+
+function parseResponseHeaders(rawHeaders: string): Headers {
+  const headers = new Headers()
+  rawHeaders
+    .trim()
+    .split(/[\r\n]+/)
+    .filter(Boolean)
+    .forEach((line) => {
+      const separator = line.indexOf(':')
+      if (separator <= 0) return
+      headers.append(line.slice(0, separator).trim(), line.slice(separator + 1).trim())
+    })
+  return headers
 }
 
 async function refreshShareLogin(shareId: string): Promise<void> {

@@ -287,7 +287,7 @@
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 29rem) minmax(0, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 29rem) auto;
   align-items: center;
   gap: 0.8rem;
   min-height: var(--app-topbar-height);
@@ -482,6 +482,14 @@
   font-weight: 800;
 }
 
+.workspace-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .workspace-actions {
   display: flex;
   align-items: center;
@@ -636,13 +644,17 @@
   }
 
   .workspace-topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     padding: 0.75rem 1rem;
   }
 
   .workspace-search {
     justify-self: end;
     width: 2.7rem;
+  }
+
+  .upload-status-popover {
+    justify-self: end;
   }
 
   .workspace-topbar-center {
@@ -670,14 +682,24 @@
 @media (max-width: 720px) {
   .workspace-topbar {
     min-height: auto;
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto;
     align-items: start;
   }
 
-  .workspace-actions {
+  .workspace-search {
+    justify-self: stretch;
+    width: auto;
+  }
+
+  .workspace-topbar-actions {
+    grid-column: 1 / -1;
     width: 100%;
     justify-content: flex-start;
     overflow-x: auto;
+  }
+
+  .workspace-actions {
+    justify-content: flex-start;
   }
 
   .profile-button-name,

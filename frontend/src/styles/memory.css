@@ -678,17 +678,6 @@
   display: none;
 }
 
-.memory-upload-action.p-button {
-  background: #0f766e;
-  border-color: #0f766e;
-  color: #fff;
-}
-
-.memory-upload-action.p-button:not(:disabled):hover {
-  background: #115e59;
-  border-color: #115e59;
-}
-
 .memory-download-options {
   display: grid;
   gap: 0.75rem;
@@ -1632,6 +1621,10 @@
   font-size: 0.92rem;
 }
 
+.memory-upload-prime-picker .p-fileupload-file-name {
+  display: none;
+}
+
 .memory-upload-native-fallback {
   position: absolute;
   width: 1px;
@@ -1644,16 +1637,37 @@
 .memory-upload-file-list {
   display: grid;
   gap: 0.45rem;
-  max-height: 180px;
   margin: 0;
   padding: 0;
-  overflow: auto;
   list-style: none;
+}
+
+.memory-upload-selection {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.memory-upload-selection .memory-upload-file-list {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.memory-upload-clear-button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.memory-upload-clear-button:hover:not(:disabled) {
+  color: var(--app-danger);
 }
 
 .memory-upload-file-list li {
   display: grid;
-  grid-template-columns: 1.25rem minmax(0, 1fr);
+  grid-template-columns: 1.25rem minmax(0, 1fr) 1.8rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.55rem 0.65rem;
@@ -1663,10 +1677,217 @@
   color: var(--app-text);
 }
 
-.memory-upload-file-list li span:last-child {
+.memory-upload-file-list li > span:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.memory-upload-file-remove {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
+.memory-upload-file-remove:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.memory-upload-progress {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.memory-upload-progress-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.memory-upload-progress-header span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-upload-progress-track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.memory-upload-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 0.15s ease;
+}
+
+.upload-status-popover {
+  position: relative;
+}
+
+.upload-status-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
+.upload-status-trigger-active {
+  color: var(--app-accent);
+}
+
+.upload-status-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  min-width: 1.15rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.upload-status-panel {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  z-index: 50;
+  width: min(420px, calc(100vw - 2rem));
+  max-height: min(560px, calc(100vh - 6rem));
+  overflow: auto;
+  padding: 0.85rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: #fff;
+  box-shadow: var(--app-shadow-lg);
+}
+
+.upload-status-inline {
+  padding: 0.85rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #f8fafc;
+}
+
+.upload-status,
+.upload-status-batches,
+.upload-status-batch {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.upload-status-header,
+.upload-status-batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.upload-status-header h3,
+.upload-status-header p {
+  margin: 0;
+}
+
+.upload-status-header h3 {
+  font-size: 1rem;
+}
+
+.upload-status-header p,
+.upload-status-empty {
+  color: var(--app-muted);
+  font-size: 0.88rem;
+}
+
+.upload-status-batch-header {
+  color: var(--app-text);
+  font-size: 0.9rem;
+}
+
+.upload-status-file-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upload-status-file {
+  display: grid;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto auto 1.7rem;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  color: var(--app-text);
+  font-size: 0.86rem;
+}
+
+.upload-status-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-status-file-status,
+.upload-status-file-percent {
+  color: var(--app-muted);
+}
+
+.upload-status-file-done .upload-status-file-icon {
+  color: #047857;
+}
+
+.upload-status-file-failed .upload-status-file-icon {
+  color: #dc2626;
+}
+
+.upload-status-file-cancel,
+.upload-status-dismiss {
+  border: 0;
+  background: transparent;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
+.upload-status-file-cancel {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+}
+
+.upload-status-file-cancel:hover,
+.upload-status-dismiss:hover {
+  color: var(--app-danger);
+}
+
+.upload-status-dismiss {
+  justify-self: end;
+  padding: 0;
+  font-size: 0.82rem;
 }
 
 .public-share-view {

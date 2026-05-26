@@ -30,6 +30,7 @@ import type {
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryRequest,
+  UploadMediaOptions,
   UploadMemoryMediaRequest
 } from '../api'
 import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
@@ -77,7 +78,11 @@ const props = defineProps<{
   saveJournal?: (memoryId: string, request: UpdateMemoryJournalRequest) => Promise<MemoryJournal>
   setCover?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
   removeCover?: (memoryId: string) => Promise<Memory>
-  uploadMedia?: (memoryId: string, request: UploadMemoryMediaRequest) => Promise<MemoryMedia>
+  uploadMedia?: (
+    memoryId: string,
+    request: UploadMemoryMediaRequest,
+    options?: UploadMediaOptions
+  ) => Promise<MemoryMedia>
   deleteMemory?: (memoryId: string) => Promise<void>
   updateMediaMetadata?: (
     mediaId: string,

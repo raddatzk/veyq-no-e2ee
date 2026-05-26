@@ -32,7 +32,8 @@ const mocks = vi.hoisted(() => ({
   removeMemoryCover: vi.fn(),
   listMemoryMedia: vi.fn(),
   updateMemoryMediaMetadataBatch: vi.fn(),
-  uploadMemoryMedia: vi.fn(),
+  callApi: vi.fn(),
+  uploadBlob: vi.fn(),
   getPublicShareMemoryHeader: vi.fn()
 }))
 
@@ -53,12 +54,16 @@ vi.mock('../../../api/generatedClient', () => ({
   },
   memoryMediaApi: {
     listMemoryMedia: mocks.listMemoryMedia,
-    updateMemoryMediaMetadataBatch: mocks.updateMemoryMediaMetadataBatch,
-    uploadMemoryMedia: mocks.uploadMemoryMedia
+    updateMemoryMediaMetadataBatch: mocks.updateMemoryMediaMetadataBatch
   },
   publicSharesApi: {
     getPublicShareMemoryHeader: mocks.getPublicShareMemoryHeader
   }
+}))
+
+vi.mock('../../../shared/api/httpClient', () => ({
+  callApi: mocks.callApi,
+  uploadBlob: mocks.uploadBlob
 }))
 
 describe('memoryApi facade', () => {
@@ -280,28 +285,76 @@ describe('memoryApi facade', () => {
     })
   })
 
-  it('uploads memory media using undefined for an empty optional title', async () => {
-    const file = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
-    mocks.uploadMemoryMedia.mockResolvedValue({
-      id: 'media-1',
-      memoryId: 'mem-1',
-      title: 'Photo',
-      uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
-      createdAt: '2026-01-01T00:00:00Z',
-      capturedAtOverride: false,
-      mimeType: 'image/jpeg',
-      sizeBytes: 12,
-      contentUrl: '/content'
-    })
+  it('uploads memory media through a resumable chunk session without an empty optional title', async () => {
+    const file = new File(['image-data-12345'], 'photo.jpg', { type: 'image/jpeg' })
+    mocks.callApi
+      .mockResolvedValueOnce({ uploadId: 'upl-1', chunkSizeBytes: 10 })
+      .mockResolvedValueOnce({
+        uploadId: 'upl-1',
+        memoryId: 'mem-1',
+        filename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: file.size,
+        chunkSizeBytes: 5,
+        uploadedChunks: [],
+        uploadedBytes: 0,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z'
+      })
+      .mockResolvedValueOnce({
+        id: 'media-1',
+        memoryId: 'mem-1',
+        title: 'Photo',
+        uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
+        createdAt: '2026-01-01T00:00:00Z',
+        capturedAtOverride: false,
+        mimeType: 'image/jpeg',
+        sizeBytes: 12,
+        contentUrl: '/content'
+      })
 
     await uploadMemoryMedia('tenant', 'mem-1', { file, title: null })
 
-    expect(mocks.uploadMemoryMedia).toHaveBeenCalledWith({
-      tenantName: 'tenant',
-      memoryId: 'mem-1',
-      file,
-      title: undefined
-    })
+    expect(mocks.callApi).toHaveBeenNthCalledWith(
+      1,
+      '/api/tenant/memories/mem-1/media/uploads',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          filename: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          sizeBytes: file.size
+        })
+      })
+    )
+    expect(mocks.uploadBlob).toHaveBeenNthCalledWith(
+      1,
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/chunks/0',
+      expect.any(Blob),
+      'application/octet-stream',
+      expect.any(Function),
+      undefined
+    )
+    expect(mocks.uploadBlob).toHaveBeenNthCalledWith(
+      2,
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/chunks/1',
+      expect.any(Blob),
+      'application/octet-stream',
+      expect.any(Function),
+      undefined
+    )
+    expect(mocks.uploadBlob).toHaveBeenNthCalledWith(
+      3,
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/chunks/2',
+      expect.any(Blob),
+      'application/octet-stream',
+      expect.any(Function),
+      undefined
+    )
+    expect(mocks.callApi).toHaveBeenLastCalledWith(
+      '/api/tenant/memories/mem-1/media/uploads/upl-1/complete',
+      { method: 'POST' }
+    )
   })
 
   it('updates memory media metadata in batches and normalizes returned media', async () => {

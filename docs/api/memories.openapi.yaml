@@ -666,6 +666,115 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: createMemoryMediaUpload
+      summary: Create a resumable media upload session
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryMediaUpload"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaUploadSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: getMemoryMediaUpload
+      summary: Get a resumable media upload session
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PendingMemoryMediaUploadSession"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: abortMemoryMediaUpload
+      summary: Abort a resumable media upload session
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '204':
+          description: Upload session aborted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}":
+    put:
+      tags:
+        - MemoryMedia
+      operationId: uploadMemoryMediaChunk
+      summary: Upload one media chunk
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+        - "$ref": "#/components/parameters/ChunkIndex"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadMediaChunk"
+      responses:
+        '204':
+          description: Upload chunk stored.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/complete":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: completeMemoryMediaUpload
+      summary: Complete a resumable media upload session
+      x-implementation-status: implemented
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMedia"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/download":
     get:
       tags:
@@ -1041,6 +1150,22 @@ components:
         maximum: 50
       description: Maximum number of results to return.
       example: 20
+    UploadId:
+      in: path
+      required: true
+      name: uploadId
+      schema:
+        type: string
+      description: Resumable upload session id.
+    ChunkIndex:
+      in: path
+      required: true
+      name: chunkIndex
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+      description: Zero-based upload chunk index.
   requestBodies:
     CreateMemory:
       required: true
@@ -1128,6 +1253,24 @@ components:
                 nullable: true
           example:
             title: Beach
+    CreateMemoryMediaUpload:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryMediaUploadRequest"
+          example:
+            filename: beach.mp4
+            mimeType: video/mp4
+            sizeBytes: 73400320
+            title: Beach
+    UploadMediaChunk:
+      required: true
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
     UpdateMemoryMediaMetadata:
       required: true
       content:
@@ -1297,6 +1440,18 @@ components:
         application/json:
           schema:
             "$ref": "#/components/schemas/MemoryMediaSummary"
+    MemoryMediaUploadSession:
+      description: Created resumable media upload session.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaUploadSession"
+    PendingMemoryMediaUploadSession:
+      description: Resumable media upload session status.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PendingMemoryMediaUploadSession"
           example: &memoryMediaExample
             id: med_abc123
             memoryId: mem_abc123
@@ -1831,6 +1986,82 @@ components:
           type: integer
           format: int64
           description: Signed offset in seconds applied to each selected media capture timestamp.
+    CreateMemoryMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - filename
+        - mimeType
+        - sizeBytes
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+          nullable: true
+    MemoryMediaUploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - chunkSizeBytes
+      properties:
+        uploadId:
+          type: string
+        chunkSizeBytes:
+          type: integer
+          format: int64
+    PendingMemoryMediaUploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - memoryId
+        - filename
+        - mimeType
+        - sizeBytes
+        - chunkSizeBytes
+        - uploadedChunks
+        - uploadedBytes
+        - createdAt
+        - updatedAt
+      properties:
+        uploadId:
+          type: string
+        memoryId:
+          type: string
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+          nullable: true
+        chunkSizeBytes:
+          type: integer
+          format: int64
+        uploadedChunks:
+          type: array
+          items:
+            type: integer
+            format: int32
+        uploadedBytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     MemoryMediaBatchResponse:
       type: object
       additionalProperties: false

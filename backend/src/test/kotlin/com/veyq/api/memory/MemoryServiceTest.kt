@@ -27,12 +27,14 @@ import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
+import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
+import com.veyq.api.library.LibraryDeletionService
 import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
@@ -81,6 +83,7 @@ class MemoryServiceTest {
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var folderService: FolderService
+    @Inject lateinit var libraryDeletionService: LibraryDeletionService
 
     private lateinit var runId: String
     private lateinit var tenant: Tenant
@@ -402,6 +405,162 @@ class MemoryServiceTest {
 
         assertThat(Files.exists(originalPath)).isFalse()
         assertThat(Files.exists(previewPath)).isFalse()
+    }
+
+    @Test
+    fun `memory chunk upload resumes existing chunks and completes media`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("chunk-trip", "Chunk Trip"))
+        val image = Files.readAllBytes(imageFile("chunk-upload"))
+        val session = mediaService.createMemoryMediaUpload(
+            trip.id,
+            CreateMemoryMediaUploadRequest(filename = "chunk.png", mimeType = "image/png", sizeBytes = image.size.toLong(), title = "Chunk")
+        )
+
+        mediaService.uploadMemoryMediaChunk(trip.id, session.uploadId, 0, tempUploadChunk(image.copyOfRange(0, 4)))
+        val pending = mediaService.memoryMediaUploadStatus(trip.id, session.uploadId)
+        assertThat(pending.uploadedChunks).containsExactly(0)
+        assertThat(pending.uploadedBytes).isEqualTo(4)
+
+        for (offset in 4 until image.size step 4) {
+            val chunkIndex = offset / 4
+            mediaService.uploadMemoryMediaChunk(
+                trip.id,
+                session.uploadId,
+                chunkIndex,
+                tempUploadChunk(image.copyOfRange(offset, (offset + 4).coerceAtMost(image.size)))
+            )
+        }
+        val media = mediaService.completeMemoryMediaUpload(trip.id, session.uploadId)
+
+        assertThat(media.title).isEqualTo("Chunk")
+        assertThat(media.sizeBytes).isEqualTo(image.size.toLong())
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.id)).isNotNull
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            mediaService.memoryMediaUploadStatus(trip.id, session.uploadId)
+        }
+    }
+
+    @Test
+    fun `memory chunk upload rejects out of range chunk index`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("chunk-range-trip", "Chunk Range Trip"))
+        val session = mediaService.createMemoryMediaUpload(
+            trip.id,
+            CreateMemoryMediaUploadRequest(filename = "range.txt", mimeType = "text/plain", sizeBytes = 5, title = "Range")
+        )
+
+        assertThatExceptionOfType(BadRequestException::class.java)
+            .isThrownBy {
+                mediaService.uploadMemoryMediaChunk(trip.id, session.uploadId, 2, tempUploadChunk("x"))
+            }
+            .withMessageContaining("chunkIndex is outside upload range")
+    }
+
+    @Test
+    fun `failed memory chunk complete keeps upload session`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("chunk-missing-trip", "Chunk Missing Trip"))
+        val session = mediaService.createMemoryMediaUpload(
+            trip.id,
+            CreateMemoryMediaUploadRequest(filename = "missing.txt", mimeType = "text/plain", sizeBytes = 8, title = "Missing")
+        )
+
+        mediaService.uploadMemoryMediaChunk(trip.id, session.uploadId, 0, tempUploadChunk("abcd"))
+
+        assertThatExceptionOfType(BadRequestException::class.java)
+            .isThrownBy {
+                mediaService.completeMemoryMediaUpload(trip.id, session.uploadId)
+            }
+            .withMessageContaining("Missing upload chunk")
+
+        assertThat(mediaService.memoryMediaUploadStatus(trip.id, session.uploadId).uploadedChunks).containsExactly(0)
+    }
+
+    @Test
+    fun `memory chunk upload abort deletes session and chunks`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("chunk-abort-trip", "Chunk Abort Trip"))
+        val session = mediaService.createMemoryMediaUpload(
+            trip.id,
+            CreateMemoryMediaUploadRequest(filename = "abort.txt", mimeType = "text/plain", sizeBytes = 4, title = "Abort")
+        )
+
+        mediaService.uploadMemoryMediaChunk(trip.id, session.uploadId, 0, tempUploadChunk("abcd"))
+        mediaService.abortMemoryMediaUpload(trip.id, session.uploadId)
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            mediaService.memoryMediaUploadStatus(trip.id, session.uploadId)
+        }
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            mediaService.completeMemoryMediaUpload(trip.id, session.uploadId)
+        }
+    }
+
+    @Test
+    fun `deleting memory removes pending upload sessions for memory tree`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("chunk-cleanup-root", "Chunk Cleanup Root"))
+        val child = memoryService.createMemory(CreateMemoryRequest("chunk-cleanup-child", "Chunk Cleanup Child", parentId = root.id))
+        val corruptUploadId = writeCorruptUploadSession()
+        val rootSession = mediaService.createMemoryMediaUpload(
+            root.id,
+            CreateMemoryMediaUploadRequest(filename = "root.txt", mimeType = "text/plain", sizeBytes = 4, title = "Root")
+        )
+        val childSession = mediaService.createMemoryMediaUpload(
+            child.id,
+            CreateMemoryMediaUploadRequest(filename = "child.txt", mimeType = "text/plain", sizeBytes = 4, title = "Child")
+        )
+        mediaService.uploadMemoryMediaChunk(root.id, rootSession.uploadId, 0, tempUploadChunk("root"))
+        mediaService.uploadMemoryMediaChunk(child.id, childSession.uploadId, 0, tempUploadChunk("part"))
+        val rootUploadDirectory = uploadSessionDirectory(rootSession.uploadId)
+        val childUploadDirectory = uploadSessionDirectory(childSession.uploadId)
+
+        memoryService.deleteMemory(root.id)
+
+        assertThat(Files.exists(rootUploadDirectory)).isFalse()
+        assertThat(Files.exists(childUploadDirectory)).isFalse()
+        assertThat(Files.exists(uploadSessionDirectory(corruptUploadId))).isTrue()
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            mediaService.memoryMediaUploadStatus(root.id, rootSession.uploadId)
+        }
+        deleteUploadSessionDirectory(corruptUploadId)
+    }
+
+    @Test
+    fun `invalid upload session status returns not found`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("invalid-upload-session-trip", "Invalid Upload Session Trip"))
+        val uploadId = writeCorruptUploadSession()
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            mediaService.memoryMediaUploadStatus(trip.id, uploadId)
+        }
+        deleteUploadSessionDirectory(uploadId)
+    }
+
+    @Test
+    fun `deleting tenant removes only pending upload sessions for that tenant`() {
+        val targetMemory = memoryService.createMemory(CreateMemoryRequest("tenant-cleanup-target", "Tenant Cleanup Target"))
+        val targetSession = mediaService.createMemoryMediaUpload(
+            targetMemory.id,
+            CreateMemoryMediaUploadRequest(filename = "target.txt", mimeType = "text/plain", sizeBytes = 4, title = "Target")
+        )
+        mediaService.uploadMemoryMediaChunk(targetMemory.id, targetSession.uploadId, 0, tempUploadChunk("part"))
+        val targetUploadDirectory = uploadSessionDirectory(targetSession.uploadId)
+
+        val otherOwner = createUser("tenant-cleanup-other-$runId", ServerRole.ServerMember)
+        val otherTenant = createTenant("tenant-cleanup-other-$runId", "Tenant Cleanup Other $runId", otherOwner, TenantRole.TenantOwner)
+        useContext(otherOwner, otherTenant)
+        val otherMemory = memoryService.createMemory(CreateMemoryRequest("tenant-cleanup-other", "Tenant Cleanup Other"))
+        val otherSession = mediaService.createMemoryMediaUpload(
+            otherMemory.id,
+            CreateMemoryMediaUploadRequest(filename = "other.txt", mimeType = "text/plain", sizeBytes = 4, title = "Other")
+        )
+        mediaService.uploadMemoryMediaChunk(otherMemory.id, otherSession.uploadId, 0, tempUploadChunk("part"))
+        val otherUploadDirectory = uploadSessionDirectory(otherSession.uploadId)
+
+        inTransaction {
+            libraryDeletionService.deleteTenant(tenant)
+        }
+
+        assertThat(Files.exists(targetUploadDirectory)).isFalse()
+        assertThat(Files.exists(otherUploadDirectory)).isTrue()
+        assertThat(mediaService.memoryMediaUploadStatus(otherMemory.id, otherSession.uploadId).uploadedChunks).containsExactly(0)
     }
 
     @Test
@@ -1054,6 +1213,33 @@ class MemoryServiceTest {
         val path = Files.createTempFile(prefix, ".txt")
         Files.writeString(path, "not an image")
         return path
+    }
+
+    private fun tempUploadChunk(content: String): Path {
+        val path = Files.createTempFile("veyq-upload-chunk-", ".part")
+        Files.writeString(path, content)
+        return path
+    }
+
+    private fun tempUploadChunk(content: ByteArray): Path {
+        val path = Files.createTempFile("veyq-upload-chunk-", ".part")
+        Files.write(path, content)
+        return path
+    }
+
+    private fun uploadSessionDirectory(uploadId: String): Path =
+        mediaConfig.storageDir.resolve("_uploads").resolve(uploadId)
+
+    private fun writeCorruptUploadSession(): String {
+        val uploadId = UUID.randomUUID().toString()
+        val directory = uploadSessionDirectory(uploadId)
+        Files.createDirectories(directory)
+        Files.writeString(directory.resolve("session.properties"), "not-a-valid-session=true")
+        return uploadId
+    }
+
+    private fun deleteUploadSessionDirectory(uploadId: String) {
+        uploadSessionDirectory(uploadId).toFile().deleteRecursively()
     }
 
     private fun writeStoredMedia(media: Media, content: String) {

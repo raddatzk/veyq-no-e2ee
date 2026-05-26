@@ -6,13 +6,18 @@ import Dialog from 'primevue/dialog'
 import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import Message from 'primevue/message'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { uploadMemoryMedia, type MemoryMedia, type UploadMemoryMediaRequest } from '../api'
+import { uploadMemoryMedia, type MemoryMedia, type UploadMediaOptions, type UploadMemoryMediaRequest } from '../api'
+import { startUploadBatch } from '../composables/useUploadQueue'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memoryId: string | null
-  uploadMedia?: (memoryId: string, request: UploadMemoryMediaRequest) => Promise<MemoryMedia>
+  uploadMedia?: (
+    memoryId: string,
+    request: UploadMemoryMediaRequest,
+    options?: UploadMediaOptions
+  ) => Promise<MemoryMedia>
 }>()
 const emit = defineEmits<{
   saved: []
@@ -22,7 +27,7 @@ const { t } = useI18n()
 const files = ref<File[]>([])
 const error = ref('')
 const loading = ref(false)
-const picker = ref<{ clear: () => void } | null>(null)
+const picker = ref<{ clear?: () => void } | null>(null)
 
 watch(visible, (isVisible) => {
   if (!isVisible) return
@@ -31,17 +36,26 @@ watch(visible, (isVisible) => {
 })
 
 function updateFiles(event: Event) {
+  if (loading.value) return
   const input = event.target as HTMLInputElement
   files.value = Array.from(input.files || [])
 }
 
 function selectFiles(event: FileUploadSelectEvent) {
+  if (loading.value) return
   files.value = event.files
 }
 
 function clearFiles() {
+  if (loading.value) return
   files.value = []
-  picker.value?.clear()
+  picker.value?.clear?.()
+}
+
+function removeFile(index: number) {
+  if (loading.value) return
+  files.value = files.value.filter((_, fileIndex) => fileIndex !== index)
+  if (files.value.length === 0) picker.value?.clear?.()
 }
 
 async function submit() {
@@ -49,14 +63,24 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    for (const file of files.value) {
-      const request = { file, title: file.name }
-      if (props.uploadMedia) await props.uploadMedia(props.memoryId, request)
-      else await uploadMemoryMedia(props.tenantName, props.memoryId, request)
-    }
+    const memoryId = props.memoryId
+    startUploadBatch({
+      label: t('media.uploadBatchTitle', { count: files.value.length }),
+      files: [...files.value],
+      context: { type: 'memory', tenantName: props.tenantName, memoryId },
+      uploadFile: (file, options) => {
+        const request = { file, title: file.name }
+        return props.uploadMedia
+          ? props.uploadMedia(memoryId, request, options)
+          : uploadMemoryMedia(props.tenantName, memoryId, request, options)
+      },
+      onComplete: () => {
+        emit('saved')
+      }
+    })
     visible.value = false
-    clearFiles()
-    emit('saved')
+    files.value = []
+    picker.value?.clear?.()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('memory.uploadFailed'))
   } finally {
@@ -71,29 +95,54 @@ async function submit() {
       <div class="memory-upload-picker">
         <FileUpload
           ref="picker"
+          class="memory-upload-prime-picker"
           mode="basic"
           accept="image/*,video/*"
           :choose-label="t('media.chooseFiles')"
           custom-upload
           multiple
+          :disabled="loading"
           @select="selectFiles"
+        >
+          <template #filelabel />
+        </FileUpload>
+        <input
+          class="memory-upload-native-fallback"
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          :disabled="loading"
+          @change="updateFiles"
         />
-        <input class="memory-upload-native-fallback" type="file" multiple accept="image/*,video/*" @change="updateFiles" />
         <span>{{ files.length ? t('media.selectedCount', { count: files.length }) : t('media.noneSelected') }}</span>
       </div>
-      <ul v-if="files.length" class="memory-upload-file-list">
-        <li v-for="file in files" :key="`${file.name}-${file.size}`">
-          <span class="pi pi-file" />
-          <span>{{ file.name }}</span>
-        </li>
-      </ul>
+      <div v-if="files.length" class="memory-upload-selection">
+        <button type="button" class="memory-upload-clear-button" :disabled="loading" @click="clearFiles">
+          {{ t('media.clearSelectedFiles') }}
+        </button>
+        <ul class="memory-upload-file-list">
+          <li v-for="(file, index) in files" :key="`${file.name}-${file.size}-${index}`">
+            <span class="pi pi-file" />
+            <span>{{ file.name }}</span>
+            <button
+              type="button"
+              class="memory-upload-file-remove"
+              :disabled="loading"
+              :aria-label="t('media.removeSelectedFile', { file: file.name })"
+              @click="removeFile(index)"
+            >
+              <span class="pi pi-times" />
+            </button>
+          </li>
+        </ul>
+      </div>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="button-row">
         <Button
           type="submit"
           :label="t('common.upload')"
           icon="pi pi-upload"
-          :disabled="files.length === 0"
+          :disabled="files.length === 0 || loading"
           :loading="loading"
         />
         <Button
@@ -101,6 +150,7 @@ async function submit() {
           :label="t('common.cancel')"
           severity="secondary"
           outlined
+          :disabled="loading"
           @click="visible = false"
         />
       </div>

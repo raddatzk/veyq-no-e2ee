@@ -1,6 +1,7 @@
 package com.veyq.api.memory
 
 import com.veyq.api.generated.api.PublicSharesApi
+import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
@@ -9,6 +10,7 @@ import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.core.Response
+import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -182,4 +184,60 @@ class PublicShareResource @Inject constructor(
 
     override fun publicShareMediaPreview(shareId: String, mediaId: String): Response =
         memoryShareService.publicShareMediaPreview(shareId, mediaId)
+
+    override fun createPublicShareMediaUpload(
+        shareId: String,
+        createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest,
+    ): Response =
+        Response.ok(memoryShareService.createPublicShareMediaUpload(shareId, createMemoryMediaUploadRequest)).build()
+
+    override fun createPublicShareMemoryMediaUpload(
+        shareId: String,
+        memoryId: String,
+        createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest,
+    ): Response =
+        Response.ok(memoryShareService.createPublicShareMemoryMediaUpload(shareId, memoryId, createMemoryMediaUploadRequest)).build()
+
+    override fun getPublicShareMediaUpload(shareId: String, uploadId: String): Response =
+        Response.ok(memoryShareService.publicShareMediaUploadStatus(shareId, uploadId)).build()
+
+    override fun getPublicShareMemoryMediaUpload(shareId: String, memoryId: String, uploadId: String): Response =
+        Response.ok(memoryShareService.publicShareMemoryMediaUploadStatus(shareId, memoryId, uploadId)).build()
+
+    override fun uploadPublicShareMediaChunk(
+        shareId: String,
+        uploadId: String,
+        chunkIndex: Int,
+        body: File,
+    ): Response {
+        memoryShareService.uploadPublicShareMediaChunk(shareId, uploadId, chunkIndex, body.toPath())
+        return Response.noContent().build()
+    }
+
+    override fun uploadPublicShareMemoryMediaChunk(
+        shareId: String,
+        memoryId: String,
+        uploadId: String,
+        chunkIndex: Int,
+        body: File,
+    ): Response {
+        memoryShareService.uploadPublicShareMemoryMediaChunk(shareId, memoryId, uploadId, chunkIndex, body.toPath())
+        return Response.noContent().build()
+    }
+
+    override fun completePublicShareMediaUpload(shareId: String, uploadId: String): Response =
+        Response.ok(memoryShareService.completePublicShareMediaUpload(shareId, uploadId)).build()
+
+    override fun completePublicShareMemoryMediaUpload(shareId: String, memoryId: String, uploadId: String): Response =
+        Response.ok(memoryShareService.completePublicShareMemoryMediaUpload(shareId, memoryId, uploadId)).build()
+
+    override fun abortPublicShareMediaUpload(shareId: String, uploadId: String): Response {
+        memoryShareService.abortPublicShareMediaUpload(shareId, uploadId)
+        return Response.noContent().build()
+    }
+
+    override fun abortPublicShareMemoryMediaUpload(shareId: String, memoryId: String, uploadId: String): Response {
+        memoryShareService.abortPublicShareMemoryMediaUpload(shareId, memoryId, uploadId)
+        return Response.noContent().build()
+    }
 }

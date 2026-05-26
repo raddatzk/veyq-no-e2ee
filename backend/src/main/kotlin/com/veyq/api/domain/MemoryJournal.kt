@@ -18,7 +18,7 @@ class MemoryJournal : PanacheEntityBase {
     lateinit var memory: Memory
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "longtext")
     lateinit var markdown: String
 
     @Column(name = "created_at", nullable = false)
