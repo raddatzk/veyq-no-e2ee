@@ -27,7 +27,7 @@ defineEmits<{
       </div>
       <div class="memory-card-grid memory-card-grid-memories">
         <p v-if="!memories.length" class="memory-empty memory-empty-inline">
-          {{ t('media.empty') }}
+          {{ t('memory.memoryEmpty') }}
         </p>
         <MemoryCard
           v-for="memory in memories"

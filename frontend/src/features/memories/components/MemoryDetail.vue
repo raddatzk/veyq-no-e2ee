@@ -455,7 +455,19 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
+          <div v-if="visibleMedia.length === 0" class="memory-empty memory-empty-action">
+            <span class="pi pi-images" />
+            <span>{{ t('memory.galleryEmptyAction') }}</span>
+            <Button
+              v-if="capabilities.canUpload"
+              icon="pi pi-upload"
+              :label="t('memory.upload')"
+              size="small"
+              @click="uploadOpen = true"
+            />
+          </div>
           <MediaGrid
+            v-else
             :tenant-name="tenantName"
             :media="visibleMedia"
             :streaming="false"
@@ -624,6 +636,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <span class="pi pi-plus" />
               <strong>{{ t('memory.childCreate') }}</strong>
             </button>
+          </div>
+          <div v-if="childMemories.length === 0 && !capabilities.canCreateChildMemory" class="memory-empty">
+            <span class="pi pi-sitemap" />
+            <span>{{ t('memory.childrenEmpty') }}</span>
           </div>
         </TabPanel>
         <TabPanel value="info">

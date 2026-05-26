@@ -37,6 +37,7 @@ const role = ref<MemoryShareRole>('VIEWER')
 const passwordEnabled = ref(false)
 const password = ref('')
 const error = ref('')
+const message = ref('')
 const loading = ref(false)
 const renameDialogVisible = ref(false)
 const passwordDialogVisible = ref(false)
@@ -74,6 +75,7 @@ watch(
     passwordEnabled.value = false
     password.value = ''
     error.value = ''
+    message.value = ''
     void loadShares()
   },
   { immediate: true }
@@ -93,6 +95,7 @@ async function loadShares() {
 async function createShare() {
   if (passwordEnabled.value && !password.value.trim()) return
   error.value = ''
+  message.value = ''
   loading.value = true
   try {
     await createMemoryShare(props.tenantName, props.memory.id, {
@@ -154,6 +157,7 @@ async function updateShare(
   request: { name?: string | null; role?: MemoryShareRole; enabled?: boolean; password?: string | null }
 ) {
   error.value = ''
+  message.value = ''
   loading.value = true
   try {
     await updateMemoryShare(props.tenantName, share.id, request)
@@ -166,7 +170,14 @@ async function updateShare(
 }
 
 async function copyShare(share: MemoryShareSummary) {
-  await navigator.clipboard.writeText(`${origin.value}${share.shareUrl}`)
+  error.value = ''
+  message.value = ''
+  try {
+    await navigator.clipboard.writeText(`${origin.value}${share.shareUrl}`)
+    message.value = t('share.linkCopied')
+  } catch {
+    error.value = t('share.linkCopyFailed')
+  }
 }
 
 function shareLabel(share: MemoryShareSummary) {
@@ -200,6 +211,7 @@ const canSavePassword = computed(() => {
   <Dialog v-model:visible="visible" :header="t('share.title')" modal class="tenant-dialog share-dialog">
     <div class="form">
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+      <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
       <div class="form-grid">
         <label>

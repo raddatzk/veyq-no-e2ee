@@ -96,6 +96,43 @@ docker compose up --build
 
 The app is served through the domain configured by `VEYQ_TRAEFIK_RULE`. The health endpoint is available at `/q/health`.
 
+### Private Alpha Self-Hosting Runbook
+
+Use this path for a first self-hosted Veyq instance. It is suitable for a trusted private alpha, not yet for a public managed service.
+
+1. Copy `infra/.env.example` to `infra/.env`.
+2. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
+3. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
+4. Set `WEBAUTHN_ORIGINS` to the HTTPS origin and `WEBAUTHN_RP_ID` to the host without protocol.
+5. Configure SMTP through the `MAIL_*` variables before inviting users.
+6. Start with `docker compose up --build` from `infra/`.
+7. Open the configured host, create the first admin and create the first tenant.
+
+Back up at least these Docker volumes before upgrading or testing destructive flows:
+
+- `infra_veyq-db`: MariaDB data.
+- `infra_veyq-media`: original uploads, previews and explicit Memory covers.
+- `infra_traefik-letsencrypt`: ACME certificates and account state.
+
+Example backup commands from the `infra/` directory:
+
+```bash
+docker compose exec veyq-db mariadb-dump -u root -p"${DB_ROOT_PASSWORD}" "${DB_NAME:-veyq}" > veyq-db.sql
+docker run --rm -v infra_veyq-media:/data -v "$PWD":/backup alpine tar czf /backup/veyq-media.tgz -C /data .
+```
+
+Before considering a private alpha instance ready, run the product smoke flow once:
+
+- Initial setup creates the first admin and tenant.
+- Login, logout and refresh cookies work through the configured HTTPS host.
+- A Memory can be created with an optional cover.
+- Photos and videos can be uploaded and viewed.
+- The Journal can be saved and reloaded.
+- A child Memory can be created and opened.
+- Viewer, Contributor, Manager and Uploader shares can be opened from a fresh browser session.
+- Public upload links accept media without exposing the gallery.
+- ZIP downloads work for direct Memory media and for media including child Memories.
+
 ## Reset Sidecar
 
 The reset sidecar is intended for development and disposable test instances where a quick return to the initial setup flow is useful. It must not be exposed for real production data.

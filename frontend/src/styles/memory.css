@@ -318,6 +318,10 @@
   background: #fff;
 }
 
+.memory-empty-action {
+  flex-wrap: wrap;
+}
+
 .memory-refresh {
   display: flex;
   justify-content: flex-end;
@@ -1714,6 +1718,10 @@
   margin: 0;
   color: var(--app-muted);
   line-height: 1.5;
+}
+
+.public-share-upload-note {
+  font-size: 0.9rem;
 }
 
 .public-share-upload-copy {

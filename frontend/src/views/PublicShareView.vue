@@ -55,6 +55,7 @@ const selectedFiles = ref<File[]>([])
 const uploadPicker = ref<{ clear: () => void } | null>(null)
 const createMemoryOpen = ref(false)
 const error = ref('')
+const message = ref('')
 const loading = ref(false)
 
 const isUploaderOnly = computed(() => share.value?.role === 'UPLOADER')
@@ -114,6 +115,7 @@ async function loadShare() {
 async function login() {
   if (!canSubmitLogin.value) return
   error.value = ''
+  message.value = ''
   loading.value = true
   try {
     share.value = await loginPublicShare(
@@ -136,6 +138,7 @@ async function login() {
 
 async function closeShare() {
   await logoutPublicShare(shareId.value)
+  message.value = ''
   memory.value = null
   memoryHeader.value = null
   memoryJournal.value = null
@@ -151,6 +154,7 @@ async function loadProtectedContent() {
 
 async function loadCurrentMemory() {
   error.value = ''
+  message.value = ''
   loading.value = true
   try {
     const current = await getPublicShareMemoryByPath(shareId.value, sharePath.value)
@@ -204,8 +208,10 @@ function clearUploadSelection() {
 async function uploadToRoot() {
   if (!selectedFiles.value.length) return
   error.value = ''
+  message.value = ''
   loading.value = true
   try {
+    const uploadCount = selectedFiles.value.length
     for (const file of selectedFiles.value) {
       await uploadPublicShareMedia(shareId.value, {
         file,
@@ -213,6 +219,7 @@ async function uploadToRoot() {
       })
     }
     clearUploadSelection()
+    message.value = t('share.uploadComplete', { count: uploadCount })
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.uploadFailed'))
   } finally {
@@ -254,6 +261,7 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
     </header>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+    <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
     <form v-if="canShowLogin" class="public-share-login" @submit.prevent="login">
       <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
@@ -292,6 +300,7 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       <div class="public-share-upload-copy">
         <h2>{{ t('share.uploadTitle') }}</h2>
         <p>{{ t('share.uploadCopy') }}</p>
+        <p class="public-share-upload-note">{{ t('share.uploaderOnlyNotice') }}</p>
       </div>
       <div class="memory-upload-picker">
         <FileUpload

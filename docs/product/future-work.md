@@ -6,7 +6,6 @@ This document turns the Memory product context into follow-up topics for develop
 
 - Decide sync semantics: last-write-wins now, ETags or conflict resolution later.
 - Decide privacy model for person/participant pages.
-- Decide license strategy: AGPL, trademark policy, community/commercial split.
 - Decide optional central services: push gateway, managed hosting, update/license services.
 - Decide E2E encryption stance for V1 and what metadata remains server-visible.
 

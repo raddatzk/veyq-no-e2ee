@@ -27,6 +27,14 @@
   width: min(560px, calc(100vw - 2rem));
 }
 
+.share-dialog .form > .p-message:first-child {
+  margin-top: 0.75rem;
+}
+
+.share-dialog .form > .p-message + .p-message {
+  margin-top: 0;
+}
+
 .tenant-dialog .p-dialog-header-actions .p-button,
 .tenant-dialog .p-dialog-header-icon {
   border: 0;

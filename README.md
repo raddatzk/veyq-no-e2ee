@@ -93,4 +93,4 @@ Read [`AGENTS.md`](AGENTS.md) before making product or architecture changes. In 
 
 ## License
 
-License strategy is not final yet. It should be decided through an ADR before a public release.
+The private alpha remains source-available only to trusted contributors until a root `LICENSE` file is added. The current public-release target is AGPL-3.0-only for the community edition with Veyq brand assets reserved separately; see [`docs/adr/0008-private-alpha-license-strategy.md`](docs/adr/0008-private-alpha-license-strategy.md).

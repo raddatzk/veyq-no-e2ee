@@ -505,6 +505,11 @@ describe('Memory detail dialogs', () => {
     await flushPromises()
     expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { role: 'CONTRIBUTOR' })
 
+    await wrapper.find('button[aria-label="Freigabe-Link kopieren"]').trigger('click')
+    await flushPromises()
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/s/shr-1'))
+    expect(wrapper.text()).toContain('Freigabe-Link wurde kopiert.')
+
     await wrapper.find('button[aria-label="Freigabe umbenennen"]').trigger('click')
     await flushPromises()
     await wrapper.findAll('input').at(-1)!.setValue('Friends')
@@ -586,6 +591,7 @@ describe('Memory detail dialogs', () => {
     await wrapper.find('button[aria-label="Freigabe-Link kopieren"]').trigger('click')
     await flushPromises()
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/s/shr-upload'))
+    expect(wrapper.text()).toContain('Freigabe-Link wurde kopiert.')
 
     await wrapper.find('button[aria-label="Freigabe umbenennen"]').trigger('click')
     await flushPromises()
