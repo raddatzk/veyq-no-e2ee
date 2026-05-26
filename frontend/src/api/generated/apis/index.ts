@@ -10,6 +10,7 @@ export * from './MemoryNavigationApi';
 export * from './MemorySharesApi';
 export * from './ProfilesApi';
 export * from './PublicSharesApi';
+export * from './SearchApi';
 export * from './ServerApi';
 export * from './SettingsApi';
 export * from './SetupApi';

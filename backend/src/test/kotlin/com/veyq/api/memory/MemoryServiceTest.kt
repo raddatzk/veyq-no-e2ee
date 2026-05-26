@@ -29,6 +29,7 @@ import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
+import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
@@ -76,6 +77,7 @@ class MemoryServiceTest {
     @Inject lateinit var memoryService: MemoryService
     @Inject lateinit var memoryNavigationService: MemoryNavigationService
     @Inject lateinit var memoryJournalService: MemoryJournalService
+    @Inject lateinit var searchService: SearchService
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var folderService: FolderService
@@ -791,6 +793,69 @@ class MemoryServiceTest {
                 cropHeight = 1.0,
             )
         }
+    }
+
+    @Test
+    fun `search finds visible memories folders and journal snippets with ranked results`() {
+        val folder = folderService.createFolder(CreateFolderRequest("beach-archive", "Beach Archive"))
+        val exact = memoryService.createMemory(CreateMemoryRequest("beach", "Beach"))
+        val journalOnly = memoryService.createMemory(CreateMemoryRequest("journal-day", "Journal Day"))
+        memoryJournalService.updateJournal(
+            memory(journalOnly.id),
+            "We found the quiet beach picnic spot after sunset.",
+            MemoryJournalService.JournalValidationContext(memory(journalOnly.id)),
+        )
+
+        val results = searchService.search("beach", 10)
+
+        assertThat(results.map { it.id }).containsSubsequence(exact.id, folder.id, journalOnly.id)
+        assertThat(results.first { it.id == exact.id }.matchTypes).contains(SearchResultSummary.MatchTypes.TITLE)
+        assertThat(results.first { it.id == folder.id }.kind).isEqualTo(SearchResultSummary.Kind.FOLDER)
+        assertThat(results.first { it.id == journalOnly.id }.matchTypes).contains(SearchResultSummary.MatchTypes.JOURNAL)
+        assertThat(results.first { it.id == journalOnly.id }.journalSnippet).contains("quiet beach picnic")
+    }
+
+    @Test
+    fun `search only returns memories and folders in visible scopes`() {
+        val outsider = createUser("search-outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+        val group = createGroup("search-private-$runId", owner)
+        val groupFolder = folderService.createFolder(
+            CreateFolderRequest(
+                name = "secret-search-folder",
+                displayName = "Secret Search Folder",
+                scope = MemoryScopeRequest("GROUP", group.name),
+            )
+        )
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest(
+                "secret-search-memory",
+                "Secret Search Memory",
+                scope = MemoryScopeRequest("GROUP", group.name),
+            )
+        )
+        val personalMemory = memoryService.createMemory(
+            CreateMemoryRequest(
+                "secret-search-personal",
+                "Secret Search Personal",
+                scope = MemoryScopeRequest("USER", null),
+            )
+        )
+
+        assertThat(searchService.search("secret-search", 10).map { it.id })
+            .contains(groupFolder.id, groupMemory.id, personalMemory.id)
+
+        useContext(outsider, tenant)
+        assertThat(searchService.search("secret-search", 10)).isEmpty()
+    }
+
+    @Test
+    fun `search limits result count`() {
+        memoryService.createMemory(CreateMemoryRequest("limit-search-one", "Limit Search One"))
+        memoryService.createMemory(CreateMemoryRequest("limit-search-two", "Limit Search Two"))
+        memoryService.createMemory(CreateMemoryRequest("limit-search-three", "Limit Search Three"))
+
+        assertThat(searchService.search("limit-search", 2)).hasSize(2)
     }
 
     @Test

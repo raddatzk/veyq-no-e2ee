@@ -5,7 +5,8 @@ import {
   memoryMediaApi,
   memoryNavigationApi,
   memorySharesApi,
-  publicSharesApi
+  publicSharesApi,
+  searchApi
 } from '../../../api/generatedClient'
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
@@ -30,6 +31,7 @@ import type {
   MemoryJournal,
   MemoryMedia,
   MemoryNavigationResponse,
+  SearchResultSummary,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
@@ -48,6 +50,14 @@ export function getMemoryNavigation(
       favoriteMemories: navigation.favoriteMemories.map(normalizeMemory)
     })
   )
+}
+
+export function searchTenant(
+  tenantName: string,
+  query: string,
+  limit = 20
+): Promise<SearchResultSummary[]> {
+  return generatedCall(searchApi.searchTenant({ tenantName, q: query, limit }))
 }
 
 export function createFolder(

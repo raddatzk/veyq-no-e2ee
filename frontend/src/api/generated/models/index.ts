@@ -62,6 +62,7 @@ export * from './PublicShareSummary';
 export * from './PublicShareTreeResponse';
 export * from './PublicUserSummary';
 export * from './ResetPasswordRequest';
+export * from './SearchResultSummary';
 export * from './ServerRole';
 export * from './ServerSettingsResponse';
 export * from './SettingsBreadcrumb';

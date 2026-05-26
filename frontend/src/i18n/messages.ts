@@ -82,6 +82,10 @@ export const messages = {
       },
       navigationLoadFailed: 'Navigation konnte nicht geladen werden',
       personal: 'Persönlich',
+      searchEmpty: 'Keine passenden Memories oder Ordner gefunden.',
+      searchFailed: 'Suche konnte nicht geladen werden.',
+      searchLoading: 'Suche läuft...',
+      searchMinLength: 'Gib mindestens zwei Zeichen ein.',
       searchPlaceholder: 'Suche in allem, worauf du Zugriff hast...',
       theme: 'Darstellung',
       themes: {
@@ -497,6 +501,10 @@ export const messages = {
       },
       navigationLoadFailed: 'Navigation could not be loaded',
       personal: 'Personal',
+      searchEmpty: 'No matching Memories or folders found.',
+      searchFailed: 'Search could not be loaded.',
+      searchLoading: 'Searching...',
+      searchMinLength: 'Enter at least two characters.',
       searchPlaceholder: 'Search everything you can access...',
       theme: 'Appearance',
       themes: {

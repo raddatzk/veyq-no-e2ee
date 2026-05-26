@@ -16,6 +16,7 @@ import type {
   PublicShareMediaSummary,
   PublicShareSummary,
   PublicShareTreeResponse,
+  SearchResultSummary,
   MemoryScopeRequest,
   MemorySummary,
   MemoryScopeRoot,
@@ -40,6 +41,7 @@ export type {
   PublicShareMediaSummary,
   PublicShareSummary,
   PublicShareTreeResponse,
+  SearchResultSummary,
   MemoryJournalSummary,
 }
 

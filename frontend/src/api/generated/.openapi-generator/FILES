@@ -9,6 +9,7 @@ apis/MemoryNavigationApi.ts
 apis/MemorySharesApi.ts
 apis/ProfilesApi.ts
 apis/PublicSharesApi.ts
+apis/SearchApi.ts
 apis/ServerApi.ts
 apis/SettingsApi.ts
 apis/SetupApi.ts
@@ -78,6 +79,7 @@ models/PublicShareSummary.ts
 models/PublicShareTreeResponse.ts
 models/PublicUserSummary.ts
 models/ResetPasswordRequest.ts
+models/SearchResultSummary.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts
 models/SettingsBreadcrumb.ts

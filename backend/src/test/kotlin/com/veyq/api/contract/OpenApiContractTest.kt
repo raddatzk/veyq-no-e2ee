@@ -12,6 +12,7 @@ import com.veyq.api.generated.api.MemoryNavigationApi
 import com.veyq.api.generated.api.MemorySharesApi
 import com.veyq.api.generated.api.ProfilesApi
 import com.veyq.api.generated.api.PublicSharesApi
+import com.veyq.api.generated.api.SearchApi
 import com.veyq.api.generated.api.ServerApi
 import com.veyq.api.generated.api.SettingsApi
 import com.veyq.api.generated.api.SetupApi
@@ -23,6 +24,7 @@ import com.veyq.api.memory.MemoryNavigationResource
 import com.veyq.api.memory.MemoryResource
 import com.veyq.api.memory.MemoryShareResource
 import com.veyq.api.memory.PublicShareResource
+import com.veyq.api.memory.SearchResource
 import com.veyq.api.settings.SettingsNavigationResource
 import com.veyq.api.settings.SettingsResource
 import com.veyq.api.setup.SetupResource
@@ -344,6 +346,7 @@ class OpenApiContractTest {
             "GET /api/settings",
             "GET /api/settings/server",
             "GET /api/{tenantName}/memory-navigation",
+            "GET /api/{tenantName}/search",
             "POST /api/{tenantName}/folders",
             "POST /api/{tenantName}/folders/update",
             "POST /api/{tenantName}/folders/move",
@@ -417,6 +420,7 @@ class OpenApiContractTest {
             MemoryMediaApi::class.java to MemoryMediaResource::class.java,
             MemorySharesApi::class.java to MemoryShareResource::class.java,
             PublicSharesApi::class.java to PublicShareResource::class.java,
+            SearchApi::class.java to SearchResource::class.java,
         )
 
         fun generatedInterface(specFile: String, operationId: String): Class<*> =
@@ -433,6 +437,7 @@ class OpenApiContractTest {
                     "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
+                    "searchTenant" -> SearchApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
                     else -> error("No generated memories interface mapping for $operationId")
                 }

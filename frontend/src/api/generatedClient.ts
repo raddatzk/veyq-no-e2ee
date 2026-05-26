@@ -11,6 +11,7 @@ import {
   MemorySharesApi,
   ProfilesApi,
   PublicSharesApi,
+  SearchApi,
   ServerApi,
   SettingsApi,
   SetupApi,
@@ -33,6 +34,7 @@ export const memoryNavigationApi = new MemoryNavigationApi(generatedConfiguratio
 export const memorySharesApi = new MemorySharesApi(generatedConfiguration)
 export const profilesApi = new ProfilesApi(generatedConfiguration)
 export const publicSharesApi = new PublicSharesApi(generatedConfiguration)
+export const searchApi = new SearchApi(generatedConfiguration)
 export const serverApi = new ServerApi(generatedConfiguration)
 export const settingsApi = new SettingsApi(generatedConfiguration)
 export const frontendApi = new FrontendApi(generatedConfiguration)

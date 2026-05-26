@@ -131,6 +131,41 @@
     color: var(--app-muted);
   }
 
+  .workspace-search-panel {
+    border-color: var(--app-line);
+    background: var(--app-surface);
+    color: var(--app-text);
+    box-shadow: var(--app-shadow-md);
+  }
+
+  .workspace-topbar-center input {
+    color: var(--app-text);
+  }
+
+  .workspace-topbar-center input::placeholder {
+    color: var(--app-muted);
+  }
+
+  .workspace-search-result {
+    color: var(--app-text);
+  }
+
+  .workspace-search-result:hover,
+  .workspace-search-result-active {
+    background: var(--app-hover);
+  }
+
+  .workspace-search-result-text small,
+  .workspace-search-state {
+    color: var(--app-muted);
+  }
+
+  .workspace-search-result-icon,
+  .workspace-search-result-kind {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+  }
+
   .sidebar-tenant-avatar,
   .sidebar-nav-link > .pi,
   .sidebar-scope-icon,
