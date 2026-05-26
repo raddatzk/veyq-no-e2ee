@@ -37,6 +37,7 @@ export const rootNavigation = {
   location: { kind: 'TENANT', path: '/', displayName: 'Friends' },
   breadcrumbs: [{ label: 'Friends', path: '/' }],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
+  favoriteMemories: [],
   folders: []
 }
 
@@ -47,6 +48,7 @@ export const personalNavigation = {
     { label: 'Persönlich', path: '/~administrator' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
+  favoriteMemories: [],
   folders: []
 }
 
@@ -57,6 +59,7 @@ export const groupNavigation = {
     { label: '@Travel', path: '/@travel' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
+  favoriteMemories: [],
   folders: []
 }
 
@@ -67,6 +70,7 @@ export const folderNavigation = {
     { label: 'Reisen', path: '/reisen' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
+  favoriteMemories: [],
   folders: []
 }
 
@@ -327,6 +331,15 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
         descendantMediaCount: 0,
         childMemoryCount: weddingMemory.childCount,
         scope: weddingMemory.scope
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/journal`) {
+      await fulfillJson(route, {
+        memoryId: weddingMemory.id,
+        markdown: '',
+        updatedAt: '2026-05-24T10:00:00Z'
       })
       return
     }

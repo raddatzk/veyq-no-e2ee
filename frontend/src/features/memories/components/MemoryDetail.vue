@@ -3,12 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import Menu from 'primevue/menu'
 import Message from 'primevue/message'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import type { MenuItem } from 'primevue/menuitem'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
 import {
@@ -106,6 +108,7 @@ const shareOpen = ref(false)
 const uploaderShareOpen = ref(false)
 const uploadOpen = ref(false)
 const downloadOpen = ref(false)
+const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const favoriteSaving = ref(false)
 const favoriteOverride = ref<boolean | null>(null)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
@@ -174,6 +177,76 @@ const subtreeDownloadUrl = computed(() => memoryDownloadUrl(true))
 const canBatchUpdateMediaMetadata = computed(() => Boolean(props.updateMediaMetadataBatch || props.tenantName))
 const journalMarkdown = computed(() => props.journal?.markdown ?? '')
 const journalHasContent = computed(() => journalMarkdown.value.trim().length > 0)
+const favoriteActionLabel = computed(() =>
+  detailHeader.value.favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')
+)
+const overflowActionItems = computed<MenuItem[]>(() => {
+  const items: Array<MenuItem | null> = [
+    {
+      label: favoriteActionLabel.value,
+      icon: detailHeader.value.favorite ? 'pi pi-star-fill' : 'pi pi-star',
+      disabled: favoriteSaving.value,
+      command: () => {
+        void toggleFavorite()
+      }
+    },
+    canDownloadMemory.value
+      ? {
+          label: t('memory.download'),
+          icon: 'pi pi-download',
+          command: () => {
+            downloadOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canEdit
+      ? {
+          label: t('common.edit'),
+          icon: 'pi pi-pencil',
+          command: () => {
+            editOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canManageCover
+      ? {
+          label: t('memory.cover'),
+          icon: 'pi pi-image',
+          command: () => {
+            coverOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canShare
+      ? {
+          label: t('share.uploadRequest'),
+          icon: 'pi pi-user-plus',
+          command: () => {
+            uploaderShareOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canShare
+      ? {
+          label: t('share.title'),
+          icon: 'pi pi-share-alt',
+          command: () => {
+            shareOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canDelete && capabilities.value.canDeleteCurrentMemory
+      ? {
+          label: t('common.delete'),
+          icon: 'pi pi-trash',
+          command: () => {
+            deleteOpen.value = true
+          }
+        }
+      : null
+  ]
+  return items.filter((item): item is MenuItem => item !== null)
+})
 
 watch(
   () => props.journal?.markdown,
@@ -275,6 +348,10 @@ async function toggleFavorite() {
   } finally {
     favoriteSaving.value = false
   }
+}
+
+function toggleActionMenu(event: MouseEvent) {
+  actionMenu.value?.toggle(event)
 }
 
 function toggleJournalMedia(mediaId: string) {
@@ -403,8 +480,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
           </div>
           <div class="memory-detail-actions">
             <Button
+              v-tooltip.bottom="favoriteActionLabel"
+              class="memory-icon-action memory-action-inline"
               :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
-              :label="detailHeader.favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')"
+              :aria-label="favoriteActionLabel"
               :severity="detailHeader.favorite ? 'warn' : 'secondary'"
               :outlined="!detailHeader.favorite"
               :loading="favoriteSaving"
@@ -421,8 +500,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="canDownloadMemory"
+              v-tooltip.bottom="t('memory.download')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-download"
-              :label="t('memory.download')"
+              :aria-label="t('memory.download')"
               severity="secondary"
               outlined
               size="small"
@@ -430,8 +511,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canEdit"
+              v-tooltip.bottom="t('common.edit')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-pencil"
-              :label="t('common.edit')"
+              :aria-label="t('common.edit')"
               severity="secondary"
               outlined
               size="small"
@@ -439,8 +522,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canManageCover"
+              v-tooltip.bottom="t('memory.cover')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-image"
-              :label="t('memory.cover')"
+              :aria-label="t('memory.cover')"
               severity="secondary"
               outlined
               size="small"
@@ -448,8 +533,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canShare"
+              v-tooltip.bottom="t('share.uploadRequest')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-user-plus"
-              :label="t('share.uploadRequest')"
+              :aria-label="t('share.uploadRequest')"
               severity="secondary"
               outlined
               size="small"
@@ -457,8 +544,10 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canShare"
+              v-tooltip.bottom="t('share.title')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-share-alt"
-              :label="t('share.title')"
+              :aria-label="t('share.title')"
               severity="secondary"
               outlined
               size="small"
@@ -466,13 +555,28 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <Button
               v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
+              v-tooltip.bottom="t('common.delete')"
+              class="memory-icon-action memory-action-inline"
               icon="pi pi-trash"
-              :label="t('common.delete')"
+              :aria-label="t('common.delete')"
               severity="danger"
               outlined
               size="small"
               @click="deleteOpen = true"
             />
+            <Button
+              v-if="overflowActionItems.length"
+              v-tooltip.bottom="t('common.more')"
+              class="memory-icon-action memory-actions-overflow"
+              icon="pi pi-ellipsis-h"
+              :aria-label="t('common.more')"
+              severity="secondary"
+              outlined
+              size="small"
+              aria-haspopup="menu"
+              @click="toggleActionMenu"
+            />
+            <Menu ref="actionMenu" :model="overflowActionItems" popup />
           </div>
         </div>
         <div class="memory-detail-meta">

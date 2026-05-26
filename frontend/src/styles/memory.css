@@ -666,6 +666,18 @@
   gap: 0.55rem;
 }
 
+.memory-icon-action.p-button {
+  flex: 0 0 auto;
+  width: 2.55rem;
+  min-width: 2.55rem;
+  height: 2.55rem;
+  padding-inline: 0;
+}
+
+.memory-actions-overflow.p-button {
+  display: none;
+}
+
 .memory-upload-action.p-button {
   background: #0f766e;
   border-color: #0f766e;
@@ -1815,6 +1827,14 @@
 
   .memory-detail-actions {
     justify-content: flex-start;
+  }
+
+  .memory-action-inline.p-button {
+    display: none;
+  }
+
+  .memory-actions-overflow.p-button {
+    display: inline-flex;
   }
 
   .public-share-login {

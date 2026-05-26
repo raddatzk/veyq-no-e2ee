@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { config, flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
@@ -17,6 +17,9 @@ vi.mock('../api', async (importOriginal) => ({
 describe('MemoryDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    config.global.directives = {
+      tooltip: {}
+    }
   })
 
   it('renders header date total media and chapters', () => {
@@ -196,7 +199,7 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-download-option').attributes('href')).toBe('/share/mem-1/download?children=false')
 
     await wrapper.setProps({ capabilities: { canDownload: false } })
-    expect(wrapper.text()).not.toContain('Herunterladen')
+    expect(wrapper.findAll('button').some((button) => button.attributes('aria-label') === 'Herunterladen')).toBe(false)
   })
 
   it('opens uploader share requests from the header action', async () => {
@@ -497,8 +500,9 @@ function detailStubs() {
     Button: {
       props: ['label', 'icon', 'disabled'],
       emits: ['click'],
-      template: '<button type="button" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
+      template: '<button type="button" v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
     },
+    Menu: { template: '<div />' },
     Carousel: {
       props: ['value', 'autoplayInterval', 'page', 'showNavigators'],
       emits: ['update:page'],
@@ -555,7 +559,9 @@ function detailStubs() {
 }
 
 function findButton(wrapper: ReturnType<typeof mount>, label: string, occurrence = 0) {
-  const button = wrapper.findAll('button').filter((candidate) => candidate.text().includes(label))[occurrence]
+  const button = wrapper
+    .findAll('button')
+    .filter((candidate) => candidate.text().includes(label) || candidate.attributes('aria-label') === label)[occurrence]
   if (!button) throw new Error(`Button not found: ${label}`)
   return button
 }
