@@ -1,6 +1,7 @@
 import type { PasskeyLoginRequest, PasskeyRegistrationRequest } from '../../api/generated'
 
 type PublicKeyOptions = Record<string, unknown>
+const PASSKEY_RELYING_PARTY_NAME = 'Veyq'
 
 export function passkeysAvailable(): boolean {
   return typeof window !== 'undefined' && Boolean(window.PublicKeyCredential && navigator.credentials)
@@ -61,8 +62,13 @@ export async function getPasskeyCredential(options: PublicKeyOptions): Promise<P
 }
 
 function creationOptions(options: PublicKeyOptions): PublicKeyCredentialCreationOptions {
+  const rp = recordOption(options.rp)
   return {
     ...options,
+    rp: {
+      ...rp,
+      name: relyingPartyName(rp.name)
+    },
     challenge: decodeBase64Url(stringOption(options.challenge)),
     user: {
       ...(options.user as Record<string, unknown>),
@@ -89,6 +95,32 @@ function credentialDescriptor(descriptor: PublicKeyOptions): PublicKeyCredential
     ...descriptor,
     id: decodeBase64Url(stringOption(descriptor.id))
   } as PublicKeyCredentialDescriptor
+}
+
+function recordOption(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+}
+
+function relyingPartyName(value: unknown): string {
+  if (typeof value !== 'string') {
+    return PASSKEY_RELYING_PARTY_NAME
+  }
+
+  const name = value.trim()
+  return name && !isLocalhostName(name) ? name : PASSKEY_RELYING_PARTY_NAME
+}
+
+function isLocalhostName(value: string): boolean {
+  const lowerValue = value.toLowerCase()
+  return (
+    lowerValue === 'localhost' ||
+    lowerValue.startsWith('localhost:') ||
+    lowerValue === '127.0.0.1' ||
+    lowerValue.startsWith('127.0.0.1:') ||
+    lowerValue === '::1' ||
+    lowerValue === '[::1]' ||
+    lowerValue.startsWith('[::1]:')
+  )
 }
 
 function stringOption(value: unknown): string {

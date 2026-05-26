@@ -431,6 +431,7 @@ class UserManagementResourceTest {
             .`when`().post("/api/users/me/passkeys/options")
             .then()
             .statusCode(200)
+            .body("rp.name", equalTo("Veyq"))
             .body("user.name", equalTo(currentUser.email))
             .body("user.displayName", equalTo(currentUser.displayName))
             .body("user.id", not(equalTo(currentUser.email)))
