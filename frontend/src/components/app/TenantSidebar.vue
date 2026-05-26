@@ -3,13 +3,17 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
+import logoDarkUrl from '../../assets/brand/logo-dark.svg'
+import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { getMemoryNavigation, type MemoryScopeRoot } from '../../features/memories/api'
 import { useAuthState } from '../../shared/state/useAuthState'
+import { useThemeState } from '../../shared/state/useThemeState'
 import ProfileMenu from './ProfileMenu.vue'
 
 const route = useRoute()
 const { t } = useI18n()
 const { authState } = useAuthState()
+const { resolvedTheme } = useThemeState()
 const emit = defineEmits<{
   createTenant: []
 }>()
@@ -24,6 +28,7 @@ const activeTenantName = computed(() => String(route.params.tenantName || authSt
 const activeTenant = computed(() => authState.tenants.find((tenant) => tenant.name === activeTenantName.value))
 const personalRoot = computed(() => scopeRoots.value.find((scopeRoot) => scopeRoot.kind === 'USER'))
 const groupRoots = computed(() => scopeRoots.value.filter((scopeRoot) => scopeRoot.kind === 'GROUP'))
+const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
 const tenantMenuItems = computed(() =>
   canCreateTenant.value
     ? [
@@ -78,7 +83,12 @@ function toggleTenantMenu(event: MouseEvent) {
 <template>
   <aside class="tenant-sidebar">
     <RouterLink to="/" class="sidebar-brand" aria-label="Veyq Home">
-      <span class="sidebar-brand-mark">∞</span>
+      <img
+        class="sidebar-brand-mark"
+        :src="brandLogoUrl"
+        alt=""
+        aria-hidden="true"
+      />
       <span>veyq</span>
     </RouterLink>
 

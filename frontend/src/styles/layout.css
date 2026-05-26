@@ -48,13 +48,11 @@
 }
 
 .sidebar-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 2rem;
+  width: 2.05rem;
   height: 2rem;
-  color: var(--app-accent);
-  font-size: 2rem;
-  line-height: 1;
+  flex: 0 0 auto;
+  object-fit: contain;
+  object-position: center;
 }
 
 .sidebar-section {

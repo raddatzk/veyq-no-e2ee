@@ -119,7 +119,7 @@ describe('ProfileMenu', () => {
 
 function menuLabels(wrapper: ReturnType<typeof shallowMount>) {
   return wrapper
-    .findComponent({ name: 'Menu' })
+    .findComponent({ name: 'TieredMenu' })
     .props('model')
     .filter((item: { label?: string }) => item.label)
     .map((item: { label: string }) => item.label)
@@ -127,7 +127,7 @@ function menuLabels(wrapper: ReturnType<typeof shallowMount>) {
 
 function menuItem(wrapper: ReturnType<typeof shallowMount>, label: string) {
   return wrapper
-    .findComponent({ name: 'Menu' })
+    .findComponent({ name: 'TieredMenu' })
     .props('model')
     .find((item: { label?: string }) => item.label === label) as { command?: () => void }
 }
@@ -135,6 +135,6 @@ function menuItem(wrapper: ReturnType<typeof shallowMount>, label: string) {
 function primeVueStubs() {
   return {
     Avatar: { name: 'Avatar', template: '<div />' },
-    Menu: { name: 'Menu', props: ['model'], template: '<div />' }
+    TieredMenu: { name: 'TieredMenu', props: ['model'], template: '<div />' }
   }
 }

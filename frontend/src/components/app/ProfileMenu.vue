@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Avatar from 'primevue/avatar'
-import Menu from 'primevue/menu'
+import TieredMenu from 'primevue/tieredmenu'
 import { logout } from '../../api/authClient'
 import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../../i18n'
 import { useAuthState } from '../../shared/state/useAuthState'
@@ -108,5 +108,5 @@ async function doLogout() {
     <span v-if="showName" class="profile-button-name">{{ authState.userLabel }}</span>
     <span v-if="showName" class="pi pi-chevron-down profile-button-chevron" />
   </button>
-  <Menu ref="userMenu" :model="menuItems" popup />
+  <TieredMenu ref="userMenu" :model="menuItems" popup />
 </template>
