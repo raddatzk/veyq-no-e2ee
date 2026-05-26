@@ -6,7 +6,7 @@ import type {
   MemoryHeaderSummary,
   MemoryJournalSummary,
   MediaUploader,
-  MemoryNavigationResponse,
+  MemoryNavigationResponse as GeneratedMemoryNavigationResponse,
   MemoryMediaSummary,
   MemoryScope,
   MemoryShareSummary,
@@ -32,7 +32,6 @@ export type {
   MemoryScope,
   MemoryScopeRequest,
   MemoryFolder,
-  MemoryNavigationResponse,
   MemoryScopeRoot,
   MediaUploader,
   MemoryShareSummary,
@@ -53,6 +52,10 @@ export type Memory = Omit<
   coverUrl: string | null
   coverCrop: CoverCrop | null
   scope: MemoryScope | null
+}
+
+export type MemoryNavigationResponse = Omit<GeneratedMemoryNavigationResponse, 'favoriteMemories'> & {
+  favoriteMemories: Memory[]
 }
 
 export type MemoryHeader = Omit<

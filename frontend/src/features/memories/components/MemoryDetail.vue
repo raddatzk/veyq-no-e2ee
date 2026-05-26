@@ -11,7 +11,13 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
-import { updateMemoryMediaMetadata, updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch } from '../api'
+import {
+  favoriteMemory,
+  unfavoriteMemory,
+  updateMemoryMediaMetadata,
+  updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch
+} from '../api'
+import { notifyMemoryFavoritesChanged } from '../composables/useMemoryFavoritesRefresh'
 import type {
   Memory,
   MemoryHeader,
@@ -100,6 +106,8 @@ const shareOpen = ref(false)
 const uploaderShareOpen = ref(false)
 const uploadOpen = ref(false)
 const downloadOpen = ref(false)
+const favoriteSaving = ref(false)
+const favoriteOverride = ref<boolean | null>(null)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 const journalEditing = ref(false)
 const journalSaving = ref(false)
@@ -137,6 +145,7 @@ const detailHeader = computed<MemoryHeader>(() => ({
   directMediaCount: props.header?.directMediaCount ?? props.memory.mediaCount,
   descendantMediaCount: props.header?.descendantMediaCount ?? 0,
   childMemoryCount: props.header?.childMemoryCount ?? props.memory.childCount,
+  favorite: favoriteOverride.value ?? props.header?.favorite ?? props.memory.favorite,
   scope: props.header?.scope ?? props.memory.scope
 }))
 const coverUrl = computed(() => {
@@ -172,6 +181,13 @@ watch(
     if (!journalEditing.value) journalDraft.value = value ?? ''
   },
   { immediate: true }
+)
+
+watch(
+  () => props.memory.id,
+  () => {
+    favoriteOverride.value = null
+  }
 )
 
 function formatDate(value: string): string {
@@ -243,6 +259,21 @@ async function submitJournal() {
     journalError.value = t('memory.journalSaveFailed')
   } finally {
     journalSaving.value = false
+  }
+}
+
+async function toggleFavorite() {
+  if (favoriteSaving.value) return
+  favoriteSaving.value = true
+  try {
+    const updated = detailHeader.value.favorite
+      ? await unfavoriteMemory(props.tenantName, props.memory.id)
+      : await favoriteMemory(props.tenantName, props.memory.id)
+    favoriteOverride.value = updated.favorite
+    notifyMemoryFavoritesChanged()
+    emit('changed', updated)
+  } finally {
+    favoriteSaving.value = false
   }
 }
 
@@ -371,6 +402,15 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             <h1>{{ detailHeader.displayName }}</h1>
           </div>
           <div class="memory-detail-actions">
+            <Button
+              :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
+              :label="detailHeader.favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')"
+              :severity="detailHeader.favorite ? 'warn' : 'secondary'"
+              :outlined="!detailHeader.favorite"
+              :loading="favoriteSaving"
+              size="small"
+              @click="toggleFavorite"
+            />
             <Button
               v-if="capabilities.canUpload"
               icon="pi pi-upload"

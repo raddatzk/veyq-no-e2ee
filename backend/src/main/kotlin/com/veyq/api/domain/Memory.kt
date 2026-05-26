@@ -108,6 +108,42 @@ class Memory : PanacheEntityBase {
     }
 }
 
+@Entity
+@Table(
+    name = "veyq_memory_favorite",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uq_veyq_memory_favorite_user_memory",
+            columnNames = ["tenant_id", "user_id", "memory_id"],
+        ),
+    ],
+)
+class MemoryFavorite : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    lateinit var tenant: Tenant
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    lateinit var user: User
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "memory_id", nullable = false)
+    lateinit var memory: Memory
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @PrePersist
+    fun beforePersist() {
+        createdAt = Instant.now()
+    }
+}
+
 @ApplicationScoped
 class MemoryRepo : PanacheRepository<Memory> {
     fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Memory? =
@@ -125,4 +161,13 @@ class MemoryRepo : PanacheRepository<Memory> {
 
     fun listChildren(tenant: Tenant, parent: Memory): List<Memory> =
         list("tenant = ?1 and parentMemory = ?2 order by displayName", tenant, parent)
+}
+
+@ApplicationScoped
+class MemoryFavoriteRepo : PanacheRepository<MemoryFavorite> {
+    fun findByTenantUserAndMemory(tenant: Tenant, user: User, memory: Memory): MemoryFavorite? =
+        find("tenant = ?1 and user = ?2 and memory = ?3", tenant, user, memory).firstResult()
+
+    fun listByTenantAndUser(tenant: Tenant, user: User): List<MemoryFavorite> =
+        list("tenant = ?1 and user = ?2 order by createdAt desc", tenant, user)
 }

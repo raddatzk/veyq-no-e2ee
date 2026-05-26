@@ -20,6 +20,7 @@ class MemoryNavigationService @Inject constructor(
     private val folderRepo: TenantFolderRepo,
     private val groupRepo: TenantGroupRepo,
     private val groupMemberRepo: TenantGroupMemberRepo,
+    private val memoryService: MemoryService,
     requestContext: RequestContext,
 ) : LibraryService(folderRepo, groupRepo, groupMemberRepo, requestContext) {
     fun navigation(path: String?): MemoryNavigationResponse {
@@ -36,6 +37,7 @@ class MemoryNavigationService @Inject constructor(
             location = location.toLocation(),
             breadcrumbs = location.toBreadcrumbs(),
             scopeRoots = if (location == ResolvedMemoryLocation.Tenant) scopeRoots() else emptyList(),
+            favoriteMemories = memoryService.listFavoriteMemories(),
             folders = folderRepo.listChildren(tenant(), parent)
                 .filter { it.hasScope(scope) && isFolderVisible(it) }
                 .map { it.toSummary() },

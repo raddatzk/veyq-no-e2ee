@@ -1,9 +1,24 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
+const apiMocks = vi.hoisted(() => ({
+  favoriteMemory: vi.fn(),
+  unfavoriteMemory: vi.fn()
+}))
+
+vi.mock('../api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api')>()),
+  favoriteMemory: apiMocks.favoriteMemory,
+  unfavoriteMemory: apiMocks.unfavoriteMemory
+}))
+
 describe('MemoryDetail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders header date total media and chapters', () => {
     const wrapper = mount(MemoryDetail, {
       props: {
@@ -81,6 +96,47 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-detail-cover img').exists()).toBe(false)
     expect(wrapper.find('.memory-detail-cover .pi-images').exists()).toBe(true)
   })
+
+  it('toggles the current memory as a favorite', async () => {
+    apiMocks.favoriteMemory.mockResolvedValue(memory({ favorite: true }))
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory({ favorite: false }),
+        header: header({ favorite: false }),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await findButton(wrapper, 'Favorisieren').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.favoriteMemory).toHaveBeenCalledWith('tenant', 'mem-1')
+    expect(wrapper.emitted('changed')?.[0]).toEqual([expect.objectContaining({ favorite: true })])
+  })
+
+  it('removes the current memory from favorites', async () => {
+    apiMocks.unfavoriteMemory.mockResolvedValue(memory({ favorite: false }))
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory({ favorite: true }),
+        header: header({ favorite: true }),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await findButton(wrapper, 'Favorit entfernen').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.unfavoriteMemory).toHaveBeenCalledWith('tenant', 'mem-1')
+    expect(wrapper.emitted('changed')?.[0]).toEqual([expect.objectContaining({ favorite: false })])
+  })
+
 
   it('renders an explicit cover image', () => {
     const wrapper = mount(MemoryDetail, {
@@ -527,6 +583,7 @@ function memory(overrides: Partial<Memory> = {}): Memory {
     endDate: '2026-05-05',
     childCount: 0,
     mediaCount: 0,
+    favorite: false,
     scope: { type: 'TENANT' },
     ...overrides
   }
@@ -544,6 +601,7 @@ function header(overrides: Partial<MemoryHeader> = {}): MemoryHeader {
     directMediaCount: 0,
     descendantMediaCount: 0,
     childMemoryCount: 0,
+    favorite: false,
     scope: { type: 'TENANT' },
     ...overrides
   }

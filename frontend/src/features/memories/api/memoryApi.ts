@@ -42,7 +42,12 @@ export function getMemoryNavigation(
   tenantName: string,
   path: string
 ): Promise<MemoryNavigationResponse> {
-  return generatedCall(memoryNavigationApi.getMemoryNavigation({ tenantName, path }))
+  return generatedCall(memoryNavigationApi.getMemoryNavigation({ tenantName, path })).then(
+    (navigation) => ({
+      ...navigation,
+      favoriteMemories: navigation.favoriteMemories.map(normalizeMemory)
+    })
+  )
 }
 
 export function createFolder(
@@ -71,6 +76,14 @@ export function listMemoriesByFolder(tenantName: string, folderPath: string): Pr
 
 export function getMemory(tenantName: string, memoryId: string): Promise<Memory> {
   return generatedCall(memoriesApi.getMemory({ tenantName, memoryId })).then(normalizeMemory)
+}
+
+export function favoriteMemory(tenantName: string, memoryId: string): Promise<Memory> {
+  return generatedCall(memoriesApi.favoriteMemory({ tenantName, memoryId })).then(normalizeMemory)
+}
+
+export function unfavoriteMemory(tenantName: string, memoryId: string): Promise<Memory> {
+  return generatedCall(memoriesApi.unfavoriteMemory({ tenantName, memoryId })).then(normalizeMemory)
 }
 
 export function getMemoryHeader(tenantName: string, memoryId: string): Promise<MemoryHeader> {
@@ -510,7 +523,8 @@ function normalizeMemory(
     coverUrl?: string
     coverCrop?: Memory['coverCrop']
     scope?: Memory['scope']
-  } & Omit<Memory, 'parentId' | 'coverMediaId' | 'coverUrl' | 'coverCrop' | 'scope'>
+    favorite?: boolean
+  } & Omit<Memory, 'parentId' | 'coverMediaId' | 'coverUrl' | 'coverCrop' | 'scope' | 'favorite'>
 ): Memory {
   return {
     ...memory,
@@ -518,6 +532,7 @@ function normalizeMemory(
     coverMediaId: memory.coverMediaId ?? null,
     coverUrl: memory.coverUrl ?? null,
     coverCrop: memory.coverCrop ?? null,
+    favorite: memory.favorite ?? false,
     scope: memory.scope ?? null
   }
 }
@@ -527,12 +542,14 @@ function normalizeMemoryHeader(
     coverUrl?: string
     coverCrop?: MemoryHeader['coverCrop']
     scope?: MemoryHeader['scope']
-  } & Omit<MemoryHeader, 'coverUrl' | 'coverCrop' | 'scope'>
+    favorite?: boolean
+  } & Omit<MemoryHeader, 'coverUrl' | 'coverCrop' | 'scope' | 'favorite'>
 ): MemoryHeader {
   return {
     ...header,
     coverUrl: header.coverUrl ?? null,
     coverCrop: header.coverCrop ?? null,
+    favorite: header.favorite ?? false,
     scope: header.scope ?? null
   }
 }
@@ -582,6 +599,7 @@ function normalizePublicShareMemory(memory: PublicShareMemorySummary): Memory {
     coverMediaId: memory.coverMediaId,
     coverUrl: memory.coverUrl,
     coverCrop: memory.coverCrop,
+    favorite: false,
     scope: undefined
   })
 }
@@ -591,6 +609,7 @@ function normalizePublicShareMemoryHeader(header: PublicShareMemoryHeaderSummary
     ...header,
     coverUrl: header.coverUrl,
     coverCrop: header.coverCrop,
+    favorite: false,
     scope: null
   })
 }

@@ -34,6 +34,13 @@ import {
     MemoryFolderToJSON,
     MemoryFolderToJSONTyped,
 } from './MemoryFolder';
+import type { MemorySummary } from './MemorySummary';
+import {
+    MemorySummaryFromJSON,
+    MemorySummaryFromJSONTyped,
+    MemorySummaryToJSON,
+    MemorySummaryToJSONTyped,
+} from './MemorySummary';
 import type { MemoryScopeRoot } from './MemoryScopeRoot';
 import {
     MemoryScopeRootFromJSON,
@@ -67,6 +74,12 @@ export interface MemoryNavigationResponse {
      */
     scopeRoots: Array<MemoryScopeRoot>;
     /**
+     * Memories favorited by the current user and visible in the current tenant.
+     * @type {Array<MemorySummary>}
+     * @memberof MemoryNavigationResponse
+     */
+    favoriteMemories: Array<MemorySummary>;
+    /**
      * 
      * @type {Array<MemoryFolder>}
      * @memberof MemoryNavigationResponse
@@ -81,6 +94,7 @@ export function instanceOfMemoryNavigationResponse(value: object): value is Memo
     if (!('location' in value) || value['location'] === undefined) return false;
     if (!('breadcrumbs' in value) || value['breadcrumbs'] === undefined) return false;
     if (!('scopeRoots' in value) || value['scopeRoots'] === undefined) return false;
+    if (!('favoriteMemories' in value) || value['favoriteMemories'] === undefined) return false;
     if (!('folders' in value) || value['folders'] === undefined) return false;
     return true;
 }
@@ -98,6 +112,7 @@ export function MemoryNavigationResponseFromJSONTyped(json: any, ignoreDiscrimin
         'location': MemoryNavigationLocationFromJSON(json['location']),
         'breadcrumbs': ((json['breadcrumbs'] as Array<any>).map(MemoryNavigationBreadcrumbFromJSON)),
         'scopeRoots': ((json['scopeRoots'] as Array<any>).map(MemoryScopeRootFromJSON)),
+        'favoriteMemories': ((json['favoriteMemories'] as Array<any>).map(MemorySummaryFromJSON)),
         'folders': ((json['folders'] as Array<any>).map(MemoryFolderFromJSON)),
     };
 }
@@ -116,6 +131,7 @@ export function MemoryNavigationResponseToJSONTyped(value?: MemoryNavigationResp
         'location': MemoryNavigationLocationToJSON(value['location']),
         'breadcrumbs': ((value['breadcrumbs'] as Array<any>).map(MemoryNavigationBreadcrumbToJSON)),
         'scopeRoots': ((value['scopeRoots'] as Array<any>).map(MemoryScopeRootToJSON)),
+        'favoriteMemories': ((value['favoriteMemories'] as Array<any>).map(MemorySummaryToJSON)),
         'folders': ((value['folders'] as Array<any>).map(MemoryFolderToJSON)),
     };
 }

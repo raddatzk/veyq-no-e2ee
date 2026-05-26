@@ -60,6 +60,12 @@ class MemoryResource @Inject constructor(
         return Response.noContent().build()
     }
 
+    override fun favoriteMemory(tenantName: String, memoryId: String): Response =
+        Response.ok(memoryService.favoriteMemory(memoryId)).build()
+
+    override fun unfavoriteMemory(tenantName: String, memoryId: String): Response =
+        Response.ok(memoryService.unfavoriteMemory(memoryId)).build()
+
     override fun listChildMemories(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.listChildren(memoryId)).build()
 

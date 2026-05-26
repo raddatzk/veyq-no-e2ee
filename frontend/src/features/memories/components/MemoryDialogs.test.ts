@@ -700,6 +700,7 @@ function memory(overrides: Partial<Memory> = {}): Memory {
     endDate: '2026-05-05',
     childCount: 0,
     mediaCount: 0,
+    favorite: false,
     scope: null,
     ...overrides
   }

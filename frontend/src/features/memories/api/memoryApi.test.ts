@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMemory,
   deleteMemory,
+  favoriteMemory,
   getMemoryHeader,
   getMemoryByPath,
   getPublicShareMemoryHeader,
@@ -12,6 +13,7 @@ import {
   setMemoryCover,
   updateMemory,
   updateMemoryMediaMetadataBatch,
+  unfavoriteMemory,
   uploadMemoryMedia
 } from './memoryApi'
 
@@ -21,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   listMemoriesByFolder: vi.fn(),
   getMemoryByPath: vi.fn(),
   getMemoryHeader: vi.fn(),
+  favoriteMemory: vi.fn(),
+  unfavoriteMemory: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),
   deleteMemory: vi.fn(),
@@ -39,6 +43,8 @@ vi.mock('../../../api/generatedClient', () => ({
     listMemoriesByFolder: mocks.listMemoriesByFolder,
     getMemoryByPath: mocks.getMemoryByPath,
     getMemoryHeader: mocks.getMemoryHeader,
+    favoriteMemory: mocks.favoriteMemory,
+    unfavoriteMemory: mocks.unfavoriteMemory,
     createMemory: mocks.createMemory,
     updateMemory: mocks.updateMemory,
     deleteMemory: mocks.deleteMemory,
@@ -90,7 +96,8 @@ describe('memoryApi facade', () => {
         startDate: '2026-05-03',
         endDate: '2026-05-05',
         childCount: 0,
-        mediaCount: 0
+        mediaCount: 0,
+        favorite: true
       }
     ])
 
@@ -110,6 +117,7 @@ describe('memoryApi facade', () => {
         endDate: '2026-05-05',
         childCount: 0,
         mediaCount: 0,
+        favorite: true,
         scope: null
       }
     ])
@@ -127,6 +135,7 @@ describe('memoryApi facade', () => {
       directMediaCount: 2,
       descendantMediaCount: 3,
       childMemoryCount: 1,
+      favorite: true,
       scope: { type: 'TENANT' }
     })
 
@@ -143,6 +152,7 @@ describe('memoryApi facade', () => {
       directMediaCount: 2,
       descendantMediaCount: 3,
       childMemoryCount: 1,
+      favorite: true,
       scope: { type: 'TENANT' }
     })
     expect(mocks.getMemoryHeader).toHaveBeenCalledWith({
@@ -166,12 +176,26 @@ describe('memoryApi facade', () => {
     const header = await getPublicShareMemoryHeader('shr-1', 'mem-1')
 
     expect(header.scope).toBeNull()
+    expect(header.favorite).toBe(false)
     expect(header.coverUrl).toBeNull()
     expect(header.directMediaCount).toBe(1)
     expect(mocks.getPublicShareMemoryHeader).toHaveBeenCalledWith({
       shareId: 'shr-1',
       memoryId: 'mem-1'
     })
+  })
+
+  it('maps favorite toggles through generated clients', async () => {
+    mocks.favoriteMemory.mockResolvedValue({ ...memoryResponse('trip'), favorite: true })
+    mocks.unfavoriteMemory.mockResolvedValue({ ...memoryResponse('trip'), favorite: false })
+
+    const favorited = await favoriteMemory('tenant', 'mem-trip')
+    const unfavorited = await unfavoriteMemory('tenant', 'mem-trip')
+
+    expect(favorited.favorite).toBe(true)
+    expect(unfavorited.favorite).toBe(false)
+    expect(mocks.favoriteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-trip' })
+    expect(mocks.unfavoriteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-trip' })
   })
 
   it('maps create and update request null values to generated undefined fields', async () => {
@@ -367,6 +391,7 @@ function memoryResponse(name: string) {
     startDate: '2026-05-03',
     endDate: '2026-05-05',
     childCount: 0,
-    mediaCount: 0
+    mediaCount: 0,
+    favorite: false
   }
 }

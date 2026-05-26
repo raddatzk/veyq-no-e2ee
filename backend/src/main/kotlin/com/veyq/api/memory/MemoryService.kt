@@ -40,6 +40,7 @@ import kotlin.math.abs
 @Singleton
 class MemoryService @Inject constructor(
     private val memoryRepo: MemoryRepo,
+    private val memoryFavoriteRepo: MemoryFavoriteRepo,
     private val mediaRepo: MediaRepo,
     private val folderRepo: TenantFolderRepo,
     private val groupRepo: TenantGroupRepo,
@@ -79,6 +80,35 @@ class MemoryService @Inject constructor(
         memoryRepo.listChildren(tenant(), resolveVisibleMemory(publicId))
             .filter(::isMemoryVisible)
             .map(::toSummary)
+
+    fun listFavoriteMemories(): List<MemorySummary> =
+        memoryFavoriteRepo.listByTenantAndUser(tenant(), user())
+            .map { it.memory }
+            .filter(::isMemoryVisible)
+            .map(::toSummary)
+
+    @Transactional
+    fun favoriteMemory(publicId: String): MemorySummary {
+        val memory = resolveVisibleMemory(publicId)
+        if (memoryFavoriteRepo.findByTenantUserAndMemory(tenant(), user(), memory) == null) {
+            memoryFavoriteRepo.persist(
+                MemoryFavorite().also {
+                    it.tenant = tenant()
+                    it.user = user()
+                    it.memory = memory
+                }
+            )
+            memoryFavoriteRepo.flush()
+        }
+        return toSummary(memory)
+    }
+
+    @Transactional
+    fun unfavoriteMemory(publicId: String): MemorySummary {
+        val memory = resolveVisibleMemory(publicId)
+        memoryFavoriteRepo.findByTenantUserAndMemory(tenant(), user(), memory)?.delete()
+        return toSummary(memory)
+    }
 
     @Transactional
     fun createMemory(request: CreateMemoryRequest): MemorySummary {
@@ -316,6 +346,7 @@ class MemoryService @Inject constructor(
             endDate = memory.endDate,
             childCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
             mediaCount = mediaRepo.listByMemory(memory).size,
+            favorite = isFavorite(memory),
             scope = memory.scope().toApiScope(),
         )
 
@@ -333,9 +364,13 @@ class MemoryService @Inject constructor(
             directMediaCount = directMediaCount,
             descendantMediaCount = visibleDescendants.sumOf { mediaRepo.listByMemory(it).size },
             childMemoryCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
+            favorite = isFavorite(memory),
             scope = memory.scope().toApiScope(),
         )
     }
+
+    private fun isFavorite(memory: Memory): Boolean =
+        memoryFavoriteRepo.findByTenantUserAndMemory(tenant(), user(), memory) != null
 
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): MemoryDateRange {
         val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")

@@ -50,6 +50,11 @@ export interface DeleteMemoryRequest {
     memoryId: string;
 }
 
+export interface FavoriteMemoryRequest {
+    tenantName: string;
+    memoryId: string;
+}
+
 export interface GetMemoryRequest {
     tenantName: string;
     memoryId: string;
@@ -103,6 +108,11 @@ export interface SetMemoryCoverRequest {
     cropHeight: number;
     file?: Blob;
     mediaId?: string;
+}
+
+export interface UnfavoriteMemoryRequest {
+    tenantName: string;
+    memoryId: string;
 }
 
 export interface UpdateMemoryOperationRequest {
@@ -175,6 +185,32 @@ export interface MemoriesApiInterface {
      * Delete a memory
      */
     deleteMemory(requestParameters: DeleteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for favoriteMemory without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    favoriteMemoryRequestOpts(requestParameters: FavoriteMemoryRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Marks one visible Memory as a favorite for the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Favorite a memory
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    favoriteMemoryRaw(requestParameters: FavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Marks one visible Memory as a favorite for the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Favorite a memory
+     */
+    favoriteMemory(requestParameters: FavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
 
     /**
      * Creates request options for getMemory without sending the request
@@ -447,6 +483,32 @@ export interface MemoriesApiInterface {
     setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
 
     /**
+     * Creates request options for unfavoriteMemory without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    unfavoriteMemoryRequestOpts(requestParameters: UnfavoriteMemoryRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Removes the current user\'s favorite marker from one visible Memory. The operation is idempotent.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Remove a memory favorite
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    unfavoriteMemoryRaw(requestParameters: UnfavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Removes the current user\'s favorite marker from one visible Memory. The operation is idempotent.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove a memory favorite
+     */
+    unfavoriteMemory(requestParameters: UnfavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
+
+    /**
      * Creates request options for updateMemory without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -618,6 +680,61 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async deleteMemory(requestParameters: DeleteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deleteMemoryRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for favoriteMemory without sending the request
+     */
+    async favoriteMemoryRequestOpts(requestParameters: FavoriteMemoryRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling favoriteMemory().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling favoriteMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/favorite`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Marks one visible Memory as a favorite for the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Favorite a memory
+     */
+    async favoriteMemoryRaw(requestParameters: FavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+        const requestOptions = await this.favoriteMemoryRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemorySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Marks one visible Memory as a favorite for the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Favorite a memory
+     */
+    async favoriteMemory(requestParameters: FavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+        const response = await this.favoriteMemoryRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -1227,6 +1344,61 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async setMemoryCover(requestParameters: SetMemoryCoverRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
         const response = await this.setMemoryCoverRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for unfavoriteMemory without sending the request
+     */
+    async unfavoriteMemoryRequestOpts(requestParameters: UnfavoriteMemoryRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling unfavoriteMemory().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling unfavoriteMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/favorite`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Removes the current user\'s favorite marker from one visible Memory. The operation is idempotent.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove a memory favorite
+     */
+    async unfavoriteMemoryRaw(requestParameters: UnfavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+        const requestOptions = await this.unfavoriteMemoryRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemorySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Removes the current user\'s favorite marker from one visible Memory. The operation is idempotent.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Remove a memory favorite
+     */
+    async unfavoriteMemory(requestParameters: UnfavoriteMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+        const response = await this.unfavoriteMemoryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

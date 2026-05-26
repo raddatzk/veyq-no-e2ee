@@ -95,6 +95,12 @@ export interface MemoryHeaderSummary {
      */
     childMemoryCount: number;
     /**
+     * Whether the current user has favorited this Memory.
+     * @type {boolean}
+     * @memberof MemoryHeaderSummary
+     */
+    favorite: boolean;
+    /**
      * 
      * @type {MemoryScope}
      * @memberof MemoryHeaderSummary
@@ -114,6 +120,7 @@ export function instanceOfMemoryHeaderSummary(value: object): value is MemoryHea
     if (!('directMediaCount' in value) || value['directMediaCount'] === undefined) return false;
     if (!('descendantMediaCount' in value) || value['descendantMediaCount'] === undefined) return false;
     if (!('childMemoryCount' in value) || value['childMemoryCount'] === undefined) return false;
+    if (!('favorite' in value) || value['favorite'] === undefined) return false;
     if (!('scope' in value) || value['scope'] === undefined) return false;
     return true;
 }
@@ -138,6 +145,7 @@ export function MemoryHeaderSummaryFromJSONTyped(json: any, ignoreDiscriminator:
         'directMediaCount': json['directMediaCount'],
         'descendantMediaCount': json['descendantMediaCount'],
         'childMemoryCount': json['childMemoryCount'],
+        'favorite': json['favorite'],
         'scope': MemoryScopeFromJSON(json['scope']),
     };
 }
@@ -163,6 +171,7 @@ export function MemoryHeaderSummaryToJSONTyped(value?: MemoryHeaderSummary | nul
         'directMediaCount': value['directMediaCount'],
         'descendantMediaCount': value['descendantMediaCount'],
         'childMemoryCount': value['childMemoryCount'],
+        'favorite': value['favorite'],
         'scope': MemoryScopeToJSON(value['scope']),
     };
 }

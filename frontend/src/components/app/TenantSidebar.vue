@@ -5,7 +5,10 @@ import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
-import { getMemoryNavigation, type MemoryScopeRoot } from '../../features/memories/api'
+import { getMemoryNavigation, type Memory, type MemoryScopeRoot } from '../../features/memories/api'
+import { memoryFavoritesRefreshToken } from '../../features/memories/composables/useMemoryFavoritesRefresh'
+import MemoryCoverImage from '../../features/memories/components/MemoryCoverImage.vue'
+import { API_BASE } from '../../shared/api/httpClient'
 import { useAuthState } from '../../shared/state/useAuthState'
 import { useThemeState } from '../../shared/state/useThemeState'
 import ProfileMenu from './ProfileMenu.vue'
@@ -20,6 +23,7 @@ const emit = defineEmits<{
 
 const tenantMenu = ref()
 const scopeRoots = ref<MemoryScopeRoot[]>([])
+const favoriteMemories = ref<Memory[]>([])
 const sidebarError = ref('')
 let loadSequence = 0
 
@@ -41,12 +45,13 @@ const tenantMenuItems = computed(() =>
     : []
 )
 
-watch(activeTenantName, loadNavigationData, { immediate: true })
+watch([activeTenantName, memoryFavoritesRefreshToken], loadNavigationData, { immediate: true })
 
 async function loadNavigationData() {
   const tenantName = activeTenantName.value
   const sequence = ++loadSequence
   scopeRoots.value = []
+  favoriteMemories.value = []
   sidebarError.value = ''
   if (!tenantName || !authState.isAuthenticated) return
 
@@ -54,6 +59,7 @@ async function loadNavigationData() {
     const navigation = await getMemoryNavigation(tenantName, '/')
     if (sequence !== loadSequence) return
     scopeRoots.value = navigation.scopeRoots
+    favoriteMemories.value = navigation.favoriteMemories
   } catch {
     if (sequence === loadSequence) sidebarError.value = t('navigation.navigationLoadFailed')
   }
@@ -73,6 +79,10 @@ function scopeLabel(scopeRoot: MemoryScopeRoot): string {
 
 function scopeMeta(scopeRoot: MemoryScopeRoot): string {
   return scopeRoot.kind === 'GROUP' ? t('group.group') : scopeRoot.displayName
+}
+
+function memoryCoverUrl(memory: Memory): string {
+  return memory.coverUrl ? `${API_BASE}${memory.coverUrl}` : ''
 }
 
 function toggleTenantMenu(event: MouseEvent) {
@@ -167,15 +177,27 @@ function toggleTenantMenu(event: MouseEvent) {
     <section class="sidebar-section">
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('navigation.favorites') }}</p>
-        <button
-          class="sidebar-section-action"
-          type="button"
-          :title="t('navigation.addFavorite')"
-          disabled
-        >
-          <span class="pi pi-plus" />
-        </button>
       </div>
+      <RouterLink
+        v-for="memory in favoriteMemories"
+        :key="memory.id"
+        :to="`/${activeTenantName}${memory.path}`"
+        class="sidebar-scope-link sidebar-favorite-link"
+      >
+        <span class="sidebar-favorite-cover">
+          <MemoryCoverImage
+            v-if="memoryCoverUrl(memory)"
+            :src="memoryCoverUrl(memory)"
+            :alt="memory.displayName"
+            :crop="memory.coverCrop"
+          />
+          <span v-else class="pi pi-images" />
+        </span>
+        <span>
+          <strong>{{ memory.displayName }}</strong>
+          <small>{{ memory.path }}</small>
+        </span>
+      </RouterLink>
     </section>
 
     <section v-if="activeTenant" class="sidebar-section">

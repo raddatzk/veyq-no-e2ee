@@ -378,6 +378,65 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/favorite":
+    put:
+      tags:
+        - Memories
+      operationId: favoriteMemory
+      summary: Favorite a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Marks one visible Memory as a favorite for the current user.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - Memories
+      operationId: unfavoriteMemory
+      summary: Remove a memory favorite
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Removes the current user's favorite marker from one visible Memory. The operation is idempotent.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/children":
     get:
       tags:
@@ -1227,6 +1286,7 @@ components:
         - location
         - breadcrumbs
         - scopeRoots
+        - favoriteMemories
         - folders
       properties:
         location:
@@ -1239,6 +1299,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/MemoryScopeRoot"
+        favoriteMemories:
+          type: array
+          description: Memories favorited by the current user and visible in the current tenant.
+          items:
+            "$ref": "#/components/schemas/MemorySummary"
         folders:
           type: array
           items:
@@ -1376,6 +1441,7 @@ components:
         - path
         - childCount
         - mediaCount
+        - favorite
       properties:
         id:
           type: string
@@ -1416,6 +1482,9 @@ components:
         mediaCount:
           type: integer
           format: int32
+        favorite:
+          type: boolean
+          description: Whether the current user has favorited this Memory.
         scope:
           "$ref": "#/components/schemas/MemoryScope"
     MemoryHeaderSummary:
@@ -1430,6 +1499,7 @@ components:
         - directMediaCount
         - descendantMediaCount
         - childMemoryCount
+        - favorite
         - scope
       properties:
         id:
@@ -1462,6 +1532,9 @@ components:
           type: integer
           format: int32
           description: Direct visible child Memories.
+        favorite:
+          type: boolean
+          description: Whether the current user has favorited this Memory.
         scope:
           "$ref": "#/components/schemas/MemoryScope"
     MemoryJournalSummary:

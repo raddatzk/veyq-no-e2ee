@@ -107,6 +107,12 @@ export interface MemorySummary {
      */
     mediaCount: number;
     /**
+     * Whether the current user has favorited this Memory.
+     * @type {boolean}
+     * @memberof MemorySummary
+     */
+    favorite: boolean;
+    /**
      * 
      * @type {MemoryScope}
      * @memberof MemorySummary
@@ -126,6 +132,7 @@ export function instanceOfMemorySummary(value: object): value is MemorySummary {
     if (!('endDate' in value) || value['endDate'] === undefined) return false;
     if (!('childCount' in value) || value['childCount'] === undefined) return false;
     if (!('mediaCount' in value) || value['mediaCount'] === undefined) return false;
+    if (!('favorite' in value) || value['favorite'] === undefined) return false;
     return true;
 }
 
@@ -151,6 +158,7 @@ export function MemorySummaryFromJSONTyped(json: any, ignoreDiscriminator: boole
         'endDate': json['endDate'],
         'childCount': json['childCount'],
         'mediaCount': json['mediaCount'],
+        'favorite': json['favorite'],
         'scope': json['scope'] == null ? undefined : MemoryScopeFromJSON(json['scope']),
     };
 }
@@ -178,6 +186,7 @@ export function MemorySummaryToJSONTyped(value?: MemorySummary | null, ignoreDis
         'endDate': value['endDate'],
         'childCount': value['childCount'],
         'mediaCount': value['mediaCount'],
+        'favorite': value['favorite'],
         'scope': MemoryScopeToJSON(value['scope']),
     };
 }

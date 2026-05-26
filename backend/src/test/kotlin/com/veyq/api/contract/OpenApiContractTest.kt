@@ -355,6 +355,8 @@ class OpenApiContractTest {
             "GET /api/{tenantName}/memories/{memoryId}",
             "PUT /api/{tenantName}/memories/{memoryId}",
             "DELETE /api/{tenantName}/memories/{memoryId}",
+            "PUT /api/{tenantName}/memories/{memoryId}/favorite",
+            "DELETE /api/{tenantName}/memories/{memoryId}/favorite",
             "GET /api/{tenantName}/memories/{memoryId}/children",
             "GET /api/{tenantName}/memories/{memoryId}/header",
             "GET /api/{tenantName}/memories/{memoryId}/journal",
@@ -428,7 +430,7 @@ class OpenApiContractTest {
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
-                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "updateMemoryJournal", "updateMemory", "deleteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
+                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java

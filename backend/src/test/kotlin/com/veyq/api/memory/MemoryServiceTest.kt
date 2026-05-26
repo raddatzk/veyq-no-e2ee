@@ -74,6 +74,7 @@ class MemoryServiceTest {
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var memoryService: MemoryService
+    @Inject lateinit var memoryNavigationService: MemoryNavigationService
     @Inject lateinit var memoryJournalService: MemoryJournalService
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var mediaConfig: MediaConfig
@@ -110,6 +111,64 @@ class MemoryServiceTest {
         assertThat(memoryService.getMemory(trip.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
         assertThat(memoryService.getMemory(trip.id).endDate).isEqualTo(LocalDate.parse("2026-05-03"))
         assertThat(memoryService.getMemory(day.id).startDate).isEqualTo(LocalDate.parse("2026-05-01"))
+    }
+
+    @Test
+    fun `favorites are private to the current tenant user and appear in navigation`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("favorite-trip", "Favorite Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("favorite-day", "Favorite Day", parentId = trip.id))
+        val otherUser = createUser("favorite-other-$runId", ServerRole.ServerMember)
+        addTenantMember(otherUser, TenantRole.TenantMember)
+
+        assertThat(memoryService.getMemory(trip.id).favorite).isFalse()
+        assertThat(memoryService.getMemoryHeader(trip.id).favorite).isFalse()
+
+        assertThat(memoryService.favoriteMemory(trip.id).favorite).isTrue()
+        Thread.sleep(5)
+        assertThat(memoryService.favoriteMemory(day.id).favorite).isTrue()
+
+        val navigation = memoryNavigationService.navigation("/")
+        assertThat(navigation.favoriteMemories).extracting("id").containsExactly(day.id, trip.id)
+        assertThat(memoryService.getMemory(trip.id).favorite).isTrue()
+        assertThat(memoryService.getMemoryHeader(trip.id).favorite).isTrue()
+
+        useContext(otherUser, tenant)
+        assertThat(memoryService.getMemory(trip.id).favorite).isFalse()
+        assertThat(memoryNavigationService.navigation("/").favoriteMemories).isEmpty()
+
+        assertThat(memoryService.favoriteMemory(trip.id).favorite).isTrue()
+        assertThat(memoryNavigationService.navigation("/").favoriteMemories).extracting("id").containsExactly(trip.id)
+
+        assertThat(memoryService.unfavoriteMemory(trip.id).favorite).isFalse()
+        assertThat(memoryService.unfavoriteMemory(trip.id).favorite).isFalse()
+        assertThat(memoryNavigationService.navigation("/").favoriteMemories).isEmpty()
+
+        useContext(owner, tenant)
+        assertThat(memoryService.getMemory(trip.id).favorite).isTrue()
+        assertThat(memoryNavigationService.navigation("/").favoriteMemories).extracting("id").containsExactly(day.id, trip.id)
+    }
+
+    @Test
+    fun `favorites reject memories outside the current visible tenant scope`() {
+        val group = createGroup("favorite-private-group-$runId", owner)
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest("favorite-group", "Favorite Group", scope = MemoryScopeRequest("GROUP", group.name))
+        )
+        val outsider = createUser("favorite-outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+
+        useContext(outsider, tenant)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryService.favoriteMemory(groupMemory.id)
+        }
+
+        useContext(owner, tenant)
+        val otherTenantOwner = createUser("favorite-other-tenant-$runId", ServerRole.ServerMember)
+        val otherTenant = createTenant("favorite-other-$runId", "Other Favorite $runId", otherTenantOwner, TenantRole.TenantOwner)
+        useContext(otherTenantOwner, otherTenant)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryService.favoriteMemory(groupMemory.id)
+        }
     }
 
     @Test

@@ -131,6 +131,10 @@
   grid-template-columns: 2.1rem minmax(0, 1fr);
 }
 
+.sidebar-favorite-link {
+  grid-template-columns: 3.2rem minmax(0, 1fr);
+}
+
 .sidebar-tenant-link:hover,
 .sidebar-nav-link:hover,
 .sidebar-memory-link:hover,
@@ -174,6 +178,25 @@
 .sidebar-scope-icon.pi-user {
   background: #eefdf7;
   color: #047857;
+}
+
+.sidebar-favorite-cover {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e8f0ff;
+  color: #1e3a8a;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.sidebar-favorite-cover .memory-cover-image,
+.sidebar-favorite-cover img {
+  width: 100%;
+  height: 100%;
 }
 
 .sidebar-tenant-text,
