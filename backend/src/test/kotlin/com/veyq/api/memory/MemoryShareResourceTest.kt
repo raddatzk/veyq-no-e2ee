@@ -378,6 +378,66 @@ class MemoryShareResourceTest {
     }
 
     @Test
+    fun `public share upload sessions are isolated by share identity and share id`() {
+        val shareId = createShare("UPLOADER")
+        val ownerAccessCookie = loginShare(shareId, displayName = "Alex")
+        val otherIdentityCookie = loginShare(shareId, displayName = "Blake")
+        val otherShareId = createShare("UPLOADER")
+        val otherShareCookie = loginShare(otherShareId, displayName = "Casey")
+
+        val uploadId = given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", ownerAccessCookie)
+            .contentType("application/json")
+            .body("""{"filename":"private.png","mimeType":"image/png","sizeBytes":8,"title":"Private Upload"}""")
+            .`when`().post("/api/public-shares/$shareId/media/uploads")
+            .then()
+            .statusCode(200)
+            .body("uploadId", notNullValue())
+            .extract()
+            .path<String>("uploadId")
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", otherIdentityCookie)
+            .`when`().get("/api/public-shares/$shareId/media/uploads/$uploadId")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", otherIdentityCookie)
+            .contentType("application/octet-stream")
+            .body("abcd".toByteArray())
+            .`when`().put("/api/public-shares/$shareId/media/uploads/$uploadId/chunks/0")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", otherIdentityCookie)
+            .`when`().post("/api/public-shares/$shareId/media/uploads/$uploadId/complete")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", otherShareCookie)
+            .`when`().get("/api/public-shares/$otherShareId/media/uploads/$uploadId")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", otherShareCookie)
+            .`when`().delete("/api/public-shares/$otherShareId/media/uploads/$uploadId")
+            .then()
+            .statusCode(404)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", ownerAccessCookie)
+            .`when`().get("/api/public-shares/$shareId/media/uploads/$uploadId")
+            .then()
+            .statusCode(200)
+            .body("uploadId", equalTo(uploadId))
+            .body("uploadedChunks", equalTo(emptyList<Int>()))
+    }
+
+    @Test
     fun `viewer share can download visible original media as zip and uploader share cannot`() {
         val child = createMemory("day-$runId", "Day $runId", parent = memory)
         val rootMedia = createMedia("Root Download", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
@@ -911,10 +971,10 @@ class MemoryShareResourceTest {
             .extract()
             .cookie("VEYQ_ACCESS_TOKEN")
 
-    private fun loginShare(shareId: String): String =
+    private fun loginShare(shareId: String, displayName: String = "Alex"): String =
         given()
             .contentType("application/json")
-            .body("""{"password":"share-password123","displayName":"Alex"}""")
+            .body("""{"password":"share-password123","displayName":"$displayName"}""")
             .`when`().post("/api/public-shares/$shareId/login")
             .then()
             .statusCode(200)

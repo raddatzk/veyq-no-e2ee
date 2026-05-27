@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { mockMemoryDetailApi, mockPublicViewerShareApi, weddingMemory } from './support/api'
 
 test('memory detail renders breadcrumb context and memory tabs', async ({ page }) => {
@@ -54,7 +54,7 @@ test('share dialog manages password protection with a toggle', async ({ page }) 
   })
 
   await page.goto(`/friends${weddingMemory.path}`)
-  await page.getByRole('button', { name: 'Memory teilen' }).click()
+  await openShareDialog(page)
 
   const shareDialog = page.getByRole('dialog', { name: 'Memory teilen' })
   await expect(shareDialog).toBeVisible()
@@ -98,3 +98,14 @@ test('public share route renders the shared memory view under /s', async ({ page
   await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Memory teilen' })).toHaveCount(0)
 })
+
+async function openShareDialog(page: Page) {
+  const directShareButton = page.locator('.memory-detail-actions').getByRole('button', { name: 'Memory teilen' })
+  if (await directShareButton.isVisible()) {
+    await directShareButton.click()
+    return
+  }
+
+  await page.locator('.memory-detail-actions').getByRole('button', { name: 'Mehr' }).click()
+  await page.getByRole('menuitem', { name: 'Memory teilen' }).click()
+}

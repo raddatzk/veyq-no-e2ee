@@ -62,7 +62,7 @@ cp .env.example .env
 docker compose up
 ```
 
-Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`.
+Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`. The normal image-based Compose stack keeps MariaDB internal to the Compose network; the local build override publishes MariaDB on host port `3306` for development tools.
 
 The reset sidecar can clear veyq tables, delete media volume contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
 

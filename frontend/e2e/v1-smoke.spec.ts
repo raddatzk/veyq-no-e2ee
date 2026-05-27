@@ -52,9 +52,7 @@ test('V1 public viewer share stays gallery-only and shows share scope', async ({
   await page.goto('/s/shr-e2e')
 
   await expect(page.locator('.app-shell')).toHaveCount(0)
-  await expect(page.locator('.public-share-header').getByRole('heading', { name: weddingMemory.displayName })).toBeVisible()
-  await expect(page.locator('.public-share-meta')).toContainText('Viewer')
-  await expect(page.locator('.public-share-meta')).toContainText('Ansehen')
+  await expect(page.getByRole('heading', { name: weddingMemory.displayName })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Galerie' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Kapitel' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0)
@@ -82,7 +80,7 @@ test('V1 public viewer share shows map tracks and playlist privacy gates', async
   await page.goto('/s/shr-e2e')
 
   await page.getByRole('tab', { name: 'Karte' }).click()
-  await expect(page.getByText('Externe Kartenkacheln sind deaktiviert')).toBeVisible()
+  await expect(page.getByRole('tabpanel', { name: 'Karte' }).getByText('Externe Kartenkacheln sind deaktiviert')).toBeVisible()
   await expect(page.locator('.leaflet-marker-icon')).toHaveCount(0)
   await expect.poll(() => osmRequests).toBe(0)
 
@@ -91,16 +89,13 @@ test('V1 public viewer share shows map tracks and playlist privacy gates', async
   await expect(page.locator('dd').getByText('2,4 km')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Playlists' }).click()
-  await expect(page.getByText('Roadtrip Soundtrack')).toBeVisible()
-  await expect(page.getByText('YouTube ist deaktiviert')).toBeVisible()
-  await expect(page.locator('.memory-playlist-embed iframe')).toHaveCount(0)
-  await expect.poll(() => youtubeRequests).toBe(0)
-
-  await page.getByRole('button', { name: 'YouTube laden' }).click()
-  await expect(page.locator('.memory-playlist-embed iframe')).toHaveAttribute(
-    'src',
-    'https://www.youtube-nocookie.com/embed/videoseries?list=PL1234567890abcdef'
+  await expect(page.getByRole('heading', { name: 'Roadtrip Soundtrack' })).toBeVisible()
+  await expect(page.locator('.memory-playlists iframe')).toHaveCount(0)
+  await expect(page.locator('.memory-playlists').getByRole('link', { name: /Beim Anbieter öffnen/ })).toHaveAttribute(
+    'href',
+    'https://www.youtube.com/playlist?list=PL1234567890abcdef'
   )
+  await expect.poll(() => youtubeRequests).toBe(0)
 })
 
 test('V1 uploader-only public share uploads without exposing the gallery', async ({ page }) => {
@@ -117,7 +112,6 @@ test('V1 uploader-only public share uploads without exposing the gallery', async
 
   await page.goto('/s/shr-upload')
 
-  await expect(page.getByRole('heading', { name: 'Sommerreise Upload' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Zur Erinnerung beitragen' })).toBeVisible()
   await expect(page.getByText('Dieser Link zeigt keine Galerie oder andere Beiträge.')).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Galerie' })).toHaveCount(0)

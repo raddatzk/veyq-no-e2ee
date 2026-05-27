@@ -1,4 +1,8 @@
 services:
+  veyq-db:
+    ports:
+      - "3306:3306"
+
   veyq:
     build:
       context: ..

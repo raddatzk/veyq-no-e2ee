@@ -87,6 +87,8 @@ The Compose setup under `infra/` starts:
 - `veyq`: veyq application container.
 - `veyq-reset`: optional reset sidecar for disposable development/test instances.
 
+The normal image-based Compose file keeps MariaDB available only inside the Compose network. The local source-build override below publishes MariaDB on host port `3306` so local database tools can connect during development.
+
 Start the normal stack:
 
 ```bash

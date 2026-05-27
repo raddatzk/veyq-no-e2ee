@@ -222,17 +222,10 @@ export const publicPlaylist = {
   memoryId: weddingMemory.id,
   title: 'Roadtrip Soundtrack',
   note: 'Songs from the weekend',
-  providerLinks: [
-    {
-      id: 'provider-youtube-e2e',
-      provider: 'YOUTUBE',
-      url: 'https://www.youtube.com/playlist?list=PL1234567890abcdef',
-      externalId: 'PL1234567890abcdef',
-      embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL1234567890abcdef',
-      createdAt: '2026-05-24T10:00:00Z',
-      updatedAt: '2026-05-24T10:00:00Z'
-    }
-  ],
+  featured: true,
+  provider: 'YOUTUBE',
+  url: 'https://www.youtube.com/playlist?list=PL1234567890abcdef',
+  externalId: 'PL1234567890abcdef',
   createdAt: '2026-05-24T10:00:00Z',
   updatedAt: '2026-05-24T10:00:00Z'
 }
@@ -471,7 +464,9 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
         directMediaCount: memory.mediaCount,
         descendantMediaCount: 0,
         childMemoryCount: memory.childCount,
-        scope: memory.scope
+        scope: memory.scope,
+        favorite: false,
+        participants: []
       })
       return
     }
@@ -705,7 +700,9 @@ export async function mockPublicViewerShareApi(
         directMediaCount: (options.media ?? []).length,
         descendantMediaCount: 0,
         childMemoryCount: publicShareRootMemory.childCount,
-        scope: null
+        scope: null,
+        favorite: false,
+        participants: []
       })
       return
     }

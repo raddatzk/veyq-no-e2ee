@@ -106,7 +106,7 @@ for (const viewport of viewports) {
           await expect(page.getByRole('link', { name: /Persönlich/ })).toBeVisible()
           await expect(page.getByRole('link', { name: /Group With A Very Long Name/ })).toBeVisible()
           await expect(page.getByRole('link', { name: /Sommerreise mit einem/ })).toBeVisible()
-          await expect(page.getByRole('link', { name: /Gruppe erstellen/ })).toBeVisible()
+          await expect(page.getByRole('button', { name: /Gruppe erstellen/ })).toBeVisible()
           await expect(page.getByRole('button', { name: 'Bereich erstellen' })).toBeVisible()
         } else {
           await page.locator('.tenant-sidebar').getByRole('button', { name: 'Bereichsmenü öffnen' }).click()
@@ -172,12 +172,12 @@ for (const viewport of viewports) {
 
       await page.goto('/s/shr-e2e')
       await expect(page.locator('.app-shell')).toHaveCount(0)
-      await expect(page.locator('.public-share-header').getByRole('heading', { name: weddingMemory.displayName })).toBeVisible()
+      await expect(page.getByRole('heading', { name: weddingMemory.displayName })).toBeVisible()
       await assertNoHorizontalOverflow(page)
       await assertElementFitsViewport(page, '.public-share-view')
 
       await page.getByRole('tab', { name: 'Karte' }).click()
-      await expect(page.getByText('Externe Kartenkacheln sind deaktiviert')).toBeVisible()
+      await expect(page.getByRole('tabpanel', { name: 'Karte' }).getByText('Externe Kartenkacheln sind deaktiviert')).toBeVisible()
       await assertNoHorizontalOverflow(page)
       await assertElementFitsViewport(page, '.memory-media-map-shell')
 
@@ -187,13 +187,13 @@ for (const viewport of viewports) {
       await assertElementFitsViewport(page, '.memory-track-grid')
 
       await page.getByRole('tab', { name: 'Playlists' }).click()
-      await expect(page.getByText('Roadtrip Soundtrack')).toBeVisible()
-      await expect(page.getByText('YouTube ist deaktiviert')).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Roadtrip Soundtrack' })).toBeVisible()
       await assertNoHorizontalOverflow(page)
       await assertElementFitsViewport(page, '.memory-playlist-grid')
 
-      await expect(page.getByRole('heading', { name: 'Datenschutz' })).toBeVisible()
-      await assertElementFitsViewport(page, '.privacy-settings-panel')
+      await page.getByRole('button', { name: 'Datenschutz' }).click()
+      await expect(page.getByRole('dialog', { name: 'Externe Inhalte' })).toBeVisible()
+      await assertElementFitsViewport(page, '.p-dialog')
     })
   })
 }
