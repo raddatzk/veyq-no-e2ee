@@ -3,7 +3,7 @@ set -euo pipefail
 
 VEYQ_DIR="${VEYQ_DIR:-/opt/veyq}"
 VEYQ_REPO="${VEYQ_REPO:-raddatzk/veyq}"
-VEYQ_REF="${VEYQ_REF:-master}"
+VEYQ_REF="${VEYQ_REF:-main}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${VEYQ_REPO}/${VEYQ_REF}}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
