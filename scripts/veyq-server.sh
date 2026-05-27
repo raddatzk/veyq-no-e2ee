@@ -70,7 +70,7 @@ install() {
   fi
 
   if prompt_yes_no "Pull and start veyq now?" "y"; then
-    compose pull
+    pull_services
     compose up -d
     wait_for_health
   fi
@@ -85,7 +85,7 @@ upgrade() {
   cp docker-compose.yml "backups/docker-compose.$(timestamp).yml" 2>/dev/null || true
   cp .env "backups/env.$(timestamp)" 2>/dev/null || true
   download_infra
-  compose pull
+  pull_services
   compose up -d
   wait_for_health
 }
@@ -230,6 +230,13 @@ wait_for_health() {
 
 compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
+pull_services() {
+  echo "Pulling veyq application image first..."
+  compose pull veyq
+  echo "Pulling supporting service images..."
+  compose pull traefik veyq-db
 }
 
 compose_project() {
