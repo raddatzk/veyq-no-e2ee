@@ -53,7 +53,7 @@ npm run check
 
 ## Server Installation
 
-The recommended self-hosted server path is the setup script. It downloads the Compose files into `/opt/veyq`, creates `.env`, prompts for the common server values, can start the stack and later provides `doctor`, `backup` and `upgrade` commands.
+The recommended self-hosted server path is the setup script. It asks for the install directory, downloads the Compose files, creates `.env`, prompts for the common server values, can start the stack and later provides `doctor`, `backup` and `upgrade` commands.
 
 Run this on the server:
 
@@ -63,6 +63,26 @@ curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/main/scripts/veyq-ser
 ```
 
 After installation, run `sudo ./veyq-server.sh doctor` from `/opt/veyq` after `.env` changes and before upgrades. For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
+
+### Environment Variables
+
+The install script prompts for the common values and writes them to `.env`. These variables can also be set before running the script or edited later in `.env`:
+
+- `VEYQ_DIR`: install directory for downloaded Compose files and `.env`; defaults to the current directory.
+- `VEYQ_REPO`, `VEYQ_REF`: GitHub repository and branch/tag/SHA used by the script to download server files; defaults to `raddatzk/veyq` and `main`.
+- `VEYQ_IMAGE`: runtime container image used by the production Compose stack, for example `ghcr.io/raddatzk/veyq:latest`.
+- `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS host.
+- `WEBAUTHN_ORIGINS`, `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_NAME`: passkey origin and relying-party settings. Keep these aligned with the public HTTPS host.
+- `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
+- `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
+- `VEYQ_SOURCE_URL`, `VEYQ_SUPPORT_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license, optional support link and build metadata shown in server settings.
+- `MEDIA_STORAGE_DIR`, `MEDIA_CHUNK_SIZE`, `MEDIA_MAX_UPLOAD_SIZE`, `MEDIA_UPLOAD_SESSION_TTL_HOURS`, `MEDIA_UPLOAD_SESSION_CLEANUP_CRON`, `FFMPEG_PATH`, `MEDIA_PREVIEW_TIMEOUT_SECONDS`: media storage, upload and preview-generation settings.
+- `COOKIE_SECURE`, `COOKIE_ACCESS_TOKEN_NAME`, `COOKIE_REFRESH_TOKEN_NAME`, `ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_MINUTES`, `ACCESS_TOKEN_AUDIT_TTL_DAYS`, `REFRESH_TOKEN_AUDIT_TTL_DAYS`, `TOKEN_CLEANUP_CRON`: authentication cookie and token retention settings.
+- `INVITATION_TTL_DAYS`, `EMAIL_CHANGE_TTL_HOURS`, `RESET_PASSWORD_TTL_HOURS`, `USER_CLEANUP_CRON`, `USER_CLEANUP_RETENTION_DAYS`: user workflow token lifetimes and cleanup.
+- `BCRYPT_TARGET_MS`, `BCRYPT_MIN_COST`, `BCRYPT_MAX_COST`, `BCRYPT_BENCHMARK_SAMPLES`: password hashing benchmark and bounds.
+- `COMPOSE_PROFILES=reset`, `RESET_TRAEFIK_RULE`, `RESET_USERNAME`, `RESET_PASSWORD`, `RESET_RESTART_CONTAINER`: optional reset sidecar for disposable test instances only.
+
+See [`infra/.env.example`](infra/.env.example) for all defaults and comments.
 
 ## Docker Compose Test Instance
 

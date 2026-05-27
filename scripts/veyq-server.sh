@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VEYQ_DIR="${VEYQ_DIR:-/opt/veyq}"
+VEYQ_DIR="${VEYQ_DIR:-$PWD}"
 VEYQ_REPO="${VEYQ_REPO:-raddatzk/veyq}"
 VEYQ_REF="${VEYQ_REF:-main}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${VEYQ_REPO}/${VEYQ_REF}}"
@@ -21,7 +21,7 @@ Commands:
   backup    Create a database dump and media archive in ./backups.
 
 Environment:
-  VEYQ_DIR   Install directory. Default: /opt/veyq
+  VEYQ_DIR   Install directory. Default: current directory
   VEYQ_REPO  GitHub repo to download infra files from. Default: raddatzk/veyq
   VEYQ_REF   Branch, tag or SHA to download infra files from. Default: main
 USAGE
@@ -44,6 +44,11 @@ main() {
 install() {
   require_command docker
   require_compose
+  VEYQ_DIR="$(prompt "Install directory" "$VEYQ_DIR")"
+  if [ -z "$VEYQ_DIR" ]; then
+    echo "Install directory is required." >&2
+    exit 1
+  fi
   mkdir -p "$VEYQ_DIR"
   cd "$VEYQ_DIR"
   download_infra
