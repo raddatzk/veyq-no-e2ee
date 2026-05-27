@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Veyq needs shareable Memory subtrees without turning public pages into tenant membership or social graph surfaces. Public shares must be revocable, optionally password-protected and scoped to the selected Memory tree.
+veyq needs shareable Memory subtrees without turning public pages into tenant membership or social graph surfaces. Public shares must be revocable, optionally password-protected and scoped to the selected Memory tree.
 
 ## Decision
 

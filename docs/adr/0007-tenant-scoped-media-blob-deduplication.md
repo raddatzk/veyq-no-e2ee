@@ -8,11 +8,11 @@ Accepted
 
 Memory media are user-facing assets: they belong to one Memory, have a title, uploader context, share identity context and per-Memory captured-time corrections. The bytes behind those assets can be identical across uploads, and previews should not be regenerated or stored once per Memory asset.
 
-Veyq must remain self-hostable and privacy-preserving. Content hashes must not become public API identifiers, and identical files from different tenants must not create cross-tenant linkage.
+veyq must remain self-hostable and privacy-preserving. Content hashes must not become public API identifiers, and identical files from different tenants must not create cross-tenant linkage.
 
 ## Decision
 
-Veyq stores uploaded media bytes in tenant-scoped `MediaBlob` records addressed internally by SHA-256. `Media` remains the public, Memory-specific asset and references exactly one blob.
+veyq stores uploaded media bytes in tenant-scoped `MediaBlob` records addressed internally by SHA-256. `Media` remains the public, Memory-specific asset and references exactly one blob.
 
 `MediaBlob` owns original storage keys, preview storage keys, MIME type, byte size and extracted metadata such as captured time, camera, dimensions and GPS. `Media` owns title, original filename, uploader or share identity, Memory ownership, creation time and captured-time override state.
 

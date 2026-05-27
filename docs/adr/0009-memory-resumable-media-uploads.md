@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Large Memory media uploads need visible progress, cancellation and server-side cleanup for incomplete transfers. Veyq previously had upload-session APIs in the old Album/Explorer model, but ADR 0004 removed those product/API concepts.
+Large Memory media uploads need visible progress, cancellation and server-side cleanup for incomplete transfers. veyq previously had upload-session APIs in the old Album/Explorer model, but ADR 0004 removed those product/API concepts.
 
 The web frontend keeps current upload state in memory so uploads can continue while users navigate within the SPA. A full browser reload aborts the running web upload because the browser no longer grants access to the selected local files unless the application stores those files or asks the user to select them again.
 

@@ -1,10 +1,10 @@
-# Veyq
+# veyq
 
-Veyq is a self-hostable memory sharing application for preserving and sharing trips, events and personal moments as curated memories. It is meant to feel like a private archive with beautiful sharing, not like a generic gallery, cloud drive or folder browser.
+veyq is a self-hostable memory sharing application for preserving and sharing trips, events and personal moments as curated memories. It is meant to feel like a private archive with beautiful sharing, not like a generic gallery, cloud drive or folder browser.
 
-## What Veyq Is
+## What veyq Is
 
-Veyq focuses on memories instead of files. A memory can be a small moment or a larger journey, and the product direction combines media, journal text, maps, tracks, people, weather and music context into one shareable experience.
+veyq focuses on memories instead of files. A memory can be a small moment or a larger journey, and the product direction combines media, journal text, maps, tracks, people, weather and music context into one shareable experience.
 
 The long-term goal is a self-hostable product that works on arbitrary domains, keeps central infrastructure optional and avoids public social-graph leakage.
 
@@ -53,7 +53,7 @@ npm run check
 
 ## Docker Compose Test Instance
 
-The Docker Compose setup under [`infra`](infra) starts Traefik, MariaDB and the Veyq application container. It can also run an optional `veyq-reset` sidecar for disposable development or test instances.
+The Docker Compose setup under [`infra`](infra) starts Traefik, MariaDB and the veyq application container. It can also run an optional `veyq-reset` sidecar for disposable development or test instances.
 
 ```bash
 cd infra
@@ -93,4 +93,6 @@ Read [`AGENTS.md`](AGENTS.md) before making product or architecture changes. In 
 
 ## License
 
-The private alpha remains source-available only to trusted contributors until a root `LICENSE` file is added. The current public-release target is AGPL-3.0-only for the community edition with Veyq brand assets reserved separately; see [`docs/adr/0008-private-alpha-license-strategy.md`](docs/adr/0008-private-alpha-license-strategy.md).
+veyq is licensed under AGPL-3.0-only. See [`LICENSE`](LICENSE) for the full text and [`NOTICE`](NOTICE) for project notices.
+
+The veyq name, logos and brand assets are reserved separately and are not granted by the software license. See [`docs/legal/trademark-policy.md`](docs/legal/trademark-policy.md).
