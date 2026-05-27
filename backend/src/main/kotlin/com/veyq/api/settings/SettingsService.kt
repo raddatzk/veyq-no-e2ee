@@ -1,12 +1,56 @@
 package com.veyq.api.settings
 
+import com.veyq.api.generated.model.ServerLicenseSummary
 import com.veyq.api.generated.model.ServerSettingsResponse
+import com.veyq.api.generated.model.ServerSupportSummary
 import jakarta.inject.Singleton
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import java.net.URI
+import java.util.Optional
 
 @Singleton
-class SettingsService {
+class SettingsService(
+    @param:ConfigProperty(name = "veyq.source-url")
+    private val sourceUrl: String,
+    @param:ConfigProperty(name = "veyq.support-url")
+    private val supportUrl: Optional<String>,
+    @param:ConfigProperty(name = "veyq.version")
+    private val version: Optional<String>,
+    @param:ConfigProperty(name = "veyq.revision")
+    private val revision: Optional<String>,
+) {
 
     fun serverSettings(): ServerSettingsResponse {
-        return ServerSettingsResponse("Server", true)
+        val source = sourceUrl.trim().ifBlank { DEFAULT_SOURCE_URL }
+        return ServerSettingsResponse(
+            displayName = "Server",
+            userManagementAvailable = true,
+            license = ServerLicenseSummary(
+                edition = ServerLicenseSummary.Edition.COMMUNITY,
+                license = "AGPL-3.0-only",
+                sourceUrl = URI.create(source),
+                noticeUrl = source.docUri("NOTICE"),
+                trademarkPolicyUrl = source.docUri("docs/legal/trademark-policy.md"),
+                commercialBoundaryUrl = source.docUri("docs/legal/commercial-boundary.md"),
+                version = version.clean(),
+                revision = revision.clean(),
+            ),
+            support = supportUrl.clean()?.let { ServerSupportSummary(URI.create(it)) },
+        )
+    }
+
+    private fun String.docUri(path: String): URI {
+        val normalized = trim().removeSuffix("/")
+        val url = when {
+            "github.com/" in normalized -> "$normalized/blob/main/$path"
+            else -> "$normalized/$path"
+        }
+        return URI.create(url)
+    }
+
+    private fun Optional<String>.clean(): String? = orElse("").trim().ifBlank { null }
+
+    companion object {
+        private const val DEFAULT_SOURCE_URL = "https://github.com/veyq/veyq"
     }
 }

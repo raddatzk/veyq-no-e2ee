@@ -1,0 +1,72 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getServerSettings, type ServerSettingsResponse } from '../api'
+import ServerSettingsPanel from './ServerSettingsPanel.vue'
+
+vi.mock('../api', () => ({
+  getServerSettings: vi.fn()
+}))
+
+const getServerSettingsMock = vi.mocked(getServerSettings)
+
+describe('ServerSettingsPanel', () => {
+  afterEach(() => {
+    vi.resetAllMocks()
+  })
+
+  it('renders license and edition information', async () => {
+    getServerSettingsMock.mockResolvedValue(serverSettings())
+
+    const wrapper = mount(ServerSettingsPanel, {
+      global: { stubs: primeStubs() }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Lizenz & Edition')
+    expect(wrapper.text()).toContain('Community Edition · AGPL-3.0-only')
+    expect(wrapper.find('a[href="https://github.com/veyq/veyq"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('veyq unterstützen')
+  })
+
+  it('renders support action when a support URL is configured', async () => {
+    getServerSettingsMock.mockResolvedValue(
+      serverSettings({ support: { url: 'https://support.example.test/veyq' } })
+    )
+
+    const wrapper = mount(ServerSettingsPanel, {
+      global: { stubs: primeStubs() }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('veyq unterstützen')
+    expect(wrapper.find('a[href="https://support.example.test/veyq"]').text()).toContain('Unterstützen')
+  })
+})
+
+function serverSettings(overrides: Partial<ServerSettingsResponse> = {}): ServerSettingsResponse {
+  return {
+    displayName: 'Server',
+    userManagementAvailable: true,
+    license: {
+      edition: 'COMMUNITY',
+      license: 'AGPL-3.0-only',
+      sourceUrl: 'https://github.com/veyq/veyq',
+      noticeUrl: 'https://github.com/veyq/veyq/blob/main/NOTICE',
+      trademarkPolicyUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/trademark-policy.md',
+      commercialBoundaryUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/commercial-boundary.md',
+      version: 'v1.0.0'
+    },
+    ...overrides
+  }
+}
+
+function primeStubs() {
+  return {
+    Message: {
+      template: '<div><slot /></div>'
+    },
+    ProgressSpinner: {
+      template: '<span />'
+    }
+  }
+}

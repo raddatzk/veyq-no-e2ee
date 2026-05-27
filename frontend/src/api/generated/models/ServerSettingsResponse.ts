@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -13,6 +13,21 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ServerLicenseSummary } from './ServerLicenseSummary';
+import {
+    ServerLicenseSummaryFromJSON,
+    ServerLicenseSummaryFromJSONTyped,
+    ServerLicenseSummaryToJSON,
+    ServerLicenseSummaryToJSONTyped,
+} from './ServerLicenseSummary';
+import type { ServerSupportSummary } from './ServerSupportSummary';
+import {
+    ServerSupportSummaryFromJSON,
+    ServerSupportSummaryFromJSONTyped,
+    ServerSupportSummaryToJSON,
+    ServerSupportSummaryToJSONTyped,
+} from './ServerSupportSummary';
+
 /**
  * 
  * @export
@@ -31,6 +46,18 @@ export interface ServerSettingsResponse {
      * @memberof ServerSettingsResponse
      */
     userManagementAvailable: boolean;
+    /**
+     * 
+     * @type {ServerLicenseSummary}
+     * @memberof ServerSettingsResponse
+     */
+    license: ServerLicenseSummary;
+    /**
+     * 
+     * @type {ServerSupportSummary}
+     * @memberof ServerSettingsResponse
+     */
+    support?: ServerSupportSummary;
 }
 
 /**
@@ -39,6 +66,7 @@ export interface ServerSettingsResponse {
 export function instanceOfServerSettingsResponse(value: object): value is ServerSettingsResponse {
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('userManagementAvailable' in value) || value['userManagementAvailable'] === undefined) return false;
+    if (!('license' in value) || value['license'] === undefined) return false;
     return true;
 }
 
@@ -54,6 +82,8 @@ export function ServerSettingsResponseFromJSONTyped(json: any, ignoreDiscriminat
         
         'displayName': json['displayName'],
         'userManagementAvailable': json['userManagementAvailable'],
+        'license': ServerLicenseSummaryFromJSON(json['license']),
+        'support': json['support'] == null ? undefined : ServerSupportSummaryFromJSON(json['support']),
     };
 }
 
@@ -70,6 +100,8 @@ export function ServerSettingsResponseToJSONTyped(value?: ServerSettingsResponse
         
         'displayName': value['displayName'],
         'userManagementAvailable': value['userManagementAvailable'],
+        'license': ServerLicenseSummaryToJSON(value['license']),
+        'support': ServerSupportSummaryToJSON(value['support']),
     };
 }
 

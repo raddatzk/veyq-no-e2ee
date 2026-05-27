@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Server API
+  title: veyq Server API
   version: 0.2.0
   description: API-first target contract for server-level settings and administration metadata.
 servers:
@@ -54,8 +54,17 @@ components:
           schema:
             "$ref": "#/components/schemas/ServerSettingsResponse"
           example:
-            displayName: Veyq
+            displayName: veyq
             userManagementAvailable: true
+            license:
+              edition: COMMUNITY
+              license: AGPL-3.0-only
+              sourceUrl: https://github.com/veyq/veyq
+              noticeUrl: https://github.com/veyq/veyq/blob/main/NOTICE
+              trademarkPolicyUrl: https://github.com/veyq/veyq/blob/main/docs/legal/trademark-policy.md
+              commercialBoundaryUrl: https://github.com/veyq/veyq/blob/main/docs/legal/commercial-boundary.md
+              version: 0.1.0
+              revision: sha-unknown
 
   schemas:
     ServerSettingsResponse:
@@ -64,17 +73,86 @@ components:
       required:
       - displayName
       - userManagementAvailable
+      - license
       properties:
         displayName:
           type: string
           description: Anzeigename des Servers.
           examples:
-          - Veyq
+          - veyq
         userManagementAvailable:
           type: boolean
           description: Gibt an, ob die Benutzerverwaltung fuer den aktuellen Server verfuegbar ist.
           examples:
           - true
+        license:
+          "$ref": "#/components/schemas/ServerLicenseSummary"
+        support:
+          "$ref": "#/components/schemas/ServerSupportSummary"
       example:
-        displayName: Veyq
+        displayName: veyq
         userManagementAvailable: true
+        license:
+          edition: COMMUNITY
+          license: AGPL-3.0-only
+          sourceUrl: https://github.com/veyq/veyq
+          noticeUrl: https://github.com/veyq/veyq/blob/main/NOTICE
+          trademarkPolicyUrl: https://github.com/veyq/veyq/blob/main/docs/legal/trademark-policy.md
+          commercialBoundaryUrl: https://github.com/veyq/veyq/blob/main/docs/legal/commercial-boundary.md
+          version: 0.1.0
+          revision: sha-unknown
+
+    ServerLicenseSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - edition
+      - license
+      - sourceUrl
+      - noticeUrl
+      - trademarkPolicyUrl
+      - commercialBoundaryUrl
+      properties:
+        edition:
+          type: string
+          enum:
+          - COMMUNITY
+          description: Edition der laufenden veyq-Instanz.
+        license:
+          type: string
+          description: SPDX-Lizenzkennung der Community Edition.
+          examples:
+          - AGPL-3.0-only
+        sourceUrl:
+          type: string
+          format: uri
+          description: Link zum passenden Quellcode der laufenden Instanz.
+        noticeUrl:
+          type: string
+          format: uri
+          description: Link zu Projekt- und Markenhinweisen.
+        trademarkPolicyUrl:
+          type: string
+          format: uri
+          description: Link zur veyq Trademark Policy.
+        commercialBoundaryUrl:
+          type: string
+          format: uri
+          description: Link zur Community-/Commercial-Grenze.
+        version:
+          type: string
+          description: Optional gesetzte veyq-Version.
+        revision:
+          type: string
+          description: Optional gesetzte Build- oder Commit-Revision.
+
+    ServerSupportSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Freiwilliger Spenden- oder Support-Link fuer veyq.

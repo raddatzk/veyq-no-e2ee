@@ -45,6 +45,29 @@ async function loadSettings() {
         </div>
         <i class="pi pi-server"></i>
       </div>
+      <div class="settings-entry license-settings-entry">
+        <div>
+          <strong>{{ t('license.title') }}</strong>
+          <span>{{ t('license.summary', { edition: t(`license.edition.${settings.license.edition}`), license: settings.license.license }) }}</span>
+          <i>{{ t('license.sourceNotice') }}</i>
+        </div>
+        <div class="settings-link-list">
+          <a :href="settings.license.sourceUrl" target="_blank" rel="noreferrer">{{ t('license.source') }}</a>
+          <a :href="settings.license.noticeUrl" target="_blank" rel="noreferrer">NOTICE</a>
+          <a :href="settings.license.trademarkPolicyUrl" target="_blank" rel="noreferrer">{{ t('license.trademark') }}</a>
+          <a :href="settings.license.commercialBoundaryUrl" target="_blank" rel="noreferrer">{{ t('license.commercialBoundary') }}</a>
+        </div>
+      </div>
+      <div v-if="settings.support" class="settings-entry support-settings-entry">
+        <div>
+          <strong>{{ t('support.title') }}</strong>
+          <span>{{ t('support.settingsCopy') }}</span>
+        </div>
+        <a class="p-button p-button-sm" :href="settings.support.url" target="_blank" rel="noreferrer">
+          <span class="pi pi-heart" />
+          <span>{{ t('support.action') }}</span>
+        </a>
+      </div>
     </template>
   </section>
 </template>
