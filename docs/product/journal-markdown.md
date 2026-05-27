@@ -15,7 +15,7 @@ The MVP supports normal Markdown authoring patterns:
 - Blockquotes.
 - Inline code and code blocks.
 - Standard links.
-- Standard images, including Veyq media embeds.
+- Standard images, including veyq media embeds.
 
 Example:
 
@@ -31,9 +31,9 @@ We walked through the old town after breakfast.
 Favorite stop: [the evening walk](veyq:memory/mem_child123).
 ```
 
-## Veyq Embed Links
+## veyq Embed Links
 
-Veyq-specific embeds use Markdown link targets with the `veyq:` scheme. This keeps journals readable as plain Markdown while allowing the app to render richer Memory context.
+veyq-specific embeds use Markdown link targets with the `veyq:` scheme. This keeps journals readable as plain Markdown while allowing the app to render richer Memory context.
 
 ### Media
 
@@ -79,7 +79,13 @@ Example:
 [Playlist](veyq:playlist?url={encodedUrl})
 ```
 
-Playlist embeds are model-light in the MVP. The app renders the label and URL context directly from the query parameter. Veyq does not create playlist database rows or cache external playlist metadata yet.
+URL-only playlist embeds render the label and URL context directly from the query parameter. They remain supported for lightweight compatibility, but new UI flows should prefer internal playlist references:
+
+```markdown
+[Playlist](veyq:playlist/{playlistId})
+```
+
+Stored playlist embeds reference Memory playlist objects. If a referenced playlist is deleted later, the journal Markdown is preserved and the renderer shows an unavailable embed. A veyq playlist holds one provider link in V1, such as Spotify, Apple Music, YouTube, SoundCloud or Deezer.
 
 ### Map
 
@@ -92,10 +98,10 @@ Map embeds are model-light in the MVP. `lat` and `lng` are required numeric para
 ### Track
 
 ```markdown
-[Track](veyq:track?url={encodedUrl})
+[Track](veyq:track/{trackId})
 ```
 
-Track embeds are model-light in the MVP. The app renders the label and URL context directly from the query parameter. Veyq does not create track database rows for journal embeds yet.
+Track embeds reference stored GPX tracks in the current Memory context. If a referenced track is deleted later, the journal Markdown is preserved and the renderer shows an unavailable embed.
 
 ## Validation Rules
 
@@ -104,7 +110,9 @@ The backend validates `veyq:` targets when a journal is saved:
 - Unsupported `veyq:` embed types are rejected.
 - Media embeds must point to visible media in the allowed Memory context. Carousel embeds validate every comma-separated media id.
 - Memory embeds must point to visible Memories in the allowed Memory context.
-- Playlist and track embeds must include a non-empty `url` query parameter.
+- URL-only playlist embeds must include a non-empty `url` query parameter.
+- Stored playlist embeds must point to a visible playlist in the allowed Memory context.
+- Track embeds must point to a visible stored track in the allowed Memory context.
 - Map embeds must include numeric `lat` and `lng`; `zoom` must be numeric when provided.
 - Journal Markdown must be present and may not exceed the backend size limit.
 
@@ -130,6 +138,6 @@ The Journal MVP deliberately avoids:
 - Version history.
 - Collaborative editing.
 - Optimistic conflict resolution.
-- Playlist, map or track domain tables for journal-only embeds.
+- Map domain tables for journal-only embeds.
 
 These can be designed later without changing the plain Markdown storage model.

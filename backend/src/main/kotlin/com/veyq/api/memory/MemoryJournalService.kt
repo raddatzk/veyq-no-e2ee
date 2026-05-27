@@ -6,7 +6,9 @@ import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
 import com.veyq.api.domain.MemoryJournal
 import com.veyq.api.domain.MemoryJournalRepo
+import com.veyq.api.domain.MemoryPlaylistRepo
 import com.veyq.api.domain.MemoryRepo
+import com.veyq.api.domain.MemoryTrackRepo
 import com.veyq.api.generated.model.MemoryJournalSummary
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -22,6 +24,8 @@ class MemoryJournalService @Inject constructor(
     private val journalRepo: MemoryJournalRepo,
     private val mediaRepo: MediaRepo,
     private val memoryRepo: MemoryRepo,
+    private val trackRepo: MemoryTrackRepo,
+    private val playlistRepo: MemoryPlaylistRepo,
 ) {
     fun getJournal(memory: Memory): MemoryJournalSummary =
         journalRepo.findByMemory(memory)?.let(::toSummary) ?: emptySummary(memory)
@@ -53,15 +57,15 @@ class MemoryJournalService @Inject constructor(
         VEYQ_LINK.findAll(markdown).forEach { match ->
             val rawTarget = match.groupValues[1]
             val uri = runCatching { URI(rawTarget) }.getOrNull()
-                ?: throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+                ?: throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
             when (uri.schemeSpecificPart.substringBefore("?").substringBefore("/")) {
                 "media" -> validateMediaEmbed(uri, context)
                 "memory" -> validateMemoryEmbed(uri, context)
                 "memory-path" -> validateMemoryPathEmbed(uri, context)
-                "playlist" -> validateRequiredQuery(uri, "url")
+                "playlist" -> validatePlaylistEmbed(uri, context)
                 "map" -> validateMapEmbed(uri)
-                "track" -> validateRequiredQuery(uri, "url")
-                else -> throw BadRequestException("Unsupported Veyq journal embed", "MEMORY_JOURNAL_EMBED_UNSUPPORTED")
+                "track" -> validateTrackEmbed(uri, context)
+                else -> throw BadRequestException("Unsupported veyq journal embed", "MEMORY_JOURNAL_EMBED_UNSUPPORTED")
             }
         }
     }
@@ -71,7 +75,7 @@ class MemoryJournalService @Inject constructor(
             .map { it.trim() }
             .filter { it.isNotBlank() }
         if (mediaIds.isEmpty()) {
-            throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
         }
         mediaIds.forEach { mediaId ->
             validateSingleMediaEmbed(mediaId, context)
@@ -88,6 +92,35 @@ class MemoryJournalService @Inject constructor(
             ownerMemory.id == context.memory.id
         }
         if (!allowed) throw NotFoundException("Media not found")
+    }
+
+    private fun validateTrackEmbed(uri: URI, context: JournalValidationContext) {
+        val trackId = pathValue(uri, "track")
+        val track = trackRepo.findByTenantAndPublicId(context.memory.tenant, trackId)
+            ?: throw NotFoundException("Track not found")
+        val allowed = if (context.allowShareSubtreeMedia) {
+            context.shareRoot != null && isDescendantOrSelf(track.memory, context.shareRoot)
+        } else {
+            track.memory.id == context.memory.id
+        }
+        if (!allowed) throw NotFoundException("Track not found")
+    }
+
+    private fun validatePlaylistEmbed(uri: URI, context: JournalValidationContext) {
+        val target = uri.schemeSpecificPart.substringBefore("?")
+        if (target == "playlist") {
+            validateRequiredQuery(uri, "url")
+            return
+        }
+        val playlistId = pathValue(uri, "playlist")
+        val playlist = playlistRepo.findByTenantAndPublicId(context.memory.tenant, playlistId)
+            ?: throw NotFoundException("Playlist not found")
+        val allowed = if (context.allowShareSubtreeMedia) {
+            context.shareRoot != null && isDescendantOrSelf(playlist.memory, context.shareRoot)
+        } else {
+            playlist.memory.id == context.memory.id
+        }
+        if (!allowed) throw NotFoundException("Playlist not found")
     }
 
     private fun validateMemoryEmbed(uri: URI, context: JournalValidationContext) {
@@ -120,14 +153,14 @@ class MemoryJournalService @Inject constructor(
 
     private fun validateRequiredQuery(uri: URI, key: String) {
         if (query(uri)[key].isNullOrBlank()) {
-            throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
         }
     }
 
     private fun validateMapEmbed(uri: URI) {
         val params = query(uri)
-        params["lat"]?.toDoubleOrNull() ?: throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
-        params["lng"]?.toDoubleOrNull() ?: throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+        params["lat"]?.toDoubleOrNull() ?: throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+        params["lng"]?.toDoubleOrNull() ?: throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
         params["zoom"]?.toDoubleOrNull()
     }
 
@@ -135,7 +168,7 @@ class MemoryJournalService @Inject constructor(
         val prefix = "$type/"
         val value = uri.schemeSpecificPart.substringBefore("?")
         if (!value.startsWith(prefix) || value.length <= prefix.length) {
-            throw BadRequestException("Invalid Veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
         }
         return value.removePrefix(prefix).trim()
     }
