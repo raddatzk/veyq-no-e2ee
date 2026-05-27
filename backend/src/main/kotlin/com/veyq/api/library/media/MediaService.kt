@@ -4,6 +4,8 @@ import com.veyq.api.auth.BadRequestException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.domain.ArchiveMediaKeyset
 import com.veyq.api.domain.ArchiveMediaRow
+import com.veyq.api.domain.ArchiveTrackKeyset
+import com.veyq.api.domain.ArchiveTrackRow
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.MediaBlob
@@ -13,6 +15,7 @@ import com.veyq.api.domain.Memory
 import com.veyq.api.domain.MemoryShareIdentity
 import com.veyq.api.domain.MemoryShareIdentityRepo
 import com.veyq.api.domain.MemoryRepo
+import com.veyq.api.domain.MemoryTrackRepo
 import com.veyq.api.domain.TenantFolderRepo
 import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
@@ -30,6 +33,7 @@ import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.LibraryScopes
+import com.veyq.api.library.track.MemoryTrackService
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
@@ -65,6 +69,7 @@ import javax.imageio.ImageIO
 @Singleton
 class MediaService @Inject constructor(
     private val mediaRepo: MediaRepo,
+    private val trackRepo: MemoryTrackRepo,
     private val mediaBlobRepo: MediaBlobRepo,
     private val memoryRepo: MemoryRepo,
     private val userRepo: UserRepo,
@@ -72,6 +77,7 @@ class MediaService @Inject constructor(
     private val mediaConfig: MediaConfig,
     private val mediaTypeDetector: MediaTypeDetector,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
+    private val trackService: MemoryTrackService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val mediaGroupMemberRepo: TenantGroupMemberRepo,
@@ -160,6 +166,29 @@ class MediaService @Inject constructor(
                         }
                         val last = rows.last()
                         after = ArchiveMediaKeyset(last.sortTime, last.createdAt, last.id)
+                    }
+                    var trackAfter: ArchiveTrackKeyset? = null
+                    while (true) {
+                        val rows = trackRepo.listArchiveRowsByMemoryIds(memoryIds, trackAfter, mediaConfig.archiveBatchSize)
+                        if (rows.isEmpty()) break
+
+                        rows.forEach { row ->
+                            val path = storagePath(row.storageKey)
+                            if (!Files.isRegularFile(path)) throw NotFoundException("Track file not found")
+                            val zipEntry = ZipEntry(trackArchiveEntryName(memoryDirectories, row, locale, usedNames))
+                            zipEntry.time = row.sortTime.toEpochMilli()
+                            zip.putNextEntry(zipEntry)
+                            Files.newInputStream(path).use { input ->
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read == -1) break
+                                    zip.write(buffer, 0, read)
+                                }
+                            }
+                            zip.closeEntry()
+                        }
+                        val last = rows.last()
+                        trackAfter = ArchiveTrackKeyset(last.sortTime, last.createdAt, last.id)
                     }
                 }
             } catch (e: IOException) {
@@ -907,6 +936,16 @@ class MediaService @Inject constructor(
         val directory = memoryDirectories[media.memoryId] ?: throw NotFoundException("Media not found")
         val baseFilename = mediaFilename(media, locale)
         return uniqueArchiveName("$directory/$baseFilename", usedNames)
+    }
+
+    private fun trackArchiveEntryName(
+        memoryDirectories: Map<Long, String>,
+        track: ArchiveTrackRow,
+        locale: String?,
+        usedNames: MutableMap<String, Int>,
+    ): String {
+        val directory = memoryDirectories[track.memoryId] ?: throw NotFoundException("Track not found")
+        return uniqueArchiveName("$directory/tracks/${trackService.archiveFilename(track, locale)}", usedNames)
     }
 
     private fun memoryPath(rootMemory: Memory, memory: Memory): List<String> {
