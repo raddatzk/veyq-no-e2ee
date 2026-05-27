@@ -28,7 +28,7 @@ RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.p
 FROM eclipse-temurin:21-jre-jammy AS runtime-jvm
 WORKDIR /work/
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=backend-build-jvm /code/backend/build/quarkus-app /work/quarkus-app
 EXPOSE 8080
@@ -36,7 +36,7 @@ ENTRYPOINT ["java", "-Dquarkus.http.host=0.0.0.0", "-jar", "/work/quarkus-app/qu
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5 AS runtime-native
 WORKDIR /work/
-RUN (microdnf install -y ffmpeg-free || microdnf install -y ffmpeg) && microdnf clean all
+RUN (microdnf install -y curl ffmpeg-free || microdnf install -y curl ffmpeg) && microdnf clean all
 COPY --from=backend-build-native /code/backend/build/*-runner /work/application
 RUN chmod 775 /work /work/application
 EXPOSE 8080

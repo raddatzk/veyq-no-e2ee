@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, quote
 import pymysql
 
 
-APP_TITLE = "Veyq Test Reset"
+APP_TITLE = "veyq Test Reset"
 EXCLUDED_TABLES = {"flyway_schema_history"}
 
 
@@ -311,7 +311,7 @@ def render_page(status: Optional[str] = None, details: Optional[dict[str, Any]] 
 
 
 class ResetHandler(BaseHTTPRequestHandler):
-    server_version = "VeyqReset/1.0"
+    server_version = "veyq-reset/1.0"
 
     @property
     def config(self) -> ResetConfig:
@@ -347,7 +347,7 @@ class ResetHandler(BaseHTTPRequestHandler):
             self.write_html(
                 HTTPStatus.UNAUTHORIZED,
                 render_page("Invalid username or password."),
-                extra_headers={"WWW-Authenticate": 'Basic realm="Veyq Reset"'},
+                extra_headers={"WWW-Authenticate": 'Basic realm="veyq Reset"'},
             )
             return
 

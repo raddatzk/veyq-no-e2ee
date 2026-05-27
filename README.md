@@ -59,16 +59,25 @@ The Docker Compose setup under [`infra`](infra) starts Traefik, MariaDB and the 
 cd infra
 cp .env.example .env
 # adjust .env
-docker compose up --build
+docker compose up
 ```
 
-The reset sidecar can clear Veyq tables, delete media volume contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
+Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`.
+
+The reset sidecar can clear veyq tables, delete media volume contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
+
+For server installs and upgrades, use [`scripts/veyq-server.sh`](scripts/veyq-server.sh). It downloads the Compose files, can guide `.env` setup, starts the stack and provides backup/upgrade commands.
+Run `./veyq-server.sh doctor` on the server after editing `.env` and before upgrades.
 
 ## API-First Development
 
 The backend API contracts live as OpenAPI 3.1 specifications in [`docs/api`](docs/api). Backend resources implement generated JAX-RS interfaces, and the frontend generates TypeScript clients from the same contracts.
 
 Keep new public API behavior documented in the relevant OpenAPI spec before or alongside implementation.
+
+## CI
+
+GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend/frontend checks and [`container.yml`](.github/workflows/container.yml) for building and publishing runtime images to GitHub Container Registry.
 
 ## Documentation Map
 

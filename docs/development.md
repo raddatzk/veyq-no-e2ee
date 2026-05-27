@@ -1,4 +1,4 @@
-# Veyq Development Environment
+# veyq Development Environment
 
 This document describes the local and test-instance development environment. Product and architecture decisions live in the broader `docs/` tree; this file is about day-to-day development operations.
 
@@ -82,7 +82,7 @@ The Compose setup under `infra/` starts:
 
 - `traefik`: reverse proxy, TLS and routing.
 - `veyq-db`: MariaDB database.
-- `veyq`: Veyq application container.
+- `veyq`: veyq application container.
 - `veyq-reset`: optional reset sidecar for disposable development/test instances.
 
 Start the normal stack:
@@ -91,22 +91,59 @@ Start the normal stack:
 cd infra
 cp .env.example .env
 # adjust .env
-docker compose up --build
+docker compose up
+```
+
+For local source builds instead of a published image, include the build override:
+
+```bash
+cd infra
+docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 ```
 
 The app is served through the domain configured by `VEYQ_TRAEFIK_RULE`. The health endpoint is available at `/q/health`.
 
 ### Private Alpha Self-Hosting Runbook
 
-Use this path for a first self-hosted Veyq instance. It is suitable for a trusted private alpha, not yet for a public managed service.
+Use this path for a first self-hosted veyq instance. It is suitable for a trusted private alpha, not yet for a public managed service.
+
+The recommended server install path is the helper script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/veyq/veyq/main/scripts/veyq-server.sh | \
+  sudo VEYQ_REPO=veyq/veyq VEYQ_REF=main bash -s -- install
+```
+
+Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files. The script downloads `docker-compose.yml`, `.env.example` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.
+
+Manual install:
 
 1. Copy `infra/.env.example` to `infra/.env`.
-2. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
-3. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
-4. Set `WEBAUTHN_ORIGINS` to the HTTPS origin and `WEBAUTHN_RP_ID` to the host without protocol.
-5. Configure SMTP through the `MAIL_*` variables before inviting users.
-6. Start with `docker compose up --build` from `infra/`.
-7. Open the configured host, create the first admin and create the first tenant.
+2. Set `VEYQ_IMAGE` to the published image, for example `ghcr.io/<owner>/veyq:latest`.
+3. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
+4. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
+5. Set `WEBAUTHN_ORIGINS` to the HTTPS origin and `WEBAUTHN_RP_ID` to the host without protocol.
+6. Set `VEYQ_SOURCE_URL` when running a fork or modified public deployment so AGPL source links point to the matching source.
+7. Optionally set `VEYQ_SUPPORT_URL` to show ServerOwners a voluntary support link.
+8. Configure SMTP through the `MAIL_*` variables before inviting users.
+9. Start with `docker compose up -d` from `infra/`.
+10. Open the configured host, create the first admin and create the first tenant.
+
+Upgrade with the helper script:
+
+```bash
+cd /opt/veyq
+sudo ./veyq-server.sh doctor
+sudo ./veyq-server.sh backup
+sudo ./veyq-server.sh upgrade
+```
+
+Manual upgrade:
+
+1. Back up `.env`, the database and media volume.
+2. Pull the configured image with `docker compose pull`.
+3. Restart with `docker compose up -d`.
+4. Check `docker compose ps` and `docker compose logs veyq`.
 
 Back up at least these Docker volumes before upgrading or testing destructive flows:
 
@@ -117,9 +154,18 @@ Back up at least these Docker volumes before upgrading or testing destructive fl
 Example backup commands from the `infra/` directory:
 
 ```bash
+cp .env "veyq-env-$(date -u +%Y%m%dT%H%M%SZ)"
 docker compose exec veyq-db mariadb-dump -u root -p"${DB_ROOT_PASSWORD}" "${DB_NAME:-veyq}" > veyq-db.sql
 docker run --rm -v infra_veyq-media:/data -v "$PWD":/backup alpine tar czf /backup/veyq-media.tgz -C /data .
 ```
+
+The helper script writes all three backup artifacts together:
+
+```bash
+sudo ./veyq-server.sh backup
+```
+
+Run `sudo ./veyq-server.sh doctor` after editing `.env`; it validates required values, catches default secrets and checks the Compose configuration without changing running services.
 
 Before considering a private alpha instance ready, run the product smoke flow once:
 
@@ -153,7 +199,7 @@ Required passkey settings for Compose:
 
 - `WEBAUTHN_ORIGINS`: comma-separated HTTPS origins allowed to use passkeys, for example `https://veyq.example.com`.
 - `WEBAUTHN_RP_ID`: relying-party domain, usually the host without protocol, for example `veyq.example.com`.
-- `WEBAUTHN_RP_NAME`: display name shown by authenticators. Defaults to `Veyq`.
+- `WEBAUTHN_RP_NAME`: display name shown by authenticators. Defaults to `veyq`.
 
 Optional reset setting:
 
@@ -165,13 +211,13 @@ When enabled, the reset service:
 - Serves a small HTTP UI on container port `8081`.
 - Is routed by Traefik through `RESET_TRAEFIK_RULE`.
 - Uses HTTP Basic Auth with `RESET_USERNAME` and `RESET_PASSWORD`.
-- Connects to the same MariaDB database as Veyq.
-- Mounts the same media volume as Veyq.
+- Connects to the same MariaDB database as veyq.
+- Mounts the same media volume as veyq.
 - Mounts the Docker socket so it can restart the app container after reset.
 
 Reset behavior:
 
-- Truncates all Veyq database tables except `flyway_schema_history`.
+- Truncates all veyq database tables except `flyway_schema_history`.
 - Deletes all entries below `MEDIA_STORAGE_DIR`, default `/data/veyq-media`.
 - Restarts `RESET_RESTART_CONTAINER`.
 - Keeps database schema, Docker volumes and Flyway migration history.
@@ -181,7 +227,7 @@ Start the stack with the reset sidecar:
 
 ```bash
 cd infra
-docker compose up --build
+docker compose up
 ```
 
 Then open the host configured by `RESET_TRAEFIK_RULE`, authenticate with `RESET_USERNAME` and `RESET_PASSWORD`, and trigger the reset from the page.

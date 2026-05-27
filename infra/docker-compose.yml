@@ -34,10 +34,7 @@ services:
       - "3306:3306"
 
   veyq:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: ${VEYQ_BUILD_TARGET:-runtime-jvm}
+    image: ${VEYQ_IMAGE:?Set VEYQ_IMAGE}
     container_name: veyq
     environment:
       DB_URL: jdbc:mariadb://veyq-db:3306/${DB_NAME:-veyq}
@@ -62,12 +59,18 @@ services:
       BCRYPT_BENCHMARK_SAMPLES: ${BCRYPT_BENCHMARK_SAMPLES:-2}
       WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:?Set WEBAUTHN_ORIGINS}
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:?Set WEBAUTHN_RP_ID}
-      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Veyq}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-veyq}
       MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
       MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
       MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
       MEDIA_UPLOAD_SESSION_CLEANUP_CRON: "${MEDIA_UPLOAD_SESSION_CLEANUP_CRON:-0 0 * * * ?}"
       MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
+      FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
+      MEDIA_PREVIEW_TIMEOUT_SECONDS: ${MEDIA_PREVIEW_TIMEOUT_SECONDS:-15}
+      VEYQ_SOURCE_URL: ${VEYQ_SOURCE_URL:-https://github.com/veyq/veyq}
+      VEYQ_SUPPORT_URL: ${VEYQ_SUPPORT_URL:-}
+      VEYQ_VERSION: ${VEYQ_VERSION:-}
+      VEYQ_REVISION: ${VEYQ_REVISION:-}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
       MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT}
@@ -81,6 +84,12 @@ services:
       - veyq-media:${MEDIA_STORAGE_DIR:-/data/veyq-media}
     depends_on:
       - veyq-db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     labels:
       - traefik.enable=true
       - traefik.http.routers.veyq.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}
