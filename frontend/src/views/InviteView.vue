@@ -8,6 +8,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import PasskeyNameDialog from '../components/auth/PasskeyNameDialog.vue'
+import RegistrationPrivacyOptIns from '../components/auth/RegistrationPrivacyOptIns.vue'
 import { acceptInvitation, acceptInvitationWithPasskey } from '../api/invitationClient'
 import { bootstrap } from '../api/entrypointClient'
 import { listMyPasskeys, updateMyPasskey, type PasskeySummary } from '../features/settings/api'
@@ -26,6 +27,8 @@ const savingPasskeyName = ref(false)
 const namingPasskey = ref<PasskeySummary | null>(null)
 const pendingRedirect = ref('/')
 const authMethod = ref<'passkey' | 'password'>('passkey')
+const showPrivacyOptIns = ref(false)
+const needsPrivacyOptIn = ref(false)
 const userId = computed(() => Number(route.params.userId))
 const token = computed(() => route.hash.replace(/^#/, ''))
 const requiresPassword = computed(() => !authState.isAuthenticated)
@@ -41,10 +44,11 @@ async function submit() {
     error.value = t('auth.displayNameRequired')
     return
   }
-  const withPasskey = requiresPassword.value && authMethod.value === 'passkey'
+  const createsAccount = requiresPassword.value
+  const withPasskey = createsAccount && authMethod.value === 'passkey'
   loading.value = true
   try {
-    if (!requiresPassword.value) {
+    if (!createsAccount) {
       await acceptInvitation(userId.value, token.value)
     } else if (withPasskey) {
       await acceptInvitationWithPasskey(userId.value, token.value, inviteDisplayName)
@@ -55,8 +59,11 @@ async function submit() {
     if (entrypoint.user) {
       setAuthenticated(entrypoint.user, entrypoint.tenants)
       pendingRedirect.value = entrypoint.tenants[0] ? `/${entrypoint.tenants[0].name}` : '/'
+      needsPrivacyOptIn.value = createsAccount
       if (withPasskey) {
         await showLatestPasskeyNameDialog()
+      } else if (createsAccount) {
+        showPrivacyOptIns.value = true
       } else {
         await finishInvite()
       }
@@ -89,7 +96,7 @@ async function saveInvitePasskeyName(displayName: string) {
   try {
     await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
     namingPasskey.value = null
-    await finishInvite()
+    await continueAfterRegistration()
   } catch (caught) {
     error.value = getErrorMessage(caught, t('profile.passkeyRenameFailed'))
   } finally {
@@ -100,6 +107,20 @@ async function saveInvitePasskeyName(displayName: string) {
 async function skipInvitePasskeyName() {
   if (!namingPasskey.value) return
   namingPasskey.value = null
+  await continueAfterRegistration()
+}
+
+async function continueAfterRegistration() {
+  if (needsPrivacyOptIn.value) {
+    showPrivacyOptIns.value = true
+  } else {
+    await finishInvite()
+  }
+}
+
+async function finishPrivacyOptIns() {
+  showPrivacyOptIns.value = false
+  needsPrivacyOptIn.value = false
   await finishInvite()
 }
 
@@ -112,7 +133,8 @@ async function finishInvite() {
   <Card class="login-card">
     <template #title>{{ t('auth.inviteTitle') }}</template>
     <template #content>
-      <form class="form" @submit.prevent="submit">
+      <RegistrationPrivacyOptIns v-if="showPrivacyOptIns" @complete="finishPrivacyOptIns" />
+      <form v-else class="form" @submit.prevent="submit">
         <div v-if="requiresPassword" class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
           <button
             type="button"

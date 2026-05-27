@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import SetupView from './SetupView.vue'
 import { setupAdmin, setupAdminWithPasskey } from '../api/setupClient'
 import { tenants } from '../api/tenantClient'
+import { login } from '../api/authClient'
 import { listMyPasskeys, updateMyPasskey } from '../features/settings/api'
 import { authState } from '../authState'
 import { serverState } from '../serverState'
@@ -30,6 +31,7 @@ vi.mock('../features/settings/api', () => ({
 const setupAdminMock = vi.mocked(setupAdmin)
 const setupAdminWithPasskeyMock = vi.mocked(setupAdminWithPasskey)
 const tenantsMock = vi.mocked(tenants)
+const loginMock = vi.mocked(login)
 const listMyPasskeysMock = vi.mocked(listMyPasskeys)
 const updateMyPasskeyMock = vi.mocked(updateMyPasskey)
 
@@ -38,6 +40,7 @@ describe('SetupView', () => {
     setupAdminMock.mockReset()
     setupAdminWithPasskeyMock.mockReset()
     tenantsMock.mockReset()
+    loginMock.mockReset()
     listMyPasskeysMock.mockReset()
     updateMyPasskeyMock.mockReset()
     authState.isAuthenticated = false
@@ -45,6 +48,7 @@ describe('SetupView', () => {
     authState.userLabel = ''
     authState.tenants = []
     serverState.setupCompleted = false
+    window.localStorage.clear()
   })
 
   it('requires a display name before starting passkey setup', async () => {
@@ -68,9 +72,10 @@ describe('SetupView', () => {
     expect(setupAdminWithPasskeyMock).not.toHaveBeenCalled()
     expect(setupAdminMock).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Bitte gib einen Anzeigenamen ein.')
+    expect(wrapper.text()).not.toContain('Externe Inhalte')
   })
 
-  it('creates a passkey admin and asks to confirm the suggested passkey name', async () => {
+  it('asks for privacy opt-ins after passkey admin setup and passkey naming', async () => {
     setupAdminWithPasskeyMock.mockResolvedValue({
       userId: 1,
       email: 'admin@example.test',
@@ -102,15 +107,75 @@ describe('SetupView', () => {
     expect(setupAdminWithPasskeyMock).toHaveBeenCalledWith('admin@example.test', 'Administrator')
     expect(setupAdminMock).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Passkey benennen')
+    expect(window.localStorage.getItem('veyq:user:1:osm-tiles-enabled')).toBeNull()
 
     await wrapper.findAll('input').at(-1)!.setValue('  MacBook Touch ID  ')
     await wrapper.findAll('button').filter((button) => button.text() === 'Speichern').at(-1)!.trigger('click')
     await flushPromises()
 
     expect(updateMyPasskeyMock).toHaveBeenCalledWith(5, 'MacBook Touch ID')
+    expect(wrapper.text()).toContain('Externe Inhalte')
+
+    await buttonByText(wrapper, 'Alle akzeptieren').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('veyq:user:1:osm-tiles-enabled')).toBe('true')
+    expect(window.localStorage.getItem('veyq:osm-tiles-enabled')).toBeNull()
+    expect(wrapper.text()).toContain('Bereich erstellen')
+  })
+
+  it('asks for privacy opt-ins after password admin setup', async () => {
+    setupAdminMock.mockResolvedValue(undefined)
+    loginMock.mockResolvedValue({
+      userId: 1,
+      email: 'admin@example.test',
+      displayName: 'Administrator',
+      permalink: 'administrator',
+      serverRole: 'ServerOwner',
+      passkeyCount: 0
+    })
+    tenantsMock.mockResolvedValue([])
+    window.localStorage.setItem('veyq:user:1:osm-tiles-enabled', 'true')
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/setup', component: SetupView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/setup')
+    await router.isReady()
+
+    const wrapper = mount(SetupView, { global: { plugins: [router], stubs: viewStubs() } })
+    await buttonByText(wrapper, 'Passwort').trigger('click')
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('admin@example.test')
+    await inputs[1].setValue('welcome123456')
+    await inputs[2].setValue('  Administrator  ')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(setupAdminMock).toHaveBeenCalledWith({
+      password: 'welcome123456',
+      displayName: 'Administrator',
+      email: 'admin@example.test'
+    })
+    expect(loginMock).toHaveBeenCalledWith('admin@example.test', 'welcome123456')
+    expect(wrapper.text()).toContain('Externe Inhalte')
+
+    await buttonByText(wrapper, 'Keine akzeptieren').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('veyq:user:1:osm-tiles-enabled')).toBeNull()
     expect(wrapper.text()).toContain('Bereich erstellen')
   })
 })
+
+function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
+  const button = wrapper.findAll('button').find((candidate) => candidate.text() === text)
+  if (!button) throw new Error(`Button not found: ${text}`)
+  return button
+}
 
 function passkey(passkeyId: number, displayName: string) {
   return {

@@ -8,6 +8,7 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import PasskeyNameDialog from '../components/auth/PasskeyNameDialog.vue'
+import RegistrationPrivacyOptIns from '../components/auth/RegistrationPrivacyOptIns.vue'
 import { login } from '../api/authClient'
 import { setupAdmin, setupAdminWithPasskey } from '../api/setupClient'
 import { createTenant, tenants } from '../api/tenantClient'
@@ -21,7 +22,7 @@ const router = useRouter()
 const { t } = useI18n()
 const { setAuthenticated, setTenants } = useAuthState()
 const { setSetupCompleted } = useServerState()
-const step = ref<'admin' | 'tenant'>('admin')
+const step = ref<'admin' | 'privacy' | 'tenant'>('admin')
 const tenantDisplayName = ref('Friends')
 const tenantName = ref('friends')
 const tenantDomain = ref(window.location.host)
@@ -79,7 +80,7 @@ async function submitAdmin() {
     if (withPasskey) {
       await showLatestPasskeyNameDialog()
     } else {
-      step.value = 'tenant'
+      step.value = 'privacy'
     }
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('setup.adminCreateFailed'))
@@ -96,7 +97,7 @@ async function showLatestPasskeyNameDialog() {
   } catch {
     namingPasskey.value = null
   }
-  if (!namingPasskey.value) step.value = 'tenant'
+  if (!namingPasskey.value) step.value = 'privacy'
 }
 
 async function saveSetupPasskeyName(displayName: string) {
@@ -106,7 +107,7 @@ async function saveSetupPasskeyName(displayName: string) {
   try {
     await updateMyPasskey(namingPasskey.value.passkeyId, displayName)
     namingPasskey.value = null
-    step.value = 'tenant'
+    step.value = 'privacy'
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('profile.passkeyRenameFailed'))
   } finally {
@@ -117,7 +118,7 @@ async function saveSetupPasskeyName(displayName: string) {
 function skipSetupPasskeyName() {
   if (!namingPasskey.value) return
   namingPasskey.value = null
-  step.value = 'tenant'
+  step.value = 'privacy'
 }
 
 async function setupAdminWithPassword() {
@@ -138,6 +139,10 @@ async function submitTenant() {
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('setup.tenantCreateFailed'))
   }
+}
+
+function finishPrivacyOptIns() {
+  step.value = 'tenant'
 }
 
 async function skipTenant() {
@@ -215,6 +220,8 @@ async function skipTenant() {
         @save="saveSetupPasskeyName"
         @skip="skipSetupPasskeyName"
       />
+
+      <RegistrationPrivacyOptIns v-if="step === 'privacy'" @complete="finishPrivacyOptIns" />
 
       <form v-if="step === 'tenant'" class="form" @submit.prevent="submitTenant">
         <label>

@@ -38,9 +38,10 @@ describe('InviteView', () => {
     authState.user = null
     authState.userLabel = ''
     authState.tenants = []
+    window.localStorage.clear()
   })
 
-  it('accepts invitation with token from hash', async () => {
+  it('asks for privacy opt-ins after password invitation acceptance', async () => {
     acceptInvitationMock.mockResolvedValue({
       userId: 42,
       email: 'invitee@example.test',
@@ -82,9 +83,16 @@ describe('InviteView', () => {
     await flushPromises()
 
     expect(acceptInvitationMock).toHaveBeenCalledWith(42, 'invite-token', 'welcome123456', 'Invitee')
+    expect(wrapper.text()).toContain('Externe Inhalte')
+
+    await buttonByText(wrapper, 'Keine akzeptieren').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('veyq:user:42:osm-tiles-enabled')).toBeNull()
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('accepts invitation with passkey by default', async () => {
+  it('asks for privacy opt-ins after passkey invitation acceptance and passkey naming', async () => {
     acceptInvitationWithPasskeyMock.mockResolvedValue({
       userId: 42,
       email: 'invitee@example.test',
@@ -129,12 +137,58 @@ describe('InviteView', () => {
     )
     expect(acceptInvitationMock).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Passkey benennen')
+    expect(window.localStorage.getItem('veyq:user:42:osm-tiles-enabled')).toBeNull()
 
     await wrapper.findAll('input').at(-1)!.setValue('  Private 1Password  ')
     await wrapper.findAll('button').filter((button) => button.text() === 'Speichern').at(-1)!.trigger('click')
     await flushPromises()
 
     expect(updateMyPasskeyMock).toHaveBeenCalledWith(9, 'Private 1Password')
+    expect(wrapper.text()).toContain('Externe Inhalte')
+
+    const consentOptions = wrapper.findAll('input[type="checkbox"]')
+    await consentOptions[0].setValue(true)
+    await buttonByText(wrapper, 'Speichern').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('veyq:user:42:osm-tiles-enabled')).toBe('true')
+    expect(window.localStorage.getItem('veyq:osm-tiles-enabled')).toBeNull()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('accepts an invitation for an already signed-in user without privacy opt-ins', async () => {
+    authState.isAuthenticated = true
+    authState.user = {
+      userId: 42,
+      email: 'invitee@example.test',
+      displayName: 'Invitee',
+      permalink: 'invitee',
+      serverRole: 'ServerMember',
+      passkeyCount: 0
+    }
+    acceptInvitationMock.mockResolvedValue(authState.user)
+    bootstrapMock.mockResolvedValue({
+      serverId: 'server',
+      user: authState.user,
+      tenants: []
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/invite/:userId', component: InviteView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/invite/42#invite-token')
+    await router.isReady()
+
+    const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(acceptInvitationMock).toHaveBeenCalledWith(42, 'invite-token')
+    expect(wrapper.text()).not.toContain('Externe Inhalte')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
   it('requires a display name before starting passkey invitation acceptance', async () => {
@@ -158,6 +212,12 @@ describe('InviteView', () => {
     expect(wrapper.text()).toContain('Bitte gib einen Anzeigenamen ein.')
   })
 })
+
+function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
+  const button = wrapper.findAll('button').find((candidate) => candidate.text() === text)
+  if (!button) throw new Error(`Button not found: ${text}`)
+  return button
+}
 
 function passkey(passkeyId: number, displayName: string) {
   return {
