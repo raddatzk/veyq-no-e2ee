@@ -53,17 +53,20 @@ install() {
   cd "$VEYQ_DIR"
   download_infra
 
+  local setup_default="n"
   if [ ! -f .env ]; then
     cp .env.example .env
     chmod 600 .env
     echo "Created $VEYQ_DIR/.env"
-    if prompt_yes_no "Run interactive setup now?" "y"; then
-      setup_env
-    else
-      echo "Edit $VEYQ_DIR/.env before starting veyq."
-    fi
+    setup_default="y"
   else
     echo "Keeping existing $VEYQ_DIR/.env"
+  fi
+
+  if prompt_yes_no "Run interactive setup now?" "$setup_default"; then
+    setup_env
+  else
+    echo "Edit $VEYQ_DIR/.env before starting veyq."
   fi
 
   if prompt_yes_no "Pull and start veyq now?" "y"; then
@@ -252,7 +255,7 @@ prompt() {
   local label="$1"
   local default="$2"
   local value
-  read -r -p "$label [$default]: " value
+  read_prompt "$label [$default]: " value
   printf '%s' "${value:-$default}"
 }
 
@@ -260,7 +263,7 @@ prompt_yes_no() {
   local label="$1"
   local default="$2"
   local value
-  read -r -p "$label [${default}]: " value
+  read_prompt "$label [${default}]: " value
   value="${value:-$default}"
   case "$value" in
     y|Y|yes|YES|Yes|j|J|ja|JA|Ja) return 0 ;;
@@ -275,12 +278,25 @@ prompt_secret_or_random() {
   local generated
   generated="$(random_secret)"
   if [ -n "$current" ] && [ "$current" != "change-me" ] && [ "$current" != "change-root-me" ] && [ "$current" != "change-mail-me" ] && [ "$current" != "change-reset-me" ]; then
-    read -r -p "$label [keep existing]: " value
+    read_prompt "$label [keep existing]: " value
     printf '%s' "${value:-$current}"
   else
-    read -r -p "$label [generated]: " value
+    read_prompt "$label [generated]: " value
     printf '%s' "${value:-$generated}"
   fi
+}
+
+read_prompt() {
+  local message="$1"
+  local __resultvar="$2"
+  local value
+  if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    printf '%s' "$message" > /dev/tty
+    IFS= read -r value < /dev/tty || value=""
+  else
+    read -r -p "$message" value || value=""
+  fi
+  printf -v "$__resultvar" '%s' "$value"
 }
 
 random_secret() {
