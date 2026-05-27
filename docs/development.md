@@ -115,8 +115,8 @@ For expected operational failure cases, diagnostics and recovery steps, see [`op
 The recommended server install path is the helper script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/master/scripts/veyq-server.sh | \
-  sudo VEYQ_REPO=raddatzk/veyq VEYQ_REF=master bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/main/scripts/veyq-server.sh | \
+  sudo VEYQ_REPO=raddatzk/veyq VEYQ_REF=main bash -s -- install
 ```
 
 Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files when running a fork. The script downloads `docker-compose.yml`, `.env.example` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.

@@ -42,7 +42,7 @@ class SettingsService(
     private fun String.docUri(path: String): URI {
         val normalized = trim().removeSuffix("/")
         val url = when {
-            "github.com/" in normalized -> "$normalized/blob/master/$path"
+            "github.com/" in normalized -> "$normalized/blob/main/$path"
             else -> "$normalized/$path"
         }
         return URI.create(url)

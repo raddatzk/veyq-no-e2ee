@@ -24,9 +24,10 @@ describe('MemoryAssetBuckets', () => {
     ])
 
     await wrapper.findAll('.asset-bucket-button')[1].trigger('click')
+    const expectedDate = formatDate(media().capturedAt)
     expect(wrapper.findAll('.asset-bucket-media-item').map((item) => item.text())).toEqual([
-      'First upload03.05.2026, 12:00',
-      'First upload03.05.2026, 12:00'
+      `First upload${expectedDate}`,
+      `First upload${expectedDate}`
     ])
 
     const canonChip = wrapper.findAll('.asset-camera-chip').find((chip) => chip.text().includes('Canon R6'))
@@ -59,7 +60,11 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T13:30')
     await wrapper.find('form').trigger('submit.prevent')
 
-    expect(updateMetadataBatch).toHaveBeenCalledWith('mem-1', ['media-1'], 5400)
+    expect(updateMetadataBatch).toHaveBeenCalledWith(
+      'mem-1',
+      ['media-1'],
+      offsetSeconds('2026-05-03T13:30', media().capturedAt)
+    )
     expect(wrapper.emitted('updated')?.[0]).toEqual([
       [expect.objectContaining({ id: 'media-1', capturedAt: '2026-05-03T13:00:00Z' })]
     ])
@@ -117,7 +122,11 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T11:30')
     await wrapper.find('form').trigger('submit.prevent')
 
-    expect(updateMetadataBatch).toHaveBeenCalledWith('mem-1', ['media-1', 'media-2'], -1800)
+    expect(updateMetadataBatch).toHaveBeenCalledWith(
+      'mem-1',
+      ['media-1', 'media-2'],
+      offsetSeconds('2026-05-03T11:30', media().capturedAt)
+    )
   })
 
   it('opens an asset card options dialog for just that media item', async () => {
@@ -139,7 +148,11 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T12:15')
     await wrapper.find('form').trigger('submit.prevent')
 
-    expect(updateMetadataBatch).toHaveBeenCalledWith('mem-1', ['media-2'], 900)
+    expect(updateMetadataBatch).toHaveBeenCalledWith(
+      'mem-1',
+      ['media-2'],
+      offsetSeconds('2026-05-03T12:15', media().capturedAt)
+    )
   })
 
   it('uses created time as the reference fallback when captured time is missing', async () => {
@@ -164,7 +177,11 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T10:30')
     await wrapper.find('form').trigger('submit.prevent')
 
-    expect(updateMetadataBatch).toHaveBeenCalledWith('mem-1', ['media-1'], 1800)
+    expect(updateMetadataBatch).toHaveBeenCalledWith(
+      'mem-1',
+      ['media-1'],
+      offsetSeconds('2026-05-03T10:30', '2026-05-03T08:00:00Z')
+    )
   })
 
   it('shows a readable offset preview', async () => {
@@ -181,7 +198,7 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('.asset-card-options-button').trigger('click')
     await wrapper.find('#asset-corrected-time').setValue('2026-05-12T16:30')
 
-    expect(wrapper.text()).toContain('+1W 2T 4h 30m')
+    expect(wrapper.text()).toContain(formatOffset(offsetSeconds('2026-05-12T16:30', media().capturedAt)))
   })
 
   it('keeps batch actions disabled without a selection or without a changed reference time', async () => {
@@ -243,4 +260,36 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     gpsLongitude: null,
     ...overrides
   }
+}
+
+function formatDate(value: string | null) {
+  if (!value) return 'Keine Aufnahmezeit'
+  return new Intl.DateTimeFormat('de-DE', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value))
+}
+
+function offsetSeconds(localDateTime: string, referenceIso: string | null) {
+  if (!referenceIso) return 0
+  return Math.trunc((new Date(localDateTime).getTime() - new Date(referenceIso).getTime()) / 1000)
+}
+
+function formatOffset(seconds: number) {
+  const sign = seconds < 0 ? '-' : '+'
+  let remaining = Math.abs(seconds)
+  const weeks = Math.floor(remaining / 604_800)
+  remaining -= weeks * 604_800
+  const days = Math.floor(remaining / 86_400)
+  remaining -= days * 86_400
+  const hours = Math.floor(remaining / 3_600)
+  remaining -= hours * 3_600
+  const minutes = Math.floor(remaining / 60)
+  const parts = [
+    weeks ? `${weeks}W` : '',
+    days ? `${days}T` : '',
+    hours ? `${hours}h` : '',
+    minutes ? `${minutes}m` : ''
+  ].filter(Boolean)
+  return parts.length ? `${sign}${parts.join(' ')}` : '+0m'
 }

@@ -23,7 +23,7 @@ Commands:
 Environment:
   VEYQ_DIR   Install directory. Default: /opt/veyq
   VEYQ_REPO  GitHub repo to download infra files from. Default: raddatzk/veyq
-  VEYQ_REF   Branch, tag or SHA to download infra files from. Default: master
+  VEYQ_REF   Branch, tag or SHA to download infra files from. Default: main
 USAGE
 }
 
