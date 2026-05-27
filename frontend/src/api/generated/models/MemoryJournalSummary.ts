@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -26,7 +26,7 @@ export interface MemoryJournalSummary {
      */
     memoryId: string;
     /**
-     * Markdown journal body with optional Veyq embed links.
+     * Markdown journal body with optional veyq embed links.
      * @type {string}
      * @memberof MemoryJournalSummary
      */

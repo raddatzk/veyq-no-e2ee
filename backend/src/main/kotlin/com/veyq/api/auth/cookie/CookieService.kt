@@ -32,7 +32,7 @@ class CookieService @Inject constructor(
         return NewCookie.Builder(name)
             .value(value)
             .path(path)
-            .comment("Veyq session ${name} cookie")
+            .comment("veyq session ${name} cookie")
             .maxAge(maxAge)
             .secure(cookieConfig.secure)
             .httpOnly(true)

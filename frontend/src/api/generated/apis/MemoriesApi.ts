@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -547,7 +547,7 @@ export interface MemoriesApiInterface {
     updateMemoryJournalRequestOpts(requestParameters: UpdateMemoryJournalOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Replaces the Markdown journal for one visible Memory. veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * @summary Update memory journal
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -559,7 +559,7 @@ export interface MemoriesApiInterface {
     updateMemoryJournalRaw(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
 
     /**
-     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Replaces the Markdown journal for one visible Memory. veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Update memory journal
      */
     updateMemoryJournal(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
@@ -1513,7 +1513,7 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Replaces the Markdown journal for one visible Memory. veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Update memory journal
      */
     async updateMemoryJournalRaw(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
@@ -1524,7 +1524,7 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Replaces the Markdown journal for one visible Memory. Veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Replaces the Markdown journal for one visible Memory. veyq embed links are validated against content visible inside the current Memory context.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Update memory journal
      */
     async updateMemoryJournal(requestParameters: UpdateMemoryJournalOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {

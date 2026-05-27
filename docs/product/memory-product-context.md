@@ -1,12 +1,12 @@
-# Veyq Memory Product Context
+# veyq Memory Product Context
 
-This document captures the product and architecture context discussed for Veyq so future work can turn it into ADRs, API contracts, UI designs and implementation tasks.
+This document captures the product and architecture context discussed for veyq so future work can turn it into ADRs, API contracts, UI designs and implementation tasks.
 
 It is intentionally broader than the current implementation. Memory UI v1 and Memory APIs are now the active baseline. Folders remain organizational; albums are no longer part of the active product, API or database schema.
 
 ## Product Positioning
 
-Veyq is a self-hostable memory sharing product. It should not feel like a generic gallery, cloud drive or folder browser.
+veyq is a self-hostable memory sharing product. It should not feel like a generic gallery, cloud drive or folder browser.
 
 The core promise is a private archive that can also be shared beautifully with friends and family. The original inspiration was a travel and vacation video portfolio, but the concept generalizes to trips, events, weddings, family moments and personal archives.
 
@@ -20,7 +20,7 @@ Product qualities:
 
 Branding notes:
 
-- Project name: `Veyq`.
+- Project name: `veyq`.
 - Primary domain idea: `veyq.app`.
 - Logo direction: minimal, abstract geometric `V`, usable on dark backgrounds.
 
@@ -75,7 +75,7 @@ Proposed Memory header:
 - Time range.
 - Places.
 - Weather summary.
-- Playlist.
+- Header playlist player for the featured playlist, with playlist-level previous/next controls when the Memory has multiple playlists.
 - Participants.
 - Track summary.
 
@@ -98,13 +98,13 @@ Original uploads must be stored unchanged. Derived media can include:
 
 Each Memory has exactly one journal.
 
-The journal should be Markdown-based with a lightweight Veyq-specific embed syntax. It should support references to assets, playlists and other contextual elements without turning into a heavy CMS.
+The journal should be Markdown-based with a lightweight veyq-specific embed syntax. It should support references to assets, playlists and other contextual elements without turning into a heavy CMS.
 
 The supported Markdown and `veyq:` embed syntax are documented in [Journal Markdown](journal-markdown.md).
 
 ## Music and Playlists
 
-Veyq should store external streaming references only, not self-hosted MP3 files.
+veyq should store external streaming references only, not self-hosted MP3 files. The playlist model is defined by [ADR 0010](../adr/0010-memory-playlist-links.md), with implementation detail in [Memory Playlists](playlists.md).
 
 Supported references:
 
@@ -112,7 +112,9 @@ Supported references:
 - Spotify links.
 - Optional deep links.
 
-Playlist metadata may be cached for display. Playlist context can attach to trips, events or small moments.
+Playlist context can attach to trips, events or small moments. A veyq playlist has one provider link in V1. A Memory can mark one playlist as featured for the Memory Header link; if no playlist is featured, the first playlist is used as the header default. Header previous/next controls switch between playlists. Automatic cross-provider playlist matching and multiple provider links are deferred.
+
+Playlist metadata may be cached for display later, but V1 opens provider links externally rather than embedding playback widgets.
 
 ## Maps, Tracks and Weather
 
@@ -124,7 +126,7 @@ Weather can enrich Memory headers and timelines where useful.
 
 ## Sharing and Upload Links
 
-Veyq should support public sharing without becoming a social network.
+veyq should support public sharing without becoming a social network.
 
 Sharing ideas:
 
@@ -162,15 +164,17 @@ A useful mental model is a virtual bucket per uploader inside a Memory. This can
 
 ## People and Participants
 
-People are tenant-scoped.
+People may be recognized across the instance, but their visible identity and profile surfaces are viewer-scoped.
 
 A person may optionally link to a global user account, but the person model should not require a user account. Public participant pages should remain minimal.
 
 Authenticated users may see other Memories for a person only if they are authorized for those Memories. There must be no public "where else does this person appear" feature.
 
+Person lookup and search must be non-enumerable. The product should not reveal whether a person exists, exists but is unauthorized, or exists but has no matches in the viewer's visible Memories. A viewer may resolve person identities only through their own tenant memberships, explicit visible Memory participation or visible shared content.
+
 ## Tenants, Groups and Scopes
 
-One Veyq server can host multiple tenants.
+One veyq server can host multiple tenants.
 
 Users are global to the server and may belong to multiple tenants. The UI should support fast tenant switching.
 
@@ -189,11 +193,12 @@ Group model:
 
 ## Federation and Remote Sharing
 
-Veyq should remain self-hosted and domain-flexible.
+veyq should remain self-hosted and domain-flexible.
 
 Future ideas:
 
-- Follow or bookmark remote shares.
+- Persist or bookmark Memory shares from another tenant or instance without copying the source Memory.
+- Let a target tenant, group or user decide who sees the persisted share entry while source access remains controlled by the original share.
 - No direct copying in V1.
 - Later federation, import or offline support.
 - Home-instance concept.
@@ -212,14 +217,14 @@ Deep-link ideas:
 
 - Universal Links.
 - Support arbitrary self-hosted domains.
-- Official Veyq app.
+- Official veyq app.
 - Optional white-label apps.
 - Instance branding metadata.
 - "Open in App" banner.
 
 ## Demo and Onboarding
 
-Veyq should be understandable through examples rather than a heavy tutorial.
+veyq should be understandable through examples rather than a heavy tutorial.
 
 Ideas:
 
@@ -238,8 +243,7 @@ Backend direction:
 - Flyway-managed database migrations.
 - Hibernate ORM Panache.
 - MariaDB in production-oriented runtime.
-- Local accounts first.
-- Passkeys later.
+- Local accounts and passkeys first.
 - Local filesystem storage first.
 - Docker volumes.
 - No comments in V1.
@@ -255,16 +259,16 @@ These points are already documented in the README and describe the current syste
 
 Runtime and deployment:
 
-- Veyq is currently a Quarkus/Vue application.
+- veyq is currently a Quarkus/Vue application.
 - The frontend is Vue 3 with TypeScript.
 - The backend serves API and the built frontend.
 - Docker Compose is the local runtime path.
 - The application exposes a health endpoint at `/q/health`.
-- Domains, TLS and root-path rewrites are intentionally handled by an admin-controlled reverse proxy in front of Veyq.
+- Domains, TLS and root-path rewrites are intentionally handled by an admin-controlled reverse proxy in front of veyq.
 - The backend currently does not model host mappings; tenant scoping uses a technical tenant `name` in the path.
 - The real `infra/.env` is not versioned and contains domains, database credentials, reset credentials and the Let's Encrypt email.
-- The app container loads the same environment file via `env_file`.
-- A reset sidecar exists for test instances. It clears Veyq database tables except `flyway_schema_history`, clears the media volume and restarts the app while keeping schema and volumes.
+- Docker Compose reads the same `.env` file for variable substitution into the app, database, Traefik and optional reset sidecar services.
+- A reset sidecar exists for test instances. It clears veyq database tables except `flyway_schema_history`, clears the media volume and restarts the app while keeping schema and volumes.
 
 Setup and accounts:
 
@@ -325,9 +329,9 @@ Current media access:
 
 Current test coverage:
 
-- Backend tests cover password hashing, cookies, token rotation, token cleanup, auth, setup, tenant handling, user management, settings, Memory navigation, Memory ownership, upload and media streaming.
+- Backend tests cover password hashing, cookies, token rotation, token cleanup, auth, setup, tenant handling, user management, settings, Memory navigation, Memory ownership, upload, media streaming, GPX parsing and playlist provider URL parsing.
 - Contract tests cover OpenAPI descriptions, examples, preconditions, implemented endpoints, resource interface binding and generated payload usage.
-- Frontend checks include `vue-tsc`, ESLint, Vitest and Vite build through `npm run check`.
+- Frontend checks include `vue-tsc`, ESLint, Vitest and Vite build through `npm run check`; component tests cover Memory detail flows, maps/tracks/playlists, consent helpers and settings panels.
 
 ## Privacy and API Rules
 
@@ -382,7 +386,7 @@ Push notification ideas:
 Licensing and business-model ideas:
 
 - AGPL as a possible base.
-- Trademark protection for the Veyq name and logo.
+- Trademark protection for the veyq name and logo.
 - Community and commercial model.
 - Official hosting offers.
 - No hard DRM strategy.
@@ -412,7 +416,7 @@ Frontend direction:
 
 ## Documentation Strategy
 
-Veyq should be easy for human developers and AI agents to work on.
+veyq should be easy for human developers and AI agents to work on.
 
 Documentation ideas:
 

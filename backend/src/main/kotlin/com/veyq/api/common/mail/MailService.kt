@@ -23,11 +23,11 @@ class MailService @Inject constructor(
         sendSafely(
             Mail.withText(
                 user.email,
-                "Veyq Einladung",
+                "veyq Einladung",
                 """
                 Hallo ${user.displayName},
 
-                fuer dich wurde ein Veyq-Account angelegt.
+                fuer dich wurde ein veyq-Account angelegt.
                 Lege dein Passwort ueber diesen Link fest:
 
                 $inviteUrl
@@ -42,7 +42,7 @@ class MailService @Inject constructor(
         sendSafely(
             Mail.withText(
                 user.email,
-                "Veyq Password Reset",
+                "veyq Password Reset",
                 """
                     Hallo ${user.displayName},
                     
@@ -60,7 +60,7 @@ class MailService @Inject constructor(
         sendSafely(
             Mail.withText(
                 pendingEmail,
-                "Veyq Email bestaetigen",
+                "veyq Email bestaetigen",
                 """
                     Hallo ${user.displayName},
 
@@ -89,5 +89,5 @@ class MailService @Inject constructor(
         value
             .replace(Regex("[\\r\\n<>]"), " ")
             .trim()
-            .ifBlank { "Veyq" }
+            .ifBlank { "veyq" }
 }

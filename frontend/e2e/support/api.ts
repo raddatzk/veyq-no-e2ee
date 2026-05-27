@@ -10,6 +10,15 @@ export const adminUser = {
   passkeyCount: 0
 }
 
+export const longNameUser = {
+  userId: 2,
+  email: 'alexandra.maximiliana.really-long-email-address@example.test',
+  displayName: 'Alexandra Maximiliana von Sehrlangem Anzeigenamen',
+  permalink: 'alexandra-maximiliana',
+  serverRole: 'User',
+  passkeyCount: 2
+}
+
 export const tenant = {
   id: 1,
   name: 'friends',
@@ -32,6 +41,13 @@ export const groupScopeRoot = {
   displayName: 'Travel',
   path: '/@travel'
 }
+
+export const overflowGroupScopeRoots = [
+  { kind: 'GROUP', name: 'family', displayName: 'Family', path: '/@family' },
+  { kind: 'GROUP', name: 'school', displayName: 'School Friends', path: '/@school' },
+  { kind: 'GROUP', name: 'long-group', displayName: 'Group With A Very Long Name', path: '/@long-group' },
+  { kind: 'GROUP', name: 'neighbors', displayName: 'Neighbors', path: '/@neighbors' }
+]
 
 export const rootNavigation = {
   location: { kind: 'TENANT', path: '/', displayName: 'Friends' },
@@ -89,6 +105,16 @@ export const weddingMemory = {
   scope: { type: 'TENANT' }
 }
 
+export const longNameMemory = {
+  ...weddingMemory,
+  id: 'memory-long-name',
+  name: 'sommerreise-mit-einem-aussergewoehnlich-langen-memory-namen',
+  displayName: 'Sommerreise mit einem aussergewoehnlich langen Memory Namen fuer Responsive Tests',
+  path: '/reisen/sommerreise-mit-einem-aussergewoehnlich-langen-memory-namen',
+  mediaCount: 7,
+  childCount: 3
+}
+
 export const childMemory = {
   id: 'memory-child',
   name: 'abendessen',
@@ -121,14 +147,108 @@ export const publicShareRootMemory = {
 
 type AuthenticatedOwnerApiOptions = {
   folderMemories?: unknown[]
+  favoriteMemories?: unknown[]
+  scopeRoots?: unknown[]
   onCreateFolder?: (body: unknown) => void
   onCreateMemory?: (body: unknown) => void
 }
 
 type MemoryDetailApiOptions = {
   shares?: unknown[]
+  memory?: typeof weddingMemory
+  childMemories?: unknown[]
+  media?: unknown[]
+  tracks?: unknown[]
+  playlists?: unknown[]
+  journalMarkdown?: string
   onCreateShare?: (body: unknown) => void
   onUpdateShare?: (body: unknown) => void
+}
+
+export const geotaggedMedia = {
+  id: 'media-map-e2e',
+  memoryId: weddingMemory.id,
+  title: 'Terrace',
+  filename: 'terrace.jpg',
+  uploader: { type: 'USER', displayName: 'Kevin' },
+  createdAt: '2026-05-24T16:30:00Z',
+  capturedAt: '2026-05-03T16:30:00Z',
+  capturedAtOverride: false,
+  mimeType: 'image/jpeg',
+  sizeBytes: 12,
+  contentUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/media/media-map-e2e/content',
+  previewUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/media/media-map-e2e/preview',
+  cameraMake: null,
+  cameraModel: null,
+  lensModel: null,
+  imageWidth: 1200,
+  imageHeight: 800,
+  gpsLatitude: 52.52,
+  gpsLongitude: 13.405
+}
+
+export const publicTrack = {
+  id: 'track-e2e',
+  memoryId: weddingMemory.id,
+  title: 'Morning Walk',
+  activityType: 'WALKING',
+  distanceMeters: 2400,
+  ascentMeters: 120,
+  descentMeters: 80,
+  pointCount: 3,
+  startedAt: '2026-05-03T08:00:00Z',
+  endedAt: '2026-05-03T09:00:00Z',
+  bounds: {
+    minLatitude: 52.51,
+    minLongitude: 13.39,
+    maxLatitude: 52.53,
+    maxLongitude: 13.42
+  },
+  geometry: {
+    type: 'LineString',
+    coordinates: [
+      [13.39, 52.51],
+      [13.405, 52.52],
+      [13.42, 52.53]
+    ]
+  },
+  contentUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/tracks/track-e2e/content',
+  createdAt: '2026-05-24T10:00:00Z',
+  updatedAt: '2026-05-24T10:00:00Z'
+}
+
+export const publicPlaylist = {
+  id: 'playlist-e2e',
+  memoryId: weddingMemory.id,
+  title: 'Roadtrip Soundtrack',
+  note: 'Songs from the weekend',
+  providerLinks: [
+    {
+      id: 'provider-youtube-e2e',
+      provider: 'YOUTUBE',
+      url: 'https://www.youtube.com/playlist?list=PL1234567890abcdef',
+      externalId: 'PL1234567890abcdef',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/videoseries?list=PL1234567890abcdef',
+      createdAt: '2026-05-24T10:00:00Z',
+      updatedAt: '2026-05-24T10:00:00Z'
+    }
+  ],
+  createdAt: '2026-05-24T10:00:00Z',
+  updatedAt: '2026-05-24T10:00:00Z'
+}
+
+export const serverSettings = {
+  displayName: 'veyq Testserver',
+  userManagementAvailable: true,
+  license: {
+    edition: 'COMMUNITY',
+    license: 'AGPL-3.0-only',
+    sourceUrl: 'https://github.com/veyq/veyq',
+    noticeUrl: 'https://github.com/veyq/veyq/blob/main/NOTICE',
+    trademarkPolicyUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/trademark-policy.md',
+    commercialBoundaryUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/commercial-boundary.md',
+    version: 'e2e'
+  }
 }
 
 export function fulfillJson(route: Route, json: unknown, status = 200) {
@@ -205,9 +325,19 @@ export async function mockAuthenticatedOwnerApi(
       return
     }
 
+    if (method === 'GET' && url.pathname === '/api/settings/server') {
+      await fulfillJson(route, serverSettings)
+      return
+    }
+
     if (method === 'GET' && url.pathname === '/api/friends/memory-navigation') {
       const path = url.searchParams.get('path') || '/'
-      await fulfillJson(route, navigationForPath(path))
+      const navigation = navigationForPath(path)
+      await fulfillJson(route, {
+        ...navigation,
+        favoriteMemories: options.favoriteMemories ?? navigation.favoriteMemories,
+        scopeRoots: options.scopeRoots ?? navigation.scopeRoots
+      })
       return
     }
 
@@ -223,7 +353,12 @@ export async function mockAuthenticatedOwnerApi(
 
     if (method === 'GET' && url.pathname === '/api/friends/groups') {
       await fulfillJson(route, {
-        groups: [{ name: groupScopeRoot.name, displayName: groupScopeRoot.displayName }]
+        groups: (options.scopeRoots ?? [groupScopeRoot])
+          .filter((scopeRoot) => isRecord(scopeRoot) && scopeRoot.kind === 'GROUP')
+          .map((scopeRoot) => ({
+            name: String(scopeRoot.name),
+            displayName: String(scopeRoot.displayName)
+          }))
       })
       return
     }
@@ -284,6 +419,7 @@ export async function mockAuthenticatedOwnerWithoutTenants(page: Page) {
 }
 
 export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOptions = {}) {
+  const memory = options.memory ?? weddingMemory
   await page.route('**://*/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -298,6 +434,11 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
       return
     }
 
+    if (method === 'GET' && url.pathname === '/api/settings/server') {
+      await fulfillJson(route, serverSettings)
+      return
+    }
+
     if (method === 'GET' && url.pathname === '/api/friends/memory-navigation') {
       const path = url.searchParams.get('path') || '/'
       await fulfillJson(route, navigationForPath(path))
@@ -306,8 +447,8 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
 
     if (method === 'GET' && url.pathname === '/api/friends/memories/by-path') {
       const path = url.searchParams.get('path')
-      if (path === weddingMemory.path) {
-        await fulfillJson(route, weddingMemory)
+      if (path === memory.path) {
+        await fulfillJson(route, memory)
         return
       }
       if (path === childMemory.path) {
@@ -318,53 +459,63 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
       return
     }
 
-    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/header`) {
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/header`) {
       await fulfillJson(route, {
-        id: weddingMemory.id,
-        displayName: weddingMemory.displayName,
-        path: weddingMemory.path,
-        coverUrl: weddingMemory.coverUrl,
+        id: memory.id,
+        displayName: memory.displayName,
+        path: memory.path,
+        coverUrl: memory.coverUrl,
         coverCrop: null,
-        startDate: weddingMemory.startDate,
-        endDate: weddingMemory.endDate,
-        directMediaCount: weddingMemory.mediaCount,
+        startDate: memory.startDate,
+        endDate: memory.endDate,
+        directMediaCount: memory.mediaCount,
         descendantMediaCount: 0,
-        childMemoryCount: weddingMemory.childCount,
-        scope: weddingMemory.scope
+        childMemoryCount: memory.childCount,
+        scope: memory.scope
       })
       return
     }
 
-    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/journal`) {
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/journal`) {
       await fulfillJson(route, {
-        memoryId: weddingMemory.id,
-        markdown: '',
+        memoryId: memory.id,
+        markdown: options.journalMarkdown ?? '',
         updatedAt: '2026-05-24T10:00:00Z'
       })
       return
     }
 
-    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/children`) {
-      await fulfillJson(route, [childMemory])
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/children`) {
+      await fulfillJson(route, options.childMemories ?? [childMemory])
       return
     }
 
-    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/media`) {
-      await fulfillJson(route, [])
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/media`) {
+      await fulfillJson(route, options.media ?? [])
       return
     }
 
-    if (method === 'GET' && url.pathname === `/api/friends/memories/${weddingMemory.id}/shares`) {
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/tracks`) {
+      await fulfillJson(route, options.tracks ?? [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/playlists`) {
+      await fulfillJson(route, options.playlists ?? [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/shares`) {
       await fulfillJson(route, options.shares ?? [])
       return
     }
 
-    if (method === 'POST' && url.pathname === `/api/friends/memories/${weddingMemory.id}/shares`) {
+    if (method === 'POST' && url.pathname === `/api/friends/memories/${memory.id}/shares`) {
       const body = request.postDataJSON()
       options.onCreateShare?.(body)
       await fulfillJson(route, {
         id: 'shr-e2e',
-        memoryId: weddingMemory.id,
+        memoryId: memory.id,
         name: body.name ?? null,
         role: body.role,
         enabled: true,
@@ -397,7 +548,110 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
   })
 }
 
-export async function mockPublicViewerShareApi(page: Page) {
+export async function mockResponsiveSettingsApi(page: Page) {
+  await page.route('**://*/api/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const method = request.method()
+
+    if (method === 'GET' && url.pathname === '/api/frontend/bootstrap') {
+      await fulfillJson(route, {
+        serverId: 'e2e',
+        user: adminUser,
+        tenants: [tenant]
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/settings') {
+      const path = url.searchParams.get('path') || '/settings'
+      await fulfillJson(route, settingsResponseForPath(path))
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/settings/server') {
+      await fulfillJson(route, {
+        ...serverSettings,
+        displayName: 'veyq Testserver mit langem Namen fuer Responsive Checks'
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/users/me') {
+      await fulfillJson(route, {
+        ...adminUser,
+        pendingEmail: 'administrator.pending.with-a-long-local-part@example.test'
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/users/me/passkeys') {
+      await fulfillJson(route, {
+        passkeys: [
+          {
+            passkeyId: 1,
+            displayName: 'MacBook Pro Passkey mit sehr langem Geraetenamen',
+            createdAt: '2026-05-24T10:00:00Z',
+            lastUsedAt: '2026-05-25T10:00:00Z'
+          },
+          {
+            passkeyId: 2,
+            displayName: 'Backup Security Key',
+            createdAt: '2026-05-20T10:00:00Z',
+            lastUsedAt: null
+          }
+        ]
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/tenants/friends/users') {
+      await fulfillJson(route, {
+        users: [
+          {
+            user: adminUser,
+            email: adminUser.email,
+            role: 'TenantOwner',
+            status: 'Active'
+          },
+          {
+            user: longNameUser,
+            email: longNameUser.email,
+            role: 'TenantMember',
+            status: 'Pending'
+          }
+        ]
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/friends/groups') {
+      await fulfillJson(route, {
+        groups: [
+          { id: 1, name: groupScopeRoot.name, displayName: groupScopeRoot.displayName },
+          {
+            id: 2,
+            name: 'familienurlaub-mit-einem-sehr-langen-gruppennamen',
+            displayName: 'Familienurlaub mit einem sehr langen Gruppennamen'
+          }
+        ]
+      })
+      return
+    }
+
+    await fulfillUnhandled(route, method, url.pathname)
+  })
+}
+
+export async function mockPublicViewerShareApi(
+  page: Page,
+  options: {
+    media?: unknown[]
+    tracks?: unknown[]
+    playlists?: unknown[]
+    journalMarkdown?: string
+  } = {}
+) {
   await page.route('**://*/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -423,13 +677,19 @@ export async function mockPublicViewerShareApi(page: Page) {
         canUpload: false,
         canEdit: false,
         canDelete: false,
-        rootMemory: publicShareRootMemory
+        rootMemory: {
+          ...publicShareRootMemory,
+          mediaCount: (options.media ?? []).length
+        }
       })
       return
     }
 
     if (method === 'GET' && url.pathname === '/api/public-shares/shr-e2e/memories/by-path') {
-      await fulfillJson(route, publicShareRootMemory)
+      await fulfillJson(route, {
+        ...publicShareRootMemory,
+        mediaCount: (options.media ?? []).length
+      })
       return
     }
 
@@ -442,7 +702,7 @@ export async function mockPublicViewerShareApi(page: Page) {
         coverCrop: publicShareRootMemory.coverCrop,
         startDate: publicShareRootMemory.startDate,
         endDate: publicShareRootMemory.endDate,
-        directMediaCount: publicShareRootMemory.mediaCount,
+        directMediaCount: (options.media ?? []).length,
         descendantMediaCount: 0,
         childMemoryCount: publicShareRootMemory.childCount,
         scope: null
@@ -463,7 +723,34 @@ export async function mockPublicViewerShareApi(page: Page) {
     }
 
     if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media`) {
-      await fulfillJson(route, [])
+      await fulfillJson(route, options.media ?? [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/journal`) {
+      await fulfillJson(route, {
+        memoryId: weddingMemory.id,
+        markdown: options.journalMarkdown ?? '',
+        updatedAt: '2026-05-24T10:00:00Z'
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/tracks`) {
+      await fulfillJson(route, options.tracks ?? [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/playlists`) {
+      await fulfillJson(route, options.playlists ?? [])
+      return
+    }
+
+    if (
+      method === 'GET' &&
+      url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media/media-map-e2e/preview`
+    ) {
+      await fulfillPng(route)
       return
     }
 
@@ -471,8 +758,140 @@ export async function mockPublicViewerShareApi(page: Page) {
   })
 }
 
+export async function mockPublicUploaderShareApi(
+  page: Page,
+  options: {
+    onCreateUpload?: (body: unknown) => void
+    onChunkUpload?: (chunkIndex: string) => void
+  } = {}
+) {
+  await page.route('**://*/api/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const method = request.method()
+
+    if (method === 'GET' && url.pathname === '/api/frontend/bootstrap') {
+      await fulfillJson(route, {
+        serverId: 'e2e',
+        user: null,
+        tenants: []
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/public-shares/shr-upload') {
+      await fulfillJson(route, {
+        id: 'shr-upload',
+        role: 'UPLOADER',
+        authenticated: true,
+        passwordRequired: false,
+        displayNameRequired: false,
+        canViewGallery: false,
+        canUpload: true,
+        canEdit: false,
+        canDelete: false,
+        rootMemory: {
+          ...publicShareRootMemory,
+          displayName: 'Sommerreise Upload'
+        }
+      })
+      return
+    }
+
+    if (method === 'POST' && url.pathname === '/api/public-shares/shr-upload/media/uploads') {
+      options.onCreateUpload?.(request.postDataJSON())
+      await fulfillJson(route, {
+        uploadId: 'upl-public-e2e',
+        chunkSizeBytes: 1024
+      })
+      return
+    }
+
+    if (method === 'GET' && url.pathname === '/api/public-shares/shr-upload/media/uploads/upl-public-e2e') {
+      await fulfillJson(route, {
+        uploadId: 'upl-public-e2e',
+        memoryId: publicShareRootMemory.id,
+        filename: 'beach.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 10,
+        title: 'beach.jpg',
+        chunkSizeBytes: 1024,
+        uploadedChunks: [],
+        uploadedBytes: 0,
+        createdAt: '2026-05-24T10:00:00Z',
+        updatedAt: '2026-05-24T10:00:00Z'
+      })
+      return
+    }
+
+    const chunkMatch = url.pathname.match(
+      /^\/api\/public-shares\/shr-upload\/media\/uploads\/upl-public-e2e\/chunks\/([^/]+)$/
+    )
+    if (method === 'PUT' && chunkMatch) {
+      options.onChunkUpload?.(chunkMatch[1])
+      await route.fulfill({ status: 204 })
+      return
+    }
+
+    if (method === 'POST' && url.pathname === '/api/public-shares/shr-upload/media/uploads/upl-public-e2e/complete') {
+      await fulfillJson(route, {
+        id: 'med-public-e2e',
+        memoryId: publicShareRootMemory.id,
+        title: 'beach.jpg',
+        filename: 'beach.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 10,
+        capturedAt: null,
+        createdAt: '2026-05-24T10:00:00Z',
+        updatedAt: '2026-05-24T10:00:00Z',
+        uploader: { type: 'SHARE_GUEST', displayName: 'Gast' },
+        contentUrl: '/api/public-shares/shr-upload/media/med-public-e2e/content',
+        previewUrl: '/api/public-shares/shr-upload/media/med-public-e2e/preview'
+      })
+      return
+    }
+
+    await fulfillUnhandled(route, method, url.pathname)
+  })
+}
+
+function settingsResponseForPath(path: string) {
+  if (path === '/~me') {
+    return {
+      subject: { type: 'USER', label: adminUser.displayName },
+      breadcrumbs: [
+        { label: 'Einstellungen', path: '/~me' },
+        { label: adminUser.displayName, path: '/~me' }
+      ]
+    }
+  }
+
+  if (path === '/settings') {
+    return {
+      subject: { type: 'SERVER', label: 'Server' },
+      breadcrumbs: [
+        { label: 'Einstellungen', path: '/settings' },
+        { label: 'Server', path: '/settings' }
+      ]
+    }
+  }
+
+  return {
+    subject: { type: 'TENANT', label: tenant.displayName },
+    breadcrumbs: [
+      { label: 'Einstellungen', path: `/${tenant.name}/settings` },
+      { label: tenant.displayName, path: `/${tenant.name}/settings` }
+    ]
+  }
+}
+
 export function navigationForPath(path: string) {
-  if (path === personalScopeRoot.path || path.startsWith(`${personalScopeRoot.path}/`)) {
+  if (
+    path === personalScopeRoot.path ||
+    path.startsWith(`${personalScopeRoot.path}/`) ||
+    path === '/~me' ||
+    path.startsWith('/~me/')
+  ) {
     return personalNavigation
   }
   if (path === groupScopeRoot.path || path.startsWith(`${groupScopeRoot.path}/`)) {
@@ -495,4 +914,8 @@ export function fulfillPng(route: Route) {
       'base64'
     )
   })
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { MemoryParticipantSummary } from './MemoryParticipantSummary';
+import {
+    MemoryParticipantSummaryFromJSON,
+    MemoryParticipantSummaryFromJSONTyped,
+    MemoryParticipantSummaryToJSON,
+    MemoryParticipantSummaryToJSONTyped,
+} from './MemoryParticipantSummary';
 import type { MemoryScope } from './MemoryScope';
 import {
     MemoryScopeFromJSON,
@@ -106,6 +113,12 @@ export interface MemoryHeaderSummary {
      * @memberof MemoryHeaderSummary
      */
     scope: MemoryScope;
+    /**
+     * 
+     * @type {Array<MemoryParticipantSummary>}
+     * @memberof MemoryHeaderSummary
+     */
+    participants: Array<MemoryParticipantSummary>;
 }
 
 /**
@@ -122,6 +135,7 @@ export function instanceOfMemoryHeaderSummary(value: object): value is MemoryHea
     if (!('childMemoryCount' in value) || value['childMemoryCount'] === undefined) return false;
     if (!('favorite' in value) || value['favorite'] === undefined) return false;
     if (!('scope' in value) || value['scope'] === undefined) return false;
+    if (!('participants' in value) || value['participants'] === undefined) return false;
     return true;
 }
 
@@ -147,6 +161,7 @@ export function MemoryHeaderSummaryFromJSONTyped(json: any, ignoreDiscriminator:
         'childMemoryCount': json['childMemoryCount'],
         'favorite': json['favorite'],
         'scope': MemoryScopeFromJSON(json['scope']),
+        'participants': ((json['participants'] as Array<any>).map(MemoryParticipantSummaryFromJSON)),
     };
 }
 
@@ -173,6 +188,7 @@ export function MemoryHeaderSummaryToJSONTyped(value?: MemoryHeaderSummary | nul
         'childMemoryCount': value['childMemoryCount'],
         'favorite': value['favorite'],
         'scope': MemoryScopeToJSON(value['scope']),
+        'participants': ((value['participants'] as Array<any>).map(MemoryParticipantSummaryToJSON)),
     };
 }
 

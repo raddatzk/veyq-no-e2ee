@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -137,7 +137,7 @@ export interface MemoryMediaApiInterface {
     abortMemoryMediaUploadRequestOpts(requestParameters: AbortMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Deletes an unfinished resumable upload session and its temporary chunks.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * @summary Abort a resumable media upload session
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -149,6 +149,7 @@ export interface MemoryMediaApiInterface {
     abortMemoryMediaUploadRaw(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Deletes an unfinished resumable upload session and its temporary chunks.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Abort a resumable media upload session
      */
     abortMemoryMediaUpload(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -164,7 +165,7 @@ export interface MemoryMediaApiInterface {
     completeMemoryMediaUploadRequestOpts(requestParameters: CompleteMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Assembles all stored chunks, validates the final file and creates the Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - All chunks for the upload session have been stored.  Implementierungsstatus: implemented.
      * @summary Complete a resumable media upload session
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -176,6 +177,7 @@ export interface MemoryMediaApiInterface {
     completeMemoryMediaUploadRaw(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>>;
 
     /**
+     * Assembles all stored chunks, validates the final file and creates the Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - All chunks for the upload session have been stored.  Implementierungsstatus: implemented.
      * Complete a resumable media upload session
      */
     completeMemoryMediaUpload(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
@@ -191,7 +193,7 @@ export interface MemoryMediaApiInterface {
     createMemoryMediaUploadRequestOpts(requestParameters: CreateMemoryMediaUploadOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Creates a resumable upload session for one image or video that will be assigned to the addressed Memory when completed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * @summary Create a resumable media upload session
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -203,6 +205,7 @@ export interface MemoryMediaApiInterface {
     createMemoryMediaUploadRaw(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
 
     /**
+     * Creates a resumable upload session for one image or video that will be assigned to the addressed Memory when completed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Create a resumable media upload session
      */
     createMemoryMediaUpload(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
@@ -248,7 +251,7 @@ export interface MemoryMediaApiInterface {
     getMemoryMediaUploadRequestOpts(requestParameters: GetMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Returns progress information for a resumable upload session owned by the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * @summary Get a resumable media upload session
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -260,6 +263,7 @@ export interface MemoryMediaApiInterface {
     getMemoryMediaUploadRaw(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
 
     /**
+     * Returns progress information for a resumable upload session owned by the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Get a resumable media upload session
      */
     getMemoryMediaUpload(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
@@ -447,7 +451,7 @@ export interface MemoryMediaApiInterface {
     uploadMemoryMediaChunkRequestOpts(requestParameters: UploadMemoryMediaChunkRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Stores one chunk for a resumable media upload session. Chunks may be retried with the same index.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * @summary Upload one media chunk
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -461,6 +465,7 @@ export interface MemoryMediaApiInterface {
     uploadMemoryMediaChunkRaw(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Stores one chunk for a resumable media upload session. Chunks may be retried with the same index.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Upload one media chunk
      */
     uploadMemoryMediaChunk(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -516,6 +521,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Deletes an unfinished resumable upload session and its temporary chunks.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Abort a resumable media upload session
      */
     async abortMemoryMediaUploadRaw(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -526,6 +532,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Deletes an unfinished resumable upload session and its temporary chunks.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Abort a resumable media upload session
      */
     async abortMemoryMediaUpload(requestParameters: AbortMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -576,6 +583,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates the Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - All chunks for the upload session have been stored.  Implementierungsstatus: implemented.
      * Complete a resumable media upload session
      */
     async completeMemoryMediaUploadRaw(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>> {
@@ -586,6 +594,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates the Memory media asset.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - All chunks for the upload session have been stored.  Implementierungsstatus: implemented.
      * Complete a resumable media upload session
      */
     async completeMemoryMediaUpload(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary> {
@@ -639,6 +648,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Creates a resumable upload session for one image or video that will be assigned to the addressed Memory when completed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Create a resumable media upload session
      */
     async createMemoryMediaUploadRaw(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
@@ -649,6 +659,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Creates a resumable upload session for one image or video that will be assigned to the addressed Memory when completed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Create a resumable media upload session
      */
     async createMemoryMediaUpload(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
@@ -763,6 +774,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Returns progress information for a resumable upload session owned by the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Get a resumable media upload session
      */
     async getMemoryMediaUploadRaw(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
@@ -773,6 +785,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Returns progress information for a resumable upload session owned by the current user.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Get a resumable media upload session
      */
     async getMemoryMediaUpload(requestParameters: GetMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
@@ -1240,6 +1253,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Stores one chunk for a resumable media upload session. Chunks may be retried with the same index.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Upload one media chunk
      */
     async uploadMemoryMediaChunkRaw(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1250,6 +1264,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Stores one chunk for a resumable media upload session. Chunks may be retried with the same index.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The upload session belongs to the addressed Memory and current user.  Implementierungsstatus: implemented.
      * Upload one media chunk
      */
     async uploadMemoryMediaChunk(requestParameters: UploadMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

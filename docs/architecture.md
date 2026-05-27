@@ -1,8 +1,8 @@
-# Veyq Architektur
+# veyq Architektur
 
 ## Zielbild
 
-Veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
+veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
 
 ## Laufzeit
 
@@ -35,6 +35,10 @@ Veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Do
   - Memory-spezifische Medien-Assets mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Uploader oder Share-Identität, Zugriffsscope, direkter Memory-Zuordnung, Titel, Originaldateiname und Referenz auf `veyq_media_blob`
 - `veyq_memory`
   - neue Memory-Zielstruktur mit öffentlicher `public_id`, Parent-Memory, Zugriffsscope, Cover-Media und direkter Media-Zuordnung
+- `veyq_memory_track`
+  - Memory-spezifische GPX-Tracks mit öffentlicher `public_id`, Titel, Aktivitätstyp, Bounding Box, Distanz, Punktanzahl, Zeitspanne und Storage-Key für die Original-GPX-Datei
+- `veyq_memory_share` / `veyq_memory_share_identity` / Share-Token-Tabellen
+  - Public-Share-Links für Memory-Subtrees, anonyme Share-Identitäten, share-scoped Access-/Refresh-Tokens und Rollen für Viewer, Contributor, Manager und Uploader
 - `veyq_config`
   - technische App-Konfiguration wie bcrypt-Cost
 
@@ -122,6 +126,8 @@ Child-Ordner und root-level Memories in Ordnern erben den Scope ihres Parent-Ord
 
 Medien werden öffentlich über `Media.publicId` adressiert. Memory-Media-Listen laufen über `/api/{tenantName}/memories/{memoryId}/media`; Binärcontent und Previews laufen über `/api/{tenantName}/memory-media/{mediaId}/...` und unterstützen Range-Requests für Originalcontent. Intern liest Content über `Media.blob.storageKey`; Hashes, Blob-IDs und Storage-Keys werden nicht über öffentliche APIs exponiert.
 
+Aus EXIF extrahierte GPS-Koordinaten bleiben Teil der Media-Metadaten. Das Frontend kann daraus eine Leaflet-basierte Medienkarte bauen. Externe OpenStreetMap-Kacheln werden nicht automatisch geladen; die Entscheidung liegt als globales Browser-Opt-in unter `veyq:osm-tiles-enabled` und kann über Karte, Public-Share-Seite oder Settings zurückgenommen werden.
+
 ## Memory-Schicht
 
 Memory UI v1 und die Memory APIs sind die aktive fachliche Ebene. Tenant Home, persönliche Bereiche, Gruppenbereiche, Ordner und Memory-Details werden über Memory-Navigation, Folder- und Memory-Endpunkte abgebildet.
@@ -130,7 +136,13 @@ Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder U
 
 Originale und Previews gehören zu `veyq_media_blob`. Previews werden pro Blob gespeichert und wiederverwendet. Beim Löschen eines Media-Assets wird der Blob erst entfernt, wenn kein weiteres Media mehr darauf zeigt. Explizite Memory-Cover-Uploads bleiben davon getrennte Memory-Dateien; Cover können alternativ auf ein bestehendes Memory-Media-Asset zeigen.
 
-Die Migration `V2__memory_model.sql` legt die Memory-Tabelle und die direkte `memory_id`-Zuordnung auf Medien an. `V10__media_blobs.sql` trennt tenant-scoped Blob-Speicher von Memory-spezifischen Media-Assets. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
+GPX-Tracks gehören direkt zu einer Memory. Uploads werden serverseitig geparst und mit Activity Type, Bounds, Distanz, Punktzahl und optionaler Zeitspanne gespeichert. Die Original-GPX-Datei bleibt downloadbar und wird in Memory-ZIP-Archive aufgenommen. Public Shares dürfen Tracks je nach Rolle lesen, hochladen, bearbeiten oder löschen. Journal-Referenzen auf gelöschte Tracks bleiben als Markdown erhalten und rendern als nicht verfügbar.
+
+Memory-Playlists gehören ebenfalls direkt zu einer Memory. `veyq_memory_playlist` speichert Titel, Notiz, Featured-Status sowie genau einen externen Playlist-Link mit Provider und External-ID. V1 unterstützt Spotify, Apple Music, YouTube, SoundCloud und Deezer. Public Shares dürfen Playlists je nach Rolle lesen und bei Contributor-/Manager-Rechten bearbeiten. Externe Player werden in V1 nicht eingebettet; die UI öffnet den gespeicherten Anbieter-Link extern. Journal-Referenzen auf gelöschte Playlists bleiben als Markdown erhalten und rendern als nicht verfügbar.
+
+Public Shares sind separate Ressourcen auf Memory-Subtrees. Registrierte Benutzer, die intern Zugriff auf die Root-Memory haben, erhalten beim Öffnen eines Share-Links ein `redirectUrl` auf die normale interne Memory-Route. Externe Besucher nutzen share-scoped HttpOnly-Cookies auf `/api/public-shares`; Uploader-only Shares bleiben auf den fokussierten Upload-Flow beschränkt.
+
+Die Migration `V2__memory_model.sql` legt die Memory-Tabelle und die direkte `memory_id`-Zuordnung auf Medien an. `V10__media_blobs.sql` trennt tenant-scoped Blob-Speicher von Memory-spezifischen Media-Assets. `V12__memory_tracks.sql` ergänzt Memory-GPX-Tracks. `V13__memory_playlists.sql` ergänzt Memory-Playlists. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
 
 ## Testing
 
@@ -148,5 +160,6 @@ Abgedeckt sind:
 - Gruppen-Scoping und Gruppen-Owner
 - Scope-basierte Memory-/Media-Sichtbarkeit und `publicId`
 - Memory-Tree-Invarianten, Scope-Sichtbarkeit, Memory-Media-Ownership und Cover-Regeln
+- Public-Share-Rollen, Share-Cookies, Upload-Flows, Memory-Track-Verhalten und Memory-Playlist-Verhalten
 - OpenAPI-Contract-Tests für API-first Bindung
 - Frontend-Codegen-Facades, NDJSON-Parsing, Upload-Composables und UI-Komponenten über Vitest

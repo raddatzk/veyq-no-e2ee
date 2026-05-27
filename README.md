@@ -86,8 +86,14 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend/fronten
 - [`docs/development.md`](docs/development.md): local development, Docker Compose and reset sidecar.
 - [`docs/architecture.md`](docs/architecture.md): current system architecture and implemented domain model.
 - [`docs/product/memory-product-context.md`](docs/product/memory-product-context.md): product vision and Memory context.
-- [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and Veyq embed syntax.
+- [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and veyq embed syntax.
+- [`docs/product/playlists.md`](docs/product/playlists.md): Memory playlist links, permissions and API surface.
 - [`docs/product/future-work.md`](docs/product/future-work.md): ADR, API, UX and spike candidates.
+- [`docs/product/v1-scope.md`](docs/product/v1-scope.md): V1 release scope and deferred work.
+- [`docs/releases/v1.md`](docs/releases/v1.md): Draft V1 release notes, known limits and release checklist.
+- [`docs/legal/privacy.md`](docs/legal/privacy.md): Privacy notes for cookies, public shares and OpenStreetMap map tiles.
+- [`docs/legal/trademark-policy.md`](docs/legal/trademark-policy.md): veyq brand and trademark usage rules.
+- [`docs/legal/commercial-boundary.md`](docs/legal/commercial-boundary.md): Boundary between the AGPL community edition and optional commercial layers.
 - [`docs/adr/README.md`](docs/adr/README.md): Architecture Decision Record process and template.
 - [`docs/api`](docs/api): OpenAPI contracts.
 
