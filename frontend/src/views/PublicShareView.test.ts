@@ -104,7 +104,7 @@ describe('PublicShareView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Bereitgestellt von veyq')
-    expect(wrapper.find('a[href="https://github.com/veyq/veyq"]').text()).toBe('Projekt')
+    expect(wrapper.find('a[href="https://github.com/raddatzk/veyq"]').text()).toBe('Projekt')
     expect(wrapper.find('.privacy-settings-dialog-content').exists()).toBe(false)
 
     await wrapper.find('.public-share-footer button').trigger('click')

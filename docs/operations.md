@@ -74,7 +74,7 @@ sudo docker compose pull veyq
 sudo docker compose logs --tail=200 traefik
 ```
 
-Safe recovery: set `VEYQ_TRAEFIK_RULE` to a valid host rule such as ``Host(`veyq.example.com`)`` and set `VEYQ_IMAGE` to a published image, for example `ghcr.io/<owner>/veyq:<tag>`. Then run:
+Safe recovery: set `VEYQ_TRAEFIK_RULE` to a valid host rule such as ``Host(`veyq.example.com`)`` and set `VEYQ_IMAGE` to a published image, for example `ghcr.io/raddatzk/veyq:<tag>`. Then run:
 
 ```bash
 sudo ./veyq-server.sh doctor

@@ -9,7 +9,7 @@ class SettingsServiceTest {
     @Test
     fun `server settings expose community license defaults without support link`() {
         val settings = SettingsService(
-            sourceUrl = "https://github.com/veyq/veyq",
+            sourceUrl = "https://github.com/raddatzk/veyq",
             supportUrl = Optional.empty(),
             version = Optional.empty(),
             revision = Optional.empty(),
@@ -17,8 +17,8 @@ class SettingsServiceTest {
 
         assertThat(settings.license.edition.value).isEqualTo("COMMUNITY")
         assertThat(settings.license.license).isEqualTo("AGPL-3.0-only")
-        assertThat(settings.license.sourceUrl.toString()).isEqualTo("https://github.com/veyq/veyq")
-        assertThat(settings.license.noticeUrl.toString()).isEqualTo("https://github.com/veyq/veyq/blob/main/NOTICE")
+        assertThat(settings.license.sourceUrl.toString()).isEqualTo("https://github.com/raddatzk/veyq")
+        assertThat(settings.license.noticeUrl.toString()).isEqualTo("https://github.com/raddatzk/veyq/blob/master/NOTICE")
         assertThat(settings.support).isNull()
     }
 

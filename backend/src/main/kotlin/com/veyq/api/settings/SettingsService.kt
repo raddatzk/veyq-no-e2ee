@@ -42,7 +42,7 @@ class SettingsService(
     private fun String.docUri(path: String): URI {
         val normalized = trim().removeSuffix("/")
         val url = when {
-            "github.com/" in normalized -> "$normalized/blob/main/$path"
+            "github.com/" in normalized -> "$normalized/blob/master/$path"
             else -> "$normalized/$path"
         }
         return URI.create(url)
@@ -51,6 +51,6 @@ class SettingsService(
     private fun Optional<String>.clean(): String? = orElse("").trim().ifBlank { null }
 
     companion object {
-        private const val DEFAULT_SOURCE_URL = "https://github.com/veyq/veyq"
+        private const val DEFAULT_SOURCE_URL = "https://github.com/raddatzk/veyq"
     }
 }

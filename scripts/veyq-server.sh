@@ -2,8 +2,8 @@
 set -euo pipefail
 
 VEYQ_DIR="${VEYQ_DIR:-/opt/veyq}"
-VEYQ_REPO="${VEYQ_REPO:-veyq/veyq}"
-VEYQ_REF="${VEYQ_REF:-main}"
+VEYQ_REPO="${VEYQ_REPO:-raddatzk/veyq}"
+VEYQ_REF="${VEYQ_REF:-master}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${VEYQ_REPO}/${VEYQ_REF}}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
@@ -22,8 +22,8 @@ Commands:
 
 Environment:
   VEYQ_DIR   Install directory. Default: /opt/veyq
-  VEYQ_REPO  GitHub repo to download infra files from. Default: veyq/veyq
-  VEYQ_REF   Branch, tag or SHA to download infra files from. Default: main
+  VEYQ_REPO  GitHub repo to download infra files from. Default: raddatzk/veyq
+  VEYQ_REF   Branch, tag or SHA to download infra files from. Default: master
 USAGE
 }
 
@@ -181,8 +181,15 @@ doctor() {
       failed=1
     fi
   done
-  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)' && check_env_default_secret RESET_PASSWORD; then
-    failed=1
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)'; then
+    for key in RESET_TRAEFIK_RULE RESET_USERNAME RESET_PASSWORD; do
+      if ! check_env_required "$key"; then
+        failed=1
+      fi
+    done
+    if check_env_default_secret RESET_PASSWORD; then
+      failed=1
+    fi
   fi
 
   if compose config >/dev/null; then

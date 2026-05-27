@@ -437,7 +437,7 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
 
     <footer class="public-share-footer">
       <span>{{ t('share.providedBy') }}</span>
-      <a href="https://github.com/veyq/veyq" target="_blank" rel="noreferrer">{{ t('share.projectLink') }}</a>
+      <a href="https://github.com/raddatzk/veyq" target="_blank" rel="noreferrer">{{ t('share.projectLink') }}</a>
       <button type="button" @click="privacyDialogOpen = true">{{ t('share.privacyLink') }}</button>
     </footer>
 

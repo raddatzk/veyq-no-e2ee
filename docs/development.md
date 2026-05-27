@@ -115,16 +115,16 @@ For expected operational failure cases, diagnostics and recovery steps, see [`op
 The recommended server install path is the helper script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/veyq/veyq/main/scripts/veyq-server.sh | \
-  sudo VEYQ_REPO=veyq/veyq VEYQ_REF=main bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/master/scripts/veyq-server.sh | \
+  sudo VEYQ_REPO=raddatzk/veyq VEYQ_REF=master bash -s -- install
 ```
 
-Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files. The script downloads `docker-compose.yml`, `.env.example` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.
+Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files when running a fork. The script downloads `docker-compose.yml`, `.env.example` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.
 
 Manual install:
 
 1. Copy `infra/.env.example` to `infra/.env`.
-2. Set `VEYQ_IMAGE` to the published image, for example `ghcr.io/<owner>/veyq:latest`.
+2. Set `VEYQ_IMAGE` to the published image, for example `ghcr.io/raddatzk/veyq:latest`.
 3. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
 4. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
 5. Set `WEBAUTHN_ORIGINS` to the HTTPS origin and `WEBAUTHN_RP_ID` to the host without protocol.

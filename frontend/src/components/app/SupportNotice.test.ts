@@ -88,10 +88,10 @@ function serverSettings(overrides: Partial<ServerSettingsResponse> = {}): Server
     license: {
       edition: 'COMMUNITY',
       license: 'AGPL-3.0-only',
-      sourceUrl: 'https://github.com/veyq/veyq',
-      noticeUrl: 'https://github.com/veyq/veyq/blob/main/NOTICE',
-      trademarkPolicyUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/trademark-policy.md',
-      commercialBoundaryUrl: 'https://github.com/veyq/veyq/blob/main/docs/legal/commercial-boundary.md',
+      sourceUrl: 'https://github.com/raddatzk/veyq',
+      noticeUrl: 'https://github.com/raddatzk/veyq/blob/master/NOTICE',
+      trademarkPolicyUrl: 'https://github.com/raddatzk/veyq/blob/master/docs/legal/trademark-policy.md',
+      commercialBoundaryUrl: 'https://github.com/raddatzk/veyq/blob/master/docs/legal/commercial-boundary.md',
       version: 'v1.0.0'
     },
     ...overrides
