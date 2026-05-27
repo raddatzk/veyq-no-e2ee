@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -17,7 +17,13 @@ import {
   favoriteMemory,
   unfavoriteMemory,
   updateMemoryMediaMetadata,
-  updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch
+  updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch,
+  uploadMemoryTrack as uploadTenantMemoryTrack,
+  updateMemoryTrack as updateTenantMemoryTrack,
+  deleteMemoryTrack as deleteTenantMemoryTrack,
+  createMemoryPlaylist as createTenantMemoryPlaylist,
+  updateMemoryPlaylist as updateTenantMemoryPlaylist,
+  deleteMemoryPlaylist as deleteTenantMemoryPlaylist
 } from '../api'
 import { notifyMemoryFavoritesChanged } from '../composables/useMemoryFavoritesRefresh'
 import type {
@@ -25,13 +31,19 @@ import type {
   MemoryHeader,
   MemoryJournal,
   MemoryMedia,
+  MemoryPlaylist,
+  MemoryTrack,
+  CreateMemoryPlaylistRequest,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryPlaylistRequest,
+  UpdateMemoryTrackRequest,
   UpdateMemoryRequest,
   UploadMediaOptions,
-  UploadMemoryMediaRequest
+  UploadMemoryMediaRequest,
+  UploadMemoryTrackRequest
 } from '../api'
 import DeleteMemoryDialog from './DeleteMemoryDialog.vue'
 import EditMemoryDialog from './EditMemoryDialog.vue'
@@ -41,9 +53,17 @@ import MemoryAssetBuckets from './MemoryAssetBuckets.vue'
 import MemoryCard from './MemoryCard.vue'
 import MemoryCoverImage from './MemoryCoverImage.vue'
 import MemoryCoverDialog from './MemoryCoverDialog.vue'
+import MemoryHeaderPlaylistPlayer from './MemoryHeaderPlaylistPlayer.vue'
+import MemoryParticipantsDialog from './MemoryParticipantsDialog.vue'
+import MemoryParticipantsStrip from './MemoryParticipantsStrip.vue'
+import MemoryPlaylistsPanel from './MemoryPlaylistsPanel.vue'
 import MemoryShareDialog from './MemoryShareDialog.vue'
+import MemoryTracksPanel from './MemoryTracksPanel.vue'
 import MemoryUploaderShareDialog from './MemoryUploaderShareDialog.vue'
 import MemoryUploadDialog from './MemoryUploadDialog.vue'
+import { DEFAULT_MEMORY_DETAIL_TAB, type MemoryDetailTab } from '../utils/memoryTabs'
+
+const MemoryMediaMap = defineAsyncComponent(() => import('./MemoryMediaMap.vue'))
 
 type MemoryDetailCapabilities = {
   canEdit?: boolean
@@ -57,6 +77,10 @@ type MemoryDetailCapabilities = {
   canDeleteCurrentMemory?: boolean
   canEditJournal?: boolean
   canDownload?: boolean
+  canEditTracks?: boolean
+  canEditPlaylists?: boolean
+  canFavorite?: boolean
+  canManageParticipants?: boolean
 }
 
 type MediaInsertRange = {
@@ -73,6 +97,9 @@ const props = defineProps<{
   journal?: MemoryJournal | null
   childMemories: Memory[]
   media: MemoryMedia[]
+  playlists?: MemoryPlaylist[]
+  tracks?: MemoryTrack[]
+  activeTab?: MemoryDetailTab
   capabilities?: MemoryDetailCapabilities
   saveMemory?: (memoryId: string, request: UpdateMemoryRequest) => Promise<Memory>
   saveJournal?: (memoryId: string, request: UpdateMemoryJournalRequest) => Promise<MemoryJournal>
@@ -94,6 +121,12 @@ const props = defineProps<{
     request: UpdateMemoryMediaMetadataBatchRequest
   ) => Promise<MemoryMedia[]>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+  uploadTrack?: (memoryId: string, request: UploadMemoryTrackRequest) => Promise<MemoryTrack>
+  updateTrack?: (trackId: string, memoryId: string, request: UpdateMemoryTrackRequest) => Promise<MemoryTrack>
+  deleteTrack?: (trackId: string, memoryId: string) => Promise<void>
+  createPlaylist?: (memoryId: string, request: CreateMemoryPlaylistRequest) => Promise<MemoryPlaylist>
+  updatePlaylist?: (playlistId: string, memoryId: string, request: UpdateMemoryPlaylistRequest) => Promise<MemoryPlaylist>
+  deletePlaylist?: (playlistId: string, memoryId: string) => Promise<void>
   downloadUrl?: (memoryId: string, includeChildren: boolean) => string
 }>()
 const { locale, t } = useI18n()
@@ -104,6 +137,7 @@ const emit = defineEmits<{
   changed: [memory: Memory]
   deleted: [parentPath: string]
   mediaDeleted: [media: MemoryMedia]
+  'update:activeTab': [tab: MemoryDetailTab]
 }>()
 
 const editOpen = ref(false)
@@ -111,12 +145,15 @@ const coverOpen = ref(false)
 const deleteOpen = ref(false)
 const shareOpen = ref(false)
 const uploaderShareOpen = ref(false)
+const participantsOpen = ref(false)
 const uploadOpen = ref(false)
 const downloadOpen = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const secondaryActionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const favoriteSaving = ref(false)
 const favoriteOverride = ref<boolean | null>(null)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
+const uploadedMedia = ref<Record<string, MemoryMedia>>({})
 const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalDraft = ref('')
@@ -128,6 +165,12 @@ const mediaPickerCaptionEdited = ref(false)
 const selectedJournalMediaIds = ref<string[]>([])
 const mediaInsertRange = ref<MediaInsertRange | null>(null)
 const lastMediaTriggerPosition = ref<number | null>(null)
+const selectedTab = computed({
+  get: () => props.activeTab ?? DEFAULT_MEMORY_DETAIL_TAB,
+  set: (value: string | number) => {
+    emit('update:activeTab', String(value) as MemoryDetailTab)
+  }
+})
 const capabilities = computed(() => ({
   canEdit: props.capabilities?.canEdit ?? true,
   canUpload: props.capabilities?.canUpload ?? true,
@@ -139,7 +182,11 @@ const capabilities = computed(() => ({
   canDeleteMedia: props.capabilities?.canDeleteMedia ?? false,
   canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true,
   canEditJournal: props.capabilities?.canEditJournal ?? props.capabilities?.canEdit ?? true,
-  canDownload: props.capabilities?.canDownload ?? true
+  canDownload: props.capabilities?.canDownload ?? true,
+  canEditTracks: props.capabilities?.canEditTracks ?? props.capabilities?.canEdit ?? true,
+  canEditPlaylists: props.capabilities?.canEditPlaylists ?? props.capabilities?.canEdit ?? true,
+  canFavorite: props.capabilities?.canFavorite ?? true,
+  canManageParticipants: props.capabilities?.canManageParticipants ?? props.capabilities?.canEdit ?? true
 }))
 
 const detailHeader = computed<MemoryHeader>(() => ({
@@ -154,7 +201,8 @@ const detailHeader = computed<MemoryHeader>(() => ({
   descendantMediaCount: props.header?.descendantMediaCount ?? 0,
   childMemoryCount: props.header?.childMemoryCount ?? props.memory.childCount,
   favorite: favoriteOverride.value ?? props.header?.favorite ?? props.memory.favorite,
-  scope: props.header?.scope ?? props.memory.scope
+  scope: props.header?.scope ?? props.memory.scope,
+  participants: props.header?.participants ?? []
 }))
 const coverUrl = computed(() => {
   if (detailHeader.value.coverUrl) return `${API_BASE}${detailHeader.value.coverUrl}`
@@ -172,8 +220,17 @@ const dateRangeLabel = computed(() => {
 const totalMediaCount = computed(
   () => detailHeader.value.directMediaCount + detailHeader.value.descendantMediaCount
 )
-const mediaCountLabel = computed(() => `${totalMediaCount.value} ${t('memory.mediaCount')}`)
-const visibleMedia = computed(() => props.media.map((media) => mediaOverrides.value[media.id] || media))
+const uploadedMediaList = computed(() =>
+  Object.values(uploadedMedia.value).filter((media) => !props.media.some((item) => item.id === media.id))
+)
+const localTotalMediaCount = computed(() => totalMediaCount.value + uploadedMediaList.value.length)
+const mediaCountLabel = computed(() => `${localTotalMediaCount.value} ${t('memory.mediaCount')}`)
+const visibleMedia = computed(() => {
+  const merged = [...props.media, ...uploadedMediaList.value]
+  return merged.map((media) => mediaOverrides.value[media.id] || media)
+})
+const visiblePlaylists = computed(() => props.playlists ?? [])
+const visibleTracks = computed(() => props.tracks ?? [])
 const canDownloadMemory = computed(() =>
   capabilities.value.canDownload && totalMediaCount.value > 0 && Boolean(props.downloadUrl || props.tenantName)
 )
@@ -185,16 +242,8 @@ const journalHasContent = computed(() => journalMarkdown.value.trim().length > 0
 const favoriteActionLabel = computed(() =>
   detailHeader.value.favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')
 )
-const overflowActionItems = computed<MenuItem[]>(() => {
+const secondaryOverflowActionItems = computed<MenuItem[]>(() => {
   const items: Array<MenuItem | null> = [
-    {
-      label: favoriteActionLabel.value,
-      icon: detailHeader.value.favorite ? 'pi pi-star-fill' : 'pi pi-star',
-      disabled: favoriteSaving.value,
-      command: () => {
-        void toggleFavorite()
-      }
-    },
     canDownloadMemory.value
       ? {
           label: t('memory.download'),
@@ -219,6 +268,15 @@ const overflowActionItems = computed<MenuItem[]>(() => {
           icon: 'pi pi-image',
           command: () => {
             coverOpen.value = true
+          }
+        }
+      : null,
+    capabilities.value.canManageParticipants
+      ? {
+          label: t('memory.participantsManage'),
+          icon: 'pi pi-users',
+          command: () => {
+            participantsOpen.value = true
           }
         }
       : null,
@@ -252,6 +310,22 @@ const overflowActionItems = computed<MenuItem[]>(() => {
   ]
   return items.filter((item): item is MenuItem => item !== null)
 })
+const overflowActionItems = computed<MenuItem[]>(() => {
+  const items: Array<MenuItem | null> = [
+    capabilities.value.canFavorite
+      ? {
+          label: favoriteActionLabel.value,
+          icon: detailHeader.value.favorite ? 'pi pi-star-fill' : 'pi pi-star',
+          disabled: favoriteSaving.value,
+          command: () => {
+            void toggleFavorite()
+          }
+        }
+      : null,
+    ...secondaryOverflowActionItems.value
+  ]
+  return items.filter((item): item is MenuItem => item !== null)
+})
 
 watch(
   () => props.journal?.markdown,
@@ -265,6 +339,8 @@ watch(
   () => props.memory.id,
   () => {
     favoriteOverride.value = null
+    uploadedMedia.value = {}
+    mediaOverrides.value = {}
   }
 )
 
@@ -310,6 +386,41 @@ function mergeUpdatedMedia(updated: MemoryMedia[]) {
     ...mediaOverrides.value,
     ...Object.fromEntries(updated.map((media) => [media.id, media]))
   }
+}
+
+function addUploadedMedia(media: MemoryMedia) {
+  if (media.memoryId !== props.memory.id) return
+  uploadedMedia.value = { ...uploadedMedia.value, [media.id]: media }
+}
+
+function submitTrackUpload(request: UploadMemoryTrackRequest): Promise<MemoryTrack> {
+  if (props.uploadTrack) return props.uploadTrack(props.memory.id, request)
+  return uploadTenantMemoryTrack(props.tenantName, props.memory.id, request)
+}
+
+function submitTrackUpdate(trackId: string, request: UpdateMemoryTrackRequest): Promise<MemoryTrack> {
+  if (props.updateTrack) return props.updateTrack(trackId, props.memory.id, request)
+  return updateTenantMemoryTrack(props.tenantName, props.memory.id, trackId, request)
+}
+
+function submitTrackDelete(trackId: string): Promise<void> {
+  if (props.deleteTrack) return props.deleteTrack(trackId, props.memory.id)
+  return deleteTenantMemoryTrack(props.tenantName, props.memory.id, trackId)
+}
+
+function submitPlaylistCreate(request: CreateMemoryPlaylistRequest): Promise<MemoryPlaylist> {
+  if (props.createPlaylist) return props.createPlaylist(props.memory.id, request)
+  return createTenantMemoryPlaylist(props.tenantName, props.memory.id, request)
+}
+
+function submitPlaylistUpdate(playlistId: string, request: UpdateMemoryPlaylistRequest): Promise<MemoryPlaylist> {
+  if (props.updatePlaylist) return props.updatePlaylist(playlistId, props.memory.id, request)
+  return updateTenantMemoryPlaylist(props.tenantName, props.memory.id, playlistId, request)
+}
+
+function submitPlaylistDelete(playlistId: string): Promise<void> {
+  if (props.deletePlaylist) return props.deletePlaylist(playlistId, props.memory.id)
+  return deleteTenantMemoryPlaylist(props.tenantName, props.memory.id, playlistId)
 }
 
 function startJournalEdit() {
@@ -359,6 +470,10 @@ function toggleActionMenu(event: MouseEvent) {
   actionMenu.value?.toggle(event)
 }
 
+function toggleSecondaryActionMenu(event: MouseEvent) {
+  secondaryActionMenu.value?.toggle(event)
+}
+
 function toggleJournalMedia(mediaId: string) {
   selectedJournalMediaIds.value = selectedJournalMediaIds.value.includes(mediaId)
     ? selectedJournalMediaIds.value.filter((id) => id !== mediaId)
@@ -368,7 +483,7 @@ function toggleJournalMedia(mediaId: string) {
 
 function openMediaPicker(range?: MediaInsertRange) {
   mediaInsertRange.value = range ?? currentTextareaRange()
-  selectedJournalMediaIds.value = range?.mediaIds?.filter((id) => props.media.some((media) => media.id === id)) ?? []
+  selectedJournalMediaIds.value = range?.mediaIds?.filter((id) => visibleMedia.value.some((media) => media.id === id)) ?? []
   mediaPickerCaption.value = range?.caption ?? ''
   mediaPickerCaptionEdited.value = Boolean(range?.caption)
   mediaPickerOpen.value = true
@@ -391,7 +506,7 @@ function currentTextareaRange(): MediaInsertRange {
 function syncMediaPickerCaption() {
   if (mediaPickerCaptionEdited.value) return
   if (selectedJournalMediaIds.value.length === 1) {
-    mediaPickerCaption.value = props.media.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || ''
+    mediaPickerCaption.value = visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || ''
   } else if (selectedJournalMediaIds.value.length > 1) {
     mediaPickerCaption.value = t('memory.journalMediaCarouselCaption')
   } else {
@@ -404,7 +519,7 @@ function insertSelectedJournalMedia() {
   const range = mediaInsertRange.value ?? currentTextareaRange()
   const caption = mediaPickerCaption.value.trim() || (
     selectedJournalMediaIds.value.length === 1
-      ? props.media.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || 'Caption'
+      ? visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || 'Caption'
       : t('memory.journalMediaCarouselCaption')
   )
   const markdown = `![${caption}](${`veyq:media/${selectedJournalMediaIds.value.join(',')}`})`
@@ -468,7 +583,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
 <template>
   <div class="memory-detail">
     <header class="memory-detail-header">
-      <div class="memory-detail-cover">
+      <div class="memory-detail-cover" :class="{ 'memory-detail-cover-has-image': Boolean(coverUrl) }">
         <MemoryCoverImage
           v-if="coverUrl"
           :src="coverUrl"
@@ -479,109 +594,139 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       </div>
       <div class="memory-detail-heading">
         <div class="memory-detail-title-row">
-          <div>
-            <p>{{ t('memory.title') }}</p>
+          <div class="memory-detail-title-copy">
             <h1>{{ detailHeader.displayName }}</h1>
           </div>
-          <div class="memory-detail-actions">
-            <Button
-              v-tooltip.bottom="favoriteActionLabel"
-              class="memory-icon-action memory-action-inline"
-              :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
-              :aria-label="favoriteActionLabel"
-              :severity="detailHeader.favorite ? 'warn' : 'secondary'"
-              :outlined="!detailHeader.favorite"
-              :loading="favoriteSaving"
-              size="small"
-              @click="toggleFavorite"
-            />
-            <Button
-              v-if="capabilities.canUpload"
-              icon="pi pi-upload"
-              :label="t('memory.upload')"
-              class="memory-upload-action"
-              size="small"
-              @click="uploadOpen = true"
-            />
-            <Button
-              v-if="canDownloadMemory"
-              v-tooltip.bottom="t('memory.download')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-download"
-              :aria-label="t('memory.download')"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="downloadOpen = true"
-            />
-            <Button
-              v-if="capabilities.canEdit"
-              v-tooltip.bottom="t('common.edit')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-pencil"
-              :aria-label="t('common.edit')"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="editOpen = true"
-            />
-            <Button
-              v-if="capabilities.canManageCover"
-              v-tooltip.bottom="t('memory.cover')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-image"
-              :aria-label="t('memory.cover')"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="coverOpen = true"
-            />
-            <Button
-              v-if="capabilities.canShare"
-              v-tooltip.bottom="t('share.uploadRequest')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-user-plus"
-              :aria-label="t('share.uploadRequest')"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="uploaderShareOpen = true"
-            />
-            <Button
-              v-if="capabilities.canShare"
-              v-tooltip.bottom="t('share.title')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-share-alt"
-              :aria-label="t('share.title')"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="shareOpen = true"
-            />
-            <Button
-              v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
-              v-tooltip.bottom="t('common.delete')"
-              class="memory-icon-action memory-action-inline"
-              icon="pi pi-trash"
-              :aria-label="t('common.delete')"
-              severity="danger"
-              outlined
-              size="small"
-              @click="deleteOpen = true"
-            />
-            <Button
-              v-if="overflowActionItems.length"
-              v-tooltip.bottom="t('common.more')"
-              class="memory-icon-action memory-actions-overflow"
-              icon="pi pi-ellipsis-h"
-              :aria-label="t('common.more')"
-              severity="secondary"
-              outlined
-              size="small"
-              aria-haspopup="menu"
-              @click="toggleActionMenu"
-            />
-            <Menu ref="actionMenu" :model="overflowActionItems" popup />
+          <div class="memory-detail-control-panel">
+            <div class="memory-detail-actions">
+              <Button
+                v-if="capabilities.canFavorite"
+                v-tooltip.bottom="favoriteActionLabel"
+                class="memory-icon-action memory-action-inline"
+                :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
+                :aria-label="favoriteActionLabel"
+                :severity="detailHeader.favorite ? 'warn' : 'secondary'"
+                :outlined="!detailHeader.favorite"
+                :loading="favoriteSaving"
+                size="small"
+                @click="toggleFavorite"
+              />
+              <Button
+                v-if="capabilities.canUpload"
+                icon="pi pi-upload"
+                :label="t('memory.upload')"
+                class="memory-upload-action"
+                size="small"
+                @click="uploadOpen = true"
+              />
+              <MemoryHeaderPlaylistPlayer
+                v-if="visiblePlaylists.length > 0"
+                :playlists="visiblePlaylists"
+              />
+              <Button
+                v-if="canDownloadMemory"
+                v-tooltip.bottom="t('memory.download')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-download"
+                :aria-label="t('memory.download')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="downloadOpen = true"
+              />
+              <Button
+                v-if="capabilities.canEdit"
+                v-tooltip.bottom="t('common.edit')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-pencil"
+                :aria-label="t('common.edit')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="editOpen = true"
+              />
+              <Button
+                v-if="capabilities.canManageCover"
+                v-tooltip.bottom="t('memory.cover')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-image"
+                :aria-label="t('memory.cover')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="coverOpen = true"
+              />
+              <Button
+                v-if="capabilities.canManageParticipants"
+                v-tooltip.bottom="t('memory.participantsManage')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-users"
+                :aria-label="t('memory.participantsManage')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="participantsOpen = true"
+              />
+              <Button
+                v-if="capabilities.canShare"
+                v-tooltip.bottom="t('share.uploadRequest')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-user-plus"
+                :aria-label="t('share.uploadRequest')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="uploaderShareOpen = true"
+              />
+              <Button
+                v-if="capabilities.canShare"
+                v-tooltip.bottom="t('share.title')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-share-alt"
+                :aria-label="t('share.title')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="shareOpen = true"
+              />
+              <Button
+                v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
+                v-tooltip.bottom="t('common.delete')"
+                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                icon="pi pi-trash"
+                :aria-label="t('common.delete')"
+                severity="danger"
+                outlined
+                size="small"
+                @click="deleteOpen = true"
+              />
+              <Button
+                v-if="secondaryOverflowActionItems.length"
+                v-tooltip.bottom="t('common.more')"
+                class="memory-icon-action memory-actions-overflow memory-actions-overflow-secondary"
+                icon="pi pi-ellipsis-h"
+                :aria-label="t('common.more')"
+                severity="secondary"
+                outlined
+                size="small"
+                aria-haspopup="menu"
+                @click="toggleSecondaryActionMenu"
+              />
+              <Menu ref="secondaryActionMenu" :model="secondaryOverflowActionItems" popup />
+              <Button
+                v-if="overflowActionItems.length"
+                v-tooltip.bottom="t('common.more')"
+                class="memory-icon-action memory-actions-overflow memory-actions-overflow-mobile"
+                icon="pi pi-ellipsis-h"
+                :aria-label="t('common.more')"
+                severity="secondary"
+                outlined
+                size="small"
+                aria-haspopup="menu"
+                @click="toggleActionMenu"
+              />
+              <Menu ref="actionMenu" :model="overflowActionItems" popup />
+            </div>
           </div>
         </div>
         <div class="memory-detail-meta">
@@ -591,13 +736,20 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             <i class="pi pi-sitemap" /> {{ detailHeader.childMemoryCount }} {{ t('memory.children') }}
           </span>
         </div>
+        <MemoryParticipantsStrip
+          :tenant-name="tenantName"
+          :participants="detailHeader.participants"
+        />
       </div>
     </header>
 
-    <Tabs value="gallery" class="memory-tabs">
+    <Tabs v-model:value="selectedTab" class="memory-tabs">
       <TabList>
         <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
         <Tab value="buckets">{{ t('media.buckets') }}</Tab>
+        <Tab value="map">{{ t('map.title') }}</Tab>
+        <Tab value="tracks">{{ t('track.title') }}</Tab>
+        <Tab value="playlists">{{ t('playlist.title') }}</Tab>
         <Tab value="journal">{{ t('memory.journal') }}</Tab>
         <Tab value="children">{{ t('memory.children') }}</Tab>
         <Tab value="info">{{ t('memory.info') }}</Tab>
@@ -634,6 +786,37 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             :media="visibleMedia"
             :update-metadata-batch="canBatchUpdateMediaMetadata ? submitMediaMetadataBatch : undefined"
             @updated="mergeUpdatedMedia"
+          />
+        </TabPanel>
+        <TabPanel value="map">
+          <MemoryMediaMap
+            :tenant-name="tenantName"
+            :media="visibleMedia"
+            :can-edit-metadata="capabilities.canEditMediaMetadata"
+            :can-delete-media="capabilities.canDeleteMedia"
+            :update-metadata="updateSingleMediaMetadata"
+            :delete-media="deleteMedia"
+            @deleted="$emit('mediaDeleted', $event)"
+          />
+        </TabPanel>
+        <TabPanel value="tracks">
+          <MemoryTracksPanel
+            :tracks="visibleTracks"
+            :can-edit="capabilities.canEditTracks"
+            :upload-track="capabilities.canEditTracks ? submitTrackUpload : undefined"
+            :update-track="capabilities.canEditTracks ? submitTrackUpdate : undefined"
+            :delete-track="capabilities.canEditTracks ? submitTrackDelete : undefined"
+            @changed="$emit('changed', memory)"
+          />
+        </TabPanel>
+        <TabPanel value="playlists">
+          <MemoryPlaylistsPanel
+            :playlists="visiblePlaylists"
+            :can-edit="capabilities.canEditPlaylists"
+            :create-playlist="capabilities.canEditPlaylists ? submitPlaylistCreate : undefined"
+            :update-playlist="capabilities.canEditPlaylists ? submitPlaylistUpdate : undefined"
+            :delete-playlist="capabilities.canEditPlaylists ? submitPlaylistDelete : undefined"
+            @changed="$emit('changed', memory)"
           />
         </TabPanel>
         <TabPanel value="journal">
@@ -706,11 +889,11 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                       <dt>{{ t('memory.journalHelpMemoryPath') }}</dt>
                       <dd><code>[Title](veyq:memory-path/Day%202)</code></dd>
                       <dt>{{ t('memory.journalHelpPlaylist') }}</dt>
-                      <dd><code>[Playlist](veyq:playlist?url=...)</code></dd>
+                      <dd><code>[Playlist](veyq:playlist/{playlistId})</code></dd>
                       <dt>{{ t('memory.journalHelpMap') }}</dt>
                       <dd><code>[Place](veyq:map?lat=52.5&amp;lng=13.4&amp;zoom=12)</code></dd>
                       <dt>{{ t('memory.journalHelpTrack') }}</dt>
-                      <dd><code>[Track](veyq:track?url=...)</code></dd>
+                      <dd><code>[Track](veyq:track/{trackId})</code></dd>
                     </dl>
                     <p>{{ t('memory.journalHelpMediaEdit') }}</p>
                   </div>
@@ -720,7 +903,9 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                 <JournalRenderer
                   v-if="journalDraft.trim()"
                   :markdown="journalDraft"
-                  :media="media"
+                  :media="visibleMedia"
+                  :tracks="visibleTracks"
+                  :playlists="visiblePlaylists"
                   :child-memories="childMemories"
                   @open-memory="$emit('openMemory', $event)"
                 />
@@ -748,7 +933,9 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             <JournalRenderer
               v-else-if="journalHasContent"
               :markdown="journalMarkdown"
-              :media="media"
+              :media="visibleMedia"
+              :tracks="visibleTracks"
+              :playlists="visiblePlaylists"
               :child-memories="childMemories"
               @open-memory="$emit('openMemory', $event)"
             />
@@ -798,7 +985,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             <dt>{{ t('common.permalink') }}</dt>
             <dd>{{ detailHeader.path }}</dd>
             <dt>{{ t('memory.mediaCount') }}</dt>
-            <dd>{{ totalMediaCount }}</dd>
+            <dd>{{ localTotalMediaCount }}</dd>
             <template v-if="detailHeader.childMemoryCount > 0">
               <dt>{{ t('memory.children') }}</dt>
               <dd>{{ detailHeader.childMemoryCount }}</dd>
@@ -824,6 +1011,13 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       :remove-cover-override="removeCover"
       @saved="$emit('changed', $event)"
     />
+    <MemoryParticipantsDialog
+      v-model:visible="participantsOpen"
+      :tenant-name="tenantName"
+      :memory-id="memory.id"
+      :participants="detailHeader.participants"
+      @saved="$emit('changed', memory)"
+    />
     <DeleteMemoryDialog
       v-model:visible="deleteOpen"
       :tenant-name="tenantName"
@@ -838,6 +1032,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       :tenant-name="tenantName"
       :memory-id="memory.id"
       :upload-media="uploadMedia"
+      @uploaded="addUploadedMedia"
       @saved="$emit('changed', memory)"
     />
     <Dialog
@@ -865,7 +1060,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
     </Dialog>
     <JournalMediaPickerDialog
       v-model:visible="mediaPickerOpen"
-      :media="media"
+      :media="visibleMedia"
       :caption="mediaPickerCaption"
       :selected-ids="selectedJournalMediaIds"
       @update:caption="mediaPickerCaption = $event"

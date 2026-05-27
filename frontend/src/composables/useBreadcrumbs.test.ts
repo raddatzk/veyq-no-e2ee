@@ -31,13 +31,13 @@ describe('useBreadcrumbs', () => {
     expect(router.currentRoute.value.fullPath).toBe('/friends')
   })
 
-  it('falls back to Veyq when no active tenant is known', async () => {
+  it('falls back to veyq when no active tenant is known', async () => {
     const router = testRouter()
     await router.push('/login')
     await router.isReady()
     const wrapper = mount(BreadcrumbProbe, { global: { plugins: [router] } })
 
-    expect(wrapper.text()).toBe('Veyq')
+    expect(wrapper.text()).toBe('veyq')
 
     await wrapper.find('button').trigger('click')
     await flushPromises()

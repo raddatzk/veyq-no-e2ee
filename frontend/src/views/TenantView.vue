@@ -13,6 +13,7 @@ import { useMemoryRouteData } from '../features/memories/composables/useMemoryRo
 import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
 import { memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/paths'
+import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,7 @@ const tenantName = computed(() => String(route.params.tenantName || ''))
 const tenant = computed(() => authState.tenants.find((item) => item.name === tenantName.value))
 const tenantTitle = computed(() => tenant.value?.displayName || tenantName.value)
 const routePath = computed(() => routePathToMemoryPath(route.params.pathMatch))
+const activeMemoryTab = computed(() => memoryTabFromHash(route.hash))
 const createFolderOpen = ref(false)
 const createMemoryOpen = ref(false)
 
@@ -39,6 +41,8 @@ const {
   memoryBreadcrumbs,
   memoryJournal,
   memoryHeader,
+  playlists,
+  tracks,
   navigation
 } = useMemoryRouteData(tenantName, routePath)
 
@@ -62,6 +66,10 @@ function openContextSettings() {
 
 function navigateToPath(path: string) {
   void router.push(memoryPathToTenantRoute(tenantName.value, path))
+}
+
+function updateActiveMemoryTab(tab: MemoryDetailTab) {
+  void router.replace({ path: route.path, query: route.query, hash: memoryTabToHash(tab) })
 }
 
 function handleMemoryChanged(updatedMemory: { path: string }) {
@@ -90,7 +98,11 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :playlists="playlists"
+      :tracks="tracks"
+      :active-tab="activeMemoryTab"
       :save-journal="(memoryId, request) => updateMemoryJournal(tenantName, memoryId, request)"
+      @update:active-tab="updateActiveMemoryTab"
       @open-memory="navigateToPath($event.path)"
       @create-child-memory="createMemoryOpen = true"
       @changed="handleMemoryChanged"

@@ -1,7 +1,7 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Settings API
+  title: veyq Settings API
   version: 0.2.0
   description: API contract for resolving settings navigation context.
 servers:
@@ -146,6 +146,10 @@ components:
           type: string
         label:
           type: string
+      example:
+        path: /friends/@alle/settings
+        displayName: Einstellungen
+        label: Einstellungen
     SettingsSubject:
       type: object
       additionalProperties: false
@@ -160,6 +164,10 @@ components:
           type: string
         label:
           type: string
+      example:
+        type: GROUP
+        displayName: Alle
+        label: "@Alle"
     SettingsBreadcrumb:
       type: object
       additionalProperties: false
@@ -177,6 +185,11 @@ components:
           type: string
         label:
           type: string
+      example:
+        type: GROUP
+        path: /friends/@alle
+        displayName: Alle
+        label: "@Alle"
     SettingsSubjectType:
       type: string
       enum:
@@ -203,3 +216,6 @@ components:
           type: string
           description: English fallback message. Frontends should prefer localized text for the code.
           example: Invalid request
+      example:
+        code: BAD_REQUEST
+        message: Invalid request

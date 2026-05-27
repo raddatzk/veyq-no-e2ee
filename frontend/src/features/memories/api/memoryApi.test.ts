@@ -141,7 +141,8 @@ describe('memoryApi facade', () => {
       descendantMediaCount: 3,
       childMemoryCount: 1,
       favorite: true,
-      scope: { type: 'TENANT' }
+      scope: { type: 'TENANT' },
+      participants: []
     })
 
     const header = await getMemoryHeader('tenant', 'mem-1')
@@ -158,7 +159,8 @@ describe('memoryApi facade', () => {
       descendantMediaCount: 3,
       childMemoryCount: 1,
       favorite: true,
-      scope: { type: 'TENANT' }
+      scope: { type: 'TENANT' },
+      participants: []
     })
     expect(mocks.getMemoryHeader).toHaveBeenCalledWith({
       tenantName: 'tenant',

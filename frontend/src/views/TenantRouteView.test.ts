@@ -21,8 +21,8 @@ describe('TenantRouteView', () => {
       email: 'kevin@example.test',
       displayName: 'Kevin',
       permalink: 'kevin',
-      role: 'ServerOwner',
-      status: 'Active'
+      serverRole: 'ServerOwner',
+      passkeyCount: 0
     }
 
     const { router, wrapper } = await mountAt('/friends/~kevin')

@@ -20,6 +20,7 @@ const props = defineProps<{
   ) => Promise<MemoryMedia>
 }>()
 const emit = defineEmits<{
+  uploaded: [media: MemoryMedia]
   saved: []
 }>()
 
@@ -73,6 +74,9 @@ async function submit() {
         return props.uploadMedia
           ? props.uploadMedia(memoryId, request, options)
           : uploadMemoryMedia(props.tenantName, memoryId, request, options)
+      },
+      onFileComplete: (_file, result) => {
+        emit('uploaded', result as MemoryMedia)
       },
       onComplete: () => {
         emit('saved')

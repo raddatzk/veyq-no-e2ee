@@ -1,7 +1,7 @@
 import type { PasskeyLoginRequest, PasskeyRegistrationRequest } from '../../api/generated'
 
 type PublicKeyOptions = Record<string, unknown>
-const PASSKEY_RELYING_PARTY_NAME = 'Veyq'
+const PASSKEY_RELYING_PARTY_NAME = 'veyq'
 
 export function passkeysAvailable(): boolean {
   return typeof window !== 'undefined' && Boolean(window.PublicKeyCredential && navigator.credentials)

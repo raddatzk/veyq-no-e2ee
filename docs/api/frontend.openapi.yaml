@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Frontend API
+  title: veyq Frontend API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Veyq Frontend API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer veyq Frontend API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
   - url: "/"
 tags:
@@ -48,7 +48,9 @@ components:
               userId: 1
               email: kevin@example.test
               displayName: Kevin
+              permalink: kevin
               serverRole: ServerOwner
+              passkeyCount: 1
             tenants:
             - id: 42
               name: friends
@@ -59,7 +61,9 @@ components:
               - userId: 1
                 email: kevin@example.test
                 displayName: Kevin
+                permalink: kevin
                 serverRole: ServerOwner
+                passkeyCount: 1
 
   schemas:
     BootstrapResponse:
@@ -78,3 +82,25 @@ components:
           type: array
           items:
             "$ref": "./tenants.openapi.yaml#/components/schemas/TenantSummary"
+      example:
+        serverId: srv_123
+        user:
+          userId: 1
+          email: kevin@example.test
+          displayName: Kevin
+          permalink: kevin
+          serverRole: ServerOwner
+          passkeyCount: 1
+        tenants:
+        - id: 42
+          name: friends
+          displayName: Friends
+          domain: friends.example.test
+          role: TenantOwner
+          admins:
+          - userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            permalink: kevin
+            serverRole: ServerOwner
+            passkeyCount: 1

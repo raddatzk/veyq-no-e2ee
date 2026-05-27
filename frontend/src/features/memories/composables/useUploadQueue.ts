@@ -36,9 +36,11 @@ export type UploadQueueBatch = {
   context: UploadQueueContext
   files: UploadQueueFile[]
   startedAt: number
+  sequence: number
   finishedAt: number | null
   acknowledged: boolean
   uploadFile?: (file: File, options: UploadMediaOptions) => Promise<unknown>
+  onFileComplete?: (file: UploadQueueFile, result: unknown) => void | Promise<void>
   onComplete?: () => void | Promise<void>
 }
 
@@ -47,12 +49,14 @@ type StartUploadBatchRequest = {
   files: File[]
   context: UploadQueueContext
   uploadFile?: (file: File, options: UploadMediaOptions) => Promise<unknown>
+  onFileComplete?: (file: UploadQueueFile, result: unknown) => void | Promise<void>
   onComplete?: () => void | Promise<void>
 }
 
 const batches = reactive<UploadQueueBatch[]>([])
 const queueRevision = ref(0)
 let runnerRequest: Promise<void> | null = null
+let batchSequence = 0
 
 const activeBatches = computed(() => {
   trackQueueRevision()
@@ -105,9 +109,11 @@ export function startUploadBatch(request: StartUploadBatchRequest): UploadQueueB
       controller: new AbortController()
     })),
     startedAt: Date.now(),
+    sequence: ++batchSequence,
     finishedAt: null,
     acknowledged: false,
     uploadFile: request.uploadFile,
+    onFileComplete: request.onFileComplete,
     onComplete: request.onComplete
   }
 
@@ -239,7 +245,7 @@ async function uploadQueueFile(
       await finalizeBatch(batch)
       return 'completed'
     }
-    await uploadFile(queueFile.file, {
+    const result = await uploadFile(queueFile.file, {
       signal: queueFile.controller.signal,
       onSession: (session) => {
         setFileSession(queueFile, session.uploadId)
@@ -253,6 +259,7 @@ async function uploadQueueFile(
     })
     setFileProgress(queueFile, queueFile.sizeBytes)
     setFileStatus(queueFile, 'done')
+    await batch.onFileComplete?.(queueFile, result)
   } catch (error) {
     if (error instanceof UploadCancelledError) {
       setFileProgress(queueFile, 0)
@@ -331,7 +338,14 @@ function uploadQueueId(): string {
 }
 
 function orderedBatches(): UploadQueueBatch[] {
-  return [...batches].sort((left, right) => left.startedAt - right.startedAt)
+  return orderUploadBatches(batches)
+}
+
+export function orderUploadBatches(batchesToOrder: UploadQueueBatch[]): UploadQueueBatch[] {
+  return [...batchesToOrder].sort((left, right) => {
+    const startedDiff = left.startedAt - right.startedAt
+    return startedDiff || left.sequence - right.sequence
+  })
 }
 
 function isRecoverableUploadInterruption(error: unknown): boolean {

@@ -14,7 +14,7 @@ describe('createPasskeyCredential', () => {
     }
   })
 
-  it('uses Veyq as the relying party name when the API returns localhost', async () => {
+  it('uses veyq as the relying party name when the API returns localhost', async () => {
     const createMock = mockPasskeyCreate()
 
     await createPasskeyCredential({
@@ -27,7 +27,7 @@ describe('createPasskeyCredential', () => {
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({
         publicKey: expect.objectContaining({
-          rp: expect.objectContaining({ id: 'localhost', name: 'Veyq' })
+          rp: expect.objectContaining({ id: 'localhost', name: 'veyq' })
         })
       })
     )

@@ -1,9 +1,9 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Common API Components
+  title: veyq Common API Components
   version: 0.1.0
-  description: Shared API-first components used by Veyq backend API specs.
+  description: Shared API-first components used by veyq backend API specs.
 paths: {}
 components:
   parameters:
@@ -123,6 +123,9 @@ components:
           "$ref": "#/components/schemas/DisplayName"
         permalink:
           "$ref": "#/components/schemas/Permalink"
+        avatarUrl:
+          type: string
+          nullable: true
         serverRole:
           "$ref": "#/components/schemas/ServerRole"
         pendingEmail:
@@ -136,6 +139,7 @@ components:
         email: kevin@example.test
         displayName: Kevin
         permalink: kevin
+        avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
         serverRole: ServerOwner
         passkeyCount: 1
 
@@ -241,6 +245,9 @@ components:
           type: string
           description: English fallback message. Frontends should prefer localized text for the code.
           example: Cover crop is invalid
+      example:
+        code: MEMORY_COVER_CROP_INVALID
+        message: Cover crop is invalid
 
     ServerRole:
       type: string

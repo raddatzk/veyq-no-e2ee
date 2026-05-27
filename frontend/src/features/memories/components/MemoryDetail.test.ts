@@ -140,6 +140,45 @@ describe('MemoryDetail', () => {
     expect(wrapper.emitted('changed')?.[0]).toEqual([expect.objectContaining({ favorite: false })])
   })
 
+  it('hides favorite actions when favorites are disabled', () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: '',
+        memory: memory({ favorite: false }),
+        header: header({ favorite: false }),
+        childMemories: [],
+        media: [],
+        capabilities: { canFavorite: false }
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.findAll('button').some((button) => button.attributes('aria-label') === 'Favorisieren')).toBe(false)
+    expect(wrapper.find('[data-testid="menu-item-favorite"]').exists()).toBe(false)
+    expect(apiMocks.favoriteMemory).not.toHaveBeenCalled()
+    expect(apiMocks.unfavoriteMemory).not.toHaveBeenCalled()
+  })
+
+  it('uses and emits controlled active tab state', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        childMemories: [],
+        media: [],
+        activeTab: 'tracks'
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    expect(wrapper.find('[data-testid="memory-tabs"]').attributes('data-active')).toBe('tracks')
+
+    await wrapper.find('[data-testid="select-journal-tab"]').trigger('click')
+
+    expect(wrapper.emitted('update:activeTab')?.[0]).toEqual(['journal'])
+  })
+
 
   it('renders an explicit cover image', () => {
     const wrapper = mount(MemoryDetail, {
@@ -217,6 +256,35 @@ describe('MemoryDetail', () => {
     await findButton(wrapper, 'Upload anfragen').trigger('click')
 
     expect(wrapper.find('[data-testid="uploader-share-dialog"]').exists()).toBe(true)
+  })
+
+  it('shows newly uploaded media immediately without duplicating after prop refresh', async () => {
+    const uploaded = media({ id: 'media-uploaded', title: 'Fresh upload' })
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ directMediaCount: 0, descendantMediaCount: 0 }),
+        childMemories: [],
+        media: []
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    wrapper.findComponent({ name: 'MemoryUploadDialog' }).vm.$emit('uploaded', uploaded)
+    await flushPromises()
+
+    const mediaGrid = wrapper.findComponent({ name: 'MediaGrid' })
+    const mediaGridProps = mediaGrid.props('media') as MemoryMedia[]
+    expect(mediaGridProps.map((item) => item.id)).toEqual(['media-uploaded'])
+    expect(wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('media')).toEqual(mediaGridProps)
+    expect(wrapper.findComponent({ name: 'MemoryCoverDialog' }).props('media')).toEqual(mediaGridProps)
+    expect(wrapper.text()).toContain('1 Medien')
+
+    await wrapper.setProps({ media: [uploaded] })
+
+    const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
+    expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
   })
 
   it('renders journal markdown and media embeds', () => {
@@ -300,7 +368,7 @@ describe('MemoryDetail', () => {
     expect(wrapper.emitted('changed')?.[0]).toEqual([memory()])
   })
 
-  it('shows markdown and Veyq embed help while editing the journal', async () => {
+  it('shows markdown and veyq embed help while editing the journal', async () => {
     const wrapper = mount(MemoryDetail, {
       props: {
         tenantName: 'tenant',
@@ -320,7 +388,7 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:media/media1,media2')
     expect(wrapper.find('.memory-journal-help').text()).toContain('Doppelklick auf ein Media-Tag')
     expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:map?lat=52.5&lng=13.4&zoom=12')
-    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:track?url=...')
+    expect(wrapper.find('.memory-journal-help').text()).toContain('veyq:track/{trackId}')
   })
 
   it('opens the media picker from the editor button and inserts selected media markdown', async () => {
@@ -502,7 +570,20 @@ function detailStubs() {
       emits: ['click'],
       template: '<button type="button" v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
     },
-    Menu: { template: '<div />' },
+    Menu: {
+      props: ['model'],
+      template: `
+        <div>
+          <span
+            v-for="item in model"
+            :key="item.label"
+            :data-testid="item.icon === 'pi pi-star' || item.icon === 'pi pi-star-fill' ? 'menu-item-favorite' : undefined"
+          >
+            {{ item.label }}
+          </span>
+        </div>
+      `
+    },
     Carousel: {
       props: ['value', 'autoplayInterval', 'page', 'showNavigators'],
       emits: ['update:page'],
@@ -537,24 +618,33 @@ function detailStubs() {
       template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value); $emit(\'input\', $event)" />'
     },
     Message: { template: '<div><slot /></div>' },
-    Tabs: { template: '<section><slot /></section>' },
+    Tabs: {
+      props: ['value'],
+      emits: ['update:value'],
+      template: `
+        <section data-testid="memory-tabs" :data-active="value">
+          <button type="button" data-testid="select-journal-tab" @click="$emit('update:value', 'journal')" />
+          <slot />
+        </section>
+      `
+    },
     TabList: { template: '<div><slot /></div>' },
     Tab: { template: '<button><slot /></button>' },
     TabPanels: { template: '<div><slot /></div>' },
     TabPanel: { template: '<div><slot /></div>' },
-    MediaGrid: { template: '<div />' },
-    MemoryAssetBuckets: { template: '<div />' },
+    MediaGrid: { name: 'MediaGrid', props: ['media'], template: '<div />' },
+    MemoryAssetBuckets: { name: 'MemoryAssetBuckets', props: ['media'], template: '<div />' },
     MemoryCard: { template: '<article />' },
     MemoryCoverImage: { template: '<img :alt="alt" />', props: ['alt'] },
     DeleteMemoryDialog: { template: '<div />' },
     EditMemoryDialog: { template: '<div />' },
-    MemoryCoverDialog: { template: '<div />' },
+    MemoryCoverDialog: { name: 'MemoryCoverDialog', props: ['media'], template: '<div />' },
     MemoryShareDialog: { template: '<div />' },
     MemoryUploaderShareDialog: {
       props: ['visible'],
       template: '<div v-if="visible" data-testid="uploader-share-dialog" />'
     },
-    MemoryUploadDialog: { template: '<div />' }
+    MemoryUploadDialog: { name: 'MemoryUploadDialog', template: '<div />' }
   }
 }
 
@@ -609,6 +699,7 @@ function header(overrides: Partial<MemoryHeader> = {}): MemoryHeader {
     childMemoryCount: 0,
     favorite: false,
     scope: { type: 'TENANT' },
+    participants: [],
     ...overrides
   }
 }

@@ -1,5 +1,6 @@
 .login-card {
   width: min(460px, 100%);
+  min-width: 0;
   border: 1px solid var(--app-line);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
@@ -17,6 +18,7 @@
 
 .tenant-dialog {
   width: min(420px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
 }
 
 .group-detail-dialog {
@@ -57,6 +59,7 @@
 
 .form {
   display: grid;
+  min-width: 0;
   gap: 1rem;
 }
 
@@ -109,6 +112,10 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.button-row .p-button {
+  max-width: 100%;
 }
 
 .toggle-row {
@@ -246,7 +253,65 @@
   gap: 0.5rem;
 }
 
+.registration-privacy-optins {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+
+.registration-privacy-optins legend {
+  padding: 0 0.25rem;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.registration-privacy-optins p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.registration-privacy-provider-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.75rem;
+}
+
+.registration-privacy-option {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+.registration-privacy-option input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--app-accent);
+}
+
 @media (max-width: 720px) {
+  .login-card {
+    border-radius: var(--app-radius);
+  }
+
+  .registration-privacy-provider-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login-card .p-card-body {
+    padding: 1rem;
+  }
+
+  .tenant-dialog {
+    width: min(100vw - 1rem, 420px);
+    max-height: calc(100dvh - 1rem);
+  }
+
   .inline-form,
   .inline-form.compact {
     grid-template-columns: 1fr;
@@ -265,5 +330,16 @@
 
   .toggle-row {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .button-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .button-row .p-button {
+    width: 100%;
   }
 }

@@ -8,6 +8,7 @@ import {
   cancelFile,
   fileProgress,
   isBatchFinished,
+  orderUploadBatches,
   useUploadQueue,
   type UploadQueueBatch,
   type UploadQueueFile
@@ -25,13 +26,13 @@ const popoverRoot = ref<HTMLElement | null>(null)
 
 const displayedBatches = computed(() => {
   trackQueueRevision()
-  return props.batches ?? visibleBatches.value
+  return orderUploadBatches(props.batches ?? visibleBatches.value)
 })
 const hasUploads = computed(() => displayedBatches.value.length > 0)
 const activeCount = computed(() =>
   displayedBatches.value.flatMap((batch) => batch.files).filter((file) => canCancelFile(file)).length
 )
-const uploadButtonLabel = computed(() =>
+const queueButtonLabel = computed(() =>
   activeFileCount.value > 0
     ? t('media.uploadActiveCount', { count: activeFileCount.value })
     : t('media.uploads')
@@ -151,10 +152,11 @@ onBeforeUnmount(() => {
       type="button"
       class="upload-status-trigger"
       :class="{ 'upload-status-trigger-active': activeFileCount > 0 }"
-      :aria-label="uploadButtonLabel"
+      :aria-label="queueButtonLabel"
+      :title="queueButtonLabel"
       @click="toggleOpen"
     >
-      <span class="pi" :class="activeFileCount > 0 ? 'pi-spin pi-spinner' : 'pi-upload'" />
+      <span class="pi" :class="activeFileCount > 0 ? 'pi-spin pi-spinner' : 'pi-list'" />
       <span v-if="activeFileCount" class="upload-status-badge">{{ activeFileCount }}</span>
     </button>
     <section v-if="open" class="upload-status-panel">

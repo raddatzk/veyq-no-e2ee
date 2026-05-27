@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Tenants API
+  title: veyq Tenants API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Veyq Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer veyq Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -550,7 +550,9 @@ components:
                   - userId: 1
                     email: kevin@example.test
                     displayName: Kevin
+                    permalink: kevin
                     serverRole: ServerOwner
+                    passkeyCount: 1
 
     Tenant:
       description: Created tenant.
@@ -568,7 +570,9 @@ components:
               - userId: 1
                 email: kevin@example.test
                 displayName: Kevin
+                permalink: kevin
                 serverRole: ServerOwner
+                passkeyCount: 1
 
     TenantSettings:
       description: Tenant settings.
@@ -697,7 +701,9 @@ components:
           - userId: 1
             email: kevin@example.test
             displayName: Kevin
+            permalink: kevin
             serverRole: ServerOwner
+            passkeyCount: 1
     TenantsSummary:
       type: object
       additionalProperties: false
@@ -719,7 +725,9 @@ components:
               - userId: 1
                 email: kevin@example.test
                 displayName: Kevin
+                permalink: kevin
                 serverRole: ServerOwner
+                passkeyCount: 1
     TenantSettingsResponse:
       type: object
       additionalProperties: false
@@ -792,6 +800,15 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/TenantUserSummary"
+      example:
+        users:
+          - user:
+              userId: 2
+              displayName: Invitee
+              permalink: invitee
+            email: invitee@example.test
+            role: TenantMember
+            status: Pending
     TenantUserSummary:
       type: object
       additionalProperties: false
@@ -809,6 +826,14 @@ components:
         status:
           description: Present only for tenant owners and server owners.
           "$ref": "#/components/schemas/TenantUserStatus"
+      example:
+        user:
+          userId: 2
+          displayName: Invitee
+          permalink: invitee
+        email: invitee@example.test
+        role: TenantMember
+        status: Pending
     UpdateTenantSettingsRequest:
       type: object
       additionalProperties: false

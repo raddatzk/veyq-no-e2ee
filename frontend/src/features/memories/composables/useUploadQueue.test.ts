@@ -6,6 +6,7 @@ import {
   cancelAll,
   cancelFile,
   clearUploadQueue,
+  orderUploadBatches,
   startUploadBatch,
   useUploadQueue
 } from './useUploadQueue'
@@ -18,6 +19,8 @@ describe('useUploadQueue', () => {
 
   async function flushUploadQueue() {
     await nextTick()
+    await Promise.resolve()
+    await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
@@ -94,6 +97,45 @@ describe('useUploadQueue', () => {
 
     resolvers[1]()
     await flushUploadQueue()
+  })
+
+  it('orders batches by start time for queue display', () => {
+    const first = startUploadBatch({
+      label: 'First',
+      files: [new File(['a'], 'a.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile: () => Promise.resolve()
+    })
+    const second = startUploadBatch({
+      label: 'Second',
+      files: [new File(['b'], 'b.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile: () => Promise.resolve()
+    })
+
+    expect(orderUploadBatches([second, first]).map((batch) => batch.id)).toEqual([first.id, second.id])
+  })
+
+  it('calls onFileComplete for successful uploads only', async () => {
+    const onFileComplete = vi.fn()
+    const results = [{ id: 'media-1' }, { id: 'media-2' }]
+    const uploadFile = vi.fn((file: File) => {
+      if (file.name === 'second.jpg') return Promise.reject(new Error('Nope'))
+      return Promise.resolve(results[0])
+    })
+    const batch = startUploadBatch({
+      label: 'Batch',
+      files: [new File(['first'], 'first.jpg'), new File(['second'], 'second.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile,
+      onFileComplete
+    })
+
+    await flushUploadQueue()
+
+    expect(onFileComplete).toHaveBeenCalledTimes(1)
+    expect(onFileComplete).toHaveBeenCalledWith(batch.files[0], results[0])
+    expect(batch.files[1].status).toBe('failed')
   })
 
   it('cancels individual queued and active files', async () => {

@@ -4,7 +4,7 @@ import { authState } from './authState'
 import { serverState } from './serverState'
 
 describe('router', () => {
-  it('redirects email confirmation to login with return path when anonymous', async () => {
+  it('allows anonymous email confirmation links', async () => {
     authState.loading = false
     authState.isAuthenticated = false
     serverState.setupCompleted = true
@@ -12,7 +12,6 @@ describe('router', () => {
     await router.push('/email/confirm#token-123')
     await router.isReady()
 
-    expect(router.currentRoute.value.name).toBe('login')
-    expect(router.currentRoute.value.query.redirect).toBe('/email/confirm#token-123')
+    expect(router.currentRoute.value.name).toBe('email-confirm')
   })
 })

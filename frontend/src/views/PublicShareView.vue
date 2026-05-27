@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -11,18 +12,24 @@ import CreateMemoryDialog from '../features/memories/components/CreateMemoryDial
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import UploadStatusMenu from '../features/memories/components/UploadStatusMenu.vue'
 import { startUploadBatch, useUploadQueue } from '../features/memories/composables/useUploadQueue'
+import PrivacySettingsPanel from '../features/settings/components/PrivacySettingsPanel.vue'
 import { API_BASE } from '../shared/api/httpClient'
 import { getErrorMessage } from '../shared/utils/errors'
+import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
 import {
   createPublicShareChildMemory,
+  createPublicShareMemoryPlaylist,
   deletePublicShareMedia,
   deletePublicShareMemory,
+  deletePublicShareMemoryPlaylist,
   getPublicShare,
   getPublicShareMemoryHeader,
   getPublicShareMemoryJournal,
   getPublicShareMemoryByPath,
   listPublicShareChildMemories,
   listPublicShareMemoryMedia,
+  listPublicShareMemoryPlaylists,
+  listPublicShareMemoryTracks,
   loginPublicShare,
   logoutPublicShare,
   removePublicShareMemoryCover,
@@ -30,12 +37,18 @@ import {
   updatePublicShareMediaMetadata,
   updatePublicShareMemory,
   updatePublicShareMemoryJournal,
+  updatePublicShareMemoryPlaylist,
+  updatePublicShareMemoryTrack,
   uploadPublicShareMedia,
   uploadPublicShareMemoryMedia,
+  uploadPublicShareMemoryTrack,
+  deletePublicShareMemoryTrack,
   type Memory,
   type MemoryHeader,
   type MemoryJournal,
   type MemoryMedia,
+  type MemoryPlaylist,
+  type MemoryTrack,
   type PublicShareSummary
 } from '../features/memories/api'
 
@@ -45,17 +58,21 @@ const { locale, t } = useI18n()
 
 const shareId = computed(() => String(route.params.shareId || ''))
 const sharePath = computed(() => routePathToSharePath(route.params.pathMatch))
+const activeMemoryTab = computed(() => memoryTabFromHash(route.hash))
 const share = ref<PublicShareSummary | null>(null)
 const memory = ref<Memory | null>(null)
 const memoryHeader = ref<MemoryHeader | null>(null)
 const memoryJournal = ref<MemoryJournal | null>(null)
 const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
+const playlists = ref<MemoryPlaylist[]>([])
+const tracks = ref<MemoryTrack[]>([])
 const password = ref('')
 const displayName = ref('')
 const selectedFiles = ref<File[]>([])
 const uploadPicker = ref<{ clear: () => void } | null>(null)
 const createMemoryOpen = ref(false)
+const privacyDialogOpen = ref(false)
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
@@ -79,6 +96,9 @@ const publicShareUploadBatches = computed(() =>
     (batch) => batch.context.type === 'public-share-root' && batch.context.shareId === shareId.value
   )
 )
+const shareCoverUrl = computed(() =>
+  memoryHeader.value?.coverUrl ? `${API_BASE}${memoryHeader.value.coverUrl}` : ''
+)
 const capabilities = computed(() => ({
   canEdit: Boolean(share.value?.canEdit),
   canUpload: Boolean(share.value?.canUpload),
@@ -89,15 +109,18 @@ const capabilities = computed(() => ({
   canEditJournal: Boolean(share.value?.canDelete),
   canEditMediaMetadata: Boolean(share.value?.canEdit),
   canDeleteMedia: Boolean(share.value?.canDelete),
+  canEditTracks: Boolean(share.value?.canEdit),
+  canEditPlaylists: Boolean(share.value?.canEdit),
   canDeleteCurrentMemory: Boolean(share.value?.canDelete && memory.value?.id !== share.value.rootMemory?.id),
   showScope: false,
-  canDownload: Boolean(share.value?.canViewGallery && !isUploaderOnly.value)
+  canDownload: Boolean(share.value?.canViewGallery && !isUploaderOnly.value),
+  canFavorite: false
 }))
 
 onMounted(loadShare)
 
 watch(
-  () => route.fullPath,
+  () => [shareId.value, sharePath.value],
   () => {
     if (hasShareAccess.value && !isUploaderOnly.value) void loadCurrentMemory()
   }
@@ -129,7 +152,7 @@ async function login() {
     share.value = await loginPublicShare(
       shareId.value,
       share.value?.passwordRequired ? password.value : null,
-      displayName.value.trim()
+      share.value?.displayNameRequired ? displayName.value.trim() : null
     )
     password.value = ''
     if (share.value.redirectUrl) {
@@ -152,6 +175,8 @@ async function closeShare() {
   memoryJournal.value = null
   childMemories.value = []
   media.value = []
+  playlists.value = []
+  tracks.value = []
   await loadShare()
 }
 
@@ -167,16 +192,20 @@ async function loadCurrentMemory() {
   try {
     const current = await getPublicShareMemoryByPath(shareId.value, sharePath.value)
     memory.value = current
-    const [header, journal, children, memoryMedia] = await Promise.all([
+    const [header, journal, children, memoryMedia, memoryTracks, memoryPlaylists] = await Promise.all([
       getPublicShareMemoryHeader(shareId.value, current.id),
       getPublicShareMemoryJournal(shareId.value, current.id),
       listPublicShareChildMemories(shareId.value, current.id),
-      listPublicShareMemoryMedia(shareId.value, current.id)
+      listPublicShareMemoryMedia(shareId.value, current.id),
+      listPublicShareMemoryTracks(shareId.value, current.id),
+      listPublicShareMemoryPlaylists(shareId.value, current.id)
     ])
     memoryHeader.value = header
     memoryJournal.value = journal
     childMemories.value = children
     media.value = memoryMedia
+    tracks.value = memoryTracks
+    playlists.value = memoryPlaylists
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
   } finally {
@@ -186,6 +215,10 @@ async function loadCurrentMemory() {
 
 function openMemory(nextMemory: Memory) {
   void router.push(publicShareRoute(nextMemory.path))
+}
+
+function updateActiveMemoryTab(tab: MemoryDetailTab) {
+  void router.replace({ path: route.path, query: route.query, hash: memoryTabToHash(tab) })
 }
 
 function handleMemoryChanged(updated: Memory) {
@@ -261,26 +294,36 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
 
 <template>
   <section class="public-share-view">
-    <header class="public-share-header">
+    <header
+      v-if="canShowLogin"
+      class="public-share-header"
+      :class="{ 'public-share-header-with-cover': Boolean(shareCoverUrl) }"
+    >
+      <img v-if="shareCoverUrl" class="public-share-header-cover" :src="shareCoverUrl" alt="" />
       <div>
         <p>{{ t('share.intro') }}</p>
         <h1>{{ memory?.displayName || share?.rootMemory?.displayName || t('share.intro') }}</h1>
       </div>
+    </header>
+
+    <div v-if="share?.authenticated" class="public-share-actions">
       <Button
-        v-if="share?.authenticated"
         :label="t('common.close')"
         icon="pi pi-sign-out"
         severity="secondary"
         outlined
         @click="closeShare"
       />
-    </header>
+    </div>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
     <form v-if="canShowLogin" class="public-share-login" @submit.prevent="login">
-      <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
+      <div class="public-share-login-copy">
+        <h2>{{ t('share.loginTitle') }}</h2>
+        <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
+      </div>
       <InputText
         v-if="share?.passwordRequired"
         v-model="password"
@@ -365,6 +408,9 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :playlists="playlists"
+      :tracks="tracks"
+      :active-tab="activeMemoryTab"
       :capabilities="capabilities"
       :save-memory="(memoryId, request) => updatePublicShareMemory(shareId, memoryId, request)"
       :save-journal="(memoryId, request) => updatePublicShareMemoryJournal(shareId, memoryId, request)"
@@ -374,13 +420,35 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       :delete-memory="(memoryId) => deletePublicShareMemory(shareId, memoryId)"
       :update-media-metadata="(mediaId, memoryId, request) => updatePublicShareMediaMetadata(shareId, memoryId, mediaId, request)"
       :delete-media="(mediaId, memoryId) => deletePublicShareMedia(shareId, memoryId, mediaId)"
+      :upload-track="(memoryId, request) => uploadPublicShareMemoryTrack(shareId, memoryId, request)"
+      :update-track="(trackId, memoryId, request) => updatePublicShareMemoryTrack(shareId, memoryId, trackId, request)"
+      :delete-track="(trackId, memoryId) => deletePublicShareMemoryTrack(shareId, memoryId, trackId)"
+      :create-playlist="(memoryId, request) => createPublicShareMemoryPlaylist(shareId, memoryId, request)"
+      :update-playlist="(playlistId, memoryId, request) => updatePublicShareMemoryPlaylist(shareId, memoryId, playlistId, request)"
+      :delete-playlist="(playlistId, memoryId) => deletePublicShareMemoryPlaylist(shareId, memoryId, playlistId)"
       :download-url="publicShareDownloadUrl"
+      @update:active-tab="updateActiveMemoryTab"
       @open-memory="openMemory"
       @create-child-memory="createMemoryOpen = true"
       @changed="handleMemoryChanged"
       @deleted="handleMemoryDeleted"
       @media-deleted="loadCurrentMemory"
     />
+
+    <footer class="public-share-footer">
+      <span>{{ t('share.providedBy') }}</span>
+      <a href="https://github.com/veyq/veyq" target="_blank" rel="noreferrer">{{ t('share.projectLink') }}</a>
+      <button type="button" @click="privacyDialogOpen = true">{{ t('share.privacyLink') }}</button>
+    </footer>
+
+    <Dialog
+      v-model:visible="privacyDialogOpen"
+      modal
+      :header="t('privacy.dialogTitle')"
+      class="privacy-settings-dialog"
+    >
+      <PrivacySettingsPanel />
+    </Dialog>
 
     <CreateMemoryDialog
       v-if="memory"

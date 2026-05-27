@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import Carousel from 'primevue/carousel'
 import { API_BASE } from '../../../shared/api/httpClient'
-import type { Memory, MemoryMedia } from '../api'
+import type { Memory, MemoryMedia, MemoryPlaylist, MemoryTrack } from '../api'
 
 type JournalHtmlBlock = {
   type: 'html'
@@ -30,6 +30,8 @@ type JournalBlock = JournalHtmlBlock | JournalMediaBlock | JournalCarouselBlock
 const props = defineProps<{
   markdown: string
   media: MemoryMedia[]
+  tracks?: MemoryTrack[]
+  playlists?: MemoryPlaylist[]
   childMemories: Memory[]
 }>()
 
@@ -125,12 +127,12 @@ function renderContextEmbed(target: string, label: string): string {
   if (!parsed) return unavailableEmbed(label)
   if (parsed.kind === 'memory') return renderMemoryEmbed(parsed.value, label)
   if (parsed.kind === 'memory-path') return renderMemoryPathEmbed(parsed.value, label)
-  if (parsed.kind === 'playlist') return renderSimpleEmbed('pi pi-volume-up', label, parsed.params.get('url') || '')
+  if (parsed.kind === 'playlist') return renderPlaylistEmbed(parsed.value, label, parsed.params.get('url') || '')
   if (parsed.kind === 'map') {
     const coords = [parsed.params.get('lat'), parsed.params.get('lng')].filter(Boolean).join(', ')
     return renderSimpleEmbed('pi pi-map-marker', label, coords)
   }
-  if (parsed.kind === 'track') return renderSimpleEmbed('pi pi-map', label, parsed.params.get('url') || '')
+  if (parsed.kind === 'track') return renderTrackEmbed(parsed.value, label)
   return unavailableEmbed(label)
 }
 
@@ -144,6 +146,39 @@ function renderMemoryPathEmbed(path: string, label: string): string {
   const memory = props.childMemories.find((item) => item.path === path || item.path.endsWith(`/${path.replace(/^\/+/, '')}`))
   if (!memory) return unavailableEmbed(label || path)
   return renderMemoryEmbed(memory.id, label || escapeHtml(memory.displayName))
+}
+
+function renderTrackEmbed(trackId: string, label: string): string {
+  const track = props.tracks?.find((item) => item.id === trackId)
+  if (!track) return unavailableEmbed(label || trackId)
+  return renderSimpleEmbed(
+    'pi pi-map',
+    label || escapeHtml(track.title),
+    `${escapeHtml(track.title)} · ${formatDistance(track.distanceMeters)}`
+  )
+}
+
+function renderPlaylistEmbed(playlistId: string, label: string, url: string): string {
+  if (!playlistId) return renderSimpleEmbed('pi pi-volume-up', label, url)
+  const playlist = props.playlists?.find((item) => item.id === playlistId)
+  if (!playlist) return unavailableEmbed(label || playlistId)
+  return renderSimpleEmbed('pi pi-volume-up', label || escapeHtml(playlist.title), providerLabel(playlist.provider))
+}
+
+function providerLabel(provider: string): string {
+  const labels: Record<string, string> = {
+    SPOTIFY: 'Spotify',
+    APPLE_MUSIC: 'Apple Music',
+    YOUTUBE: 'YouTube',
+    SOUNDCLOUD: 'SoundCloud',
+    DEEZER: 'Deezer'
+  }
+  return labels[provider] || provider
+}
+
+function formatDistance(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`
+  return `${meters.toLocaleString()} m`
 }
 
 function renderSimpleEmbed(icon: string, label: string, meta: string): string {

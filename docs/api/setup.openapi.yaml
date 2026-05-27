@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Setup API
+  title: veyq Setup API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Veyq Setup API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer veyq Setup API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 tags:

@@ -4,31 +4,41 @@ import {
   memoriesApi,
   memoryMediaApi,
   memoryNavigationApi,
+  memoryParticipantsApi,
+  memoryPlaylistsApi,
   memorySharesApi,
+  memoryTracksApi,
   publicSharesApi,
   searchApi
 } from '../../../api/generatedClient'
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
   CreateMemoryMediaUploadRequest,
+  CreateMemoryPlaylistRequest as GeneratedCreateMemoryPlaylistRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateMemoryShareRequest as GeneratedCreateMemoryShareRequest,
   CreatePublicShareMemoryRequest as GeneratedCreatePublicShareMemoryRequest,
   MemoryMediaSummary,
+  MemoryParticipantSummary,
   MemoryMediaUploadSession,
+  MemoryPlaylistSummary,
   MemoryShareRole,
+  MemoryTrackSummary,
   PendingMemoryMediaUploadSession,
   PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareMemorySummary,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
+  UpdateMemoryPlaylistRequest as GeneratedUpdateMemoryPlaylistRequest,
+  UpdateMemoryTrackRequest as GeneratedUpdateMemoryTrackRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest,
   UpdatePublicShareMemoryRequest as GeneratedUpdatePublicShareMemoryRequest
 } from '../../../api/generated'
 import { callApi, uploadBlob } from '../../../shared/api/httpClient'
 import type {
   CreateFolderRequest,
+  CreateMemoryPlaylistRequest,
   CreateMemoryRequest,
   Memory,
   MemoryFolder,
@@ -36,14 +46,19 @@ import type {
   MemoryJournal,
   MemoryMedia,
   MemoryNavigationResponse,
+  MemoryPlaylist,
+  MemoryTrack,
   SearchResultSummary,
   SetMemoryCoverRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryPlaylistRequest,
+  UpdateMemoryTrackRequest,
   UpdateMemoryRequest,
   UploadMediaOptions,
-  UploadMemoryMediaRequest
+  UploadMemoryMediaRequest,
+  UploadMemoryTrackRequest
 } from './types'
 
 export function getMemoryNavigation(
@@ -163,6 +178,36 @@ export function listChildMemories(tenantName: string, memoryId: string): Promise
   )
 }
 
+export function listMemoryParticipants(
+  tenantName: string,
+  memoryId: string
+): Promise<MemoryParticipantSummary[]> {
+  return generatedCall(memoryParticipantsApi.listMemoryParticipants({ tenantName, memoryId }))
+}
+
+export function listMemoryParticipantCandidates(
+  tenantName: string,
+  memoryId: string
+): Promise<MemoryParticipantSummary[]> {
+  return generatedCall(memoryParticipantsApi.listMemoryParticipantCandidates({ tenantName, memoryId }))
+}
+
+export function addMemoryParticipant(
+  tenantName: string,
+  memoryId: string,
+  userId: number
+): Promise<MemoryParticipantSummary> {
+  return generatedCall(memoryParticipantsApi.addMemoryParticipant({ tenantName, memoryId, userId }))
+}
+
+export function removeMemoryParticipant(
+  tenantName: string,
+  memoryId: string,
+  userId: number
+): Promise<void> {
+  return generatedCall(memoryParticipantsApi.removeMemoryParticipant({ tenantName, memoryId, userId }))
+}
+
 export function setMemoryCover(
   tenantName: string,
   memoryId: string,
@@ -210,6 +255,88 @@ export function uploadMemoryMedia(
     request,
     options,
   ).then(normalizeMemoryMedia)
+}
+
+export function listMemoryTracks(tenantName: string, memoryId: string): Promise<MemoryTrack[]> {
+  return generatedCall(memoryTracksApi.listMemoryTracks({ tenantName, memoryId })).then((tracks) =>
+    tracks.map(normalizeMemoryTrack)
+  )
+}
+
+export function uploadMemoryTrack(
+  tenantName: string,
+  memoryId: string,
+  request: UploadMemoryTrackRequest
+): Promise<MemoryTrack> {
+  return generatedCall(
+    memoryTracksApi.uploadMemoryTrack({
+      tenantName,
+      memoryId,
+      file: request.file,
+      title: request.title,
+      activityType: request.activityType
+    })
+  ).then(normalizeMemoryTrack)
+}
+
+export function updateMemoryTrack(
+  tenantName: string,
+  memoryId: string,
+  trackId: string,
+  request: UpdateMemoryTrackRequest
+): Promise<MemoryTrack> {
+  return generatedCall(
+    memoryTracksApi.updateMemoryTrack({
+      tenantName,
+      memoryId,
+      trackId,
+      updateMemoryTrackRequest: request as GeneratedUpdateMemoryTrackRequest
+    })
+  ).then(normalizeMemoryTrack)
+}
+
+export function deleteMemoryTrack(tenantName: string, memoryId: string, trackId: string): Promise<void> {
+  return generatedCall(memoryTracksApi.deleteMemoryTrack({ tenantName, memoryId, trackId }))
+}
+
+export function listMemoryPlaylists(tenantName: string, memoryId: string): Promise<MemoryPlaylist[]> {
+  return generatedCall(memoryPlaylistsApi.listMemoryPlaylists({ tenantName, memoryId })).then(
+    (playlists) => playlists.map(normalizeMemoryPlaylist)
+  )
+}
+
+export function createMemoryPlaylist(
+  tenantName: string,
+  memoryId: string,
+  request: CreateMemoryPlaylistRequest
+): Promise<MemoryPlaylist> {
+  return generatedCall(
+    memoryPlaylistsApi.createMemoryPlaylist({
+      tenantName,
+      memoryId,
+      createMemoryPlaylistRequest: createMemoryPlaylistRequest(request)
+    })
+  ).then(normalizeMemoryPlaylist)
+}
+
+export function updateMemoryPlaylist(
+  tenantName: string,
+  memoryId: string,
+  playlistId: string,
+  request: UpdateMemoryPlaylistRequest
+): Promise<MemoryPlaylist> {
+  return generatedCall(
+    memoryPlaylistsApi.updateMemoryPlaylist({
+      tenantName,
+      memoryId,
+      playlistId,
+      updateMemoryPlaylistRequest: request as GeneratedUpdateMemoryPlaylistRequest
+    })
+  ).then(normalizeMemoryPlaylist)
+}
+
+export function deleteMemoryPlaylist(tenantName: string, memoryId: string, playlistId: string): Promise<void> {
+  return generatedCall(memoryPlaylistsApi.deleteMemoryPlaylist({ tenantName, memoryId, playlistId }))
 }
 
 export function updateMemoryMediaMetadata(
@@ -290,11 +417,15 @@ export function getPublicShare(shareId: string) {
   return generatedCall(publicSharesApi.getPublicShare({ shareId }))
 }
 
-export function loginPublicShare(shareId: string, password: string | null, displayName: string) {
+export function loginPublicShare(shareId: string, password: string | null, displayName?: string | null) {
+  const normalizedDisplayName = displayName?.trim()
   return generatedCall(
     publicSharesApi.loginPublicShare({
       shareId,
-      publicShareLoginRequest: { password: password ?? undefined, displayName }
+      publicShareLoginRequest: {
+        password: password ?? undefined,
+        displayName: normalizedDisplayName || undefined
+      }
     })
   )
 }
@@ -416,6 +547,102 @@ export function listPublicShareMemoryMedia(
   return generatedCall(publicSharesApi.listPublicShareMemoryMedia({ shareId, memoryId })).then(
     (media) => media.map(normalizePublicShareMedia)
   )
+}
+
+export function listPublicShareMemoryTracks(
+  shareId: string,
+  memoryId: string
+): Promise<MemoryTrack[]> {
+  return generatedCall(publicSharesApi.listPublicShareMemoryTracks({ shareId, memoryId })).then(
+    (tracks) => tracks.map(normalizeMemoryTrack)
+  )
+}
+
+export function listPublicShareMemoryPlaylists(
+  shareId: string,
+  memoryId: string
+): Promise<MemoryPlaylist[]> {
+  return generatedCall(publicSharesApi.listPublicShareMemoryPlaylists({ shareId, memoryId })).then(
+    (playlists) => playlists.map(normalizeMemoryPlaylist)
+  )
+}
+
+export function createPublicShareMemoryPlaylist(
+  shareId: string,
+  memoryId: string,
+  request: CreateMemoryPlaylistRequest
+): Promise<MemoryPlaylist> {
+  return generatedCall(
+    publicSharesApi.createPublicShareMemoryPlaylist({
+      shareId,
+      memoryId,
+      createMemoryPlaylistRequest: createMemoryPlaylistRequest(request)
+    })
+  ).then(normalizeMemoryPlaylist)
+}
+
+export function updatePublicShareMemoryPlaylist(
+  shareId: string,
+  memoryId: string,
+  playlistId: string,
+  request: UpdateMemoryPlaylistRequest
+): Promise<MemoryPlaylist> {
+  return generatedCall(
+    publicSharesApi.updatePublicShareMemoryPlaylist({
+      shareId,
+      memoryId,
+      playlistId,
+      updateMemoryPlaylistRequest: request as GeneratedUpdateMemoryPlaylistRequest
+    })
+  ).then(normalizeMemoryPlaylist)
+}
+
+export function deletePublicShareMemoryPlaylist(
+  shareId: string,
+  memoryId: string,
+  playlistId: string
+): Promise<void> {
+  return generatedCall(publicSharesApi.deletePublicShareMemoryPlaylist({ shareId, memoryId, playlistId }))
+}
+
+export function uploadPublicShareMemoryTrack(
+  shareId: string,
+  memoryId: string,
+  request: UploadMemoryTrackRequest
+): Promise<MemoryTrack> {
+  return generatedCall(
+    publicSharesApi.uploadPublicShareMemoryTrack({
+      shareId,
+      memoryId,
+      file: request.file,
+      title: request.title,
+      activityType: request.activityType
+    })
+  ).then(normalizeMemoryTrack)
+}
+
+export function updatePublicShareMemoryTrack(
+  shareId: string,
+  memoryId: string,
+  trackId: string,
+  request: UpdateMemoryTrackRequest
+): Promise<MemoryTrack> {
+  return generatedCall(
+    publicSharesApi.updatePublicShareMemoryTrack({
+      shareId,
+      memoryId,
+      trackId,
+      updateMemoryTrackRequest: request as GeneratedUpdateMemoryTrackRequest
+    })
+  ).then(normalizeMemoryTrack)
+}
+
+export function deletePublicShareMemoryTrack(
+  shareId: string,
+  memoryId: string,
+  trackId: string
+): Promise<void> {
+  return generatedCall(publicSharesApi.deletePublicShareMemoryTrack({ shareId, memoryId, trackId }))
 }
 
 export function uploadPublicShareMemoryMedia(
@@ -604,6 +831,15 @@ function updateMemoryRequest(request: UpdateMemoryRequest): GeneratedUpdateMemor
   }
 }
 
+function createMemoryPlaylistRequest(request: CreateMemoryPlaylistRequest): GeneratedCreateMemoryPlaylistRequest {
+  return {
+    title: request.title ?? undefined,
+    note: request.note ?? undefined,
+    featured: request.featured,
+    url: request.url
+  }
+}
+
 function createPublicShareMemoryRequest(request: CreateMemoryRequest) {
   return {
     name: request.name,
@@ -649,14 +885,16 @@ function normalizeMemoryHeader(
     coverCrop?: MemoryHeader['coverCrop']
     scope?: MemoryHeader['scope']
     favorite?: boolean
-  } & Omit<MemoryHeader, 'coverUrl' | 'coverCrop' | 'scope' | 'favorite'>
+    participants?: MemoryHeader['participants']
+  } & Omit<MemoryHeader, 'coverUrl' | 'coverCrop' | 'scope' | 'favorite' | 'participants'>
 ): MemoryHeader {
   return {
     ...header,
     coverUrl: header.coverUrl ?? null,
     coverCrop: header.coverCrop ?? null,
     favorite: header.favorite ?? false,
-    scope: header.scope ?? null
+    scope: header.scope ?? null,
+    participants: header.participants ?? []
   }
 }
 
@@ -698,6 +936,18 @@ function normalizeMemoryMedia(
   }
 }
 
+function normalizeMemoryTrack(track: MemoryTrackSummary): MemoryTrack {
+  return track
+}
+
+function normalizeMemoryPlaylist(playlist: MemoryPlaylistSummary): MemoryPlaylist {
+  return {
+    ...playlist,
+    note: playlist.note ?? undefined,
+    featured: playlist.featured ?? false
+  }
+}
+
 function normalizePublicShareMemory(memory: PublicShareMemorySummary): Memory {
   return normalizeMemory({
     ...memory,
@@ -730,7 +980,7 @@ function normalizePublicShareMedia(media: PublicShareMediaSummary): MemoryMedia 
     lensModel: undefined,
     imageWidth: undefined,
     imageHeight: undefined,
-    gpsLatitude: undefined,
-    gpsLongitude: undefined
+    gpsLatitude: media.gpsLatitude ?? undefined,
+    gpsLongitude: media.gpsLongitude ?? undefined
   })
 }

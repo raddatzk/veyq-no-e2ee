@@ -311,8 +311,10 @@ describe('Memory detail dialogs', () => {
 
   it('starts a background upload batch and closes the dialog', async () => {
     const first = new File(['first-file'], 'beach.jpg', { type: 'image/jpeg' })
-    const uploadMedia = vi.fn().mockResolvedValue(media())
+    const uploaded = media({ id: 'media-uploaded', title: 'Beach' })
+    const uploadMedia = vi.fn().mockResolvedValue(uploaded)
     const saved = vi.fn()
+    const uploadedEvent = vi.fn()
     const { visibleBatches } = useUploadQueue()
 
     const wrapper = mount(MemoryUploadDialog, {
@@ -321,6 +323,7 @@ describe('Memory detail dialogs', () => {
         tenantName: 'tenant',
         memoryId: 'mem-1',
         uploadMedia,
+        onUploaded: uploadedEvent,
         onSaved: saved
       },
       global: { stubs: dialogStubs() }
@@ -334,6 +337,7 @@ describe('Memory detail dialogs', () => {
     expect(visibleBatches.value[0].files[0].name).toBe('beach.jpg')
     expect(uploadMedia).toHaveBeenCalledWith('mem-1', { file: first, title: 'beach.jpg' }, expect.any(Object))
     expect(wrapper.emitted('update:visible')?.at(-1)).toEqual([false])
+    expect(uploadedEvent).toHaveBeenCalledWith(uploaded)
     expect(saved).toHaveBeenCalled()
   })
 

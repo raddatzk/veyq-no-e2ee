@@ -7,11 +7,15 @@ import {
   listChildMemories,
   listMemoriesByFolder,
   listMemoryMedia,
+  listMemoryPlaylists,
+  listMemoryTracks,
   type Memory,
   type MemoryHeader,
   type MemoryJournal,
   type MemoryMedia,
-  type MemoryNavigationResponse
+  type MemoryNavigationResponse,
+  type MemoryPlaylist,
+  type MemoryTrack
 } from '../api'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
 
@@ -34,6 +38,8 @@ export function useMemoryRouteData(
   const memoryBreadcrumbs = ref<MemoryRouteBreadcrumb[]>([])
   const childMemories = ref<Memory[]>([])
   const media = ref<MemoryMedia[]>([])
+  const playlists = ref<MemoryPlaylist[]>([])
+  const tracks = ref<MemoryTrack[]>([])
   const loading = ref(false)
   const error = ref('')
   let loadSequence = 0
@@ -62,6 +68,8 @@ export function useMemoryRouteData(
     memoryBreadcrumbs.value = []
     childMemories.value = []
     media.value = []
+    playlists.value = []
+    tracks.value = []
 
     try {
       if (routePath.value !== '/') {
@@ -83,12 +91,14 @@ export function useMemoryRouteData(
       if (sequence !== loadSequence) return true
       kind.value = 'memory'
       memory.value = loadedMemory
-      const [header, journal, breadcrumbs, children, memoryMedia] = await Promise.all([
+      const [header, journal, breadcrumbs, children, memoryMedia, memoryTracks, memoryPlaylists] = await Promise.all([
         getMemoryHeader(tenantName.value, loadedMemory.id),
         getMemoryJournal(tenantName.value, loadedMemory.id),
         loadMemoryBreadcrumbs(loadedMemory),
         listChildMemories(tenantName.value, loadedMemory.id),
-        listMemoryMedia(tenantName.value, loadedMemory.id, false)
+        listMemoryMedia(tenantName.value, loadedMemory.id, false),
+        listMemoryTracks(tenantName.value, loadedMemory.id),
+        listMemoryPlaylists(tenantName.value, loadedMemory.id)
       ])
       if (sequence !== loadSequence) return true
       memoryHeader.value = header
@@ -96,6 +106,8 @@ export function useMemoryRouteData(
       memoryBreadcrumbs.value = breadcrumbs
       childMemories.value = children
       media.value = memoryMedia
+      tracks.value = memoryTracks
+      playlists.value = memoryPlaylists
       return true
     } catch (unknownError) {
       if (isApiStatus(unknownError, 404)) return false
@@ -141,6 +153,8 @@ export function useMemoryRouteData(
     load,
     loading,
     media,
+    playlists,
+    tracks,
     memories,
     memory,
     memoryBreadcrumbs,

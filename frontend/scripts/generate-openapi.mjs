@@ -33,7 +33,7 @@ const generatorOptions = [
 const bundled = {
   openapi: '3.1.0',
   info: {
-    title: 'Veyq API',
+    title: 'veyq API',
     version: '0.1.0',
     description: 'Bundled frontend API contract generated from docs/api specs.'
   },

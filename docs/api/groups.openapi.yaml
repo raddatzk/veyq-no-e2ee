@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Groups API
+  title: veyq Groups API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Veyq Groups API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer veyq Groups API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -279,6 +279,9 @@ components:
           format: int64
         role:
           "$ref": "#/components/schemas/GroupRole"
+      example:
+        id: 7
+        role: GroupOwner
     UpdateGroupRequest:
       type: object
       additionalProperties: false
@@ -312,6 +315,12 @@ components:
         role:
           description: Present only for group owners, tenant owners and server owners.
           "$ref": "#/components/schemas/GroupRole"
+      example:
+        user:
+          userId: 1
+          displayName: Kevin
+          permalink: kevin
+        role: GroupOwner
     GroupSummary:
       type: object
       additionalProperties: false
@@ -340,6 +349,7 @@ components:
           - user:
               userId: 1
               displayName: Kevin
+              permalink: kevin
             role: GroupOwner
     SimplifiedGroupSummary:
       type: object
@@ -356,6 +366,10 @@ components:
           "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        id: 99
+        name: family
+        displayName: Family
     GroupsSummary:
       type: object
       additionalProperties: false

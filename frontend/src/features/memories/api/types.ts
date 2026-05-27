@@ -6,10 +6,15 @@ import type {
   MemoryFolder,
   MemoryHeaderSummary,
   MemoryJournalSummary,
+  MemoryPlaylistProvider,
+  MemoryPlaylistSummary,
+  MemoryTrackActivityType,
+  MemoryTrackSummary,
   MemoryMediaUploadSession,
   MediaUploader,
   MemoryNavigationResponse as GeneratedMemoryNavigationResponse,
   MemoryMediaSummary,
+  MemoryParticipantSummary,
   MemoryScope,
   MemoryShareSummary,
   MemoryShareRole,
@@ -28,6 +33,8 @@ import type {
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest as GeneratedUpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
+  UpdateMemoryPlaylistRequest as GeneratedUpdateMemoryPlaylistRequest,
+  UpdateMemoryTrackRequest as GeneratedUpdateMemoryTrackRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
 } from '../../../api/generated'
 
@@ -38,8 +45,11 @@ export type {
   MemoryFolder,
   MemoryScopeRoot,
   MediaUploader,
+  MemoryParticipantSummary,
   MemoryShareSummary,
   MemoryShareRole,
+  MemoryPlaylistProvider,
+  MemoryTrackActivityType,
   PublicShareMemorySummary,
   PublicShareMediaSummary,
   PublicShareSummary,
@@ -85,6 +95,27 @@ export type PublicShareMemoryHeader = Omit<
 }
 
 export type MemoryJournal = MemoryJournalSummary
+
+export type MemoryTrack = MemoryTrackSummary
+
+export type UpdateMemoryTrackRequest = GeneratedUpdateMemoryTrackRequest
+
+export type MemoryPlaylist = MemoryPlaylistSummary
+
+export type UpdateMemoryPlaylistRequest = GeneratedUpdateMemoryPlaylistRequest
+
+export type CreateMemoryPlaylistRequest = {
+  title?: string | null
+  note?: string | null
+  featured?: boolean
+  url: string
+}
+
+export type UploadMemoryTrackRequest = {
+  file: File
+  title: string
+  activityType: MemoryTrackActivityType
+}
 
 export type MemoryMedia = Omit<
   MemoryMediaSummary,

@@ -9,7 +9,10 @@ import com.veyq.api.generated.api.FoldersApi
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.api.MemoryMediaApi
 import com.veyq.api.generated.api.MemoryNavigationApi
+import com.veyq.api.generated.api.MemoryParticipantsApi
+import com.veyq.api.generated.api.MemoryPlaylistsApi
 import com.veyq.api.generated.api.MemorySharesApi
+import com.veyq.api.generated.api.MemoryTracksApi
 import com.veyq.api.generated.api.ProfilesApi
 import com.veyq.api.generated.api.PublicSharesApi
 import com.veyq.api.generated.api.SearchApi
@@ -21,8 +24,11 @@ import com.veyq.api.generated.api.UsersApi
 import com.veyq.api.library.folder.FolderResource
 import com.veyq.api.memory.MemoryMediaResource
 import com.veyq.api.memory.MemoryNavigationResource
+import com.veyq.api.memory.MemoryParticipantResource
+import com.veyq.api.memory.MemoryPlaylistResource
 import com.veyq.api.memory.MemoryResource
 import com.veyq.api.memory.MemoryShareResource
+import com.veyq.api.memory.MemoryTrackResource
 import com.veyq.api.memory.PublicShareResource
 import com.veyq.api.memory.SearchResource
 import com.veyq.api.settings.SettingsNavigationResource
@@ -312,6 +318,9 @@ class OpenApiContractTest {
             "POST /api/setup/admin",
             "GET /api/users/me",
             "PUT /api/users/me",
+            "GET /api/users/me/avatar",
+            "PUT /api/users/me/avatar",
+            "DELETE /api/users/me/avatar",
             "POST /api/users/me/email/confirm",
             "POST /api/users/me/password/change",
             "GET /api/users/me/passkeys",
@@ -364,9 +373,27 @@ class OpenApiContractTest {
             "GET /api/{tenantName}/memories/{memoryId}/header",
             "GET /api/{tenantName}/memories/{memoryId}/journal",
             "PUT /api/{tenantName}/memories/{memoryId}/journal",
+            "GET /api/{tenantName}/memories/{memoryId}/participants",
+            "GET /api/{tenantName}/memories/{memoryId}/participant-candidates",
+            "PUT /api/{tenantName}/memories/{memoryId}/participants/{userId}",
+            "DELETE /api/{tenantName}/memories/{memoryId}/participants/{userId}",
             "GET /api/{tenantName}/memories/{memoryId}/media",
             "POST /api/{tenantName}/memories/{memoryId}/media",
+            "POST /api/{tenantName}/memories/{memoryId}/media/uploads",
+            "GET /api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}",
+            "DELETE /api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}",
+            "PUT /api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}",
+            "POST /api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/complete",
             "GET /api/{tenantName}/memories/{memoryId}/download",
+            "GET /api/{tenantName}/memories/{memoryId}/tracks",
+            "POST /api/{tenantName}/memories/{memoryId}/tracks",
+            "PUT /api/{tenantName}/memories/{memoryId}/tracks/{trackId}",
+            "DELETE /api/{tenantName}/memories/{memoryId}/tracks/{trackId}",
+            "GET /api/{tenantName}/memories/{memoryId}/tracks/{trackId}/content",
+            "GET /api/{tenantName}/memories/{memoryId}/playlists",
+            "POST /api/{tenantName}/memories/{memoryId}/playlists",
+            "PUT /api/{tenantName}/memories/{memoryId}/playlists/{playlistId}",
+            "DELETE /api/{tenantName}/memories/{memoryId}/playlists/{playlistId}",
             "PUT /api/{tenantName}/memories/{memoryId}/cover",
             "DELETE /api/{tenantName}/memories/{memoryId}/cover",
             "GET /api/{tenantName}/memories/{memoryId}/cover/content",
@@ -375,6 +402,7 @@ class OpenApiContractTest {
             "GET /api/{tenantName}/memory-media/{mediaId}/content",
             "GET /api/{tenantName}/memory-media/{mediaId}/preview",
             "GET /api/{tenantName}/profiles/{userPermalink}",
+            "GET /api/{tenantName}/profiles/{userPermalink}/avatar",
             "GET /api/{tenantName}/memories/{memoryId}/shares",
             "POST /api/{tenantName}/memories/{memoryId}/shares",
             "PUT /api/{tenantName}/memory-shares/{shareId}",
@@ -393,7 +421,21 @@ class OpenApiContractTest {
             "POST /api/public-shares/{shareId}/memories/{memoryId}/children",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/media",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/media",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/media/uploads",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}",
+            "PUT /api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/media/uploads/{uploadId}/complete",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/download",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/tracks",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/tracks",
+            "PUT /api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}/content",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/playlists",
+            "POST /api/public-shares/{shareId}/memories/{memoryId}/playlists",
+            "PUT /api/public-shares/{shareId}/memories/{memoryId}/playlists/{playlistId}",
+            "DELETE /api/public-shares/{shareId}/memories/{memoryId}/playlists/{playlistId}",
             "PUT /api/public-shares/{shareId}/memories/{memoryId}/cover",
             "DELETE /api/public-shares/{shareId}/memories/{memoryId}/cover",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/cover/content",
@@ -401,6 +443,11 @@ class OpenApiContractTest {
             "DELETE /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}",
             "GET /api/public-shares/{shareId}/media",
             "POST /api/public-shares/{shareId}/media",
+            "POST /api/public-shares/{shareId}/media/uploads",
+            "GET /api/public-shares/{shareId}/media/uploads/{uploadId}",
+            "DELETE /api/public-shares/{shareId}/media/uploads/{uploadId}",
+            "PUT /api/public-shares/{shareId}/media/uploads/{uploadId}/chunks/{chunkIndex}",
+            "POST /api/public-shares/{shareId}/media/uploads/{uploadId}/complete",
             "GET /api/public-shares/{shareId}/media/{mediaId}/content",
             "GET /api/public-shares/{shareId}/media/{mediaId}/preview",
         )
@@ -417,7 +464,10 @@ class OpenApiContractTest {
             FoldersApi::class.java to FolderResource::class.java,
             MemoryNavigationApi::class.java to MemoryNavigationResource::class.java,
             MemoriesApi::class.java to MemoryResource::class.java,
+            MemoryParticipantsApi::class.java to MemoryParticipantResource::class.java,
             MemoryMediaApi::class.java to MemoryMediaResource::class.java,
+            MemoryTracksApi::class.java to MemoryTrackResource::class.java,
+            MemoryPlaylistsApi::class.java to MemoryPlaylistResource::class.java,
             MemorySharesApi::class.java to MemoryShareResource::class.java,
             PublicSharesApi::class.java to PublicShareResource::class.java,
             SearchApi::class.java to SearchResource::class.java,
@@ -428,14 +478,17 @@ class OpenApiContractTest {
                 "auth.openapi.yaml" -> AuthApi::class.java
                 "setup.openapi.yaml" -> SetupApi::class.java
                 "users.openapi.yaml" -> when (operationId) {
-                    "getUserProfile" -> ProfilesApi::class.java
+                    "getUserProfile", "getUserProfileAvatar" -> ProfilesApi::class.java
                     else -> UsersApi::class.java
                 }
                 "tenants.openapi.yaml" -> TenantsApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
                     "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
-                    "listMemoryMedia", "uploadMemoryMedia", "updateMemoryMediaMetadata", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
+                    "listMemoryParticipants", "listMemoryParticipantCandidates", "addMemoryParticipant", "removeMemoryParticipant" -> MemoryParticipantsApi::class.java
+                    "listMemoryMedia", "uploadMemoryMedia", "createMemoryMediaUpload", "getMemoryMediaUpload", "abortMemoryMediaUpload", "uploadMemoryMediaChunk", "completeMemoryMediaUpload", "updateMemoryMediaMetadata", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview" -> MemoryMediaApi::class.java
+                    "listMemoryTracks", "uploadMemoryTrack", "updateMemoryTrack", "deleteMemoryTrack", "memoryTrackContent" -> MemoryTracksApi::class.java
+                    "listMemoryPlaylists", "createMemoryPlaylist", "updateMemoryPlaylist", "deleteMemoryPlaylist" -> MemoryPlaylistsApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
                     "searchTenant" -> SearchApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
@@ -445,7 +498,7 @@ class OpenApiContractTest {
                 "settings.openapi.yaml" -> SettingsApi::class.java
                 "shares.openapi.yaml" -> when (operationId) {
                     "listMemoryShares", "createMemoryShare", "updateMemoryShare" -> MemorySharesApi::class.java
-                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "getPublicShareMemoryHeader", "getPublicShareMemoryJournal", "updatePublicShareMemoryJournal", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "publicShareMediaContent", "publicShareMediaPreview" -> PublicSharesApi::class.java
+                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "getPublicShareMemoryHeader", "getPublicShareMemoryJournal", "updatePublicShareMemoryJournal", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "createPublicShareMemoryMediaUpload", "getPublicShareMemoryMediaUpload", "abortPublicShareMemoryMediaUpload", "uploadPublicShareMemoryMediaChunk", "completePublicShareMemoryMediaUpload", "listPublicShareMemoryTracks", "uploadPublicShareMemoryTrack", "updatePublicShareMemoryTrack", "deletePublicShareMemoryTrack", "publicShareMemoryTrackContent", "listPublicShareMemoryPlaylists", "createPublicShareMemoryPlaylist", "updatePublicShareMemoryPlaylist", "deletePublicShareMemoryPlaylist", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "createPublicShareMediaUpload", "getPublicShareMediaUpload", "abortPublicShareMediaUpload", "uploadPublicShareMediaChunk", "completePublicShareMediaUpload", "publicShareMediaContent", "publicShareMediaPreview" -> PublicSharesApi::class.java
                     else -> error("No generated shares interface mapping for $operationId")
                 }
                 else -> error("No generated interface mapping for $specFile")

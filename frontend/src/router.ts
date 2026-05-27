@@ -62,7 +62,8 @@ function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
     to.name !== 'setup' &&
     to.name !== 'invite' &&
     to.name !== 'public-share' &&
-    to.name !== 'password-reset'
+    to.name !== 'password-reset' &&
+    to.name !== 'email-confirm'
   )
 }
 
