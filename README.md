@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/main/scripts/veyq-ser
   bash -s -- install
 ```
 
-After installation, run `sudo ./veyq-server.sh doctor` from `/opt/veyq` after `.env` changes and before upgrades. For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
+After installation, run `./veyq-server.sh doctor` from the install directory after `.env` changes and before upgrades. Use `sudo` only if your Docker setup requires it. For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
 
 ### Environment Variables
 

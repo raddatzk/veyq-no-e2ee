@@ -5,21 +5,27 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21 AS backend-build-base
+FROM eclipse-temurin:21-jdk-jammy AS backend-build-base
 WORKDIR /code/backend
-COPY --chown=quarkus:quarkus backend/gradlew backend/gradlew.bat backend/build.gradle.kts backend/settings.gradle.kts ./
-COPY --chown=quarkus:quarkus backend/gradle ./gradle
-USER quarkus
+COPY backend/gradlew backend/gradlew.bat backend/build.gradle.kts backend/settings.gradle.kts ./
+COPY backend/gradle ./gradle
 # Cache-friendly warmup: downloads Gradle wrapper/distribution and plugin metadata once
 RUN ./gradlew --no-daemon help
 
 FROM backend-build-base AS backend-build-jvm
-COPY --chown=quarkus:quarkus docs/api ../docs/api
-COPY --chown=quarkus:quarkus backend/src ./src
-COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
+COPY docs/api ../docs/api
+COPY backend/src ./src
+COPY --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
 RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.package.type=fast-jar -x test
 
-FROM backend-build-base AS backend-build-native
+FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21 AS backend-build-native-base
+WORKDIR /code/backend
+COPY --chown=quarkus:quarkus backend/gradlew backend/gradlew.bat backend/build.gradle.kts backend/settings.gradle.kts ./
+COPY --chown=quarkus:quarkus backend/gradle ./gradle
+USER quarkus
+RUN ./gradlew --no-daemon help
+
+FROM backend-build-native-base AS backend-build-native
 COPY --chown=quarkus:quarkus docs/api ../docs/api
 COPY --chown=quarkus:quarkus backend/src ./src
 COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
