@@ -31,9 +31,13 @@ import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import javax.imageio.ImageIO
 
 @QuarkusTest
 class UserManagementResourceTest {
@@ -63,6 +67,93 @@ class UserManagementResourceTest {
         val owner = createUser("mgmt-owner-$runId", "admin1234567", ServerRole.ServerOwner)
         tenant = createTenant("mgmt-$runId", "Management $runId", "mgmt-$runId.example.test", owner)
         ownerCookie = login(owner.email, "admin1234567")
+    }
+
+    @Test
+    fun `uploads serves and deletes own avatar`() {
+        val avatar = createAvatarImage()
+
+        val avatarUrl = given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", avatar.toFile(), "image/png")
+            .`when`().put("/api/users/me/avatar")
+            .then()
+            .statusCode(200)
+            .body("avatarUrl", org.hamcrest.Matchers.startsWith("/api/users/me/avatar?v="))
+            .extract()
+            .path<String>("avatarUrl")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get(avatarUrl)
+            .then()
+            .statusCode(200)
+            .contentType("image/png")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().delete("/api/users/me/avatar")
+            .then()
+            .statusCode(200)
+            .body("avatarUrl", nullValue())
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users/me/avatar")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
+    fun `profile avatar follows tenant profile visibility`() {
+        val avatar = createAvatarImage()
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", avatar.toFile(), "image/png")
+            .`when`().put("/api/users/me/avatar")
+            .then()
+            .statusCode(200)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/${tenant.name}/profiles/${owner.permalink}/avatar")
+            .then()
+            .statusCode(200)
+            .contentType("image/png")
+
+        val outsider = createUser("avatar-outsider-$runId", "admin1234567", ServerRole.ServerMember)
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/${tenant.name}/profiles/${outsider.permalink}/avatar")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
+    fun `avatar upload rejects invalid image data`() {
+        val invalid = Files.createTempFile("veyq-avatar-invalid-", ".png")
+        Files.writeString(invalid, "not an image")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", invalid.toFile(), "image/png")
+            .`when`().put("/api/users/me/avatar")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
+    fun `avatar upload rejects oversized files`() {
+        val oversized = Files.createTempFile("veyq-avatar-oversized-", ".png")
+        Files.write(oversized, ByteArray((5 * 1024 * 1024) + 1))
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", oversized.toFile(), "image/png")
+            .`when`().put("/api/users/me/avatar")
+            .then()
+            .statusCode(413)
     }
 
     @Test
@@ -265,7 +356,8 @@ class UserManagementResourceTest {
         assertThat(response).containsEntry("displayName", "mgmt-owner-$runId")
         assertThat(response).containsEntry("permalink", "mgmt-owner-$runId")
         assertThat(response).containsEntry("initials", "M")
-        assertThat(response).doesNotContainKeys("userId", "email", "memories")
+        assertThat(response).containsKey("memories")
+        assertThat(response).doesNotContainKeys("userId", "email")
 
         given()
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
@@ -431,7 +523,7 @@ class UserManagementResourceTest {
             .`when`().post("/api/users/me/passkeys/options")
             .then()
             .statusCode(200)
-            .body("rp.name", equalTo("Veyq"))
+            .body("rp.name", equalTo("veyq"))
             .body("user.name", equalTo(currentUser.email))
             .body("user.displayName", equalTo(currentUser.displayName))
             .body("user.id", not(equalTo(currentUser.email)))
@@ -1069,6 +1161,11 @@ class UserManagementResourceTest {
                 tenantMemberRepo.persist(it)
             }
             tenant
+        }
+
+    private fun createAvatarImage(): Path =
+        Files.createTempFile("veyq-avatar-", ".png").also { path ->
+            ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
         }
 
     private fun <T> inTransaction(block: () -> T): T {

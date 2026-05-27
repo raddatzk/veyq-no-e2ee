@@ -38,6 +38,14 @@ export function updateMySettings(request: UpdateUserSettingsRequest): Promise<Us
   return generatedCall(usersApi.updateMySettings({ updateUserSettingsRequest: request }))
 }
 
+export function updateMyAvatar(file: Blob): Promise<UserSettingsResponse> {
+  return generatedCall(usersApi.updateMyAvatar({ file }))
+}
+
+export function deleteMyAvatar(): Promise<UserSettingsResponse> {
+  return generatedCall(usersApi.deleteMyAvatar())
+}
+
 export function confirmMyEmailChange(token: string): Promise<UserSettingsResponse> {
   return generatedCall(usersApi.confirmMyEmailChange({ confirmEmailChangeRequest: { token } }))
 }

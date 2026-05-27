@@ -21,6 +21,9 @@ import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 @ApplicationScoped
 class UserResource(
@@ -35,6 +38,22 @@ class UserResource(
 
     override fun updateMySettings(request: UpdateUserSettingsRequest): Response =
         Response.ok(userService.updateMySettings(request)).build()
+
+    override fun getMyAvatar(): Response =
+        userService.myAvatar()
+
+    override fun updateMyAvatar(fileInputStream: InputStream): Response {
+        val temp = Files.createTempFile("veyq-avatar-", ".tmp")
+        return try {
+            fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            Response.ok(userService.updateMyAvatar(temp)).build()
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    override fun deleteMyAvatar(): Response =
+        Response.ok(userService.deleteMyAvatar()).build()
 
     override fun confirmMyEmailChange(request: ConfirmEmailChangeRequest): Response =
         Response.ok(userService.confirmMyEmailChange(request)).build()

@@ -2,17 +2,22 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import ProgressSpinner from 'primevue/progressspinner'
 import PasskeyNameDialog from '../../../components/auth/PasskeyNameDialog.vue'
+import PrivacySettingsPanel from './PrivacySettingsPanel.vue'
 import {
   changeMyPassword,
   createMyPasskey,
+  deleteMyAvatar,
   deleteMyPasskey,
   getMySettings,
   listMyPasskeys,
+  updateMyAvatar,
   updateMySettings,
   updateMyPasskey,
   type PasskeySummary,
@@ -32,6 +37,7 @@ const passkeyNames = ref<Record<number, string>>({})
 const namingPasskey = ref<PasskeySummary | null>(null)
 const loading = ref(false)
 const savingProfile = ref(false)
+const savingAvatar = ref(false)
 const savingPassword = ref(false)
 const savingPasskey = ref(false)
 const savingPasskeyName = ref(false)
@@ -41,6 +47,7 @@ const error = ref('')
 const profileMessage = ref('')
 const passwordMessage = ref('')
 const passkeyMessage = ref('')
+const privacyDialogOpen = ref(false)
 
 onMounted(loadSettings)
 
@@ -79,6 +86,38 @@ async function saveProfile() {
     error.value = caught instanceof Error ? caught.message : t('profile.profileSaveFailed')
   } finally {
     savingProfile.value = false
+  }
+}
+
+async function uploadAvatar(event: FileUploadSelectEvent) {
+  const file = event.files?.[0]
+  if (!file) return
+  savingAvatar.value = true
+  error.value = ''
+  profileMessage.value = ''
+  try {
+    const nextSettings = await updateMyAvatar(file)
+    applySettings(nextSettings)
+    profileMessage.value = t('profile.avatarSaveSuccess')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('profile.avatarSaveFailed')
+  } finally {
+    savingAvatar.value = false
+  }
+}
+
+async function removeAvatar() {
+  savingAvatar.value = true
+  error.value = ''
+  profileMessage.value = ''
+  try {
+    const nextSettings = await deleteMyAvatar()
+    applySettings(nextSettings)
+    profileMessage.value = t('profile.avatarDeleteSuccess')
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('profile.avatarDeleteFailed')
+  } finally {
+    savingAvatar.value = false
   }
 }
 
@@ -205,6 +244,7 @@ function applySettings(nextSettings: UserSettingsResponse) {
     authState.user.displayName = nextSettings.displayName
     authState.user.permalink = nextSettings.permalink
     authState.user.email = nextSettings.email
+    authState.user.avatarUrl = nextSettings.avatarUrl
     authState.userLabel = nextSettings.displayName || nextSettings.email
   }
 }
@@ -232,6 +272,30 @@ function formatTimestamp(value?: string) {
 
     <template v-else-if="settings">
       <form class="form settings-form" @submit.prevent="saveProfile">
+        <div class="profile-avatar-settings">
+          <img v-if="settings.avatarUrl" class="profile-avatar-image" :src="settings.avatarUrl" alt="" />
+          <span v-else class="profile-avatar-fallback">{{ displayName.charAt(0).toUpperCase() || '?' }}</span>
+          <div class="button-row">
+            <FileUpload
+              mode="basic"
+              accept="image/png,image/jpeg"
+              :choose-label="t('profile.avatarChoose')"
+              custom-upload
+              :disabled="savingAvatar"
+              @select="uploadAvatar"
+            />
+            <Button
+              type="button"
+              icon="pi pi-trash"
+              severity="secondary"
+              text
+              :disabled="!settings.avatarUrl"
+              :loading="savingAvatar"
+              :aria-label="t('profile.avatarRemove')"
+              @click="removeAvatar"
+            />
+          </div>
+        </div>
         <label>
           <span>{{ t('auth.displayName') }}</span>
           <InputText v-model="displayName" autocomplete="name" />
@@ -267,6 +331,23 @@ function formatTimestamp(value?: string) {
         </div>
         <Message v-if="passwordMessage" severity="success" :closable="false">{{ passwordMessage }}</Message>
       </form>
+
+      <section class="form settings-form">
+        <div>
+          <h2>{{ t('privacy.externalContent') }}</h2>
+          <p>{{ t('privacy.externalContentCopy') }}</p>
+        </div>
+        <div class="button-row">
+          <Button
+            type="button"
+            :label="t('privacy.manageExternalContent')"
+            icon="pi pi-shield"
+            severity="secondary"
+            outlined
+            @click="privacyDialogOpen = true"
+          />
+        </div>
+      </section>
 
       <section class="form settings-form">
         <div>
@@ -324,6 +405,14 @@ function formatTimestamp(value?: string) {
         @save="saveCreatedPasskeyName"
         @skip="keepCreatedPasskeyName"
       />
+      <Dialog
+        v-model:visible="privacyDialogOpen"
+        modal
+        :header="t('privacy.dialogTitle')"
+        class="privacy-settings-dialog"
+      >
+        <PrivacySettingsPanel />
+      </Dialog>
     </template>
   </section>
 </template>

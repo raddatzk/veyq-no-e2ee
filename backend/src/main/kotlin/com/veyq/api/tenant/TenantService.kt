@@ -15,6 +15,7 @@ import com.veyq.api.generated.model.UpdateTenantSettingsRequest
 import com.veyq.api.generated.model.ManagedUserTenantSummary
 import com.veyq.api.generated.model.UserSummary
 import com.veyq.api.library.LibraryDeletionService
+import com.veyq.api.usermgmt.user.ownAvatarUrl
 import com.veyq.api.usermgmt.user.toUsersApiRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -156,4 +157,12 @@ private fun TenantRole.toTenantsApiRole(): ApiTenantRole =
     }
 
 private fun User.toTenantAdminSummary(): UserSummary =
-    UserSummary(id, email, displayName, permalink, role.toUsersApiRole(), passkeyCredentials.size)
+    UserSummary(
+        userId = id,
+        email = email,
+        displayName = displayName,
+        permalink = permalink,
+        serverRole = role.toUsersApiRole(),
+        passkeyCount = passkeyCredentials.size,
+        avatarUrl = ownAvatarUrl(),
+    )

@@ -11,4 +11,7 @@ class ProfileResource @Inject constructor(
 ) : ProfilesApi {
     override fun getUserProfile(tenantName: String, userPermalink: String): Response =
         Response.ok(userService.getUserProfile(userPermalink)).build()
+
+    override fun getUserProfileAvatar(tenantName: String, userPermalink: String): Response =
+        userService.getUserProfileAvatar(userPermalink)
 }

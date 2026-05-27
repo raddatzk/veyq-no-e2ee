@@ -104,7 +104,8 @@ async function doLogout() {
 
 <template>
   <button class="profile-button" type="button" @click="userMenu.toggle($event)">
-    <Avatar :label="profileLabel" shape="circle" />
+    <Avatar v-if="authState.user?.avatarUrl" :image="authState.user.avatarUrl" shape="circle" />
+    <Avatar v-else :label="profileLabel" shape="circle" />
     <span v-if="showName" class="profile-button-name">{{ authState.userLabel }}</span>
     <span v-if="showName" class="pi pi-chevron-down profile-button-chevron" />
   </button>

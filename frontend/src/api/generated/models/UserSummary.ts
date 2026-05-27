@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -53,6 +53,12 @@ export interface UserSummary {
     permalink: string;
     /**
      * 
+     * @type {string}
+     * @memberof UserSummary
+     */
+    avatarUrl?: string;
+    /**
+     * 
      * @type {ServerRole}
      * @memberof UserSummary
      */
@@ -100,6 +106,7 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'email': json['email'],
         'displayName': json['displayName'],
         'permalink': json['permalink'],
+        'avatarUrl': json['avatarUrl'] == null ? undefined : json['avatarUrl'],
         'serverRole': ServerRoleFromJSON(json['serverRole']),
         'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
         'passkeyCount': json['passkeyCount'],
@@ -121,6 +128,7 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
         'email': value['email'],
         'displayName': value['displayName'],
         'permalink': value['permalink'],
+        'avatarUrl': value['avatarUrl'],
         'serverRole': ServerRoleToJSON(value['serverRole']),
         'pendingEmail': value['pendingEmail'],
         'passkeyCount': value['passkeyCount'],

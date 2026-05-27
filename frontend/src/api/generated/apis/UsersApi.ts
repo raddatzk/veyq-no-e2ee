@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -120,6 +120,10 @@ export interface ResetMyPasswordRequest {
 export interface UpdateManagedUserRequest {
     userId: number;
     updateManagedUserRoleRequest: UpdateManagedUserRoleRequest;
+}
+
+export interface UpdateMyAvatarRequest {
+    file: Blob;
 }
 
 export interface UpdateMyPasskeyRequest {
@@ -335,6 +339,28 @@ export interface UsersApiInterface {
     createMyPasskeyOptions(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<{ [key: string]: any; }>;
 
     /**
+     * Creates request options for deleteMyAvatar without sending the request
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    deleteMyAvatarRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Eigenes Profilbild loeschen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    deleteMyAvatarRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild loeschen
+     */
+    deleteMyAvatar(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
+
+    /**
      * Creates request options for deleteMyPasskey without sending the request
      * @param {number} passkeyId Internal ID of an own passkey
      * @throws {RequiredError}
@@ -403,6 +429,28 @@ export interface UsersApiInterface {
      * Verwaltete Benutzer auflisten
      */
     getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
+
+    /**
+     * Creates request options for getMyAvatar without sending the request
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    getMyAvatarRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * @summary Eigenes Profilbild abrufen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    getMyAvatarRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild abrufen
+     */
+    getMyAvatar(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for listMyPasskeys without sending the request
@@ -499,6 +547,30 @@ export interface UsersApiInterface {
      * Server-Rolle eines Benutzers ändern
      */
     updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
+
+    /**
+     * Creates request options for updateMyAvatar without sending the request
+     * @param {Blob} file JPEG or PNG profile image up to 5 MB.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    updateMyAvatarRequestOpts(requestParameters: UpdateMyAvatarRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * @summary Eigenes Profilbild aktualisieren
+     * @param {Blob} file JPEG or PNG profile image up to 5 MB.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof UsersApiInterface
+     */
+    updateMyAvatarRaw(requestParameters: UpdateMyAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>>;
+
+    /**
+     * Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild aktualisieren
+     */
+    updateMyAvatar(requestParameters: UpdateMyAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary>;
 
     /**
      * Creates request options for updateMyPasskey without sending the request
@@ -963,6 +1035,45 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
+     * Creates request options for deleteMyAvatar without sending the request
+     */
+    async deleteMyAvatarRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/avatar`;
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild loeschen
+     */
+    async deleteMyAvatarRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.deleteMyAvatarRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild loeschen
+     */
+    async deleteMyAvatar(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.deleteMyAvatarRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for deleteMyPasskey without sending the request
      */
     async deleteMyPasskeyRequestOpts(requestParameters: DeleteMyPasskeyRequest): Promise<runtime.RequestOpts> {
@@ -1092,6 +1203,45 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.getAllUsersRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getMyAvatar without sending the request
+     */
+    async getMyAvatarRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/users/me/avatar`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild abrufen
+     */
+    async getMyAvatarRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.getMyAvatarRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild abrufen
+     */
+    async getMyAvatar(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getMyAvatarRaw(initOverrides);
         return await response.value();
     }
 
@@ -1283,6 +1433,73 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
      */
     async updateManagedUser(requestParameters: UpdateManagedUserRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
         const response = await this.updateManagedUserRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateMyAvatar without sending the request
+     */
+    async updateMyAvatarRequestOpts(requestParameters: UpdateMyAvatarRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['file'] == null) {
+            throw new runtime.RequiredError(
+                'file',
+                'Required parameter "file" was null or undefined when calling updateMyAvatar().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
+
+
+        let urlPath = `/api/users/me/avatar`;
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: formParams,
+        };
+    }
+
+    /**
+     * Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild aktualisieren
+     */
+    async updateMyAvatarRaw(requestParameters: UpdateMyAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserSummary>> {
+        const requestOptions = await this.updateMyAvatarRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UserSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein.  Implementierungsstatus: implemented.
+     * Eigenes Profilbild aktualisieren
+     */
+    async updateMyAvatar(requestParameters: UpdateMyAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserSummary> {
+        const response = await this.updateMyAvatarRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

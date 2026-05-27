@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -30,6 +30,11 @@ export interface GetUserProfileRequest {
     userPermalink: string;
 }
 
+export interface GetUserProfileAvatarRequest {
+    tenantName: string;
+    userPermalink: string;
+}
+
 /**
  * ProfilesApi - interface
  * 
@@ -47,7 +52,7 @@ export interface ProfilesApiInterface {
     getUserProfileRequestOpts(requestParameters: GetUserProfileRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
+     * Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
      * @summary Öffentliches User-Profil im Tenant abrufen
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} userPermalink Public user profile permalink.
@@ -58,10 +63,36 @@ export interface ProfilesApiInterface {
     getUserProfileRaw(requestParameters: GetUserProfileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserProfileSummary>>;
 
     /**
-     * Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
+     * Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
      * Öffentliches User-Profil im Tenant abrufen
      */
     getUserProfile(requestParameters: GetUserProfileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserProfileSummary>;
+
+    /**
+     * Creates request options for getUserProfileAvatar without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} userPermalink Public user profile permalink.
+     * @throws {RequiredError}
+     * @memberof ProfilesApiInterface
+     */
+    getUserProfileAvatarRequestOpts(requestParameters: GetUserProfileAvatarRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein. - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * @summary Profilbild im Tenant abrufen
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} userPermalink Public user profile permalink.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ProfilesApiInterface
+     */
+    getUserProfileAvatarRaw(requestParameters: GetUserProfileAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein. - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Profilbild im Tenant abrufen
+     */
+    getUserProfileAvatar(requestParameters: GetUserProfileAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
 }
 
@@ -106,7 +137,7 @@ export class ProfilesApi extends runtime.BaseAPI implements ProfilesApiInterface
     }
 
     /**
-     * Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
+     * Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
      * Öffentliches User-Profil im Tenant abrufen
      */
     async getUserProfileRaw(requestParameters: GetUserProfileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UserProfileSummary>> {
@@ -117,11 +148,66 @@ export class ProfilesApi extends runtime.BaseAPI implements ProfilesApiInterface
     }
 
     /**
-     * Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
+     * Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.  Implementierungsstatus: implemented.
      * Öffentliches User-Profil im Tenant abrufen
      */
     async getUserProfile(requestParameters: GetUserProfileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UserProfileSummary> {
         const response = await this.getUserProfileRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getUserProfileAvatar without sending the request
+     */
+    async getUserProfileAvatarRequestOpts(requestParameters: GetUserProfileAvatarRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getUserProfileAvatar().'
+            );
+        }
+
+        if (requestParameters['userPermalink'] == null) {
+            throw new runtime.RequiredError(
+                'userPermalink',
+                'Required parameter "userPermalink" was null or undefined when calling getUserProfileAvatar().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/profiles/{userPermalink}/avatar`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"userPermalink"}}`, encodeURIComponent(String(requestParameters['userPermalink'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein. - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Profilbild im Tenant abrufen
+     */
+    async getUserProfileAvatarRaw(requestParameters: GetUserProfileAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.getUserProfileAvatarRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein. - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.  Implementierungsstatus: implemented.
+     * Profilbild im Tenant abrufen
+     */
+    async getUserProfileAvatar(requestParameters: GetUserProfileAvatarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getUserProfileAvatarRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

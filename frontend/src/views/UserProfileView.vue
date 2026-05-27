@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import { getUserProfile, type UserProfile } from '../features/profiles/api'
-import { routePathToMemoryPath } from '../shared/utils/paths'
+import MemoryCard from '../features/memories/components/MemoryCard.vue'
+import { memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/paths'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const tenantName = computed(() => String(route.params.tenantName || ''))
 const profilePermalink = computed(() => {
@@ -33,6 +35,10 @@ async function loadProfile() {
     loading.value = false
   }
 }
+
+function openMemory(memory: { path: string }) {
+  void router.push(memoryPathToTenantRoute(tenantName.value, memory.path))
+}
 </script>
 
 <template>
@@ -43,11 +49,26 @@ async function loadProfile() {
       <span>{{ t('profile.loading') }}</span>
     </div>
     <section v-else-if="profile" class="profile-header">
-      <div class="profile-avatar" aria-hidden="true">{{ profile.initials }}</div>
+      <div class="profile-avatar" aria-hidden="true">
+        <img v-if="profile.avatarUrl" :src="profile.avatarUrl" alt="" />
+        <span v-else>{{ profile.initials }}</span>
+      </div>
       <div>
         <h1>{{ profile.displayName }}</h1>
         <p>~{{ profile.permalink }}</p>
       </div>
+    </section>
+    <section v-if="profile" class="profile-memories" :aria-label="t('profile.memories')">
+      <h2>{{ t('profile.memories') }}</h2>
+      <div v-if="profile.memories.length" class="memory-card-grid memory-card-grid-memories">
+        <MemoryCard
+          v-for="memory in profile.memories"
+          :key="memory.id"
+          :memory="memory"
+          @open="openMemory"
+        />
+      </div>
+      <p v-else class="memory-empty">{{ t('profile.memoriesEmpty') }}</p>
     </section>
   </main>
 </template>
@@ -78,6 +99,13 @@ async function loadProfile() {
   color: #14213d;
   font-size: 1.45rem;
   font-weight: 800;
+  overflow: hidden;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .profile-header h1 {
@@ -90,5 +118,15 @@ async function loadProfile() {
 .profile-header p {
   margin: 0.25rem 0 0;
   color: var(--app-muted);
+}
+
+.profile-memories {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-memories h2 {
+  margin: 0;
+  font-size: 1.15rem;
 }
 </style>

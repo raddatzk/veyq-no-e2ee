@@ -17,6 +17,7 @@ import com.veyq.api.generated.model.AdminPasskeySetupRequest
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 import com.veyq.api.generated.model.SetupStatusSummary
 import com.veyq.api.generated.model.UserSummary
+import com.veyq.api.usermgmt.user.ownAvatarUrl
 import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -119,12 +120,13 @@ class SetupService @Inject constructor(
 
     private fun User.toSetupSummary(): UserSummary =
         UserSummary(
-            id,
-            email,
-            displayName,
-            permalink,
-            ApiServerRole.ServerOwner,
-            passkeyCredentialRepo.countByUser(this).toInt(),
+            userId = id,
+            email = email,
+            displayName = displayName,
+            permalink = permalink,
+            serverRole = ApiServerRole.ServerOwner,
+            passkeyCount = passkeyCredentialRepo.countByUser(this).toInt(),
+            avatarUrl = ownAvatarUrl(),
         )
 }
 

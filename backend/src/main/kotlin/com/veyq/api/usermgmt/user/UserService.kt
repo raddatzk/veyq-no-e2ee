@@ -11,6 +11,8 @@ import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.*
+import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.memory.MemoryService
 import com.veyq.api.tenant.toManagedTenantSummary
 import com.veyq.api.security.RateLimitService
 import com.veyq.api.usermgmt.EmailChangeService
@@ -19,8 +21,16 @@ import com.veyq.api.usermgmt.ResetPasswordService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import jakarta.ws.rs.core.Response
 import io.vertx.ext.web.RoutingContext
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.time.Instant
+import java.util.UUID
+import javax.imageio.ImageIO
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 
 @ApplicationScoped
@@ -36,6 +46,8 @@ class UserService @Inject constructor(
     private val emailChangeService: EmailChangeService,
     private val rateLimitService: RateLimitService,
     private val passkeyService: PasskeyService,
+    private val memoryService: MemoryService,
+    private val mediaConfig: MediaConfig,
 ) {
     fun me(): UserSummary {
         return summarize(requestContext.user!!, emailChangeService.pendingEmail(requestContext.user!!))
@@ -47,17 +59,48 @@ class UserService @Inject constructor(
     }
 
     fun getUserProfile(userPermalink: String): UserProfileSummary {
-        val permalink = normalizePermalink(userPermalink)
-        val profileUser = userRepo.findByPermalink(permalink)
-            ?: throw NotFoundException("Profile not found")
-        tenantMemberRepo.findByTenantAndUser(requestContext.tenant!!, profileUser)
-            ?: throw NotFoundException("Profile not found")
+        val profileUser = visibleProfileUser(userPermalink)
         return UserProfileSummary(
             displayName = profileUser.displayName,
             permalink = profileUser.permalink,
             initials = initials(profileUser.displayName),
-            avatarUrl = null,
+            memories = memoryService.listParticipantRootMemories(profileUser),
+            avatarUrl = profileUser.avatarUrlForTenant(requestContext.tenant!!.name),
         )
+    }
+
+    fun myAvatar(): Response =
+        avatarResponse(managedUser())
+
+    fun getUserProfileAvatar(userPermalink: String): Response =
+        avatarResponse(visibleProfileUser(userPermalink))
+
+    @Transactional
+    fun updateMyAvatar(uploadPath: Path): UserSummary {
+        val user = managedUser()
+        val size = Files.size(uploadPath)
+        if (size <= 0) throw BadRequestException("Avatar file is required", "AVATAR_REQUIRED")
+        if (size > MAX_AVATAR_BYTES) throw PayloadTooLargeException("Avatar file is too large")
+        val contentType = detectAvatarContentType(uploadPath)
+        val oldStorageKey = user.avatarStorageKey
+        val storageKey = avatarStorageKey(user, contentType)
+        writeAvatarFile(uploadPath, storageKey)
+        user.avatarStorageKey = storageKey
+        user.avatarContentType = contentType
+        user.avatarUpdatedAt = Instant.now()
+        oldStorageKey?.let(::deleteAvatarFile)
+        return summarize(user, emailChangeService.pendingEmail(user))
+    }
+
+    @Transactional
+    fun deleteMyAvatar(): UserSummary {
+        val user = managedUser()
+        val oldStorageKey = user.avatarStorageKey
+        user.avatarStorageKey = null
+        user.avatarContentType = null
+        user.avatarUpdatedAt = null
+        oldStorageKey?.let(::deleteAvatarFile)
+        return summarize(user, emailChangeService.pendingEmail(user))
     }
 
     @Transactional
@@ -343,6 +386,70 @@ class UserService @Inject constructor(
     private fun managedUser(): User =
         userRepo.findById(user().id) ?: throw UnauthorizedException("Invalid user")
 
+    private fun visibleProfileUser(userPermalink: String): User {
+        val permalink = normalizePermalink(userPermalink)
+        val profileUser = userRepo.findByPermalink(permalink)
+            ?: throw NotFoundException("Profile not found")
+        tenantMemberRepo.findByTenantAndUser(requestContext.tenant!!, profileUser)
+            ?: throw NotFoundException("Profile not found")
+        return profileUser
+    }
+
+    private fun avatarResponse(user: User): Response {
+        val storageKey = user.avatarStorageKey ?: throw NotFoundException("Avatar not found")
+        val contentType = user.avatarContentType ?: throw NotFoundException("Avatar not found")
+        val path = storagePath(storageKey)
+        if (!Files.exists(path)) throw NotFoundException("Avatar not found")
+        return Response.ok(path.toFile(), contentType)
+            .header("Cache-Control", "private, max-age=3600")
+            .build()
+    }
+
+    private fun detectAvatarContentType(path: Path): String {
+        val image = ImageIO.read(path.toFile()) ?: throw BadRequestException("Avatar image is invalid", "AVATAR_INVALID")
+        if (image.width <= 0 || image.height <= 0) throw BadRequestException("Avatar image is invalid", "AVATAR_INVALID")
+        ImageIO.createImageInputStream(path.toFile()).use { stream ->
+            val readers = ImageIO.getImageReaders(stream)
+            if (!readers.hasNext()) throw BadRequestException("Avatar image is invalid", "AVATAR_INVALID")
+            val reader = readers.next()
+            val format = reader.formatName.lowercase()
+            reader.dispose()
+            return when (format) {
+                "jpeg", "jpg" -> "image/jpeg"
+                "png" -> "image/png"
+                else -> throw BadRequestException("Avatar image must be JPEG or PNG", "AVATAR_TYPE_UNSUPPORTED")
+            }
+        }
+    }
+
+    private fun avatarStorageKey(user: User, contentType: String): String {
+        val extension = if (contentType == "image/png") "png" else "jpg"
+        return "users/${user.id}/avatar-${UUID.randomUUID()}.$extension"
+    }
+
+    private fun writeAvatarFile(source: Path, storageKey: String) {
+        val target = storagePath(storageKey)
+        Files.createDirectories(target.parent)
+        val temp = target.resolveSibling("${target.fileName}.tmp")
+        try {
+            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private fun deleteAvatarFile(storageKey: String) {
+        Files.deleteIfExists(storagePath(storageKey))
+    }
+
+    private fun storagePath(storageKey: String): Path {
+        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
+        val path = root.resolve(storageKey).normalize()
+        if (!path.startsWith(root)) throw BadRequestException("Invalid avatar storage key")
+        return path
+    }
+
     private fun activeServerOwnerCount(): Int =
         userRepo.listByRole(ServerRole.ServerOwner).count { it.isActive() }
 
@@ -351,18 +458,30 @@ class UserService @Inject constructor(
 
     private fun summarize(user: User, pendingEmail: String? = null): UserSummary =
         UserSummary(
-            user.id,
-            user.email,
-            user.displayName,
-            user.permalink,
-            user.role.toUsersApiRole(),
-            passkeyCredentialRepo.countByUser(user).toInt(),
-            pendingEmail,
+            userId = user.id,
+            email = user.email,
+            displayName = user.displayName,
+            permalink = user.permalink,
+            serverRole = user.role.toUsersApiRole(),
+            passkeyCount = passkeyCredentialRepo.countByUser(user).toInt(),
+            avatarUrl = user.ownAvatarUrl(),
+            pendingEmail = pendingEmail,
         )
 
     companion object {
+        private const val MAX_AVATAR_BYTES = 5L * 1024L * 1024L
+
         fun toUserSummary(user: User, pendingEmail: String? = null): UserSummary {
-            return UserSummary(user.id, user.email, user.displayName, user.permalink, user.role.toUsersApiRole(), 0, pendingEmail)
+            return UserSummary(
+                userId = user.id,
+                email = user.email,
+                displayName = user.displayName,
+                permalink = user.permalink,
+                serverRole = user.role.toUsersApiRole(),
+                passkeyCount = 0,
+                avatarUrl = user.ownAvatarUrl(),
+                pendingEmail = pendingEmail,
+            )
         }
     }
 }
@@ -387,8 +506,28 @@ fun User.toManagedUserSummary(knownTenant: Tenant? = null): ManagedUserSummary {
 }
 
 fun User.toUserSummary(pendingEmail: String? = null): UserSummary {
-    return UserSummary(id, email, displayName, permalink, role.toUsersApiRole(), passkeyCredentials.size, pendingEmail)
+    return UserSummary(
+        userId = id,
+        email = email,
+        displayName = displayName,
+        permalink = permalink,
+        serverRole = role.toUsersApiRole(),
+        passkeyCount = passkeyCredentials.size,
+        avatarUrl = ownAvatarUrl(),
+        pendingEmail = pendingEmail,
+    )
 }
+
+fun User.ownAvatarUrl(): String? =
+    avatarUpdatedAt?.takeIf { avatarStorageKey != null }?.let { "/api/users/me/avatar?v=${url(it.toString())}" }
+
+fun User.avatarUrlForTenant(tenantName: String): String? =
+    avatarUpdatedAt?.takeIf { avatarStorageKey != null }?.let {
+        "/api/${url(tenantName)}/profiles/${url(permalink)}/avatar?v=${url(it.toString())}"
+    }
+
+private fun url(value: String): String =
+    URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
 
 fun ServerRole.toUsersApiRole(): ApiServerRole =
     when (this) {

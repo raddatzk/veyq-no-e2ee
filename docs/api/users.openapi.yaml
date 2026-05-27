@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Veyq Users API
+  title: veyq Users API
   version: 0.1.0
   description: >-
-    API-first Zielvertrag fuer Veyq Users API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+    API-first Zielvertrag fuer veyq Users API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
 servers:
 - url: "/"
 security:
@@ -64,6 +64,83 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: partial.
+  "/api/users/me/avatar":
+    get:
+      tags:
+      - Users
+      operationId: getMyAvatar
+      responses:
+        '200':
+          "$ref": "#/components/responses/AvatarImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenes Profilbild abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ein Profilbild besitzen.
+      description: |-
+        Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ein Profilbild besitzen.
+
+        Implementierungsstatus: implemented.
+    put:
+      tags:
+      - Users
+      operationId: updateMyAvatar
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadAvatar"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '413':
+          "$ref": "./common.openapi.yaml#/components/responses/413"
+      summary: Eigenes Profilbild aktualisieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+    delete:
+      tags:
+      - Users
+      operationId: deleteMyAvatar
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigenes Profilbild loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
   "/api/users/me/email/confirm":
     post:
       tags:
@@ -343,12 +420,46 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
       description: |-
-        Liefert die kopfdaten eines im Tenant sichtbaren User-Profils. Memories werden in v1 nicht geliefert.
+        Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.
 
         Vorbedingungen:
         - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
         - Das initiale Setup muss abgeschlossen sein.
         - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+
+        Implementierungsstatus: implemented.
+  "/api/{tenantName}/profiles/{userPermalink}/avatar":
+    get:
+      tags:
+        - Profiles
+      operationId: getUserProfileAvatar
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/UserPermalink"
+      responses:
+        '200':
+          "$ref": "#/components/responses/AvatarImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Profilbild im Tenant abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+        - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.
+      description: |-
+        Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+        - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.
 
         Implementierungsstatus: implemented.
   "/api/users":
@@ -593,6 +704,22 @@ components:
             displayName: Kevin Raddatz
             permalink: kevin
             email: kevin@example.test
+    UploadAvatar:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: JPEG or PNG profile image up to 5 MB.
+          example:
+            file: "<binary image bytes>"
 
     ChangePassword:
       required: true
@@ -755,6 +882,7 @@ components:
             email: kevin@example.test
             displayName: Kevin
             permalink: kevin
+            avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
             serverRole: ServerOwner
             passkeyCount: 1
     UserProfile:
@@ -767,6 +895,18 @@ components:
             displayName: Kevin
             permalink: kevin
             initials: KR
+            avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+            memories:
+              - id: mem_abc123
+                parentId: null
+                name: summer-trip
+                displayName: Summer Trip
+                path: /summer-trip
+                startDate: "2026-05-03"
+                endDate: "2026-05-05"
+                childCount: 1
+                mediaCount: 12
+                favorite: true
     Passkeys:
       description: Own passkeys.
       content:
@@ -800,6 +940,19 @@ components:
             challenge: challenge
             timeout: 300000
             attestation: none
+    AvatarImage:
+      description: Profile avatar image.
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+          example: "<binary jpeg avatar>"
+        image/png:
+          schema:
+            type: string
+            format: binary
+          example: "<binary png avatar>"
 
   schemas:
     UserStatus:
@@ -859,6 +1012,7 @@ components:
         - displayName
         - permalink
         - initials
+        - memories
       properties:
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
@@ -871,10 +1025,17 @@ components:
         avatarUrl:
           type: string
           nullable: true
+        memories:
+          type: array
+          description: Visible root Memories where this profile user participates. Child-Memory participation is represented by the nearest visible root Memory.
+          items:
+            "$ref": "./memories.openapi.yaml#/components/schemas/MemorySummary"
       example:
         displayName: Kevin
         permalink: kevin
         initials: K
+        avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+        memories: []
 
     ChangePasswordRequest:
       type: object
@@ -1029,6 +1190,10 @@ components:
           "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        tenantId: 42
+        name: friends
+        displayName: Friends
 
     ManagedUsersSummary:
       type: object

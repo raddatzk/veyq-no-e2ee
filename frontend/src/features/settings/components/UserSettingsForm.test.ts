@@ -3,39 +3,53 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import UserSettingsForm from './UserSettingsForm.vue'
 import {
   createMyPasskey,
+  deleteMyAvatar,
   deleteMyPasskey,
   getMySettings,
   listMyPasskeys,
+  updateMyAvatar,
   updateMyPasskey,
   updateMySettings
 } from '../api'
 import { setLocale } from '../../../i18n'
+import { authState } from '../../../authState'
 
 vi.mock('../api', () => ({
   changeMyPassword: vi.fn(),
   createMyPasskey: vi.fn(),
+  deleteMyAvatar: vi.fn(),
   deleteMyPasskey: vi.fn(),
   getMySettings: vi.fn(),
   listMyPasskeys: vi.fn(),
+  updateMyAvatar: vi.fn(),
   updateMyPasskey: vi.fn(),
   updateMySettings: vi.fn()
 }))
 
 const createMyPasskeyMock = vi.mocked(createMyPasskey)
+const deleteMyAvatarMock = vi.mocked(deleteMyAvatar)
 const deleteMyPasskeyMock = vi.mocked(deleteMyPasskey)
 const getMySettingsMock = vi.mocked(getMySettings)
 const listMyPasskeysMock = vi.mocked(listMyPasskeys)
+const updateMyAvatarMock = vi.mocked(updateMyAvatar)
 const updateMyPasskeyMock = vi.mocked(updateMyPasskey)
 const updateMySettingsMock = vi.mocked(updateMySettings)
 
 describe('UserSettingsForm', () => {
   afterEach(() => {
     createMyPasskeyMock.mockReset()
+    deleteMyAvatarMock.mockReset()
     deleteMyPasskeyMock.mockReset()
     getMySettingsMock.mockReset()
     listMyPasskeysMock.mockReset()
+    updateMyAvatarMock.mockReset()
     updateMyPasskeyMock.mockReset()
     updateMySettingsMock.mockReset()
+    authState.isAuthenticated = false
+    authState.user = null
+    authState.userLabel = ''
+    authState.tenants = []
+    window.localStorage.clear()
     setLocale('de')
   })
 
@@ -73,6 +87,87 @@ describe('UserSettingsForm', () => {
 
     expect(wrapper.text()).toContain('My settings')
     expect(wrapper.text()).toContain('Profile and login')
+  })
+
+  it('uploads an avatar and updates auth state', async () => {
+    authState.user = userSettings('owner@example.test')
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+    updateMyAvatarMock.mockResolvedValue(userSettings('owner@example.test', undefined, '/api/users/me/avatar?v=1'))
+    const file = new File(['avatar'], 'avatar.png', { type: 'image/png' })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [file] })
+    await flushPromises()
+
+    expect(updateMyAvatarMock).toHaveBeenCalledWith(file)
+    expect(authState.user.avatarUrl).toBe('/api/users/me/avatar?v=1')
+    expect(wrapper.text()).toContain('Profilbild wurde gespeichert.')
+  })
+
+  it('deletes an avatar and clears auth state', async () => {
+    authState.user = userSettings('owner@example.test', undefined, '/api/users/me/avatar?v=1')
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test', undefined, '/api/users/me/avatar?v=1'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+    deleteMyAvatarMock.mockResolvedValue(userSettings('owner@example.test'))
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.attributes('aria-label') === 'Profilbild entfernen')!.trigger('click')
+    await flushPromises()
+
+    expect(deleteMyAvatarMock).toHaveBeenCalledWith()
+    expect(authState.user.avatarUrl).toBeUndefined()
+    expect(wrapper.text()).toContain('Profilbild wurde gelöscht.')
+  })
+
+  it('opens external content dialog and stores grouped provider consent for the signed-in user', async () => {
+    authState.isAuthenticated = true
+    authState.user = {
+      userId: 1,
+      email: 'owner@example.test',
+      displayName: 'Owner',
+      permalink: 'owner',
+      serverRole: 'ServerOwner',
+      passkeyCount: 0
+    }
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Externe Inhalte')
+    await wrapper.findAll('button').find((button) => button.text() === 'Externe Inhalte verwalten')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Karten')
+    expect(wrapper.text()).toContain('OpenStreetMap')
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    expect(checkboxes).toHaveLength(1)
+    await checkboxes[0].setValue(true)
+
+    expect(window.localStorage.getItem('veyq:user:1:osm-tiles-enabled')).toBe('true')
+    expect(window.localStorage.getItem('veyq:osm-tiles-enabled')).toBeNull()
+
+    await checkboxes[0].setValue(false)
+
+    expect(window.localStorage.getItem('veyq:user:1:osm-tiles-enabled')).toBeNull()
+  })
+
+  it('does not show external content dialog before opening it', async () => {
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Externe Inhalte verwalten')
+    expect(wrapper.text()).not.toContain('Karten')
   })
 
   it('adds a passkey and asks to confirm the suggested name', async () => {
@@ -144,7 +239,7 @@ describe('UserSettingsForm', () => {
   })
 })
 
-function userSettings(email: string, pendingEmail?: string) {
+function userSettings(email: string, pendingEmail?: string, avatarUrl?: string) {
   return {
     userId: 1,
     email,
@@ -152,6 +247,7 @@ function userSettings(email: string, pendingEmail?: string) {
     permalink: 'owner',
     serverRole: 'ServerOwner',
     passkeyCount: 0,
+    avatarUrl,
     pendingEmail
   } as const
 }
@@ -177,6 +273,11 @@ function formStubs() {
       props: ['modelValue']
     },
     Message: { template: '<div><slot /></div>' },
+    FileUpload: {
+      name: 'FileUpload',
+      template: '<button type="button">{{ chooseLabel }}</button>',
+      props: ['chooseLabel']
+    },
     Dialog: {
       template: '<div v-if="visible">{{ header }}<slot /></div>',
       props: ['visible', 'header']

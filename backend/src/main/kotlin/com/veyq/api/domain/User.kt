@@ -37,6 +37,15 @@ class User : PanacheEntityBase {
     @Column(name = "password_set_at")
     var passwordSetAt: Instant? = null
 
+    @Column(name = "avatar_storage_key", length = 512)
+    var avatarStorageKey: String? = null
+
+    @Column(name = "avatar_content_type", length = 64)
+    var avatarContentType: String? = null
+
+    @Column(name = "avatar_updated_at")
+    var avatarUpdatedAt: Instant? = null
+
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     var tenantMemberships: MutableSet<TenantMember> = mutableSetOf()
 

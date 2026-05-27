@@ -11,6 +11,7 @@ import com.veyq.api.domain.ServerRole
 import com.veyq.api.generated.model.LoginRequest
 import com.veyq.api.generated.model.UserSummary
 import com.veyq.api.security.RateLimitService
+import com.veyq.api.usermgmt.user.ownAvatarUrl
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -99,12 +100,13 @@ class AuthService @Inject constructor(
         val refreshCookie = cookieService.createRefreshCookie(refreshToken)
 
         val response = UserSummary(
-            user.id,
-            user.email,
-            user.displayName,
-            user.permalink,
-            user.role.toAuthApiRole(),
-            passkeyCredentialRepo.countByUser(user).toInt(),
+            userId = user.id,
+            email = user.email,
+            displayName = user.displayName,
+            permalink = user.permalink,
+            serverRole = user.role.toAuthApiRole(),
+            passkeyCount = passkeyCredentialRepo.countByUser(user).toInt(),
+            avatarUrl = user.ownAvatarUrl(),
         )
 
         return LoginContext(response, accessCookie, refreshCookie)

@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { MemorySummary } from './MemorySummary';
+import {
+    MemorySummaryFromJSON,
+    MemorySummaryFromJSONTyped,
+    MemorySummaryToJSON,
+    MemorySummaryToJSONTyped,
+} from './MemorySummary';
+
 /**
  * 
  * @export
@@ -43,6 +51,12 @@ export interface UserProfileSummary {
      * @memberof UserProfileSummary
      */
     avatarUrl?: string;
+    /**
+     * Visible root Memories where this profile user participates. Child-Memory participation is represented by the nearest visible root Memory.
+     * @type {Array<MemorySummary>}
+     * @memberof UserProfileSummary
+     */
+    memories: Array<MemorySummary>;
 }
 
 /**
@@ -52,6 +66,7 @@ export function instanceOfUserProfileSummary(value: object): value is UserProfil
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('permalink' in value) || value['permalink'] === undefined) return false;
     if (!('initials' in value) || value['initials'] === undefined) return false;
+    if (!('memories' in value) || value['memories'] === undefined) return false;
     return true;
 }
 
@@ -69,6 +84,7 @@ export function UserProfileSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'permalink': json['permalink'],
         'initials': json['initials'],
         'avatarUrl': json['avatarUrl'] == null ? undefined : json['avatarUrl'],
+        'memories': ((json['memories'] as Array<any>).map(MemorySummaryFromJSON)),
     };
 }
 
@@ -87,6 +103,7 @@ export function UserProfileSummaryToJSONTyped(value?: UserProfileSummary | null,
         'permalink': value['permalink'],
         'initials': value['initials'],
         'avatarUrl': value['avatarUrl'],
+        'memories': ((value['memories'] as Array<any>).map(MemorySummaryToJSON)),
     };
 }
 
