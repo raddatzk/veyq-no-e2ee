@@ -108,6 +108,7 @@ The app is served through the domain configured by `VEYQ_TRAEFIK_RULE`. The heal
 ### Private Alpha Self-Hosting Runbook
 
 Use this path for a first self-hosted veyq instance. It is suitable for a trusted private alpha, not yet for a public managed service.
+For expected operational failure cases, diagnostics and recovery steps, see [`operations.md`](operations.md).
 
 The recommended server install path is the helper script:
 

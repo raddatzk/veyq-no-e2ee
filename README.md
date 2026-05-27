@@ -68,6 +68,7 @@ The reset sidecar can clear veyq tables, delete media volume contents and restar
 
 For server installs and upgrades, use [`scripts/veyq-server.sh`](scripts/veyq-server.sh). It downloads the Compose files, can guide `.env` setup, starts the stack and provides backup/upgrade commands.
 Run `./veyq-server.sh doctor` on the server after editing `.env` and before upgrades.
+For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
 
 ## API-First Development
 
@@ -84,6 +85,7 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend/fronten
 - [`README.md`](README.md): GitHub entry point and project map.
 - [`AGENTS.md`](AGENTS.md): operating context and rules for AI agents and contributors.
 - [`docs/development.md`](docs/development.md): local development, Docker Compose and reset sidecar.
+- [`docs/operations.md`](docs/operations.md): operator runbook for expected self-hosting failure cases.
 - [`docs/architecture.md`](docs/architecture.md): current system architecture and implemented domain model.
 - [`docs/product/memory-product-context.md`](docs/product/memory-product-context.md): product vision and Memory context.
 - [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and veyq embed syntax.
