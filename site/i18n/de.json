@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "title": "veyq - Strukturierte Erinnerungen",
+    "description": "veyq ist eine selbsthostbare Plattform für strukturierte Memories mit Fotos, Videos, Journal, Karten, Tracks und Kontext."
+  },
+  "nav": {
+    "concept": "Konzept",
+    "features": "Features",
+    "screenshots": "Screenshots",
+    "selfhosted": "Selbsthostbar",
+    "docs": "Docs"
+  },
+  "theme": {
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "settings": {
+    "label": "Sprache und Darstellung",
+    "languageLabel": "Sprache",
+    "themeLabel": "Darstellung",
+    "language": "Sprache",
+    "theme": "Darstellung",
+    "german": "Deutsch",
+    "english": "English"
+  },
+  "cta": {
+    "github": "GitHub öffnen",
+    "sponsor": "Sponsor werden",
+    "learn": "Mehr erfahren",
+    "docs": "Dokumentation lesen"
+  },
+  "hero": {
+    "eyebrow": "Self-hosted Memory Sharing",
+    "title": "Erinnerungen, die mehr bedeuten.",
+    "lead": "veyq ist die selbsthostbare Plattform für strukturierte Erinnerungen. Für Reisen, besondere Momente und die Menschen, mit denen du sie teilst."
+  },
+  "mock": {
+    "memories": "Memories",
+    "trip": "Albanien 2024",
+    "family": "Familie",
+    "friends": "Freunde",
+    "title": "Albanien 2024",
+    "dates": "1. Juni – 15. Juni 2024",
+    "tabOverview": "Übersicht",
+    "tabJournal": "Journal",
+    "tabMap": "Karte",
+    "tabTracks": "Tracks",
+    "statsMemories": "Memories",
+    "statsMedia": "Fotos & Videos",
+    "statsTracks": "Tracks",
+    "previewLabel": "Vorschau der veyq Memory-Oberfläche"
+  },
+  "concept": {
+    "eyebrow": "Was ist veyq?",
+    "title": "Mehr als Fotos. Deine ganze Geschichte.",
+    "body": "veyq organisiert Erinnerungen in Memories. Jede Memory kann Fotos, Videos, Karten, Tracks, Playlists, Journaltexte und Kontext enthalten."
+  },
+  "features": {
+    "structured": {
+      "title": "Strukturiert",
+      "body": "Verschachtelte Memories geben Reisen, Ereignissen und Momenten natürliche Ordnung."
+    },
+    "journal": {
+      "title": "Journal",
+      "body": "Schreibe deine Geschichte in Markdown und verbinde sie mit Medien und Kontext."
+    },
+    "context": {
+      "title": "Kontext",
+      "body": "Karten, GPS-Tracks, Wetter und Playlists machen Erinnerungen lebendig."
+    },
+    "shared": {
+      "title": "Gemeinsam",
+      "body": "Teile Memories und sammle Beiträge, ohne daraus ein soziales Netzwerk zu machen."
+    }
+  },
+  "screens": {
+    "eyebrow": "Screenshots",
+    "title": "Eine Oberfläche für die ganze Erinnerung.",
+    "body": "Die echten Produkt-Screenshots können später direkt in diese Slots gelegt werden.",
+    "desktop": {
+      "title": "Memory-Übersicht",
+      "body": "Desktop-Ansicht mit Galerie, Journal, Karte, Tracks und Kontextspalte."
+    },
+    "mobile": {
+      "title": "Mobil dabei",
+      "body": "Eine kompakte Memory-Ansicht für unterwegs."
+    },
+    "map": {
+      "title": "Reise im Kontext",
+      "body": "Karten und Tracks zeigen, wo Momente passiert sind."
+    }
+  },
+  "selfhosted": {
+    "eyebrow": "Self-hosted by design",
+    "title": "Deine Daten. Dein Zuhause.",
+    "body": "veyq läuft auf deinem eigenen Server. Deine Memories gehören dir, nicht einer Cloud.",
+    "points": {
+      "hosted": "Selbsthostbar",
+      "open": "Open Source",
+      "private": "Privat per Default",
+      "api": "API-first entwickelt"
+    }
+  },
+  "final": {
+    "title": "Open Source mit Herz für Memories.",
+    "body": "veyq ist früh, aber die Richtung ist klar: Erinnerungen kuratieren, selbst hosten und schön teilen."
+  },
+  "footer": {
+    "github": "GitHub",
+    "sponsor": "Sponsor",
+    "docs": "Docs"
+  }
+}
