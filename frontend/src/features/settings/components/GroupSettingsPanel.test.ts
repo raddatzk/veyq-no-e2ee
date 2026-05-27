@@ -116,6 +116,10 @@ describe('GroupSettingsPanel', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Gruppe erstellen')
+    expect(replaceMock).not.toHaveBeenCalled()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Abbrechen'))!.trigger('click')
+
     expect(replaceMock).toHaveBeenCalledWith({ path: '/friends/settings', query: {} })
   })
 

@@ -202,6 +202,39 @@ describe('WorkspaceTopbar', () => {
     expect(wrapper.text()).toContain('second.jpg')
   })
 
+  it('shows upload batches in queue order when a later upload is added', async () => {
+    const resolvers: Array<() => void> = []
+    const uploadFile = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+
+    startUploadBatch({
+      label: '450 Medien',
+      files: [new File(['first-file'], 'wedding.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile
+    })
+    startUploadBatch({
+      label: '1 Medien',
+      files: [new File(['second-file'], 'Teneriffa.jpg')],
+      context: { type: 'memory', tenantName: 'friends', memoryId: 'mem-1' },
+      uploadFile
+    })
+    const wrapper = mountTopbar()
+    await nextTick()
+    await flushPromises()
+
+    await wrapper.find('.upload-status-trigger').trigger('click')
+    const text = wrapper.text()
+
+    expect(text.indexOf('450 Medien')).toBeLessThan(text.indexOf('1 Medien'))
+    expect(text).toContain('Teneriffa.jpg')
+    expect(text).toContain('Wartet')
+  })
+
   it('closes the upload popover with escape and outside click', async () => {
     startUploadBatch({
       label: '1 Medium',

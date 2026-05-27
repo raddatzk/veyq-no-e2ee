@@ -25,7 +25,7 @@ test('initial setup keeps tenant creation outside the workspace shell', async ({
 
   await expect(page).toHaveURL(/\/friends$/)
   await expect(page.locator('.app-shell')).toBeVisible()
-  await expect(page.getByText('Friends').first()).toBeVisible()
+  await expect(page.locator('.sidebar-tenant-link-active').filter({ hasText: 'Friends' })).toBeVisible()
 })
 
 test('server owners can create a tenant from an empty workspace shell', async ({ page }) => {

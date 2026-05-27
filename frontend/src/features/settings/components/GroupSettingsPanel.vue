@@ -157,7 +157,19 @@ function openCreateDialog() {
   error.value = ''
   message.value = ''
   createDialogVisible.value = true
+}
+
+function closeCreateDialog() {
+  createDialogVisible.value = false
   clearCreateGroupQuery()
+}
+
+function updateCreateDialogVisible(visible: boolean) {
+  if (visible) {
+    createDialogVisible.value = true
+  } else {
+    closeCreateDialog()
+  }
 }
 
 function openDeleteDialog() {
@@ -189,6 +201,7 @@ async function submitCreate() {
     const created = await createGroup(props.tenantName, groupName, groupDisplayName)
     upsertGroup(created)
     createDialogVisible.value = false
+    clearCreateGroupQuery()
     selectedGroup.value = created
     editingInitialGroupName.value = created.name
     displayName.value = created.displayName
@@ -524,7 +537,13 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
       </div>
     </Dialog>
 
-    <Dialog v-model:visible="createDialogVisible" :header="t('group.create')" modal class="tenant-dialog">
+    <Dialog
+      :visible="createDialogVisible"
+      :header="t('group.create')"
+      modal
+      class="tenant-dialog"
+      @update:visible="updateCreateDialogVisible"
+    >
       <form class="form" @submit.prevent="submitCreate">
         <label>
           {{ t('common.name') }}
@@ -546,7 +565,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
             :label="t('common.cancel')"
             severity="secondary"
             outlined
-            @click="createDialogVisible = false"
+            @click="closeCreateDialog"
           />
         </div>
       </form>

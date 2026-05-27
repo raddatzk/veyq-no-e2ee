@@ -14,6 +14,9 @@ const getSettingsMock = vi.mocked(getSettings)
 describe('SettingsView', () => {
   afterEach(() => {
     getSettingsMock.mockReset()
+    authState.isAuthenticated = false
+    authState.user = null
+    authState.userLabel = ''
     authState.tenants = []
   })
 
@@ -27,6 +30,55 @@ describe('SettingsView', () => {
     await flushPromises()
 
     expect(getSettingsMock).toHaveBeenCalledWith('/~me')
+  })
+
+  it('does not show browser privacy settings globally on settings pages', async () => {
+    getSettingsMock.mockResolvedValue(settingsResponse('/~me', 'USER'))
+    const router = testRouter()
+    await router.push('/~me')
+    await router.isReady()
+
+    const wrapper = mount(SettingsView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('User settings')
+    expect(wrapper.text()).not.toContain('Privacy settings')
+  })
+
+  it('does not show browser privacy settings on tenant settings pages', async () => {
+    authState.tenants = [
+      {
+        id: 1,
+        name: 'friends',
+        displayName: 'Friends',
+        domain: 'friends.example.test',
+        role: 'TenantOwner',
+        admins: []
+      }
+    ]
+    getSettingsMock.mockResolvedValue(settingsResponse('/friends/settings', 'TENANT'))
+    const router = testRouter()
+    await router.push('/friends/settings')
+    await router.isReady()
+
+    const wrapper = mount(SettingsView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Tenant settings')
+    expect(wrapper.text()).not.toContain('Privacy settings')
+  })
+
+  it('does not show browser privacy settings on server settings pages', async () => {
+    getSettingsMock.mockResolvedValue(settingsResponse('/settings', 'SERVER'))
+    const router = testRouter()
+    await router.push('/settings')
+    await router.isReady()
+
+    const wrapper = mount(SettingsView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Server settings')
+    expect(wrapper.text()).not.toContain('Privacy settings')
   })
 
   it('loads tenant settings context with tenant prefix in the path', async () => {
@@ -64,6 +116,29 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Group settings')
     expect(wrapper.text()).not.toContain('Tenant settings')
   })
+
+  it('does not show tenant settings while opening the create group flow', async () => {
+    authState.tenants = [
+      {
+        id: 1,
+        name: 'friends',
+        displayName: 'Friends',
+        domain: 'friends.example.test',
+        role: 'TenantOwner',
+        admins: []
+      }
+    ]
+    getSettingsMock.mockResolvedValue(settingsResponse('/friends/settings', 'TENANT'))
+    const router = testRouter()
+    await router.push('/friends/settings?createGroup=1')
+    await router.isReady()
+
+    const wrapper = mount(SettingsView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Group settings')
+    expect(wrapper.text()).not.toContain('Tenant settings')
+  })
 })
 
 function testRouter() {
@@ -77,7 +152,7 @@ function testRouter() {
   })
 }
 
-function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT') {
+function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT' | 'SERVER') {
   return {
     location: {
       path,
@@ -86,8 +161,8 @@ function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT') {
     },
     subject: {
       type,
-      displayName: type === 'USER' ? 'Me' : type === 'TENANT' ? 'Friends' : 'Family',
-      label: type === 'USER' ? '~Me' : type === 'TENANT' ? 'Friends' : '@Family'
+      displayName: type === 'USER' ? 'Me' : type === 'TENANT' ? 'Friends' : type === 'SERVER' ? 'Server' : 'Family',
+      label: type === 'USER' ? '~Me' : type === 'TENANT' ? 'Friends' : type === 'SERVER' ? 'Server' : '@Family'
     },
     breadcrumbs: [
       {

@@ -21,6 +21,7 @@ const settingsPath = computed(() => route.path || '/')
 const tenantName = computed(() => settingsPath.value.trim().split('/').filter(Boolean)[0] || '')
 const activeTenant = computed(() => authState.tenants.find((tenant) => tenant.name === tenantName.value))
 const canManageTenant = computed(() => activeTenant.value?.role === 'TenantOwner')
+const isCreatingGroup = computed(() => route.query.createGroup === '1')
 const groupName = computed(() => {
   const groupSegment = settingsPath.value.trim().split('/').find((segment) => segment.startsWith('@'))
   return groupSegment ? groupSegment.substring(1) : ''
@@ -81,7 +82,7 @@ function localizeSettingsLabel(label: string): string {
       <ServerSettingsPanel v-if="settings.subject.type === 'SERVER'" />
       <UserSettingsForm v-else-if="settings.subject.type === 'USER'" />
       <template v-else-if="settings.subject.type === 'TENANT'">
-        <TenantSettingsPanel v-if="canManageTenant" :tenant-name="tenantName" />
+        <TenantSettingsPanel v-if="canManageTenant && !isCreatingGroup" :tenant-name="tenantName" />
         <GroupSettingsPanel :tenant-name="tenantName" />
       </template>
       <GroupSettingsPanel

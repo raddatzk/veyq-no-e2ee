@@ -4,7 +4,8 @@ import { authState } from '../../authState'
 import AppShell from './AppShell.vue'
 
 const routeState = vi.hoisted(() => ({
-  name: 'home' as string | null
+  name: 'home' as string | null,
+  params: {} as Record<string, string>
 }))
 
 vi.mock('vue-router', () => ({
@@ -15,6 +16,7 @@ vi.mock('vue-router', () => ({
 describe('AppShell', () => {
   afterEach(() => {
     routeState.name = 'home'
+    routeState.params = {}
     authState.isAuthenticated = false
     authState.user = null
     authState.userLabel = ''
@@ -36,6 +38,7 @@ describe('AppShell', () => {
   it('shows the workspace shell for authenticated app routes', () => {
     routeState.name = 'tenant'
     authState.isAuthenticated = true
+    authState.user = user('ServerMember')
 
     const wrapper = shallowMount(AppShell, {
       global: { stubs: shellStubs() }
@@ -43,12 +46,38 @@ describe('AppShell', () => {
 
     expect(wrapper.find('.app-shell').exists()).toBe(true)
     expect(wrapper.find('.public-shell').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'SupportNotice' }).exists()).toBe(false)
+  })
+
+  it('shows support notice only for server owners', () => {
+    routeState.name = 'tenant'
+    authState.isAuthenticated = true
+    authState.user = user('ServerOwner')
+
+    const wrapper = shallowMount(AppShell, {
+      global: { stubs: shellStubs() }
+    })
+
+    expect(wrapper.findComponent({ name: 'SupportNotice' }).exists()).toBe(true)
   })
 })
 
+function user(serverRole: 'ServerOwner' | 'ServerMember') {
+  return {
+    userId: 1,
+    email: 'owner@example.test',
+    displayName: 'Owner',
+    permalink: 'owner',
+    serverRole,
+    passkeyCount: 0
+  }
+}
+
 function shellStubs() {
   return {
+    CreateGroupFlowDialog: { name: 'CreateGroupFlowDialog', template: '<div />' },
     CreateTenantDialog: { name: 'CreateTenantDialog', template: '<div />' },
+    SupportNotice: { name: 'SupportNotice', template: '<section />' },
     TenantSidebar: { name: 'TenantSidebar', template: '<aside />' },
     WorkspaceTopbar: { name: 'WorkspaceTopbar', template: '<header />' }
   }

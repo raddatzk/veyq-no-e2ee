@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test'
 import {
   groupScopeRoot,
   mockAuthenticatedOwnerApi,
-  personalScopeRoot,
   weddingMemory
 } from './support/api'
 
@@ -12,10 +11,11 @@ test('tenant home renders memory navigation without legacy areas', async ({ page
   await page.goto('/friends')
 
   await expect(page.locator('.app-shell')).toBeVisible()
-  await expect(page.locator('.sidebar-nav-link').filter({ hasText: 'Home' })).toBeVisible()
+  await expect(page.locator('.sidebar-brand')).toBeVisible()
+  await expect(page.locator('.sidebar-nav-link').filter({ hasText: 'Home' })).toHaveCount(0)
   await expect(page.locator('.sidebar-nav-link').filter({ hasText: 'Persönlich' })).toBeVisible()
-  await expect(page.getByText('Favoriten')).toBeVisible()
-  await expect(page.getByText('Gruppen')).toBeVisible()
+  await expect(page.locator('.sidebar-section-label').filter({ hasText: 'Favoriten' })).toBeVisible()
+  await expect(page.locator('.sidebar-section-label').filter({ hasText: 'Gruppen' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Travel Gruppe/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Alben' })).toHaveCount(0)
 })
@@ -26,7 +26,7 @@ test('sidebar scope links navigate to personal and group roots', async ({ page }
   await page.goto('/friends')
   await page.locator('.sidebar-nav-link').filter({ hasText: 'Persönlich' }).click()
 
-  await expect(page).toHaveURL(new RegExp(`/friends${personalScopeRoot.path}$`))
+  await expect(page).toHaveURL(/\/friends\/~me$/)
   await expect(page.locator('.app-breadcrumb')).toContainText('Persönlich')
 
   await page.getByRole('link', { name: /Travel Gruppe/ }).click()

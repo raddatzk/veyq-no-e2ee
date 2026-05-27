@@ -163,11 +163,19 @@ function isMacPlatform(): boolean {
 <template>
   <header class="workspace-topbar">
     <Breadcrumb :model="items" class="app-breadcrumb" />
-    <div ref="searchRoot" class="workspace-search">
+    <div
+      ref="searchRoot"
+      class="workspace-search"
+      :class="{ 'workspace-search-open': searchOpen }"
+    >
       <label
         class="workspace-topbar-center"
         :aria-label="t('navigation.globalSearch')"
-        :class="{ 'workspace-topbar-center-disabled': !searchEnabled }"
+        data-testid="workspace-search-trigger"
+        :class="{
+          'workspace-topbar-center-disabled': !searchEnabled,
+          'workspace-topbar-center-open': searchOpen
+        }"
         @click="openSearch"
       >
         <span class="pi pi-search" />
@@ -228,6 +236,7 @@ function isMacPlatform(): boolean {
         <Button
           v-for="action in actions"
           :key="action.key"
+          class="workspace-action-button"
           :icon="action.icon"
           :aria-label="action.label"
           :severity="action.severity"

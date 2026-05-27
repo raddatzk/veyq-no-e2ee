@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import Dialog from 'primevue/dialog'
 import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
 import { getMemoryNavigation, type Memory, type MemoryScopeRoot } from '../../features/memories/api'
@@ -14,18 +16,32 @@ import { useThemeState } from '../../shared/state/useThemeState'
 import ProfileMenu from './ProfileMenu.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const { authState } = useAuthState()
 const { resolvedTheme } = useThemeState()
+const props = defineProps<{
+  navigationRefreshKey?: number
+}>()
 const emit = defineEmits<{
   createTenant: []
+  createGroup: []
 }>()
 
 const tenantMenu = ref()
+const compactTenantMenu = ref()
+const groupMenu = ref()
+const mobileMenuOpen = ref(false)
+const compactGroupLinks = ref<HTMLElement | null>(null)
+const compactGroupMeasure = ref<HTMLElement | null>(null)
 const scopeRoots = ref<MemoryScopeRoot[]>([])
 const favoriteMemories = ref<Memory[]>([])
 const sidebarError = ref('')
+const compactGroupLinksWidth = ref(0)
+const compactGroupOverflowWidth = ref(48)
+const compactGroupItemWidths = ref<Record<string, number>>({})
 let loadSequence = 0
+let compactGroupResizeObserver: ResizeObserver | null = null
 
 const canCreateTenant = computed(() => authState.user?.serverRole === 'ServerOwner')
 const activeTenantName = computed(() => String(route.params.tenantName || authState.tenants[0]?.name || ''))
@@ -33,6 +49,26 @@ const activeTenant = computed(() => authState.tenants.find((tenant) => tenant.na
 const personalRoot = computed(() => scopeRoots.value.find((scopeRoot) => scopeRoot.kind === 'USER'))
 const groupRoots = computed(() => scopeRoots.value.filter((scopeRoot) => scopeRoot.kind === 'GROUP'))
 const brandLogoUrl = computed(() => (resolvedTheme.value === 'dark' ? logoDarkUrl : logoLightUrl))
+const visibleCompactGroupRoots = computed(() => {
+  const availableWidth = compactGroupLinksWidth.value - compactGroupOverflowWidth.value - 8
+  if (availableWidth <= 0) return groupRoots.value.slice(0, 1)
+
+  const visible: MemoryScopeRoot[] = []
+  let usedWidth = 0
+  for (const scopeRoot of groupRoots.value) {
+    const itemWidth = compactGroupItemWidths.value[scopeRoot.path] ?? 126
+    const nextWidth = usedWidth + itemWidth + (visible.length > 0 ? 8 : 0)
+    if (nextWidth > availableWidth) break
+    visible.push(scopeRoot)
+    usedWidth = nextWidth
+  }
+
+  return visible.length > 0 ? visible : groupRoots.value.slice(0, 1)
+})
+const overflowCompactGroupRoots = computed(() => {
+  const visiblePaths = new Set(visibleCompactGroupRoots.value.map((scopeRoot) => scopeRoot.path))
+  return groupRoots.value.filter((scopeRoot) => !visiblePaths.has(scopeRoot.path))
+})
 const tenantMenuItems = computed(() =>
   canCreateTenant.value
     ? [
@@ -44,8 +80,81 @@ const tenantMenuItems = computed(() =>
       ]
     : []
 )
+const compactTenantMenuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = authState.tenants
+    .filter((tenant) => tenant.name !== activeTenantName.value)
+    .map((tenant) => ({
+      label: tenant.displayName,
+      icon: 'pi pi-box',
+      command: () => {
+        void router.push(`/${tenant.name}`)
+      }
+    }))
 
-watch([activeTenantName, memoryFavoritesRefreshToken], loadNavigationData, { immediate: true })
+  if (canCreateTenant.value) {
+    if (items.length > 0) items.push({ separator: true })
+    items.push({
+      label: t('navigation.createTenant'),
+      icon: 'pi pi-plus',
+      command: () => emit('createTenant')
+    })
+  }
+
+  return items
+})
+const groupMenuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = overflowCompactGroupRoots.value.map((scopeRoot) => ({
+    label: scopeLabel(scopeRoot),
+    icon: scopeIcon(scopeRoot),
+    command: () => {
+      void router.push(`/${activeTenantName.value}${scopeRoot.path}`)
+    }
+  }))
+
+  if (activeTenant.value) {
+    if (items.length > 0) items.push({ separator: true })
+    items.push({
+      label: t('navigation.groupCreate'),
+      icon: 'pi pi-plus',
+      command: () => {
+        emit('createGroup')
+      }
+    })
+  }
+
+  return items
+})
+
+watch(
+  [
+    activeTenantName,
+    memoryFavoritesRefreshToken,
+    () => authState.isAuthenticated,
+    () => authState.tenants.length,
+    () => props.navigationRefreshKey
+  ],
+  loadNavigationData,
+  { immediate: true }
+)
+watch(groupRoots, () => {
+  void measureCompactGroupNav()
+})
+
+onMounted(() => {
+  void measureCompactGroupNav()
+  if (typeof ResizeObserver === 'undefined') return
+
+  compactGroupResizeObserver = new ResizeObserver(() => {
+    void measureCompactGroupNav()
+  })
+  if (compactGroupLinks.value) compactGroupResizeObserver.observe(compactGroupLinks.value)
+  if (compactGroupMeasure.value) compactGroupResizeObserver.observe(compactGroupMeasure.value)
+})
+
+onBeforeUnmount(() => {
+  compactGroupResizeObserver?.disconnect()
+  compactGroupResizeObserver = null
+})
 
 async function loadNavigationData() {
   const tenantName = activeTenantName.value
@@ -53,7 +162,7 @@ async function loadNavigationData() {
   scopeRoots.value = []
   favoriteMemories.value = []
   sidebarError.value = ''
-  if (!tenantName || !authState.isAuthenticated) return
+  if (!tenantName) return
 
   try {
     const navigation = await getMemoryNavigation(tenantName, '/')
@@ -88,11 +197,45 @@ function memoryCoverUrl(memory: Memory): string {
 function toggleTenantMenu(event: MouseEvent) {
   tenantMenu.value?.toggle(event)
 }
+
+function toggleCompactTenantMenu(event: MouseEvent) {
+  compactTenantMenu.value?.toggle(event)
+}
+
+function toggleGroupMenu(event: MouseEvent) {
+  groupMenu.value?.toggle(event)
+}
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false
+}
+
+async function measureCompactGroupNav() {
+  await nextTick()
+  if (compactGroupLinks.value) {
+    compactGroupLinksWidth.value = compactGroupLinks.value.getBoundingClientRect().width
+  }
+
+  const measureRoot = compactGroupMeasure.value
+  if (!measureRoot) return
+
+  const widths: Record<string, number> = {}
+  for (const element of Array.from(measureRoot.querySelectorAll<HTMLElement>('[data-compact-group-path]'))) {
+    const path = element.dataset.compactGroupPath
+    if (path) widths[path] = Math.ceil(element.getBoundingClientRect().width)
+  }
+  compactGroupItemWidths.value = widths
+
+  const overflowButton = measureRoot.querySelector<HTMLElement>('[data-compact-group-overflow]')
+  if (overflowButton) {
+    compactGroupOverflowWidth.value = Math.ceil(overflowButton.getBoundingClientRect().width)
+  }
+}
 </script>
 
 <template>
   <aside class="tenant-sidebar">
-    <RouterLink to="/" class="sidebar-brand" aria-label="Veyq Home">
+    <RouterLink to="/" class="sidebar-brand" aria-label="veyq Home">
       <img
         class="sidebar-brand-mark"
         :src="brandLogoUrl"
@@ -102,7 +245,7 @@ function toggleTenantMenu(event: MouseEvent) {
       <span>veyq</span>
     </RouterLink>
 
-    <section class="sidebar-section">
+    <section class="sidebar-section sidebar-tenant-section">
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('tenant.title') }}</p>
         <button
@@ -116,6 +259,18 @@ function toggleTenantMenu(event: MouseEvent) {
           <span class="pi pi-plus" />
         </button>
       </div>
+      <button
+        v-if="activeTenant"
+        class="compact-menu-button compact-tenant-menu-button"
+        type="button"
+        :aria-label="t('navigation.tenantMenuOpen')"
+        aria-haspopup="menu"
+        @click="toggleCompactTenantMenu"
+      >
+        <span class="sidebar-tenant-avatar">{{ tenantInitial(activeTenant.displayName) }}</span>
+        <span class="compact-menu-label">{{ activeTenant.displayName }}</span>
+        <span class="pi pi-chevron-down compact-menu-chevron" />
+      </button>
       <div class="sidebar-tenant-switcher">
         <div
           v-for="tenant in authState.tenants"
@@ -156,14 +311,11 @@ function toggleTenantMenu(event: MouseEvent) {
           </RouterLink>
         </div>
         <Menu ref="tenantMenu" :model="tenantMenuItems" popup />
+        <Menu ref="compactTenantMenu" :model="compactTenantMenuItems" popup />
       </div>
     </section>
 
     <nav v-if="activeTenant" class="sidebar-nav" :aria-label="t('navigation.workspaceNavigation')">
-      <RouterLink :to="`/${activeTenant.name}`" class="sidebar-nav-link">
-        <span class="pi pi-home" />
-        <span>{{ t('navigation.home') }}</span>
-      </RouterLink>
       <RouterLink
         v-if="personalRoot"
         :to="`/${activeTenantName}${personalRoot.path}`"
@@ -174,7 +326,7 @@ function toggleTenantMenu(event: MouseEvent) {
       </RouterLink>
     </nav>
 
-    <section class="sidebar-section">
+    <section class="sidebar-section sidebar-favorites-section">
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('navigation.favorites') }}</p>
       </div>
@@ -200,24 +352,69 @@ function toggleTenantMenu(event: MouseEvent) {
       </RouterLink>
     </section>
 
-    <section v-if="activeTenant" class="sidebar-section">
+    <section v-if="activeTenant" class="sidebar-section sidebar-groups-section">
       <div class="sidebar-section-heading">
         <p class="sidebar-section-label">{{ t('navigation.groups') }}</p>
-        <RouterLink
+        <button
           v-if="activeTenant"
-          :to="`/${activeTenant.name}/settings?createGroup=1`"
           class="sidebar-section-action"
+          type="button"
           :title="t('navigation.groupCreate')"
           :aria-label="t('navigation.groupCreate')"
+          @click="emit('createGroup')"
         >
           <span class="pi pi-plus" />
-        </RouterLink>
+        </button>
+      </div>
+      <div class="compact-group-nav">
+        <span class="compact-group-divider" aria-hidden="true" />
+        <div ref="compactGroupLinks" class="compact-group-links">
+          <RouterLink
+            v-for="scopeRoot in visibleCompactGroupRoots"
+            :key="scopeRoot.path"
+            :to="`/${activeTenantName}${scopeRoot.path}`"
+            class="sidebar-scope-link compact-group-link"
+          >
+            <span :class="['sidebar-scope-icon', scopeIcon(scopeRoot)]" />
+            <span>
+              <strong>{{ scopeLabel(scopeRoot) }}</strong>
+              <small>{{ scopeMeta(scopeRoot) }}</small>
+            </span>
+          </RouterLink>
+          <button
+            v-if="groupMenuItems.length"
+            class="compact-group-overflow-button"
+            type="button"
+            :aria-label="t('navigation.groupsMenuOpen')"
+            aria-haspopup="menu"
+            @click="toggleGroupMenu"
+          >
+            <span class="pi pi-chevron-down" />
+          </button>
+        </div>
+      </div>
+      <div ref="compactGroupMeasure" class="compact-group-measure" aria-hidden="true">
+        <span
+          v-for="scopeRoot in groupRoots"
+          :key="scopeRoot.path"
+          class="sidebar-scope-link compact-group-link"
+          :data-compact-group-path="scopeRoot.path"
+        >
+          <span :class="['sidebar-scope-icon', scopeIcon(scopeRoot)]" />
+          <span>
+            <strong>{{ scopeLabel(scopeRoot) }}</strong>
+            <small>{{ scopeMeta(scopeRoot) }}</small>
+          </span>
+        </span>
+        <button class="compact-group-overflow-button" type="button" data-compact-group-overflow>
+          <span class="pi pi-chevron-down" />
+        </button>
       </div>
       <RouterLink
         v-for="scopeRoot in groupRoots"
         :key="scopeRoot.path"
         :to="`/${activeTenantName}${scopeRoot.path}`"
-        class="sidebar-scope-link"
+        class="sidebar-scope-link desktop-group-link"
       >
         <span :class="['sidebar-scope-icon', scopeIcon(scopeRoot)]" />
         <span>
@@ -225,11 +422,140 @@ function toggleTenantMenu(event: MouseEvent) {
           <small>{{ scopeMeta(scopeRoot) }}</small>
         </span>
       </RouterLink>
+      <Menu ref="groupMenu" :model="groupMenuItems" popup />
     </section>
 
     <section class="sidebar-section sidebar-profile">
       <ProfileMenu show-name />
     </section>
+
+    <button
+      class="mobile-navigation-button"
+      type="button"
+      :aria-label="t('navigation.mobileMenuOpen')"
+      @click="mobileMenuOpen = true"
+    >
+      <span class="pi pi-bars" />
+    </button>
+
+    <Dialog
+      v-model:visible="mobileMenuOpen"
+      modal
+      position="bottom"
+      class="tenant-dialog mobile-nav-dialog"
+      :header="t('navigation.mobileMenu')"
+    >
+      <div class="mobile-nav-sheet">
+        <header v-if="activeTenant" class="mobile-nav-sheet-header">
+          <span class="sidebar-tenant-avatar">{{ tenantInitial(activeTenant.displayName) }}</span>
+          <span>
+            <strong>{{ activeTenant.displayName }}</strong>
+            <small>{{ activeTenant.domain }}</small>
+          </span>
+        </header>
+
+        <section class="mobile-nav-section">
+          <h2>{{ t('tenant.title') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-for="tenant in authState.tenants"
+              :key="tenant.id"
+              :to="`/${tenant.name}`"
+              class="mobile-nav-item"
+              :class="{ 'mobile-nav-item-active': activeTenantName === tenant.name }"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-tenant-avatar">{{ tenantInitial(tenant.displayName) }}</span>
+              <span>
+                <strong>{{ tenant.displayName }}</strong>
+                <small>{{ tenant.domain }}</small>
+              </span>
+            </RouterLink>
+            <button
+              v-if="canCreateTenant"
+              class="mobile-nav-item mobile-nav-action"
+              type="button"
+              @click="emit('createTenant'); closeMobileMenu()"
+            >
+              <span class="pi pi-plus" />
+              <span>{{ t('navigation.createTenant') }}</span>
+            </button>
+          </div>
+        </section>
+
+        <section v-if="activeTenant" class="mobile-nav-section">
+          <h2>{{ t('navigation.workspaceNavigation') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-if="personalRoot"
+              :to="`/${activeTenantName}${personalRoot.path}`"
+              class="mobile-nav-item"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-scope-icon pi pi-user" />
+              <span>{{ t('navigation.personal') }}</span>
+            </RouterLink>
+          </div>
+        </section>
+
+        <section v-if="activeTenant" class="mobile-nav-section">
+          <h2>{{ t('navigation.groups') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-for="scopeRoot in groupRoots"
+              :key="scopeRoot.path"
+              :to="`/${activeTenantName}${scopeRoot.path}`"
+              class="mobile-nav-item"
+              @click="closeMobileMenu"
+            >
+              <span :class="['sidebar-scope-icon', scopeIcon(scopeRoot)]" />
+              <span>
+                <strong>{{ scopeLabel(scopeRoot) }}</strong>
+                <small>{{ scopeMeta(scopeRoot) }}</small>
+              </span>
+            </RouterLink>
+            <button
+              type="button"
+              class="mobile-nav-item mobile-nav-action"
+              @click="emit('createGroup'); closeMobileMenu()"
+            >
+              <span class="pi pi-plus" />
+              <span>{{ t('navigation.groupCreate') }}</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="mobile-nav-section">
+          <h2>{{ t('navigation.favorites') }}</h2>
+          <div class="mobile-nav-list">
+            <RouterLink
+              v-for="memory in favoriteMemories"
+              :key="memory.id"
+              :to="`/${activeTenantName}${memory.path}`"
+              class="mobile-nav-item mobile-nav-favorite"
+              @click="closeMobileMenu"
+            >
+              <span class="sidebar-favorite-cover">
+                <MemoryCoverImage
+                  v-if="memoryCoverUrl(memory)"
+                  :src="memoryCoverUrl(memory)"
+                  :alt="memory.displayName"
+                  :crop="memory.coverCrop"
+                />
+                <span v-else class="pi pi-images" />
+              </span>
+              <span>
+                <strong>{{ memory.displayName }}</strong>
+                <small>{{ memory.path }}</small>
+              </span>
+            </RouterLink>
+            <p v-if="favoriteMemories.length === 0" class="mobile-nav-empty">
+              {{ t('navigation.noFavorites') }}
+            </p>
+          </div>
+        </section>
+      </div>
+    </Dialog>
 
     <p v-if="sidebarError" class="sidebar-error">{{ sidebarError }}</p>
   </aside>
