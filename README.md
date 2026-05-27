@@ -51,6 +51,19 @@ cd frontend
 npm run check
 ```
 
+## Server Installation
+
+The recommended self-hosted server path is the setup script. It downloads the Compose files into `/opt/veyq`, creates `.env`, prompts for the common server values, can start the stack and later provides `doctor`, `backup` and `upgrade` commands.
+
+Run this on the server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/main/scripts/veyq-server.sh | \
+  bash -s -- install
+```
+
+After installation, run `sudo ./veyq-server.sh doctor` from `/opt/veyq` after `.env` changes and before upgrades. For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
+
 ## Docker Compose Test Instance
 
 The Docker Compose setup under [`infra`](infra) starts Traefik, MariaDB and the veyq application container. It can also run an optional `veyq-reset` sidecar for disposable development or test instances.
@@ -65,10 +78,6 @@ docker compose up
 Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`. The normal image-based Compose stack keeps MariaDB internal to the Compose network; the local build override publishes MariaDB on host port `3306` for development tools.
 
 The reset sidecar can clear veyq tables, delete media volume contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
-
-For server installs and upgrades, use [`scripts/veyq-server.sh`](scripts/veyq-server.sh). It downloads the Compose files, can guide `.env` setup, starts the stack and provides backup/upgrade commands.
-Run `./veyq-server.sh doctor` on the server after editing `.env` and before upgrades.
-For expected self-hosting failure cases and recovery steps, see [`docs/operations.md`](docs/operations.md).
 
 ## API-First Development
 
