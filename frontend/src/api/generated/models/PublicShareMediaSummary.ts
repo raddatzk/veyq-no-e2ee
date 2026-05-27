@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -93,6 +93,18 @@ export interface PublicShareMediaSummary {
      * @memberof PublicShareMediaSummary
      */
     previewUrl?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof PublicShareMediaSummary
+     */
+    gpsLatitude?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof PublicShareMediaSummary
+     */
+    gpsLongitude?: number;
 }
 
 /**
@@ -132,6 +144,8 @@ export function PublicShareMediaSummaryFromJSONTyped(json: any, ignoreDiscrimina
         'sizeBytes': json['sizeBytes'],
         'contentUrl': json['contentUrl'],
         'previewUrl': json['previewUrl'] == null ? undefined : json['previewUrl'],
+        'gpsLatitude': json['gpsLatitude'] == null ? undefined : json['gpsLatitude'],
+        'gpsLongitude': json['gpsLongitude'] == null ? undefined : json['gpsLongitude'],
     };
 }
 
@@ -157,6 +171,8 @@ export function PublicShareMediaSummaryToJSONTyped(value?: PublicShareMediaSumma
         'sizeBytes': value['sizeBytes'],
         'contentUrl': value['contentUrl'],
         'previewUrl': value['previewUrl'],
+        'gpsLatitude': value['gpsLatitude'],
+        'gpsLongitude': value['gpsLongitude'],
     };
 }
 

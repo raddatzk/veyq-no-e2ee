@@ -31,6 +31,8 @@ import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
+import com.veyq.api.library.playlist.MemoryPlaylistService
+import com.veyq.api.library.track.MemoryTrackService
 import com.veyq.api.security.RateLimitService
 import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
@@ -62,6 +64,8 @@ class MemoryShareService @Inject constructor(
     private val groupMemberRepo: TenantGroupMemberRepo,
     private val passwordService: PasswordService,
     private val mediaService: MediaService,
+    private val trackService: MemoryTrackService,
+    private val playlistService: MemoryPlaylistService,
     private val memoryJournalService: MemoryJournalService,
     private val mediaConfig: MediaConfig,
     private val requestContext: RequestContext,
@@ -132,7 +136,7 @@ class MemoryShareService @Inject constructor(
             }
         }
 
-        val displayName = requiredShareDisplayName(request.displayName)
+        val displayName = shareDisplayName(share, request.displayName)
         val identity = MemoryShareIdentity().also {
             it.share = share
             it.displayName = displayName
@@ -326,6 +330,99 @@ class MemoryShareService @Inject constructor(
             archiveName = publicShareArchiveFilename(memory, includeChildren, locale),
             locale = locale,
         )
+    }
+
+    fun listPublicShareMemoryTracks(shareId: String, memoryId: String): List<com.veyq.api.generated.model.MemoryTrackSummary> {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return trackService.listPublicShareMemoryTracks(access.share.publicId, memory)
+    }
+
+    @Transactional
+    fun uploadPublicShareMemoryTrack(
+        shareId: String,
+        memoryId: String,
+        uploadPath: Path,
+        originalFilename: String?,
+        title: String?,
+        activityType: com.veyq.api.generated.model.MemoryTrackActivityType?,
+    ): com.veyq.api.generated.model.MemoryTrackSummary {
+        val access = requireTrackEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return trackService.uploadPublicShareMemoryTrack(
+            shareId = access.share.publicId,
+            memory = memory,
+            uploadPath = uploadPath,
+            originalFilename = originalFilename,
+            title = title,
+            activityType = activityType,
+        )
+    }
+
+    @Transactional
+    fun updatePublicShareMemoryTrack(
+        shareId: String,
+        memoryId: String,
+        trackId: String,
+        request: com.veyq.api.generated.model.UpdateMemoryTrackRequest,
+    ): com.veyq.api.generated.model.MemoryTrackSummary {
+        val access = requireTrackEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return trackService.updatePublicShareMemoryTrack(access.share.publicId, memory, trackId, request)
+    }
+
+    @Transactional
+    fun deletePublicShareMemoryTrack(shareId: String, memoryId: String, trackId: String) {
+        val access = requireTrackEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        trackService.deletePublicShareMemoryTrack(memory, trackId)
+    }
+
+    fun publicShareMemoryTrackContent(shareId: String, memoryId: String, trackId: String): Response {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return trackService.publicShareMemoryTrackContent(memory, trackId)
+    }
+
+    fun listPublicShareMemoryPlaylists(shareId: String, memoryId: String): List<com.veyq.api.generated.model.MemoryPlaylistSummary> {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return playlistService.listPublicShareMemoryPlaylists(memory)
+    }
+
+    @Transactional
+    fun createPublicShareMemoryPlaylist(
+        shareId: String,
+        memoryId: String,
+        request: com.veyq.api.generated.model.CreateMemoryPlaylistRequest,
+    ): com.veyq.api.generated.model.MemoryPlaylistSummary {
+        val access = requirePlaylistEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return playlistService.createPublicShareMemoryPlaylist(
+            memory = memory,
+            request = request,
+            authenticatedUser = access.authenticatedUser,
+            shareIdentity = access.shareIdentity,
+        )
+    }
+
+    @Transactional
+    fun updatePublicShareMemoryPlaylist(
+        shareId: String,
+        memoryId: String,
+        playlistId: String,
+        request: com.veyq.api.generated.model.UpdateMemoryPlaylistRequest,
+    ): com.veyq.api.generated.model.MemoryPlaylistSummary {
+        val access = requirePlaylistEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        return playlistService.updatePublicShareMemoryPlaylist(memory, playlistId, request)
+    }
+
+    @Transactional
+    fun deletePublicShareMemoryPlaylist(shareId: String, memoryId: String, playlistId: String) {
+        val access = requirePlaylistEditAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        playlistService.deletePublicShareMemoryPlaylist(memory, playlistId)
     }
 
     fun listPublicShareMedia(shareId: String): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
@@ -669,6 +766,16 @@ class MemoryShareService @Inject constructor(
             if (!it.canEdit) throw ForbiddenException("Share does not allow editing")
         }
 
+    private fun requireTrackEditAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!it.canEdit) throw ForbiddenException("Share does not allow track editing")
+        }
+
+    private fun requirePlaylistEditAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!it.canEdit) throw ForbiddenException("Share does not allow playlist editing")
+        }
+
     private fun requireDeleteAccess(share: MemoryShare): ShareAccess =
         requireFullAccess(share).also {
             if (!it.canDelete) throw ForbiddenException("Share does not allow deleting")
@@ -891,6 +998,13 @@ class MemoryShareService @Inject constructor(
         return displayName
     }
 
+    private fun shareDisplayName(share: MemoryShare, value: String?): String {
+        if (requiresShareDisplayName(share)) return requiredShareDisplayName(value)
+        return value?.trim()?.takeIf { it.isNotBlank() }?.also {
+            if (it.length > 80) throw BadRequestException("displayName is too long")
+        } ?: "Viewer"
+    }
+
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): Pair<LocalDate, LocalDate> {
         val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")
         val end = endDate ?: throw BadRequestException("endDate is required", "MEMORY_DATE_RANGE_REQUIRED")
@@ -996,6 +1110,9 @@ class MemoryShareService @Inject constructor(
     private fun canDelete(role: MemoryShareRole): Boolean =
         role == MemoryShareRole.MANAGER
 
+    private fun requiresShareDisplayName(share: MemoryShare): Boolean =
+        share.role != MemoryShareRole.VIEWER
+
     private fun toManagedSummary(share: MemoryShare): MemoryShareSummary =
         MemoryShareSummary(
             id = share.publicId,
@@ -1015,7 +1132,7 @@ class MemoryShareService @Inject constructor(
             role = access.share.role.toApi(),
             authenticated = access.authenticatedUser != null || access.shareIdentity != null,
             passwordRequired = access.share.passwordHash != null,
-            displayNameRequired = access.share.passwordHash != null || (access.share.role != MemoryShareRole.VIEWER && access.shareIdentity == null && access.authenticatedUser == null),
+            displayNameRequired = requiresShareDisplayName(access.share) && access.shareIdentity == null && access.authenticatedUser == null,
             canViewGallery = access.canViewGallery,
             canUpload = access.canUpload,
             canEdit = access.canEdit,

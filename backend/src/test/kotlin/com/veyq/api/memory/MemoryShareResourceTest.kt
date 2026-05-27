@@ -65,6 +65,7 @@ class MemoryShareResourceTest {
             .statusCode(200)
             .body("authenticated", equalTo(false))
             .body("passwordRequired", equalTo(true))
+            .body("displayNameRequired", equalTo(false))
             .body("rootMemory", nullValue())
 
         given()
@@ -81,11 +82,12 @@ class MemoryShareResourceTest {
 
         val accessCookie = given()
             .contentType("application/json")
-            .body("""{"password":"share-password123","displayName":"Alex"}""")
+            .body("""{"password":"share-password123"}""")
             .`when`().post("/api/public-shares/$shareId/login")
             .then()
             .statusCode(200)
             .body("authenticated", equalTo(true))
+            .body("displayNameRequired", equalTo(false))
             .extract()
             .cookie("VEYQ_SHARE_ACCESS_TOKEN")
 
@@ -164,6 +166,20 @@ class MemoryShareResourceTest {
     @Test
     fun `public share upload returns stable code for empty files`() {
         val shareId = createShare("UPLOADER")
+
+        given()
+            .`when`().get("/api/public-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("displayNameRequired", equalTo(true))
+
+        given()
+            .contentType("application/json")
+            .body("""{"password":"share-password123"}""")
+            .`when`().post("/api/public-shares/$shareId/login")
+            .then()
+            .statusCode(400)
+
         val accessCookie = loginShare(shareId)
         val empty = Files.createTempFile("veyq-empty-upload-", ".png")
         try {
@@ -790,6 +806,65 @@ class MemoryShareResourceTest {
             .statusCode(403)
     }
 
+    @Test
+    fun `memory playlists expose a single featured playlist`() {
+        val firstPlaylistId = createPlaylist("First Soundtrack", featured = true)
+        val secondPlaylistId = createPlaylist("Second Soundtrack", featured = false)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .`when`().get("/api/${tenant.name}/memories/${memory.publicId}/playlists")
+            .then()
+            .statusCode(200)
+            .body("[0].id", equalTo(firstPlaylistId))
+            .body("[0].featured", equalTo(true))
+            .body("[1].id", equalTo(secondPlaylistId))
+            .body("[1].featured", equalTo(false))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body("""{"title":"Second Soundtrack","featured":true}""")
+            .`when`().put("/api/${tenant.name}/memories/${memory.publicId}/playlists/$secondPlaylistId")
+            .then()
+            .statusCode(200)
+            .body("featured", equalTo(true))
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .`when`().get("/api/${tenant.name}/memories/${memory.publicId}/playlists")
+            .then()
+            .statusCode(200)
+            .body("[0].id", equalTo(secondPlaylistId))
+            .body("[0].featured", equalTo(true))
+            .body("[1].id", equalTo(firstPlaylistId))
+            .body("[1].featured", equalTo(false))
+    }
+
+    @Test
+    fun `public share viewers can read playlists but uploader only shares cannot`() {
+        val playlistId = createPlaylist("Share Soundtrack", featured = true)
+        val viewerShareId = createShare("VIEWER")
+        val viewerAccessCookie = loginShare(viewerShareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .`when`().get("/api/public-shares/$viewerShareId/memories/${memory.publicId}/playlists")
+            .then()
+            .statusCode(200)
+            .body("[0].id", equalTo(playlistId))
+            .body("[0].featured", equalTo(true))
+
+        val uploaderShareId = createShare("UPLOADER")
+        val uploaderAccessCookie = loginShare(uploaderShareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", uploaderAccessCookie)
+            .`when`().get("/api/public-shares/$uploaderShareId/memories/${memory.publicId}/playlists")
+            .then()
+            .statusCode(403)
+    }
+
     private fun createShare(role: String, password: String? = "share-password123", name: String? = null): String {
         val fields = mutableListOf("\"role\":\"$role\"")
         name?.let { fields += "\"name\":\"$it\"" }
@@ -804,6 +879,27 @@ class MemoryShareResourceTest {
             .extract()
             .path("id")
     }
+
+    private fun createPlaylist(title: String, featured: Boolean): String =
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body(
+                """
+                {
+                  "title":"$title",
+                  "featured":$featured,
+                  "url":"https://www.youtube.com/playlist?list=PL1234567890abcdef"
+                }
+                """.trimIndent()
+            )
+            .`when`().post("/api/${tenant.name}/memories/${memory.publicId}/playlists")
+            .then()
+            .statusCode(200)
+            .body("title", equalTo(title))
+            .body("featured", equalTo(featured))
+            .extract()
+            .path("id")
 
     private fun login(): String =
         given()

@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -16,10 +16,14 @@
 import * as runtime from '../runtime';
 import type {
   CreateMemoryMediaUploadRequest,
+  CreateMemoryPlaylistRequest,
   CreatePublicShareMemoryRequest,
   ErrorResponse,
   MemoryJournalSummary,
   MemoryMediaUploadSession,
+  MemoryPlaylistSummary,
+  MemoryTrackActivityType,
+  MemoryTrackSummary,
   PendingMemoryMediaUploadSession,
   PublicShareLoginRequest,
   PublicShareMediaSummary,
@@ -29,11 +33,15 @@ import type {
   PublicShareTreeResponse,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryPlaylistRequest,
+  UpdateMemoryTrackRequest,
   UpdatePublicShareMemoryRequest,
 } from '../models/index';
 import {
     CreateMemoryMediaUploadRequestFromJSON,
     CreateMemoryMediaUploadRequestToJSON,
+    CreateMemoryPlaylistRequestFromJSON,
+    CreateMemoryPlaylistRequestToJSON,
     CreatePublicShareMemoryRequestFromJSON,
     CreatePublicShareMemoryRequestToJSON,
     ErrorResponseFromJSON,
@@ -42,6 +50,12 @@ import {
     MemoryJournalSummaryToJSON,
     MemoryMediaUploadSessionFromJSON,
     MemoryMediaUploadSessionToJSON,
+    MemoryPlaylistSummaryFromJSON,
+    MemoryPlaylistSummaryToJSON,
+    MemoryTrackActivityTypeFromJSON,
+    MemoryTrackActivityTypeToJSON,
+    MemoryTrackSummaryFromJSON,
+    MemoryTrackSummaryToJSON,
     PendingMemoryMediaUploadSessionFromJSON,
     PendingMemoryMediaUploadSessionToJSON,
     PublicShareLoginRequestFromJSON,
@@ -60,6 +74,10 @@ import {
     UpdateMemoryJournalRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
     UpdateMemoryMediaMetadataRequestToJSON,
+    UpdateMemoryPlaylistRequestFromJSON,
+    UpdateMemoryPlaylistRequestToJSON,
+    UpdateMemoryTrackRequestFromJSON,
+    UpdateMemoryTrackRequestToJSON,
     UpdatePublicShareMemoryRequestFromJSON,
     UpdatePublicShareMemoryRequestToJSON,
 } from '../models/index';
@@ -103,6 +121,12 @@ export interface CreatePublicShareMemoryMediaUploadRequest {
     createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
 }
 
+export interface CreatePublicShareMemoryPlaylistRequest {
+    shareId: string;
+    memoryId: string;
+    createMemoryPlaylistRequest: CreateMemoryPlaylistRequest;
+}
+
 export interface DeletePublicShareMediaRequest {
     shareId: string;
     memoryId: string;
@@ -112,6 +136,18 @@ export interface DeletePublicShareMediaRequest {
 export interface DeletePublicShareMemoryRequest {
     shareId: string;
     memoryId: string;
+}
+
+export interface DeletePublicShareMemoryPlaylistRequest {
+    shareId: string;
+    memoryId: string;
+    playlistId: string;
+}
+
+export interface DeletePublicShareMemoryTrackRequest {
+    shareId: string;
+    memoryId: string;
+    trackId: string;
 }
 
 export interface DownloadPublicShareMemoryMediaRequest {
@@ -169,6 +205,16 @@ export interface ListPublicShareMemoryMediaRequest {
     memoryId: string;
 }
 
+export interface ListPublicShareMemoryPlaylistsRequest {
+    shareId: string;
+    memoryId: string;
+}
+
+export interface ListPublicShareMemoryTracksRequest {
+    shareId: string;
+    memoryId: string;
+}
+
 export interface LoginPublicShareRequest {
     shareId: string;
     publicShareLoginRequest: PublicShareLoginRequest;
@@ -192,6 +238,12 @@ export interface PublicShareMediaPreviewRequest {
 export interface PublicShareMemoryCoverContentRequest {
     shareId: string;
     memoryId: string;
+}
+
+export interface PublicShareMemoryTrackContentRequest {
+    shareId: string;
+    memoryId: string;
+    trackId: string;
 }
 
 export interface RefreshPublicShareRequest {
@@ -233,6 +285,20 @@ export interface UpdatePublicShareMemoryJournalRequest {
     updateMemoryJournalRequest: UpdateMemoryJournalRequest;
 }
 
+export interface UpdatePublicShareMemoryPlaylistRequest {
+    shareId: string;
+    memoryId: string;
+    playlistId: string;
+    updateMemoryPlaylistRequest: UpdateMemoryPlaylistRequest;
+}
+
+export interface UpdatePublicShareMemoryTrackRequest {
+    shareId: string;
+    memoryId: string;
+    trackId: string;
+    updateMemoryTrackRequest: UpdateMemoryTrackRequest;
+}
+
 export interface UploadPublicShareMediaRequest {
     shareId: string;
     file: Blob;
@@ -261,6 +327,14 @@ export interface UploadPublicShareMemoryMediaChunkRequest {
     body: Blob;
 }
 
+export interface UploadPublicShareMemoryTrackRequest {
+    shareId: string;
+    memoryId: string;
+    file: Blob;
+    title: string;
+    activityType: MemoryTrackActivityType;
+}
+
 /**
  * PublicSharesApi - interface
  * 
@@ -278,7 +352,7 @@ export interface PublicSharesApiInterface {
     abortPublicShareMediaUploadRequestOpts(requestParameters: AbortPublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Deletes an unfinished root public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * @summary Abort a resumable public share root media upload session
      * @param {string} shareId Public share id.
      * @param {string} uploadId Resumable upload session id.
@@ -289,6 +363,7 @@ export interface PublicSharesApiInterface {
     abortPublicShareMediaUploadRaw(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Deletes an unfinished root public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Abort a resumable public share root media upload session
      */
     abortPublicShareMediaUpload(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -304,7 +379,7 @@ export interface PublicSharesApiInterface {
     abortPublicShareMemoryMediaUploadRequestOpts(requestParameters: AbortPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Deletes an unfinished public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * @summary Abort a resumable public share Memory media upload session
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -316,6 +391,7 @@ export interface PublicSharesApiInterface {
     abortPublicShareMemoryMediaUploadRaw(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Deletes an unfinished public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Abort a resumable public share Memory media upload session
      */
     abortPublicShareMemoryMediaUpload(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -330,7 +406,7 @@ export interface PublicSharesApiInterface {
     completePublicShareMediaUploadRequestOpts(requestParameters: CompletePublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Assembles all stored chunks, validates the final file and creates media in the shared root Memory.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * @summary Complete a resumable public share root media upload session
      * @param {string} shareId Public share id.
      * @param {string} uploadId Resumable upload session id.
@@ -341,6 +417,7 @@ export interface PublicSharesApiInterface {
     completePublicShareMediaUploadRaw(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>>;
 
     /**
+     * Assembles all stored chunks, validates the final file and creates media in the shared root Memory.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Complete a resumable public share root media upload session
      */
     completePublicShareMediaUpload(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
@@ -356,7 +433,7 @@ export interface PublicSharesApiInterface {
     completePublicShareMemoryMediaUploadRequestOpts(requestParameters: CompletePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Assembles all stored chunks, validates the final file and creates a public-share Memory media asset.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * @summary Complete a resumable public share Memory media upload session
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -368,6 +445,7 @@ export interface PublicSharesApiInterface {
     completePublicShareMemoryMediaUploadRaw(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>>;
 
     /**
+     * Assembles all stored chunks, validates the final file and creates a public-share Memory media asset.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Complete a resumable public share Memory media upload session
      */
     completePublicShareMemoryMediaUpload(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
@@ -410,7 +488,7 @@ export interface PublicSharesApiInterface {
     createPublicShareMediaUploadRequestOpts(requestParameters: CreatePublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Creates a resumable upload session for the root public-share upload flow.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * @summary Create a resumable public share root media upload session
      * @param {string} shareId Public share id.
      * @param {CreateMemoryMediaUploadRequest} createMemoryMediaUploadRequest 
@@ -421,6 +499,7 @@ export interface PublicSharesApiInterface {
     createPublicShareMediaUploadRaw(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
 
     /**
+     * Creates a resumable upload session for the root public-share upload flow.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Create a resumable public share root media upload session
      */
     createPublicShareMediaUpload(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
@@ -436,7 +515,7 @@ export interface PublicSharesApiInterface {
     createPublicShareMemoryMediaUploadRequestOpts(requestParameters: CreatePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Creates a resumable upload session for one image or video inside a Memory in the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * @summary Create a resumable public share Memory media upload session
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -448,9 +527,38 @@ export interface PublicSharesApiInterface {
     createPublicShareMemoryMediaUploadRaw(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>>;
 
     /**
+     * Creates a resumable upload session for one image or video inside a Memory in the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Create a resumable public share Memory media upload session
      */
     createPublicShareMemoryMediaUpload(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
+
+    /**
+     * Creates request options for createPublicShareMemoryPlaylist without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryPlaylistRequest} createMemoryPlaylistRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryPlaylistRequestOpts(requestParameters: CreatePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Creates playlist context for one Memory inside the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Create public share Memory playlist
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryPlaylistRequest} createMemoryPlaylistRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryPlaylistRaw(requestParameters: CreatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryPlaylistSummary>>;
+
+    /**
+     * Creates playlist context for one Memory inside the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Create public share Memory playlist
+     */
+    createPublicShareMemoryPlaylist(requestParameters: CreatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryPlaylistSummary>;
 
     /**
      * Creates request options for deletePublicShareMedia without sending the request
@@ -505,6 +613,62 @@ export interface PublicSharesApiInterface {
      * Delete a submemory through a public share
      */
     deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deletePublicShareMemoryPlaylist without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} playlistId Public playlist id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryPlaylistRequestOpts(requestParameters: DeletePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Delete public share Memory playlist
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} playlistId Public playlist id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryPlaylistRaw(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete public share Memory playlist
+     */
+    deletePublicShareMemoryPlaylist(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deletePublicShareMemoryTrack without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryTrackRequestOpts(requestParameters: DeletePublicShareMemoryTrackRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Delete a public share Memory track
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryTrackRaw(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete a public share Memory track
+     */
+    deletePublicShareMemoryTrack(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for downloadPublicShareMemoryMedia without sending the request
@@ -570,7 +734,7 @@ export interface PublicSharesApiInterface {
     getPublicShareMediaUploadRequestOpts(requestParameters: GetPublicShareMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Returns progress information for a root public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * @summary Get a resumable public share root media upload session
      * @param {string} shareId Public share id.
      * @param {string} uploadId Resumable upload session id.
@@ -581,6 +745,7 @@ export interface PublicSharesApiInterface {
     getPublicShareMediaUploadRaw(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
 
     /**
+     * Returns progress information for a root public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Get a resumable public share root media upload session
      */
     getPublicShareMediaUpload(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
@@ -674,7 +839,7 @@ export interface PublicSharesApiInterface {
     getPublicShareMemoryMediaUploadRequestOpts(requestParameters: GetPublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Returns progress information for a public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * @summary Get a resumable public share Memory media upload session
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -686,6 +851,7 @@ export interface PublicSharesApiInterface {
     getPublicShareMemoryMediaUploadRaw(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>>;
 
     /**
+     * Returns progress information for a public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Get a resumable public share Memory media upload session
      */
     getPublicShareMemoryMediaUpload(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession>;
@@ -791,6 +957,58 @@ export interface PublicSharesApiInterface {
     listPublicShareMemoryMedia(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PublicShareMediaSummary>>;
 
     /**
+     * Creates request options for listPublicShareMemoryPlaylists without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryPlaylistsRequestOpts(requestParameters: ListPublicShareMemoryPlaylistsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Lists playlist context assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary List public share Memory playlists
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryPlaylistsRaw(requestParameters: ListPublicShareMemoryPlaylistsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryPlaylistSummary>>>;
+
+    /**
+     * Lists playlist context assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory playlists
+     */
+    listPublicShareMemoryPlaylists(requestParameters: ListPublicShareMemoryPlaylistsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryPlaylistSummary>>;
+
+    /**
+     * Creates request options for listPublicShareMemoryTracks without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryTracksRequestOpts(requestParameters: ListPublicShareMemoryTracksRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Lists GPX tracks assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary List public share Memory tracks
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryTracksRaw(requestParameters: ListPublicShareMemoryTracksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryTrackSummary>>>;
+
+    /**
+     * Lists GPX tracks assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory tracks
+     */
+    listPublicShareMemoryTracks(requestParameters: ListPublicShareMemoryTracksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryTrackSummary>>;
+
+    /**
      * Creates request options for loginPublicShare without sending the request
      * @param {string} shareId Public share id.
      * @param {PublicShareLoginRequest} publicShareLoginRequest 
@@ -800,7 +1018,7 @@ export interface PublicSharesApiInterface {
     loginPublicShareRequestOpts(requestParameters: LoginPublicShareRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled.
+     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled. - Contributor, Manager and Uploader shares provide a display name for the anonymous share identity.
      * @summary Open a public share identity session
      * @param {string} shareId Public share id.
      * @param {PublicShareLoginRequest} publicShareLoginRequest 
@@ -811,7 +1029,7 @@ export interface PublicSharesApiInterface {
     loginPublicShareRaw(requestParameters: LoginPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareSummary>>;
 
     /**
-     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled.
+     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled. - Contributor, Manager and Uploader shares provide a display name for the anonymous share identity.
      * Open a public share identity session
      */
     loginPublicShare(requestParameters: LoginPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareSummary>;
@@ -919,6 +1137,34 @@ export interface PublicSharesApiInterface {
      * Stream explicit public share Memory cover
      */
     publicShareMemoryCoverContent(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for publicShareMemoryTrackContent without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMemoryTrackContentRequestOpts(requestParameters: PublicShareMemoryTrackContentRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams the original GPX file for a track visible through a public share.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Download public share Memory track GPX
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMemoryTrackContentRaw(requestParameters: PublicShareMemoryTrackContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams the original GPX file for a track visible through a public share.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Download public share Memory track GPX
+     */
+    publicShareMemoryTrackContent(requestParameters: PublicShareMemoryTrackContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for refreshPublicShare without sending the request
@@ -1077,7 +1323,7 @@ export interface PublicSharesApiInterface {
     updatePublicShareMemoryJournalRequestOpts(requestParameters: UpdatePublicShareMemoryJournalRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Replaces the Markdown journal for one Memory inside the shared subtree. veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * @summary Update public share Memory journal
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -1089,10 +1335,70 @@ export interface PublicSharesApiInterface {
     updatePublicShareMemoryJournalRaw(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>>;
 
     /**
-     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Replaces the Markdown journal for one Memory inside the shared subtree. veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Update public share Memory journal
      */
     updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
+
+    /**
+     * Creates request options for updatePublicShareMemoryPlaylist without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} playlistId Public playlist id.
+     * @param {UpdateMemoryPlaylistRequest} updateMemoryPlaylistRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryPlaylistRequestOpts(requestParameters: UpdatePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Updates editable playlist metadata and optionally replaces the external playlist URL visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Update public share Memory playlist
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} playlistId Public playlist id.
+     * @param {UpdateMemoryPlaylistRequest} updateMemoryPlaylistRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryPlaylistRaw(requestParameters: UpdatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryPlaylistSummary>>;
+
+    /**
+     * Updates editable playlist metadata and optionally replaces the external playlist URL visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update public share Memory playlist
+     */
+    updatePublicShareMemoryPlaylist(requestParameters: UpdatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryPlaylistSummary>;
+
+    /**
+     * Creates request options for updatePublicShareMemoryTrack without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @param {UpdateMemoryTrackRequest} updateMemoryTrackRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryTrackRequestOpts(requestParameters: UpdatePublicShareMemoryTrackRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Updates the editable title and activity type for a GPX track visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Update a public share Memory track
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} trackId Public track id.
+     * @param {UpdateMemoryTrackRequest} updateMemoryTrackRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryTrackRaw(requestParameters: UpdatePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryTrackSummary>>;
+
+    /**
+     * Updates the editable title and activity type for a GPX track visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update a public share Memory track
+     */
+    updatePublicShareMemoryTrack(requestParameters: UpdatePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryTrackSummary>;
 
     /**
      * Creates request options for uploadPublicShareMedia without sending the request
@@ -1134,7 +1440,7 @@ export interface PublicSharesApiInterface {
     uploadPublicShareMediaChunkRequestOpts(requestParameters: UploadPublicShareMediaChunkRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Stores one chunk for a root public-share upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * @summary Upload one public share root media chunk
      * @param {string} shareId Public share id.
      * @param {string} uploadId Resumable upload session id.
@@ -1147,6 +1453,7 @@ export interface PublicSharesApiInterface {
     uploadPublicShareMediaChunkRaw(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Stores one chunk for a root public-share upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Upload one public share root media chunk
      */
     uploadPublicShareMediaChunk(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -1194,7 +1501,7 @@ export interface PublicSharesApiInterface {
     uploadPublicShareMemoryMediaChunkRequestOpts(requestParameters: UploadPublicShareMemoryMediaChunkRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * 
+     * Stores one chunk for a public-share Memory upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * @summary Upload one public share Memory media chunk
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -1208,9 +1515,42 @@ export interface PublicSharesApiInterface {
     uploadPublicShareMemoryMediaChunkRaw(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
+     * Stores one chunk for a public-share Memory upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Upload one public share Memory media chunk
      */
     uploadPublicShareMemoryMediaChunk(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for uploadPublicShareMemoryTrack without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {Blob} file GPX file.
+     * @param {string} title 
+     * @param {MemoryTrackActivityType} activityType 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMemoryTrackRequestOpts(requestParameters: UploadPublicShareMemoryTrackRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Uploads one GPX track into a Memory inside the shared subtree. Viewer and uploader-only shares cannot upload tracks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * @summary Upload a public share Memory GPX track
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {Blob} file GPX file.
+     * @param {string} title 
+     * @param {MemoryTrackActivityType} activityType 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    uploadPublicShareMemoryTrackRaw(requestParameters: UploadPublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryTrackSummary>>;
+
+    /**
+     * Uploads one GPX track into a Memory inside the shared subtree. Viewer and uploader-only shares cannot upload tracks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Upload a public share Memory GPX track
+     */
+    uploadPublicShareMemoryTrack(requestParameters: UploadPublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryTrackSummary>;
 
 }
 
@@ -1255,6 +1595,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Deletes an unfinished root public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Abort a resumable public share root media upload session
      */
     async abortPublicShareMediaUploadRaw(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1265,6 +1606,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Deletes an unfinished root public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Abort a resumable public share root media upload session
      */
     async abortPublicShareMediaUpload(requestParameters: AbortPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -1315,6 +1657,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Deletes an unfinished public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Abort a resumable public share Memory media upload session
      */
     async abortPublicShareMemoryMediaUploadRaw(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1325,6 +1668,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Deletes an unfinished public-share upload session and its temporary chunks.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Abort a resumable public share Memory media upload session
      */
     async abortPublicShareMemoryMediaUpload(requestParameters: AbortPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -1367,6 +1711,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates media in the shared root Memory.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Complete a resumable public share root media upload session
      */
     async completePublicShareMediaUploadRaw(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>> {
@@ -1377,6 +1722,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates media in the shared root Memory.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Complete a resumable public share root media upload session
      */
     async completePublicShareMediaUpload(requestParameters: CompletePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
@@ -1428,6 +1774,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates a public-share Memory media asset.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Complete a resumable public share Memory media upload session
      */
     async completePublicShareMemoryMediaUploadRaw(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>> {
@@ -1438,6 +1785,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Assembles all stored chunks, validates the final file and creates a public-share Memory media asset.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Complete a resumable public share Memory media upload session
      */
     async completePublicShareMemoryMediaUpload(requestParameters: CompletePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
@@ -1548,6 +1896,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates a resumable upload session for the root public-share upload flow.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Create a resumable public share root media upload session
      */
     async createPublicShareMediaUploadRaw(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
@@ -1558,6 +1907,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates a resumable upload session for the root public-share upload flow.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Create a resumable public share root media upload session
      */
     async createPublicShareMediaUpload(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
@@ -1611,6 +1961,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates a resumable upload session for one image or video inside a Memory in the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Create a resumable public share Memory media upload session
      */
     async createPublicShareMemoryMediaUploadRaw(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUploadSession>> {
@@ -1621,10 +1972,76 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates a resumable upload session for one image or video inside a Memory in the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Create a resumable public share Memory media upload session
      */
     async createPublicShareMemoryMediaUpload(requestParameters: CreatePublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession> {
         const response = await this.createPublicShareMemoryMediaUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for createPublicShareMemoryPlaylist without sending the request
+     */
+    async createPublicShareMemoryPlaylistRequestOpts(requestParameters: CreatePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling createPublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling createPublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['createMemoryPlaylistRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryPlaylistRequest',
+                'Required parameter "createMemoryPlaylistRequest" was null or undefined when calling createPublicShareMemoryPlaylist().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/playlists`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryPlaylistRequestToJSON(requestParameters['createMemoryPlaylistRequest']),
+        };
+    }
+
+    /**
+     * Creates playlist context for one Memory inside the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Create public share Memory playlist
+     */
+    async createPublicShareMemoryPlaylistRaw(requestParameters: CreatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryPlaylistSummary>> {
+        const requestOptions = await this.createPublicShareMemoryPlaylistRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryPlaylistSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Creates playlist context for one Memory inside the shared subtree.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Create public share Memory playlist
+     */
+    async createPublicShareMemoryPlaylist(requestParameters: CreatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryPlaylistSummary> {
+        const response = await this.createPublicShareMemoryPlaylistRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -1742,6 +2159,130 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deletePublicShareMemoryRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deletePublicShareMemoryPlaylist without sending the request
+     */
+    async deletePublicShareMemoryPlaylistRequestOpts(requestParameters: DeletePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling deletePublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deletePublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['playlistId'] == null) {
+            throw new runtime.RequiredError(
+                'playlistId',
+                'Required parameter "playlistId" was null or undefined when calling deletePublicShareMemoryPlaylist().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/playlists/{playlistId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"playlistId"}}`, encodeURIComponent(String(requestParameters['playlistId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete public share Memory playlist
+     */
+    async deletePublicShareMemoryPlaylistRaw(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deletePublicShareMemoryPlaylistRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete public share Memory playlist
+     */
+    async deletePublicShareMemoryPlaylist(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deletePublicShareMemoryPlaylistRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deletePublicShareMemoryTrack without sending the request
+     */
+    async deletePublicShareMemoryTrackRequestOpts(requestParameters: DeletePublicShareMemoryTrackRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling deletePublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deletePublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['trackId'] == null) {
+            throw new runtime.RequiredError(
+                'trackId',
+                'Required parameter "trackId" was null or undefined when calling deletePublicShareMemoryTrack().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"trackId"}}`, encodeURIComponent(String(requestParameters['trackId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete a public share Memory track
+     */
+    async deletePublicShareMemoryTrackRaw(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deletePublicShareMemoryTrackRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Delete a public share Memory track
+     */
+    async deletePublicShareMemoryTrack(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deletePublicShareMemoryTrackRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -1890,6 +2431,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Returns progress information for a root public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Get a resumable public share root media upload session
      */
     async getPublicShareMediaUploadRaw(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
@@ -1900,6 +2442,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Returns progress information for a root public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Get a resumable public share root media upload session
      */
     async getPublicShareMediaUpload(requestParameters: GetPublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
@@ -2119,6 +2662,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Returns progress information for a public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Get a resumable public share Memory media upload session
      */
     async getPublicShareMemoryMediaUploadRaw(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PendingMemoryMediaUploadSession>> {
@@ -2129,6 +2673,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Returns progress information for a public-share upload session owned by the current share identity.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Get a resumable public share Memory media upload session
      */
     async getPublicShareMemoryMediaUpload(requestParameters: GetPublicShareMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PendingMemoryMediaUploadSession> {
@@ -2341,6 +2886,116 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates request options for listPublicShareMemoryPlaylists without sending the request
+     */
+    async listPublicShareMemoryPlaylistsRequestOpts(requestParameters: ListPublicShareMemoryPlaylistsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling listPublicShareMemoryPlaylists().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling listPublicShareMemoryPlaylists().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/playlists`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Lists playlist context assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory playlists
+     */
+    async listPublicShareMemoryPlaylistsRaw(requestParameters: ListPublicShareMemoryPlaylistsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryPlaylistSummary>>> {
+        const requestOptions = await this.listPublicShareMemoryPlaylistsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemoryPlaylistSummaryFromJSON));
+    }
+
+    /**
+     * Lists playlist context assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory playlists
+     */
+    async listPublicShareMemoryPlaylists(requestParameters: ListPublicShareMemoryPlaylistsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryPlaylistSummary>> {
+        const response = await this.listPublicShareMemoryPlaylistsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listPublicShareMemoryTracks without sending the request
+     */
+    async listPublicShareMemoryTracksRequestOpts(requestParameters: ListPublicShareMemoryTracksRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling listPublicShareMemoryTracks().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling listPublicShareMemoryTracks().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/tracks`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Lists GPX tracks assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory tracks
+     */
+    async listPublicShareMemoryTracksRaw(requestParameters: ListPublicShareMemoryTracksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryTrackSummary>>> {
+        const requestOptions = await this.listPublicShareMemoryTracksRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemoryTrackSummaryFromJSON));
+    }
+
+    /**
+     * Lists GPX tracks assigned directly to a Memory visible through the public share. `UPLOADER` shares are excluded because they do not expose the Memory view.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * List public share Memory tracks
+     */
+    async listPublicShareMemoryTracks(requestParameters: ListPublicShareMemoryTracksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryTrackSummary>> {
+        const response = await this.listPublicShareMemoryTracksRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for loginPublicShare without sending the request
      */
     async loginPublicShareRequestOpts(requestParameters: LoginPublicShareRequest): Promise<runtime.RequestOpts> {
@@ -2378,7 +3033,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled.
+     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled. - Contributor, Manager and Uploader shares provide a display name for the anonymous share identity.
      * Open a public share identity session
      */
     async loginPublicShareRaw(requestParameters: LoginPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareSummary>> {
@@ -2389,7 +3044,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled.
+     * Checks the public share password, creates an anonymous share identity and sets HttpOnly share access-/refresh-token cookies.  Vorbedingungen: - The share id exists and the share is enabled. - Contributor, Manager and Uploader shares provide a display name for the anonymous share identity.
      * Open a public share identity session
      */
     async loginPublicShare(requestParameters: LoginPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareSummary> {
@@ -2607,6 +3262,69 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async publicShareMemoryCoverContent(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.publicShareMemoryCoverContentRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for publicShareMemoryTrackContent without sending the request
+     */
+    async publicShareMemoryTrackContentRequestOpts(requestParameters: PublicShareMemoryTrackContentRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling publicShareMemoryTrackContent().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling publicShareMemoryTrackContent().'
+            );
+        }
+
+        if (requestParameters['trackId'] == null) {
+            throw new runtime.RequiredError(
+                'trackId',
+                'Required parameter "trackId" was null or undefined when calling publicShareMemoryTrackContent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}/content`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"trackId"}}`, encodeURIComponent(String(requestParameters['trackId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the original GPX file for a track visible through a public share.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Download public share Memory track GPX
+     */
+    async publicShareMemoryTrackContentRaw(requestParameters: PublicShareMemoryTrackContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.publicShareMemoryTrackContentRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the original GPX file for a track visible through a public share.  Vorbedingungen: - The share is enabled. - The share role allows full Memory gallery access. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Download public share Memory track GPX
+     */
+    async publicShareMemoryTrackContent(requestParameters: PublicShareMemoryTrackContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.publicShareMemoryTrackContentRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -2991,7 +3709,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Replaces the Markdown journal for one Memory inside the shared subtree. veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Update public share Memory journal
      */
     async updatePublicShareMemoryJournalRaw(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryJournalSummary>> {
@@ -3002,11 +3720,157 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Replaces the Markdown journal for one Memory inside the shared subtree. Veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Replaces the Markdown journal for one Memory inside the shared subtree. veyq embed links are validated against content visible inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Update public share Memory journal
      */
     async updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
         const response = await this.updatePublicShareMemoryJournalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updatePublicShareMemoryPlaylist without sending the request
+     */
+    async updatePublicShareMemoryPlaylistRequestOpts(requestParameters: UpdatePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling updatePublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updatePublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['playlistId'] == null) {
+            throw new runtime.RequiredError(
+                'playlistId',
+                'Required parameter "playlistId" was null or undefined when calling updatePublicShareMemoryPlaylist().'
+            );
+        }
+
+        if (requestParameters['updateMemoryPlaylistRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryPlaylistRequest',
+                'Required parameter "updateMemoryPlaylistRequest" was null or undefined when calling updatePublicShareMemoryPlaylist().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/playlists/{playlistId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"playlistId"}}`, encodeURIComponent(String(requestParameters['playlistId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryPlaylistRequestToJSON(requestParameters['updateMemoryPlaylistRequest']),
+        };
+    }
+
+    /**
+     * Updates editable playlist metadata and optionally replaces the external playlist URL visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update public share Memory playlist
+     */
+    async updatePublicShareMemoryPlaylistRaw(requestParameters: UpdatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryPlaylistSummary>> {
+        const requestOptions = await this.updatePublicShareMemoryPlaylistRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryPlaylistSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Updates editable playlist metadata and optionally replaces the external playlist URL visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update public share Memory playlist
+     */
+    async updatePublicShareMemoryPlaylist(requestParameters: UpdatePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryPlaylistSummary> {
+        const response = await this.updatePublicShareMemoryPlaylistRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updatePublicShareMemoryTrack without sending the request
+     */
+    async updatePublicShareMemoryTrackRequestOpts(requestParameters: UpdatePublicShareMemoryTrackRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling updatePublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updatePublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['trackId'] == null) {
+            throw new runtime.RequiredError(
+                'trackId',
+                'Required parameter "trackId" was null or undefined when calling updatePublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['updateMemoryTrackRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryTrackRequest',
+                'Required parameter "updateMemoryTrackRequest" was null or undefined when calling updatePublicShareMemoryTrack().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"trackId"}}`, encodeURIComponent(String(requestParameters['trackId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryTrackRequestToJSON(requestParameters['updateMemoryTrackRequest']),
+        };
+    }
+
+    /**
+     * Updates the editable title and activity type for a GPX track visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update a public share Memory track
+     */
+    async updatePublicShareMemoryTrackRaw(requestParameters: UpdatePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryTrackSummary>> {
+        const requestOptions = await this.updatePublicShareMemoryTrackRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryTrackSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Updates the editable title and activity type for a GPX track visible through a public share.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Update a public share Memory track
+     */
+    async updatePublicShareMemoryTrack(requestParameters: UpdatePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryTrackSummary> {
+        const response = await this.updatePublicShareMemoryTrackRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -3143,6 +4007,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Stores one chunk for a root public-share upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Upload one public share root media chunk
      */
     async uploadPublicShareMediaChunkRaw(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -3153,6 +4018,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Stores one chunk for a root public-share upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present.  Implementierungsstatus: implemented.
      * Upload one public share root media chunk
      */
     async uploadPublicShareMediaChunk(requestParameters: UploadPublicShareMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -3308,6 +4174,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Stores one chunk for a public-share Memory upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Upload one public share Memory media chunk
      */
     async uploadPublicShareMemoryMediaChunkRaw(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -3318,10 +4185,116 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Stores one chunk for a public-share Memory upload session. Chunks may be retried with the same index.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
      * Upload one public share Memory media chunk
      */
     async uploadPublicShareMemoryMediaChunk(requestParameters: UploadPublicShareMemoryMediaChunkRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.uploadPublicShareMemoryMediaChunkRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for uploadPublicShareMemoryTrack without sending the request
+     */
+    async uploadPublicShareMemoryTrackRequestOpts(requestParameters: UploadPublicShareMemoryTrackRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling uploadPublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling uploadPublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['file'] == null) {
+            throw new runtime.RequiredError(
+                'file',
+                'Required parameter "file" was null or undefined when calling uploadPublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['title'] == null) {
+            throw new runtime.RequiredError(
+                'title',
+                'Required parameter "title" was null or undefined when calling uploadPublicShareMemoryTrack().'
+            );
+        }
+
+        if (requestParameters['activityType'] == null) {
+            throw new runtime.RequiredError(
+                'activityType',
+                'Required parameter "activityType" was null or undefined when calling uploadPublicShareMemoryTrack().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
+
+        if (requestParameters['title'] != null) {
+            formParams.append('title', requestParameters['title'] as any);
+        }
+
+        if (requestParameters['activityType'] != null) {
+            formParams.append('activityType', requestParameters['activityType'] as any);
+        }
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/tracks`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: formParams,
+        };
+    }
+
+    /**
+     * Uploads one GPX track into a Memory inside the shared subtree. Viewer and uploader-only shares cannot upload tracks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Upload a public share Memory GPX track
+     */
+    async uploadPublicShareMemoryTrackRaw(requestParameters: UploadPublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryTrackSummary>> {
+        const requestOptions = await this.uploadPublicShareMemoryTrackRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryTrackSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Uploads one GPX track into a Memory inside the shared subtree. Viewer and uploader-only shares cannot upload tracks.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.  Implementierungsstatus: implemented.
+     * Upload a public share Memory GPX track
+     */
+    async uploadPublicShareMemoryTrack(requestParameters: UploadPublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryTrackSummary> {
+        const response = await this.uploadPublicShareMemoryTrackRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
 }

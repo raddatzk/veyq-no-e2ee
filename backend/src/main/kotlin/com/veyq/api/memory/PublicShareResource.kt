@@ -2,10 +2,14 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.PublicSharesApi
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
+import com.veyq.api.generated.model.MemoryTrackActivityType
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
+import com.veyq.api.generated.model.UpdateMemoryTrackRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -81,6 +85,69 @@ class PublicShareResource @Inject constructor(
 
     override fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean?, locale: String?): Response =
         memoryShareService.downloadPublicShareMemoryMedia(shareId, memoryId, includeChildren ?: false, locale)
+
+    override fun listPublicShareMemoryTracks(shareId: String, memoryId: String): Response =
+        Response.ok(memoryShareService.listPublicShareMemoryTracks(shareId, memoryId)).build()
+
+    override fun uploadPublicShareMemoryTrack(
+        shareId: String,
+        memoryId: String,
+        fileInputStream: InputStream,
+        title: String?,
+        activityType: MemoryTrackActivityType?,
+    ): Response {
+        val temp = Files.createTempFile("veyq-public-share-track-", ".gpx")
+        return try {
+            fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            Response.ok(
+                memoryShareService.uploadPublicShareMemoryTrack(
+                    shareId = shareId,
+                    memoryId = memoryId,
+                    uploadPath = temp,
+                    originalFilename = null,
+                    title = title,
+                    activityType = activityType,
+                )
+            ).build()
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    override fun updatePublicShareMemoryTrack(
+        shareId: String,
+        memoryId: String,
+        trackId: String,
+        updateMemoryTrackRequest: UpdateMemoryTrackRequest,
+    ): Response =
+        Response.ok(memoryShareService.updatePublicShareMemoryTrack(shareId, memoryId, trackId, updateMemoryTrackRequest)).build()
+
+    override fun deletePublicShareMemoryTrack(shareId: String, memoryId: String, trackId: String): Response =
+        memoryShareService.deletePublicShareMemoryTrack(shareId, memoryId, trackId).let { Response.noContent().build() }
+
+    override fun publicShareMemoryTrackContent(shareId: String, memoryId: String, trackId: String): Response =
+        memoryShareService.publicShareMemoryTrackContent(shareId, memoryId, trackId)
+
+    override fun listPublicShareMemoryPlaylists(shareId: String, memoryId: String): Response =
+        Response.ok(memoryShareService.listPublicShareMemoryPlaylists(shareId, memoryId)).build()
+
+    override fun createPublicShareMemoryPlaylist(
+        shareId: String,
+        memoryId: String,
+        createMemoryPlaylistRequest: CreateMemoryPlaylistRequest,
+    ): Response =
+        Response.ok(memoryShareService.createPublicShareMemoryPlaylist(shareId, memoryId, createMemoryPlaylistRequest)).build()
+
+    override fun updatePublicShareMemoryPlaylist(
+        shareId: String,
+        memoryId: String,
+        playlistId: String,
+        updateMemoryPlaylistRequest: UpdateMemoryPlaylistRequest,
+    ): Response =
+        Response.ok(memoryShareService.updatePublicShareMemoryPlaylist(shareId, memoryId, playlistId, updateMemoryPlaylistRequest)).build()
+
+    override fun deletePublicShareMemoryPlaylist(shareId: String, memoryId: String, playlistId: String): Response =
+        memoryShareService.deletePublicShareMemoryPlaylist(shareId, memoryId, playlistId).let { Response.noContent().build() }
 
     override fun listPublicShareMedia(shareId: String): Response =
         Response.ok(memoryShareService.listPublicShareMedia(shareId)).build()

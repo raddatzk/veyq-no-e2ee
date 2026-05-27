@@ -1257,6 +1257,8 @@ class MediaService @Inject constructor(
             sizeBytes = blob.sizeBytes,
             contentUrl = "/api/public-shares/${url(shareId)}/media/${url(publicId)}/content",
             previewUrl = if (canGeneratePreview(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
+            gpsLatitude = blob.gpsLatitude,
+            gpsLongitude = blob.gpsLongitude,
         )
 
     private fun Media.uploader(): MediaUploader {

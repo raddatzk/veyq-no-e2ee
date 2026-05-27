@@ -1,7 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * Veyq API
+ * veyq API
  * Bundled frontend API contract generated from docs/api specs.
  *
  * The version of the OpenAPI document: 0.1.0
@@ -26,18 +26,17 @@ export interface PublicShareLoginRequest {
      */
     password?: string;
     /**
-     * 
+     * Required for Contributor, Manager and Uploader shares. Viewer shares may omit it.
      * @type {string}
      * @memberof PublicShareLoginRequest
      */
-    displayName: string;
+    displayName?: string;
 }
 
 /**
  * Check if a given object implements the PublicShareLoginRequest interface.
  */
 export function instanceOfPublicShareLoginRequest(value: object): value is PublicShareLoginRequest {
-    if (!('displayName' in value) || value['displayName'] === undefined) return false;
     return true;
 }
 
@@ -52,7 +51,7 @@ export function PublicShareLoginRequestFromJSONTyped(json: any, ignoreDiscrimina
     return {
         
         'password': json['password'] == null ? undefined : json['password'],
-        'displayName': json['displayName'],
+        'displayName': json['displayName'] == null ? undefined : json['displayName'],
     };
 }
 
