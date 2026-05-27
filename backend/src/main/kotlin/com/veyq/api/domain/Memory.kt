@@ -144,6 +144,46 @@ class MemoryFavorite : PanacheEntityBase {
     }
 }
 
+@Entity
+@Table(
+    name = "veyq_memory_participant",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uq_veyq_memory_participant_memory_user",
+            columnNames = ["memory_id", "user_id"],
+        ),
+    ],
+)
+class MemoryParticipant : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    lateinit var tenant: Tenant
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "memory_id", nullable = false)
+    lateinit var memory: Memory
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    lateinit var user: User
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "added_by_user_id", nullable = false)
+    lateinit var addedBy: User
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @PrePersist
+    fun beforePersist() {
+        createdAt = Instant.now()
+    }
+}
+
 @ApplicationScoped
 class MemoryRepo : PanacheRepository<Memory> {
     fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Memory? =
@@ -170,4 +210,16 @@ class MemoryFavoriteRepo : PanacheRepository<MemoryFavorite> {
 
     fun listByTenantAndUser(tenant: Tenant, user: User): List<MemoryFavorite> =
         list("tenant = ?1 and user = ?2 order by createdAt desc", tenant, user)
+}
+
+@ApplicationScoped
+class MemoryParticipantRepo : PanacheRepository<MemoryParticipant> {
+    fun findByMemoryAndUser(memory: Memory, user: User): MemoryParticipant? =
+        find("memory = ?1 and user = ?2", memory, user).firstResult()
+
+    fun listByMemory(memory: Memory): List<MemoryParticipant> =
+        list("memory = ?1 order by user.displayName, user.permalink", memory)
+
+    fun listByTenantAndUser(tenant: Tenant, user: User): List<MemoryParticipant> =
+        list("tenant = ?1 and user = ?2 order by memory.displayName", tenant, user)
 }

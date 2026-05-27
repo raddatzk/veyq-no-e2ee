@@ -28,12 +28,15 @@ import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
+import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
+import com.veyq.api.library.playlist.MemoryPlaylistService
 import com.veyq.api.library.LibraryDeletionService
 import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaConfig
@@ -80,6 +83,7 @@ class MemoryServiceTest {
     @Inject lateinit var memoryNavigationService: MemoryNavigationService
     @Inject lateinit var memoryJournalService: MemoryJournalService
     @Inject lateinit var searchService: SearchService
+    @Inject lateinit var memoryPlaylistService: MemoryPlaylistService
     @Inject lateinit var mediaService: MediaService
     @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var folderService: FolderService
@@ -99,6 +103,52 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `creates updates and deletes memory playlist with single provider link`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("playlist-trip", "Playlist Trip"))
+        val playlist = memoryPlaylistService.createMemoryPlaylist(
+            trip.id,
+            CreateMemoryPlaylistRequest(
+                title = "Roadtrip Soundtrack",
+                note = "Songs from the van",
+                url = "https://www.youtube.com/playlist?list=PL1234567890abcdef",
+            ),
+        )
+
+        assertThat(playlist.title).isEqualTo("Roadtrip Soundtrack")
+        assertThat(playlist.provider.name).isEqualTo("YOUTUBE")
+        assertThat(playlist.url).isEqualTo("https://www.youtube.com/playlist?list=PL1234567890abcdef")
+        assertThat(playlist.externalId).isEqualTo("PL1234567890abcdef")
+
+        val metadataOnly = memoryPlaylistService.updateMemoryPlaylist(
+            trip.id,
+            playlist.id,
+            UpdateMemoryPlaylistRequest(title = "Roadtrip Mix", note = "Updated", featured = true),
+        )
+
+        assertThat(metadataOnly.provider.name).isEqualTo("YOUTUBE")
+        assertThat(metadataOnly.url).isEqualTo("https://www.youtube.com/playlist?list=PL1234567890abcdef")
+        assertThat(metadataOnly.featured).isTrue()
+
+        val relinked = memoryPlaylistService.updateMemoryPlaylist(
+            trip.id,
+            playlist.id,
+            UpdateMemoryPlaylistRequest(
+                title = "Roadtrip Mix",
+                note = "Updated",
+                url = "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            ),
+        )
+
+        assertThat(relinked.provider.name).isEqualTo("SPOTIFY")
+        assertThat(relinked.externalId).isEqualTo("37i9dQZF1DXcBWIGoYBM5M")
+
+        memoryPlaylistService.deleteMemoryPlaylist(trip.id, playlist.id)
+
+        assertThatExceptionOfType(NotFoundException::class.java)
+            .isThrownBy { memoryPlaylistService.updateMemoryPlaylist(trip.id, playlist.id, UpdateMemoryPlaylistRequest(title = "Gone")) }
+    }
+
+    @Test
     fun `creates root and child memories and lists descendant media by taken time`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("trip", "Trip"))
         val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
@@ -109,6 +159,8 @@ class MemoryServiceTest {
 
         assertThat(memoryService.listRootMemories()).extracting("path").containsExactly("/trip")
         assertThat(memoryService.listChildren(trip.id)).extracting("path").containsExactly("/trip/day-one")
+        assertThat(memoryService.listParticipants(trip.id).map { it.userId }).containsExactly(owner.id)
+        assertThat(memoryService.listParticipants(day.id).map { it.userId }).containsExactly(owner.id)
         assertThat(mediaService.listMemoryMedia(trip.id, includeChildren = false)).extracting("id")
             .containsExactly(rootMedia.publicId)
         assertThat(mediaService.listMemoryMedia(trip.id, includeChildren = true)).extracting("id")
@@ -174,6 +226,71 @@ class MemoryServiceTest {
         assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
             memoryService.favoriteMemory(groupMemory.id)
         }
+    }
+
+    @Test
+    fun `adds lists and removes tenant memory participants`() {
+        val participant = createUser("participant-$runId", ServerRole.ServerMember)
+        addTenantMember(participant, TenantRole.TenantMember)
+        inTransaction {
+            userRepo.findById(participant.id)!!.also {
+                it.avatarStorageKey = "users/${participant.id}/avatar.png"
+                it.avatarContentType = "image/png"
+                it.avatarUpdatedAt = Instant.parse("2026-05-27T10:00:00Z")
+            }
+        }
+        val trip = memoryService.createMemory(CreateMemoryRequest("participant-trip", "Participant Trip"))
+
+        val added = memoryService.addParticipant(trip.id, participant.id)
+
+        assertThat(added.displayName).isEqualTo(participant.displayName)
+        assertThat(memoryService.listParticipants(trip.id).map { it.userId }).containsExactly(owner.id, participant.id)
+        assertThat(memoryService.listParticipants(trip.id).single { it.userId == participant.id }.avatarUrl)
+            .isEqualTo("/api/${tenant.name}/profiles/${participant.permalink}/avatar?v=2026-05-27T10%3A00%3A00Z")
+        assertThat(memoryService.getMemoryHeader(trip.id).participants.map { it.userId }).containsExactly(owner.id, participant.id)
+
+        memoryService.removeParticipant(trip.id, participant.id)
+
+        assertThat(memoryService.listParticipants(trip.id).map { it.userId }).containsExactly(owner.id)
+    }
+
+    @Test
+    fun `participant eligibility follows group and personal memory scope`() {
+        val groupMember = createUser("group-participant-$runId", ServerRole.ServerMember)
+        val outsider = createUser("group-outsider-$runId", ServerRole.ServerMember)
+        addTenantMember(groupMember, TenantRole.TenantMember)
+        addTenantMember(outsider, TenantRole.TenantMember)
+        val group = createGroup("participants-$runId", owner)
+        addGroupMember(group, groupMember)
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest("group-memory", "Group Memory", scope = MemoryScopeRequest("GROUP", group.name))
+        )
+
+        assertThat(memoryService.listParticipantCandidates(groupMemory.id).map { it.userId })
+            .contains(owner.id, groupMember.id)
+            .doesNotContain(outsider.id)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryService.addParticipant(groupMemory.id, outsider.id)
+        }
+
+        val personalMemory = memoryService.createMemory(
+            CreateMemoryRequest("personal-memory", "Personal Memory", scope = MemoryScopeRequest("USER", null))
+        )
+        assertThat(memoryService.listParticipantCandidates(personalMemory.id).map { it.userId }).containsExactly(owner.id)
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
+            memoryService.addParticipant(personalMemory.id, groupMember.id)
+        }
+    }
+
+    @Test
+    fun `participant profile memories return visible roots only`() {
+        val participant = createUser("profile-participant-$runId", ServerRole.ServerMember)
+        addTenantMember(participant, TenantRole.TenantMember)
+        val trip = memoryService.createMemory(CreateMemoryRequest("profile-trip", "Profile Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("profile-day", "Profile Day", parentId = trip.id))
+        memoryService.addParticipant(day.id, participant.id)
+
+        assertThat(memoryService.listParticipantRootMemories(participant).map { it.id }).containsExactly(trip.id)
     }
 
     @Test

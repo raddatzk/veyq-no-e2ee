@@ -8,6 +8,7 @@ import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryRequest
 import com.veyq.api.generated.model.CoverCrop
 import com.veyq.api.generated.model.MemoryHeaderSummary
+import com.veyq.api.generated.model.MemoryParticipantSummary
 import com.veyq.api.generated.model.MemoryScope
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MemorySummary
@@ -21,6 +22,7 @@ import com.veyq.api.library.media.MediaKind
 import com.veyq.api.library.media.MediaMetadataExtractor
 import com.veyq.api.library.media.MediaService
 import com.veyq.api.library.media.MediaTypeDetector
+import com.veyq.api.usermgmt.user.avatarUrlForTenant
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
@@ -41,10 +43,13 @@ import kotlin.math.abs
 class MemoryService @Inject constructor(
     private val memoryRepo: MemoryRepo,
     private val memoryFavoriteRepo: MemoryFavoriteRepo,
+    private val memoryParticipantRepo: MemoryParticipantRepo,
     private val mediaRepo: MediaRepo,
     private val folderRepo: TenantFolderRepo,
     private val groupRepo: TenantGroupRepo,
     private val memoryGroupMemberRepo: TenantGroupMemberRepo,
+    private val tenantMemberRepo: TenantMemberRepo,
+    private val userRepo: UserRepo,
     private val mediaConfig: MediaConfig,
     private val mediaService: MediaService,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
@@ -81,6 +86,22 @@ class MemoryService @Inject constructor(
             .filter(::isMemoryVisible)
             .map(::toSummary)
 
+    fun listParticipants(publicId: String): List<MemoryParticipantSummary> =
+        visibleParticipants(resolveVisibleMemory(publicId))
+
+    fun listParticipantCandidates(publicId: String): List<MemoryParticipantSummary> =
+        participantCandidates(resolveVisibleMemory(publicId)).map { it.toParticipantSummary() }
+
+    fun listParticipantRootMemories(profileUser: User): List<MemorySummary> =
+        memoryParticipantRepo.listByTenantAndUser(tenant(), profileUser)
+            .asSequence()
+            .map { rootMemory(it.memory) }
+            .filter(::isMemoryVisible)
+            .distinctBy { it.id }
+            .sortedWith(compareBy<Memory> { it.displayName.lowercase() }.thenBy { it.publicId })
+            .map(::toSummary)
+            .toList()
+
     fun listFavoriteMemories(): List<MemorySummary> =
         memoryFavoriteRepo.listByTenantAndUser(tenant(), user())
             .map { it.memory }
@@ -111,6 +132,29 @@ class MemoryService @Inject constructor(
     }
 
     @Transactional
+    fun addParticipant(publicId: String, userId: Long): MemoryParticipantSummary {
+        val memory = resolveVisibleMemory(publicId)
+        val targetUser = userRepo.findById(userId) ?: throw NotFoundException("Participant not found")
+        if (!isParticipantEligible(memory, targetUser)) throw NotFoundException("Participant not found")
+        val participant = memoryParticipantRepo.findByMemoryAndUser(memory, targetUser) ?: MemoryParticipant().also {
+            it.tenant = tenant()
+            it.memory = memory
+            it.user = targetUser
+            it.addedBy = user()
+            memoryParticipantRepo.persist(it)
+            memoryParticipantRepo.flush()
+        }
+        return participant.user.toParticipantSummary()
+    }
+
+    @Transactional
+    fun removeParticipant(publicId: String, userId: Long) {
+        val memory = resolveVisibleMemory(publicId)
+        val targetUser = userRepo.findById(userId) ?: return
+        memoryParticipantRepo.findByMemoryAndUser(memory, targetUser)?.delete()
+    }
+
+    @Transactional
     fun createMemory(request: CreateMemoryRequest): MemorySummary {
         val parent = request.parentId?.trim()?.takeIf { it.isNotBlank() }?.let(::resolveVisibleMemory)
         val folderTarget = if (parent == null) request.folderPath
@@ -135,6 +179,14 @@ class MemoryService @Inject constructor(
             it.endDate = dateRange.endDate
             memoryRepo.persist(it)
         }
+        memoryParticipantRepo.persist(
+            MemoryParticipant().also {
+                it.tenant = tenant()
+                it.memory = memory
+                it.user = user()
+                it.addedBy = user()
+            }
+        )
         memoryRepo.flush()
         return toSummary(memory)
     }
@@ -368,8 +420,58 @@ class MemoryService @Inject constructor(
             childMemoryCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
             favorite = isFavorite(memory),
             scope = memory.scope().toApiScope(),
+            participants = visibleParticipants(memory),
         )
     }
+
+    private fun visibleParticipants(memory: Memory): List<MemoryParticipantSummary> =
+        memoryParticipantRepo.listByMemory(memory)
+            .map { it.user }
+            .filter { isParticipantEligible(memory, it) }
+            .sortedWith(compareBy<User> { it.displayName.lowercase() }.thenBy { it.permalink })
+            .map { it.toParticipantSummary() }
+
+    private fun participantCandidates(memory: Memory): List<User> =
+        when (val scope = memory.scope()) {
+            LibraryScopeKey.Tenant -> tenantMemberRepo.listByTenant(tenant())
+                .filter { it.acceptedAt != null }
+                .map { it.user }
+            is LibraryScopeKey.Group -> scope.group.members
+                .map { it.user }
+                .filter { user -> tenantMemberRepo.findByTenantAndUser(tenant(), user)?.acceptedAt != null }
+            is LibraryScopeKey.User -> listOf(scope.user)
+                .filter { user -> tenantMemberRepo.findByTenantAndUser(tenant(), user)?.acceptedAt != null }
+        }
+            .distinctBy { it.id }
+            .sortedWith(compareBy<User> { it.displayName.lowercase() }.thenBy { it.permalink })
+
+    private fun isParticipantEligible(memory: Memory, participant: User): Boolean =
+        when (val scope = memory.scope()) {
+            LibraryScopeKey.Tenant -> tenantMemberRepo.findByTenantAndUser(tenant(), participant)?.acceptedAt != null
+            is LibraryScopeKey.Group ->
+                tenantMemberRepo.findByTenantAndUser(tenant(), participant)?.acceptedAt != null &&
+                    memoryGroupMemberRepo.findByGroupAndUser(scope.group, participant) != null
+            is LibraryScopeKey.User -> scope.user.id == participant.id &&
+                tenantMemberRepo.findByTenantAndUser(tenant(), participant)?.acceptedAt != null
+        }
+
+    private fun User.toParticipantSummary(): MemoryParticipantSummary =
+        MemoryParticipantSummary(
+            userId = id,
+            displayName = displayName,
+            permalink = permalink,
+            initials = initials(displayName),
+            avatarUrl = avatarUrlForTenant(tenant().name),
+        )
+
+    private fun initials(displayName: String): String =
+        displayName
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .take(2)
+            .joinToString("") { it.first().uppercase() }
+            .take(4)
+            .ifBlank { "?" }
 
     private fun isFavorite(memory: Memory): Boolean =
         memoryFavoriteRepo.findByTenantUserAndMemory(tenant(), user(), memory) != null
@@ -438,6 +540,9 @@ class MemoryService @Inject constructor(
     private fun descendantsAndSelf(root: Memory): List<Memory> =
         listOf(root) + memoryRepo.list("tenant", tenant())
             .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+
+    private fun rootMemory(memory: Memory): Memory =
+        generateSequence(memory) { it.parentMemory }.last()
 
     private fun isDescendantOrSame(candidate: Memory, ancestor: Memory): Boolean =
         generateSequence(candidate) { it.parentMemory }.any { it.id == ancestor.id }
