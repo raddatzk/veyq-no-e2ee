@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ProgressSpinner from 'primevue/progressspinner'
 import MediaLightbox from './MediaLightbox.vue'
-import { calculateJustifiedMediaLayout } from './mediaGridLayout'
+import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from './mediaGridLayout'
 import type { MediaGridLayoutResult, MediaGridLayoutTile } from './mediaGridLayout'
 import type { MemoryMedia, UpdateMemoryMediaMetadataRequest } from '../../features/memories/api'
 import { API_BASE } from '../../api/httpClient'
@@ -59,7 +59,7 @@ const galleryItems = computed<GalleryItem[]>(() =>
   }))
 )
 const galleryItemById = computed(() => new Map(galleryItems.value.map((item) => [item.id, item])))
-const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 190 : 260))
+const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
 const galleryTiles = computed<GalleryTile[]>(() =>
   layout.value.tiles
     .map((tile) => {
@@ -182,10 +182,7 @@ async function recalculateLayout() {
 }
 
 function mediaAspectRatio(media: MemoryMedia): number {
-  if (!media.imageWidth || !media.imageHeight || media.imageWidth <= 0 || media.imageHeight <= 0) {
-    return 4 / 3
-  }
-  return media.imageWidth / media.imageHeight
+  return galleryDisplayAspectRatio(media.imageWidth, media.imageHeight)
 }
 
 function isImage(media: MemoryMedia): boolean {

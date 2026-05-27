@@ -26,6 +26,8 @@ export type MediaGridLayoutResult = {
 }
 
 const fallbackAspectRatio = 4 / 3
+const minGalleryAspectRatio = 3 / 4
+const maxGalleryAspectRatio = 4 / 3
 
 function layoutRow(
   row: Required<MediaGridLayoutSource>[],
@@ -107,6 +109,19 @@ export function calculateJustifiedMediaLayout(input: MediaGridLayoutInput): Medi
     tiles,
     height: Math.max(top, 0)
   }
+}
+
+export function galleryDisplayAspectRatio(width: number | null | undefined, height: number | null | undefined): number {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return fallbackAspectRatio
+  }
+
+  const aspectRatio = width / height
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+    return fallbackAspectRatio
+  }
+
+  return Math.min(maxGalleryAspectRatio, Math.max(minGalleryAspectRatio, aspectRatio))
 }
 
 function safeAspectRatio(value: number | undefined): number {

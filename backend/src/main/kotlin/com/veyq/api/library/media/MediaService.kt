@@ -43,9 +43,6 @@ import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.core.StreamingOutput
 import org.jboss.logging.Logger
 import org.jboss.resteasy.reactive.multipart.FileUpload
-import java.awt.Color
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
 import java.io.IOException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -1082,21 +1079,14 @@ class MediaService @Inject constructor(
         val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
         try {
             val source = ImageIO.read(originalPath.toFile()) ?: return false
-            val scale = minOf(1.0, PREVIEW_MAX_EDGE.toDouble() / maxOf(source.width, source.height).toDouble())
-            val targetWidth = maxOf(1, (source.width * scale).toInt())
-            val targetHeight = maxOf(1, (source.height * scale).toInt())
-            val preview = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
-            val graphics = preview.createGraphics()
-            try {
-                graphics.color = Color.WHITE
-                graphics.fillRect(0, 0, targetWidth, targetHeight)
-                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                graphics.drawImage(source, 0, 0, targetWidth, targetHeight, null)
-            } finally {
-                graphics.dispose()
-            }
+            val orientedSource = MediaImageOrientation.apply(
+                source,
+                mediaMetadataExtractor.extractOrientation(originalPath)
+            )
+            val scale = minOf(1.0, PREVIEW_MAX_EDGE.toDouble() / maxOf(orientedSource.width, orientedSource.height).toDouble())
+            val targetWidth = maxOf(1, (orientedSource.width * scale).toInt())
+            val targetHeight = maxOf(1, (orientedSource.height * scale).toInt())
+            val preview = MediaImageOrientation.resize(orientedSource, targetWidth, targetHeight)
             if (!ImageIO.write(preview, "jpg", temp.toFile())) return false
             Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             blob.previewStorageKey = previewStorageKey(blob)
