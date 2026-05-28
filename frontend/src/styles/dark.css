@@ -293,7 +293,7 @@
   }
 
   .media-lightbox {
-    background: var(--app-bg);
+    background: var(--app-backdrop-strong);
     color: var(--app-text);
   }
 

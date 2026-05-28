@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import {
   updateMemoryMediaMetadata,
   type MemoryMedia,
@@ -48,6 +50,7 @@ const capturedAtInput = ref('')
 const saveError = ref('')
 const isSaving = ref(false)
 const dragStartY = ref<number | null>(null)
+const detailActionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const fullscreenTarget = ref<HTMLElement | null>(null)
 const fullscreenOpen = ref(false)
 const fullscreenOriginalLoaded = ref(false)
@@ -83,6 +86,27 @@ const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMed
 const canFullscreenOriginal = computed(() =>
   canUseFullscreen.value && (isImage.value || isVideo.value)
 )
+const detailActionItems = computed<MenuItem[]>(() => {
+  const items: Array<MenuItem | null> = [
+    canEditMetadata.value
+      ? {
+          label: t('media.capturedAtEdit'),
+          icon: 'pi pi-clock',
+          command: startCapturedAtEdit
+        }
+      : null,
+    canDeleteMedia.value
+      ? {
+          label: t('common.delete'),
+          icon: 'pi pi-trash',
+          class: 'memory-menu-danger',
+          disabled: isSaving.value,
+          command: deleteCurrentMedia
+        }
+      : null
+  ]
+  return items.filter((item): item is MenuItem => item !== null)
+})
 const metadataRows = computed(() =>
   [
     { label: t('media.capturedAt'), value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
@@ -187,6 +211,10 @@ async function deleteCurrentMedia() {
   } finally {
     isSaving.value = false
   }
+}
+
+function toggleDetailActionMenu(event: MouseEvent) {
+  detailActionMenu.value?.toggle(event)
 }
 
 async function openOriginalFullscreen() {
@@ -363,25 +391,18 @@ function onSheetPointerUp(event: PointerEvent) {
         />
         <div class="media-lightbox-details-header">
           <h2>{{ t('media.information') }}</h2>
-          <div class="media-lightbox-details-actions">
+          <div v-if="detailActionItems.length" class="media-lightbox-details-actions">
             <button
-              v-if="canEditMetadata"
-              class="veyq-text-button lightbox-text-button"
+              class="veyq-icon-button lightbox-icon-button"
               type="button"
-              @click="startCapturedAtEdit"
-            >
-              {{ t('media.capturedAtEdit') }}
-            </button>
-            <button
-              v-if="canDeleteMedia"
-              class="veyq-icon-button lightbox-icon-button lightbox-delete-button"
-              type="button"
-              :aria-label="t('common.delete')"
+              :aria-label="t('media.options')"
               :disabled="isSaving"
-              @click="deleteCurrentMedia"
+              aria-haspopup="menu"
+              @click="toggleDetailActionMenu"
             >
-              <span class="pi pi-trash" aria-hidden="true" />
+              <span class="pi pi-ellipsis-v" aria-hidden="true" />
             </button>
+            <Menu ref="detailActionMenu" :model="detailActionItems" popup />
           </div>
         </div>
 

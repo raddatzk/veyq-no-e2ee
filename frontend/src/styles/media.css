@@ -38,7 +38,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: var(--app-bg);
+  background: var(--app-backdrop-strong);
   color: var(--app-text);
 }
 
@@ -57,7 +57,7 @@
   min-width: 0;
   padding: 0 1.25rem;
   border-bottom: 1px solid var(--app-line);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--app-overlay);
   backdrop-filter: blur(18px);
 }
 
@@ -93,12 +93,16 @@
   width: 44px;
   height: 44px;
   border: 1px solid var(--app-line);
-  border-radius: 999px;
-  background: var(--app-on-strong);
+  border-radius: 8px;
+  background: var(--app-surface);
   color: var(--app-text);
   text-decoration: none;
   cursor: pointer;
   box-shadow: var(--app-shadow-sm);
+}
+
+.veyq-icon-button.lightbox-icon-button {
+  border-radius: 8px;
 }
 
 .lightbox-icon-button:hover,
@@ -137,7 +141,7 @@
   position: absolute;
   inset: 72px 0 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) clamp(20rem, 28vw, 22.5rem);
   min-width: 0;
   min-height: 0;
 }
@@ -146,12 +150,13 @@
   position: relative;
   min-width: 0;
   min-height: 0;
-  background: var(--app-surface-muted);
+  overflow: hidden;
+  background: var(--app-backdrop-strong);
 }
 
 .media-lightbox-stage {
   position: absolute;
-  inset: 1.25rem 88px 1.25rem;
+  inset: 1.25rem 92px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -166,7 +171,7 @@
   width: auto;
   height: auto;
   border-radius: var(--app-radius);
-  box-shadow: var(--app-shadow-md);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.34);
 }
 
 .media-lightbox-stage img {
@@ -175,7 +180,8 @@
 }
 
 .media-lightbox-stage video {
-  width: min(100%, 1200px);
+  max-width: min(100%, 1200px);
+  object-fit: contain;
   background: #000;
 }
 
@@ -236,8 +242,12 @@
   min-width: 0;
   overflow: auto;
   padding: 1.25rem;
+  border: 0;
   border-left: 1px solid var(--app-line);
-  background: var(--app-on-strong);
+  border-radius: 0;
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: none;
 }
 
 .media-lightbox-sheet-handle {
@@ -249,7 +259,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .media-lightbox-details-header h2 {
@@ -261,16 +271,21 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
 .lightbox-text-button {
-  padding: 0.45rem 0.65rem;
+  max-width: min(100%, 16rem);
+  min-height: 2.15rem;
+  padding: 0.35rem 0.6rem;
   border: 1px solid var(--app-line);
   border-radius: 8px;
-  background: var(--app-on-strong);
+  background: var(--app-surface);
   color: var(--app-text);
+  font-size: 0.86rem;
+  line-height: 1.15;
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 
 .lightbox-text-button:disabled {
@@ -287,7 +302,7 @@
   color: var(--app-danger);
 }
 
-.lightbox-delete-button:hover:not(:disabled) {
+.lightbox-icon-button.lightbox-delete-button:hover:not(:disabled) {
   background: var(--app-danger-soft);
 }
 
@@ -313,7 +328,7 @@
   padding: 0.5rem;
   border: 1px solid var(--app-line);
   border-radius: 8px;
-  background: var(--app-on-strong);
+  background: var(--app-surface);
   color: var(--app-text);
 }
 
@@ -409,7 +424,7 @@
   color: var(--app-danger) !important;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .media-lightbox {
     padding: 0;
   }
@@ -461,7 +476,7 @@
     border-top: 1px solid var(--app-line);
     border-left: 0;
     border-radius: 14px 14px 0 0;
-    background: var(--app-on-strong);
+    background: var(--app-surface);
     transform: translateY(calc(100% - 74px));
     transition: transform 160ms ease;
     touch-action: pan-y;
