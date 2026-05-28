@@ -61,6 +61,10 @@ install() {
   fi
   mkdir -p "$VEYQ_DIR"
   cd "$VEYQ_DIR"
+  if [ -f .env ]; then
+    require_env_readable
+    require_env_writable
+  fi
   download_infra
 
   local setup_default="n"
@@ -105,6 +109,8 @@ upgrade() {
   require_compose
   cd "$VEYQ_DIR"
   require_file .env
+  require_env_readable
+  require_env_writable
   mkdir -p backups
   cp docker-compose.yml "backups/docker-compose.$(timestamp).yml" 2>/dev/null || true
   cp .env "backups/env.$(timestamp)" 2>/dev/null || true
@@ -129,6 +135,8 @@ download_infra() {
 setup_env() {
   cd "$VEYQ_DIR"
   require_file .env
+  require_env_readable
+  require_env_writable
 
   echo "Configuring $VEYQ_DIR/.env"
   apply_env_defaults
@@ -191,6 +199,7 @@ backup() {
   require_compose
   cd "$VEYQ_DIR"
   require_file .env
+  require_env_readable
   mkdir -p backups
   local db_root_password
   local db_name
@@ -315,6 +324,7 @@ doctor() {
   cd "$VEYQ_DIR"
   require_file .env
   require_file docker-compose.yml
+  require_env_readable
 
   local failed=0
   echo "Checking $VEYQ_DIR"
@@ -366,6 +376,8 @@ auto_upgrade() {
   require_compose
   cd "$VEYQ_DIR"
   require_file .env
+  require_env_readable
+  require_env_writable
   mkdir -p logs
   exec > >(tee -a logs/auto-upgrade.log) 2>&1
 
@@ -794,6 +806,7 @@ env_value() {
   local key="$1"
   local default="$2"
   local line
+  require_env_readable
   line="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 || true)"
   if [ -z "$line" ] || [ -z "${line#*=}" ]; then
     printf '%s' "$default"
@@ -816,6 +829,8 @@ set_env() {
   local key="$1"
   local value="$2"
   local tmp
+  require_env_readable
+  require_env_writable
   tmp="$(mktemp)"
   if grep -qE "^#?${key}=" .env; then
     awk -v key="$key" -v value="$value" '
@@ -835,6 +850,8 @@ set_env() {
 remove_env() {
   local key="$1"
   local tmp
+  require_env_readable
+  require_env_writable
   if grep -qE "^${key}=" .env; then
     tmp="$(mktemp)"
     awk -v key="$key" '$0 !~ "^" key "=" { print }' .env > "$tmp"
@@ -952,6 +969,24 @@ require_compose() {
 require_file() {
   if [ ! -f "$1" ]; then
     echo "Missing $VEYQ_DIR/$1. Run install first." >&2
+    exit 1
+  fi
+}
+
+require_env_readable() {
+  if [ ! -r .env ]; then
+    echo "Cannot read $VEYQ_DIR/.env." >&2
+    echo "The file may be owned by root from a previous sudo run." >&2
+    echo "Run this command with sudo, or intentionally change ownership and keep permissions restrictive." >&2
+    exit 1
+  fi
+}
+
+require_env_writable() {
+  if [ ! -w .env ]; then
+    echo "Cannot write $VEYQ_DIR/.env." >&2
+    echo "The file may be owned by root from a previous sudo run." >&2
+    echo "Run this command with sudo, or intentionally change ownership and keep permissions restrictive." >&2
     exit 1
   fi
 }
