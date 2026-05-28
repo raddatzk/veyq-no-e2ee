@@ -133,6 +133,39 @@ Manual install:
 8. Start with `docker compose up -d` from `infra/`.
 9. Open the configured host, create the first admin and create the first tenant.
 
+### Media Storage Options
+
+The default media storage mode is a Compose-managed Docker volume:
+
+```env
+MEDIA_STORAGE_MODE=docker-volume
+MEDIA_STORAGE_MOUNT_TYPE=volume
+MEDIA_STORAGE_SOURCE=veyq-media
+MEDIA_STORAGE_DIR=/data/veyq-media
+```
+
+To use a local path, including a CIFS share already mounted by the host OS, bind-mount an absolute host directory:
+
+```env
+MEDIA_STORAGE_MODE=host-path
+MEDIA_STORAGE_MOUNT_TYPE=bind
+MEDIA_STORAGE_SOURCE=/mnt/veyq-media
+MEDIA_STORAGE_DIR=/data/veyq-media
+```
+
+To let Docker mount CIFS directly, use the CIFS volume source:
+
+```env
+MEDIA_STORAGE_MODE=cifs-volume
+MEDIA_STORAGE_MOUNT_TYPE=volume
+MEDIA_STORAGE_SOURCE=veyq-media-cifs
+MEDIA_CIFS_DEVICE=//nas.example.com/veyq-media
+MEDIA_CIFS_OPTIONS=username=veyq,password=change-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
+MEDIA_STORAGE_DIR=/data/veyq-media
+```
+
+Keep `.env` at `chmod 600` when it contains CIFS credentials. Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
+
 Upgrade with the helper script:
 
 ```bash
@@ -144,15 +177,15 @@ sudo ./veyq-server.sh upgrade
 
 Manual upgrade:
 
-1. Back up `.env`, the database and media volume.
+1. Back up `.env`, the database and media storage.
 2. Pull the configured image with `docker compose pull`.
 3. Restart with `docker compose up -d`.
 4. Check `docker compose ps` and `docker compose logs veyq`.
 
-Back up at least these Docker volumes before upgrading or testing destructive flows:
+Back up at least these state locations before upgrading or testing destructive flows:
 
 - `infra_veyq-db`: MariaDB data.
-- `infra_veyq-media`: original uploads, previews and explicit Memory covers.
+- media storage: `infra_veyq-media` for `docker-volume`, `infra_veyq-media-cifs` for `cifs-volume`, or the configured `MEDIA_STORAGE_SOURCE` host path for `host-path`.
 - `infra_traefik-letsencrypt`: ACME certificates and account state.
 
 Example backup commands from the `infra/` directory:
@@ -162,6 +195,8 @@ cp .env "veyq-env-$(date -u +%Y%m%dT%H%M%SZ)"
 docker compose exec veyq-db mariadb-dump -u root -p"${DB_ROOT_PASSWORD}" "${DB_NAME:-veyq}" > veyq-db.sql
 docker run --rm -v infra_veyq-media:/data -v "$PWD":/backup alpine tar czf /backup/veyq-media.tgz -C /data .
 ```
+
+For `cifs-volume`, replace `infra_veyq-media` with `infra_veyq-media-cifs`. For `host-path`, mount the configured host path instead, for example `-v /mnt/veyq-media:/data:ro`.
 
 The helper script writes all three backup artifacts together:
 
@@ -221,7 +256,7 @@ When enabled, the reset service:
 - Is routed by Traefik through `RESET_TRAEFIK_RULE`.
 - Uses HTTP Basic Auth with `RESET_USERNAME` and `RESET_PASSWORD`.
 - Connects to the same MariaDB database as veyq.
-- Mounts the same media volume as veyq.
+- Mounts the same media storage source as veyq.
 - Mounts the Docker socket so it can restart the app container after reset.
 
 Reset behavior:

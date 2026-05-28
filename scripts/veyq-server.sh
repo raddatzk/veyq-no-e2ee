@@ -134,6 +134,8 @@ setup_env() {
   set_env DB_PASSWORD "$(prompt_secret_or_random "Database app password" "$(env_value DB_PASSWORD "")")"
   set_env DB_ROOT_PASSWORD "$(prompt_secret_or_random "Database root password" "$(env_value DB_ROOT_PASSWORD "")")"
 
+  setup_media_storage_env
+
   echo "Mail settings are required for invitations and password resets."
   set_env MAIL_FROM "$(prompt "Mail sender address" "$(env_value MAIL_FROM "noreply@${public_host}")")"
   set_env MAIL_HOST "$(prompt "SMTP host" "$(env_value MAIL_HOST "smtp.example.com")")"
@@ -175,7 +177,7 @@ backup() {
   local name="veyq-backup-$(timestamp)"
   cp .env "backups/${name}.env"
   compose exec -T veyq-db mariadb-dump -u root -p"${db_root_password}" "${db_name}" > "backups/${name}.sql"
-  docker run --rm -v "$(compose_project)_veyq-media:/data:ro" -v "$PWD/backups:/backup" alpine \
+  docker run --rm -v "$(media_backup_mount):/data:ro" -v "$PWD/backups:/backup" alpine \
     tar czf "/backup/${name}-media.tgz" -C /data .
   echo "Wrote backups/${name}.env, backups/${name}.sql and backups/${name}-media.tgz"
 }
@@ -209,6 +211,10 @@ doctor() {
     if check_env_default_secret RESET_PASSWORD; then
       failed=1
     fi
+  fi
+
+  if ! check_media_storage_env; then
+    failed=1
   fi
 
   if compose config >/dev/null; then
@@ -250,8 +256,187 @@ pull_services() {
   compose pull traefik veyq-db
 }
 
+setup_media_storage_env() {
+  local current_mode mode
+  current_mode="$(media_storage_mode)"
+  mode="$(prompt_storage_mode "$current_mode")"
+  set_env MEDIA_STORAGE_MODE "$mode"
+  set_env MEDIA_STORAGE_DIR "$(prompt "Container media storage path" "$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")")"
+
+  case "$mode" in
+    docker-volume)
+      set_env MEDIA_STORAGE_MOUNT_TYPE "volume"
+      set_env MEDIA_STORAGE_SOURCE "veyq-media"
+      ;;
+    host-path)
+      set_env MEDIA_STORAGE_MOUNT_TYPE "bind"
+      set_env MEDIA_STORAGE_SOURCE "$(prompt_absolute_path "Host media storage path" "$(env_value MEDIA_STORAGE_SOURCE "/mnt/veyq-media")")"
+      ;;
+    cifs-volume)
+      set_env MEDIA_STORAGE_MOUNT_TYPE "volume"
+      set_env MEDIA_STORAGE_SOURCE "veyq-media-cifs"
+      set_env MEDIA_CIFS_DEVICE "$(prompt "CIFS share path" "$(env_value MEDIA_CIFS_DEVICE "//nas.example.com/veyq-media")")"
+      set_env MEDIA_CIFS_OPTIONS "$(prompt "CIFS mount options" "$(env_value MEDIA_CIFS_OPTIONS "username=veyq,password=change-cifs-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770")")"
+      ;;
+  esac
+}
+
+prompt_storage_mode() {
+  local default="$1"
+  local value
+  while true; do
+    value="$(prompt "Media storage mode (docker-volume, host-path, cifs-volume)" "$default")"
+    case "$value" in
+      docker-volume|host-path|cifs-volume)
+        printf '%s' "$value"
+        return 0
+        ;;
+      *)
+        echo "Choose docker-volume, host-path or cifs-volume." >&2
+        ;;
+    esac
+  done
+}
+
+prompt_absolute_path() {
+  local label="$1"
+  local default="$2"
+  local value
+  while true; do
+    value="$(prompt "$label" "$default")"
+    case "$value" in
+      /*)
+        printf '%s' "$value"
+        return 0
+        ;;
+      *)
+        echo "$label must be an absolute path." >&2
+        ;;
+    esac
+  done
+}
+
+media_storage_mode() {
+  local mode
+  mode="$(env_value MEDIA_STORAGE_MODE "")"
+  if [ -n "$mode" ]; then
+    printf '%s' "$mode"
+    return 0
+  fi
+
+  local mount_type source
+  mount_type="$(env_value MEDIA_STORAGE_MOUNT_TYPE "volume")"
+  source="$(env_value MEDIA_STORAGE_SOURCE "veyq-media")"
+  if [ "$mount_type" = "bind" ]; then
+    printf '%s' "host-path"
+  elif [ "$source" = "veyq-media-cifs" ]; then
+    printf '%s' "cifs-volume"
+  else
+    printf '%s' "docker-volume"
+  fi
+}
+
+media_backup_mount() {
+  local mode source
+  mode="$(media_storage_mode)"
+  source="$(env_value MEDIA_STORAGE_SOURCE "veyq-media")"
+  case "$mode" in
+    docker-volume|cifs-volume)
+      printf '%s' "$(compose_project)_${source}"
+      ;;
+    host-path)
+      printf '%s' "$source"
+      ;;
+    *)
+      echo "Unsupported MEDIA_STORAGE_MODE for backup: $mode" >&2
+      exit 1
+      ;;
+  esac
+}
+
+check_media_storage_env() {
+  local failed=0
+  local mode mount_type source storage_dir
+  mode="$(media_storage_mode)"
+  mount_type="$(env_value MEDIA_STORAGE_MOUNT_TYPE "volume")"
+  source="$(env_value MEDIA_STORAGE_SOURCE "veyq-media")"
+  storage_dir="$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")"
+
+  case "$storage_dir" in
+    /*) ;;
+    *)
+      echo "MEDIA_STORAGE_DIR must be an absolute container path." >&2
+      failed=1
+      ;;
+  esac
+
+  case "$mode" in
+    docker-volume)
+      if [ "$mount_type" != "volume" ]; then
+        echo "MEDIA_STORAGE_MOUNT_TYPE must be volume for MEDIA_STORAGE_MODE=docker-volume." >&2
+        failed=1
+      fi
+      if [ -z "$source" ]; then
+        echo "MEDIA_STORAGE_SOURCE is required for MEDIA_STORAGE_MODE=docker-volume." >&2
+        failed=1
+      fi
+      ;;
+    host-path)
+      if [ "$mount_type" != "bind" ]; then
+        echo "MEDIA_STORAGE_MOUNT_TYPE must be bind for MEDIA_STORAGE_MODE=host-path." >&2
+        failed=1
+      fi
+      case "$source" in
+        /*) ;;
+        *)
+          echo "MEDIA_STORAGE_SOURCE must be an absolute host path for MEDIA_STORAGE_MODE=host-path." >&2
+          failed=1
+          ;;
+      esac
+      if [ -n "$source" ] && [ ! -d "$source" ]; then
+        echo "MEDIA_STORAGE_SOURCE does not exist or is not a directory: $source" >&2
+        failed=1
+      fi
+      ;;
+    cifs-volume)
+      if [ "$mount_type" != "volume" ]; then
+        echo "MEDIA_STORAGE_MOUNT_TYPE must be volume for MEDIA_STORAGE_MODE=cifs-volume." >&2
+        failed=1
+      fi
+      if [ "$source" != "veyq-media-cifs" ]; then
+        echo "MEDIA_STORAGE_SOURCE must be veyq-media-cifs for MEDIA_STORAGE_MODE=cifs-volume." >&2
+        failed=1
+      fi
+      if ! check_env_required MEDIA_CIFS_DEVICE; then
+        failed=1
+      fi
+      if ! check_env_required MEDIA_CIFS_OPTIONS; then
+        failed=1
+      fi
+      case "$(env_value MEDIA_CIFS_OPTIONS "")" in
+        *change-cifs-me*)
+          echo "Replace default secret in .env: MEDIA_CIFS_OPTIONS" >&2
+          failed=1
+          ;;
+      esac
+      ;;
+    *)
+      echo "MEDIA_STORAGE_MODE must be docker-volume, host-path or cifs-volume." >&2
+      failed=1
+      ;;
+  esac
+
+  [ "$failed" -eq 0 ]
+}
+
 compose_project() {
-  basename "$VEYQ_DIR" | tr -c 'a-zA-Z0-9' ''
+  local project
+  project="$(compose config 2>/dev/null | awk '/^name:/ { print $2; exit }' || true)"
+  if [ -n "$project" ]; then
+    printf '%s' "$project"
+  else
+    basename "$VEYQ_DIR" | tr -cd 'a-zA-Z0-9'
+  fi
 }
 
 download() {

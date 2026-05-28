@@ -78,7 +78,9 @@ services:
     expose:
       - "8080"
     volumes:
-      - veyq-media:${MEDIA_STORAGE_DIR:-/data/veyq-media}
+      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
+        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
+        target: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
     depends_on:
       - veyq-db
     healthcheck:
@@ -112,7 +114,9 @@ services:
     expose:
       - "8081"
     volumes:
-      - veyq-media:${MEDIA_STORAGE_DIR:-/data/veyq-media}
+      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
+        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
+        target: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - veyq-db
@@ -126,4 +130,10 @@ services:
 volumes:
   veyq-db:
   veyq-media:
+  veyq-media-cifs:
+    driver: local
+    driver_opts:
+      type: cifs
+      o: ${MEDIA_CIFS_OPTIONS:-username=,password=,vers=3.0}
+      device: ${MEDIA_CIFS_DEVICE:-//example.invalid/veyq-media}
   traefik-letsencrypt:

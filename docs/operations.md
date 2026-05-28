@@ -124,7 +124,7 @@ curl -I http://veyq.example.com/.well-known/acme-challenge/test
 
 Safe recovery: fix DNS and inbound port `80`, confirm `LETSENCRYPT_EMAIL`, then restart Traefik. Do not delete the `traefik-letsencrypt` volume unless you understand the Let's Encrypt rate-limit impact and have backed it up.
 
-Prevention: back up the `traefik-letsencrypt` volume with the database and media volumes before upgrades or host changes.
+Prevention: back up the `traefik-letsencrypt` volume with the database and media storage before upgrades or host changes.
 
 ## Passkeys
 
@@ -192,27 +192,28 @@ Prevention: always run backup before upgrade, pin release tags for real instance
 
 Symptom: uploads return errors, previews are missing, or previously uploaded media is gone after a container restart.
 
-Likely cause: the `veyq-media` volume is missing, `MEDIA_STORAGE_DIR` changed, the mounted directory has permission problems, or the reset sidecar cleared a disposable instance.
+Likely cause: the configured media storage source is missing, `MEDIA_STORAGE_DIR` changed, a host path or CIFS mount has permission problems, or the reset sidecar cleared a disposable instance.
 
 Inspect:
 
 ```bash
 cd /opt/veyq
 sudo docker compose ps
-sudo docker volume ls | grep veyq-media
+sudo grep -E '^(MEDIA_STORAGE_MODE|MEDIA_STORAGE_MOUNT_TYPE|MEDIA_STORAGE_SOURCE|MEDIA_STORAGE_DIR|MEDIA_CIFS_DEVICE)=' .env
+sudo docker volume ls | grep veyq-media || true
 sudo docker compose exec veyq sh -lc 'echo "$MEDIA_STORAGE_DIR"; ls -la "$MEDIA_STORAGE_DIR" | head'
 sudo docker compose logs --tail=200 veyq
 ```
 
-Safe recovery: restore the media volume from backup that matches the database backup. If only `MEDIA_STORAGE_DIR` changed, return it to the previous value and restart before writing new media.
+Safe recovery: restore the media storage from backup that matches the database backup. If only `MEDIA_STORAGE_DIR` or the mount source changed, return it to the previous value and restart before writing new media.
 
-Prevention: include `veyq-media` in backups. Do not enable the reset sidecar for any environment that should preserve data.
+Prevention: include the configured media storage in backups. For `docker-volume`, back up `infra_veyq-media`; for `cifs-volume`, back up `infra_veyq-media-cifs`; for `host-path`, back up `MEDIA_STORAGE_SOURCE`. Do not enable the reset sidecar for any environment that should preserve data.
 
 ### Disk full or permission errors
 
 Symptom: uploads fail, backups fail, or logs mention no space left on device or permission denied.
 
-Likely cause: the Docker host disk is full, the backup directory is full, or a host-mounted media path has incorrect ownership.
+Likely cause: the Docker host disk is full, the backup directory is full, a host-mounted media path has incorrect ownership, or the CIFS share is unavailable or mounted with incompatible options.
 
 Inspect:
 
@@ -224,7 +225,7 @@ sudo docker compose logs --tail=200 veyq
 sudo du -sh backups 2>/dev/null || true
 ```
 
-Safe recovery: free host disk space, move old backups off the server, then retry the failed operation. For host-mounted storage, fix host path ownership and restart veyq.
+Safe recovery: free host disk space, move old backups off the server, then retry the failed operation. For host-mounted storage, fix host path ownership and restart veyq. For Docker-managed CIFS, verify `MEDIA_CIFS_DEVICE`, credentials and mount options in `.env`, then recreate the affected container.
 
 Prevention: monitor host disk usage and backup growth. Keep enough free space for at least one database dump and one compressed media archive.
 
@@ -280,7 +281,7 @@ sudo docker compose logs --tail=200 veyq
 curl -Ik -H 'Range: bytes=0-1023' 'https://veyq.example.com/<affected-media-url>'
 ```
 
-Safe recovery: confirm the same media exists in the media volume and re-upload the asset if the original is missing or truncated. If an additional upstream proxy is used, verify that it passes `Range` headers and partial-content responses.
+Safe recovery: confirm the same media exists in the configured media storage and re-upload the asset if the original is missing or truncated. If an additional upstream proxy is used, verify that it passes `Range` headers and partial-content responses.
 
 Prevention: keep the supported deployment path simple: browser to Traefik to veyq. Back up database and media together so media records and files stay consistent.
 
@@ -332,7 +333,7 @@ Prevention: configure SMTP before inviting users and include mail delivery in th
 
 Symptom: `./veyq-server.sh backup` exits with an error, no `.sql` file is written, or the media archive fails.
 
-Likely cause: `DB_ROOT_PASSWORD` is missing or wrong, MariaDB is unavailable, Docker cannot mount the media volume, or the host disk is full.
+Likely cause: `DB_ROOT_PASSWORD` is missing or wrong, MariaDB is unavailable, Docker cannot mount the configured media storage, the host path is missing, CIFS credentials are wrong, or the host disk is full.
 
 Inspect:
 
@@ -341,6 +342,7 @@ cd /opt/veyq
 sudo ./veyq-server.sh doctor
 sudo docker compose ps
 sudo docker compose logs --tail=200 veyq-db
+sudo grep -E '^(MEDIA_STORAGE_MODE|MEDIA_STORAGE_SOURCE|MEDIA_CIFS_DEVICE)=' .env
 df -h
 ls -lah backups 2>/dev/null || true
 ```
@@ -392,7 +394,7 @@ sudo docker compose up -d
 sudo docker stop veyq-reset
 ```
 
-If the reset action was already triggered, restore the database and media volume from backup.
+If the reset action was already triggered, restore the database and media storage from backup.
 
 Prevention: enable reset only for disposable development or test instances. Treat access to the reset UI as destructive admin access.
 

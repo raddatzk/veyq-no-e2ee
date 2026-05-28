@@ -20,7 +20,7 @@ Memory UI v1 and the Memory APIs are now the active product baseline. Folders re
 - Frontend: Vue 3, TypeScript, OpenAPI-generated API clients
 - Database: MariaDB for the Docker Compose runtime
 - API: OpenAPI-first contracts under [`docs/api`](docs/api)
-- Infrastructure: Docker Compose, Traefik, local filesystem media storage
+- Infrastructure: Docker Compose, Traefik, configurable local filesystem media storage
 
 ## Quick Start
 
@@ -76,13 +76,24 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
 - `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
 - `VEYQ_SOURCE_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license and build metadata shown in server settings.
-- `MEDIA_STORAGE_DIR`, `MEDIA_CHUNK_SIZE`, `MEDIA_MAX_UPLOAD_SIZE`, `MEDIA_UPLOAD_SESSION_TTL_HOURS`, `MEDIA_UPLOAD_SESSION_CLEANUP_CRON`, `FFMPEG_PATH`, `MEDIA_PREVIEW_TIMEOUT_SECONDS`: media storage, upload and preview-generation settings.
+- `MEDIA_STORAGE_MODE`, `MEDIA_STORAGE_MOUNT_TYPE`, `MEDIA_STORAGE_SOURCE`, `MEDIA_STORAGE_DIR`, `MEDIA_CIFS_DEVICE`, `MEDIA_CIFS_OPTIONS`: media storage backend settings. The supported modes are Docker named volume, host bind mount and Docker-managed CIFS volume.
+- `MEDIA_CHUNK_SIZE`, `MEDIA_MAX_UPLOAD_SIZE`, `MEDIA_UPLOAD_SESSION_TTL_HOURS`, `MEDIA_UPLOAD_SESSION_CLEANUP_CRON`, `FFMPEG_PATH`, `MEDIA_PREVIEW_TIMEOUT_SECONDS`: media upload and preview-generation settings.
 - `COOKIE_SECURE`, `COOKIE_ACCESS_TOKEN_NAME`, `COOKIE_REFRESH_TOKEN_NAME`, `ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_MINUTES`, `ACCESS_TOKEN_AUDIT_TTL_DAYS`, `REFRESH_TOKEN_AUDIT_TTL_DAYS`, `TOKEN_CLEANUP_CRON`: authentication cookie and token retention settings.
 - `INVITATION_TTL_DAYS`, `EMAIL_CHANGE_TTL_HOURS`, `RESET_PASSWORD_TTL_HOURS`, `USER_CLEANUP_CRON`, `USER_CLEANUP_RETENTION_DAYS`: user workflow token lifetimes and cleanup.
 - `BCRYPT_TARGET_MS`, `BCRYPT_MIN_COST`, `BCRYPT_MAX_COST`, `BCRYPT_BENCHMARK_SAMPLES`: password hashing benchmark and bounds.
 - `COMPOSE_PROFILES=reset`, `RESET_TRAEFIK_RULE`, `RESET_USERNAME`, `RESET_PASSWORD`, `RESET_RESTART_CONTAINER`: optional reset sidecar for disposable test instances only.
 
 See [`infra/.env.template`](infra/.env.template) for all defaults and comments.
+
+### Media Storage
+
+The Compose stack stores uploaded originals, previews and Memory covers below `MEDIA_STORAGE_DIR` inside the app container. `MEDIA_STORAGE_MODE` controls where that path is mounted from:
+
+- `docker-volume`: default, uses the Compose-managed `veyq-media` Docker volume.
+- `host-path`: bind-mounts an absolute host directory from `MEDIA_STORAGE_SOURCE`, for example a CIFS share mounted by the host at `/mnt/veyq-media`.
+- `cifs-volume`: lets Docker create the `veyq-media-cifs` volume from `MEDIA_CIFS_DEVICE` and `MEDIA_CIFS_OPTIONS`, for example `//nas.example.com/photos` plus CIFS mount options.
+
+If CIFS credentials are stored in `.env`, keep the file private with `chmod 600 .env`.
 
 ## Docker Compose Test Instance
 
@@ -97,7 +108,7 @@ docker compose up
 
 Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`. The normal image-based Compose stack keeps MariaDB internal to the Compose network; the local build override publishes MariaDB on host port `3306` for development tools.
 
-The reset sidecar can clear veyq tables, delete media volume contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
+The reset sidecar can clear veyq tables, delete media storage contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
 
 ## API-First Development
 
