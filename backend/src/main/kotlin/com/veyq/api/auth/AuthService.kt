@@ -106,6 +106,7 @@ class AuthService @Inject constructor(
             permalink = user.permalink,
             serverRole = user.role.toAuthApiRole(),
             passkeyCount = passkeyCredentialRepo.countByUser(user).toInt(),
+            hasPassword = user.passwordSetAt != null,
             avatarUrl = user.ownAvatarUrl(),
         )
 

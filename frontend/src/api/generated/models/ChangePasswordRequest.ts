@@ -20,11 +20,11 @@ import { mapValues } from '../runtime';
  */
 export interface ChangePasswordRequest {
     /**
-     * 
+     * Required when the user already has a password. Omitted when setting the first password for a passkey-only account.
      * @type {string}
      * @memberof ChangePasswordRequest
      */
-    currentPassword: string;
+    currentPassword?: string;
     /**
      * 
      * @type {string}
@@ -37,7 +37,6 @@ export interface ChangePasswordRequest {
  * Check if a given object implements the ChangePasswordRequest interface.
  */
 export function instanceOfChangePasswordRequest(value: object): value is ChangePasswordRequest {
-    if (!('currentPassword' in value) || value['currentPassword'] === undefined) return false;
     if (!('newPassword' in value) || value['newPassword'] === undefined) return false;
     return true;
 }
@@ -52,7 +51,7 @@ export function ChangePasswordRequestFromJSONTyped(json: any, ignoreDiscriminato
     }
     return {
         
-        'currentPassword': json['currentPassword'],
+        'currentPassword': json['currentPassword'] == null ? undefined : json['currentPassword'],
         'newPassword': json['newPassword'],
     };
 }

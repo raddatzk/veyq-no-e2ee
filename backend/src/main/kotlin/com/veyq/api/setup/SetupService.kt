@@ -126,6 +126,7 @@ class SetupService @Inject constructor(
             permalink = permalink,
             serverRole = ApiServerRole.ServerOwner,
             passkeyCount = passkeyCredentialRepo.countByUser(this).toInt(),
+            hasPassword = passwordSetAt != null,
             avatarUrl = ownAvatarUrl(),
         )
 }

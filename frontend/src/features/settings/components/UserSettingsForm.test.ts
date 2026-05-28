@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import UserSettingsForm from './UserSettingsForm.vue'
 import {
+  changeMyPassword,
   createMyPasskey,
   deleteMyAvatar,
   deleteMyPasskey,
@@ -27,6 +28,7 @@ vi.mock('../api', () => ({
 }))
 
 const createMyPasskeyMock = vi.mocked(createMyPasskey)
+const changeMyPasswordMock = vi.mocked(changeMyPassword)
 const deleteMyAvatarMock = vi.mocked(deleteMyAvatar)
 const deleteMyPasskeyMock = vi.mocked(deleteMyPasskey)
 const getMySettingsMock = vi.mocked(getMySettings)
@@ -37,6 +39,7 @@ const updateMySettingsMock = vi.mocked(updateMySettings)
 
 describe('UserSettingsForm', () => {
   afterEach(() => {
+    changeMyPasswordMock.mockReset()
     createMyPasskeyMock.mockReset()
     deleteMyAvatarMock.mockReset()
     deleteMyPasskeyMock.mockReset()
@@ -132,7 +135,8 @@ describe('UserSettingsForm', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
     getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
     listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
@@ -168,6 +172,51 @@ describe('UserSettingsForm', () => {
 
     expect(wrapper.text()).toContain('Externe Inhalte verwalten')
     expect(wrapper.text()).not.toContain('Karten')
+  })
+
+  it('changes an existing password with the current password', async () => {
+    changeMyPasswordMock.mockResolvedValue()
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test', undefined, undefined, true))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [] })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Aktuelles Passwort')
+    expect(wrapper.text()).toContain('Passwort ändern')
+
+    const passwordForm = wrapper.findAll('form')[1]
+    const passwordInputs = passwordForm.findAll('input')
+    await passwordInputs[0].setValue('current-password')
+    await passwordInputs[1].setValue('new-password-123')
+    await passwordForm.trigger('submit')
+    await flushPromises()
+
+    expect(changeMyPasswordMock).toHaveBeenCalledWith({
+      currentPassword: 'current-password',
+      newPassword: 'new-password-123'
+    })
+  })
+
+  it('sets the first password without requiring the current password', async () => {
+    changeMyPasswordMock.mockResolvedValue()
+    getMySettingsMock.mockResolvedValue(userSettings('owner@example.test', undefined, undefined, false))
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [passkey(7, 'Laptop')] })
+
+    const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Aktuelles Passwort')
+    expect(wrapper.text()).toContain('Passwort setzen')
+
+    const passwordForm = wrapper.findAll('form')[1]
+    await passwordForm.find('input').setValue('new-password-123')
+    await passwordForm.trigger('submit')
+    await flushPromises()
+
+    expect(changeMyPasswordMock).toHaveBeenCalledWith({
+      newPassword: 'new-password-123'
+    })
   })
 
   it('adds a passkey and asks to confirm the suggested name', async () => {
@@ -239,7 +288,7 @@ describe('UserSettingsForm', () => {
   })
 })
 
-function userSettings(email: string, pendingEmail?: string, avatarUrl?: string) {
+function userSettings(email: string, pendingEmail?: string, avatarUrl?: string, hasPassword = true) {
   return {
     userId: 1,
     email,
@@ -247,6 +296,7 @@ function userSettings(email: string, pendingEmail?: string, avatarUrl?: string) 
     permalink: 'owner',
     serverRole: 'ServerOwner',
     passkeyCount: 0,
+    hasPassword,
     avatarUrl,
     pendingEmail
   } as const

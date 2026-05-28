@@ -885,6 +885,7 @@ components:
             avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
             serverRole: ServerOwner
             passkeyCount: 1
+            hasPassword: true
     UserProfile:
       description: Public user profile.
       content:
@@ -1041,11 +1042,11 @@ components:
       type: object
       additionalProperties: false
       required:
-        - currentPassword
         - newPassword
       properties:
         currentPassword:
           type: string
+          description: Required when the user already has a password. Omitted when setting the first password for a passkey-only account.
         newPassword:
           "$ref": "./common.openapi.yaml#/components/schemas/Password"
       example:

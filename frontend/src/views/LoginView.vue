@@ -36,7 +36,8 @@ async function submit() {
         permalink: user.permalink,
         serverRole: user.serverRole,
         pendingEmail: user.pendingEmail,
-        passkeyCount: user.passkeyCount
+        passkeyCount: user.passkeyCount,
+        hasPassword: user.hasPassword
       },
       await tenants()
     )
@@ -60,7 +61,8 @@ async function submitPasskey() {
         permalink: user.permalink,
         serverRole: user.serverRole,
         pendingEmail: user.pendingEmail,
-        passkeyCount: user.passkeyCount
+        passkeyCount: user.passkeyCount,
+        hasPassword: user.hasPassword
       },
       await tenants()
     )

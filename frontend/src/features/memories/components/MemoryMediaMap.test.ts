@@ -132,7 +132,8 @@ describe('MemoryMediaMap', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
     const wrapper = mountMap()
 

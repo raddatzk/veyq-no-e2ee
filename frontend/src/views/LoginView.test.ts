@@ -57,7 +57,8 @@ describe('LoginView', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerOwner',
-      passkeyCount: 1
+      passkeyCount: 1,
+      hasPassword: true
     })
     tenantsMock.mockResolvedValue([])
     const router = testRouter()

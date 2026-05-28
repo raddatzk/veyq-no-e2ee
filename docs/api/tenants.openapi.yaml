@@ -670,6 +670,7 @@ components:
                     permalink: kevin
                     serverRole: ServerOwner
                     passkeyCount: 1
+                    hasPassword: true
 
     Tenant:
       description: Created tenant.
@@ -690,6 +691,7 @@ components:
                 permalink: kevin
                 serverRole: ServerOwner
                 passkeyCount: 1
+                hasPassword: true
 
     TenantSettings:
       description: Tenant settings.
@@ -845,6 +847,7 @@ components:
             permalink: kevin
             serverRole: ServerOwner
             passkeyCount: 1
+            hasPassword: true
     TenantsSummary:
       type: object
       additionalProperties: false
@@ -870,6 +873,7 @@ components:
                 permalink: kevin
                 serverRole: ServerOwner
                 passkeyCount: 1
+                hasPassword: true
     TenantSettingsResponse:
       type: object
       additionalProperties: false

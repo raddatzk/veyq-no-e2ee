@@ -51,6 +51,7 @@ components:
               permalink: kevin
               serverRole: ServerOwner
               passkeyCount: 1
+              hasPassword: true
             tenants:
             - id: 42
               name: friends
@@ -64,6 +65,7 @@ components:
                 permalink: kevin
                 serverRole: ServerOwner
                 passkeyCount: 1
+                hasPassword: true
 
   schemas:
     BootstrapResponse:
@@ -91,6 +93,7 @@ components:
           permalink: kevin
           serverRole: ServerOwner
           passkeyCount: 1
+          hasPassword: true
         tenants:
         - id: 42
           name: friends
@@ -104,3 +107,4 @@ components:
             permalink: kevin
             serverRole: ServerOwner
             passkeyCount: 1
+            hasPassword: true

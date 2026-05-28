@@ -48,7 +48,8 @@ describe('InviteView', () => {
       displayName: 'Invitee',
       permalink: 'invitee',
       serverRole: 'ServerMember',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
@@ -58,7 +59,8 @@ describe('InviteView', () => {
         displayName: 'Invitee',
         permalink: 'invitee',
         serverRole: 'ServerMember',
-        passkeyCount: 0
+        passkeyCount: 0,
+        hasPassword: true
       },
       tenants: []
     })
@@ -99,7 +101,8 @@ describe('InviteView', () => {
       displayName: 'Invitee',
       permalink: 'invitee',
       serverRole: 'ServerMember',
-      passkeyCount: 1
+      passkeyCount: 1,
+      hasPassword: false
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
@@ -109,7 +112,8 @@ describe('InviteView', () => {
         displayName: 'Invitee',
         permalink: 'invitee',
         serverRole: 'ServerMember',
-        passkeyCount: 1
+        passkeyCount: 1,
+        hasPassword: false
       },
       tenants: []
     })
@@ -164,7 +168,8 @@ describe('InviteView', () => {
       displayName: 'Invitee',
       permalink: 'invitee',
       serverRole: 'ServerMember',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
     acceptInvitationMock.mockResolvedValue(authState.user)
     bootstrapMock.mockResolvedValue({

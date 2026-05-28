@@ -126,10 +126,16 @@ async function savePassword() {
   error.value = ''
   passwordMessage.value = ''
   try {
-    await changeMyPassword({
-      currentPassword: currentPassword.value,
-      newPassword: newPassword.value
-    })
+    await changeMyPassword(
+      settings.value?.hasPassword
+        ? {
+            currentPassword: currentPassword.value,
+            newPassword: newPassword.value
+          }
+        : {
+            newPassword: newPassword.value
+          }
+    )
     currentPassword.value = ''
     newPassword.value = ''
     passwordMessage.value = t('profile.passwordChangeSuccess')
@@ -318,7 +324,7 @@ function formatTimestamp(value?: string) {
       </form>
 
       <form class="form settings-form" @submit.prevent="savePassword">
-        <label>
+        <label v-if="settings.hasPassword">
           <span>{{ t('settings.currentPassword') }}</span>
           <Password v-model="currentPassword" autocomplete="current-password" toggle-mask :feedback="false" />
         </label>
@@ -327,7 +333,12 @@ function formatTimestamp(value?: string) {
           <Password v-model="newPassword" autocomplete="new-password" toggle-mask />
         </label>
         <div class="button-row">
-          <Button type="submit" :label="t('profile.passwordChange')" icon="pi pi-key" :loading="savingPassword" />
+          <Button
+            type="submit"
+            :label="settings.hasPassword ? t('profile.passwordChange') : t('profile.passwordSet')"
+            icon="pi pi-key"
+            :loading="savingPassword"
+          />
         </div>
         <Message v-if="passwordMessage" severity="success" :closable="false">{{ passwordMessage }}</Message>
       </form>

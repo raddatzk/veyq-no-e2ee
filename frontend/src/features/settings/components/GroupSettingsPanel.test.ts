@@ -249,7 +249,8 @@ function userSummary(userId: number, displayName: string) {
     displayName,
     permalink: displayName.toLowerCase(),
     serverRole: 'ServerMember',
-    passkeyCount: 0
+    passkeyCount: 0,
+    hasPassword: true
   } as const
 }
 

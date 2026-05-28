@@ -70,7 +70,8 @@ async function submitAdmin() {
       permalink: user.permalink,
       serverRole: user.serverRole,
       pendingEmail: user.pendingEmail,
-      passkeyCount: user.passkeyCount
+      passkeyCount: user.passkeyCount,
+      hasPassword: user.hasPassword
     }
     setAuthenticated(
       authenticatedUser,

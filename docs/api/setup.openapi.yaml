@@ -172,6 +172,7 @@ components:
             displayName: Administrator
             serverRole: ServerOwner
             passkeyCount: 0
+            hasPassword: true
     PasskeyRegistrationOptions:
       description: Passkey registration options.
       content:

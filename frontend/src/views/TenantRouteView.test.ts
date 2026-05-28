@@ -22,7 +22,8 @@ describe('TenantRouteView', () => {
       displayName: 'Kevin',
       permalink: 'kevin',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
 
     const { router, wrapper } = await mountAt('/friends/~kevin')

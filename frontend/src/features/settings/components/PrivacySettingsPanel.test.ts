@@ -35,7 +35,8 @@ describe('PrivacySettingsPanel', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
     const wrapper = mount(PrivacySettingsPanel)
     const checkboxes = wrapper.findAll('input[type="checkbox"]')

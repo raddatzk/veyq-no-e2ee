@@ -75,6 +75,12 @@ export interface UserSummary {
      * @memberof UserSummary
      */
     passkeyCount: number;
+    /**
+     * Whether the user has set a password login method.
+     * @type {boolean}
+     * @memberof UserSummary
+     */
+    hasPassword: boolean;
 }
 
 
@@ -89,6 +95,7 @@ export function instanceOfUserSummary(value: object): value is UserSummary {
     if (!('permalink' in value) || value['permalink'] === undefined) return false;
     if (!('serverRole' in value) || value['serverRole'] === undefined) return false;
     if (!('passkeyCount' in value) || value['passkeyCount'] === undefined) return false;
+    if (!('hasPassword' in value) || value['hasPassword'] === undefined) return false;
     return true;
 }
 
@@ -110,6 +117,7 @@ export function UserSummaryFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'serverRole': ServerRoleFromJSON(json['serverRole']),
         'pendingEmail': json['pendingEmail'] == null ? undefined : json['pendingEmail'],
         'passkeyCount': json['passkeyCount'],
+        'hasPassword': json['hasPassword'],
     };
 }
 
@@ -132,6 +140,7 @@ export function UserSummaryToJSONTyped(value?: UserSummary | null, ignoreDiscrim
         'serverRole': ServerRoleToJSON(value['serverRole']),
         'pendingEmail': value['pendingEmail'],
         'passkeyCount': value['passkeyCount'],
+        'hasPassword': value['hasPassword'],
     };
 }
 

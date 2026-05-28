@@ -435,6 +435,7 @@ class UserManagementResourceTest {
             .then()
             .statusCode(200)
             .body("passkeyCount", equalTo(1))
+            .body("hasPassword", equalTo(true))
 
         given()
             .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
@@ -443,6 +444,75 @@ class UserManagementResourceTest {
             .statusCode(204)
 
         assertThat(passkeyCredentialRepo.findById(passkey.id)).isNull()
+    }
+
+    @Test
+    fun `passkey only user can set first password without current password`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        createPasskey(currentUser, "Laptop")
+        inTransaction {
+            userRepo.findById(currentUser.id)!!.passwordSetAt = null
+        }
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users/me")
+            .then()
+            .statusCode(200)
+            .body("hasPassword", equalTo(false))
+            .body("passkeyCount", equalTo(1))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"newPassword":"new-admin1234567"}""")
+            .`when`().post("/api/users/me/password/change")
+            .then()
+            .statusCode(204)
+
+        entityManager.clear()
+        assertThat(userRepo.findById(currentUser.id)!!.passwordSetAt).isNotNull
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"${currentUser.email}","password":"new-admin1234567"}""")
+            .`when`().post("/api/auth/login")
+            .then()
+            .statusCode(200)
+    }
+
+    @Test
+    fun `password user must provide current password when changing password`() {
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"newPassword":"new-admin1234567"}""")
+            .`when`().post("/api/users/me/password/change")
+            .then()
+            .statusCode(401)
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"currentPassword":"wrong-password","newPassword":"new-admin1234567"}""")
+            .`when`().post("/api/users/me/password/change")
+            .then()
+            .statusCode(401)
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"currentPassword":"admin1234567","newPassword":"new-admin1234567"}""")
+            .`when`().post("/api/users/me/password/change")
+            .then()
+            .statusCode(204)
+
+        given()
+            .contentType("application/json")
+            .body("""{"email":"mgmt-owner-$runId@example.com","password":"new-admin1234567"}""")
+            .`when`().post("/api/auth/login")
+            .then()
+            .statusCode(200)
     }
 
     @Test

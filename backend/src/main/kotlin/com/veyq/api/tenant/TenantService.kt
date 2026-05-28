@@ -300,5 +300,6 @@ private fun User.toTenantAdminSummary(): UserSummary =
         permalink = permalink,
         serverRole = role.toUsersApiRole(),
         passkeyCount = passkeyCredentials.size,
+        hasPassword = passwordSetAt != null,
         avatarUrl = ownAvatarUrl(),
     )

@@ -69,7 +69,8 @@ function user(serverRole: 'ServerOwner' | 'ServerMember') {
     displayName: 'Owner',
     permalink: 'owner',
     serverRole,
-    passkeyCount: 0
+    passkeyCount: 0,
+    hasPassword: true
   }
 }
 

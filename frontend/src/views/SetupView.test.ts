@@ -82,7 +82,8 @@ describe('SetupView', () => {
       displayName: 'Administrator',
       permalink: 'administrator',
       serverRole: 'ServerOwner',
-      passkeyCount: 1
+      passkeyCount: 1,
+      hasPassword: false
     })
     tenantsMock.mockResolvedValue([])
     listMyPasskeysMock.mockResolvedValue({ passkeys: [passkey(5, 'Apple Passwords')] })
@@ -132,7 +133,8 @@ describe('SetupView', () => {
       displayName: 'Administrator',
       permalink: 'administrator',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     })
     tenantsMock.mockResolvedValue([])
     window.localStorage.setItem('veyq:user:1:osm-tiles-enabled', 'true')

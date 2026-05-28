@@ -156,7 +156,12 @@ class UserService @Inject constructor(
         val newPassword = request.newPassword
         val user = managedUser()
 
-        passwordService.updatePassword(user, currentPassword, newPassword)
+        if (user.passwordSetAt == null) {
+            passwordService.setPassword(user, newPassword, Instant.now())
+            return
+        }
+
+        passwordService.updatePassword(user, currentPassword ?: "", newPassword)
     }
 
     @Transactional
@@ -464,6 +469,7 @@ class UserService @Inject constructor(
             permalink = user.permalink,
             serverRole = user.role.toUsersApiRole(),
             passkeyCount = passkeyCredentialRepo.countByUser(user).toInt(),
+            hasPassword = user.passwordSetAt != null,
             avatarUrl = user.ownAvatarUrl(),
             pendingEmail = pendingEmail,
         )
@@ -479,6 +485,7 @@ class UserService @Inject constructor(
                 permalink = user.permalink,
                 serverRole = user.role.toUsersApiRole(),
                 passkeyCount = 0,
+                hasPassword = user.passwordSetAt != null,
                 avatarUrl = user.ownAvatarUrl(),
                 pendingEmail = pendingEmail,
             )
@@ -513,6 +520,7 @@ fun User.toUserSummary(pendingEmail: String? = null): UserSummary {
         permalink = permalink,
         serverRole = role.toUsersApiRole(),
         passkeyCount = passkeyCredentials.size,
+        hasPassword = passwordSetAt != null,
         avatarUrl = ownAvatarUrl(),
         pendingEmail = pendingEmail,
     )

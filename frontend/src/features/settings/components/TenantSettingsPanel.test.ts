@@ -256,7 +256,8 @@ describe('TenantSettingsPanel', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerMember' as const,
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
     authState.user = owner
     authState.tenants = [

@@ -29,7 +29,8 @@ describe('ProfileMenu', () => {
       displayName: 'Member',
       permalink: 'member',
       serverRole: 'ServerMember',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -55,7 +56,8 @@ describe('ProfileMenu', () => {
       displayName: 'Owner',
       permalink: 'owner',
       serverRole: 'ServerOwner',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -76,7 +78,8 @@ describe('ProfileMenu', () => {
       displayName: 'Member',
       permalink: 'member',
       serverRole: 'ServerMember',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
 
     const wrapper = shallowMount(ProfileMenu, {
@@ -100,7 +103,8 @@ describe('ProfileMenu', () => {
       displayName: 'Member',
       permalink: 'member',
       serverRole: 'ServerMember',
-      passkeyCount: 0
+      passkeyCount: 0,
+      hasPassword: true
     }
 
     const wrapper = shallowMount(ProfileMenu, {
