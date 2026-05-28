@@ -262,13 +262,13 @@ async function loadCurrentMemoryDetails(sequence: number, current: Memory) {
     loadCurrentMemoryDetailPart(sequence, () => listPublicShareChildMemories(shareId.value, current.id), (children) => {
       childMemories.value = children
     }),
-    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMedia(shareId.value, current.id), (memoryMedia) => {
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMedia(shareId.value, current.id, true), (memoryMedia) => {
       media.value = memoryMedia
       mediaLoading.value = false
     }, () => {
       mediaLoading.value = false
     }),
-    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMediaBuckets(shareId.value, current.id), (buckets) => {
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMediaBuckets(shareId.value, current.id, true), (buckets) => {
       mediaBuckets.value = buckets
     }),
     loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryTracks(shareId.value, current.id), (memoryTracks) => {

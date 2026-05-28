@@ -246,7 +246,7 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('#asset-move-target').setValue('bucket-target')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
-    expect(moveMedia).toHaveBeenCalledWith(['media-2'], 'bucket-target')
+    expect(moveMedia).toHaveBeenCalledWith('mem-1', ['media-2'], 'bucket-target')
     expect(wrapper.emitted('updated')?.[0]).toEqual([
       [expect.objectContaining({ id: 'media-2', bucketId: 'bucket-target' })]
     ])
@@ -276,7 +276,7 @@ describe('MemoryAssetBuckets', () => {
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
     expect(confirm).not.toHaveBeenCalled()
-    expect(deleteMediaBatch).toHaveBeenCalledWith(['media-2'])
+    expect(deleteMediaBatch).toHaveBeenCalledWith('mem-1', ['media-2'])
     confirm.mockRestore()
   })
 
@@ -303,7 +303,7 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.text()).toContain('Diese Aktion löscht 2 ausgewählte Medien dauerhaft aus diesem Bucket.')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
-    expect(deleteMediaBatch).toHaveBeenCalledWith(['media-1', 'media-2'])
+    expect(deleteMediaBatch).toHaveBeenCalledWith('mem-1', ['media-1', 'media-2'])
   })
 
   it('keeps batch actions disabled without a selection or without a changed reference time', async () => {

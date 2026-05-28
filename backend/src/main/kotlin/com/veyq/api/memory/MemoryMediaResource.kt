@@ -28,8 +28,8 @@ class MemoryMediaResource @Inject constructor(
     override fun listMemoryMedia(tenantName: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(mediaService.listMemoryMedia(memoryId, includeChildren ?: false)).build()
 
-    override fun listMemoryMediaBuckets(tenantName: String, memoryId: String): Response =
-        Response.ok(mediaService.listMemoryMediaBuckets(memoryId)).build()
+    override fun listMemoryMediaBuckets(tenantName: String, memoryId: String, includeChildren: Boolean?): Response =
+        Response.ok(mediaService.listMemoryMediaBuckets(memoryId, includeChildren ?: false)).build()
 
     override fun createMemoryMediaBucket(
         tenantName: String,

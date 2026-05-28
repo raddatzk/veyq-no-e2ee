@@ -239,11 +239,13 @@ export interface ListPublicShareMediaRequest {
 export interface ListPublicShareMemoryMediaRequest {
     shareId: string;
     memoryId: string;
+    includeChildren?: boolean;
 }
 
 export interface ListPublicShareMemoryMediaBucketsRequest {
     shareId: string;
     memoryId: string;
+    includeChildren?: boolean;
 }
 
 export interface ListPublicShareMemoryPlaylistsRequest {
@@ -740,7 +742,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryMediaBucketRequestOpts(requestParameters: DeletePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes a bucket subtree and contained media when the current identity can manage that bucket. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * @summary Delete a public share Memory media bucket
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -752,7 +754,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryMediaBucketRaw(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes a bucket subtree and contained media when the current identity can manage that bucket. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Delete a public share Memory media bucket
      */
     deletePublicShareMemoryMediaBucket(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -1077,16 +1079,18 @@ export interface PublicSharesApiInterface {
      * Creates request options for listPublicShareMemoryMedia without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include media assigned to descendant Memories inside the shared subtree.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
      */
     listPublicShareMemoryMediaRequestOpts(requestParameters: ListPublicShareMemoryMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Lists media for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media for one Memory inside the shared subtree. When `includeChildren=true`, media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * @summary List media for one public share Memory
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include media assigned to descendant Memories inside the shared subtree.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
@@ -1094,7 +1098,7 @@ export interface PublicSharesApiInterface {
     listPublicShareMemoryMediaRaw(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PublicShareMediaSummary>>>;
 
     /**
-     * Lists media for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media for one Memory inside the shared subtree. When `includeChildren=true`, media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List media for one public share Memory
      */
     listPublicShareMemoryMedia(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PublicShareMediaSummary>>;
@@ -1103,16 +1107,18 @@ export interface PublicSharesApiInterface {
      * Creates request options for listPublicShareMemoryMediaBuckets without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include media buckets assigned to descendant Memories inside the shared subtree.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
      */
     listPublicShareMemoryMediaBucketsRequestOpts(requestParameters: ListPublicShareMemoryMediaBucketsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media buckets visible to the current public-share identity for one Memory. When `includeChildren=true`, buckets from descendant Memories inside the shared subtree are included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * @summary List public share Memory media buckets
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include media buckets assigned to descendant Memories inside the shared subtree.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
@@ -1120,7 +1126,7 @@ export interface PublicSharesApiInterface {
     listPublicShareMemoryMediaBucketsRaw(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>>;
 
     /**
-     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media buckets visible to the current public-share identity for one Memory. When `includeChildren=true`, buckets from descendant Memories inside the shared subtree are included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List public share Memory media buckets
      */
     listPublicShareMemoryMediaBuckets(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>>;
@@ -2587,7 +2593,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes a bucket subtree and contained media when the current identity can manage that bucket. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Delete a public share Memory media bucket
      */
     async deletePublicShareMemoryMediaBucketRaw(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -2598,7 +2604,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes a bucket subtree and contained media when the current identity can manage that bucket. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Delete a public share Memory media bucket
      */
     async deletePublicShareMemoryMediaBucket(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -3294,6 +3300,10 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
 
         const queryParameters: any = {};
 
+        if (requestParameters['includeChildren'] != null) {
+            queryParameters['includeChildren'] = requestParameters['includeChildren'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -3310,7 +3320,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Lists media for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media for one Memory inside the shared subtree. When `includeChildren=true`, media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List media for one public share Memory
      */
     async listPublicShareMemoryMediaRaw(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<PublicShareMediaSummary>>> {
@@ -3321,7 +3331,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Lists media for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media for one Memory inside the shared subtree. When `includeChildren=true`, media from descendant Memories inside the shared subtree is included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List media for one public share Memory
      */
     async listPublicShareMemoryMedia(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PublicShareMediaSummary>> {
@@ -3349,6 +3359,10 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
 
         const queryParameters: any = {};
 
+        if (requestParameters['includeChildren'] != null) {
+            queryParameters['includeChildren'] = requestParameters['includeChildren'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -3365,7 +3379,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media buckets visible to the current public-share identity for one Memory. When `includeChildren=true`, buckets from descendant Memories inside the shared subtree are included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List public share Memory media buckets
      */
     async listPublicShareMemoryMediaBucketsRaw(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>> {
@@ -3376,7 +3390,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Lists media buckets visible to the current public-share identity for one Memory. When `includeChildren=true`, buckets from descendant Memories inside the shared subtree are included.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * List public share Memory media buckets
      */
     async listPublicShareMemoryMediaBuckets(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>> {

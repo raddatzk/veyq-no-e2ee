@@ -84,11 +84,11 @@ class PublicShareResource @Inject constructor(
     override fun deletePublicShareMemory(shareId: String, memoryId: String): Response =
         memoryShareService.deletePublicShareMemory(shareId, memoryId).let { Response.noContent().build() }
 
-    override fun listPublicShareMemoryMedia(shareId: String, memoryId: String): Response =
-        Response.ok(memoryShareService.listPublicShareMemoryMedia(shareId, memoryId)).build()
+    override fun listPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean?): Response =
+        Response.ok(memoryShareService.listPublicShareMemoryMedia(shareId, memoryId, includeChildren ?: false)).build()
 
-    override fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String): Response =
-        Response.ok(memoryShareService.listPublicShareMemoryMediaBuckets(shareId, memoryId)).build()
+    override fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String, includeChildren: Boolean?): Response =
+        Response.ok(memoryShareService.listPublicShareMemoryMediaBuckets(shareId, memoryId, includeChildren ?: false)).build()
 
     override fun createPublicShareMemoryMediaBucket(
         shareId: String,

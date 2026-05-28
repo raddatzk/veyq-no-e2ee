@@ -12,6 +12,7 @@ import jakarta.transaction.UserTransaction
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasSize
+import org.hamcrest.Matchers.containsInAnyOrder
 import org.hamcrest.Matchers.notNullValue
 import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.BeforeEach
@@ -562,6 +563,24 @@ class MemoryShareResourceTest {
 
         val viewerShareId = createShare("VIEWER")
         val viewerAccessCookie = loginShare(viewerShareId)
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .queryParam("includeChildren", true)
+            .`when`().get("/api/public-shares/$viewerShareId/memories/${memory.publicId}/media")
+            .then()
+            .statusCode(200)
+            .body("id", containsInAnyOrder(rootMedia.publicId, childMedia.publicId))
+            .body("memoryId", containsInAnyOrder(memory.publicId, child.publicId))
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
+            .queryParam("includeChildren", true)
+            .`when`().get("/api/public-shares/$viewerShareId/memories/${memory.publicId}/media-buckets")
+            .then()
+            .statusCode(200)
+            .body("memoryId", containsInAnyOrder(memory.publicId, child.publicId))
+            .body("mediaCount", containsInAnyOrder(1, 1))
+
         val archive = given()
             .cookie("VEYQ_SHARE_ACCESS_TOKEN", viewerAccessCookie)
             .queryParam("includeChildren", true)

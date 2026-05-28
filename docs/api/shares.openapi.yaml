@@ -490,7 +490,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Lists media for one Memory inside the shared subtree.
+        Lists media for one Memory inside the shared subtree. When `includeChildren=true`, media from descendant Memories inside the shared subtree is included.
 
         Vorbedingungen:
         - The share is enabled.
@@ -499,6 +499,13 @@ paths:
       parameters:
         - "$ref": "#/components/parameters/ShareId"
         - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include media assigned to descendant Memories inside the shared subtree.
       responses:
         "200":
           "$ref": "#/components/responses/PublicShareMediaList"
@@ -551,7 +558,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Lists media buckets visible to the current public-share identity for one Memory.
+        Lists media buckets visible to the current public-share identity for one Memory. When `includeChildren=true`, buckets from descendant Memories inside the shared subtree are included.
 
         Vorbedingungen:
         - The share is enabled.
@@ -560,6 +567,13 @@ paths:
       parameters:
         - "$ref": "#/components/parameters/ShareId"
         - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include media buckets assigned to descendant Memories inside the shared subtree.
       responses:
         "200":
           "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaBucketList"

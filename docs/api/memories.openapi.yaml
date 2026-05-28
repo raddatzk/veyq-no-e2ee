@@ -833,7 +833,7 @@ paths:
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
       description: |-
-        Lists the persistent uploader buckets and subbuckets for one Memory.
+        Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -842,6 +842,13 @@ paths:
       parameters:
         - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
         - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include buckets assigned to visible descendant Memories.
       responses:
         '200':
           "$ref": "#/components/responses/MemoryMediaBucketList"

@@ -120,13 +120,13 @@ export function useMemoryRouteData(
       loadMemoryDetailPart(sequence, () => listChildMemories(tenantName.value, loadedMemory.id), (children) => {
         childMemories.value = children
       }),
-      loadMemoryDetailPart(sequence, () => listMemoryMedia(tenantName.value, loadedMemory.id, false), (memoryMedia) => {
+      loadMemoryDetailPart(sequence, () => listMemoryMedia(tenantName.value, loadedMemory.id, true), (memoryMedia) => {
         media.value = memoryMedia
         mediaLoading.value = false
       }, () => {
         mediaLoading.value = false
       }),
-      loadMemoryDetailPart(sequence, () => listMemoryMediaBuckets(tenantName.value, loadedMemory.id), (buckets) => {
+      loadMemoryDetailPart(sequence, () => listMemoryMediaBuckets(tenantName.value, loadedMemory.id, true), (buckets) => {
         mediaBuckets.value = buckets
       }),
       loadMemoryDetailPart(sequence, () => listMemoryTracks(tenantName.value, loadedMemory.id), (memoryTracks) => {

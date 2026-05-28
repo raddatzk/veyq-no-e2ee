@@ -330,19 +330,22 @@ class MemoryShareService @Inject constructor(
         deleteMemoryTree(memory)
     }
 
-    fun listPublicShareMemoryMedia(shareId: String, memoryId: String): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
+    fun listPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean = false): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
-        return mediaRepo.listByMemory(memory)
+        val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
+        return mediaRepo.listByMemoriesOrdered(memories)
             .filter { isPublicMediaVisible(access, it) }
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
     }
 
-    fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String): List<MemoryMediaBucketSummary> {
+    @Transactional
+    fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String, includeChildren: Boolean = false): List<MemoryMediaBucketSummary> {
         val access = requireAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
-        val visibleMedia = mediaRepo.listByMemory(memory).filter { isPublicMediaVisible(access, it) }
-        return mediaService.listPublicShareBuckets(memory, visibleMedia)
+        val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
+        val visibleMedia = mediaRepo.listByMemoriesOrdered(memories).filter { isPublicMediaVisible(access, it) }
+        return mediaService.listPublicShareBuckets(memories, visibleMedia)
     }
 
     @Transactional
@@ -387,11 +390,7 @@ class MemoryShareService @Inject constructor(
     fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean, locale: String?): Response {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
-        val memories = if (includeChildren) {
-            subtree(memory).filter { isDescendantOrSelf(it, access.share.rootMemory) }
-        } else {
-            listOf(memory)
-        }
+        val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
         return mediaService.archiveResponse(
             memoryDirectories = mediaService.archiveMemoryDirectories(memory, memories),
             archiveName = publicShareArchiveFilename(memory, includeChildren, locale),
@@ -1080,6 +1079,13 @@ class MemoryShareService @Inject constructor(
     private fun subtree(root: Memory): List<Memory> =
         listOf(root) + memoryRepo.list("tenant", root.tenant)
             .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+
+    private fun publicShareMemories(memory: Memory, shareRoot: Memory, includeChildren: Boolean): List<Memory> =
+        if (includeChildren) {
+            subtree(memory).filter { isDescendantOrSelf(it, shareRoot) }
+        } else {
+            listOf(memory)
+        }
 
     private fun isDescendantOrSelf(candidate: Memory, root: Memory): Boolean =
         candidate.id == root.id || generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id }

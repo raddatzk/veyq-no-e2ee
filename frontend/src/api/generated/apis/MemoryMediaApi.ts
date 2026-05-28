@@ -127,6 +127,7 @@ export interface ListMemoryMediaRequest {
 export interface ListMemoryMediaBucketsRequest {
     tenantName: string;
     memoryId: string;
+    includeChildren?: boolean;
 }
 
 export interface MemoryMediaContentRequest {
@@ -398,7 +399,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaBucketRequestOpts(requestParameters: DeleteMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes a bucket subtree and contained media. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * @summary Delete a memory media bucket
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -410,7 +411,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaBucketRaw(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes a bucket subtree and contained media. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * Delete a memory media bucket
      */
     deleteMemoryMediaBucket(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -505,16 +506,18 @@ export interface MemoryMediaApiInterface {
      * Creates request options for listMemoryMediaBuckets without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include buckets assigned to visible descendant Memories.
      * @throws {RequiredError}
      * @memberof MemoryMediaApiInterface
      */
     listMemoryMediaBucketsRequestOpts(requestParameters: ListMemoryMediaBucketsRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * @summary List memory media buckets
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
+     * @param {boolean} [includeChildren] Include buckets assigned to visible descendant Memories.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MemoryMediaApiInterface
@@ -522,7 +525,7 @@ export interface MemoryMediaApiInterface {
     listMemoryMediaBucketsRaw(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>>;
 
     /**
-     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * List memory media buckets
      */
     listMemoryMediaBuckets(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>>;
@@ -1271,7 +1274,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes a bucket subtree and contained media. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * Delete a memory media bucket
      */
     async deleteMemoryMediaBucketRaw(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1282,7 +1285,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes a bucket subtree and contained media. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * Delete a memory media bucket
      */
     async deleteMemoryMediaBucket(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -1494,6 +1497,10 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
 
         const queryParameters: any = {};
 
+        if (requestParameters['includeChildren'] != null) {
+            queryParameters['includeChildren'] = requestParameters['includeChildren'];
+        }
+
         const headerParameters: runtime.HTTPHeaders = {};
 
 
@@ -1510,7 +1517,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * List memory media buckets
      */
     async listMemoryMediaBucketsRaw(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>> {
@@ -1521,7 +1528,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
      * List memory media buckets
      */
     async listMemoryMediaBuckets(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>> {

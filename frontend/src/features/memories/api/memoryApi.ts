@@ -254,9 +254,10 @@ export function listMemoryMedia(
 
 export function listMemoryMediaBuckets(
   tenantName: string,
-  memoryId: string
+  memoryId: string,
+  includeChildren = false
 ): Promise<MemoryMediaBucket[]> {
-  return generatedCall(memoryMediaApi.listMemoryMediaBuckets({ tenantName, memoryId }))
+  return generatedCall(memoryMediaApi.listMemoryMediaBuckets({ tenantName, memoryId, includeChildren }))
 }
 
 export function createMemoryMediaBucket(
@@ -649,18 +650,20 @@ export function updatePublicShareMemoryJournal(
 
 export function listPublicShareMemoryMedia(
   shareId: string,
-  memoryId: string
+  memoryId: string,
+  includeChildren = false
 ): Promise<MemoryMedia[]> {
-  return generatedCall(publicSharesApi.listPublicShareMemoryMedia({ shareId, memoryId })).then(
+  return generatedCall(publicSharesApi.listPublicShareMemoryMedia({ shareId, memoryId, includeChildren })).then(
     (media) => media.map(normalizePublicShareMedia)
   )
 }
 
 export function listPublicShareMemoryMediaBuckets(
   shareId: string,
-  memoryId: string
+  memoryId: string,
+  includeChildren = false
 ): Promise<MemoryMediaBucket[]> {
-  return generatedCall(publicSharesApi.listPublicShareMemoryMediaBuckets({ shareId, memoryId }))
+  return generatedCall(publicSharesApi.listPublicShareMemoryMediaBuckets({ shareId, memoryId, includeChildren }))
 }
 
 export function createPublicShareMemoryMediaBucket(

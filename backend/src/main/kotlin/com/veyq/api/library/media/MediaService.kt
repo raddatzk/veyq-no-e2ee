@@ -139,11 +139,12 @@ class MediaService @Inject constructor(
     }
 
     @Transactional
-    fun listMemoryMediaBuckets(memoryId: String): List<MemoryMediaBucketSummary> {
+    fun listMemoryMediaBuckets(memoryId: String, includeChildren: Boolean = false): List<MemoryMediaBucketSummary> {
         val memory = resolveVisibleMemory(memoryId)
-        ensureBucketsForMemories(listOf(memory))
+        val memories = if (includeChildren) descendantsAndSelf(memory).filter(::isMemoryVisible) else listOf(memory)
+        ensureBucketsForMemories(memories)
         ensurePrimaryBucket(memory, user(), null)
-        return bucketSummaries(memory, bucketRepo.listByMemory(memory))
+        return bucketSummaries(memories, bucketRepo.listByMemories(memories))
     }
 
     @Transactional
@@ -910,13 +911,22 @@ class MediaService @Inject constructor(
     fun resolveBucketForPublicShareUpload(memory: Memory, bucketId: String?): MemoryMediaBucket? =
         bucketId?.let { resolveBucketInMemory(memory, it) }
 
-    fun listPublicShareBuckets(memory: Memory, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> {
-        ensureBucketsForMedia(memory, visibleMedia)
-        val visibleBucketIds = visibleMedia.mapNotNull { it.bucket?.id }.toSet()
-        val buckets = bucketRepo.listByMemory(memory).filter { bucket ->
-            bucket.id in visibleBucketIds || bucketRepo.listChildren(bucket).isNotEmpty()
+    fun listPublicShareBuckets(memory: Memory, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> =
+        listPublicShareBuckets(listOf(memory), visibleMedia)
+
+    fun listPublicShareBuckets(memories: List<Memory>, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> {
+        memories.forEach { memory ->
+            ensureBucketsForMedia(memory, visibleMedia.filter { it.memory?.id == memory.id })
         }
-        return bucketSummaries(memory, buckets)
+        val visibleBucketIds = visibleMedia
+            .mapNotNull { it.bucket }
+            .flatMap { bucket -> generateSequence(bucket) { it.parentBucket }.toList() }
+            .map { it.id }
+            .toSet()
+        val buckets = bucketRepo.listByMemories(memories).filter { bucket ->
+            bucket.id in visibleBucketIds
+        }
+        return bucketSummaries(memories, buckets)
     }
 
     @Transactional
@@ -1034,14 +1044,15 @@ class MediaService @Inject constructor(
         }
     }
 
-    private fun bucketSummaries(memory: Memory, buckets: List<MemoryMediaBucket>): List<MemoryMediaBucketSummary> {
+    private fun bucketSummaries(memories: Collection<Memory>, buckets: List<MemoryMediaBucket>): List<MemoryMediaBucketSummary> {
+        val memoryIds = memories.map { it.id }.toSet()
         val bucketSet = buckets.toMutableSet()
         buckets.forEach { bucket ->
             generateSequence(bucket.parentBucket) { it.parentBucket }
-                .filter { it.memory.id == memory.id }
+                .filter { it.memory.id in memoryIds }
                 .forEach(bucketSet::add)
         }
-        val counts = mediaCountsByBucket(listOf(memory))
+        val counts = mediaCountsByBucket(memories)
         return bucketSet.sortedWith(compareBy<MemoryMediaBucket> { it.parentBucket?.id ?: 0L }.thenBy { it.displayName })
             .map { it.toSummary(counts) }
     }

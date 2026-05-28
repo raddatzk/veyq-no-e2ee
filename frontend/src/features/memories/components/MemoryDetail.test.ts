@@ -320,7 +320,8 @@ describe('MemoryDetail', () => {
     })
 
     const buckets = wrapper.findComponent({ name: 'MemoryAssetBuckets' })
-    await (buckets.props('moveMedia') as (mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>)(
+    await (buckets.props('moveMedia') as (memoryId: string, mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>)(
+      'mem-1',
       ['media-1'],
       'bucket-target'
     )

@@ -166,6 +166,7 @@ const uploaderShareOpen = ref(false)
 const participantsOpen = ref(false)
 const uploadOpen = ref(false)
 const uploadBucketId = ref<string | null>(null)
+const uploadMemoryId = ref<string | null>(null)
 const downloadOpen = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const secondaryActionMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -385,6 +386,8 @@ watch(
   () => props.memory.id,
   () => {
     favoriteOverride.value = null
+    uploadMemoryId.value = null
+    uploadBucketId.value = null
     uploadedMedia.value = {}
     mediaOverrides.value = {}
     deletedMediaIds.value = new Set()
@@ -444,13 +447,15 @@ function addUploadedMedia(media: MemoryMedia) {
   uploadedMedia.value = { ...uploadedMedia.value, [media.id]: media }
 }
 
-function openBucketUpload(bucketId: string) {
+function openBucketUpload(bucketId: string, memoryId: string) {
   uploadBucketId.value = bucketId
+  uploadMemoryId.value = memoryId
   uploadOpen.value = true
 }
 
 function openMemoryUpload() {
   uploadBucketId.value = null
+  uploadMemoryId.value = props.memory.id
   uploadOpen.value = true
 }
 
@@ -474,35 +479,37 @@ function markMediaDeleted(media: MemoryMedia) {
 }
 
 async function submitMediaBucketCreate(
+  memoryId: string,
   parentBucketId: string,
   displayName: string
 ): Promise<MemoryMediaBucket> {
   const request = { parentBucketId, displayName }
   const bucket = props.createMediaBucket
-    ? await props.createMediaBucket(props.memory.id, request)
-    : await createTenantMemoryMediaBucket(props.tenantName, props.memory.id, request)
+    ? await props.createMediaBucket(memoryId, request)
+    : await createTenantMemoryMediaBucket(props.tenantName, memoryId, request)
   createdMediaBuckets.value = { ...createdMediaBuckets.value, [bucket.id]: bucket }
   return bucket
 }
 
 async function submitMediaBucketUpdate(
+  memoryId: string,
   bucketId: string,
   displayName: string
 ): Promise<MemoryMediaBucket> {
   const request = { displayName }
   const bucket = props.updateMediaBucket
-    ? await props.updateMediaBucket(bucketId, props.memory.id, request)
-    : await updateTenantMemoryMediaBucket(props.tenantName, props.memory.id, bucketId, request)
+    ? await props.updateMediaBucket(bucketId, memoryId, request)
+    : await updateTenantMemoryMediaBucket(props.tenantName, memoryId, bucketId, request)
   mediaBucketOverrides.value = { ...mediaBucketOverrides.value, [bucket.id]: bucket }
   return bucket
 }
 
-async function submitMediaBucketDelete(bucketId: string): Promise<void> {
+async function submitMediaBucketDelete(memoryId: string, bucketId: string): Promise<void> {
   const bucket = visibleMediaBuckets.value.find((candidate) => candidate.id === bucketId)
   if (props.deleteMediaBucket) {
-    await props.deleteMediaBucket(bucketId, props.memory.id)
+    await props.deleteMediaBucket(bucketId, memoryId)
   } else {
-    await deleteTenantMemoryMediaBucket(props.tenantName, props.memory.id, bucketId)
+    await deleteTenantMemoryMediaBucket(props.tenantName, memoryId, bucketId)
   }
   if (bucket && !bucket.primary) {
     deletedMediaBucketIds.value = new Set([...deletedMediaBucketIds.value, bucketId])
@@ -530,21 +537,21 @@ async function submitMediaBucketDelete(bucketId: string): Promise<void> {
   }
 }
 
-async function submitMediaMove(mediaIds: string[], targetBucketId: string): Promise<MemoryMedia[]> {
+async function submitMediaMove(memoryId: string, mediaIds: string[], targetBucketId: string): Promise<MemoryMedia[]> {
   const request = { mediaIds, targetBucketId }
   const moved = props.moveMedia
-    ? await props.moveMedia(props.memory.id, request)
-    : await moveTenantMemoryMedia(props.tenantName, props.memory.id, request)
+    ? await props.moveMedia(memoryId, request)
+    : await moveTenantMemoryMedia(props.tenantName, memoryId, request)
   mergeUpdatedMedia(moved)
   return moved
 }
 
-async function submitMediaBatchDelete(mediaIds: string[]): Promise<void> {
+async function submitMediaBatchDelete(memoryId: string, mediaIds: string[]): Promise<void> {
   const request = { mediaIds }
   if (props.deleteMediaBatch) {
-    await props.deleteMediaBatch(props.memory.id, request)
+    await props.deleteMediaBatch(memoryId, request)
   } else {
-    await deleteTenantMemoryMediaBatch(props.tenantName, props.memory.id, request)
+    await deleteTenantMemoryMediaBatch(props.tenantName, memoryId, request)
   }
   const deleted = visibleMedia.value.filter((media) => mediaIds.includes(media.id))
   deleted.forEach(markMediaDeleted)
@@ -1213,7 +1220,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
     <MemoryUploadDialog
       v-model:visible="uploadOpen"
       :tenant-name="tenantName"
-      :memory-id="memory.id"
+      :memory-id="uploadMemoryId || memory.id"
       :bucket-id="uploadBucketId"
       :upload-media="uploadMedia"
       @uploaded="addUploadedMedia"

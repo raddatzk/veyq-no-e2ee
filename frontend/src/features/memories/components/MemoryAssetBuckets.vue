@@ -31,16 +31,16 @@ const props = defineProps<{
     mediaIds: string[],
     capturedAtOffsetSeconds: number
   ) => Promise<MemoryMedia[]>
-  createBucket?: (parentBucketId: string, displayName: string) => Promise<MemoryMediaBucket>
-  updateBucket?: (bucketId: string, displayName: string) => Promise<MemoryMediaBucket>
-  deleteBucket?: (bucketId: string) => Promise<void>
-  moveMedia?: (mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>
-  deleteMediaBatch?: (mediaIds: string[]) => Promise<void>
+  createBucket?: (memoryId: string, parentBucketId: string, displayName: string) => Promise<MemoryMediaBucket>
+  updateBucket?: (memoryId: string, bucketId: string, displayName: string) => Promise<MemoryMediaBucket>
+  deleteBucket?: (memoryId: string, bucketId: string) => Promise<void>
+  moveMedia?: (memoryId: string, mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>
+  deleteMediaBatch?: (memoryId: string, mediaIds: string[]) => Promise<void>
 }>()
 
 const emit = defineEmits<{
   updated: [media: MemoryMedia[]]
-  uploadBucket: [bucketId: string]
+  uploadBucket: [bucketId: string, memoryId: string]
 }>()
 
 const { locale, t } = useI18n()
@@ -136,7 +136,7 @@ const selectedCountLabel = computed(() =>
 const hasVisibleSelection = computed(() => filteredMedia.value.some((media) => selectedMediaIds.value.has(media.id)))
 const offsetPreview = computed(() => formatOffset(offsetSeconds.value))
 const moveTargets = computed(() =>
-  bucketRows.value.filter((bucket) => bucket.id !== activeBucket.value?.id)
+  bucketRows.value.filter((bucket) => bucket.memoryId === activeBucket.value?.memoryId && bucket.id !== activeBucket.value?.id)
 )
 const canSubmitBucketDelete = computed(
   () =>
@@ -329,14 +329,15 @@ function openMediaOptions(event: MouseEvent, mediaId: string) {
 }
 
 async function applyOffset() {
-  if (!canSubmitOffset.value) return
+  if (!canSubmitOffset.value || !activeBucket.value) return
   isSaving.value = true
   saveError.value = ''
   try {
+    const memoryId = activeBucket.value.memoryId
     const mediaIds = [...selectedMediaIds.value]
     const updated = props.updateMetadataBatch
-      ? await props.updateMetadataBatch(props.memoryId, mediaIds, offsetSeconds.value)
-      : await updateMemoryMediaMetadataBatch(props.tenantName, props.memoryId, {
+      ? await props.updateMetadataBatch(memoryId, mediaIds, offsetSeconds.value)
+      : await updateMemoryMediaMetadataBatch(props.tenantName, memoryId, {
           mediaIds,
           capturedAtOffsetSeconds: offsetSeconds.value
         })
@@ -371,9 +372,9 @@ async function submitBucketDialog() {
   saveError.value = ''
   try {
     if (bucketDialogMode.value === 'create') {
-      await props.createBucket?.(activeBucket.value.id, bucketName.value)
+      await props.createBucket?.(activeBucket.value.memoryId, activeBucket.value.id, bucketName.value)
     } else {
-      await props.updateBucket?.(activeBucket.value.id, bucketName.value)
+      await props.updateBucket?.(activeBucket.value.memoryId, activeBucket.value.id, bucketName.value)
     }
     isBucketDialogOpen.value = false
   } catch (error) {
@@ -395,7 +396,7 @@ async function deleteActiveBucket() {
   isSaving.value = true
   saveError.value = ''
   try {
-    await props.deleteBucket(activeBucket.value.id)
+    await props.deleteBucket(activeBucket.value.memoryId, activeBucket.value.id)
     isDeleteBucketDialogOpen.value = false
   } catch (error) {
     saveError.value = error instanceof Error ? error.message : t('media.bucketDeleteFailed')
@@ -416,11 +417,11 @@ function toggleSelectionActionMenu(event: MouseEvent) {
 }
 
 async function submitMove() {
-  if (!props.moveMedia || !moveTargetBucketId.value || !selectedMediaIds.value.size) return
+  if (!props.moveMedia || !activeBucket.value || !moveTargetBucketId.value || !selectedMediaIds.value.size) return
   isSaving.value = true
   saveError.value = ''
   try {
-    const updated = await props.moveMedia([...selectedMediaIds.value], moveTargetBucketId.value)
+    const updated = await props.moveMedia(activeBucket.value.memoryId, [...selectedMediaIds.value], moveTargetBucketId.value)
     emit('updated', updated)
     selectedMediaIds.value = new Set()
     isMoveDialogOpen.value = false
@@ -443,7 +444,8 @@ async function deleteSelectedMedia() {
   isSaving.value = true
   saveError.value = ''
   try {
-    await props.deleteMediaBatch(deleteMediaIds.value)
+    const memoryId = activeBucket.value?.memoryId ?? props.memoryId
+    await props.deleteMediaBatch(memoryId, deleteMediaIds.value)
     const deletedIds = new Set(deleteMediaIds.value)
     selectedMediaIds.value = new Set([...selectedMediaIds.value].filter((mediaId) => !deletedIds.has(mediaId)))
     deleteMediaIds.value = []
@@ -484,7 +486,7 @@ async function deleteSelectedMedia() {
         <div class="asset-bucket-action-row">
           <strong>{{ activeBucket?.displayName }}</strong>
           <div>
-            <button v-if="canUpload && activeBucket" class="asset-bucket-upload-button" type="button" @click="$emit('uploadBucket', activeBucket.id)">
+            <button v-if="canUpload && activeBucket" class="asset-bucket-upload-button" type="button" @click="$emit('uploadBucket', activeBucket.id, activeBucket.memoryId)">
               <span class="pi pi-upload" /> {{ t('common.upload') }}
             </button>
             <button v-if="canUpload && activeBucket?.primary && createBucket" type="button" @click="openCreateBucketDialog">
