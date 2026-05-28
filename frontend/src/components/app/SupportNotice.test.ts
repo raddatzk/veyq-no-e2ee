@@ -94,6 +94,7 @@ function serverSettings(overrides: Partial<ServerSettingsResponse> = {}): Server
       commercialBoundaryUrl: 'https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md',
       version: 'v1.0.0'
     },
+    capabilities: [],
     ...overrides
   }
 }

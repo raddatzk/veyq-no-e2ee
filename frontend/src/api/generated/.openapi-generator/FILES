@@ -26,6 +26,9 @@ models/AdminPasskeySetupOptionsRequest.ts
 models/AdminPasskeySetupRequest.ts
 models/AdminSetupRequest.ts
 models/BootstrapResponse.ts
+models/CapabilityAudience.ts
+models/CapabilityNotification.ts
+models/CapabilityNotificationsResponse.ts
 models/ChangePasswordRequest.ts
 models/ConfirmEmailChangeRequest.ts
 models/CoverCrop.ts
@@ -100,10 +103,16 @@ models/PublicShareTreeResponse.ts
 models/PublicUserSummary.ts
 models/ResetPasswordRequest.ts
 models/SearchResultSummary.ts
+models/ServerCapability.ts
 models/ServerLicenseSummary.ts
+models/ServerNotification.ts
+models/ServerNotificationType.ts
+models/ServerNotificationsResponse.ts
 models/ServerRole.ts
 models/ServerSettingsResponse.ts
 models/ServerSupportSummary.ts
+models/ServerUpdateEvent.ts
+models/ServerUpdateEventsResponse.ts
 models/SettingsBreadcrumb.ts
 models/SettingsLocation.ts
 models/SettingsResponse.ts
@@ -120,6 +129,7 @@ models/TenantUserStatus.ts
 models/TenantUserSummary.ts
 models/TenantUsersSummary.ts
 models/TenantsSummary.ts
+models/UpdateFailureStage.ts
 models/UpdateFolderRequest.ts
 models/UpdateGroupRequest.ts
 models/UpdateGroupSettingsRequest.ts
@@ -134,9 +144,12 @@ models/UpdateMemoryShareRequest.ts
 models/UpdateMemoryTrackRequest.ts
 models/UpdatePasskeyRequest.ts
 models/UpdatePublicShareMemoryRequest.ts
+models/UpdateStatus.ts
 models/UpdateTenantSettingsRequest.ts
 models/UpdateTenantUserRoleRequest.ts
 models/UpdateUserSettingsRequest.ts
+models/UpdaterUpdateCompletedRequest.ts
+models/UpdaterUpdateFailedRequest.ts
 models/UserProfileSummary.ts
 models/UserStatus.ts
 models/UserSummary.ts

@@ -9,6 +9,7 @@ class SettingsServiceTest {
     @Test
     fun `server settings expose community license defaults and sponsor link`() {
         val settings = SettingsService(
+            capabilityRegistry = CapabilityRegistry(),
             sourceUrl = "https://github.com/raddatzk/veyq",
             version = Optional.empty(),
             revision = Optional.empty(),
@@ -24,6 +25,7 @@ class SettingsServiceTest {
     @Test
     fun `server settings expose fixed sponsor link and build metadata`() {
         val settings = SettingsService(
+            capabilityRegistry = CapabilityRegistry(),
             sourceUrl = "https://example.test/source",
             version = Optional.of("v1.0.0"),
             revision = Optional.of("sha-123"),
@@ -31,6 +33,9 @@ class SettingsServiceTest {
 
         assertThat(settings.license.version).isEqualTo("v1.0.0")
         assertThat(settings.license.revision).isEqualTo("sha-123")
+        assertThat(settings.version).isEqualTo("v1.0.0")
+        assertThat(settings.revision).isEqualTo("sha-123")
+        assertThat(settings.capabilities).isNotEmpty
         assertThat(settings.license.trademarkPolicyUrl.toString()).isEqualTo("https://example.test/source/docs/legal/trademark-policy.md")
         assertThat(settings.support?.url.toString()).isEqualTo("https://github.com/sponsors/raddatzk")
     }

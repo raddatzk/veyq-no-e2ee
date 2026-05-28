@@ -10,6 +10,7 @@ import java.util.Optional
 
 @Singleton
 class SettingsService(
+    private val capabilityRegistry: CapabilityRegistry,
     @param:ConfigProperty(name = "veyq.source-url")
     private val sourceUrl: String,
     @param:ConfigProperty(name = "veyq.version")
@@ -34,6 +35,9 @@ class SettingsService(
                 revision = revision.clean(),
             ),
             support = ServerSupportSummary(URI.create(SPONSOR_URL)),
+            version = version.clean(),
+            revision = revision.clean(),
+            capabilities = capabilityRegistry.listFor(),
         )
     }
 

@@ -20,6 +20,13 @@ import {
     ServerLicenseSummaryToJSON,
     ServerLicenseSummaryToJSONTyped,
 } from './ServerLicenseSummary';
+import type { ServerCapability } from './ServerCapability';
+import {
+    ServerCapabilityFromJSON,
+    ServerCapabilityFromJSONTyped,
+    ServerCapabilityToJSON,
+    ServerCapabilityToJSONTyped,
+} from './ServerCapability';
 import type { ServerSupportSummary } from './ServerSupportSummary';
 import {
     ServerSupportSummaryFromJSON,
@@ -58,6 +65,24 @@ export interface ServerSettingsResponse {
      * @memberof ServerSettingsResponse
      */
     support?: ServerSupportSummary;
+    /**
+     * Laufende veyq-Version.
+     * @type {string}
+     * @memberof ServerSettingsResponse
+     */
+    version?: string;
+    /**
+     * Laufende Build- oder Commit-Revision.
+     * @type {string}
+     * @memberof ServerSettingsResponse
+     */
+    revision?: string;
+    /**
+     * 
+     * @type {Array<ServerCapability>}
+     * @memberof ServerSettingsResponse
+     */
+    capabilities: Array<ServerCapability>;
 }
 
 /**
@@ -67,6 +92,7 @@ export function instanceOfServerSettingsResponse(value: object): value is Server
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('userManagementAvailable' in value) || value['userManagementAvailable'] === undefined) return false;
     if (!('license' in value) || value['license'] === undefined) return false;
+    if (!('capabilities' in value) || value['capabilities'] === undefined) return false;
     return true;
 }
 
@@ -84,6 +110,9 @@ export function ServerSettingsResponseFromJSONTyped(json: any, ignoreDiscriminat
         'userManagementAvailable': json['userManagementAvailable'],
         'license': ServerLicenseSummaryFromJSON(json['license']),
         'support': json['support'] == null ? undefined : ServerSupportSummaryFromJSON(json['support']),
+        'version': json['version'] == null ? undefined : json['version'],
+        'revision': json['revision'] == null ? undefined : json['revision'],
+        'capabilities': ((json['capabilities'] as Array<any>).map(ServerCapabilityFromJSON)),
     };
 }
 
@@ -102,6 +131,9 @@ export function ServerSettingsResponseToJSONTyped(value?: ServerSettingsResponse
         'userManagementAvailable': value['userManagementAvailable'],
         'license': ServerLicenseSummaryToJSON(value['license']),
         'support': ServerSupportSummaryToJSON(value['support']),
+        'version': value['version'],
+        'revision': value['revision'],
+        'capabilities': ((value['capabilities'] as Array<any>).map(ServerCapabilityToJSON)),
     };
 }
 

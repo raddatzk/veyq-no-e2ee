@@ -1,21 +1,36 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getServerSettings, type ServerSettingsResponse } from '../api'
+import {
+  getServerNotifications,
+  getServerSettings,
+  getServerUpdateEvents,
+  type ServerSettingsResponse
+} from '../api'
 import ServerSettingsPanel from './ServerSettingsPanel.vue'
 
 vi.mock('../api', () => ({
-  getServerSettings: vi.fn()
+  getServerSettings: vi.fn(),
+  getServerNotifications: vi.fn(),
+  getServerUpdateEvents: vi.fn()
 }))
 
 const getServerSettingsMock = vi.mocked(getServerSettings)
+const getServerNotificationsMock = vi.mocked(getServerNotifications)
+const getServerUpdateEventsMock = vi.mocked(getServerUpdateEvents)
 
 describe('ServerSettingsPanel', () => {
   afterEach(() => {
     vi.resetAllMocks()
   })
 
+  function mockServerPanel(settings = serverSettings()) {
+    getServerSettingsMock.mockResolvedValue(settings)
+    getServerNotificationsMock.mockResolvedValue([])
+    getServerUpdateEventsMock.mockResolvedValue([])
+  }
+
   it('renders license and edition information', async () => {
-    getServerSettingsMock.mockResolvedValue(serverSettings())
+    mockServerPanel()
 
     const wrapper = mount(ServerSettingsPanel, {
       global: { stubs: primeStubs() }
@@ -29,9 +44,7 @@ describe('ServerSettingsPanel', () => {
   })
 
   it('renders support action from server settings', async () => {
-    getServerSettingsMock.mockResolvedValue(
-      serverSettings({ support: { url: 'https://support.example.test/veyq' } })
-    )
+    mockServerPanel(serverSettings({ support: { url: 'https://support.example.test/veyq' } }))
 
     const wrapper = mount(ServerSettingsPanel, {
       global: { stubs: primeStubs() }
@@ -56,6 +69,7 @@ function serverSettings(overrides: Partial<ServerSettingsResponse> = {}): Server
       commercialBoundaryUrl: 'https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md',
       version: 'v1.0.0'
     },
+    capabilities: [],
     ...overrides
   }
 }

@@ -15,15 +15,46 @@
 
 import * as runtime from '../runtime';
 import type {
+  CapabilityNotificationsResponse,
   ErrorResponse,
+  ServerNotificationsResponse,
   ServerSettingsResponse,
+  ServerUpdateEventsResponse,
+  UpdaterUpdateCompletedRequest,
+  UpdaterUpdateFailedRequest,
 } from '../models/index';
 import {
+    CapabilityNotificationsResponseFromJSON,
+    CapabilityNotificationsResponseToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
+    ServerNotificationsResponseFromJSON,
+    ServerNotificationsResponseToJSON,
     ServerSettingsResponseFromJSON,
     ServerSettingsResponseToJSON,
+    ServerUpdateEventsResponseFromJSON,
+    ServerUpdateEventsResponseToJSON,
+    UpdaterUpdateCompletedRequestFromJSON,
+    UpdaterUpdateCompletedRequestToJSON,
+    UpdaterUpdateFailedRequestFromJSON,
+    UpdaterUpdateFailedRequestToJSON,
 } from '../models/index';
+
+export interface DeleteServerNotificationRequest {
+    notificationId: number;
+}
+
+export interface DismissCapabilityNotificationRequest {
+    capabilityId: string;
+}
+
+export interface ReportUpdaterUpdateCompletedRequest {
+    updaterUpdateCompletedRequest: UpdaterUpdateCompletedRequest;
+}
+
+export interface ReportUpdaterUpdateFailedRequest {
+    updaterUpdateFailedRequest: UpdaterUpdateFailedRequest;
+}
 
 /**
  * ServerApi - interface
@@ -32,6 +63,54 @@ import {
  * @interface ServerApiInterface
  */
 export interface ServerApiInterface {
+    /**
+     * Creates request options for deleteServerNotification without sending the request
+     * @param {number} notificationId 
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    deleteServerNotificationRequestOpts(requestParameters: DeleteServerNotificationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Loescht einen aktiven ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * @summary ServerOwner-Hinweis loeschen
+     * @param {number} notificationId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    deleteServerNotificationRaw(requestParameters: DeleteServerNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Loescht einen aktiven ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * ServerOwner-Hinweis loeschen
+     */
+    deleteServerNotification(requestParameters: DeleteServerNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for dismissCapabilityNotification without sending the request
+     * @param {string} capabilityId 
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    dismissCapabilityNotificationRequestOpts(requestParameters: DismissCapabilityNotificationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * @summary Persoenlichen Capability-Hinweis ausblenden
+     * @param {string} capabilityId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    dismissCapabilityNotificationRaw(requestParameters: DismissCapabilityNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenlichen Capability-Hinweis ausblenden
+     */
+    dismissCapabilityNotification(requestParameters: DismissCapabilityNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
     /**
      * Creates request options for getServerSettings without sending the request
      * @throws {RequiredError}
@@ -54,12 +133,218 @@ export interface ServerApiInterface {
      */
     getServerSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerSettingsResponse>;
 
+    /**
+     * Creates request options for listCapabilityNotifications without sending the request
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listCapabilityNotificationsRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * @summary Persoenliche Capability-Hinweise abrufen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listCapabilityNotificationsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CapabilityNotificationsResponse>>;
+
+    /**
+     * Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenliche Capability-Hinweise abrufen
+     */
+    listCapabilityNotifications(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CapabilityNotificationsResponse>;
+
+    /**
+     * Creates request options for listServerNotifications without sending the request
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listServerNotificationsRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * @summary Aktive ServerOwner-Hinweise abrufen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listServerNotificationsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerNotificationsResponse>>;
+
+    /**
+     * Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Aktive ServerOwner-Hinweise abrufen
+     */
+    listServerNotifications(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerNotificationsResponse>;
+
+    /**
+     * Creates request options for listServerUpdateEvents without sending the request
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listServerUpdateEventsRequestOpts(): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * @summary Server update log abrufen
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    listServerUpdateEventsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerUpdateEventsResponse>>;
+
+    /**
+     * Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Server update log abrufen
+     */
+    listServerUpdateEvents(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerUpdateEventsResponse>;
+
+    /**
+     * Creates request options for reportUpdaterUpdateCompleted without sending the request
+     * @param {UpdaterUpdateCompletedRequest} updaterUpdateCompletedRequest 
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    reportUpdaterUpdateCompletedRequestOpts(requestParameters: ReportUpdaterUpdateCompletedRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * @summary Internen erfolgreichen Auto-Update-Status erfassen
+     * @param {UpdaterUpdateCompletedRequest} updaterUpdateCompletedRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    reportUpdaterUpdateCompletedRaw(requestParameters: ReportUpdaterUpdateCompletedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen erfolgreichen Auto-Update-Status erfassen
+     */
+    reportUpdaterUpdateCompleted(requestParameters: ReportUpdaterUpdateCompletedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for reportUpdaterUpdateFailed without sending the request
+     * @param {UpdaterUpdateFailedRequest} updaterUpdateFailedRequest 
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    reportUpdaterUpdateFailedRequestOpts(requestParameters: ReportUpdaterUpdateFailedRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * @summary Internen fehlgeschlagenen Auto-Update-Status erfassen
+     * @param {UpdaterUpdateFailedRequest} updaterUpdateFailedRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof ServerApiInterface
+     */
+    reportUpdaterUpdateFailedRaw(requestParameters: ReportUpdaterUpdateFailedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen fehlgeschlagenen Auto-Update-Status erfassen
+     */
+    reportUpdaterUpdateFailed(requestParameters: ReportUpdaterUpdateFailedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
 }
 
 /**
  * 
  */
 export class ServerApi extends runtime.BaseAPI implements ServerApiInterface {
+
+    /**
+     * Creates request options for deleteServerNotification without sending the request
+     */
+    async deleteServerNotificationRequestOpts(requestParameters: DeleteServerNotificationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['notificationId'] == null) {
+            throw new runtime.RequiredError(
+                'notificationId',
+                'Required parameter "notificationId" was null or undefined when calling deleteServerNotification().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/settings/server/notifications/{notificationId}`;
+        urlPath = urlPath.replace(`{${"notificationId"}}`, encodeURIComponent(String(requestParameters['notificationId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Loescht einen aktiven ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * ServerOwner-Hinweis loeschen
+     */
+    async deleteServerNotificationRaw(requestParameters: DeleteServerNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteServerNotificationRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Loescht einen aktiven ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * ServerOwner-Hinweis loeschen
+     */
+    async deleteServerNotification(requestParameters: DeleteServerNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteServerNotificationRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for dismissCapabilityNotification without sending the request
+     */
+    async dismissCapabilityNotificationRequestOpts(requestParameters: DismissCapabilityNotificationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['capabilityId'] == null) {
+            throw new runtime.RequiredError(
+                'capabilityId',
+                'Required parameter "capabilityId" was null or undefined when calling dismissCapabilityNotification().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/notifications/capabilities/{capabilityId}`;
+        urlPath = urlPath.replace(`{${"capabilityId"}}`, encodeURIComponent(String(requestParameters['capabilityId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenlichen Capability-Hinweis ausblenden
+     */
+    async dismissCapabilityNotificationRaw(requestParameters: DismissCapabilityNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.dismissCapabilityNotificationRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenlichen Capability-Hinweis ausblenden
+     */
+    async dismissCapabilityNotification(requestParameters: DismissCapabilityNotificationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.dismissCapabilityNotificationRaw(requestParameters, initOverrides);
+    }
 
     /**
      * Creates request options for getServerSettings without sending the request
@@ -98,6 +383,219 @@ export class ServerApi extends runtime.BaseAPI implements ServerApiInterface {
     async getServerSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerSettingsResponse> {
         const response = await this.getServerSettingsRaw(initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Creates request options for listCapabilityNotifications without sending the request
+     */
+    async listCapabilityNotificationsRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/notifications/capabilities`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenliche Capability-Hinweise abrufen
+     */
+    async listCapabilityNotificationsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CapabilityNotificationsResponse>> {
+        const requestOptions = await this.listCapabilityNotificationsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CapabilityNotificationsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.  Implementierungsstatus: implemented.
+     * Persoenliche Capability-Hinweise abrufen
+     */
+    async listCapabilityNotifications(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CapabilityNotificationsResponse> {
+        const response = await this.listCapabilityNotificationsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listServerNotifications without sending the request
+     */
+    async listServerNotificationsRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/settings/server/notifications`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Aktive ServerOwner-Hinweise abrufen
+     */
+    async listServerNotificationsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerNotificationsResponse>> {
+        const requestOptions = await this.listServerNotificationsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ServerNotificationsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Aktive ServerOwner-Hinweise abrufen
+     */
+    async listServerNotifications(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerNotificationsResponse> {
+        const response = await this.listServerNotificationsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for listServerUpdateEvents without sending the request
+     */
+    async listServerUpdateEventsRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/settings/server/update-events`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Server update log abrufen
+     */
+    async listServerUpdateEventsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ServerUpdateEventsResponse>> {
+        const requestOptions = await this.listServerUpdateEventsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ServerUpdateEventsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: implemented.
+     * Server update log abrufen
+     */
+    async listServerUpdateEvents(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ServerUpdateEventsResponse> {
+        const response = await this.listServerUpdateEventsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for reportUpdaterUpdateCompleted without sending the request
+     */
+    async reportUpdaterUpdateCompletedRequestOpts(requestParameters: ReportUpdaterUpdateCompletedRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['updaterUpdateCompletedRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updaterUpdateCompletedRequest',
+                'Required parameter "updaterUpdateCompletedRequest" was null or undefined when calling reportUpdaterUpdateCompleted().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/internal/updater/update-completed`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdaterUpdateCompletedRequestToJSON(requestParameters['updaterUpdateCompletedRequest']),
+        };
+    }
+
+    /**
+     * Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen erfolgreichen Auto-Update-Status erfassen
+     */
+    async reportUpdaterUpdateCompletedRaw(requestParameters: ReportUpdaterUpdateCompletedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.reportUpdaterUpdateCompletedRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen erfolgreichen Auto-Update-Status erfassen
+     */
+    async reportUpdaterUpdateCompleted(requestParameters: ReportUpdaterUpdateCompletedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.reportUpdaterUpdateCompletedRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for reportUpdaterUpdateFailed without sending the request
+     */
+    async reportUpdaterUpdateFailedRequestOpts(requestParameters: ReportUpdaterUpdateFailedRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['updaterUpdateFailedRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updaterUpdateFailedRequest',
+                'Required parameter "updaterUpdateFailedRequest" was null or undefined when calling reportUpdaterUpdateFailed().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/internal/updater/update-failed`;
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdaterUpdateFailedRequestToJSON(requestParameters['updaterUpdateFailedRequest']),
+        };
+    }
+
+    /**
+     * Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen fehlgeschlagenen Auto-Update-Status erfassen
+     */
+    async reportUpdaterUpdateFailedRaw(requestParameters: ReportUpdaterUpdateFailedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.reportUpdaterUpdateFailedRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.  Vorbedingungen: - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.  Implementierungsstatus: implemented.
+     * Internen fehlgeschlagenen Auto-Update-Status erfassen
+     */
+    async reportUpdaterUpdateFailed(requestParameters: ReportUpdaterUpdateFailedRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.reportUpdaterUpdateFailedRaw(requestParameters, initOverrides);
     }
 
 }

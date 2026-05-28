@@ -39,6 +39,182 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
           "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/update-events":
+    get:
+      tags:
+      - Server
+      summary: Server update log abrufen
+      operationId: listServerUpdateEvents
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/ServerUpdateEvents"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/notifications":
+    get:
+      tags:
+      - Server
+      summary: Aktive ServerOwner-Hinweise abrufen
+      operationId: listServerNotifications
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/ServerNotifications"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/notifications/{notificationId}":
+    delete:
+      tags:
+      - Server
+      summary: ServerOwner-Hinweis loeschen
+      operationId: deleteServerNotification
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Loescht einen aktiven ServerOwner-Hinweis.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      parameters:
+      - "$ref": "#/components/parameters/NotificationId"
+      responses:
+        '204':
+          description: Hinweis geloescht.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/notifications/capabilities":
+    get:
+      tags:
+      - Server
+      summary: Persoenliche Capability-Hinweise abrufen
+      operationId: listCapabilityNotifications
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      description: |-
+        Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/CapabilityNotifications"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+  "/api/notifications/capabilities/{capabilityId}":
+    delete:
+      tags:
+      - Server
+      summary: Persoenlichen Capability-Hinweis ausblenden
+      operationId: dismissCapabilityNotification
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      description: |-
+        Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+
+        Implementierungsstatus: implemented.
+      parameters:
+      - "$ref": "#/components/parameters/CapabilityId"
+      responses:
+        '204':
+          description: Capability-Hinweis ausgeblendet.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/internal/updater/update-completed":
+    post:
+      tags:
+      - Server
+      summary: Internen erfolgreichen Auto-Update-Status erfassen
+      operationId: reportUpdaterUpdateCompleted
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+      description: |-
+        Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+
+        Implementierungsstatus: implemented.
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdaterUpdateCompleted"
+      responses:
+        '204':
+          description: Update-Ereignis erfasst.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+  "/api/internal/updater/update-failed":
+    post:
+      tags:
+      - Server
+      summary: Internen fehlgeschlagenen Auto-Update-Status erfassen
+      operationId: reportUpdaterUpdateFailed
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+      description: |-
+        Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+
+        Implementierungsstatus: implemented.
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdaterUpdateFailed"
+      responses:
+        '204':
+          description: Update-Ereignis erfasst.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
 components:
   securitySchemes:
     accessTokenCookie:
@@ -65,6 +241,91 @@ components:
               commercialBoundaryUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md
               version: 0.1.0
               revision: sha-unknown
+    ServerUpdateEvents:
+      description: Server update log
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ServerUpdateEventsResponse"
+          example:
+            events:
+            - id: 1
+              status: COMPLETED
+              fromVersion: 1.122
+              toVersion: 1.123
+              image: ghcr.io/raddatzk/veyq:1
+              digest: sha256:example
+              occurredAt: "2026-05-28T09:00:00Z"
+    ServerNotifications:
+      description: Aktive ServerOwner-Hinweise
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ServerNotificationsResponse"
+          example:
+            notifications:
+            - id: 1
+              type: AUTO_UPDATE_FAILED
+              createdAt: "2026-05-28T09:00:00Z"
+              updateEvent:
+                id: 2
+                status: FAILED
+                image: ghcr.io/raddatzk/veyq:1
+                stage: HEALTHCHECK
+                occurredAt: "2026-05-28T09:00:00Z"
+    CapabilityNotifications:
+      description: Persoenliche Capability-Hinweise
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CapabilityNotificationsResponse"
+          example:
+            notifications:
+            - capability:
+                id: memory.playlists
+                introducedInVersion: 1.0
+                audience: ALL_USERS
+
+  requestBodies:
+    UpdaterUpdateCompleted:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdaterUpdateCompletedRequest"
+          example:
+            fromVersion: 1.122
+            toVersion: 1.123
+            image: ghcr.io/raddatzk/veyq:1
+            digest: sha256:example
+            occurredAt: "2026-05-28T09:00:00Z"
+    UpdaterUpdateFailed:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdaterUpdateFailedRequest"
+          example:
+            fromVersion: 1.122
+            image: ghcr.io/raddatzk/veyq:1
+            digest: sha256:example
+            stage: HEALTHCHECK
+            occurredAt: "2026-05-28T09:00:00Z"
+
+  parameters:
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    CapabilityId:
+      name: capabilityId
+      in: path
+      required: true
+      schema:
+        type: string
 
   schemas:
     ServerSettingsResponse:
@@ -74,6 +335,7 @@ components:
       - displayName
       - userManagementAvailable
       - license
+      - capabilities
       properties:
         displayName:
           type: string
@@ -89,6 +351,16 @@ components:
           "$ref": "#/components/schemas/ServerLicenseSummary"
         support:
           "$ref": "#/components/schemas/ServerSupportSummary"
+        version:
+          type: string
+          description: Laufende veyq-Version.
+        revision:
+          type: string
+          description: Laufende Build- oder Commit-Revision.
+        capabilities:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerCapability"
       example:
         displayName: veyq
         userManagementAvailable: true
@@ -101,6 +373,9 @@ components:
           commercialBoundaryUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md
           version: 0.1.0
           revision: sha-unknown
+        version: 1.123
+        revision: sha-abcdef
+        capabilities: []
 
     ServerLicenseSummary:
       type: object
@@ -156,3 +431,176 @@ components:
           type: string
           format: uri
           description: Freiwilliger Spenden- oder Support-Link fuer veyq.
+
+    ServerCapability:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - introducedInVersion
+      - audience
+      properties:
+        id:
+          type: string
+        introducedInVersion:
+          type: string
+        audience:
+          "$ref": "#/components/schemas/CapabilityAudience"
+
+    CapabilityAudience:
+      type: string
+      enum:
+      - ALL_USERS
+      - SERVER_OWNER
+
+    ServerUpdateEventsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - events
+      properties:
+        events:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerUpdateEvent"
+
+    ServerUpdateEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - image
+      - occurredAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          "$ref": "#/components/schemas/UpdateStatus"
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        stage:
+          "$ref": "#/components/schemas/UpdateFailureStage"
+        occurredAt:
+          type: string
+          format: date-time
+
+    UpdateStatus:
+      type: string
+      enum:
+      - COMPLETED
+      - FAILED
+
+    UpdateFailureStage:
+      type: string
+      enum:
+      - DOCTOR
+      - DIGEST_CHECK
+      - BACKUP
+      - PULL
+      - START
+      - HEALTHCHECK
+      - NOTIFY
+
+    ServerNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - notifications
+      properties:
+        notifications:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerNotification"
+
+    ServerNotification:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - type
+      - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          "$ref": "#/components/schemas/ServerNotificationType"
+        updateEvent:
+          "$ref": "#/components/schemas/ServerUpdateEvent"
+        createdAt:
+          type: string
+          format: date-time
+
+    ServerNotificationType:
+      type: string
+      enum:
+      - AUTO_UPDATE_FAILED
+
+    CapabilityNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - notifications
+      properties:
+        notifications:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CapabilityNotification"
+
+    CapabilityNotification:
+      type: object
+      additionalProperties: false
+      required:
+      - capability
+      properties:
+        capability:
+          "$ref": "#/components/schemas/ServerCapability"
+
+    UpdaterUpdateCompletedRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - image
+      - occurredAt
+      properties:
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+
+    UpdaterUpdateFailedRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - image
+      - stage
+      - occurredAt
+      properties:
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        stage:
+          "$ref": "#/components/schemas/UpdateFailureStage"
+        occurredAt:
+          type: string
+          format: date-time
