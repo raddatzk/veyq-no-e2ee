@@ -12,8 +12,11 @@ import type {
   ManagedUsersSummary,
   PasskeySummary,
   PasskeysSummary,
+  CapabilityNotification,
+  ServerNotification,
   ServerRole,
   ServerSettingsResponse,
+  ServerUpdateEvent,
   SettingsResponse,
   TenantSettingsResponse,
   TenantRole,
@@ -30,6 +33,26 @@ export function getSettings(path: string): Promise<SettingsResponse> {
 
 export function getServerSettings(): Promise<ServerSettingsResponse> {
   return generatedCall(serverApi.getServerSettings())
+}
+
+export function getServerUpdateEvents(): Promise<ServerUpdateEvent[]> {
+  return generatedCall(serverApi.listServerUpdateEvents()).then((response) => response.events)
+}
+
+export function getServerNotifications(): Promise<ServerNotification[]> {
+  return generatedCall(serverApi.listServerNotifications()).then((response) => response.notifications)
+}
+
+export function deleteServerNotification(notificationId: number): Promise<void> {
+  return generatedCall(serverApi.deleteServerNotification({ notificationId }))
+}
+
+export function getCapabilityNotifications(): Promise<CapabilityNotification[]> {
+  return generatedCall(serverApi.listCapabilityNotifications()).then((response) => response.notifications)
+}
+
+export function dismissCapabilityNotification(capabilityId: string): Promise<void> {
+  return generatedCall(serverApi.dismissCapabilityNotification({ capabilityId }))
 }
 
 export function getMySettings(): Promise<UserSettingsResponse> {

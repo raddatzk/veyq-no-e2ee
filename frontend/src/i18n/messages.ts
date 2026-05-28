@@ -482,6 +482,71 @@ export const messages = {
       uploaderOnlyNotice: 'Dieser Link zeigt keine Galerie oder andere Beiträge. Er ist nur zum Hochladen gedacht.',
       uploaderTitle: 'Upload anfragen'
     },
+    capabilities: {
+      unknownDescription: 'Diese Fähigkeit ist auf diesem Server verfügbar.',
+      items: {
+        server_setup: {
+          title: 'Self-hosted Server-Setup',
+          description: 'veyq mit Docker Compose installieren, den ersten Admin-Account erstellen und den ersten Memory-Bereich konfigurieren.'
+        },
+        auth_passkeys: {
+          title: 'Passkey-Login',
+          description: 'Passkeys für Setup, Login und die Einladung neuer Nutzer verwenden.'
+        },
+        spaces_tenant_group_personal: {
+          title: 'Mandanten-, Gruppen- und persönliche Bereiche',
+          description: 'Mandantenweite, gruppenbezogene und persönliche Memory-Bereiche mit rollenbasiertem Zugriff erstellen.'
+        },
+        memory_core: {
+          title: 'Memory-Erstellung und Verschachtelung',
+          description: 'Memories erstellen, Zeiträume und Cover pflegen, wichtige Memories favorisieren und verwandte Memories als Kapitel verschachteln.'
+        },
+        memory_media: {
+          title: 'Foto- und Video-Medien',
+          description: 'Fotos und Videos hochladen, generierte Vorschauen und Poster anzeigen, Zeitstempel korrigieren und Originalvideos abspielen.'
+        },
+        memory_media_resumable_upload: {
+          title: 'Fortsetzbare Medien-Uploads',
+          description: 'Größere Medien über Chunk-Sessions mit Fortschritt, Abbruch und Bereinigung unvollständiger Uploads hochladen.'
+        },
+        memory_media_zip_download: {
+          title: 'Memory-Medien als ZIP herunterladen',
+          description: 'Sichtbare Medien einer Memory inklusive sichtbarer untergeordneter Memories als ZIP-Archiv herunterladen.'
+        },
+        memory_journal_markdown: {
+          title: 'Markdown-Journale',
+          description: 'Memory-Journale mit Markdown und veyq-Einbettungen für Medien, Kind-Memories, Karten, Playlists und Tracks schreiben.'
+        },
+        memory_maps: {
+          title: 'Medienkarten',
+          description: 'Hochgeladene Fotos und Videos mit GPS-Metadaten auf Karten anzeigen, externe Kartenkacheln nur nach Browser-Opt-in laden.'
+        },
+        memory_tracks: {
+          title: 'GPX-Tracks',
+          description: 'GPX-Tracks hochladen, Aktivitätstypen vergeben, Originale auflisten und herunterladen sowie Tracks in Memory-Journale einbetten.'
+        },
+        memory_playlists: {
+          title: 'Memory-Playlist-Links',
+          description: 'Musikkontext mit Spotify-, Apple-Music-, YouTube-, SoundCloud- oder Deezer-Playlist-Links zu Memories hinzufügen.'
+        },
+        memory_public_sharing: {
+          title: 'Öffentliches Memory-Sharing',
+          description: 'Eine Memory-Struktur oder ausgewählte Teilbäume mit Viewer-, Contributor-, Manager- und Uploader-Rechten teilen.'
+        },
+        memory_public_uploader_links: {
+          title: 'Öffentliche Upload-Links',
+          description: 'Gäste über fokussierte Upload-Links Medien beitragen lassen, ohne Galerie oder andere Uploads offenzulegen.'
+        },
+        server_backup_upgrade: {
+          title: 'Server-Backup und Upgrade',
+          description: 'Das Server-Hilfsskript nutzen, um Konfiguration zu prüfen, Datenbank und Medienspeicher zu sichern und imagebasierte Upgrades auszuführen.'
+        },
+        server_auto_updates: {
+          title: 'Opt-in Auto-Updates',
+          description: 'Eine selbst gehostete Instanz den veyq-Anwendungscontainer innerhalb des konfigurierten Major-Kanals aktualisieren lassen.'
+        }
+      }
+    },
     settings: {
       confirmationDisplayName: 'Display-Name zur Bestätigung',
       currentPassword: 'Aktuelles Passwort',
@@ -497,6 +562,19 @@ export const messages = {
       serverLoading: 'Server-Einstellungen werden geladen...',
       serverSettings: 'Server-Einstellungen',
       serverTitle: 'Server',
+      autoUpdateFailed: 'Automatisches Update fehlgeschlagen',
+      autoUpdateFailedCopy: 'Das Update fuer {image} ist in Schritt {stage} abgebrochen.',
+      capabilities: 'Fähigkeiten',
+      capabilitiesCopy: 'Diese Server-Fähigkeiten sind in dieser veyq-Instanz verfügbar.',
+      dismiss: 'Ausblenden',
+      unknown: 'unbekannt',
+      updateLog: 'Update-Protokoll',
+      updateLogCopy: 'Die letzten automatischen Update-Ereignisse.',
+      updateLogEmpty: 'Noch keine automatischen Updates protokolliert.',
+      updateStatus: {
+        COMPLETED: 'Aktualisiert',
+        FAILED: 'Fehlgeschlagen'
+      },
       title: 'Einstellungen'
     },
     license: {
@@ -1167,6 +1245,71 @@ export const messages = {
       uploaderOnlyNotice: 'This link does not show the gallery or other contributions. It is only for uploading.',
       uploaderTitle: 'Request upload'
     },
+    capabilities: {
+      unknownDescription: 'This capability is available on this server.',
+      items: {
+        server_setup: {
+          title: 'Self-hosted server setup',
+          description: 'Install veyq with Docker Compose, create the first admin account and configure the first Memory space.'
+        },
+        auth_passkeys: {
+          title: 'Passkey login',
+          description: 'Use passkeys for setup, login and invited user onboarding.'
+        },
+        spaces_tenant_group_personal: {
+          title: 'Tenant, group and personal spaces',
+          description: 'Create tenant-wide, group-scoped and personal Memory spaces with role-based access.'
+        },
+        memory_core: {
+          title: 'Memory creation and nesting',
+          description: 'Create Memories, add date ranges and covers, favorite important Memories and nest related Memories as chapters.'
+        },
+        memory_media: {
+          title: 'Photo and video media',
+          description: 'Upload photos and videos, view generated previews and posters, correct timestamps and play original videos.'
+        },
+        memory_media_resumable_upload: {
+          title: 'Resumable media uploads',
+          description: 'Upload larger media through chunked sessions with progress, cancellation and cleanup of unfinished uploads.'
+        },
+        memory_media_zip_download: {
+          title: 'Memory media ZIP downloads',
+          description: 'Download visible Memory media, including visible descendant media, as a ZIP archive.'
+        },
+        memory_journal_markdown: {
+          title: 'Markdown journals',
+          description: 'Write Memory journals with Markdown and veyq embeds for media, child Memories, maps, playlists and tracks.'
+        },
+        memory_maps: {
+          title: 'Media maps',
+          description: 'Show uploaded photos and videos with GPS metadata on maps, with external map tiles gated by browser opt-in.'
+        },
+        memory_tracks: {
+          title: 'GPX tracks',
+          description: 'Upload GPX tracks, label activity types, list and download originals, and embed tracks in Memory journals.'
+        },
+        memory_playlists: {
+          title: 'Memory playlist links',
+          description: 'Add music context to Memories with Spotify, Apple Music, YouTube, SoundCloud or Deezer playlist links.'
+        },
+        memory_public_sharing: {
+          title: 'Public Memory sharing',
+          description: 'Share a Memory tree or selected subtrees with Viewer, Contributor, Manager and Uploader permissions.'
+        },
+        memory_public_uploader_links: {
+          title: 'Upload-only public links',
+          description: 'Let guests contribute media through focused upload links without exposing the gallery or other uploads.'
+        },
+        server_backup_upgrade: {
+          title: 'Server backup and upgrade workflow',
+          description: 'Use the server helper script to validate configuration, back up the database and media storage, and run image-based upgrades.'
+        },
+        server_auto_updates: {
+          title: 'Opt-in server auto-updates',
+          description: 'Let a self-hosted instance update the veyq application container within the configured major channel.'
+        }
+      }
+    },
     settings: {
       confirmationDisplayName: 'Display name for confirmation',
       currentPassword: 'Current password',
@@ -1182,6 +1325,19 @@ export const messages = {
       serverLoading: 'Loading server settings...',
       serverSettings: 'Server settings',
       serverTitle: 'Server',
+      autoUpdateFailed: 'Automatic update failed',
+      autoUpdateFailedCopy: 'The update for {image} stopped during {stage}.',
+      capabilities: 'Capabilities',
+      capabilitiesCopy: 'These server capabilities are available on this veyq instance.',
+      dismiss: 'Dismiss',
+      unknown: 'unknown',
+      updateLog: 'Update log',
+      updateLogCopy: 'Recent automatic update events.',
+      updateLogEmpty: 'No automatic updates have been logged yet.',
+      updateStatus: {
+        COMPLETED: 'Updated',
+        FAILED: 'Failed'
+      },
       title: 'Settings'
     },
     license: {

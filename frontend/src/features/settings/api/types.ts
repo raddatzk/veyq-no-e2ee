@@ -5,7 +5,13 @@ export type {
   SettingsSubject,
   SettingsSubjectType
 } from '../../../api/generated'
-export type { ServerSettingsResponse } from '../../../api/generated'
+export type {
+  CapabilityNotification,
+  ServerCapability,
+  ServerNotification,
+  ServerSettingsResponse,
+  ServerUpdateEvent
+} from '../../../api/generated'
 export type {
   ChangePasswordRequest,
   CreateManagedUserRequest,

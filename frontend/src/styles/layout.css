@@ -769,6 +769,31 @@
   padding: 1.05rem 1.25rem 1.6rem;
 }
 
+.capability-notices {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 1180px;
+  margin: 0 auto 1rem;
+}
+
+.capability-notice-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.capability-notice-content div {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.capability-notice-content strong,
+.capability-notice-content span {
+  overflow-wrap: anywhere;
+}
+
 .empty-home-card {
   max-width: 620px;
   border: 1px solid var(--app-line);

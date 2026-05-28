@@ -298,8 +298,28 @@
 }
 
 .license-settings-entry,
-.support-settings-entry {
+.support-settings-entry,
+.capability-settings-entry,
+.update-log-settings-entry {
   align-items: flex-start;
+}
+
+.server-notification {
+  margin-bottom: 1rem;
+}
+
+.server-notification-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.server-notification-content div,
+.settings-entry .settings-link-list > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
 }
 
 .settings-entry .settings-link-list {
@@ -321,6 +341,20 @@
   font-size: 0.86rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.settings-entry .settings-link-list > span {
+  max-width: 18rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  color: var(--app-muted);
+  font-size: 0.84rem;
+}
+
+.settings-entry .settings-link-list > span strong {
+  color: var(--app-text);
 }
 
 .settings-toolbar {

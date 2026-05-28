@@ -2,12 +2,24 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Message from 'primevue/message'
+import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { getErrorMessage } from '../../../shared/utils/errors'
-import { getServerSettings, type ServerSettingsResponse } from '../api'
+import { capabilityDescription, capabilityTitle } from '../capabilities'
+import {
+  deleteServerNotification,
+  getServerNotifications,
+  getServerSettings,
+  getServerUpdateEvents,
+  type ServerNotification,
+  type ServerSettingsResponse,
+  type ServerUpdateEvent
+} from '../api'
 
 const settings = ref<ServerSettingsResponse | null>(null)
-const { t } = useI18n()
+const notifications = ref<ServerNotification[]>([])
+const updateEvents = ref<ServerUpdateEvent[]>([])
+const { t, te } = useI18n()
 const loading = ref(false)
 const error = ref('')
 
@@ -17,13 +29,34 @@ async function loadSettings() {
   loading.value = true
   error.value = ''
   try {
-    settings.value = await getServerSettings()
+    const [serverSettings, serverNotifications, serverUpdateEvents] = await Promise.all([
+      getServerSettings(),
+      getServerNotifications(),
+      getServerUpdateEvents()
+    ])
+    settings.value = serverSettings
+    notifications.value = serverNotifications
+    updateEvents.value = serverUpdateEvents
   } catch (caught) {
     settings.value = null
+    notifications.value = []
+    updateEvents.value = []
     error.value = getErrorMessage(caught, t('settings.serverLoadFailed'))
   } finally {
     loading.value = false
   }
+}
+
+async function dismissNotification(notificationId: number) {
+  await deleteServerNotification(notificationId)
+  notifications.value = notifications.value.filter((notification) => notification.id !== notificationId)
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value))
 }
 </script>
 
@@ -38,12 +71,56 @@ async function loadSettings() {
       <span>{{ t('settings.serverLoading') }}</span>
     </div>
     <template v-else-if="settings">
+      <Message
+        v-for="notification in notifications"
+        :key="notification.id"
+        severity="error"
+        :closable="false"
+        class="server-notification"
+      >
+        <div class="server-notification-content">
+          <div>
+            <strong>{{ t('settings.autoUpdateFailed') }}</strong>
+            <span>
+              {{
+                t('settings.autoUpdateFailedCopy', {
+                  stage: notification.updateEvent?.stage || t('settings.unknown'),
+                  image: notification.updateEvent?.image || t('settings.unknown')
+                })
+              }}
+            </span>
+          </div>
+          <Button
+            icon="pi pi-times"
+            text
+            rounded
+            :aria-label="t('settings.dismiss')"
+            @click="dismissNotification(notification.id)"
+          />
+        </div>
+      </Message>
       <div class="veyq-list-row settings-entry">
         <div>
           <strong>{{ settings.displayName }}</strong>
-          <span>{{ settings.userManagementAvailable ? t('common.active') : t('common.inactive') }}</span>
+          <span>
+            {{ settings.userManagementAvailable ? t('common.active') : t('common.inactive') }}
+            <template v-if="settings.version"> · {{ settings.version }}</template>
+            <template v-if="settings.revision"> · {{ settings.revision }}</template>
+          </span>
         </div>
         <i class="pi pi-server"></i>
+      </div>
+      <div v-if="settings.capabilities.length" class="veyq-list-row settings-entry capability-settings-entry">
+        <div>
+          <strong>{{ t('settings.capabilities') }}</strong>
+          <span>{{ t('settings.capabilitiesCopy') }}</span>
+        </div>
+        <div class="settings-link-list">
+          <span v-for="capability in settings.capabilities" :key="capability.id">
+            <strong>{{ capabilityTitle(capability, t, te) }}</strong>
+            <span>{{ capabilityDescription(capability, t, te) }}</span>
+          </span>
+        </div>
       </div>
       <div class="veyq-list-row settings-entry license-settings-entry">
         <div>
@@ -67,6 +144,21 @@ async function loadSettings() {
           <span class="pi pi-heart" />
           <span>{{ t('support.action') }}</span>
         </a>
+      </div>
+      <div class="veyq-list-row settings-entry update-log-settings-entry">
+        <div>
+          <strong>{{ t('settings.updateLog') }}</strong>
+          <span>{{ updateEvents.length ? t('settings.updateLogCopy') : t('settings.updateLogEmpty') }}</span>
+        </div>
+        <div v-if="updateEvents.length" class="settings-link-list">
+          <span v-for="event in updateEvents.slice(0, 10)" :key="event.id">
+            <strong>{{ t(`settings.updateStatus.${event.status}`) }}</strong>
+            <span>
+              {{ formatDate(event.occurredAt) }} · {{ event.toVersion || event.fromVersion || event.image }}
+              <template v-if="event.stage"> · {{ event.stage }}</template>
+            </span>
+          </span>
+        </div>
       </div>
     </template>
   </section>
