@@ -1,5 +1,7 @@
 # veyq
 
+<sub>Pronounced **/veɪk/**.</sub>
+
 veyq is a self-hostable memory sharing application for preserving and sharing trips, events and personal moments as curated memories. It is meant to feel like a private archive with beautiful sharing, not like a generic gallery, cloud drive or folder browser.
 
 ## What veyq Is
