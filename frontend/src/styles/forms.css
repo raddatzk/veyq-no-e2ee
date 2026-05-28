@@ -249,14 +249,55 @@
 }
 
 .registration-privacy-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.65rem;
+  padding: 0.65rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
   color: var(--app-text);
   font-weight: 500;
 }
 
 .registration-privacy-option input {
-  width: 1rem;
-  height: 1rem;
+  display: grid;
+  flex: 0 0 auto;
+  place-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0.1rem 0 0;
+  appearance: none;
+  border: 1px solid var(--app-line);
+  border-radius: 0.3rem;
+  background: var(--app-control-bg);
   accent-color: var(--app-accent);
+}
+
+.registration-privacy-option input::before {
+  width: 0.35rem;
+  height: 0.65rem;
+  margin-top: -0.1rem;
+  border: solid var(--app-on-strong);
+  border-width: 0 0.12rem 0.12rem 0;
+  content: '';
+  transform: rotate(45deg) scale(0);
+  transition: transform 120ms ease;
+}
+
+.registration-privacy-option input:checked {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+}
+
+.registration-privacy-option input:checked::before {
+  transform: rotate(45deg) scale(1);
+}
+
+.registration-privacy-option input:focus-visible {
+  outline: 3px solid var(--app-focus-ring);
+  outline-offset: 2px;
 }
 
 @media (max-width: 720px) {
