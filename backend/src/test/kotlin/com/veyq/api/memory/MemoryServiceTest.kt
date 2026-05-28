@@ -487,6 +487,18 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `bucket listing creates empty primary bucket for current user before first upload`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-empty-trip", "Bucket Empty Trip"))
+
+        val buckets = mediaService.listMemoryMediaBuckets(trip.id)
+
+        assertThat(buckets).hasSize(1)
+        assertThat(buckets.single().primary).isTrue()
+        assertThat(buckets.single().displayName).isEqualTo(owner.displayName)
+        assertThat(buckets.single().mediaCount).isEqualTo(0)
+    }
+
+    @Test
     fun `moves selected media into subbucket and deletes selected media`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("bucket-move-trip", "Bucket Move Trip"))
         val first = createMedia(owner, memory(trip.id), "First Photo")

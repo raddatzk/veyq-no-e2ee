@@ -142,6 +142,7 @@ class MediaService @Inject constructor(
     fun listMemoryMediaBuckets(memoryId: String): List<MemoryMediaBucketSummary> {
         val memory = resolveVisibleMemory(memoryId)
         ensureBucketsForMemories(listOf(memory))
+        ensurePrimaryBucket(memory, user(), null)
         return bucketSummaries(memory, bucketRepo.listByMemory(memory))
     }
 
