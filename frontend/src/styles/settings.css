@@ -198,6 +198,13 @@
   gap: 0.18rem;
 }
 
+.passkey-row .passkey-row-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+  align-self: start;
+}
+
 .passkey-row span {
   overflow-wrap: anywhere;
 }
@@ -631,7 +638,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .passkey-row > .p-button {
+  .passkey-row .passkey-row-actions {
+    justify-content: flex-start;
+  }
+
+  .passkey-row-actions > .p-button {
     justify-self: start;
   }
 

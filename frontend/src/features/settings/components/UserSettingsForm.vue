@@ -379,23 +379,25 @@ function formatTimestamp(value?: string) {
               <span>{{ t('profile.createdAt') }}: {{ formatTimestamp(passkey.createdAt) }}</span>
               <span>{{ t('profile.lastUsedAt') }}: {{ formatTimestamp(passkey.lastUsedAt) }}</span>
             </div>
-            <Button
-              type="button"
-              icon="pi pi-save"
-              text
-              :loading="savingPasskeyId === passkey.passkeyId"
-              :aria-label="t('profile.renamePasskey')"
-              @click="renamePasskey(passkey)"
-            />
-            <Button
-              type="button"
-              icon="pi pi-trash"
-              severity="danger"
-              text
-              :loading="deletingPasskeyId === passkey.passkeyId"
-              :aria-label="t('profile.deletePasskey')"
-              @click="removePasskey(passkey)"
-            />
+            <div class="passkey-row-actions">
+              <Button
+                type="button"
+                icon="pi pi-save"
+                text
+                :loading="savingPasskeyId === passkey.passkeyId"
+                :aria-label="t('profile.renamePasskey')"
+                @click="renamePasskey(passkey)"
+              />
+              <Button
+                type="button"
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                :loading="deletingPasskeyId === passkey.passkeyId"
+                :aria-label="t('profile.deletePasskey')"
+                @click="removePasskey(passkey)"
+              />
+            </div>
           </div>
         </div>
         <div class="veyq-button-row">
