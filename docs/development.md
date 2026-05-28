@@ -199,6 +199,14 @@ Manual upgrade:
 3. Restart with `docker compose up -d`.
 4. Check `docker compose ps` and `docker compose logs veyq`.
 
+### Optional Auto-Updates
+
+veyq images are tagged as `<major>.<buildNumber>`, where `major` comes from the repository `VERSION` file and `buildNumber` comes from the GitHub Actions run number. The major tag, for example `ghcr.io/raddatzk/veyq:1`, moves to the newest compatible build in that major line.
+
+To enable automatic compatible updates, set `VEYQ_IMAGE` to the major tag, add `updater` to `COMPOSE_PROFILES`, set `VEYQ_AUTO_UPDATE_ENABLED=true` and provide `VEYQ_UPDATER_NOTIFY_TOKEN`. The setup script can generate the token. The updater sidecar is not exposed through Traefik and checks for updates every `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` with random jitter.
+
+The auto-updater only updates the `veyq` application container. It runs `doctor`, compares the remote and local image digests, creates a backup, pulls the new image, restarts veyq and waits for the health check. Successful updates are written to the server update log; failed updates create a ServerOwner notification.
+
 Back up at least these state locations before upgrading or testing destructive flows:
 
 - `infra_veyq-db`: MariaDB data.

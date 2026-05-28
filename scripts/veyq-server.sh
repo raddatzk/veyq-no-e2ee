@@ -16,6 +16,8 @@ Commands:
   install   Download Compose files, create .env and optionally run setup prompts.
   setup     Prompt for common .env values without changing volumes.
   upgrade   Refresh Compose files, pull the configured image and restart veyq.
+  auto-upgrade
+            Check the configured image and update veyq when auto-updates are enabled.
   status    Show Docker Compose service status.
   doctor    Validate local server configuration without changing services.
   backup    Create a database dump and media archive in ./backups.
@@ -33,6 +35,7 @@ main() {
     install) install ;;
     setup) setup_env ;;
     upgrade) upgrade ;;
+    auto-upgrade) auto_upgrade ;;
     status) compose ps ;;
     doctor) doctor ;;
     backup) backup ;;
@@ -146,14 +149,25 @@ setup_env() {
   set_env MAIL_TLS "$(prompt "SMTP TLS enabled" "$(env_value MAIL_TLS "true")")"
 
   if prompt_yes_no "Enable reset sidecar? Only use this for disposable test instances." "n"; then
-    set_env COMPOSE_PROFILES "reset"
+    add_compose_profile "reset"
     local reset_host
     reset_host="$(prompt "Reset host, without protocol" "reset.${public_host}")"
     set_env RESET_TRAEFIK_RULE "Host(\`${reset_host}\`)"
     set_env RESET_USERNAME "$(prompt "Reset username" "$(env_value RESET_USERNAME "admin")")"
     set_env RESET_PASSWORD "$(prompt_secret_or_random "Reset password" "$(env_value RESET_PASSWORD "")")"
   else
-    remove_env COMPOSE_PROFILES
+    remove_compose_profile "reset"
+  fi
+
+  if prompt_yes_no "Enable auto-update sidecar?" "n"; then
+    add_compose_profile "updater"
+    set_env VEYQ_AUTO_UPDATE_ENABLED "true"
+    set_env VEYQ_AUTO_UPDATE_INTERVAL_HOURS "$(prompt "Auto-update check interval in hours" "$(env_value VEYQ_AUTO_UPDATE_INTERVAL_HOURS "6")")"
+    set_env VEYQ_AUTO_UPDATE_JITTER_MINUTES "$(prompt "Auto-update jitter in minutes" "$(env_value VEYQ_AUTO_UPDATE_JITTER_MINUTES "30")")"
+    set_env VEYQ_UPDATER_NOTIFY_TOKEN "$(prompt_secret_or_random "Updater notification token" "$(env_value VEYQ_UPDATER_NOTIFY_TOKEN "")")"
+  else
+    set_env VEYQ_AUTO_UPDATE_ENABLED "false"
+    remove_compose_profile "updater"
   fi
 
   chmod 600 .env
@@ -212,6 +226,11 @@ doctor() {
       failed=1
     fi
   fi
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)updater(,|$)' || [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" = "true" ]; then
+    if ! check_env_required VEYQ_UPDATER_NOTIFY_TOKEN; then
+      failed=1
+    fi
+  fi
 
   if ! check_media_storage_env; then
     failed=1
@@ -254,6 +273,119 @@ pull_services() {
   compose pull veyq
   echo "Pulling supporting service images..."
   compose pull traefik veyq-db
+}
+
+auto_upgrade() {
+  require_command docker
+  require_compose
+  cd "$VEYQ_DIR"
+  require_file .env
+  mkdir -p logs
+  exec > >(tee -a logs/auto-upgrade.log) 2>&1
+
+  echo "[$(timestamp)] Starting auto-upgrade check"
+  if [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" != "true" ]; then
+    echo "Auto-update is disabled."
+    return 0
+  fi
+
+  local stage="DOCTOR"
+  local image=""
+  local from_version=""
+  local to_version=""
+  local remote_digest=""
+  trap 'notify_update_failed "$stage" "$from_version" "$to_version" "$image" "$remote_digest"; echo "[$(timestamp)] Auto-upgrade failed in stage $stage" >&2' ERR
+
+  doctor
+  image="$(env_value VEYQ_IMAGE "")"
+  from_version="$(container_env veyq VEYQ_VERSION)"
+
+  stage="DIGEST_CHECK"
+  remote_digest="$(remote_image_digest "$image")"
+  local local_digest
+  local_digest="$(local_image_digest "$image")"
+  echo "Configured image: $image"
+  echo "Local digest: ${local_digest:-unknown}"
+  echo "Remote digest: ${remote_digest:-unknown}"
+  if [ -n "$local_digest" ] && [ -n "$remote_digest" ] && [ "$local_digest" = "$remote_digest" ]; then
+    echo "veyq image is already up to date."
+    trap - ERR
+    return 0
+  fi
+
+  stage="BACKUP"
+  backup
+
+  stage="PULL"
+  compose pull veyq
+
+  stage="START"
+  compose up -d veyq
+
+  stage="HEALTHCHECK"
+  wait_for_health
+  to_version="$(container_env veyq VEYQ_VERSION)"
+
+  trap - ERR
+  notify_update_completed "$from_version" "$to_version" "$image" "$remote_digest" || true
+  echo "[$(timestamp)] Auto-upgrade completed"
+}
+
+remote_image_digest() {
+  local image="$1"
+  docker buildx imagetools inspect "$image" 2>/dev/null | awk '/Digest:/ { print $2; exit }'
+}
+
+local_image_digest() {
+  local image="$1"
+  local digest
+  digest="$(docker image inspect "$image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null | awk -F@ 'NF == 2 { print $2; exit }' || true)"
+  printf '%s' "$digest"
+}
+
+container_env() {
+  local container="$1"
+  local key="$2"
+  docker inspect "$container" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null |
+    awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2); exit }'
+}
+
+notify_update_completed() {
+  notify_updater "update-completed" "$1" "$2" "$3" "$4" ""
+}
+
+notify_update_failed() {
+  notify_updater "update-failed" "$2" "$3" "$4" "$5" "$1" || true
+}
+
+notify_updater() {
+  local endpoint="$1"
+  local from_version="$2"
+  local to_version="$3"
+  local image="$4"
+  local digest="$5"
+  local stage="$6"
+  local token
+  token="$(env_value VEYQ_UPDATER_NOTIFY_TOKEN "")"
+  if [ -z "$token" ]; then
+    echo "Skipping updater notification because VEYQ_UPDATER_NOTIFY_TOKEN is empty."
+    return 0
+  fi
+  local url="${VEYQ_INTERNAL_URL:-http://veyq:8080}/api/internal/updater/${endpoint}"
+  local payload
+  payload="{\"fromVersion\":\"$(json_escape "$from_version")\",\"toVersion\":\"$(json_escape "$to_version")\",\"image\":\"$(json_escape "$image")\",\"digest\":\"$(json_escape "$digest")\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ\")\""
+  if [ -n "$stage" ]; then
+    payload="${payload},\"stage\":\"$(json_escape "$stage")\""
+  fi
+  payload="${payload}}"
+  curl -fsS -X POST "$url" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    --data "$payload" >/dev/null
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 setup_media_storage_env() {
@@ -624,6 +756,32 @@ remove_env() {
   fi
 }
 
+add_compose_profile() {
+  local profile="$1"
+  local current
+  current="$(env_value COMPOSE_PROFILES "")"
+  if printf '%s' "$current" | grep -Eq "(^|,)${profile}(,|$)"; then
+    return
+  fi
+  if [ -z "$current" ]; then
+    set_env COMPOSE_PROFILES "$profile"
+  else
+    set_env COMPOSE_PROFILES "${current},${profile}"
+  fi
+}
+
+remove_compose_profile() {
+  local profile="$1"
+  local current next
+  current="$(env_value COMPOSE_PROFILES "")"
+  next="$(printf '%s' "$current" | tr ',' '\n' | awk -v profile="$profile" 'NF && $0 != profile { values[++count] = $0 } END { for (i = 1; i <= count; i++) printf "%s%s", (i > 1 ? "," : ""), values[i] }')"
+  if [ -z "$next" ]; then
+    remove_env COMPOSE_PROFILES
+  else
+    set_env COMPOSE_PROFILES "$next"
+  fi
+}
+
 check_env_required() {
   local key="$1"
   local value
@@ -673,6 +831,11 @@ env_needs_setup() {
     case "$(env_value RESET_PASSWORD "")" in
       change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
     esac
+  fi
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)updater(,|$)' || [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" = "true" ]; then
+    if [ -z "$(env_value VEYQ_UPDATER_NOTIFY_TOKEN "")" ]; then
+      return 0
+    fi
   fi
 
   return 1

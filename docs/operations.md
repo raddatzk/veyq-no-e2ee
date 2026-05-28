@@ -371,6 +371,27 @@ Safe recovery: keep the failed instance stopped if it may be writing bad state. 
 
 Prevention: run `doctor`, then `backup`, then `upgrade`. Prefer release tags over moving tags for real instances.
 
+### Auto-update fails
+
+Symptom: ServerOwner users see an automatic update failure in server settings, or `logs/auto-upgrade.log` reports a failed stage.
+
+Likely cause: the updater could not validate configuration, check the registry digest, create a backup, pull the image, restart veyq or observe a healthy container after restart.
+
+Inspect:
+
+```bash
+cd /opt/veyq
+sudo docker compose logs --tail=200 veyq-updater
+sudo docker compose logs --tail=300 veyq
+tail -n 200 logs/auto-upgrade.log
+sudo docker compose images
+ls -lah backups | tail
+```
+
+Safe recovery: inspect the failed stage first. If the app is unhealthy after a new image started, preserve logs and use the matching pre-update backup artifacts. Do not reset the database. If needed, set `VEYQ_IMAGE` to the previous exact `<major>.<buildNumber>` or `sha-*` tag and run `sudo docker compose up -d veyq`.
+
+Prevention: use a major-channel image such as `ghcr.io/raddatzk/veyq:1`, keep enough disk space for one database dump plus media archive, and leave `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` at one hour or higher.
+
 ## Reset Sidecar
 
 ### Reset sidecar is accidentally enabled
