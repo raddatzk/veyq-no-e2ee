@@ -93,7 +93,7 @@ The Compose stack stores uploaded originals, previews and Memory covers below `/
 - `host-path`: bind-mounts an absolute host directory from `MEDIA_STORAGE_SOURCE`, for example a CIFS share mounted by the host at `/mnt/veyq-media`.
 - `cifs-volume`: lets Docker create the `veyq-media-cifs` volume from `MEDIA_CIFS_DEVICE` and `MEDIA_CIFS_OPTIONS`, for example `//nas.example.com/photos` plus CIFS mount options.
 
-If CIFS credentials are stored in `.env`, keep the file private with `chmod 600 .env`.
+Keep CIFS credentials out of `docker-compose.yml`: put them in `.env` through `MEDIA_CIFS_OPTIONS` or reference a root-readable credentials file from that variable. If CIFS credentials are stored directly in `.env`, keep the file private with `chmod 600 .env`.
 
 ## Docker Compose Test Instance
 

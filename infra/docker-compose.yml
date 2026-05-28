@@ -134,9 +134,6 @@ volumes:
     driver: local
     driver_opts:
       type: cifs
-      o: ${MEDIA_CIFS_OPTIONS:-username=,password=,vers=3.0}
+      o: ${MEDIA_CIFS_OPTIONS:-}
       device: ${MEDIA_CIFS_DEVICE:-//example.invalid/veyq-media}
   traefik-letsencrypt:
-
-
-rw,credentials=/root/storagebox.creds,uid=33,gid=33,file_mode=0660,dir_mode=0750:

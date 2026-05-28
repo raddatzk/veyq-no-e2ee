@@ -161,6 +161,12 @@ MEDIA_CIFS_DEVICE=//nas.example.com/veyq-media
 MEDIA_CIFS_OPTIONS=username=veyq,password=change-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
 ```
 
+Alternatively, keep the CIFS username and password in a root-readable credentials file on the Docker host and reference it from `.env`:
+
+```env
+MEDIA_CIFS_OPTIONS=credentials=/root/veyq-cifs.creds,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
+```
+
 Uploaded originals, previews and Memory covers are mounted at `/data/veyq-media` inside the veyq containers by default. Override `MEDIA_STORAGE_DIR` only for unusual container layouts. Keep `.env` at `chmod 600` when it contains CIFS credentials. Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
 
 Upgrade with the helper script:
