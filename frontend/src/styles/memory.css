@@ -2452,6 +2452,7 @@
 .upload-status-file-status,
 .upload-status-file-percent {
   color: var(--app-muted);
+  white-space: nowrap;
 }
 
 .upload-status-file-done .upload-status-file-icon {

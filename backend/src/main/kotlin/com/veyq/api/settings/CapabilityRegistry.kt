@@ -50,6 +50,11 @@ class CapabilityRegistry {
             audience = CapabilityAudience.ALL_USERS,
         ),
         capability(
+            id = "memory.media-upload-eta",
+            audience = CapabilityAudience.ALL_USERS,
+            announceAsNew = true,
+        ),
+        capability(
             id = "memory.media-zip-download",
             audience = CapabilityAudience.ALL_USERS,
         ),

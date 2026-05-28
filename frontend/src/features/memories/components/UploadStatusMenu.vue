@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import {
   batchProgress,
+  batchRemainingSeconds,
   cancelBatch,
   cancelFile,
   fileProgress,
+  fileRemainingSeconds,
   isBatchFinished,
   orderUploadBatches,
   useUploadQueue,
@@ -75,6 +77,27 @@ function statusIcon(file: UploadQueueFile): string {
   return 'pi pi-clock'
 }
 
+function uploadPercentLabel(percent: number, remainingSeconds: number | null): string {
+  const percentLabel = t('media.uploadPercent', { percent })
+  if (remainingSeconds === null) return percentLabel
+  return `${percentLabel} · ${remainingLabel(remainingSeconds)}`
+}
+
+function batchProgressLabel(batch: UploadQueueBatch): string {
+  return uploadPercentLabel(batchProgress(batch), batchRemainingSeconds(batch))
+}
+
+function fileProgressLabel(file: UploadQueueFile): string {
+  return uploadPercentLabel(fileProgress(file), fileRemainingSeconds(file))
+}
+
+function remainingLabel(seconds: number): string {
+  if (seconds < 60) {
+    return t('media.uploadRemaining', { time: t('media.uploadRemainingLessThanMinute') })
+  }
+  return t('media.uploadRemaining', { time: `${Math.ceil(seconds / 60)} min` })
+}
+
 function canCancelFile(file: UploadQueueFile): boolean {
   return file.status === 'queued' || file.status === 'uploading'
 }
@@ -121,7 +144,7 @@ onBeforeUnmount(() => {
       <article v-for="batch in displayedBatches" :key="batch.id" class="upload-status-batch">
         <div class="upload-status-batch-header">
           <strong>{{ batch.label }}</strong>
-          <span>{{ t('media.uploadPercent', { percent: batchProgress(batch) }) }}</span>
+          <span>{{ batchProgressLabel(batch) }}</span>
         </div>
         <div class="memory-upload-progress-track" role="progressbar" :aria-valuenow="batchProgress(batch)" aria-valuemin="0" aria-valuemax="100">
           <span :style="{ width: `${batchProgress(batch)}%` }" />
@@ -131,7 +154,7 @@ onBeforeUnmount(() => {
             <span class="upload-status-file-icon" :class="statusIcon(file)" />
             <span class="upload-status-file-name">{{ file.name }}</span>
             <span class="upload-status-file-status">{{ statusLabel(file) }}</span>
-            <span class="upload-status-file-percent">{{ t('media.uploadPercent', { percent: fileProgress(file) }) }}</span>
+            <span class="upload-status-file-percent">{{ fileProgressLabel(file) }}</span>
             <button
               v-if="canCancelFile(file)"
               type="button"
@@ -180,7 +203,7 @@ onBeforeUnmount(() => {
         <article v-for="batch in displayedBatches" :key="batch.id" class="upload-status-batch">
           <div class="upload-status-batch-header">
             <strong>{{ batch.label }}</strong>
-            <span>{{ t('media.uploadPercent', { percent: batchProgress(batch) }) }}</span>
+            <span>{{ batchProgressLabel(batch) }}</span>
           </div>
           <div class="memory-upload-progress-track" role="progressbar" :aria-valuenow="batchProgress(batch)" aria-valuemin="0" aria-valuemax="100">
             <span :style="{ width: `${batchProgress(batch)}%` }" />
@@ -190,7 +213,7 @@ onBeforeUnmount(() => {
               <span class="upload-status-file-icon" :class="statusIcon(file)" />
               <span class="upload-status-file-name">{{ file.name }}</span>
               <span class="upload-status-file-status">{{ statusLabel(file) }}</span>
-              <span class="upload-status-file-percent">{{ t('media.uploadPercent', { percent: fileProgress(file) }) }}</span>
+              <span class="upload-status-file-percent">{{ fileProgressLabel(file) }}</span>
               <button
                 v-if="canCancelFile(file)"
                 type="button"

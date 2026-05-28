@@ -12,6 +12,7 @@ The V1 baseline capability IDs, versions and audiences are maintained in `Capabi
 - `memory.core`: Memory creation, nested Memories, covers, date ranges and favorites.
 - `memory.media`: photo/video upload, previews, posters, metadata and original video playback.
 - `memory.media-resumable-upload`: chunked resumable media uploads with progress and cleanup.
+- `memory.media-upload-eta`: client-side remaining-time estimates for active media uploads.
 - `memory.media-zip-download`: ZIP downloads for visible Memory media.
 - `memory.journal-markdown`: Markdown journals and veyq embeds.
 - `memory.maps`: GPS media maps with browser opt-in for external map tiles.

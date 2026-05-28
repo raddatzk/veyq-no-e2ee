@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { UploadCancelledError } from '../../../shared/api/httpClient'
 import {
+  batchRemainingSeconds,
   batchProgress,
   cancelAll,
   cancelFile,
   clearUploadQueue,
+  fileRemainingSeconds,
   orderUploadBatches,
   startUploadBatch,
   useUploadQueue
@@ -15,6 +17,7 @@ import type { UploadMediaOptions } from '../api'
 describe('useUploadQueue', () => {
   afterEach(() => {
     clearUploadQueue()
+    vi.useRealTimers()
   })
 
   async function flushUploadQueue() {
@@ -235,5 +238,92 @@ describe('useUploadQueue', () => {
     await flushUploadQueue()
 
     expect(activeFileCount.value).toBe(0)
+  })
+
+  it('estimates remaining upload time from measured progress', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let options: UploadMediaOptions | undefined
+    let resolveUpload: (() => void) | undefined
+    const batch = startUploadBatch({
+      label: 'Batch',
+      files: [new File(['x'.repeat(100)], 'a.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile: (_file, uploadOptions) =>
+        new Promise<void>((resolve) => {
+          options = uploadOptions
+          resolveUpload = resolve
+          uploadOptions.onProgress?.({ loaded: 0, total: 100 })
+        })
+    })
+
+    await flushUploadQueue()
+    expect(fileRemainingSeconds(batch.files[0])).toBeNull()
+
+    vi.advanceTimersByTime(1000)
+    options?.onProgress?.({ loaded: 50, total: 100 })
+
+    expect(fileRemainingSeconds(batch.files[0])).toBe(1)
+
+    resolveUpload?.()
+    await flushUploadQueue()
+    expect(fileRemainingSeconds(batch.files[0])).toBeNull()
+  })
+
+  it('uses active upload speed for batch remaining time including queued files', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let options: UploadMediaOptions | undefined
+    const batch = startUploadBatch({
+      label: 'Batch',
+      files: [new File(['x'.repeat(100)], 'a.jpg'), new File(['x'.repeat(100)], 'b.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile: (_file, uploadOptions) =>
+        new Promise<void>((_resolve, reject) => {
+          options = uploadOptions
+          uploadOptions.onProgress?.({ loaded: 0, total: 100 })
+          uploadOptions.signal?.addEventListener('abort', () => reject(new UploadCancelledError()))
+        })
+    })
+
+    await flushUploadQueue()
+    vi.advanceTimersByTime(1000)
+    options?.onProgress?.({ loaded: 50, total: 100 })
+
+    expect(batchRemainingSeconds(batch)).toBe(3)
+  })
+
+  it('does not count resumed bytes as newly transferred speed', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    let options: UploadMediaOptions | undefined
+    const batch = startUploadBatch({
+      label: 'Batch',
+      files: [new File(['x'.repeat(160)], 'a.jpg')],
+      context: { type: 'memory', tenantName: 'tenant', memoryId: 'mem-1' },
+      uploadFile: (_file, uploadOptions) =>
+        new Promise<void>((_resolve, reject) => {
+          options = uploadOptions
+          uploadOptions.onSession?.({
+            uploadId: 'upl-1',
+            memoryId: 'mem-1',
+            filename: 'a.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 160,
+            chunkSizeBytes: 10,
+            uploadedChunks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            uploadedBytes: 100,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          })
+          uploadOptions.signal?.addEventListener('abort', () => reject(new UploadCancelledError()))
+        })
+    })
+
+    await flushUploadQueue()
+    vi.advanceTimersByTime(1000)
+    options?.onProgress?.({ loaded: 110, total: 160 })
+
+    expect(fileRemainingSeconds(batch.files[0])).toBe(5)
   })
 })

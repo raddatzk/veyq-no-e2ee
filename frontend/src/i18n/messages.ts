@@ -276,6 +276,8 @@ export const messages = {
       uploadCancelFile: 'Upload für {file} abbrechen',
       uploadNoActive: 'Keine aktiven Uploads',
       uploadPercent: '{percent}%',
+      uploadRemaining: 'ca. {time} verbleibend',
+      uploadRemainingLessThanMinute: 'weniger als 1 Min.',
       uploadProgress: 'Lade {file} hoch ({current}/{total})',
       uploadErrors: {
         failed: 'Upload fehlgeschlagen'
@@ -508,6 +510,10 @@ export const messages = {
         memory_media_resumable_upload: {
           title: 'Fortsetzbare Medien-Uploads',
           description: 'Größere Medien über Chunk-Sessions mit Fortschritt, Abbruch und Bereinigung unvollständiger Uploads hochladen.'
+        },
+        memory_media_upload_eta: {
+          title: 'Upload-Restzeit-Prognose',
+          description: 'Aktive Medien-Uploads mit einer kompakten Schätzung der verbleibenden Dauer anzeigen.'
         },
         memory_media_zip_download: {
           title: 'Memory-Medien als ZIP herunterladen',
@@ -1038,6 +1044,8 @@ export const messages = {
       uploadCancelFile: 'Cancel upload for {file}',
       uploadNoActive: 'No active uploads',
       uploadPercent: '{percent}%',
+      uploadRemaining: 'about {time} left',
+      uploadRemainingLessThanMinute: 'less than 1 min',
       uploadProgress: 'Uploading {file} ({current}/{total})',
       uploadErrors: {
         failed: 'Upload failed'
@@ -1272,6 +1280,10 @@ export const messages = {
         memory_media_resumable_upload: {
           title: 'Resumable media uploads',
           description: 'Upload larger media through chunked sessions with progress, cancellation and cleanup of unfinished uploads.'
+        },
+        memory_media_upload_eta: {
+          title: 'Upload time remaining estimates',
+          description: 'Show active media uploads with a compact estimate of how much upload time remains.'
         },
         memory_media_zip_download: {
           title: 'Memory media ZIP downloads',

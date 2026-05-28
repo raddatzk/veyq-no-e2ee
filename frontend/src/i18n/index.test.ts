@@ -25,4 +25,14 @@ describe('i18n locale handling', () => {
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en')
     expect(document.documentElement.lang).toBe('en')
   })
+
+  it('localizes upload eta capability labels', () => {
+    expect(i18n.global.te('capabilities.items.memory_media_upload_eta.title')).toBe(true)
+    expect(i18n.global.te('capabilities.items.memory_media_upload_eta.description')).toBe(true)
+
+    setLocale('en')
+    expect(i18n.global.t('capabilities.items.memory_media_upload_eta.title')).toBe(
+      'Upload time remaining estimates'
+    )
+  })
 })

@@ -23,6 +23,11 @@ export type UploadQueueFile = {
   error: string
   uploadId: string | null
   controller: AbortController
+  uploadStartedAt: number | null
+  progressStartedAt: number | null
+  progressStartedBytes: number
+  lastProgressAt: number | null
+  bytesPerSecond: number | null
 }
 
 export type UploadQueueContext =
@@ -87,7 +92,9 @@ export function useUploadQueue() {
     acknowledgeFinished,
     clearUploadQueue,
     batchProgress,
+    batchRemainingSeconds,
     fileProgress,
+    fileRemainingSeconds,
     isBatchFinished
   }
 }
@@ -106,7 +113,12 @@ export function startUploadBatch(request: StartUploadBatchRequest): UploadQueueB
       status: 'queued',
       error: '',
       uploadId: null,
-      controller: new AbortController()
+      controller: new AbortController(),
+      uploadStartedAt: null,
+      progressStartedAt: null,
+      progressStartedBytes: 0,
+      lastProgressAt: null,
+      bytesPerSecond: null
     })),
     startedAt: Date.now(),
     sequence: ++batchSequence,
@@ -186,6 +198,28 @@ export function fileProgress(file: UploadQueueFile): number {
   return Math.min(100, Math.round((Math.min(file.loadedBytes, file.sizeBytes) / file.sizeBytes) * 100))
 }
 
+export function fileRemainingSeconds(file: UploadQueueFile): number | null {
+  trackQueueRevision()
+  if (file.status !== 'uploading') return null
+  if (!file.bytesPerSecond || file.bytesPerSecond <= 0) return null
+  const remainingBytes = Math.max(0, file.sizeBytes - Math.min(file.loadedBytes, file.sizeBytes))
+  if (remainingBytes <= 0) return null
+  return Math.ceil(remainingBytes / file.bytesPerSecond)
+}
+
+export function batchRemainingSeconds(batch: UploadQueueBatch): number | null {
+  trackQueueRevision()
+  const activeFile = batch.files.find((file) => file.status === 'uploading' && file.bytesPerSecond && file.bytesPerSecond > 0)
+  if (!activeFile?.bytesPerSecond) return null
+  const remainingBytes = batch.files.reduce((sum, file) => {
+    if (file.status === 'done' || file.status === 'failed' || file.status === 'cancelled') return sum
+    if (file.status === 'uploading') return sum + Math.max(0, file.sizeBytes - Math.min(file.loadedBytes, file.sizeBytes))
+    return sum + Math.max(0, file.sizeBytes)
+  }, 0)
+  if (remainingBytes <= 0) return null
+  return Math.ceil(remainingBytes / activeFile.bytesPerSecond)
+}
+
 export function isBatchFinished(batch: UploadQueueBatch): boolean {
   return batch.files.every((file) => file.status === 'done' || file.status === 'failed' || file.status === 'cancelled')
 }
@@ -251,6 +285,7 @@ async function uploadQueueFile(
         setFileSession(queueFile, session.uploadId)
         if ('uploadedBytes' in session) {
           setFileProgress(queueFile, Math.min(session.uploadedBytes, queueFile.sizeBytes))
+          resetFileProgressBaseline(queueFile)
         }
       },
       onProgress: ({ loaded }) => {
@@ -363,11 +398,19 @@ function isActiveFileStatus(status: UploadFileStatus): boolean {
 function setFileStatus(file: UploadQueueFile, status: UploadFileStatus, error?: string) {
   file.status = status
   if (error !== undefined) file.error = error
+  if (status === 'uploading' && file.uploadStartedAt === null) {
+    file.uploadStartedAt = Date.now()
+  }
+  if (status !== 'uploading') {
+    resetFileTiming(file)
+  }
   touchQueue()
 }
 
 function setFileProgress(file: UploadQueueFile, loadedBytes: number) {
-  file.loadedBytes = loadedBytes
+  const nextLoadedBytes = Math.max(0, loadedBytes)
+  updateFileSpeed(file, nextLoadedBytes)
+  file.loadedBytes = nextLoadedBytes
   touchQueue()
 }
 
@@ -384,6 +427,50 @@ function setFileError(file: UploadQueueFile, error: string) {
 function setBatchFinished(batch: UploadQueueBatch, finishedAt: number | null) {
   batch.finishedAt = finishedAt
   touchQueue()
+}
+
+function updateFileSpeed(file: UploadQueueFile, nextLoadedBytes: number) {
+  if (file.status !== 'uploading') return
+  const now = Date.now()
+  if (nextLoadedBytes <= file.loadedBytes) {
+    if (file.progressStartedAt === null) {
+      file.progressStartedAt = now
+      file.progressStartedBytes = nextLoadedBytes
+    }
+    return
+  }
+  if (file.progressStartedAt === null) {
+    file.progressStartedAt = now
+    file.progressStartedBytes = nextLoadedBytes
+    file.lastProgressAt = now
+    return
+  }
+  const elapsedSeconds = (now - file.progressStartedAt) / 1000
+  const transferredBytes = nextLoadedBytes - file.progressStartedBytes
+  if (elapsedSeconds > 0 && transferredBytes > 0) {
+    const averageBytesPerSecond = transferredBytes / elapsedSeconds
+    file.bytesPerSecond = file.bytesPerSecond === null
+      ? averageBytesPerSecond
+      : (file.bytesPerSecond * 0.7) + (averageBytesPerSecond * 0.3)
+    file.lastProgressAt = now
+  }
+}
+
+function resetFileTiming(file: UploadQueueFile) {
+  file.uploadStartedAt = null
+  file.progressStartedAt = null
+  file.progressStartedBytes = file.loadedBytes
+  file.lastProgressAt = null
+  file.bytesPerSecond = null
+}
+
+function resetFileProgressBaseline(file: UploadQueueFile) {
+  if (file.status !== 'uploading') return
+  const now = Date.now()
+  file.progressStartedAt = now
+  file.progressStartedBytes = file.loadedBytes
+  file.lastProgressAt = now
+  file.bytesPerSecond = null
 }
 
 function touchQueue() {
