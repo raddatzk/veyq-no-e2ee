@@ -369,8 +369,6 @@
     border-color: var(--app-line);
   }
 
-  .media-card:focus-visible,
-  .media-grid-tile:focus-visible,
   .settings-table-row.group-list-row:focus-visible,
   .tenant-dialog .p-dialog-header-actions .p-button:focus-visible,
   .tenant-dialog .p-dialog-header-icon:focus-visible {

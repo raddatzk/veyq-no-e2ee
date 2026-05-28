@@ -440,7 +440,7 @@
 }
 
 .settings-table-row.group-list-row:focus-visible {
-  outline: 2px solid rgba(37, 99, 235, 0.28);
+  outline: 2px solid var(--app-focus-ring);
   outline-offset: -2px;
 }
 

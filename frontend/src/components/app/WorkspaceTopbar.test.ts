@@ -109,6 +109,35 @@ describe('WorkspaceTopbar', () => {
     expect(mocks.push).toHaveBeenCalledWith('/friends/beach-day')
   })
 
+  it('closes search when keyboard focus leaves the search area', async () => {
+    mocks.searchTenant.mockResolvedValue([
+      {
+        kind: 'MEMORY',
+        id: 'mem_123',
+        displayName: 'Beach Day',
+        path: '/beach-day',
+        scope: { type: 'TENANT' },
+        matchTypes: new Set(['TITLE'])
+      }
+    ])
+    const wrapper = mountTopbar()
+    const input = wrapper.find('.workspace-topbar-center input')
+
+    await input.trigger('focus')
+    await input.setValue('beach')
+    await vi.advanceTimersByTimeAsync(240)
+    await flushPromises()
+
+    expect(wrapper.find('.workspace-search-panel').exists()).toBe(true)
+
+    const nextButton = wrapper.find('.upload-status-trigger')
+    await wrapper.find('.workspace-search').trigger('focusout', {
+      relatedTarget: nextButton.element
+    })
+
+    expect(wrapper.find('.workspace-search-panel').exists()).toBe(false)
+  })
+
   it('shows active uploads next to search and can cancel all', async () => {
     const uploadFile = vi.fn(
       (_file: File, options: { signal?: AbortSignal }) =>

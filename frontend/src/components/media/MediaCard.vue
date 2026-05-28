@@ -31,6 +31,7 @@ const usesPreviewImage = computed(() => isImage.value || (isVideo.value && Boole
   <button
     class="media-card"
     type="button"
+    tabindex="-1"
     :style="{ width: `${width}px`, height: `${height}px` }"
     @click="$emit('open')"
   >

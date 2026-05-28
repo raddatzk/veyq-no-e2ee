@@ -75,6 +75,7 @@ import MemoryUploadDialog from './MemoryUploadDialog.vue'
 import { DEFAULT_MEMORY_DETAIL_TAB, type MemoryDetailTab } from '../utils/memoryTabs'
 
 const MemoryMediaMap = defineAsyncComponent(() => import('./MemoryMediaMap.vue'))
+const nonFocusableTabPanelPt = { root: { tabindex: -1 } } as const
 
 type MemoryDetailCapabilities = {
   canEdit?: boolean
@@ -936,7 +937,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
         <Tab value="info">{{ t('memory.info') }}</Tab>
       </TabList>
       <TabPanels>
-        <TabPanel value="gallery">
+        <TabPanel value="gallery" :pt="nonFocusableTabPanelPt">
           <div v-if="visibleMedia.length === 0 && !mediaLoading" class="veyq-empty veyq-empty-action">
             <span class="pi pi-images" />
             <span>{{ t('memory.galleryEmptyAction') }}</span>
@@ -961,7 +962,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             @deleted="markMediaDeleted"
           />
         </TabPanel>
-        <TabPanel value="buckets">
+        <TabPanel value="buckets" :pt="nonFocusableTabPanelPt">
           <MemoryAssetBuckets
             :tenant-name="tenantName"
             :memory-id="memory.id"
@@ -980,7 +981,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             @upload-bucket="openBucketUpload"
           />
         </TabPanel>
-        <TabPanel value="map">
+        <TabPanel value="map" :pt="nonFocusableTabPanelPt">
           <MemoryMediaMap
             :tenant-name="tenantName"
             :media="visibleMedia"
@@ -991,7 +992,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             @deleted="markMediaDeleted"
           />
         </TabPanel>
-        <TabPanel value="tracks">
+        <TabPanel value="tracks" :pt="nonFocusableTabPanelPt">
           <MemoryTracksPanel
             :tracks="visibleTracks"
             :can-edit="capabilities.canEditTracks"
@@ -1001,7 +1002,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             @changed="$emit('changed', memory)"
           />
         </TabPanel>
-        <TabPanel value="playlists">
+        <TabPanel value="playlists" :pt="nonFocusableTabPanelPt">
           <MemoryPlaylistsPanel
             :playlists="visiblePlaylists"
             :can-edit="capabilities.canEditPlaylists"
@@ -1011,7 +1012,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             @changed="$emit('changed', memory)"
           />
         </TabPanel>
-        <TabPanel value="journal">
+        <TabPanel value="journal" :pt="nonFocusableTabPanelPt">
           <section class="memory-journal">
             <div class="memory-journal-toolbar">
               <div>
@@ -1152,7 +1153,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             </div>
           </section>
         </TabPanel>
-        <TabPanel value="children">
+        <TabPanel value="children" :pt="nonFocusableTabPanelPt">
           <div class="memory-card-grid memory-card-grid-memories">
             <MemoryCard
               v-for="child in childMemories"
@@ -1175,7 +1176,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             <span>{{ t('memory.childrenEmpty') }}</span>
           </div>
         </TabPanel>
-        <TabPanel value="info">
+        <TabPanel value="info" :pt="nonFocusableTabPanelPt">
           <dl class="memory-info-list">
             <dt>{{ t('memory.dateRange') }}</dt>
             <dd>{{ dateRangeLabel }}</dd>

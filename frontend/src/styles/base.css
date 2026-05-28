@@ -27,6 +27,7 @@
   --app-hover: #f3f5fa;
   --app-overlay: rgba(255, 255, 255, 0.9);
   --app-focus: #2563eb;
+  --app-focus-ring: color-mix(in srgb, var(--app-focus) 34%, transparent);
   --app-on-strong: #fff;
   --app-control-bg: #f8fafc;
   --app-control-text: #334155;
@@ -82,6 +83,7 @@
   --app-hover: #242b34;
   --app-overlay: rgba(23, 28, 34, 0.92);
   --app-focus: #93c5fd;
+  --app-focus-ring: color-mix(in srgb, var(--app-focus) 42%, transparent);
   --app-on-strong: #fff;
   --app-control-bg: #20262e;
   --app-control-text: #eef3f8;
@@ -106,6 +108,20 @@
 
 * {
   box-sizing: border-box;
+}
+
+:root {
+  --p-focus-ring-color: var(--app-focus) !important;
+  --p-form-field-focus-border-color: var(--app-focus) !important;
+  --p-form-field-focus-ring-color: var(--app-focus) !important;
+  --p-button-primary-focus-ring-color: var(--app-focus) !important;
+  --p-button-secondary-focus-ring-color: var(--app-focus) !important;
+  --p-button-success-focus-ring-color: var(--app-focus) !important;
+  --p-button-info-focus-ring-color: var(--app-focus) !important;
+  --p-button-warn-focus-ring-color: var(--app-focus) !important;
+  --p-button-help-focus-ring-color: var(--app-focus) !important;
+  --p-button-danger-focus-ring-color: var(--app-focus) !important;
+  --p-button-contrast-focus-ring-color: var(--app-focus) !important;
 }
 
 body {

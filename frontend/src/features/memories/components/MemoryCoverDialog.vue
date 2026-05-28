@@ -285,6 +285,7 @@ async function removeCover() {
           :key="mediaItem.id"
           type="button"
           class="memory-cover-option"
+          tabindex="-1"
           :class="{ 'memory-cover-option-selected': selectedMedia?.id === mediaItem.id }"
           @click="selectMedia(mediaItem)"
         >

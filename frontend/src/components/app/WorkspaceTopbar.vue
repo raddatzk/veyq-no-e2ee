@@ -115,6 +115,14 @@ function handlePointerDown(event: PointerEvent) {
   if (root && event.target instanceof Node && !root.contains(event.target)) closeSearch()
 }
 
+function handleSearchFocusout(event: FocusEvent) {
+  if (!searchOpen.value) return
+  const root = searchRoot.value
+  const nextTarget = event.relatedTarget
+  if (root && nextTarget instanceof Node && root.contains(nextTarget)) return
+  closeSearch()
+}
+
 function handleSearchKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
@@ -167,6 +175,7 @@ function isMacPlatform(): boolean {
       ref="searchRoot"
       class="workspace-search"
       :class="{ 'workspace-search-open': searchOpen }"
+      @focusout="handleSearchFocusout"
     >
       <label
         class="workspace-topbar-center"
@@ -209,6 +218,7 @@ function isMacPlatform(): boolean {
               class="workspace-search-result"
               :class="{ 'workspace-search-result-active': index === selectedIndex }"
               type="button"
+              tabindex="-1"
               role="option"
               :aria-selected="index === selectedIndex"
               @mouseenter="selectedIndex = index"

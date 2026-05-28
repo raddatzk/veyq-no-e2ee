@@ -127,9 +127,14 @@ function toggleOverflow(event: MouseEvent) {
   background: var(--app-surface);
 }
 
-.memory-participant-chip:hover,
-.memory-participant-chip:focus-visible {
+.memory-participant-chip:hover {
   border-color: var(--app-accent);
+}
+
+.memory-participant-chip:focus-visible {
+  border-color: var(--app-focus);
+  outline: 2px solid var(--app-focus-ring);
+  outline-offset: 2px;
 }
 
 .memory-participant-avatar {

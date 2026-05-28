@@ -477,7 +477,7 @@ function onSheetPointerUp(event: PointerEvent) {
 }
 
 .media-lightbox-uploader-link:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
+  outline: 2px solid var(--app-focus-ring);
   outline-offset: 3px;
   border-radius: 4px;
 }

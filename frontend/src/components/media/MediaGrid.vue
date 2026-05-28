@@ -311,6 +311,7 @@ function handleKeydown(event: KeyboardEvent) {
           :key="tile.id"
           class="media-grid-tile"
           type="button"
+          tabindex="-1"
           :style="{
             transform: `translate(${tile.left}px, ${tile.top}px)`,
             width: `${tile.renderedWidth}px`,
