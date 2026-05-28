@@ -142,9 +142,11 @@ class MediaService @Inject constructor(
     fun listMemoryMediaBuckets(memoryId: String, includeChildren: Boolean = false): List<MemoryMediaBucketSummary> {
         val memory = resolveVisibleMemory(memoryId)
         val memories = if (includeChildren) descendantsAndSelf(memory).filter(::isMemoryVisible) else listOf(memory)
+        val currentUser = user()
         ensureBucketsForMemories(memories)
-        ensurePrimaryBucket(memory, user(), null)
-        return bucketSummaries(memories, bucketRepo.listByMemories(memories))
+        ensurePrimaryBucket(memory, currentUser, null)
+        val buckets = bucketRepo.listByMemories(memories)
+        return bucketSummaries(memories, visibleBuckets(memory, memories, buckets, currentUser, includeChildren))
     }
 
     @Transactional
@@ -1055,6 +1057,37 @@ class MediaService @Inject constructor(
         val counts = mediaCountsByBucket(memories)
         return bucketSet.sortedWith(compareBy<MemoryMediaBucket> { it.parentBucket?.id ?: 0L }.thenBy { it.displayName })
             .map { it.toSummary(counts) }
+    }
+
+    private fun visibleBuckets(
+        memory: Memory,
+        memories: Collection<Memory>,
+        buckets: List<MemoryMediaBucket>,
+        currentUser: User,
+        includeChildren: Boolean,
+    ): List<MemoryMediaBucket> {
+        if (!includeChildren || memories.size <= 1) return buckets
+
+        val currentPrimary = buckets.find {
+            it.memory.id == memory.id &&
+                it.primaryBucket &&
+                it.uploaderUser?.id == currentUser.id &&
+                it.shareIdentity == null
+        } ?: return buckets
+        val hasSameUserDescendantPrimary = buckets.any {
+            it.id != currentPrimary.id &&
+                it.primaryBucket &&
+                it.uploaderUser?.id == currentUser.id &&
+                it.shareIdentity == null
+        }
+        if (!hasSameUserDescendantPrimary) return buckets
+
+        val mediaCounts = mediaCountsByBucket(memories)
+        val currentPrimaryHasMedia = (mediaCounts[currentPrimary.id] ?: 0) > 0
+        val currentPrimaryHasChildren = buckets.any { it.parentBucket?.id == currentPrimary.id }
+        if (currentPrimaryHasMedia || currentPrimaryHasChildren) return buckets
+
+        return buckets.filterNot { it.id == currentPrimary.id }
     }
 
     private fun mediaCountsByBucket(memories: Collection<Memory>): Map<Long, Int> =

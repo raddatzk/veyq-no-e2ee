@@ -506,6 +506,20 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `bucket listing with children hides redundant empty current memory primary bucket`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-tree-trip", "Bucket Tree Trip"))
+        val day = memoryService.createMemory(CreateMemoryRequest("bucket-tree-day", "Bucket Tree Day", parentId = trip.id))
+        createMedia(owner, memory(day.id), "Child Photo")
+
+        val buckets = mediaService.listMemoryMediaBuckets(trip.id, includeChildren = true)
+
+        assertThat(buckets).hasSize(1)
+        assertThat(buckets.single().memoryId).isEqualTo(day.id)
+        assertThat(buckets.single().displayName).isEqualTo(owner.displayName)
+        assertThat(buckets.single().mediaCount).isEqualTo(1)
+    }
+
+    @Test
     fun `moves selected media into subbucket and deletes selected media`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("bucket-move-trip", "Bucket Move Trip"))
         val first = createMedia(owner, memory(trip.id), "First Photo")
