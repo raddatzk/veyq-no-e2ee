@@ -61,6 +61,10 @@ install() {
     setup_default="y"
   else
     echo "Keeping existing $VEYQ_DIR/.env"
+    if env_needs_setup; then
+      echo "Existing .env still needs setup."
+      setup_default="y"
+    fi
   fi
 
   if prompt_yes_no "Run interactive setup now?" "$setup_default"; then
@@ -69,7 +73,15 @@ install() {
     echo "Edit $VEYQ_DIR/.env before starting veyq."
   fi
 
-  if prompt_yes_no "Pull and start veyq now?" "y"; then
+  local start_default="y"
+  if env_needs_setup; then
+    start_default="n"
+  fi
+  if prompt_yes_no "Pull and start veyq now?" "$start_default"; then
+    if env_needs_setup; then
+      echo "Cannot start veyq with an incomplete .env. Run ./veyq-server.sh setup first." >&2
+      exit 1
+    fi
     pull_services
     compose up -d
     wait_for_health
@@ -127,7 +139,7 @@ setup_env() {
   set_env MAIL_HOST "$(prompt "SMTP host" "$(env_value MAIL_HOST "smtp.example.com")")"
   set_env MAIL_PORT "$(prompt "SMTP port" "$(env_value MAIL_PORT "587")")"
   set_env MAIL_USERNAME "$(prompt "SMTP username" "$(env_value MAIL_USERNAME "noreply@${public_host}")")"
-  set_env MAIL_PASSWORD "$(prompt_secret_or_random "SMTP password" "$(env_value MAIL_PASSWORD "")")"
+  set_env MAIL_PASSWORD "$(prompt_secret "SMTP password" "$(env_value MAIL_PASSWORD "")")"
   set_env MAIL_LOGIN "$(prompt "SMTP login mode" "$(env_value MAIL_LOGIN "REQUIRED")")"
   set_env MAIL_TLS "$(prompt "SMTP TLS enabled" "$(env_value MAIL_TLS "true")")"
 
@@ -292,17 +304,30 @@ prompt_secret_or_random() {
   fi
 }
 
+prompt_secret() {
+  local label="$1"
+  local current="$2"
+  local value
+  if [ -n "$current" ] && [ "$current" != "change-me" ] && [ "$current" != "change-root-me" ] && [ "$current" != "change-mail-me" ] && [ "$current" != "change-reset-me" ]; then
+    read_prompt "$label [keep existing]: " value
+    printf '%s' "${value:-$current}"
+  else
+    read_prompt "$label [required]: " value
+    printf '%s' "$value"
+  fi
+}
+
 read_prompt() {
   local message="$1"
   local __resultvar="$2"
-  local value
+  local input
   if [ -r /dev/tty ] && [ -w /dev/tty ]; then
     printf '%s' "$message" > /dev/tty
-    IFS= read -r value < /dev/tty || value=""
+    IFS= read -r input < /dev/tty || input=""
   else
-    read -r -p "$message" value || value=""
+    read -r -p "$message" input || input=""
   fi
-  printf -v "$__resultvar" '%s' "$value"
+  printf -v "$__resultvar" '%s' "$input"
 }
 
 random_secret() {
@@ -344,7 +369,7 @@ set_env() {
   tmp="$(mktemp)"
   if grep -qE "^#?${key}=" .env; then
     awk -v key="$key" -v value="$value" '
-      $0 ~ "^#?" key "=" {
+      index($0, key "=") == 1 || index($0, "#" key "=") == 1 {
         print key "=" value
         next
       }
@@ -391,6 +416,34 @@ check_env_default_secret() {
       return 1
       ;;
   esac
+}
+
+env_needs_setup() {
+  local key
+  for key in VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD QUARKUS_WEBAUTHN_ORIGINS QUARKUS_WEBAUTHN_RELYING_PARTY_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD; do
+    if [ -z "$(env_value "$key" "")" ]; then
+      return 0
+    fi
+  done
+
+  for key in DB_PASSWORD DB_ROOT_PASSWORD MAIL_PASSWORD; do
+    case "$(env_value "$key" "")" in
+      change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
+    esac
+  done
+
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)'; then
+    for key in RESET_TRAEFIK_RULE RESET_USERNAME RESET_PASSWORD; do
+      if [ -z "$(env_value "$key" "")" ]; then
+        return 0
+      fi
+    done
+    case "$(env_value RESET_PASSWORD "")" in
+      change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
+    esac
+  fi
+
+  return 1
 }
 
 timestamp() {
