@@ -261,7 +261,6 @@ setup_media_storage_env() {
   current_mode="$(media_storage_mode)"
   mode="$(prompt_storage_mode "$current_mode")"
   set_env MEDIA_STORAGE_MODE "$mode"
-  set_env MEDIA_STORAGE_DIR "$(prompt "Container media storage path" "$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")")"
 
   case "$mode" in
     docker-volume)

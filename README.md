@@ -76,7 +76,7 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
 - `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
 - `VEYQ_SOURCE_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license and build metadata shown in server settings.
-- `MEDIA_STORAGE_MODE`, `MEDIA_STORAGE_MOUNT_TYPE`, `MEDIA_STORAGE_SOURCE`, `MEDIA_STORAGE_DIR`, `MEDIA_CIFS_DEVICE`, `MEDIA_CIFS_OPTIONS`: media storage backend settings. The supported modes are Docker named volume, host bind mount and Docker-managed CIFS volume.
+- `MEDIA_STORAGE_MODE`, `MEDIA_STORAGE_MOUNT_TYPE`, `MEDIA_STORAGE_SOURCE`, `MEDIA_CIFS_DEVICE`, `MEDIA_CIFS_OPTIONS`: media storage backend settings. The supported modes are Docker named volume, host bind mount and Docker-managed CIFS volume. `MEDIA_STORAGE_DIR` is an optional advanced override for the internal container path and normally does not need to be set.
 - `MEDIA_CHUNK_SIZE`, `MEDIA_MAX_UPLOAD_SIZE`, `MEDIA_UPLOAD_SESSION_TTL_HOURS`, `MEDIA_UPLOAD_SESSION_CLEANUP_CRON`, `FFMPEG_PATH`, `MEDIA_PREVIEW_TIMEOUT_SECONDS`: media upload and preview-generation settings.
 - `COOKIE_SECURE`, `COOKIE_ACCESS_TOKEN_NAME`, `COOKIE_REFRESH_TOKEN_NAME`, `ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_MINUTES`, `ACCESS_TOKEN_AUDIT_TTL_DAYS`, `REFRESH_TOKEN_AUDIT_TTL_DAYS`, `TOKEN_CLEANUP_CRON`: authentication cookie and token retention settings.
 - `INVITATION_TTL_DAYS`, `EMAIL_CHANGE_TTL_HOURS`, `RESET_PASSWORD_TTL_HOURS`, `USER_CLEANUP_CRON`, `USER_CLEANUP_RETENTION_DAYS`: user workflow token lifetimes and cleanup.
@@ -87,7 +87,7 @@ See [`infra/.env.template`](infra/.env.template) for all defaults and comments.
 
 ### Media Storage
 
-The Compose stack stores uploaded originals, previews and Memory covers below `MEDIA_STORAGE_DIR` inside the app container. `MEDIA_STORAGE_MODE` controls where that path is mounted from:
+The Compose stack stores uploaded originals, previews and Memory covers below `/data/veyq-media` inside the app container by default. `MEDIA_STORAGE_MODE` controls where that path is mounted from:
 
 - `docker-volume`: default, uses the Compose-managed `veyq-media` Docker volume.
 - `host-path`: bind-mounts an absolute host directory from `MEDIA_STORAGE_SOURCE`, for example a CIFS share mounted by the host at `/mnt/veyq-media`.

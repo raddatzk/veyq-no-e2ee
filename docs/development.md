@@ -141,7 +141,6 @@ The default media storage mode is a Compose-managed Docker volume:
 MEDIA_STORAGE_MODE=docker-volume
 MEDIA_STORAGE_MOUNT_TYPE=volume
 MEDIA_STORAGE_SOURCE=veyq-media
-MEDIA_STORAGE_DIR=/data/veyq-media
 ```
 
 To use a local path, including a CIFS share already mounted by the host OS, bind-mount an absolute host directory:
@@ -150,7 +149,6 @@ To use a local path, including a CIFS share already mounted by the host OS, bind
 MEDIA_STORAGE_MODE=host-path
 MEDIA_STORAGE_MOUNT_TYPE=bind
 MEDIA_STORAGE_SOURCE=/mnt/veyq-media
-MEDIA_STORAGE_DIR=/data/veyq-media
 ```
 
 To let Docker mount CIFS directly, use the CIFS volume source:
@@ -161,10 +159,9 @@ MEDIA_STORAGE_MOUNT_TYPE=volume
 MEDIA_STORAGE_SOURCE=veyq-media-cifs
 MEDIA_CIFS_DEVICE=//nas.example.com/veyq-media
 MEDIA_CIFS_OPTIONS=username=veyq,password=change-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
-MEDIA_STORAGE_DIR=/data/veyq-media
 ```
 
-Keep `.env` at `chmod 600` when it contains CIFS credentials. Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
+Uploaded originals, previews and Memory covers are mounted at `/data/veyq-media` inside the veyq containers by default. Override `MEDIA_STORAGE_DIR` only for unusual container layouts. Keep `.env` at `chmod 600` when it contains CIFS credentials. Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
 
 Upgrade with the helper script:
 
