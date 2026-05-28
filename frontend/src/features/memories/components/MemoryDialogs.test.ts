@@ -152,6 +152,67 @@ describe('Memory detail dialogs', () => {
     expect(saved).toHaveBeenCalledWith(created)
   })
 
+  it('sets the memory end date from the initial start date and enables full-field date picker opening', async () => {
+    const created = memory({ id: 'mem-created', name: 'day-trip', displayName: 'Day Trip' })
+    createMemoryMock.mockResolvedValue(created)
+
+    const wrapper = mount(CreateMemoryDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        tenantDisplayName: 'Tenant',
+        parentMemoryId: 'mem-parent'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('Day Trip')
+    await inputs[2].setValue('2026-05-03')
+    await flushPromises()
+
+    expect((inputs[3].element as HTMLInputElement).value).toBe('2026-05-03')
+    expect(inputs[2].attributes('data-max-date')).toBe('2026-05-03')
+    expect(inputs[3].attributes('data-min-date')).toBe('2026-05-03')
+    expect(inputs[2].attributes('data-show-on-focus')).toBe('true')
+    expect(inputs[3].attributes('data-show-on-focus')).toBe('true')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(createMemoryMock).toHaveBeenCalledWith('tenant', {
+      displayName: 'Day Trip',
+      name: 'day-trip',
+      startDate: '2026-05-03',
+      endDate: '2026-05-03',
+      parentId: 'mem-parent',
+      folderPath: null,
+      scope: null
+    })
+  })
+
+  it('does not overwrite a manually selected memory end date when the start date changes', async () => {
+    const wrapper = mount(CreateMemoryDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        tenantDisplayName: 'Tenant',
+        parentMemoryId: 'mem-parent'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const inputs = wrapper.findAll('input')
+    await inputs[2].setValue('2026-05-03')
+    await inputs[3].setValue('2026-05-05')
+    await inputs[2].setValue('2026-05-04')
+    await flushPromises()
+
+    expect((inputs[3].element as HTMLInputElement).value).toBe('2026-05-05')
+    expect(inputs[2].attributes('data-max-date')).toBe('2026-05-05')
+    expect(inputs[3].attributes('data-min-date')).toBe('2026-05-04')
+  })
+
   it('keeps memory creation disabled for an invalid date range', async () => {
     const wrapper = mount(CreateMemoryDialog, {
       props: {
@@ -175,6 +236,60 @@ describe('Memory detail dialogs', () => {
     await flushPromises()
 
     expect(createMemoryMock).not.toHaveBeenCalled()
+  })
+
+  it('fills an emptied memory end date from the next edited start date', async () => {
+    const updated = memory({
+      startDate: '2026-05-06',
+      endDate: '2026-05-06'
+    })
+    updateMemoryMock.mockResolvedValue(updated)
+
+    const wrapper = mount(EditMemoryDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memory: memory()
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const inputs = wrapper.findAll('input')
+    await inputs[3].setValue('')
+    await inputs[2].setValue('2026-05-06')
+    await flushPromises()
+
+    expect((inputs[3].element as HTMLInputElement).value).toBe('2026-05-06')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateMemoryMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      displayName: 'Trip',
+      name: 'trip',
+      startDate: '2026-05-06',
+      endDate: '2026-05-06'
+    })
+  })
+
+  it('keeps memory editing from submitting an invalid date range', async () => {
+    const wrapper = mount(EditMemoryDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memory: memory()
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const inputs = wrapper.findAll('input')
+    await inputs[2].setValue('2026-05-08')
+    await inputs[3].setValue('2026-05-05')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateMemoryMock).not.toHaveBeenCalled()
   })
 
   it('deletes a memory after explicit confirmation', async () => {
@@ -834,9 +949,14 @@ function dialogStubs() {
     },
     DatePicker: {
       template:
-        '<input v-bind="$attrs" :value="formatDate(modelValue)" @input="$emit(\'update:modelValue\', parseDate($event.target.value))" @blur="$emit(\'blur\', { originalEvent: $event, value: $event.target.value })" />',
+        '<input v-bind="$attrs" :value="formatDate(modelValue)" :data-min-date="formatDate(minDate)" :data-max-date="formatDate(maxDate)" :data-show-on-focus="String(showOnFocus)" @input="$emit(\'update:modelValue\', parseDate($event.target.value))" @blur="$emit(\'blur\', { originalEvent: $event, value: $event.target.value })" />',
       emits: ['blur', 'update:modelValue'],
-      props: ['modelValue'],
+      props: {
+        modelValue: Date,
+        minDate: Date,
+        maxDate: Date,
+        showOnFocus: Boolean
+      },
       methods: {
         formatDate(value: Date | null) {
           if (!value) return ''

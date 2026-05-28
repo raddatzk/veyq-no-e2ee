@@ -8,10 +8,12 @@ import { isoDateToLocalDate, localDateToIsoDate } from '../utils/isoDate'
 import type { SupportedLocale } from '../../i18n'
 
 const model = defineModel<string>({ required: true })
-defineProps<{
+const props = defineProps<{
   inputId?: string
   ariaLabel?: string
   required?: boolean
+  minDate?: string
+  maxDate?: string
 }>()
 
 const { locale } = useI18n()
@@ -23,6 +25,8 @@ const dateValue = computed<Date | null>({
     model.value = localDateToIsoDate(value)
   }
 })
+const minDateValue = computed(() => isoDateToLocalDate(props.minDate || '') ?? undefined)
+const maxDateValue = computed(() => isoDateToLocalDate(props.maxDate || '') ?? undefined)
 
 watch(
   locale,
@@ -70,6 +74,8 @@ function parseManualDate(value: string, currentLocale: SupportedLocale): Date | 
     :input-id="inputId"
     :aria-label="ariaLabel"
     :date-format="dateFormat"
+    :min-date="minDateValue"
+    :max-date="maxDateValue"
     :pt="{ panel: { class: 'veyq-date-panel' } }"
     :required="required"
     class="veyq-date-field"
@@ -77,7 +83,7 @@ function parseManualDate(value: string, currentLocale: SupportedLocale): Date | 
     icon="pi pi-calendar"
     icon-display="input"
     show-icon
-    :show-on-focus="false"
+    show-on-focus
     @blur="updateManualValue"
   />
 </template>

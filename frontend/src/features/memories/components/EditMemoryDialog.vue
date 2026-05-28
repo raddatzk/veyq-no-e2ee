@@ -41,6 +41,10 @@ watch(displayName, (value) => {
   if (!permalinkTouched.value) name.value = toPermalink(value)
 })
 
+watch(startDate, (value) => {
+  if (value && !endDate.value) endDate.value = value
+})
+
 watch(
   visible,
   (isVisible) => {
@@ -106,11 +110,21 @@ async function submit() {
       </label>
       <label>
         {{ t('memory.startDate') }}
-        <IsoDateField v-model="startDate" :aria-label="t('memory.startDate')" required />
+        <IsoDateField
+          v-model="startDate"
+          :aria-label="t('memory.startDate')"
+          :max-date="endDate"
+          required
+        />
       </label>
       <label>
         {{ t('memory.endDate') }}
-        <IsoDateField v-model="endDate" :aria-label="t('memory.endDate')" required />
+        <IsoDateField
+          v-model="endDate"
+          :aria-label="t('memory.endDate')"
+          :min-date="startDate"
+          required
+        />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     </form>
