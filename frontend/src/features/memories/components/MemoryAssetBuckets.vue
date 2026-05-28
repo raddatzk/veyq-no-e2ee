@@ -86,7 +86,13 @@ const activeBucket = computed(() =>
 
 const directBucketMedia = computed(() => {
   if (!activeBucket.value) return []
-  return props.media.filter((media) => media.bucketId === activeBucket.value?.id)
+  const mediaById = new Map<string, MemoryMedia>()
+  props.media
+    .filter((media) => media.bucketId === activeBucket.value?.id)
+    .forEach((media) => {
+      mediaById.set(media.id, media)
+    })
+  return [...mediaById.values()]
 })
 
 const cameraBuckets = computed<CameraBucket[]>(() => {

@@ -39,6 +39,22 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
   })
 
+  it('deduplicates repeated media ids inside the active bucket', () => {
+    const duplicated = media({ id: 'media-duplicate', bucketId: 'bucket-kevin' })
+    const wrapper = mount(MemoryAssetBuckets, {
+      props: {
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        buckets: [bucket({ id: 'bucket-kevin', displayName: 'Kevin' })],
+        media: [duplicated, { ...duplicated }]
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
+    expect(wrapper.find('.asset-camera-chip span').text()).toBe('1')
+  })
+
   it('selects one visible media item and submits only that item with offset seconds', async () => {
     const updateMetadataBatch = vi.fn().mockResolvedValue([
       media({ id: 'media-1', capturedAt: '2026-05-03T13:00:00Z' })

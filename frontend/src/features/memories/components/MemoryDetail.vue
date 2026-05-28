@@ -258,7 +258,11 @@ const localTotalMediaCount = computed(() =>
 const mediaCountLabel = computed(() => `${localTotalMediaCount.value} ${t('memory.mediaCount')}`)
 const visibleMedia = computed(() => {
   const merged = [...props.media, ...uploadedMediaList.value].filter((media) => !deletedMediaIds.value.has(media.id))
-  return merged.map((media) => mediaOverrides.value[media.id] || media)
+  const mediaById = new Map<string, MemoryMedia>()
+  merged.forEach((media) => {
+    mediaById.set(media.id, mediaOverrides.value[media.id] || media)
+  })
+  return [...mediaById.values()]
 })
 const visibleMediaCountByBucket = computed(() =>
   visibleMedia.value.reduce<Record<string, number>>((counts, media) => {

@@ -296,6 +296,24 @@ describe('MemoryDetail', () => {
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
   })
 
+  it('deduplicates repeated media ids before rendering gallery and buckets', async () => {
+    const duplicated = media({ id: 'media-duplicate', title: 'Same media', bucketId: 'bucket-source' })
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ directMediaCount: 1 }),
+        childMemories: [],
+        media: [duplicated, { ...duplicated }]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    const mediaGridProps = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
+    expect(mediaGridProps.map((item) => item.id)).toEqual(['media-duplicate'])
+    expect(wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('media')).toEqual(mediaGridProps)
+  })
+
   it('updates bucket counts after moving media locally', async () => {
     const moveMedia = vi.fn().mockResolvedValue([
       media({ id: 'media-1', bucketId: 'bucket-target' })
