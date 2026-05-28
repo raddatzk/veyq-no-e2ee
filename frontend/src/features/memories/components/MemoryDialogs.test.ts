@@ -776,7 +776,7 @@ function dialogStubs() {
       props: ['disabled', 'label', 'type']
     },
     Dialog: {
-      template: '<div v-if="visible"><slot /></div>',
+      template: '<div v-if="visible"><slot /><slot name="footer" /></div>',
       props: ['visible']
     },
     InputText: {

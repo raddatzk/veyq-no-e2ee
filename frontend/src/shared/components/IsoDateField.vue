@@ -70,13 +70,14 @@ function parseManualDate(value: string, currentLocale: SupportedLocale): Date | 
     :input-id="inputId"
     :aria-label="ariaLabel"
     :date-format="dateFormat"
+    :pt="{ panel: { class: 'veyq-date-panel' } }"
     :required="required"
-    append-to="self"
     class="veyq-date-field"
     fluid
     icon="pi pi-calendar"
     icon-display="input"
     show-icon
+    :show-on-focus="false"
     @blur="updateManualValue"
   />
 </template>
