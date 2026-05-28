@@ -7,6 +7,10 @@
   box-shadow: var(--app-shadow-md);
 }
 
+.login-card.login-card-wide {
+  width: min(680px, 100%);
+}
+
 .login-card .p-card-title {
   color: var(--app-text);
   font-size: 1.65rem;
@@ -133,6 +137,16 @@
 
 .form-message {
   margin-top: 1rem;
+}
+
+.passkey-link-submit .p-button-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .passkey-link-submit .p-button-label {
+    white-space: normal;
+  }
 }
 
 .tenant-list {

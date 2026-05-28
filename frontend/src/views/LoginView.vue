@@ -229,7 +229,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Card class="login-card">
+  <Card class="login-card" :class="{ 'login-card-wide': linkCode }">
     <template #title>{{ t('auth.login') }}</template>
     <template #content>
       <div v-if="linkCode" class="veyq-form">
@@ -241,6 +241,7 @@ onMounted(async () => {
         </Message>
         <Button
           type="button"
+          class="passkey-link-submit"
           :label="t('auth.passkeyLinkCreate', { domain: currentDomain() })"
           icon="pi pi-key"
           :loading="completingLink"

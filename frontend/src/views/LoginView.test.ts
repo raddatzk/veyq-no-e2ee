@@ -139,9 +139,9 @@ describe('LoginView', () => {
     const wrapper = mount(LoginView, { global: { plugins: [router], stubs: viewStubs() } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Passkey fuer')
+    expect(wrapper.text()).toContain('Passkey für')
     expect(wrapper.text()).toContain('anlegen')
-    expect(wrapper.text()).toContain('Passkeys sind aus Sicherheitsgruenden an eine Webseite gebunden')
+    expect(wrapper.text()).toContain('Passkeys sind aus Sicherheitsgründen an eine Webseite gebunden')
     expect(router.currentRoute.value.hash).toBe('')
     expect(router.currentRoute.value.query).toEqual({ redirect: '/memories' })
   })
@@ -155,7 +155,7 @@ describe('LoginView', () => {
     const wrapper = mount(LoginView, { global: { plugins: [router], stubs: viewStubs() } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Passkey fuer')
+    expect(wrapper.text()).toContain('Passkey für')
     expect(router.currentRoute.value.query).toEqual({ redirect: '/memories' })
   })
 
