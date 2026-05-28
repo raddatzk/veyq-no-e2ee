@@ -3,7 +3,8 @@
 }
 
 .settings-panel {
-  gap: 0.45rem;
+  display: grid;
+  gap: 1.35rem;
 }
 
 .settings-panel h1 {
@@ -17,7 +18,7 @@
 }
 
 .settings-form {
-  padding-top: 1rem;
+  padding-top: 1.2rem;
   border-top: 1px solid var(--app-line);
 }
 

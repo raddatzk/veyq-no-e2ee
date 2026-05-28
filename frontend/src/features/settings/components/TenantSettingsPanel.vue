@@ -459,9 +459,9 @@ function tenantInitial(value: string): string {
       </section>
 
       <section v-if="canDeleteTenant" class="settings-form settings-danger-zone">
-        <h2>{{ t('tenant.delete') }}</h2>
+        <h2>{{ t('tenant.dangerZone') }}</h2>
         <Button
-          :label="t('tenant.delete')"
+          :label="t('common.delete')"
           icon="pi pi-trash"
           severity="danger"
           outlined
@@ -499,7 +499,7 @@ function tenantInitial(value: string): string {
       </form>
     </Dialog>
 
-    <Dialog v-model:visible="deleteDialogVisible" :header="t('tenant.delete')" modal class="tenant-dialog">
+    <Dialog v-model:visible="deleteDialogVisible" :header="t('common.delete')" modal class="tenant-dialog">
       <div class="veyq-form">
         <p>
           {{ t('tenant.deleteConfirm', { name: tenantDisplayName }) }}

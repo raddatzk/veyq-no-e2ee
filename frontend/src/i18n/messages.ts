@@ -663,7 +663,8 @@ export const messages = {
     },
     tenant: {
       alreadyMember: 'Der User ist bereits Mitglied oder hat eine offene Einladung in diesem Bereich.',
-      delete: 'Gefährliche Zone',
+      dangerZone: 'Gefährliche Zone',
+      delete: 'Löschen',
       deleteConfirm: '{name} wirklich rekursiv löschen?',
       deleteFailed: 'Bereich konnte nicht gelöscht werden.',
       empty: 'Du hast aktuell noch keinen Bereich für deine Memories.',
@@ -1426,7 +1427,8 @@ export const messages = {
     },
     tenant: {
       alreadyMember: 'The user is already a member or has an open invitation in this space.',
-      delete: 'Danger zone',
+      dangerZone: 'Danger zone',
+      delete: 'Delete',
       deleteConfirm: 'Really delete {name} recursively?',
       deleteFailed: 'Space could not be deleted.',
       empty: 'You do not have a space for your Memories yet.',

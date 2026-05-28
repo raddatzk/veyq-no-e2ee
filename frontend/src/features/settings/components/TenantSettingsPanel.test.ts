@@ -281,10 +281,10 @@ describe('TenantSettingsPanel', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Gefährliche Zone'))!
+      .find((button) => button.text() === 'Löschen')!
       .trigger('click')
     const deleteButton = () =>
-      wrapper.findAll('button').find((button) => button.text() === 'Löschen')!
+      wrapper.findAll('button').filter((button) => button.text() === 'Löschen').at(-1)!
     expect(deleteButton().attributes('disabled')).toBeDefined()
 
     await wrapper.findAll('input').at(-1)!.setValue('Friends')
