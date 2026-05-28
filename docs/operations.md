@@ -369,13 +369,13 @@ ls -lah backups | tail
 
 Safe recovery: keep the failed instance stopped if it may be writing bad state. Restore the pre-upgrade `.env`, database and media backup together, and set `VEYQ_IMAGE` back to the previous working tag before `sudo docker compose up -d`.
 
-Prevention: run `doctor`, then `backup`, then `upgrade`. Prefer release tags over moving tags for real instances.
+Prevention: run `doctor`, then `backup`, then `upgrade`. Prefer release tags over moving tags for real instances. The helper script automatically adds safe defaults for new optional `.env` values during upgrade, but any new required secret or operator decision without a safe default must be handled manually and belongs in a new major channel.
 
 ### Auto-update fails
 
 Symptom: ServerOwner users see an automatic update failure in server settings, or `logs/auto-upgrade.log` reports a failed stage.
 
-Likely cause: the updater could not validate configuration, check the registry digest, create a backup, pull the image, restart veyq or observe a healthy container after restart.
+Likely cause: the updater could not reconcile or validate configuration, check the registry digest, create a backup, pull the image, restart veyq or observe a healthy container after restart.
 
 Inspect:
 
@@ -390,7 +390,7 @@ ls -lah backups | tail
 
 Safe recovery: inspect the failed stage first. If the app is unhealthy after a new image started, preserve logs and use the matching pre-update backup artifacts. Do not reset the database. If needed, set `VEYQ_IMAGE` to the previous exact `<major>.<buildNumber>` or `sha-*` tag and run `sudo docker compose up -d veyq`.
 
-Prevention: use a major-channel image such as `ghcr.io/raddatzk/veyq:1`, keep enough disk space for one database dump plus media archive, and leave `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` at one hour or higher.
+Prevention: use a major-channel image such as `ghcr.io/raddatzk/veyq:1`, keep enough disk space for one database dump plus media archive, and leave `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` at one hour or higher. Major-channel releases must not introduce new required `.env` decisions without a safe default; such changes require a new major version and a manual upgrade.
 
 ## Reset Sidecar
 

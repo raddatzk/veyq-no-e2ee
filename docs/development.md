@@ -192,6 +192,10 @@ sudo ./veyq-server.sh backup
 sudo ./veyq-server.sh upgrade
 ```
 
+The helper script keeps `.env` compatible with additive releases. During `upgrade` and `auto-upgrade`, it adds safe default values for newly introduced optional environment variables and records `VEYQ_ENV_SCHEMA_VERSION`. If a new release needs a secret or operator decision that has no safe default, `upgrade` stops before pulling or restarting containers and offers interactive setup when a terminal is available. `auto-upgrade` never prompts; it stops before pull/restart and reports the failure to ServerOwner users when updater notifications are configured.
+
+Within a major image channel, new environment variables must either be optional with a safe default or be handled by a migration that needs no operator decision. A new required variable without a safe default is a breaking operational change and must ship in a new major channel.
+
 Manual upgrade:
 
 1. Back up `.env`, the database and media storage.
@@ -205,7 +209,7 @@ veyq images are tagged as `<major>.<buildNumber>`, where `major` comes from the 
 
 To enable automatic compatible updates, set `VEYQ_IMAGE` to the major tag, add `updater` to `COMPOSE_PROFILES`, set `VEYQ_AUTO_UPDATE_ENABLED=true` and provide `VEYQ_UPDATER_NOTIFY_TOKEN`. The setup script can generate the token. The updater sidecar is not exposed through Traefik and checks for updates every `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` with random jitter.
 
-The auto-updater only updates the `veyq` application container. It runs `doctor`, compares the remote and local image digests, creates a backup, pulls the new image, restarts veyq and waits for the health check. Successful updates are written to the server update log; failed updates create a ServerOwner notification.
+The auto-updater only updates the `veyq` application container. It reconciles safe `.env` defaults, runs `doctor`, compares the remote and local image digests, creates a backup, pulls the new image, restarts veyq and waits for the health check. Successful updates are written to the server update log; failed updates create a ServerOwner notification.
 
 Back up at least these state locations before upgrading or testing destructive flows:
 

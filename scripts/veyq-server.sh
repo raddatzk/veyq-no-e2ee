@@ -7,6 +7,13 @@ VEYQ_REF="${VEYQ_REF:-main}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${VEYQ_REPO}/${VEYQ_REF}}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
+VEYQ_ENV_SCHEMA_VERSION="1"
+REQUIRED_ENV_KEYS=(VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD QUARKUS_WEBAUTHN_ORIGINS QUARKUS_WEBAUTHN_RELYING_PARTY_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD)
+SECRET_ENV_KEYS=(DB_PASSWORD DB_ROOT_PASSWORD MAIL_PASSWORD)
+DEFAULTABLE_ENV_KEYS=(VEYQ_ENV_SCHEMA_VERSION VEYQ_AUTO_UPDATE_ENABLED VEYQ_AUTO_UPDATE_INTERVAL_HOURS VEYQ_AUTO_UPDATE_JITTER_MINUTES)
+RESET_PROFILE_REQUIRED_ENV_KEYS=(RESET_TRAEFIK_RULE RESET_USERNAME RESET_PASSWORD)
+RESET_PROFILE_SECRET_ENV_KEYS=(RESET_PASSWORD)
+UPDATER_PROFILE_REQUIRED_ENV_KEYS=(VEYQ_UPDATER_NOTIFY_TOKEN)
 
 usage() {
   cat <<'USAGE'
@@ -61,9 +68,11 @@ install() {
     cp .env.template .env
     chmod 600 .env
     echo "Created $VEYQ_DIR/.env"
+    apply_env_defaults
     setup_default="y"
   else
     echo "Keeping existing $VEYQ_DIR/.env"
+    apply_env_defaults
     if env_needs_setup; then
       echo "Existing .env still needs setup."
       setup_default="y"
@@ -100,6 +109,7 @@ upgrade() {
   cp docker-compose.yml "backups/docker-compose.$(timestamp).yml" 2>/dev/null || true
   cp .env "backups/env.$(timestamp)" 2>/dev/null || true
   download_infra
+  ensure_env_ready_for_upgrade interactive
   pull_services
   compose up -d
   wait_for_health
@@ -121,6 +131,8 @@ setup_env() {
   require_file .env
 
   echo "Configuring $VEYQ_DIR/.env"
+  apply_env_defaults
+  set_env VEYQ_ENV_SCHEMA_VERSION "$VEYQ_ENV_SCHEMA_VERSION"
   local public_host letsencrypt_email image
   public_host="$(prompt "Public veyq host, without protocol" "$(webauthn_rp_id_default)")"
   letsencrypt_email="$(prompt "Let's Encrypt email" "$(env_value LETSENCRYPT_EMAIL "admin@example.com")")"
@@ -196,6 +208,107 @@ backup() {
   echo "Wrote backups/${name}.env, backups/${name}.sql and backups/${name}-media.tgz"
 }
 
+ensure_env_ready_for_upgrade() {
+  local mode="${1:-noninteractive}"
+  if reconcile_env && doctor; then
+    return 0
+  fi
+
+  echo "Environment is incomplete for this veyq version." >&2
+  if [ "$mode" = "interactive" ] && is_interactive && prompt_yes_no "Run interactive setup now?" "y"; then
+    setup_env
+    reconcile_env
+    doctor
+    return 0
+  fi
+
+  echo "Fix .env or run ./veyq-server.sh setup before upgrading." >&2
+  return 1
+}
+
+reconcile_env() {
+  local failed=0
+  apply_env_defaults
+
+  if ! validate_env; then
+    failed=1
+  fi
+  return "$failed"
+}
+
+apply_env_defaults() {
+  local key value
+  set_env VEYQ_ENV_SCHEMA_VERSION "$VEYQ_ENV_SCHEMA_VERSION"
+  for key in "${DEFAULTABLE_ENV_KEYS[@]}"; do
+    [ "$key" = "VEYQ_ENV_SCHEMA_VERSION" ] && continue
+    value="$(env_value "$key" "")"
+    if [ -z "$value" ]; then
+      value="$(default_env_value "$key")"
+      set_env "$key" "$value"
+      echo "Added default .env value: $key=$value"
+    fi
+  done
+}
+
+validate_env() {
+  local key failed=0
+  for key in "${REQUIRED_ENV_KEYS[@]}"; do
+    if ! check_env_required "$key"; then
+      failed=1
+    fi
+  done
+
+  for key in "${SECRET_ENV_KEYS[@]}"; do
+    if check_env_default_secret "$key"; then
+      failed=1
+    fi
+  done
+
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)'; then
+    for key in "${RESET_PROFILE_REQUIRED_ENV_KEYS[@]}"; do
+      if ! check_env_required "$key"; then
+        failed=1
+      fi
+    done
+    for key in "${RESET_PROFILE_SECRET_ENV_KEYS[@]}"; do
+      if check_env_default_secret "$key"; then
+        failed=1
+      fi
+    done
+  fi
+
+  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)updater(,|$)' || [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" = "true" ]; then
+    for key in "${UPDATER_PROFILE_REQUIRED_ENV_KEYS[@]}"; do
+      if ! check_env_required "$key"; then
+        failed=1
+      fi
+    done
+  fi
+
+  if ! check_media_storage_env; then
+    failed=1
+  fi
+
+  [ "$failed" -eq 0 ]
+}
+
+default_env_value() {
+  case "$1" in
+    VEYQ_ENV_SCHEMA_VERSION) printf '%s' "$VEYQ_ENV_SCHEMA_VERSION" ;;
+    VEYQ_AUTO_UPDATE_ENABLED) printf '%s' "false" ;;
+    VEYQ_AUTO_UPDATE_INTERVAL_HOURS) printf '%s' "6" ;;
+    VEYQ_AUTO_UPDATE_JITTER_MINUTES) printf '%s' "30" ;;
+    *)
+      echo "No default registered for $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+is_interactive() {
+  [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
 doctor() {
   require_command docker
   require_compose
@@ -205,34 +318,7 @@ doctor() {
 
   local failed=0
   echo "Checking $VEYQ_DIR"
-  for key in VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD QUARKUS_WEBAUTHN_ORIGINS QUARKUS_WEBAUTHN_RELYING_PARTY_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD; do
-    if ! check_env_required "$key"; then
-      failed=1
-    fi
-  done
-
-  for key in DB_PASSWORD DB_ROOT_PASSWORD MAIL_PASSWORD; do
-    if check_env_default_secret "$key"; then
-      failed=1
-    fi
-  done
-  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)'; then
-    for key in RESET_TRAEFIK_RULE RESET_USERNAME RESET_PASSWORD; do
-      if ! check_env_required "$key"; then
-        failed=1
-      fi
-    done
-    if check_env_default_secret RESET_PASSWORD; then
-      failed=1
-    fi
-  fi
-  if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)updater(,|$)' || [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" = "true" ]; then
-    if ! check_env_required VEYQ_UPDATER_NOTIFY_TOKEN; then
-      failed=1
-    fi
-  fi
-
-  if ! check_media_storage_env; then
+  if ! validate_env; then
     failed=1
   fi
 
@@ -289,14 +375,14 @@ auto_upgrade() {
     return 0
   fi
 
-  local stage="DOCTOR"
+  local stage="PRECHECK"
   local image=""
   local from_version=""
   local to_version=""
   local remote_digest=""
   trap 'notify_update_failed "$stage" "$from_version" "$to_version" "$image" "$remote_digest"; echo "[$(timestamp)] Auto-upgrade failed in stage $stage" >&2' ERR
 
-  doctor
+  ensure_env_ready_for_upgrade noninteractive
   image="$(env_value VEYQ_IMAGE "")"
   from_version="$(container_env veyq VEYQ_VERSION)"
 
@@ -810,32 +896,36 @@ check_env_default_secret() {
 
 env_needs_setup() {
   local key
-  for key in VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD QUARKUS_WEBAUTHN_ORIGINS QUARKUS_WEBAUTHN_RELYING_PARTY_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD; do
+  for key in "${REQUIRED_ENV_KEYS[@]}"; do
     if [ -z "$(env_value "$key" "")" ]; then
       return 0
     fi
   done
 
-  for key in DB_PASSWORD DB_ROOT_PASSWORD MAIL_PASSWORD; do
+  for key in "${SECRET_ENV_KEYS[@]}"; do
     case "$(env_value "$key" "")" in
       change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
     esac
   done
 
   if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)reset(,|$)'; then
-    for key in RESET_TRAEFIK_RULE RESET_USERNAME RESET_PASSWORD; do
+    for key in "${RESET_PROFILE_REQUIRED_ENV_KEYS[@]}"; do
       if [ -z "$(env_value "$key" "")" ]; then
         return 0
       fi
     done
-    case "$(env_value RESET_PASSWORD "")" in
-      change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
-    esac
+    for key in "${RESET_PROFILE_SECRET_ENV_KEYS[@]}"; do
+      case "$(env_value "$key" "")" in
+        change-me|change-root-me|change-mail-me|change-reset-me) return 0 ;;
+      esac
+    done
   fi
   if env_value COMPOSE_PROFILES "" | grep -Eq '(^|,)updater(,|$)' || [ "$(env_value VEYQ_AUTO_UPDATE_ENABLED "false")" = "true" ]; then
-    if [ -z "$(env_value VEYQ_UPDATER_NOTIFY_TOKEN "")" ]; then
-      return 0
-    fi
+    for key in "${UPDATER_PROFILE_REQUIRED_ENV_KEYS[@]}"; do
+      if [ -z "$(env_value "$key" "")" ]; then
+        return 0
+      fi
+    done
   fi
 
   return 1
