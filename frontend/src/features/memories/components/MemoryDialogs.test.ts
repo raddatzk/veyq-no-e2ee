@@ -334,6 +334,54 @@ describe('Memory detail dialogs', () => {
     }, expect.any(Object))
   })
 
+  it('keeps the submitted bucket for every queued file when the visible bucket changes', async () => {
+    const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
+    const second = new File(['second'], 'clip.mov', { type: 'video/quicktime' })
+    const resolvers: Array<() => void> = []
+    const uploadMedia = vi.fn(
+      () =>
+        new Promise<MemoryMedia>((resolve) => {
+          resolvers.push(() => resolve(media()))
+        })
+    )
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        bucketId: 'bucket-a',
+        uploadMedia
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadMedia).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ bucketId: 'bucket-b' })
+    resolvers[0]()
+    await flushPromises()
+
+    expect(uploadMedia).toHaveBeenCalledTimes(2)
+    expect(uploadMedia).toHaveBeenNthCalledWith(1, 'mem-1', {
+      file: first,
+      title: 'beach.jpg',
+      bucketId: 'bucket-a'
+    }, expect.any(Object))
+    expect(uploadMedia).toHaveBeenNthCalledWith(2, 'mem-1', {
+      file: second,
+      title: 'clip.mov',
+      bucketId: 'bucket-a'
+    }, expect.any(Object))
+
+    resolvers[1]()
+    await flushPromises()
+  })
+
   it('starts a background upload batch and closes the dialog', async () => {
     const first = new File(['first-file'], 'beach.jpg', { type: 'image/jpeg' })
     const uploaded = media({ id: 'media-uploaded', title: 'Beach' })

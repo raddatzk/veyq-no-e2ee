@@ -66,12 +66,14 @@ async function submit() {
   loading.value = true
   try {
     const memoryId = props.memoryId
+    const bucketId = props.bucketId ?? undefined
     startUploadBatch({
       label: t('media.uploadBatchTitle', { count: files.value.length }),
       files: [...files.value],
       context: { type: 'memory', tenantName: props.tenantName, memoryId },
       uploadFile: (file, options) => {
-        const request = { file, title: file.name, bucketId: props.bucketId ?? undefined }
+        const request: UploadMemoryMediaRequest = { file, title: file.name }
+        if (bucketId) request.bucketId = bucketId
         return props.uploadMedia
           ? props.uploadMedia(memoryId, request, options)
           : uploadMemoryMedia(props.tenantName, memoryId, request, options)
