@@ -840,7 +840,8 @@ set_env() {
       }
       { print }
     ' .env > "$tmp"
-    mv "$tmp" .env
+    cat "$tmp" > .env
+    rm -f "$tmp"
   else
     printf '\n%s=%s\n' "$key" "$value" >> .env
     rm -f "$tmp"
@@ -855,7 +856,8 @@ remove_env() {
   if grep -qE "^${key}=" .env; then
     tmp="$(mktemp)"
     awk -v key="$key" '$0 !~ "^" key "=" { print }' .env > "$tmp"
-    mv "$tmp" .env
+    cat "$tmp" > .env
+    rm -f "$tmp"
   fi
 }
 

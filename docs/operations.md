@@ -377,6 +377,8 @@ Symptom: ServerOwner users see an automatic update failure in server settings, o
 
 Likely cause: the updater could not reconcile or validate configuration, check the registry digest, create a backup, pull the image, restart veyq or observe a healthy container after restart.
 
+If `logs/auto-upgrade.log` or a manual command reports `Cannot read /opt/veyq/.env`, `Cannot write /opt/veyq/.env` or `Permission denied`, the updater may have run an older helper script that replaced `.env` from inside the root-owned sidecar container.
+
 Inspect:
 
 ```bash
@@ -389,6 +391,15 @@ ls -lah backups | tail
 ```
 
 Safe recovery: inspect the failed stage first. If the app is unhealthy after a new image started, preserve logs and use the matching pre-update backup artifacts. Do not reset the database. If needed, set `VEYQ_IMAGE` to the previous exact `<major>.<buildNumber>` or `sha-*` tag and run `sudo docker compose up -d veyq`.
+
+For a root-owned `.env`, repair ownership once, keep restrictive permissions, then rerun the command with the same user that owns the install directory:
+
+```bash
+cd /opt/veyq
+sudo chown "$(stat -c '%U:%G' .)" .env
+chmod 600 .env
+./veyq-server.sh doctor
+```
 
 Prevention: use a major-channel image such as `ghcr.io/raddatzk/veyq:1`, keep enough disk space for one database dump plus media archive, and leave `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` at one hour or higher. Major-channel releases must not introduce new required `.env` decisions without a safe default; such changes require a new major version and a manual upgrade.
 
