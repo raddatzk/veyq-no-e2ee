@@ -55,6 +55,32 @@ class MemoryMigrationTest {
                     select column_name
                     from information_schema.columns
                     where table_schema = 'veyq'
+                        and table_name = 'veyq_tenant'
+                    """.trimIndent()
+                ).use { rows ->
+                    val columns = mutableListOf<String>()
+                    while (rows.next()) columns += rows.getString("column_name")
+                    assertThat(columns).contains("terms_markdown_by_locale", "terms_version")
+                }
+
+                statement.executeQuery(
+                    """
+                    select column_name
+                    from information_schema.columns
+                    where table_schema = 'veyq'
+                        and table_name = 'veyq_memory_share'
+                    """.trimIndent()
+                ).use { rows ->
+                    val columns = mutableListOf<String>()
+                    while (rows.next()) columns += rows.getString("column_name")
+                    assertThat(columns).contains("notice_markdown_by_locale", "notice_version")
+                }
+
+                statement.executeQuery(
+                    """
+                    select column_name
+                    from information_schema.columns
+                    where table_schema = 'veyq'
                         and table_name = 'veyq_media'
                     """.trimIndent()
                 ).use { rows ->
@@ -78,6 +104,7 @@ class MemoryMigrationTest {
                         "tenant_id",
                         "content_sha256",
                         "storage_key",
+                        "thumbnail_storage_key",
                         "preview_storage_key",
                         "mime_type",
                         "size_bytes",

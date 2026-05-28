@@ -92,6 +92,12 @@ export interface MemoryMediaSummary {
      * @type {string}
      * @memberof MemoryMediaSummary
      */
+    thumbnailUrl?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof MemoryMediaSummary
+     */
     previewUrl?: string;
     /**
      * 
@@ -173,6 +179,7 @@ export function MemoryMediaSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'mimeType': json['mimeType'],
         'sizeBytes': json['sizeBytes'],
         'contentUrl': json['contentUrl'],
+        'thumbnailUrl': json['thumbnailUrl'] == null ? undefined : json['thumbnailUrl'],
         'previewUrl': json['previewUrl'] == null ? undefined : json['previewUrl'],
         'cameraMake': json['cameraMake'] == null ? undefined : json['cameraMake'],
         'cameraModel': json['cameraModel'] == null ? undefined : json['cameraModel'],
@@ -205,6 +212,7 @@ export function MemoryMediaSummaryToJSONTyped(value?: MemoryMediaSummary | null,
         'mimeType': value['mimeType'],
         'sizeBytes': value['sizeBytes'],
         'contentUrl': value['contentUrl'],
+        'thumbnailUrl': value['thumbnailUrl'],
         'previewUrl': value['previewUrl'],
         'cameraMake': value['cameraMake'],
         'cameraModel': value['cameraModel'],

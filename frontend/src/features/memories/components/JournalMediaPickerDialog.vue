@@ -35,7 +35,7 @@ function isVideoMedia(media: MemoryMedia): boolean {
 }
 
 function mediaPickerThumbnail(media: MemoryMedia): string {
-  return `${API_BASE}${media.previewUrl || media.contentUrl}`
+  return `${API_BASE}${media.thumbnailUrl || media.previewUrl || media.contentUrl}`
 }
 
 function mediaPickerDate(media: MemoryMedia): string {

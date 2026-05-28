@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -37,11 +37,7 @@ const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
 const previewUrl = computed(() =>
   props.media.previewUrl ? `${API_BASE}${props.media.previewUrl}` : null
 )
-const originalImageLoaded = ref(false)
-let imageLoadToken = 0
-const displayImageUrl = computed(() =>
-  previewUrl.value && !originalImageLoaded.value ? previewUrl.value : mediaUrl.value
-)
+const displayImageUrl = computed(() => previewUrl.value || mediaUrl.value)
 const isImage = computed(() => props.media.mimeType?.startsWith('image/'))
 const isVideo = computed(() => props.media.mimeType?.startsWith('video/'))
 const title = computed(() => props.media.title || props.media.id)
@@ -52,6 +48,11 @@ const capturedAtInput = ref('')
 const saveError = ref('')
 const isSaving = ref(false)
 const dragStartY = ref<number | null>(null)
+const fullscreenTarget = ref<HTMLElement | null>(null)
+const fullscreenOpen = ref(false)
+const fullscreenOriginalLoaded = ref(false)
+const fullscreenError = ref('')
+const canUseFullscreen = ref(false)
 const displayCapturedAt = computed(() => props.media.capturedAt || '')
 const camera = computed(() =>
   [props.media.cameraMake, props.media.cameraModel].filter(Boolean).join(' ').trim()
@@ -79,6 +80,9 @@ const uploaderLink = computed(() =>
 )
 const canEditMetadata = computed(() => props.canEditMetadata !== false)
 const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMedia))
+const canFullscreenOriginal = computed(() =>
+  canUseFullscreen.value && (isImage.value || isVideo.value)
+)
 const metadataRows = computed(() =>
   [
     { label: t('media.capturedAt'), value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
@@ -91,28 +95,24 @@ const metadataRows = computed(() =>
   ].filter((row) => row.value)
 )
 
+onMounted(() => {
+  canUseFullscreen.value =
+    document.fullscreenEnabled !== false && typeof document.documentElement.requestFullscreen === 'function'
+  document.addEventListener('fullscreenchange', handleFullscreenChange)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
+})
+
 watch(
   () => props.media.id,
   () => {
     isEditingCapturedAt.value = false
     capturedAtInput.value = isoToDatetimeLocal(props.media.capturedAt)
     saveError.value = ''
-  },
-  { immediate: true }
-)
-
-watch(
-  [() => props.media.id, mediaUrl, previewUrl, isImage],
-  () => {
-    const token = ++imageLoadToken
-    originalImageLoaded.value = !isImage.value || !previewUrl.value
-    if (!isImage.value || !previewUrl.value) return
-
-    const image = new Image()
-    image.onload = () => {
-      if (token === imageLoadToken) originalImageLoaded.value = true
-    }
-    image.src = mediaUrl.value
+    fullscreenError.value = ''
+    fullscreenOriginalLoaded.value = !isImage.value
   },
   { immediate: true }
 )
@@ -189,6 +189,28 @@ async function deleteCurrentMedia() {
   }
 }
 
+async function openOriginalFullscreen() {
+  if (!canFullscreenOriginal.value) return
+  fullscreenError.value = ''
+  fullscreenOpen.value = true
+  fullscreenOriginalLoaded.value = !isImage.value
+  await nextTick()
+  try {
+    await fullscreenTarget.value?.requestFullscreen()
+  } catch (error) {
+    fullscreenOpen.value = false
+    fullscreenOriginalLoaded.value = false
+    fullscreenError.value = error instanceof Error ? error.message : ''
+  }
+}
+
+function handleFullscreenChange() {
+  if (document.fullscreenElement !== fullscreenTarget.value) {
+    fullscreenOpen.value = false
+    fullscreenOriginalLoaded.value = false
+  }
+}
+
 function onSheetPointerDown(event: PointerEvent) {
   dragStartY.value = event.clientY
 }
@@ -225,6 +247,16 @@ function onSheetPointerUp(event: PointerEvent) {
           <span class="pi pi-download" />
         </a>
         <button
+          v-if="canFullscreenOriginal"
+          class="lightbox-icon-button"
+          type="button"
+          :aria-label="t('media.fullscreenOriginal')"
+          :title="t('media.fullscreenOriginal')"
+          @click="openOriginalFullscreen"
+        >
+          <span class="pi pi-window-maximize" />
+        </button>
+        <button
           class="lightbox-icon-button"
           type="button"
           :aria-label="t('media.closeLightbox')"
@@ -248,6 +280,7 @@ function onSheetPointerUp(event: PointerEvent) {
         </button>
 
         <div class="media-lightbox-stage">
+          <p v-if="fullscreenError" class="media-lightbox-error">{{ fullscreenError }}</p>
           <img v-if="isImage" :src="displayImageUrl" :alt="title" />
           <video
             v-else-if="isVideo"
@@ -271,6 +304,50 @@ function onSheetPointerUp(event: PointerEvent) {
         </button>
       </section>
 
+      <div
+        v-if="fullscreenOpen"
+        ref="fullscreenTarget"
+        class="media-original-fullscreen"
+      >
+        <button
+          class="lightbox-nav lightbox-nav-previous media-original-nav"
+          type="button"
+          :aria-label="t('media.previous')"
+          :disabled="!canShowPrevious"
+          @click="$emit('previous')"
+        >
+          <span class="pi pi-chevron-left" />
+        </button>
+        <div v-if="isImage && !fullscreenOriginalLoaded" class="media-original-loading">
+          <span class="pi pi-spin pi-spinner" />
+          <span>{{ t('media.originalLoading') }}</span>
+        </div>
+        <img
+          v-if="isImage"
+          :src="mediaUrl"
+          :alt="title"
+          :class="{ 'media-original-loaded': fullscreenOriginalLoaded }"
+          @load="fullscreenOriginalLoaded = true"
+        />
+        <video
+          v-else-if="isVideo"
+          :src="mediaUrl"
+          :poster="previewUrl || undefined"
+          controls
+          autoplay
+          playsinline
+        />
+        <button
+          class="lightbox-nav lightbox-nav-next media-original-nav"
+          type="button"
+          :aria-label="t('media.next')"
+          :disabled="!canShowNext"
+          @click="$emit('next')"
+        >
+          <span class="pi pi-chevron-right" />
+        </button>
+      </div>
+
       <aside
         class="media-lightbox-details"
         :class="{ 'media-lightbox-details-open': isDetailsOpen }"
@@ -286,23 +363,26 @@ function onSheetPointerUp(event: PointerEvent) {
         />
         <div class="media-lightbox-details-header">
           <h2>{{ t('media.information') }}</h2>
-          <button
-            v-if="canDeleteMedia"
-            class="lightbox-text-button"
-            type="button"
-            :disabled="isSaving"
-            @click="deleteCurrentMedia"
-          >
-            {{ t('common.delete') }}
-          </button>
-          <button
-            v-if="canEditMetadata"
-            class="lightbox-text-button"
-            type="button"
-            @click="startCapturedAtEdit"
-          >
-            {{ t('media.capturedAtEdit') }}
-          </button>
+          <div class="media-lightbox-details-actions">
+            <button
+              v-if="canEditMetadata"
+              class="lightbox-text-button"
+              type="button"
+              @click="startCapturedAtEdit"
+            >
+              {{ t('media.capturedAtEdit') }}
+            </button>
+            <button
+              v-if="canDeleteMedia"
+              class="lightbox-icon-button lightbox-delete-button"
+              type="button"
+              :aria-label="t('common.delete')"
+              :disabled="isSaving"
+              @click="deleteCurrentMedia"
+            >
+              <span class="pi pi-trash" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <form v-if="isEditingCapturedAt" class="media-lightbox-date-form" @submit.prevent="saveCapturedAt">

@@ -790,6 +790,37 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteAllMemoryMedia
+      summary: Delete all direct media from a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '204':
+          description: Direct Memory media deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/media/uploads":
     post:
       tags:
@@ -1464,6 +1495,41 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}":
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMedia
+      summary: Delete one memory media item
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+        - The media belongs directly to the addressed Memory.
+      description: |-
+        Deletes one media item directly assigned to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+        - The media belongs directly to the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '204':
+          description: Memory media deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/media/metadata-batch":
     patch:
       tags:
@@ -1570,6 +1636,38 @@ paths:
                 type: string
                 format: binary
               example: "<binary jpeg preview>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/thumbnail":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaThumbnail
+      summary: Download memory media thumbnail
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media thumbnail.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg thumbnail>"
         '401':
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
@@ -3288,6 +3386,9 @@ components:
           format: int64
         contentUrl:
           type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
         previewUrl:
           type: string
           nullable: true
@@ -3331,6 +3432,7 @@ components:
         mimeType: image/jpeg
         sizeBytes: 2048000
         contentUrl: /api/friends/memory-media/med_abc123/content
+        thumbnailUrl: /api/friends/memory-media/med_abc123/thumbnail
         previewUrl: /api/friends/memory-media/med_abc123/preview
         cameraMake: Fujifilm
         cameraModel: X100VI

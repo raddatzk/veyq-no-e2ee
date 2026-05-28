@@ -289,7 +289,7 @@ async function removeCover() {
           @click="selectMedia(mediaItem)"
         >
           <img
-            :src="`${API_BASE}${mediaItem.previewUrl || mediaItem.contentUrl}`"
+            :src="`${API_BASE}${mediaItem.thumbnailUrl || mediaItem.previewUrl || mediaItem.contentUrl}`"
             :alt="mediaItem.title || mediaItem.id"
           />
           <strong>{{ mediaItem.title || mediaItem.id }}</strong>

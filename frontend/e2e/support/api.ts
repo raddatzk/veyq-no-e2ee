@@ -177,6 +177,7 @@ export const geotaggedMedia = {
   mimeType: 'image/jpeg',
   sizeBytes: 12,
   contentUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/media/media-map-e2e/content',
+  thumbnailUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/media/media-map-e2e/thumbnail',
   previewUrl: '/api/public-shares/shr-e2e/memories/memory-wedding/media/media-map-e2e/preview',
   cameraMake: null,
   cameraModel: null,
@@ -745,7 +746,10 @@ export async function mockPublicViewerShareApi(
 
     if (
       method === 'GET' &&
-      url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media/media-map-e2e/preview`
+      (
+        url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media/media-map-e2e/thumbnail` ||
+        url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media/media-map-e2e/preview`
+      )
     ) {
       await fulfillPng(route)
       return
@@ -843,6 +847,7 @@ export async function mockPublicUploaderShareApi(
         updatedAt: '2026-05-24T10:00:00Z',
         uploader: { type: 'SHARE_GUEST', displayName: 'Gast' },
         contentUrl: '/api/public-shares/shr-upload/media/med-public-e2e/content',
+        thumbnailUrl: '/api/public-shares/shr-upload/media/med-public-e2e/thumbnail',
         previewUrl: '/api/public-shares/shr-upload/media/med-public-e2e/preview'
       })
       return

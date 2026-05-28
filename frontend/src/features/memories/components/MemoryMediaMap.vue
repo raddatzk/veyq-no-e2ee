@@ -78,7 +78,7 @@ const canShowNext = computed(
 )
 const mapSignature = computed(() =>
   geotaggedMedia.value
-    .map((media) => `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.previewUrl}`)
+    .map((media) => `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.thumbnailUrl}:${media.previewUrl}`)
     .join('|')
 )
 
@@ -253,8 +253,8 @@ function createMarkerIcon(group: MapMarkerGroup) {
   root.className = 'memory-media-map-marker'
   if (group.media.length > 1) root.classList.add('memory-media-map-marker-cluster')
 
-  if (media.previewUrl || media.mimeType.startsWith('image/')) {
-    root.style.backgroundImage = `url("${API_BASE}${media.previewUrl || media.contentUrl}")`
+  if (media.thumbnailUrl || media.previewUrl || media.mimeType.startsWith('image/')) {
+    root.style.backgroundImage = `url("${API_BASE}${media.thumbnailUrl || media.previewUrl || media.contentUrl}")`
   } else {
     const icon = document.createElement('span')
     icon.className = 'pi pi-video'

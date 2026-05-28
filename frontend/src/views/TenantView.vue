@@ -36,6 +36,7 @@ const {
   load,
   loading,
   media,
+  mediaLoading,
   memories,
   memory,
   memoryBreadcrumbs,
@@ -85,7 +86,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
   <div class="memory-page memory-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading && !memory && !navigation" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('memory.loading') }}</span>
     </div>
@@ -98,6 +99,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :media-loading="mediaLoading"
       :playlists="playlists"
       :tracks="tracks"
       :active-tab="activeMemoryTab"

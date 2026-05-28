@@ -95,7 +95,7 @@ function renderMediaBlock(mediaIds: string, caption: string): JournalMediaBlock 
 }
 
 function mediaSource(media: MemoryMedia): string {
-  return `${API_BASE}${media.previewUrl || media.contentUrl}`
+  return `${API_BASE}${media.thumbnailUrl || media.previewUrl || media.contentUrl}`
 }
 
 function mediaContentSource(media: MemoryMedia): string {

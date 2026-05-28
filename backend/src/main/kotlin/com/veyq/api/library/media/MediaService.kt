@@ -527,6 +527,7 @@ class MediaService @Inject constructor(
             mediaMetadataExtractor.apply(it, prepared.metadata)
             mediaBlobRepo.persist(it)
             mediaBlobRepo.flush()
+            generatePreviewIfSupported(it)
         }
 
     private fun createMediaBlob(
@@ -822,6 +823,21 @@ class MediaService @Inject constructor(
         return MemoryMediaBatchResponse(media = updated.map { it.toMemorySummary() })
     }
 
+    @Transactional
+    fun deleteMemoryMedia(memoryId: String, mediaId: String) {
+        val memory = resolveVisibleMemory(memoryId)
+        val media = mediaRepo.findByTenantAndPublicId(tenant(), mediaId)
+            ?: throw NotFoundException("Media not found")
+        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        deleteMedia(media)
+    }
+
+    @Transactional
+    fun deleteAllMemoryMedia(memoryId: String) {
+        val memory = resolveVisibleMemory(memoryId)
+        mediaRepo.listByMemory(memory).forEach(::deleteMedia)
+    }
+
     fun mediaContent(publicId: String, rangeHeader: String?): Response {
         val media = resolveAccessibleMedia(publicId)
         return streamOriginal(media, rangeHeader)
@@ -869,18 +885,49 @@ class MediaService @Inject constructor(
         return streamPreview(media)
     }
 
+    fun mediaThumbnail(publicId: String): Response {
+        val media = resolveAccessibleMedia(publicId)
+        return streamThumbnail(media)
+    }
+
+    fun streamThumbnail(media: Media): Response {
+        if (media.blob.thumbnailStorageKey == null) throw NotFoundException("Media thumbnail not found")
+        return streamDerivative(
+            media = media,
+            path = thumbnailPath(media.blob),
+            filenameSuffix = "thumbnail",
+            description = "thumbnail",
+            generate = { generateThumbnail(it, throwOnFailure = false) },
+        )
+    }
+
     fun streamPreview(media: Media): Response {
+        return streamDerivative(
+            media = media,
+            path = previewPath(media.blob),
+            filenameSuffix = "preview",
+            description = "preview",
+            generate = { generatePreview(it, throwOnFailure = false) },
+        )
+    }
+
+    private fun streamDerivative(
+        media: Media,
+        path: Path,
+        filenameSuffix: String,
+        description: String,
+        generate: (MediaBlob) -> Boolean,
+    ): Response {
         if (!canGeneratePreview(media.blob)) throw NotFoundException("Media not found")
 
-        val previewPath = previewPath(media.blob)
-        if (!Files.isRegularFile(previewPath)) {
-            if (!generatePreview(media.blob, throwOnFailure = false)) throw NotFoundException("Media preview not found")
+        if (!Files.isRegularFile(path)) {
+            if (!generate(media.blob)) throw NotFoundException("Media $description not found")
         }
 
-        return Response.ok(previewPath.toFile(), "image/jpeg")
+        return Response.ok(path.toFile(), "image/jpeg")
             .header("Cache-Control", "private, max-age=31536000, immutable")
-            .header("Content-Length", Files.size(previewPath))
-            .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(media.publicId)}-preview.jpg\"")
+            .header("Content-Length", Files.size(path))
+            .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(media.publicId)}-$filenameSuffix.jpg\"")
             .header("X-Content-Type-Options", "nosniff")
             .build()
     }
@@ -894,6 +941,14 @@ class MediaService @Inject constructor(
         blob.delete()
         mediaBlobRepo.flush()
         deleteRecursively(directory)
+    }
+
+    private fun deleteMedia(media: Media) {
+        memoryRepo.list("coverMedia = ?1", media).forEach { it.coverMedia = null }
+        val blob = media.blob
+        media.delete()
+        mediaRepo.flush()
+        deleteBlobIfUnreferenced(blob)
     }
 
     private fun resolveAccessibleMedia(publicId: String): Media {
@@ -1060,51 +1115,94 @@ class MediaService @Inject constructor(
 
     private fun generatePreviewIfSupported(blob: MediaBlob) {
         if (!canGeneratePreview(blob)) return
+        generateThumbnail(blob, throwOnFailure = false)
         generatePreview(blob, throwOnFailure = false)
     }
 
+    private fun generateThumbnail(blob: MediaBlob, throwOnFailure: Boolean): Boolean =
+        generateDerivative(
+            blob = blob,
+            targetPath = thumbnailPath(blob),
+            maxEdge = THUMBNAIL_MAX_EDGE,
+            logLabel = "thumbnail",
+            throwOnFailure = throwOnFailure,
+            assignStorageKey = { thumbnailStorageKey = thumbnailStorageKey(this) },
+        )
+
     private fun generatePreview(blob: MediaBlob, throwOnFailure: Boolean): Boolean {
+        return generateDerivative(
+            blob = blob,
+            targetPath = previewPath(blob),
+            maxEdge = PREVIEW_MAX_EDGE,
+            logLabel = "preview",
+            throwOnFailure = throwOnFailure,
+            assignStorageKey = { previewStorageKey = previewStorageKey(this) },
+        )
+    }
+
+    private fun generateDerivative(
+        blob: MediaBlob,
+        targetPath: Path,
+        maxEdge: Int,
+        logLabel: String,
+        throwOnFailure: Boolean,
+        assignStorageKey: MediaBlob.() -> Unit,
+    ): Boolean {
         val originalPath = storagePath(blob.storageKey)
         if (!Files.isRegularFile(originalPath)) return false
         return when {
-            blob.mimeType.startsWith("image/") -> generateImagePreview(blob, originalPath, throwOnFailure)
-            blob.mimeType.startsWith("video/") -> generateVideoPreview(blob, originalPath, throwOnFailure)
+            blob.mimeType.startsWith("image/") -> generateImageDerivative(blob, originalPath, targetPath, maxEdge, logLabel, throwOnFailure, assignStorageKey)
+            blob.mimeType.startsWith("video/") -> generateVideoDerivative(blob, originalPath, targetPath, maxEdge, logLabel, throwOnFailure, assignStorageKey)
             else -> false
         }
     }
 
-    private fun generateImagePreview(blob: MediaBlob, originalPath: Path, throwOnFailure: Boolean): Boolean {
-        val previewPath = previewPath(blob)
-        Files.createDirectories(previewPath.parent)
-        val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
+    private fun generateImageDerivative(
+        blob: MediaBlob,
+        originalPath: Path,
+        targetPath: Path,
+        maxEdge: Int,
+        logLabel: String,
+        throwOnFailure: Boolean,
+        assignStorageKey: MediaBlob.() -> Unit,
+    ): Boolean {
+        Files.createDirectories(targetPath.parent)
+        val temp = Files.createTempFile(targetPath.parent, "$logLabel-", ".jpg")
         try {
             val source = ImageIO.read(originalPath.toFile()) ?: return false
             val orientedSource = MediaImageOrientation.apply(
                 source,
                 mediaMetadataExtractor.extractOrientation(originalPath)
             )
-            val scale = minOf(1.0, PREVIEW_MAX_EDGE.toDouble() / maxOf(orientedSource.width, orientedSource.height).toDouble())
+            val scale = minOf(1.0, maxEdge.toDouble() / maxOf(orientedSource.width, orientedSource.height).toDouble())
             val targetWidth = maxOf(1, (orientedSource.width * scale).toInt())
             val targetHeight = maxOf(1, (orientedSource.height * scale).toInt())
             val preview = MediaImageOrientation.resize(orientedSource, targetWidth, targetHeight)
             if (!ImageIO.write(preview, "jpg", temp.toFile())) return false
-            Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            blob.previewStorageKey = previewStorageKey(blob)
+            Files.move(temp, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            blob.assignStorageKey()
             return true
         } catch (e: Exception) {
             if (throwOnFailure) throw e
-            log.warn("Failed to generate media preview for blob ${blob.id}: ${e.message}")
+            log.warn("Failed to generate media $logLabel for blob ${blob.id}: ${e.message}")
             return false
         } finally {
             Files.deleteIfExists(temp)
         }
     }
 
-    private fun generateVideoPreview(blob: MediaBlob, originalPath: Path, throwOnFailure: Boolean): Boolean {
-        val previewPath = previewPath(blob)
-        Files.createDirectories(previewPath.parent)
-        val temp = Files.createTempFile(previewPath.parent, "preview-", ".jpg")
-        val logFile = Files.createTempFile(previewPath.parent, "preview-", ".log")
+    private fun generateVideoDerivative(
+        blob: MediaBlob,
+        originalPath: Path,
+        targetPath: Path,
+        maxEdge: Int,
+        logLabel: String,
+        throwOnFailure: Boolean,
+        assignStorageKey: MediaBlob.() -> Unit,
+    ): Boolean {
+        Files.createDirectories(targetPath.parent)
+        val temp = Files.createTempFile(targetPath.parent, "$logLabel-", ".jpg")
+        val logFile = Files.createTempFile(targetPath.parent, "$logLabel-", ".log")
         try {
             val process = ProcessBuilder(
                 mediaConfig.ffmpegPath,
@@ -1119,7 +1217,7 @@ class MediaService @Inject constructor(
                 "-frames:v",
                 "1",
                 "-vf",
-                "scale=720:720:force_original_aspect_ratio=decrease",
+                "scale=$maxEdge:$maxEdge:force_original_aspect_ratio=decrease",
                 "-q:v",
                 "3",
                 temp.toString(),
@@ -1138,12 +1236,12 @@ class MediaService @Inject constructor(
                 throw IOException("ffmpeg exited with ${process.exitValue()}: $message")
             }
             if (!Files.isRegularFile(temp) || Files.size(temp) <= 0) return false
-            Files.move(temp, previewPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            blob.previewStorageKey = previewStorageKey(blob)
+            Files.move(temp, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            blob.assignStorageKey()
             return true
         } catch (e: Exception) {
             if (throwOnFailure) throw e
-            log.warn("Failed to generate media preview for blob ${blob.id}: ${e.message}")
+            log.warn("Failed to generate media $logLabel for blob ${blob.id}: ${e.message}")
             return false
         } finally {
             Files.deleteIfExists(temp)
@@ -1224,6 +1322,7 @@ class MediaService @Inject constructor(
             mimeType = blob.mimeType,
             sizeBytes = blob.sizeBytes,
             contentUrl = contentUrl(),
+            thumbnailUrl = thumbnailUrl(),
             previewUrl = previewUrl(),
             cameraMake = blob.cameraMake,
             cameraModel = blob.cameraModel,
@@ -1246,6 +1345,7 @@ class MediaService @Inject constructor(
             mimeType = blob.mimeType,
             sizeBytes = blob.sizeBytes,
             contentUrl = "/api/public-shares/${url(shareId)}/media/${url(publicId)}/content",
+            thumbnailUrl = if (hasThumbnail(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/thumbnail" else null,
             previewUrl = if (canGeneratePreview(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
             gpsLatitude = blob.gpsLatitude,
             gpsLongitude = blob.gpsLongitude,
@@ -1279,11 +1379,23 @@ class MediaService @Inject constructor(
     private fun Media.contentUrl(): String =
         "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"
 
+    private fun Media.thumbnailUrl(): String? =
+        if (hasThumbnail(blob)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/thumbnail" else null
+
     private fun Media.previewUrl(): String? =
         if (canGeneratePreview(blob)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/preview" else null
 
+    private fun hasThumbnail(blob: MediaBlob): Boolean =
+        blob.thumbnailStorageKey != null
+
     private fun canGeneratePreview(blob: MediaBlob): Boolean =
         blob.mimeType.startsWith("image/") || blob.mimeType.startsWith("video/")
+
+    private fun thumbnailPath(blob: MediaBlob): Path =
+        storagePath(blob.thumbnailStorageKey ?: thumbnailStorageKey(blob))
+
+    private fun thumbnailStorageKey(blob: MediaBlob): String =
+        "tenant-${blob.tenant.id}/blobs/${blob.contentSha256}/thumbnail.jpg"
 
     private fun previewPath(blob: MediaBlob): Path =
         storagePath(blob.previewStorageKey ?: previewStorageKey(blob))
@@ -1300,7 +1412,8 @@ class MediaService @Inject constructor(
     private fun Instant.toApiOffsetDateTime(): OffsetDateTime =
         OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
     companion object {
-        private const val PREVIEW_MAX_EDGE = 720
+        private const val THUMBNAIL_MAX_EDGE = 360
+        private const val PREVIEW_MAX_EDGE = 1600
         private val ARCHIVE_TIMESTAMP_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss").withZone(ZoneOffset.UTC)
     }

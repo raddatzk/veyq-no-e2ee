@@ -249,6 +249,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 12,
     contentUrl: '/api/tenant/media/media-1/content',
+    thumbnailUrl: '/api/tenant/media/media-1/thumbnail',
     previewUrl: '/api/tenant/media/media-1/preview',
     capturedAt: '2026-05-03T10:00:00Z',
     cameraMake: null,

@@ -12,6 +12,7 @@ type GalleryItem = {
   id: string
   aspectRatio: number
   mediaUrl: string
+  thumbnailUrl: string | null
   previewUrl: string | null
   alt: string
   media: MemoryMedia
@@ -53,6 +54,7 @@ const galleryItems = computed<GalleryItem[]>(() =>
     id: media.id,
     aspectRatio: mediaAspectRatio(media),
     mediaUrl: `${API_BASE}${media.contentUrl}`,
+    thumbnailUrl: media.thumbnailUrl ? `${API_BASE}${media.thumbnailUrl}` : null,
     previewUrl: media.previewUrl ? `${API_BASE}${media.previewUrl}` : null,
     alt: media.title || media.id,
     media
@@ -80,11 +82,6 @@ const canShowNext = computed(
   () => selectedIndex.value !== null && selectedIndex.value < visibleMedia.value.length - 1
 )
 const canRenderGallery = computed(() => galleryTiles.value.length > 0)
-const canRequestOriginalMedia = computed(
-  () =>
-    galleryTiles.value.length > 0 &&
-    galleryTiles.value.every((tile) => !hasPreview(tile) || isPreviewLoaded(tile))
-)
 const layoutSignature = computed(() =>
   props.media
     .map((item) => `${item.id}:${item.imageWidth ?? ''}x${item.imageHeight ?? ''}`)
@@ -131,10 +128,6 @@ watch(
 )
 
 watch(mediaGrid, attachMediaGridObserver, { flush: 'post' })
-
-watch(canRequestOriginalMedia, (canRequest) => {
-  if (canRequest) preloadOriginalImages()
-})
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
@@ -193,12 +186,12 @@ function isVideo(media: MemoryMedia): boolean {
   return Boolean(media.mimeType?.startsWith('video/'))
 }
 
-function hasPreview(tile: Pick<GalleryTile, 'previewUrl'>): boolean {
-  return Boolean(tile.previewUrl)
+function hasThumbnail(tile: Pick<GalleryTile, 'thumbnailUrl' | 'previewUrl'>): boolean {
+  return Boolean(tile.thumbnailUrl || tile.previewUrl)
 }
 
 function usesPreviewImage(tile: GalleryTile): boolean {
-  return isImage(tile.media) || (isVideo(tile.media) && hasPreview(tile))
+  return isImage(tile.media) || (isVideo(tile.media) && hasThumbnail(tile))
 }
 
 function mediaLoadKey(tile: Pick<GalleryTile, 'id'>, url: string): string {
@@ -206,7 +199,7 @@ function mediaLoadKey(tile: Pick<GalleryTile, 'id'>, url: string): string {
 }
 
 function previewLoadKey(tile: GalleryTile): string {
-  return mediaLoadKey(tile, tile.previewUrl || tile.mediaUrl)
+  return mediaLoadKey(tile, tileImageUrl(tile))
 }
 
 function originalLoadKey(tile: GalleryTile): string {
@@ -234,17 +227,11 @@ function markOriginalLoaded(tile: GalleryTile) {
 }
 
 function markTileImageLoaded(tile: GalleryTile) {
-  if (tileImageUrl(tile) === tile.mediaUrl && canRequestOriginalMedia.value) {
-    markOriginalLoaded(tile)
-  } else {
-    markPreviewLoaded(tile)
-  }
+  markPreviewLoaded(tile)
 }
 
 function tileImageUrl(tile: GalleryTile): string {
-  return isImage(tile.media) && canRequestOriginalMedia.value && isOriginalLoaded(tile)
-    ? tile.mediaUrl
-    : tile.previewUrl || tile.mediaUrl
+  return tile.thumbnailUrl || tile.previewUrl || tile.mediaUrl
 }
 
 function isTileDisplayLoaded(tile: GalleryTile): boolean {
@@ -255,18 +242,8 @@ function isTileDisplayLoaded(tile: GalleryTile): boolean {
       : true
 }
 
-function preloadOriginalImages() {
-  galleryTiles.value
-    .filter((tile) => isImage(tile.media) && !isOriginalLoaded(tile))
-    .forEach((tile) => {
-      const image = new Image()
-      image.onload = () => markOriginalLoaded(tile)
-      image.src = tile.mediaUrl
-    })
-}
-
 function pruneLoadedMediaKeys() {
-  const previewKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.previewUrl || item.mediaUrl)))
+  const previewKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.thumbnailUrl || item.previewUrl || item.mediaUrl)))
   const originalKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.mediaUrl)))
   loadedPreviewKeys.value = new Set([...loadedPreviewKeys.value].filter((key) => previewKeys.has(key)))
   loadedOriginalKeys.value = new Set([...loadedOriginalKeys.value].filter((key) => originalKeys.has(key)))
@@ -317,7 +294,9 @@ function handleKeydown(event: KeyboardEvent) {
   <section class="memory-section">
     <div class="memory-section-header">
       <h2>{{ t('media.title') }}</h2>
-      <span>{{ media.length }}</span>
+      <div class="media-grid-header-actions">
+        <span>{{ media.length }}</span>
+      </div>
     </div>
     <div
       v-if="media.length"
@@ -396,5 +375,6 @@ function handleKeydown(event: KeyboardEvent) {
       @updated="updateMedia"
       @deleted="removeMedia"
     />
+
   </section>
 </template>

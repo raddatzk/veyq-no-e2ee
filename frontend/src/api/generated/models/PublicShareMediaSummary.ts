@@ -92,6 +92,12 @@ export interface PublicShareMediaSummary {
      * @type {string}
      * @memberof PublicShareMediaSummary
      */
+    thumbnailUrl?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof PublicShareMediaSummary
+     */
     previewUrl?: string;
     /**
      * 
@@ -143,6 +149,7 @@ export function PublicShareMediaSummaryFromJSONTyped(json: any, ignoreDiscrimina
         'mimeType': json['mimeType'],
         'sizeBytes': json['sizeBytes'],
         'contentUrl': json['contentUrl'],
+        'thumbnailUrl': json['thumbnailUrl'] == null ? undefined : json['thumbnailUrl'],
         'previewUrl': json['previewUrl'] == null ? undefined : json['previewUrl'],
         'gpsLatitude': json['gpsLatitude'] == null ? undefined : json['gpsLatitude'],
         'gpsLongitude': json['gpsLongitude'] == null ? undefined : json['gpsLongitude'],
@@ -170,6 +177,7 @@ export function PublicShareMediaSummaryToJSONTyped(value?: PublicShareMediaSumma
         'mimeType': value['mimeType'],
         'sizeBytes': value['sizeBytes'],
         'contentUrl': value['contentUrl'],
+        'thumbnailUrl': value['thumbnailUrl'],
         'previewUrl': value['previewUrl'],
         'gpsLatitude': value['gpsLatitude'],
         'gpsLongitude': value['gpsLongitude'],

@@ -14,6 +14,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
 import {
+  deleteMemoryMedia as deleteTenantMemoryMedia,
   favoriteMemory,
   unfavoriteMemory,
   updateMemoryMediaMetadata,
@@ -97,6 +98,7 @@ const props = defineProps<{
   journal?: MemoryJournal | null
   childMemories: Memory[]
   media: MemoryMedia[]
+  mediaLoading?: boolean
   playlists?: MemoryPlaylist[]
   tracks?: MemoryTrack[]
   activeTab?: MemoryDetailTab
@@ -154,6 +156,7 @@ const favoriteSaving = ref(false)
 const favoriteOverride = ref<boolean | null>(null)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 const uploadedMedia = ref<Record<string, MemoryMedia>>({})
+const deletedMediaIds = ref<Set<string>>(new Set())
 const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalDraft = ref('')
@@ -179,7 +182,7 @@ const capabilities = computed(() => ({
   canShare: props.capabilities?.canShare ?? true,
   canManageCover: props.capabilities?.canManageCover ?? true,
   canEditMediaMetadata: props.capabilities?.canEditMediaMetadata ?? true,
-  canDeleteMedia: props.capabilities?.canDeleteMedia ?? false,
+  canDeleteMedia: props.capabilities?.canDeleteMedia ?? true,
   canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true,
   canEditJournal: props.capabilities?.canEditJournal ?? props.capabilities?.canEdit ?? true,
   canDownload: props.capabilities?.canDownload ?? true,
@@ -221,12 +224,19 @@ const totalMediaCount = computed(
   () => detailHeader.value.directMediaCount + detailHeader.value.descendantMediaCount
 )
 const uploadedMediaList = computed(() =>
-  Object.values(uploadedMedia.value).filter((media) => !props.media.some((item) => item.id === media.id))
+  Object.values(uploadedMedia.value).filter((media) =>
+    !props.media.some((item) => item.id === media.id) && !deletedMediaIds.value.has(media.id)
+  )
 )
-const localTotalMediaCount = computed(() => totalMediaCount.value + uploadedMediaList.value.length)
+const deletedVisibleMediaCount = computed(() =>
+  props.media.filter((media) => deletedMediaIds.value.has(media.id)).length
+)
+const localTotalMediaCount = computed(() =>
+  Math.max(0, totalMediaCount.value - deletedVisibleMediaCount.value + uploadedMediaList.value.length)
+)
 const mediaCountLabel = computed(() => `${localTotalMediaCount.value} ${t('memory.mediaCount')}`)
 const visibleMedia = computed(() => {
-  const merged = [...props.media, ...uploadedMediaList.value]
+  const merged = [...props.media, ...uploadedMediaList.value].filter((media) => !deletedMediaIds.value.has(media.id))
   return merged.map((media) => mediaOverrides.value[media.id] || media)
 })
 const visiblePlaylists = computed(() => props.playlists ?? [])
@@ -341,6 +351,7 @@ watch(
     favoriteOverride.value = null
     uploadedMedia.value = {}
     mediaOverrides.value = {}
+    deletedMediaIds.value = new Set()
   }
 )
 
@@ -390,7 +401,27 @@ function mergeUpdatedMedia(updated: MemoryMedia[]) {
 
 function addUploadedMedia(media: MemoryMedia) {
   if (media.memoryId !== props.memory.id) return
+  deletedMediaIds.value = new Set([...deletedMediaIds.value].filter((mediaId) => mediaId !== media.id))
   uploadedMedia.value = { ...uploadedMedia.value, [media.id]: media }
+}
+
+async function submitMediaDelete(mediaId: string, memoryId: string): Promise<void> {
+  if (props.deleteMedia) {
+    await props.deleteMedia(mediaId, memoryId)
+  } else {
+    await deleteTenantMemoryMedia(props.tenantName, memoryId, mediaId)
+  }
+}
+
+function markMediaDeleted(media: MemoryMedia) {
+  deletedMediaIds.value = new Set([...deletedMediaIds.value, media.id])
+  uploadedMedia.value = Object.fromEntries(
+    Object.entries(uploadedMedia.value).filter(([mediaId]) => mediaId !== media.id)
+  )
+  mediaOverrides.value = Object.fromEntries(
+    Object.entries(mediaOverrides.value).filter(([mediaId]) => mediaId !== media.id)
+  )
+  emit('mediaDeleted', media)
 }
 
 function submitTrackUpload(request: UploadMemoryTrackRequest): Promise<MemoryTrack> {
@@ -756,7 +787,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
-          <div v-if="visibleMedia.length === 0" class="memory-empty memory-empty-action">
+          <div v-if="visibleMedia.length === 0 && !mediaLoading" class="memory-empty memory-empty-action">
             <span class="pi pi-images" />
             <span>{{ t('memory.galleryEmptyAction') }}</span>
             <Button
@@ -771,12 +802,12 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             v-else
             :tenant-name="tenantName"
             :media="visibleMedia"
-            :streaming="false"
+            :streaming="Boolean(mediaLoading)"
             :can-edit-metadata="capabilities.canEditMediaMetadata"
             :can-delete-media="capabilities.canDeleteMedia"
             :update-metadata="updateSingleMediaMetadata"
-            :delete-media="deleteMedia"
-            @deleted="$emit('mediaDeleted', $event)"
+            :delete-media="submitMediaDelete"
+            @deleted="markMediaDeleted"
           />
         </TabPanel>
         <TabPanel value="buckets">
@@ -795,8 +826,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             :can-edit-metadata="capabilities.canEditMediaMetadata"
             :can-delete-media="capabilities.canDeleteMedia"
             :update-metadata="updateSingleMediaMetadata"
-            :delete-media="deleteMedia"
-            @deleted="$emit('mediaDeleted', $event)"
+            :delete-media="submitMediaDelete"
+            @deleted="markMediaDeleted"
           />
         </TabPanel>
         <TabPanel value="tracks">

@@ -476,6 +476,11 @@ class MemoryServiceTest {
         val first = mediaService.uploadMemoryMedia(firstMemory.id, TestFileUpload(upload, "same.png"), "First")
         val second = mediaService.uploadMemoryMedia(secondMemory.id, TestFileUpload(upload, "same.png"), "Second")
 
+        assertThat(first.thumbnailUrl).endsWith("/thumbnail")
+        assertThat(first.previewUrl).endsWith("/preview")
+        assertThat(first.contentUrl).endsWith("/content")
+        assertThat(first.thumbnailUrl).isNotEqualTo(first.previewUrl)
+        assertThat(first.previewUrl).isNotEqualTo(first.contentUrl)
         val firstMedia = mediaRepo.findByTenantAndPublicId(tenant, first.id)!!
         val secondMedia = mediaRepo.findByTenantAndPublicId(tenant, second.id)!!
         assertThat(firstMedia.id).isNotEqualTo(secondMedia.id)
@@ -509,6 +514,7 @@ class MemoryServiceTest {
         val second = mediaService.uploadMemoryMedia(secondMemory.id, TestFileUpload(upload, "same.png"), "Second")
         val blob = mediaRepo.findByTenantAndPublicId(tenant, first.id)!!.blob
         val originalPath = mediaConfig.storageDir.resolve(blob.storageKey)
+        val thumbnailPath = mediaConfig.storageDir.resolve(blob.thumbnailStorageKey!!)
         val previewPath = mediaConfig.storageDir.resolve(blob.previewStorageKey!!)
 
         memoryService.deleteMemory(firstMemory.id)
@@ -516,12 +522,50 @@ class MemoryServiceTest {
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, first.id)).isNull()
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.id)).isNotNull
         assertThat(Files.exists(originalPath)).isTrue()
+        assertThat(Files.exists(thumbnailPath)).isTrue()
         assertThat(Files.exists(previewPath)).isTrue()
 
         memoryService.deleteMemory(secondMemory.id)
 
         assertThat(Files.exists(originalPath)).isFalse()
+        assertThat(Files.exists(thumbnailPath)).isFalse()
         assertThat(Files.exists(previewPath)).isFalse()
+    }
+
+    @Test
+    fun `deletes one direct memory media item and clears cover references`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("delete-media-trip", "Delete Media Trip"))
+        val media = createMedia(owner, memory(trip.id), "Cover Photo")
+        memoryService.setCover(
+            trip.id,
+            uploadPath = null,
+            originalFilename = null,
+            mediaId = media.publicId,
+            cropX = 0.0,
+            cropY = 0.0,
+            cropWidth = 1.0,
+            cropHeight = 1.0,
+        )
+
+        mediaService.deleteMemoryMedia(trip.id, media.publicId)
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.publicId)).isNull()
+        assertThat(memoryService.getMemory(trip.id).coverMediaId).isNull()
+    }
+
+    @Test
+    fun `deletes all direct memory media without deleting child memory media`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("delete-all-media-trip", "Delete All Media Trip"))
+        val child = memoryService.createMemory(CreateMemoryRequest("delete-all-media-child", "Delete All Media Child", parentId = trip.id))
+        val first = createMedia(owner, memory(trip.id), "First")
+        val second = createMedia(owner, memory(trip.id), "Second")
+        val childMedia = createMedia(owner, memory(child.id), "Child")
+
+        mediaService.deleteAllMemoryMedia(trip.id)
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, first.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, childMedia.publicId)).isNotNull
     }
 
     @Test
@@ -551,7 +595,12 @@ class MemoryServiceTest {
 
         assertThat(media.title).isEqualTo("Chunk")
         assertThat(media.sizeBytes).isEqualTo(image.size.toLong())
-        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.id)).isNotNull
+        assertThat(media.thumbnailUrl).endsWith("/thumbnail")
+        assertThat(media.previewUrl).endsWith("/preview")
+        val storedMedia = mediaRepo.findByTenantAndPublicId(tenant, media.id)
+        assertThat(storedMedia).isNotNull
+        assertThat(Files.exists(mediaConfig.storageDir.resolve(storedMedia!!.blob.thumbnailStorageKey!!))).isTrue()
+        assertThat(Files.exists(mediaConfig.storageDir.resolve(storedMedia.blob.previewStorageKey!!))).isTrue()
         assertThatExceptionOfType(NotFoundException::class.java).isThrownBy {
             mediaService.memoryMediaUploadStatus(trip.id, session.uploadId)
         }

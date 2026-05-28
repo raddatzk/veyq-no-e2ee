@@ -269,6 +269,7 @@ function media(options: { id?: string; longitude?: number; latitude?: number } =
     cameraModel: null,
     lensModel: null,
     contentUrl: '/api/friends/memories/memory-1/media/media-1/content',
+    thumbnailUrl: '/api/friends/memories/memory-1/media/media-1/thumbnail',
     previewUrl: '/api/friends/memories/memory-1/media/media-1/preview',
     imageWidth: 1200,
     imageHeight: 800,

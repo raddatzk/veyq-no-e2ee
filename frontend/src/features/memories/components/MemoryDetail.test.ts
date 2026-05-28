@@ -4,12 +4,16 @@ import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
 const apiMocks = vi.hoisted(() => ({
+  deleteAllMemoryMedia: vi.fn(),
+  deleteMemoryMedia: vi.fn(),
   favoriteMemory: vi.fn(),
   unfavoriteMemory: vi.fn()
 }))
 
 vi.mock('../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api')>()),
+  deleteAllMemoryMedia: apiMocks.deleteAllMemoryMedia,
+  deleteMemoryMedia: apiMocks.deleteMemoryMedia,
   favoriteMemory: apiMocks.favoriteMemory,
   unfavoriteMemory: apiMocks.unfavoriteMemory
 }))
@@ -285,6 +289,33 @@ describe('MemoryDetail', () => {
 
     const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
+  })
+
+  it('wires tenant media deletion and removes deleted media locally', async () => {
+    const deleteMedia = vi.fn().mockResolvedValue(undefined)
+    const first = media({ id: 'media-1' })
+    const second = media({ id: 'media-2' })
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ directMediaCount: 2 }),
+        childMemories: [],
+        media: [first, second],
+        deleteMedia
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    const mediaGrid = wrapper.findComponent({ name: 'MediaGrid' })
+    await (mediaGrid.props('deleteMedia') as (mediaId: string, memoryId: string) => Promise<void>)('media-1', 'mem-1')
+    mediaGrid.vm.$emit('deleted', first)
+    await flushPromises()
+
+    expect(deleteMedia).toHaveBeenCalledWith('media-1', 'mem-1')
+    const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
+    expect(refreshedMedia.map((item) => item.id)).toEqual(['media-2'])
+    expect(wrapper.text()).toContain('1 Medien')
   })
 
   it('renders journal markdown and media embeds', () => {
@@ -632,7 +663,11 @@ function detailStubs() {
     Tab: { template: '<button><slot /></button>' },
     TabPanels: { template: '<div><slot /></div>' },
     TabPanel: { template: '<div><slot /></div>' },
-    MediaGrid: { name: 'MediaGrid', props: ['media'], template: '<div />' },
+    MediaGrid: {
+      name: 'MediaGrid',
+      props: ['media', 'deleteMedia'],
+      template: '<div />'
+    },
     MemoryAssetBuckets: { name: 'MemoryAssetBuckets', props: ['media'], template: '<div />' },
     MemoryCard: { template: '<article />' },
     MemoryCoverImage: { template: '<img :alt="alt" />', props: ['alt'] },
@@ -715,6 +750,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 12,
     contentUrl: '/api/tenant/media/media-1/content',
+    thumbnailUrl: '/api/tenant/media/media-1/thumbnail',
     previewUrl: '/api/tenant/media/media-1/preview',
     capturedAt: null,
     cameraMake: null,

@@ -170,7 +170,7 @@ function normalizeKey(value: string): string {
 }
 
 function previewUrl(media: MemoryMedia): string {
-  return `${API_BASE}${media.previewUrl || media.contentUrl}`
+  return `${API_BASE}${media.thumbnailUrl || media.previewUrl || media.contentUrl}`
 }
 
 function formatDate(value: string | null): string {

@@ -57,8 +57,21 @@ class MemoryMediaResource @Inject constructor(
     ): Response =
         Response.ok(mediaService.updateMemoryMediaMetadataBatch(memoryId, request)).build()
 
+    override fun deleteMemoryMedia(tenantName: String, memoryId: String, mediaId: String): Response {
+        mediaService.deleteMemoryMedia(memoryId, mediaId)
+        return Response.noContent().build()
+    }
+
+    override fun deleteAllMemoryMedia(tenantName: String, memoryId: String): Response {
+        mediaService.deleteAllMemoryMedia(memoryId)
+        return Response.noContent().build()
+    }
+
     override fun memoryMediaContent(tenantName: String, mediaId: String, range: String?): Response =
         mediaService.mediaContent(mediaId, range)
+
+    override fun memoryMediaThumbnail(tenantName: String, mediaId: String): Response =
+        mediaService.mediaThumbnail(mediaId)
 
     override fun memoryMediaPreview(tenantName: String, mediaId: String): Response =
         mediaService.mediaPreview(mediaId)

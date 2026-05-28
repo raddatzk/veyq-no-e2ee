@@ -272,6 +272,7 @@ describe('memoryApi facade', () => {
       id: 'media-1',
       capturedAt: null,
       previewUrl: null,
+      thumbnailUrl: null,
       cameraMake: null,
       cameraModel: null,
       lensModel: null,
@@ -385,7 +386,8 @@ describe('memoryApi facade', () => {
     expect(media[0]).toMatchObject({
       id: 'media-1',
       capturedAt: '2026-01-01T01:00:00Z',
-      previewUrl: null
+      previewUrl: null,
+      thumbnailUrl: null
     })
     expect(mocks.updateMemoryMediaMetadataBatch).toHaveBeenCalledWith({
       tenantName: 'tenant',

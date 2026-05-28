@@ -22,6 +22,7 @@ vi.mock('../features/memories/composables/useMemoryRouteData', () => ({
     load: vi.fn(),
     loading: ref(false),
     media: ref([]),
+    mediaLoading: ref(false),
     memories: ref([]),
     memory: ref({
       id: 'mem-1',
@@ -96,7 +97,7 @@ function viewStubs() {
     CreateFolderDialog: true,
     CreateMemoryDialog: true,
     MemoryDetail: {
-      props: ['activeTab'],
+      props: ['activeTab', 'mediaLoading'],
       emits: ['update:activeTab', 'openMemory'],
       template: `
         <section data-testid="memory-detail" :data-active-tab="activeTab">

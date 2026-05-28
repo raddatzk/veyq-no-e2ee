@@ -61,6 +61,17 @@ export interface CreateMemoryMediaUploadOperationRequest {
     createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
 }
 
+export interface DeleteAllMemoryMediaRequest {
+    tenantName: string;
+    memoryId: string;
+}
+
+export interface DeleteMemoryMediaRequest {
+    tenantName: string;
+    memoryId: string;
+    mediaId: string;
+}
+
 export interface DownloadMemoryMediaRequest {
     tenantName: string;
     memoryId: string;
@@ -87,6 +98,11 @@ export interface MemoryMediaContentRequest {
 }
 
 export interface MemoryMediaPreviewRequest {
+    tenantName: string;
+    mediaId: string;
+}
+
+export interface MemoryMediaThumbnailRequest {
     tenantName: string;
     mediaId: string;
 }
@@ -209,6 +225,60 @@ export interface MemoryMediaApiInterface {
      * Create a resumable media upload session
      */
     createMemoryMediaUpload(requestParameters: CreateMemoryMediaUploadOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
+
+    /**
+     * Creates request options for deleteAllMemoryMedia without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteAllMemoryMediaRequestOpts(requestParameters: DeleteAllMemoryMediaRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * @summary Delete all direct media from a memory
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteAllMemoryMediaRaw(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete all direct media from a memory
+     */
+    deleteAllMemoryMedia(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deleteMemoryMedia without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaRequestOpts(requestParameters: DeleteMemoryMediaRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * @summary Delete one memory media item
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaRaw(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete one memory media item
+     */
+    deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for downloadMemoryMedia without sending the request
@@ -349,6 +419,32 @@ export interface MemoryMediaApiInterface {
      * Download memory media preview
      */
     memoryMediaPreview(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for memoryMediaThumbnail without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaThumbnailRequestOpts(requestParameters: MemoryMediaThumbnailRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * @summary Download memory media thumbnail
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaThumbnailRaw(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media thumbnail
+     */
+    memoryMediaThumbnail(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for updateMemoryMediaMetadata without sending the request
@@ -668,6 +764,122 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Creates request options for deleteAllMemoryMedia without sending the request
+     */
+    async deleteAllMemoryMediaRequestOpts(requestParameters: DeleteAllMemoryMediaRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteAllMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deleteAllMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete all direct media from a memory
+     */
+    async deleteAllMemoryMediaRaw(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteAllMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete all direct media from a memory
+     */
+    async deleteAllMemoryMedia(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteAllMemoryMediaRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deleteMemoryMedia without sending the request
+     */
+    async deleteMemoryMediaRequestOpts(requestParameters: DeleteMemoryMediaRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deleteMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling deleteMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/{mediaId}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete one memory media item
+     */
+    async deleteMemoryMediaRaw(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Delete one memory media item
+     */
+    async deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteMemoryMediaRaw(requestParameters, initOverrides);
+    }
+
+    /**
      * Creates request options for downloadMemoryMedia without sending the request
      */
     async downloadMemoryMediaRequestOpts(requestParameters: DownloadMemoryMediaRequest): Promise<runtime.RequestOpts> {
@@ -963,6 +1175,61 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async memoryMediaPreview(requestParameters: MemoryMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.memoryMediaPreviewRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for memoryMediaThumbnail without sending the request
+     */
+    async memoryMediaThumbnailRequestOpts(requestParameters: MemoryMediaThumbnailRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling memoryMediaThumbnail().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling memoryMediaThumbnail().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memory-media/{mediaId}/thumbnail`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media thumbnail
+     */
+    async memoryMediaThumbnailRaw(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryMediaThumbnailRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media thumbnail
+     */
+    async memoryMediaThumbnail(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryMediaThumbnailRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

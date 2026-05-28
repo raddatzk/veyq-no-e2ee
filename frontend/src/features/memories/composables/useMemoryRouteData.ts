@@ -38,6 +38,7 @@ export function useMemoryRouteData(
   const memoryBreadcrumbs = ref<MemoryRouteBreadcrumb[]>([])
   const childMemories = ref<Memory[]>([])
   const media = ref<MemoryMedia[]>([])
+  const mediaLoading = ref(false)
   const playlists = ref<MemoryPlaylist[]>([])
   const tracks = ref<MemoryTrack[]>([])
   const loading = ref(false)
@@ -68,6 +69,7 @@ export function useMemoryRouteData(
     memoryBreadcrumbs.value = []
     childMemories.value = []
     media.value = []
+    mediaLoading.value = false
     playlists.value = []
     tracks.value = []
 
@@ -91,27 +93,59 @@ export function useMemoryRouteData(
       if (sequence !== loadSequence) return true
       kind.value = 'memory'
       memory.value = loadedMemory
-      const [header, journal, breadcrumbs, children, memoryMedia, memoryTracks, memoryPlaylists] = await Promise.all([
-        getMemoryHeader(tenantName.value, loadedMemory.id),
-        getMemoryJournal(tenantName.value, loadedMemory.id),
-        loadMemoryBreadcrumbs(loadedMemory),
-        listChildMemories(tenantName.value, loadedMemory.id),
-        listMemoryMedia(tenantName.value, loadedMemory.id, false),
-        listMemoryTracks(tenantName.value, loadedMemory.id),
-        listMemoryPlaylists(tenantName.value, loadedMemory.id)
-      ])
-      if (sequence !== loadSequence) return true
-      memoryHeader.value = header
-      memoryJournal.value = journal
-      memoryBreadcrumbs.value = breadcrumbs
-      childMemories.value = children
-      media.value = memoryMedia
-      tracks.value = memoryTracks
-      playlists.value = memoryPlaylists
+      mediaLoading.value = true
+      void loadMemoryRouteDetails(sequence, loadedMemory)
       return true
     } catch (unknownError) {
       if (isApiStatus(unknownError, 404)) return false
       throw unknownError
+    }
+  }
+
+  async function loadMemoryRouteDetails(sequence: number, loadedMemory: Memory) {
+    await Promise.all([
+      loadMemoryDetailPart(sequence, () => getMemoryHeader(tenantName.value, loadedMemory.id), (header) => {
+        memoryHeader.value = header
+      }),
+      loadMemoryDetailPart(sequence, () => getMemoryJournal(tenantName.value, loadedMemory.id), (journal) => {
+        memoryJournal.value = journal
+      }),
+      loadMemoryDetailPart(sequence, () => loadMemoryBreadcrumbs(loadedMemory), (breadcrumbs) => {
+        memoryBreadcrumbs.value = breadcrumbs
+      }),
+      loadMemoryDetailPart(sequence, () => listChildMemories(tenantName.value, loadedMemory.id), (children) => {
+        childMemories.value = children
+      }),
+      loadMemoryDetailPart(sequence, () => listMemoryMedia(tenantName.value, loadedMemory.id, false), (memoryMedia) => {
+        media.value = memoryMedia
+        mediaLoading.value = false
+      }, () => {
+        mediaLoading.value = false
+      }),
+      loadMemoryDetailPart(sequence, () => listMemoryTracks(tenantName.value, loadedMemory.id), (memoryTracks) => {
+        tracks.value = memoryTracks
+      }),
+      loadMemoryDetailPart(sequence, () => listMemoryPlaylists(tenantName.value, loadedMemory.id), (memoryPlaylists) => {
+        playlists.value = memoryPlaylists
+      })
+    ])
+  }
+
+  async function loadMemoryDetailPart<T>(
+    sequence: number,
+    loadPart: () => Promise<T>,
+    applyPart: (value: T) => void,
+    finalize?: () => void
+  ) {
+    try {
+      const value = await loadPart()
+      if (sequence === loadSequence) applyPart(value)
+    } catch (unknownError) {
+      if (sequence === loadSequence) {
+        error.value = getErrorMessage(unknownError, 'Ansicht konnte nicht vollständig geladen werden')
+      }
+    } finally {
+      if (sequence === loadSequence) finalize?.()
     }
   }
 
@@ -153,6 +187,7 @@ export function useMemoryRouteData(
     load,
     loading,
     media,
+    mediaLoading,
     playlists,
     tracks,
     memories,
