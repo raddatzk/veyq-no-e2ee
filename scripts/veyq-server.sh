@@ -42,6 +42,7 @@ main() {
     install) install ;;
     setup) setup_env ;;
     upgrade) upgrade ;;
+    upgrade-continue) upgrade_continue ;;
     auto-upgrade) auto_upgrade ;;
     status) compose ps ;;
     doctor) doctor ;;
@@ -115,6 +116,17 @@ upgrade() {
   cp docker-compose.yml "backups/docker-compose.$(timestamp).yml" 2>/dev/null || true
   cp .env "backups/env.$(timestamp)" 2>/dev/null || true
   download_infra
+  exec env VEYQ_DIR="$VEYQ_DIR" VEYQ_REPO="$VEYQ_REPO" VEYQ_REF="$VEYQ_REF" RAW_BASE="$RAW_BASE" ./veyq-server.sh upgrade-continue
+}
+
+upgrade_continue() {
+  require_command docker
+  require_compose
+  cd "$VEYQ_DIR"
+  require_file .env
+  require_env_readable
+  require_env_writable
+  require_file docker-compose.yml
   ensure_env_ready_for_upgrade interactive
   pull_services
   compose up -d
@@ -720,15 +732,25 @@ download() {
   local source_path="$1"
   local target_path="$2"
   local url="${RAW_BASE}/${source_path}"
+  local tmp
   echo "Downloading $source_path"
+  tmp="$(mktemp "${target_path}.tmp.XXXXXX")"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$target_path"
+    if ! curl -fsSL "$url" -o "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$target_path" "$url"
+    if ! wget -qO "$tmp" "$url"; then
+      rm -f "$tmp"
+      return 1
+    fi
   else
+    rm -f "$tmp"
     echo "curl or wget is required to download $url" >&2
     exit 1
   fi
+  mv "$tmp" "$target_path"
 }
 
 prompt() {
