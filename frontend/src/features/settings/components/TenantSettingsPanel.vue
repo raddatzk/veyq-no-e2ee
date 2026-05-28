@@ -220,10 +220,6 @@ async function saveTerms() {
   }
 }
 
-function contactClauseMarkdown(): string {
-  return termsTemplateMarkdown('contact')
-}
-
 function termsTemplateMarkdown(clauseId: TermsTemplateClauseId): string {
   return messages[templateLocale()].share.termsTemplateMarkdown[clauseId].replace('{contact}', templateContact())
 }

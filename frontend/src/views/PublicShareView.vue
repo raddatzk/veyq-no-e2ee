@@ -446,6 +446,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
         <h3>
           {{ notice.notice.scope === 'TENANT' ? t('share.noticeTenantTitle') : t('share.noticeShareTitle') }}
         </h3>
+        <!-- eslint-disable-next-line vue/no-v-html -- rendered Markdown is sanitized with DOMPurify in renderNotice(). -->
         <div class="markdown-body" v-html="notice.html" />
       </article>
       <Button

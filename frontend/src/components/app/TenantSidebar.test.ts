@@ -1,6 +1,25 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TenantSidebar from './TenantSidebar.vue'
+import type { TenantSummary } from '../../authState'
+
+function tenantSummary(
+  id: number,
+  name: string,
+  displayName: string,
+  domain: string,
+  logoUrl?: string
+): TenantSummary {
+  return {
+    id,
+    name,
+    displayName,
+    domain,
+    logoUrl,
+    role: 'TenantMember',
+    admins: []
+  }
+}
 
 const mocks = vi.hoisted(() => ({
   getMemoryNavigation: vi.fn(),
@@ -8,7 +27,16 @@ const mocks = vi.hoisted(() => ({
   authState: {
     isAuthenticated: true,
     user: { serverRole: 'ServerMember' },
-    tenants: [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }] as any[]
+    tenants: [
+      {
+        id: 1,
+        name: 'tenant',
+        displayName: 'Tenant',
+        domain: 'tenant.test',
+        role: 'TenantMember',
+        admins: []
+      }
+    ] as TenantSummary[]
   }
 }))
 
@@ -66,7 +94,7 @@ describe('TenantSidebar', () => {
 
   it('renders favorite memory covers without a favorites add action or star overlay', async () => {
     mocks.authState.user.serverRole = 'ServerMember'
-    mocks.authState.tenants = [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }]
+    mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
@@ -123,8 +151,8 @@ describe('TenantSidebar', () => {
   it('renders compact tenant menu, mobile sheet content and group overflow actions with clear labels', async () => {
     mocks.authState.user.serverRole = 'ServerOwner'
     mocks.authState.tenants = [
-      { id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' },
-      { id: 2, name: 'family', displayName: 'Family', domain: 'family.test' }
+      tenantSummary(1, 'tenant', 'Tenant', 'tenant.test'),
+      tenantSummary(2, 'family', 'Family', 'family.test')
     ]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -184,13 +212,7 @@ describe('TenantSidebar', () => {
   it('renders tenant logo images when available', async () => {
     mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [
-      {
-        id: 1,
-        name: 'tenant',
-        displayName: 'Tenant',
-        domain: 'tenant.test',
-        logoUrl: '/api/tenants/tenant/logo?v=1'
-      }
+      tenantSummary(1, 'tenant', 'Tenant', 'tenant.test', '/api/tenants/tenant/logo?v=1')
     ]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -209,7 +231,7 @@ describe('TenantSidebar', () => {
 
   it('keeps tenant initials as fallback without a logo', async () => {
     mocks.authState.user.serverRole = 'ServerMember'
-    mocks.authState.tenants = [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }]
+    mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
@@ -226,7 +248,7 @@ describe('TenantSidebar', () => {
 
   it('emits create group without navigating away from the current page', async () => {
     mocks.authState.user.serverRole = 'ServerMember'
-    mocks.authState.tenants = [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }]
+    mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
