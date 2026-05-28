@@ -15,6 +15,7 @@ import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.memory.MemoryService
 import com.veyq.api.tenant.toManagedTenantSummary
 import com.veyq.api.security.RateLimitService
+import com.veyq.api.settings.CapabilityAcknowledgementService
 import com.veyq.api.usermgmt.EmailChangeService
 import com.veyq.api.usermgmt.InvitationService
 import com.veyq.api.usermgmt.ResetPasswordService
@@ -48,6 +49,7 @@ class UserService @Inject constructor(
     private val passkeyService: PasskeyService,
     private val memoryService: MemoryService,
     private val mediaConfig: MediaConfig,
+    private val capabilityAcknowledgementService: CapabilityAcknowledgementService,
 ) {
     fun me(): UserSummary {
         return summarize(requestContext.user!!, emailChangeService.pendingEmail(requestContext.user!!))
@@ -182,6 +184,7 @@ class UserService @Inject constructor(
             it.passwordSetAt = null
             it.persistAndFlush()
         }
+        capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(user)
 
         return user.toManagedUserSummary()
     }
@@ -283,6 +286,7 @@ class UserService @Inject constructor(
                 invitedUser.permalink = uniquePermalink(displayName, invitedUser)
             }
             passwordService.setPassword(invitedUser, rawPassword, now)
+            capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(invitedUser)
         } else if (requestContext.user?.id != invitedUser.id) {
             throw UnauthorizedException("User must be logged in to accept this invitation")
         }
@@ -323,6 +327,7 @@ class UserService @Inject constructor(
             invitedUser.permalink = uniquePermalink(displayName, invitedUser)
         }
         passkeyService.createPasskeyForUser(invitedUser, request.passkeyDisplayName, request.credential, routingContext)
+        capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(invitedUser)
 
         val tenant = invitedUser.tenantMemberships.firstOrNull()?.tenant
             ?: throw BadRequestException("User has no tenant")

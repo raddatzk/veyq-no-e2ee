@@ -17,6 +17,7 @@ import com.veyq.api.generated.model.AdminPasskeySetupRequest
 import com.veyq.api.generated.model.ServerRole as ApiServerRole
 import com.veyq.api.generated.model.SetupStatusSummary
 import com.veyq.api.generated.model.UserSummary
+import com.veyq.api.settings.CapabilityAcknowledgementService
 import com.veyq.api.usermgmt.user.ownAvatarUrl
 import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
@@ -32,6 +33,7 @@ class SetupService @Inject constructor(
     private val authService: AuthService,
     private val passkeyService: PasskeyService,
     private val serverState: ServerState,
+    private val capabilityAcknowledgementService: CapabilityAcknowledgementService,
 ) {
     fun status(): SetupStatusSummary =
         SetupStatusSummary(
@@ -47,6 +49,7 @@ class SetupService @Inject constructor(
         val email = request.email.trim().lowercase()
         val user = setupUser(email, requiredSetupDisplayName(request.displayName))
         passwordService.setPassword(user, request.password, Instant.now())
+        capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(user)
         userRepo.flush()
         serverState.markSetupCompleted()
 
@@ -83,6 +86,7 @@ class SetupService @Inject constructor(
         user.displayName = requiredSetupDisplayName(request.displayName)
         user.permalink = profilePermalink(user.displayName)
         passkeyService.createPasskeyForUser(user, request.passkeyDisplayName, request.credential, routingContext)
+        capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(user)
         serverState.markSetupCompleted()
 
         return authService.loginUser(user)

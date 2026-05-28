@@ -21,6 +21,7 @@ import com.veyq.api.generated.model.TenantUserStatus
 import com.veyq.api.generated.model.TenantUserSummary
 import com.veyq.api.generated.model.TenantUsersSummary
 import com.veyq.api.generated.model.UpdateTenantUserRoleRequest
+import com.veyq.api.settings.CapabilityAcknowledgementService
 import com.veyq.api.usermgmt.InvitationService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -35,6 +36,7 @@ class TenantUserService @Inject constructor(
     private val userRepo: UserRepo,
     private val invitationService: InvitationService,
     private val passwordService: PasswordService,
+    private val capabilityAcknowledgementService: CapabilityAcknowledgementService,
 ) {
 
     fun tenantUserSettings(tenantName: String): TenantUserSettingsResponse =
@@ -117,6 +119,7 @@ class TenantUserService @Inject constructor(
             it.passwordHash = passwordService.randomPasswordHash()
             it.passwordSetAt = null
             it.persistAndFlush()
+            capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(it)
         }
     }
 
