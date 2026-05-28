@@ -305,6 +305,21 @@
   align-items: flex-start;
 }
 
+.capability-settings-entry {
+  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+}
+
+.capability-settings-entry .settings-link-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  justify-content: stretch;
+  width: 100%;
+}
+
+.capability-settings-entry .settings-link-list > span {
+  max-width: none;
+}
+
 .server-notification {
   margin-bottom: 1rem;
 }
@@ -622,6 +637,10 @@
 
   .settings-entry {
     align-items: flex-start;
+  }
+
+  .capability-settings-entry {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-toolbar {
