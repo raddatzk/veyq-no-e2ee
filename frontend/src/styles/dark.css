@@ -112,6 +112,8 @@
   .toggle-row,
   .settings-table-head,
   .management-badge,
+  .management-badge.muted,
+  .locale-markdown-editor-row,
   .asset-reference-media,
   .upload-dropzone,
   .media-thumb,
@@ -264,8 +266,20 @@
   .tenant-stats span,
   .settings-table-head,
   .management-badge,
+  .management-badge.muted,
+  .locale-markdown-editor-empty,
   .memory-journal-field,
   .memory-journal-help h4 {
+    color: var(--app-muted);
+  }
+
+  .locale-markdown-editor-entry textarea {
+    border-color: var(--app-line);
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+  }
+
+  .locale-markdown-editor-entry textarea::placeholder {
     color: var(--app-muted);
   }
 
