@@ -8,7 +8,7 @@ import CreateFolderDialog from '../features/memories/components/CreateFolderDial
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import MemoryFolderOverview from '../features/memories/components/MemoryFolderOverview.vue'
-import { updateMemoryJournal } from '../features/memories/api'
+import { updateMemoryJournal, type Memory } from '../features/memories/api'
 import { useMemoryRouteData } from '../features/memories/composables/useMemoryRouteData'
 import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
@@ -80,6 +80,14 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
   }
   void load()
 }
+
+function handleMemoryCreated(createdMemory: Memory) {
+  if (createdMemory.parentId) {
+    navigateToPath(createdMemory.path)
+    return
+  }
+  void load()
+}
 </script>
 
 <template>
@@ -134,7 +142,7 @@ function handleMemoryChanged(updatedMemory: { path: string }) {
       :tenant-display-name="tenantTitle"
       :folder-path="currentFolderPath"
       :parent-memory-id="memory?.id || null"
-      @saved="load"
+      @saved="handleMemoryCreated"
     />
   </div>
 </template>

@@ -24,7 +24,7 @@ const props = defineProps<{
   setCoverOverride?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
 }>()
 const emit = defineEmits<{
-  saved: []
+  saved: [memory: Memory]
 }>()
 
 const { t } = useI18n()
@@ -130,7 +130,7 @@ async function submit() {
       })
     }
     visible.value = false
-    emit('saved')
+    emit('saved', created)
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('memory.createFailed'))
   } finally {

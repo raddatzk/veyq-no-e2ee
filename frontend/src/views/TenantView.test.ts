@@ -90,6 +90,53 @@ describe('TenantView', () => {
     await flushPromises()
     expect(router.currentRoute.value.fullPath).toBe('/tenant/trip/day-1')
   })
+
+  it('opens a newly created child memory', async () => {
+    authState.tenants = [
+      {
+        id: 1,
+        name: 'tenant',
+        displayName: 'Tenant',
+        domain: 'tenant.example.test',
+        role: 'TenantOwner',
+        admins: []
+      }
+    ]
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:tenantName/:pathMatch(.*)*', component: TenantView }]
+    })
+    await router.push('/tenant/trip#journal')
+    await router.isReady()
+
+    const wrapper = mount(TenantView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    await wrapper.findComponent({ name: 'CreateMemoryDialog' }).vm.$emit('saved', {
+      id: 'mem-child',
+      parentId: 'mem-1',
+      name: 'day-1',
+      displayName: 'Day 1',
+      path: '/trip/day-1',
+      coverMediaId: null,
+      coverUrl: null,
+      coverCrop: null,
+      startDate: '2026-05-03',
+      endDate: '2026-05-03',
+      childCount: 0,
+      mediaCount: 0,
+      favorite: false,
+      scope: { type: 'TENANT' }
+    })
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/tenant/trip/day-1')
+  })
 })
 
 function viewStubs() {

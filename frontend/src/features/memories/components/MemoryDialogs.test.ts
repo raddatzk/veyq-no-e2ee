@@ -149,7 +149,7 @@ describe('Memory detail dialogs', () => {
     expect(coverRequest.file?.type).toBe('image/jpeg')
     expect(coverRequest.cropWidth).toBeGreaterThan(0)
     expect(coverRequest.cropHeight).toBeGreaterThan(0)
-    expect(saved).toHaveBeenCalled()
+    expect(saved).toHaveBeenCalledWith(created)
   })
 
   it('deletes a memory after explicit confirmation', async () => {
