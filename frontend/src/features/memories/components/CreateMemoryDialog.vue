@@ -9,6 +9,7 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import { groups, type TenantGroup } from '../../../api/groupClient'
 import { toPermalink } from '../../../composables/usePermalink'
+import IsoDateField from '../../../shared/components/IsoDateField.vue'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import { createMemory, setMemoryCover, type CreateMemoryRequest, type Memory, type SetMemoryCoverRequest } from '../api'
@@ -268,11 +269,11 @@ function currentCoverCrop() {
       </label>
       <label>
         {{ t('memory.startDate') }}
-        <InputText v-model="startDate" type="date" required />
+        <IsoDateField v-model="startDate" :aria-label="t('memory.startDate')" required />
       </label>
       <label>
         {{ t('memory.endDate') }}
-        <InputText v-model="endDate" type="date" required />
+        <IsoDateField v-model="endDate" :aria-label="t('memory.endDate')" required />
       </label>
       <label v-if="isTenantRootCreate">
         {{ t('memory.area') }}

@@ -152,6 +152,31 @@ describe('Memory detail dialogs', () => {
     expect(saved).toHaveBeenCalledWith(created)
   })
 
+  it('keeps memory creation disabled for an invalid date range', async () => {
+    const wrapper = mount(CreateMemoryDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        tenantDisplayName: 'Tenant',
+        parentMemoryId: 'mem-parent'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('May Trip')
+    await inputs[2].setValue('2026-05-08')
+    await inputs[3].setValue('2026-05-05')
+
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Erstellen'))!
+    expect(createButton.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(createMemoryMock).not.toHaveBeenCalled()
+  })
+
   it('deletes a memory after explicit confirmation', async () => {
     deleteMemoryMock.mockResolvedValue()
 
@@ -758,6 +783,22 @@ function dialogStubs() {
       template:
         '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
       props: ['modelValue']
+    },
+    DatePicker: {
+      template:
+        '<input v-bind="$attrs" :value="formatDate(modelValue)" @input="$emit(\'update:modelValue\', parseDate($event.target.value))" @blur="$emit(\'blur\', { originalEvent: $event, value: $event.target.value })" />',
+      emits: ['blur', 'update:modelValue'],
+      props: ['modelValue'],
+      methods: {
+        formatDate(value: Date | null) {
+          if (!value) return ''
+          return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+        },
+        parseDate(value: string) {
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+          return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null
+        }
+      }
     },
     FileUpload: {
       name: 'FileUpload',

@@ -5,7 +5,8 @@ import Aura from '@primeuix/themes/aura'
 import App from './App.vue'
 import router from './router'
 import { bootstrap as bootstrapClient } from './api/entrypointClient'
-import { i18n } from './i18n'
+import { i18n, type SupportedLocale } from './i18n'
+import { primeVueLocale } from './i18n/primevueLocale'
 import { SetupRequiredError } from './shared/api/httpClient'
 import { useAuthState } from './shared/state/useAuthState'
 import { useServerState } from './shared/state/useServerState'
@@ -36,8 +37,10 @@ async function bootstrap() {
     finishLoading()
   }
 
+  const initialLocale = i18n.global.locale.value as SupportedLocale
   const app = createApp(App)
     .use(PrimeVue, {
+      locale: primeVueLocale(initialLocale),
       theme: {
         preset: Aura,
         options: {

@@ -6,6 +6,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import { toPermalink } from '../../../composables/usePermalink'
+import IsoDateField from '../../../shared/components/IsoDateField.vue'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import { updateMemory, type Memory, type UpdateMemoryRequest } from '../api'
 import { isValidMemoryDateRange } from '../utils/memoryDateRange'
@@ -105,11 +106,11 @@ async function submit() {
       </label>
       <label>
         {{ t('memory.startDate') }}
-        <InputText v-model="startDate" type="date" required />
+        <IsoDateField v-model="startDate" :aria-label="t('memory.startDate')" required />
       </label>
       <label>
         {{ t('memory.endDate') }}
-        <InputText v-model="endDate" type="date" required />
+        <IsoDateField v-model="endDate" :aria-label="t('memory.endDate')" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <div class="veyq-dialog-action-row">

@@ -171,6 +171,7 @@
 .veyq-form .p-inputtext,
 .veyq-form .p-password,
 .veyq-form .p-select,
+.veyq-form .p-datepicker,
 .veyq-form input,
 .veyq-form select,
 .veyq-form textarea {
@@ -184,6 +185,61 @@
 .veyq-form select,
 .veyq-form textarea {
   border-radius: var(--app-radius-sm);
+}
+
+.veyq-date-field .p-datepicker-input {
+  min-height: 2.75rem;
+  padding-inline-end: 2.75rem;
+  border-radius: var(--app-radius-sm);
+}
+
+.veyq-date-field .p-datepicker-input-icon-container {
+  color: var(--app-muted);
+}
+
+.veyq-date-field .p-datepicker-panel {
+  min-width: min(100%, 20rem);
+  margin-top: 0.4rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow-md);
+}
+
+.veyq-date-field .p-datepicker-header {
+  border-color: var(--app-line);
+  color: var(--app-text);
+}
+
+.veyq-date-field .p-datepicker-weekday,
+.veyq-date-field .p-datepicker-other-month .p-datepicker-day {
+  color: var(--app-muted);
+}
+
+.veyq-date-field .p-datepicker-day,
+.veyq-date-field .p-datepicker-month,
+.veyq-date-field .p-datepicker-year {
+  border-radius: 8px;
+}
+
+.veyq-date-field .p-datepicker-day:not(.p-disabled):hover,
+.veyq-date-field .p-datepicker-month:not(.p-disabled):hover,
+.veyq-date-field .p-datepicker-year:not(.p-disabled):hover {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+
+.veyq-date-field .p-datepicker-day-selected,
+.veyq-date-field .p-datepicker-month-selected,
+.veyq-date-field .p-datepicker-year-selected {
+  background: var(--app-success);
+  color: var(--app-on-strong);
+}
+
+.veyq-date-field .p-datepicker-today .p-datepicker-day:not(.p-datepicker-day-selected) {
+  color: var(--app-success-text);
+  background: var(--app-success-soft);
 }
 
 .veyq-list {
