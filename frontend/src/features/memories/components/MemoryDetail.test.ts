@@ -296,6 +296,40 @@ describe('MemoryDetail', () => {
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
   })
 
+  it('shows media uploaded directly into a visible bucket immediately in the gallery', async () => {
+    const uploaded = media({
+      id: 'media-uploaded-child',
+      memoryId: 'child-mem-1',
+      bucketId: 'bucket-child',
+      title: 'Fresh bucket upload'
+    })
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ directMediaCount: 0, descendantMediaCount: 0 }),
+        childMemories: [memory({ id: 'child-mem-1', path: '/trip/day-1' })],
+        media: [],
+        mediaBuckets: [
+          mediaBucket({
+            id: 'bucket-child',
+            memoryId: 'child-mem-1',
+            displayName: 'Day 1 uploads'
+          })
+        ]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    wrapper.findComponent({ name: 'MemoryUploadDialog' }).vm.$emit('uploaded', uploaded)
+    await flushPromises()
+
+    const mediaGridProps = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
+    expect(mediaGridProps.map((item) => item.id)).toEqual(['media-uploaded-child'])
+    expect(wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('media')).toEqual(mediaGridProps)
+    expect(wrapper.text()).toContain('1 Medien')
+  })
+
   it('deduplicates repeated media ids before rendering gallery and buckets', async () => {
     const duplicated = media({ id: 'media-duplicate', title: 'Same media', bucketId: 'bucket-source' })
     const wrapper = mount(MemoryDetail, {

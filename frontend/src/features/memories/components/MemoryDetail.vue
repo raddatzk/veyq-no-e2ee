@@ -446,7 +446,10 @@ function mergeUpdatedMedia(updated: MemoryMedia[]) {
 }
 
 function addUploadedMedia(media: MemoryMedia) {
-  if (media.memoryId !== props.memory.id) return
+  const uploadedIntoVisibleBucket = Boolean(
+    media.bucketId && visibleMediaBuckets.value.some((bucket) => bucket.id === media.bucketId)
+  )
+  if (media.memoryId !== props.memory.id && !uploadedIntoVisibleBucket) return
   deletedMediaIds.value = new Set([...deletedMediaIds.value].filter((mediaId) => mediaId !== media.id))
   uploadedMedia.value = { ...uploadedMedia.value, [media.id]: media }
 }
