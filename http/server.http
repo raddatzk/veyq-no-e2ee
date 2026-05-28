@@ -1,2 +1,2 @@
 ### Get server information
-GET {{baseUrl}}/api/server
+GET {{baseUrl}}/api/settings/server

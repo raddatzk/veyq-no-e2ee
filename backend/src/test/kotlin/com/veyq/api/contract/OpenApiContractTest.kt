@@ -31,8 +31,6 @@ import com.veyq.api.memory.MemoryShareResource
 import com.veyq.api.memory.MemoryTrackResource
 import com.veyq.api.memory.PublicShareResource
 import com.veyq.api.memory.SearchResource
-import com.veyq.api.settings.SettingsNavigationResource
-import com.veyq.api.settings.SettingsResource
 import com.veyq.api.setup.SetupResource
 import com.veyq.api.tenant.TenantResource
 import com.veyq.api.usermgmt.group.GroupResource
@@ -487,8 +485,6 @@ class OpenApiContractTest {
             ProfilesApi::class.java to ProfileResource::class.java,
             TenantsApi::class.java to TenantResource::class.java,
             GroupsApi::class.java to GroupResource::class.java,
-            ServerApi::class.java to SettingsResource::class.java,
-            SettingsApi::class.java to SettingsNavigationResource::class.java,
             FoldersApi::class.java to FolderResource::class.java,
             MemoryNavigationApi::class.java to MemoryNavigationResource::class.java,
             MemoriesApi::class.java to MemoryResource::class.java,
