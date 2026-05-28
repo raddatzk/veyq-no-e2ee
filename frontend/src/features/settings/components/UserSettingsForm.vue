@@ -266,22 +266,22 @@ function formatTimestamp(value?: string) {
 </script>
 
 <template>
-  <section class="settings-panel">
+  <section class="veyq-surface settings-panel">
     <h1>{{ t('profile.mySettings') }}</h1>
     <p>{{ t('profile.profileAndLogin') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('settings.loading') }}</span>
     </div>
 
     <template v-else-if="settings">
-      <form class="form settings-form" @submit.prevent="saveProfile">
+      <form class="veyq-form settings-form" @submit.prevent="saveProfile">
         <div class="profile-avatar-settings">
           <img v-if="settings.avatarUrl" class="profile-avatar-image" :src="settings.avatarUrl" alt="" />
           <span v-else class="profile-avatar-fallback">{{ displayName.charAt(0).toUpperCase() || '?' }}</span>
-          <div class="button-row">
+          <div class="veyq-button-row">
             <FileUpload
               mode="basic"
               accept="image/png,image/jpeg"
@@ -317,13 +317,13 @@ function formatTimestamp(value?: string) {
         <Message v-if="settings.pendingEmail" severity="info" :closable="false">
           {{ t('profile.emailPending', { email: settings.pendingEmail }) }}
         </Message>
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="savingProfile" />
         </div>
         <Message v-if="profileMessage" severity="success" :closable="false">{{ profileMessage }}</Message>
       </form>
 
-      <form class="form settings-form" @submit.prevent="savePassword">
+      <form class="veyq-form settings-form" @submit.prevent="savePassword">
         <label v-if="settings.hasPassword">
           <span>{{ t('settings.currentPassword') }}</span>
           <Password v-model="currentPassword" autocomplete="current-password" toggle-mask :feedback="false" />
@@ -332,7 +332,7 @@ function formatTimestamp(value?: string) {
           <span>{{ t('auth.newPassword') }}</span>
           <Password v-model="newPassword" autocomplete="new-password" toggle-mask />
         </label>
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button
             type="submit"
             :label="settings.hasPassword ? t('profile.passwordChange') : t('profile.passwordSet')"
@@ -343,12 +343,12 @@ function formatTimestamp(value?: string) {
         <Message v-if="passwordMessage" severity="success" :closable="false">{{ passwordMessage }}</Message>
       </form>
 
-      <section class="form settings-form">
+      <section class="veyq-form settings-form">
         <div>
           <h2>{{ t('privacy.externalContent') }}</h2>
           <p>{{ t('privacy.externalContentCopy') }}</p>
         </div>
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button
             type="button"
             :label="t('privacy.manageExternalContent')"
@@ -360,7 +360,7 @@ function formatTimestamp(value?: string) {
         </div>
       </section>
 
-      <section class="form settings-form">
+      <section class="veyq-form settings-form">
         <div>
           <h2>{{ t('profile.passkeys') }}</h2>
           <p>{{ t('profile.recommended') }}</p>
@@ -397,7 +397,7 @@ function formatTimestamp(value?: string) {
             />
           </div>
         </div>
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button
             type="button"
             :label="t('profile.addPasskey')"

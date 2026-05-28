@@ -51,7 +51,7 @@ async function confirmDelete() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('memory.delete')" modal class="tenant-dialog">
-    <div class="form">
+    <div class="veyq-form">
       <p class="memory-dialog-copy">
         {{ t('memory.deleteCopy', { name: memory.displayName }) }}
       </p>
@@ -64,7 +64,15 @@ async function confirmDelete() {
         />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
+      <div class="veyq-dialog-action-row">
+        <Button
+          type="button"
+          :label="t('common.cancel')"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
         <Button
           type="button"
           :label="t('memory.delete')"
@@ -73,13 +81,6 @@ async function confirmDelete() {
           :disabled="!canConfirmDelete"
           :loading="loading"
           @click="confirmDelete"
-        />
-        <Button
-          type="button"
-          :label="t('common.cancel')"
-          severity="secondary"
-          outlined
-          @click="visible = false"
         />
       </div>
     </div>

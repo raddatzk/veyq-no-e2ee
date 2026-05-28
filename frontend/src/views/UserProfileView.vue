@@ -42,9 +42,9 @@ function openMemory(memory: { path: string }) {
 </script>
 
 <template>
-  <main class="profile-page">
+  <main class="veyq-page veyq-page-narrow profile-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('profile.loading') }}</span>
     </div>
@@ -68,7 +68,7 @@ function openMemory(memory: { path: string }) {
           @open="openMemory"
         />
       </div>
-      <p v-else class="memory-empty">{{ t('profile.memoriesEmpty') }}</p>
+      <p v-else class="veyq-empty">{{ t('profile.memoriesEmpty') }}</p>
     </section>
   </main>
 </template>
@@ -95,8 +95,8 @@ function openMemory(memory: { path: string }) {
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 50%;
-  background: #e5eef8;
-  color: #14213d;
+  background: var(--app-info-soft);
+  color: var(--app-info-text);
   font-size: 1.45rem;
   font-weight: 800;
   overflow: hidden;

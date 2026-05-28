@@ -153,7 +153,7 @@ function localeLabel(locale: string): string {
       class="tenant-dialog locale-markdown-dialog"
       :header="t('share.noticeLocaleDialogTitle', { locale: localeLabel(editingLocale) })"
     >
-      <div class="form">
+      <div class="veyq-form">
         <label>
           {{ t('share.noticeMarkdown') }}
           <textarea
@@ -162,15 +162,16 @@ function localeLabel(locale: string): string {
             :placeholder="t('share.noticeMarkdownPlaceholder')"
           />
         </label>
-        <div class="button-row">
-          <Button type="button" :label="t('common.save')" icon="pi pi-save" @click="saveEditor" />
+        <div class="veyq-dialog-action-row">
           <Button
             type="button"
             :label="t('common.cancel')"
+            icon="pi pi-times"
             severity="secondary"
             outlined
             @click="editingOpen = false"
           />
+          <Button type="button" :label="t('common.save')" icon="pi pi-save" @click="saveEditor" />
         </div>
       </div>
     </Dialog>

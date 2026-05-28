@@ -252,7 +252,7 @@ function currentCoverCrop() {
 
 <template>
   <Dialog v-model:visible="visible" :header="title" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="submit">
+    <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
@@ -327,20 +327,21 @@ function currentCoverCrop() {
         </label>
       </div>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
+      <div class="veyq-dialog-action-row">
+        <Button
+          type="button"
+          :label="t('common.cancel')"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          @click="visible = false"
+        />
         <Button
           type="submit"
           :label="t('common.create')"
           icon="pi pi-plus"
           :disabled="!canSubmit"
           :loading="loading"
-        />
-        <Button
-          type="button"
-          :label="t('common.cancel')"
-          severity="secondary"
-          outlined
-          @click="visible = false"
         />
       </div>
     </form>

@@ -40,13 +40,28 @@
   .sidebar-scope-link.router-link-active,
   .sidebar-tenant-menu-button:hover,
   .profile-button:hover,
-  .lightbox-icon-button:hover,
+  .veyq-icon-button:hover,
   .lightbox-nav:not(:disabled):hover,
-  .lightbox-text-button:hover:not(:disabled),
+  .veyq-text-button:hover:not(:disabled),
+  .asset-bucket-button:hover,
+  .asset-bucket-action-row button:hover,
+  .asset-selection-toolbar button:hover,
+  .asset-batch-form button:hover,
   .asset-card-options-button:hover,
   .suggest-row:hover {
     background: var(--app-hover);
     color: var(--app-text);
+  }
+
+  .asset-bucket-action-row .asset-bucket-upload-button {
+    background: var(--p-button-primary-background, var(--app-success));
+    color: var(--p-button-primary-color, var(--app-backdrop-strong));
+  }
+
+  .asset-bucket-action-row .asset-bucket-upload-button:hover,
+  .asset-batch-form button:hover:not(:disabled) {
+    background: var(--p-button-primary-hover-background, var(--app-success));
+    color: var(--p-button-primary-hover-color, var(--app-backdrop-strong));
   }
 
   .workspace-topbar-center,
@@ -59,43 +74,30 @@
   .tenant-row,
   .tenant-stats div,
   .memory-scope-root-card,
-  .memory-card,
-  .memory-folder-card,
-  .memory-scope-card,
   .memory-journal-help,
   .memory-journal-link,
   .memory-journal-context,
   .memory-journal-unavailable,
   .memory-journal-empty,
-  .memory-playlist-card,
   .memory-journal-media-option,
   .asset-bucket-button,
   .asset-camera-chip,
   .asset-selection-toolbar,
+  .asset-bucket-action-row button,
   .asset-selection-toolbar button,
   .asset-batch-form button,
   .asset-card-options-button,
   .asset-bucket-media-item,
   .memory-cover-option,
   .memory-upload-file-list li,
-  .public-share-login,
-  .public-share-notice,
-  .public-share-notice-gate,
-  .public-share-upload,
-  .settings-panel,
   .passkey-row,
-  .settings-entry,
   .support-notice,
   .suggest-panel,
   .suggest-row,
-  .management-row,
-  .lightbox-icon-button,
   .lightbox-nav,
-  .lightbox-text-button,
-  .media-lightbox-details,
   .media-lightbox-date-form input,
-  .memory-empty,
-  .memory-loading {
+  .asset-dialog-form input,
+  .asset-dialog-form select {
     background: var(--app-surface);
     color: var(--app-text);
   }
@@ -111,8 +113,6 @@
   .auth-method-switch,
   .toggle-row,
   .settings-table-head,
-  .management-badge,
-  .management-badge.muted,
   .locale-markdown-editor-row,
   .asset-reference-media,
   .upload-dropzone,
@@ -125,6 +125,7 @@
   .asset-bucket-media-item > .pi,
   .asset-reference-media img,
   .asset-reference-media > .pi,
+  .asset-bucket-action-row button:disabled,
   .asset-selection-toolbar button:disabled,
   .asset-batch-form button:disabled {
     background: var(--app-surface-muted);
@@ -133,6 +134,10 @@
 
   .support-notice span {
     color: var(--app-muted);
+  }
+
+  .support-notice .support-notice-actions a.p-button span {
+    color: inherit;
   }
 
   .auth-method-switch button {
@@ -167,19 +172,19 @@
   }
 
   .upload-status-trigger {
-    color: #94a3b8;
+    color: var(--app-muted);
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.1);
   }
 
   .upload-status-trigger:hover {
-    border-color: #475569;
+    border-color: var(--app-muted);
     background: var(--app-hover);
     color: var(--app-text);
   }
 
   .upload-status-trigger-active {
-    border-color: #134e4a;
-    background: #102f2d;
+    border-color: var(--app-success-line);
+    background: var(--app-success-soft);
     color: var(--app-success);
     box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.16);
   }
@@ -222,20 +227,20 @@
   }
 
   .sidebar-tenant-link-active .sidebar-tenant-avatar {
-    background: linear-gradient(135deg, #8b7cff, #6d5dfc);
-    color: #fff;
+    background: linear-gradient(135deg, var(--app-accent), color-mix(in srgb, var(--app-accent) 72%, var(--app-backdrop-strong)));
+    color: var(--app-on-strong);
   }
 
   .sidebar-scope-icon.pi-users,
   .memory-scope-card-group .memory-scope-card-icon {
-    background: #3a2f18;
-    color: #facc15;
+    background: var(--app-warning-soft);
+    color: var(--app-warning-text);
   }
 
   .sidebar-scope-icon.pi-user,
   .memory-scope-card-user .memory-scope-card-icon {
-    background: #133429;
-    color: #34d399;
+    background: var(--app-success-soft);
+    color: var(--app-success-text);
   }
 
   .sidebar-favorite-cover {
@@ -245,12 +250,12 @@
 
   .sidebar-memory-thumb,
   .memory-folder-card .pi {
-    background: #1d3340;
-    color: #67e8f9;
+    background: var(--app-info-soft);
+    color: var(--app-info-text);
   }
 
   .memory-detail-cover {
-    background: linear-gradient(135deg, #2a2541, #182631);
+    background: linear-gradient(135deg, var(--app-accent-soft), var(--app-info-soft));
   }
 
   .memory-titlebar p,
@@ -265,8 +270,6 @@
   .tenant-row small,
   .tenant-stats span,
   .settings-table-head,
-  .management-badge,
-  .management-badge.muted,
   .locale-markdown-editor-empty,
   .memory-journal-field,
   .memory-journal-help h4 {
@@ -286,7 +289,7 @@
   .media-grid-tile-placeholder {
     background:
       linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 8%) 45%, transparent 70%),
-      #25303a;
+      var(--app-surface-muted);
   }
 
   .media-lightbox {
@@ -299,31 +302,30 @@
   }
 
   .media-lightbox-viewer {
-    background: #0b0f14;
+    background: var(--app-backdrop-strong);
   }
 
   .memory-journal-rendered a,
   .memory-journal-media-option-check,
-  .asset-batch-form button,
   .media-lightbox-metadata a,
   .media-lightbox-stage a {
     color: var(--app-success);
   }
 
   .asset-batch-form button {
-    background: #0f766e;
-    border-color: #0f766e;
-    color: #fff;
+    background: var(--p-button-primary-background, var(--app-success));
+    border-color: var(--p-button-primary-border-color, var(--app-success));
+    color: var(--p-button-primary-color, var(--app-backdrop-strong));
   }
 
   .memory-journal-media-option:hover,
   .memory-journal-media-option-selected {
     border-color: var(--app-success);
-    background: #102f2d;
+    background: var(--app-success-soft);
   }
 
   .memory-upload-progress-track {
-    background: #1f2937;
+    background: var(--app-surface-muted);
   }
 
   .memory-upload-progress-track span {
@@ -331,13 +333,13 @@
   }
 
   .memory-upload-file-remove:hover:not(:disabled) {
-    background: #3b1d24;
-    color: #fca5a5;
+    background: var(--app-danger-soft);
+    color: var(--app-danger-strong);
   }
 
   .upload-status-badge {
     background: var(--app-success);
-    color: #06221b;
+    color: var(--app-backdrop-strong);
   }
 
   .asset-bucket-button-active,
@@ -345,26 +347,26 @@
   .asset-bucket-media-item-selected,
   .memory-cover-option-selected {
     border-color: var(--app-accent);
-    background: #242642;
+    background: var(--app-accent-soft);
   }
 
-  .management-badge.success {
-    border-color: #14532d;
-    background: #132b21;
-    color: #86efac;
+  .veyq-badge.success {
+    border-color: var(--app-success-line);
+    background: var(--app-success-soft);
+    color: var(--app-success-text);
   }
 
-  .management-badge.warning {
-    border-color: #713f12;
-    background: #2f2413;
-    color: #fde68a;
+  .veyq-badge.warning {
+    border-color: var(--app-warning-line);
+    background: var(--app-warning-soft);
+    color: var(--app-warning-text);
   }
 
   .memory-card:hover,
   .memory-folder-card:hover,
   .memory-scope-card:hover,
   .memory-create-card:hover {
-    border-color: #4d5b6c;
+    border-color: var(--app-line);
   }
 
   .media-card:focus-visible,

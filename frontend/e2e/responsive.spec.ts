@@ -152,7 +152,7 @@ for (const viewport of viewports) {
       await assertNoHorizontalOverflow(page)
 
       await page.goto('/friends/settings')
-      await expect(page.getByRole('heading', { name: 'Bereich' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Friends' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Gruppen' })).toBeVisible()
       await assertNoHorizontalOverflow(page)
       await assertElementFitsViewport(page, '.settings-page')

@@ -250,7 +250,7 @@ const canSavePassword = computed(() => {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('share.title')" modal class="tenant-dialog share-dialog">
-    <div class="form">
+    <div class="veyq-form">
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
@@ -262,25 +262,25 @@ const canSavePassword = computed(() => {
       />
 
       <ManagementList>
-        <div v-for="share in visibleShares" :key="share.id" class="management-row">
-          <div class="management-row-main">
-            <strong class="management-row-title">{{ shareLabel(share) }}</strong>
-            <span class="management-row-subtitle">{{ origin }}{{ share.shareUrl }}</span>
-            <div class="management-row-meta">
+        <div v-for="share in visibleShares" :key="share.id" class="veyq-list-row">
+          <div class="veyq-row-main">
+            <strong class="veyq-row-title">{{ shareLabel(share) }}</strong>
+            <span class="veyq-row-subtitle">{{ origin }}{{ share.shareUrl }}</span>
+            <div class="veyq-row-meta">
               <span
-                class="management-badge"
+                class="veyq-badge"
                 :class="share.hasPassword ? 'success' : 'muted'"
               >
                 {{ share.hasPassword ? t('share.hasPassword') : t('share.noPassword') }}
               </span>
               <span
-                class="management-badge"
+                class="veyq-badge"
                 :class="share.enabled ? 'success' : 'warning'"
               >
                 {{ share.enabled ? t('common.active') : t('common.disabled') }}
               </span>
               <span
-                class="management-badge"
+                class="veyq-badge"
                 :class="share.noticeMarkdownByLocale ? 'success' : 'muted'"
               >
                 {{ share.noticeMarkdownByLocale ? t('share.noticeConfigured') : t('share.noticeNotConfigured') }}
@@ -377,10 +377,10 @@ const canSavePassword = computed(() => {
   </Dialog>
 
   <Dialog v-model:visible="createDialogVisible" :header="t('share.createNew')" modal class="tenant-dialog share-dialog">
-    <form class="form" @submit.prevent="createShare">
+    <form class="veyq-form" @submit.prevent="createShare">
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-      <div class="form-grid">
+      <div class="veyq-form-grid">
         <label>
           {{ t('common.name') }}
           <InputText v-model="name" autocomplete="off" :placeholder="t('common.optional')" />
@@ -444,26 +444,27 @@ const canSavePassword = computed(() => {
   </Dialog>
 
   <Dialog v-model:visible="renameDialogVisible" :header="t('share.rename')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="saveName">
+    <form class="veyq-form" @submit.prevent="saveName">
       <label>
         {{ t('common.name') }}
         <InputText v-model="editName" autocomplete="off" :placeholder="t('common.optional')" />
       </label>
-      <div class="button-row">
-        <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="loading" />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="renameDialogVisible = false"
         />
+        <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="loading" />
       </div>
     </form>
   </Dialog>
 
   <Dialog v-model:visible="passwordDialogVisible" :header="t('share.passwordProtection')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="savePassword">
+    <form class="veyq-form" @submit.prevent="savePassword">
       <label class="toggle-row">
         <span>
           <strong>{{ t('share.passwordProtection') }}</strong>
@@ -475,8 +476,8 @@ const canSavePassword = computed(() => {
         {{ t('auth.newPassword') }}
         <InputText v-model="editPassword" type="password" autocomplete="new-password" required />
       </label>
-      <div class="dialog-action-row">
-        <div class="dialog-action-group">
+      <div class="veyq-action-row">
+        <div class="veyq-action-group">
           <Button
             type="button"
             :label="t('common.cancel')"
@@ -497,14 +498,14 @@ const canSavePassword = computed(() => {
   </Dialog>
 
   <Dialog v-model:visible="noticeDialogVisible" :header="t('share.noticeEdit')" modal class="tenant-dialog share-notice-dialog">
-    <form class="form" @submit.prevent="saveNotice">
+    <form class="veyq-form" @submit.prevent="saveNotice">
       <LocaleMarkdownEditor
         v-model="editNoticeMarkdownByLocale"
         :label="t('share.noticeTitle')"
         compact
       />
-      <div class="dialog-action-row">
-        <div class="dialog-action-group">
+      <div class="veyq-action-row">
+        <div class="veyq-action-group">
           <Button
             type="button"
             :label="t('common.cancel')"

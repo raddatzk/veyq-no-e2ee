@@ -51,7 +51,7 @@ function applyConsent() {
       <span>{{ t('privacy.osmTitle') }}</span>
     </label>
 
-    <div class="button-row">
+    <div class="veyq-button-row">
       <Button
         type="button"
         :label="t('privacy.acceptAll')"

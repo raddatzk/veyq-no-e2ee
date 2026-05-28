@@ -89,7 +89,7 @@ async function submit() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('memory.edit')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="submit">
+    <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
@@ -112,15 +112,16 @@ async function submit() {
         <InputText v-model="endDate" type="date" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
-        <Button type="submit" :label="t('common.save')" icon="pi pi-check" :loading="loading" />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="visible = false"
         />
+        <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="loading" />
       </div>
     </form>
   </Dialog>

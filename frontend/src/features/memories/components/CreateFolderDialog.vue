@@ -102,7 +102,7 @@ function rootScopeRequest() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('memory.folderCreate')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="submit">
+    <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('common.name') }}
         <InputText v-model="displayName" autocomplete="off" required />
@@ -127,15 +127,16 @@ function rootScopeRequest() {
         />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
-        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="visible = false"
         />
+        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
       </div>
     </form>
   </Dialog>

@@ -20,13 +20,13 @@ defineEmits<{
 
 <template>
   <div class="memory-route-surface">
-    <section class="memory-section">
-      <div class="memory-section-header">
+    <section class="veyq-section memory-section">
+      <div class="veyq-section-header memory-section-header">
         <h2>{{ t('memory.memories') }}</h2>
         <span>{{ memories.length }}</span>
       </div>
       <div class="memory-card-grid memory-card-grid-memories">
-        <p v-if="!memories.length" class="memory-empty memory-empty-inline">
+        <p v-if="!memories.length" class="veyq-empty veyq-empty-inline">
           {{ t('memory.memoryEmpty') }}
         </p>
         <MemoryCard
@@ -36,7 +36,7 @@ defineEmits<{
           @open="$emit('openMemory', $event)"
         />
         <button
-          class="memory-create-card memory-create-card-memory"
+          class="veyq-card veyq-card-interactive memory-create-card memory-create-card-memory"
           type="button"
           @click="$emit('createMemory')"
         >
@@ -46,26 +46,26 @@ defineEmits<{
       </div>
     </section>
 
-    <section class="memory-section">
-      <div class="memory-section-header">
+    <section class="veyq-section memory-section">
+      <div class="veyq-section-header memory-section-header">
         <h2>{{ t('memory.folders') }}</h2>
         <span>{{ navigation.folders.length }}</span>
       </div>
       <div class="memory-card-grid">
-        <p v-if="!navigation.folders.length" class="memory-empty memory-empty-inline">
+        <p v-if="!navigation.folders.length" class="veyq-empty veyq-empty-inline">
           {{ t('memory.folderEmpty') }}
         </p>
         <button
           v-for="folder in navigation.folders"
           :key="folder.path"
-          class="memory-folder-card"
+          class="veyq-card veyq-card-interactive memory-folder-card"
           type="button"
           @click="$emit('openFolder', folder)"
         >
           <span class="pi pi-folder" />
           <strong>{{ folder.displayName }}</strong>
         </button>
-        <button class="memory-create-card" type="button" @click="$emit('createFolder')">
+        <button class="veyq-card veyq-card-interactive memory-create-card" type="button" @click="$emit('createFolder')">
           <span class="pi pi-plus" />
           <strong>{{ t('memory.folderCreate') }}</strong>
         </button>

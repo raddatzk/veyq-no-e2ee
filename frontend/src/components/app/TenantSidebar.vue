@@ -133,7 +133,15 @@ watch(
     () => authState.tenants.length,
     () => props.navigationRefreshKey
   ],
-  loadNavigationData,
+  (current, previous) => {
+    const preserveExisting =
+      previous !== undefined &&
+      current[0] === previous[0] &&
+      current[2] === previous[2] &&
+      current[3] === previous[3] &&
+      current[4] === previous[4]
+    void loadNavigationData({ preserveExisting })
+  },
   { immediate: true }
 )
 watch(groupRoots, () => {
@@ -156,11 +164,13 @@ onBeforeUnmount(() => {
   compactGroupResizeObserver = null
 })
 
-async function loadNavigationData() {
+async function loadNavigationData(options: { preserveExisting?: boolean } = {}) {
   const tenantName = activeTenantName.value
   const sequence = ++loadSequence
-  scopeRoots.value = []
-  favoriteMemories.value = []
+  if (!options.preserveExisting) {
+    scopeRoots.value = []
+    favoriteMemories.value = []
+  }
   sidebarError.value = ''
   if (!tenantName) return
 

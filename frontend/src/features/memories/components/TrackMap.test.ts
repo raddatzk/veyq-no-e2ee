@@ -76,7 +76,7 @@ describe('TrackMap', () => {
         [52.52, 13.405],
         [52.53, 13.42]
       ],
-      expect.objectContaining({ color: '#0f766e' })
+      expect.objectContaining({ color: 'var(--app-success)' })
     )
     expect(leafletMock.fitBounds).toHaveBeenCalledWith(
       expect.objectContaining({

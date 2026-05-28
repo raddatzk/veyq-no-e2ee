@@ -28,24 +28,24 @@ async function loadSettings() {
 </script>
 
 <template>
-  <section class="settings-panel">
+  <section class="veyq-surface settings-panel">
     <h1>{{ t('settings.serverTitle') }}</h1>
     <p>{{ t('settings.serverSettings') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-    <div v-else-if="loading" class="memory-loading">
+    <div v-else-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('settings.serverLoading') }}</span>
     </div>
     <template v-else-if="settings">
-      <div class="settings-entry">
+      <div class="veyq-list-row settings-entry">
         <div>
           <strong>{{ settings.displayName }}</strong>
           <span>{{ settings.userManagementAvailable ? t('common.active') : t('common.inactive') }}</span>
         </div>
         <i class="pi pi-server"></i>
       </div>
-      <div class="settings-entry license-settings-entry">
+      <div class="veyq-list-row settings-entry license-settings-entry">
         <div>
           <strong>{{ t('license.title') }}</strong>
           <span>{{ t('license.summary', { edition: t(`license.edition.${settings.license.edition}`), license: settings.license.license }) }}</span>
@@ -58,7 +58,7 @@ async function loadSettings() {
           <a :href="settings.license.commercialBoundaryUrl" target="_blank" rel="noreferrer">{{ t('license.commercialBoundary') }}</a>
         </div>
       </div>
-      <div v-if="settings.support" class="settings-entry support-settings-entry">
+      <div v-if="settings.support" class="veyq-list-row settings-entry support-settings-entry">
         <div>
           <strong>{{ t('support.title') }}</strong>
           <span>{{ t('support.settingsCopy') }}</span>

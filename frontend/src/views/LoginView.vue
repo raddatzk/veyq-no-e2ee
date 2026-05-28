@@ -111,7 +111,7 @@ onMounted(async () => {
   <Card class="login-card">
     <template #title>{{ t('auth.login') }}</template>
     <template #content>
-      <form class="form" @submit.prevent="authMethod === 'passkey' ? submitPasskey() : submit()">
+      <form class="veyq-form" @submit.prevent="authMethod === 'passkey' ? submitPasskey() : submit()">
         <div class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
           <button
             type="button"

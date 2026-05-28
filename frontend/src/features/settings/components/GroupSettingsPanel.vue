@@ -380,14 +380,14 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
 </script>
 
 <template>
-  <section class="settings-panel">
+  <section class="veyq-surface settings-panel">
     <h1>{{ t('group.title') }}</h1>
     <p>{{ t('group.membersAndAreas') }}</p>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('group.listLoading') }}</span>
     </div>
@@ -419,7 +419,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
         </button>
       </div>
 
-      <div v-if="props.groupName && detailLoading" class="memory-loading">
+      <div v-if="props.groupName && detailLoading" class="veyq-loading">
         <ProgressSpinner class="small-spinner" />
         <span>{{ t('group.loading') }}</span>
       </div>
@@ -433,7 +433,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
       @update:visible="detailDialogVisible = $event"
       @hide="closeDetailDialog"
     >
-      <div v-if="detailLoading" class="memory-loading">
+      <div v-if="detailLoading" class="veyq-loading">
         <ProgressSpinner class="small-spinner" />
         <span>{{ t('group.loading') }}</span>
       </div>
@@ -461,10 +461,10 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           <div
             v-for="member in selectedGroup.members"
             :key="member.user.userId"
-            class="management-row"
+            class="veyq-list-row"
           >
-            <div class="management-row-main">
-              <strong class="management-row-title">{{ member.user.displayName }}</strong>
+            <div class="veyq-row-main">
+              <strong class="veyq-row-title">{{ member.user.displayName }}</strong>
             </div>
             <Select
               class="management-control"
@@ -516,7 +516,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
         </div>
 
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="saving" />
           <Button
             type="button"
@@ -528,7 +528,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
           />
         </div>
       </form>
-      <div v-else-if="showDetail && selectedGroup" class="settings-entry">
+      <div v-else-if="showDetail && selectedGroup" class="veyq-list-row settings-entry">
         <div>
           <strong>{{ selectedGroup.displayName }}</strong>
           <span>@{{ selectedGroup.name }}</span>
@@ -544,7 +544,7 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
       class="tenant-dialog"
       @update:visible="updateCreateDialogVisible"
     >
-      <form class="form" @submit.prevent="submitCreate">
+      <form class="veyq-form" @submit.prevent="submitCreate">
         <label>
           {{ t('common.name') }}
           <InputText v-model="createDisplayName" autocomplete="off" required />
@@ -558,21 +558,22 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
             @update:model-value="updateCreatePermalink"
           />
         </label>
-        <div class="button-row">
-          <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="saving" />
+        <div class="veyq-dialog-action-row">
           <Button
             type="button"
             :label="t('common.cancel')"
+            icon="pi pi-times"
             severity="secondary"
             outlined
             @click="closeCreateDialog"
           />
+          <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="saving" />
         </div>
       </form>
     </Dialog>
 
     <Dialog v-model:visible="deleteDialogVisible" :header="t('group.delete')" modal class="tenant-dialog">
-      <div v-if="selectedGroup" class="form">
+      <div v-if="selectedGroup" class="veyq-form">
         <p>
           {{ t('tenant.deleteConfirm', { name: selectedGroup.displayName }) }}
         </p>
@@ -584,7 +585,15 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
             :placeholder="selectedGroup.displayName"
           />
         </label>
-        <div class="button-row">
+        <div class="veyq-dialog-action-row">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            icon="pi pi-times"
+            severity="secondary"
+            outlined
+            @click="deleteDialogVisible = false"
+          />
           <Button
             :label="t('common.delete')"
             icon="pi pi-trash"
@@ -592,13 +601,6 @@ function isCurrentUserGroupOwner(group: GroupSummary): boolean {
             :disabled="!canConfirmDeleteGroup"
             :loading="saving"
             @click="submitDeleteGroup"
-          />
-          <Button
-            type="button"
-            :label="t('common.cancel')"
-            severity="secondary"
-            outlined
-            @click="deleteDialogVisible = false"
           />
         </div>
       </div>

@@ -101,7 +101,7 @@ function syncRouteLayer() {
   if (!map) return
   routeLayer?.remove()
   routeLayer = L.polyline(positions.value, {
-    color: '#0f766e',
+    color: 'var(--app-success)',
     lineCap: 'round',
     lineJoin: 'round',
     opacity: 0.95,

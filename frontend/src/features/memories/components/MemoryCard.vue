@@ -22,7 +22,7 @@ const dateSubtitle = computed(() => formatMemoryDateRange(props.memory.startDate
 </script>
 
 <template>
-  <Card class="memory-card">
+  <Card class="veyq-card veyq-card-interactive memory-card">
     <template #content>
       <button class="memory-card-main" type="button" @click="$emit('open', memory)">
         <span class="memory-card-cover">

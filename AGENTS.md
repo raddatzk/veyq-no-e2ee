@@ -14,6 +14,7 @@ Memory UI v1 and the Memory APIs are the active product baseline. Folders still 
 - [docs/development.md](docs/development.md): local development, Docker Compose and reset sidecar.
 - [docs/architecture.md](docs/architecture.md): current backend/frontend architecture.
 - [docs/product/memory-product-context.md](docs/product/memory-product-context.md): product vision, domain vocabulary and decisions discussed so far.
+- [docs/product/memory-ui-styleguide.md](docs/product/memory-ui-styleguide.md): UI colors, shared CSS classes, component patterns and product-facing style rules.
 - [docs/product/future-work.md](docs/product/future-work.md): topics that still need ADRs, API designs or implementation plans.
 - [docs/adr/README.md](docs/adr/README.md): ADR process and template.
 
@@ -21,6 +22,7 @@ Memory UI v1 and the Memory APIs are the active product baseline. Folders still 
 
 - Use `Memory` wording for product-facing concepts. Folder wording is acceptable only for organizational navigation.
 - Do not add new Album or Explorer flows, models, API contracts or database tables.
+- Follow the Memory UI styleguide for product-facing frontend work, especially shared `.veyq-*` classes, color roles, buttons, lists and dialogs.
 - Keep public APIs privacy-preserving: never expose cross-memory person graphs or unauthorized memories.
 - Keep veyq self-hostable by default. Managed hosting, push gateways, federation and commercial features must remain optional layers.
 - Document meaningful product and architecture decisions in `docs/` before or alongside implementation.

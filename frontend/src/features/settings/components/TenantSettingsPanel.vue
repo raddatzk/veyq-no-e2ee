@@ -346,13 +346,13 @@ function tenantInitial(value: string): string {
 </script>
 
 <template>
-  <section class="settings-panel">
+  <section class="veyq-surface settings-panel">
     <h1>{{ tenantDisplayName }}</h1>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('tenant.membersLoading') }}</span>
     </div>
@@ -364,7 +364,7 @@ function tenantInitial(value: string): string {
         <div class="tenant-logo-settings">
           <img v-if="tenantSettings.logoUrl" class="tenant-logo-image" :src="tenantSettings.logoUrl" alt="" />
           <span v-else class="tenant-logo-fallback">{{ tenantInitial(tenantSettings.displayName) }}</span>
-          <div class="button-row">
+          <div class="veyq-button-row">
             <FileUpload
               mode="basic"
               accept="image/png,image/jpeg"
@@ -391,7 +391,7 @@ function tenantInitial(value: string): string {
         <h2>{{ t('share.termsTitle') }}</h2>
         <p>{{ t('share.termsCopy') }}</p>
         <LocaleMarkdownEditor v-model="termsMarkdownByLocale" :label="t('share.termsLanguages')" compact />
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button
             type="button"
             :label="t('share.termsTemplateInsert')"
@@ -419,13 +419,13 @@ function tenantInitial(value: string): string {
           <Button :label="t('tenant.invite')" icon="pi pi-user-plus" @click="openInviteDialog" />
         </div>
         <ManagementList>
-          <div v-for="user in users" :key="user.user.userId" class="management-row">
-            <div class="management-row-main">
-              <strong class="management-row-title">{{ user.user.displayName }}</strong>
-              <span v-if="user.email" class="management-row-subtitle">{{ user.email }}</span>
-              <div class="management-row-meta">
+          <div v-for="user in users" :key="user.user.userId" class="veyq-list-row">
+            <div class="veyq-row-main">
+              <strong class="veyq-row-title">{{ user.user.displayName }}</strong>
+              <span v-if="user.email" class="veyq-row-subtitle">{{ user.email }}</span>
+              <div class="veyq-row-meta">
                 <span
-                  class="management-badge"
+                  class="veyq-badge"
                   :class="user.status === 'Active' ? 'success' : 'warning'"
                 >
                   {{ user.status === 'Active' ? t('common.active') : t('common.pending') }}
@@ -471,7 +471,7 @@ function tenantInitial(value: string): string {
     </template>
 
     <Dialog v-model:visible="inviteDialogVisible" :header="t('tenant.invite')" modal class="tenant-dialog">
-      <form class="form" @submit.prevent="inviteUserByEmail">
+      <form class="veyq-form" @submit.prevent="inviteUserByEmail">
         <label>
           {{ t('common.email') }}
           <InputText v-model="inviteEmail" type="email" autocomplete="email" required />
@@ -485,21 +485,22 @@ function tenantInitial(value: string): string {
             option-value="value"
           />
         </label>
-        <div class="button-row">
-          <Button type="submit" :label="t('tenant.invite')" icon="pi pi-send" :loading="saving" />
+        <div class="veyq-dialog-action-row">
           <Button
             type="button"
             :label="t('common.cancel')"
+            icon="pi pi-times"
             severity="secondary"
             outlined
             @click="inviteDialogVisible = false"
           />
+          <Button type="submit" :label="t('tenant.invite')" icon="pi pi-send" :loading="saving" />
         </div>
       </form>
     </Dialog>
 
     <Dialog v-model:visible="deleteDialogVisible" :header="t('tenant.delete')" modal class="tenant-dialog">
-      <div class="form">
+      <div class="veyq-form">
         <p>
           {{ t('tenant.deleteConfirm', { name: tenantDisplayName }) }}
         </p>
@@ -507,7 +508,15 @@ function tenantInitial(value: string): string {
           {{ t('settings.confirmationDisplayName') }}
           <InputText v-model="deleteConfirmation" autocomplete="off" :placeholder="tenantDisplayName" />
         </label>
-        <div class="button-row">
+        <div class="veyq-dialog-action-row">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            icon="pi pi-times"
+            severity="secondary"
+            outlined
+            @click="deleteDialogVisible = false"
+          />
           <Button
             :label="t('common.delete')"
             icon="pi pi-trash"
@@ -516,19 +525,12 @@ function tenantInitial(value: string): string {
             :loading="saving"
             @click="submitDeleteTenant"
           />
-          <Button
-            type="button"
-            :label="t('common.cancel')"
-            severity="secondary"
-            outlined
-            @click="deleteDialogVisible = false"
-          />
         </div>
       </div>
     </Dialog>
 
     <Dialog v-model:visible="termsTemplateDialogVisible" :header="t('share.termsTemplateTitle')" modal class="tenant-dialog">
-      <form class="form" @submit.prevent="importTermsTemplate">
+      <form class="veyq-form" @submit.prevent="importTermsTemplate">
         <label>
           {{ t('share.noticeLocale') }}
           <Select
@@ -577,19 +579,20 @@ function tenantInitial(value: string): string {
             <span>{{ t('share.termsTemplateReplace') }}</span>
           </label>
         </fieldset>
-        <div class="button-row">
+        <div class="veyq-dialog-action-row">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            icon="pi pi-times"
+            severity="secondary"
+            outlined
+            @click="termsTemplateDialogVisible = false"
+          />
           <Button
             type="submit"
             :label="t('share.termsTemplateInsert')"
             icon="pi pi-file-import"
             :disabled="!canImportTemplate"
-          />
-          <Button
-            type="button"
-            :label="t('common.cancel')"
-            severity="secondary"
-            outlined
-            @click="termsTemplateDialogVisible = false"
           />
         </div>
       </form>

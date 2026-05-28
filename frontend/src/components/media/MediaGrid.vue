@@ -291,8 +291,8 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <section class="memory-section">
-    <div class="memory-section-header">
+  <section class="veyq-section memory-section">
+    <div class="veyq-section-header memory-section-header">
       <h2>{{ t('media.title') }}</h2>
       <div class="media-grid-header-actions">
         <span>{{ media.length }}</span>
@@ -353,11 +353,11 @@ function handleKeydown(event: KeyboardEvent) {
         <span>{{ streaming ? t('media.loading') : t('media.preparing') }}</span>
       </div>
     </div>
-    <div v-else-if="streaming" class="memory-loading">
+    <div v-else-if="streaming" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('media.loading') }}</span>
     </div>
-    <div v-else class="memory-empty">{{ t('media.empty') }}</div>
+    <div v-else class="veyq-empty">{{ t('media.empty') }}</div>
 
     <MediaLightbox
       v-if="selectedMedia"

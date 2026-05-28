@@ -60,16 +60,20 @@ test('share dialog manages password protection with a toggle', async ({ page }) 
   await expect(shareDialog).toBeVisible()
   await expect(shareDialog.getByText('http://127.0.0.1:8081/s/shr-e2e')).toBeVisible()
 
-  await shareDialog.getByRole('button', { name: 'Link erstellen' }).click()
+  await shareDialog.getByRole('button', { name: 'Neue Freigabe anlegen' }).click()
+  const createDialog = page.getByRole('dialog', { name: 'Neue Freigabe anlegen' })
+  await expect(createDialog).toBeVisible()
+  await createDialog.getByRole('button', { name: 'Link erstellen' }).click()
   await expect.poll(() => createdShare).toMatchObject({
     role: 'VIEWER',
     password: null
   })
 
-  await shareDialog.getByLabel('Passwortschutz aktivieren').check()
-  await expect(shareDialog.getByRole('button', { name: 'Link erstellen' })).toBeDisabled()
-  await shareDialog.getByRole('textbox', { name: 'Passwort' }).fill('share-password123')
-  await shareDialog.getByRole('button', { name: 'Link erstellen' }).click()
+  await shareDialog.getByRole('button', { name: 'Neue Freigabe anlegen' }).click()
+  await createDialog.getByLabel('Passwortschutz aktivieren').check()
+  await expect(createDialog.getByRole('button', { name: 'Link erstellen' })).toBeDisabled()
+  await createDialog.getByRole('textbox', { name: 'Passwort' }).fill('share-password123')
+  await createDialog.getByRole('button', { name: 'Link erstellen' }).click()
   await expect.poll(() => createdShare).toMatchObject({
     role: 'VIEWER',
     password: 'share-password123'

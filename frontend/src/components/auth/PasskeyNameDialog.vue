@@ -62,7 +62,7 @@ function updateVisible(visible: boolean) {
     class="tenant-dialog"
     @update:visible="updateVisible"
   >
-    <div class="form">
+    <div class="veyq-form">
       <Message severity="info" :closable="false">
         {{ t('profile.passkeyNameHelp') }}
       </Message>
@@ -71,10 +71,11 @@ function updateVisible(visible: boolean) {
         <span>{{ t('auth.passkeyDisplayName') }}</span>
         <InputText v-model="displayName" autocomplete="off" required />
       </label>
-      <div class="button-row">
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('profile.passkeyNameSkip')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="skip"

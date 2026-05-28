@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TenantSidebar from './TenantSidebar.vue'
 import type { TenantSummary } from '../../authState'
+import { notifyMemoryFavoritesChanged } from '../../features/memories/composables/useMemoryFavoritesRefresh'
 
 function tenantSummary(
   id: number,
@@ -207,6 +208,75 @@ describe('TenantSidebar', () => {
     expect(wrapper.text()).toContain('Travel')
     expect(wrapper.text()).toContain('Gruppe erstellen')
     expect(wrapper.text()).toContain('Favorite Memory')
+  })
+
+  it('keeps scope roots visible while refreshing favorites', async () => {
+    mocks.authState.user.serverRole = 'ServerMember'
+    mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
+    mocks.getMemoryNavigation.mockResolvedValueOnce({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [
+        {
+          kind: 'USER',
+          name: 'kevin',
+          displayName: 'Kevin',
+          path: '/~kevin'
+        }
+      ],
+      favoriteMemories: [
+        {
+          id: 'mem-1',
+          parentId: null,
+          name: 'favorite',
+          displayName: 'Favorite Memory',
+          path: '/favorite',
+          coverMediaId: null,
+          coverUrl: null,
+          coverCrop: null,
+          startDate: '2026-05-03',
+          endDate: '2026-05-05',
+          childCount: 0,
+          mediaCount: 0,
+          favorite: true,
+          scope: null
+        }
+      ],
+      folders: []
+    })
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    let resolveRefresh: (value: unknown) => void = () => {}
+    const refreshPromise = new Promise((resolve) => {
+      resolveRefresh = resolve
+    })
+    mocks.getMemoryNavigation.mockImplementation(() => refreshPromise)
+
+    notifyMemoryFavoritesChanged()
+    await flushPromises()
+
+    expect(wrapper.find('a[href="/tenant/~kevin"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Favorite Memory')
+
+    resolveRefresh({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [
+        {
+          kind: 'USER',
+          name: 'kevin',
+          displayName: 'Kevin',
+          path: '/~kevin'
+        }
+      ],
+      favoriteMemories: [],
+      folders: []
+    })
+    await flushPromises()
+
+    expect(wrapper.find('a[href="/tenant/~kevin"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Favorite Memory')
   })
 
   it('renders tenant logo images when available', async () => {

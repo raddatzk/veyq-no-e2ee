@@ -172,7 +172,7 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       />
     </div>
 
-    <div v-if="tracks.length === 0" class="memory-empty memory-empty-action">
+    <div v-if="tracks.length === 0" class="veyq-empty veyq-empty-action">
       <span class="pi pi-map" />
       <span>{{ t('track.empty') }}</span>
       <small>{{ t('track.emptyAction') }}</small>
@@ -186,7 +186,7 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
     </div>
 
     <div v-else class="memory-track-grid">
-      <article v-for="track in tracks" :key="track.id" class="memory-track-card">
+      <article v-for="track in tracks" :key="track.id" class="veyq-card memory-track-card">
         <TrackMap :track="track" />
         <div class="memory-track-card-body">
           <div>
@@ -240,7 +240,7 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
     </div>
 
     <Dialog v-model:visible="uploadOpen" modal :header="t('track.upload')" class="memory-track-dialog">
-      <div class="memory-dialog-form">
+      <div class="veyq-form memory-dialog-form">
         <p v-if="error" class="memory-form-error">{{ error }}</p>
         <FileUpload
           mode="basic"
@@ -260,14 +260,7 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
           <span>{{ t('track.activityType') }}</span>
           <Select v-model="activityType" :options="activityOptions" option-label="label" option-value="value" :disabled="saving" />
         </label>
-        <div class="memory-dialog-actions">
-          <Button
-            icon="pi pi-check"
-            :label="t('common.save')"
-            :loading="saving"
-            :disabled="!selectedFile || !title.trim()"
-            @click="submitUpload"
-          />
+        <div class="veyq-dialog-action-row">
           <Button
             icon="pi pi-times"
             :label="t('common.cancel')"
@@ -276,12 +269,19 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
             :disabled="saving"
             @click="uploadOpen = false"
           />
+          <Button
+            icon="pi pi-save"
+            :label="t('common.save')"
+            :loading="saving"
+            :disabled="!selectedFile || !title.trim()"
+            @click="submitUpload"
+          />
         </div>
       </div>
     </Dialog>
 
     <Dialog :visible="Boolean(editTrack)" modal :header="t('track.edit')" class="memory-track-dialog" @update:visible="editTrack = null">
-      <div class="memory-dialog-form">
+      <div class="veyq-form memory-dialog-form">
         <p v-if="error" class="memory-form-error">{{ error }}</p>
         <label>
           <span>{{ t('track.name') }}</span>
@@ -291,14 +291,7 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
           <span>{{ t('track.activityType') }}</span>
           <Select v-model="activityType" :options="activityOptions" option-label="label" option-value="value" :disabled="saving" />
         </label>
-        <div class="memory-dialog-actions">
-          <Button
-            icon="pi pi-check"
-            :label="t('common.save')"
-            :loading="saving"
-            :disabled="!title.trim()"
-            @click="submitEdit"
-          />
+        <div class="veyq-dialog-action-row">
           <Button
             icon="pi pi-times"
             :label="t('common.cancel')"
@@ -307,17 +300,24 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
             :disabled="saving"
             @click="editTrack = null"
           />
+          <Button
+            icon="pi pi-save"
+            :label="t('common.save')"
+            :loading="saving"
+            :disabled="!title.trim()"
+            @click="submitEdit"
+          />
         </div>
       </div>
     </Dialog>
 
     <Dialog :visible="Boolean(deleteCandidate)" modal :header="t('track.delete')" class="memory-track-dialog" @update:visible="deleteCandidate = null">
-      <div class="memory-dialog-form">
+      <div class="veyq-form memory-dialog-form">
         <p>{{ t('track.deleteConfirm', { name: deleteCandidate?.title }) }}</p>
         <p v-if="error" class="memory-form-error">{{ error }}</p>
-        <div class="memory-dialog-actions">
-          <Button icon="pi pi-trash" :label="t('common.delete')" severity="danger" :loading="saving" @click="confirmDelete" />
+        <div class="veyq-dialog-action-row">
           <Button icon="pi pi-times" :label="t('common.cancel')" severity="secondary" outlined :disabled="saving" @click="deleteCandidate = null" />
+          <Button icon="pi pi-trash" :label="t('common.delete')" severity="danger" :loading="saving" @click="confirmDelete" />
         </div>
       </div>
     </Dialog>

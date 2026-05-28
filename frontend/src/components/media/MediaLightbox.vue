@@ -239,7 +239,7 @@ function onSheetPointerUp(event: PointerEvent) {
       </div>
       <div class="media-lightbox-actions">
         <a
-          class="lightbox-icon-button"
+          class="veyq-icon-button lightbox-icon-button"
           :href="mediaUrl"
           :download="downloadName"
           :aria-label="t('media.download')"
@@ -248,7 +248,7 @@ function onSheetPointerUp(event: PointerEvent) {
         </a>
         <button
           v-if="canFullscreenOriginal"
-          class="lightbox-icon-button"
+          class="veyq-icon-button lightbox-icon-button"
           type="button"
           :aria-label="t('media.fullscreenOriginal')"
           :title="t('media.fullscreenOriginal')"
@@ -257,7 +257,7 @@ function onSheetPointerUp(event: PointerEvent) {
           <span class="pi pi-window-maximize" />
         </button>
         <button
-          class="lightbox-icon-button"
+          class="veyq-icon-button lightbox-icon-button"
           type="button"
           :aria-label="t('media.closeLightbox')"
           @click="$emit('close')"
@@ -349,7 +349,7 @@ function onSheetPointerUp(event: PointerEvent) {
       </div>
 
       <aside
-        class="media-lightbox-details"
+        class="veyq-surface media-lightbox-details"
         :class="{ 'media-lightbox-details-open': isDetailsOpen }"
         @pointerdown="onSheetPointerDown"
         @pointerup="onSheetPointerUp"
@@ -366,7 +366,7 @@ function onSheetPointerUp(event: PointerEvent) {
           <div class="media-lightbox-details-actions">
             <button
               v-if="canEditMetadata"
-              class="lightbox-text-button"
+              class="veyq-text-button lightbox-text-button"
               type="button"
               @click="startCapturedAtEdit"
             >
@@ -374,7 +374,7 @@ function onSheetPointerUp(event: PointerEvent) {
             </button>
             <button
               v-if="canDeleteMedia"
-              class="lightbox-icon-button lightbox-delete-button"
+              class="veyq-icon-button lightbox-icon-button lightbox-delete-button"
               type="button"
               :aria-label="t('common.delete')"
               :disabled="isSaving"
@@ -389,11 +389,11 @@ function onSheetPointerUp(event: PointerEvent) {
           <label for="captured-at-input">{{ t('media.capturedAt') }}</label>
           <input id="captured-at-input" v-model="capturedAtInput" type="datetime-local" />
           <div class="media-lightbox-date-actions">
-            <button class="lightbox-text-button" type="submit" :disabled="isSaving">
+            <button class="veyq-text-button lightbox-text-button" type="submit" :disabled="isSaving">
               {{ t('common.save') }}
             </button>
             <button
-              class="lightbox-text-button"
+              class="veyq-text-button lightbox-text-button"
               type="button"
               :disabled="isSaving"
               @click="isEditingCapturedAt = false"

@@ -128,6 +128,7 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend/fronten
 - [`docs/operations.md`](docs/operations.md): operator runbook for expected self-hosting failure cases.
 - [`docs/architecture.md`](docs/architecture.md): current system architecture and implemented domain model.
 - [`docs/product/memory-product-context.md`](docs/product/memory-product-context.md): product vision and Memory context.
+- [`docs/product/memory-ui-styleguide.md`](docs/product/memory-ui-styleguide.md): UI colors, shared CSS classes, component patterns and product-facing style rules.
 - [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and veyq embed syntax.
 - [`docs/product/playlists.md`](docs/product/playlists.md): Memory playlist links, permissions and API surface.
 - [`docs/product/future-work.md`](docs/product/future-work.md): ADR, API, UX and spike candidates.

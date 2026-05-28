@@ -70,10 +70,10 @@ function localizeSettingsLabel(label: string): string {
 </script>
 
 <template>
-  <div class="settings-page">
+  <div class="veyq-page veyq-page-narrow settings-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-    <div v-if="loading" class="memory-loading">
+    <div v-if="loading" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('settings.loading') }}</span>
     </div>
@@ -90,7 +90,7 @@ function localizeSettingsLabel(label: string): string {
         :tenant-name="tenantName"
         :group-name="groupName"
       />
-      <section v-else class="settings-panel">
+      <section v-else class="veyq-surface settings-panel">
         <h1>{{ settings.subject.label }}</h1>
         <p>{{ t('settings.title') }}</p>
       </section>

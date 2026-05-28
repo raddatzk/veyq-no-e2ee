@@ -47,7 +47,7 @@ async function confirmEmail() {
   <Card class="login-card">
     <template #title>{{ t('settings.emailConfirmTitle') }}</template>
     <template #content>
-      <div v-if="loading" class="memory-loading">
+      <div v-if="loading" class="veyq-loading">
         <ProgressSpinner class="small-spinner" />
         <span>{{ t('settings.emailConfirmLoading') }}</span>
       </div>
@@ -57,7 +57,7 @@ async function confirmEmail() {
       <Message v-else severity="success" :closable="false" class="form-message">
         {{ t('settings.emailConfirmSuccess', { email: confirmedEmail }) }}
       </Message>
-      <div class="button-row">
+      <div class="veyq-button-row">
         <Button
           type="button"
           :label="t('settings.emailConfirmButton')"

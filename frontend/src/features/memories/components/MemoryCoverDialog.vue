@@ -266,7 +266,7 @@ async function removeCover() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('memory.coverChoose')" modal class="tenant-dialog">
-    <div class="form">
+    <div class="veyq-form">
       <p class="memory-dialog-copy">
         {{ t('memory.coverCopy') }}
       </p>
@@ -330,32 +330,35 @@ async function removeCover() {
       </div>
 
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
-        <Button
-          type="button"
-          :label="t('memory.coverSave')"
-          icon="pi pi-image"
-          :disabled="!imageLoaded"
-          :loading="loading"
-          @click="saveCover"
-        />
-        <Button
-          type="button"
-          :label="t('memory.coverRemove')"
-          icon="pi pi-times"
-          severity="secondary"
-          outlined
-          :disabled="!hasCover"
-          :loading="loading"
-          @click="removeCover"
-        />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
-          text
+          outlined
           @click="visible = false"
         />
+        <div class="veyq-action-group">
+          <Button
+            type="button"
+            :label="t('memory.coverRemove')"
+            icon="pi pi-trash"
+            severity="secondary"
+            outlined
+            :disabled="!hasCover"
+            :loading="loading"
+            @click="removeCover"
+          />
+          <Button
+            type="button"
+            :label="t('memory.coverSave')"
+            icon="pi pi-save"
+            :disabled="!imageLoaded"
+            :loading="loading"
+            @click="saveCover"
+          />
+        </div>
       </div>
     </div>
   </Dialog>

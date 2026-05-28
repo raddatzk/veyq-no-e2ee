@@ -155,7 +155,7 @@ async function skipTenant() {
   <Card class="login-card">
     <template #title>{{ t('setup.title') }}</template>
     <template #content>
-      <form v-if="step === 'admin'" class="form" @submit.prevent="submitAdmin">
+      <form v-if="step === 'admin'" class="veyq-form" @submit.prevent="submitAdmin">
         <div class="auth-method-switch" role="tablist" :aria-label="t('setup.method')">
           <button
             type="button"
@@ -224,7 +224,7 @@ async function skipTenant() {
 
       <RegistrationPrivacyOptIns v-if="step === 'privacy'" @complete="finishPrivacyOptIns" />
 
-      <form v-if="step === 'tenant'" class="form" @submit.prevent="submitTenant">
+      <form v-if="step === 'tenant'" class="veyq-form" @submit.prevent="submitTenant">
         <label>
           {{ t('setup.tenantName') }}
           <InputText v-model="tenantDisplayName" required />
@@ -242,7 +242,7 @@ async function skipTenant() {
           {{ t('common.domain') }}
           <InputText v-model="tenantDomain" autocomplete="off" required />
         </label>
-        <div class="button-row">
+        <div class="veyq-button-row">
           <Button type="submit" :label="t('setup.tenantCreate')" icon="pi pi-plus" />
           <Button
             type="button"

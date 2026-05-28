@@ -172,10 +172,7 @@ function isMacPlatform(): boolean {
         class="workspace-topbar-center"
         :aria-label="t('navigation.globalSearch')"
         data-testid="workspace-search-trigger"
-        :class="{
-          'workspace-topbar-center-disabled': !searchEnabled,
-          'workspace-topbar-center-open': searchOpen
-        }"
+        :class="{ 'workspace-topbar-center-disabled': !searchEnabled, 'workspace-topbar-center-open': searchOpen }"
         @click="openSearch"
       >
         <span class="pi pi-search" />

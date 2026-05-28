@@ -310,7 +310,7 @@ async function loadTenantUsers() {
     class="tenant-dialog"
     @update:visible="updateCreateDialogVisible"
   >
-    <form class="form" @submit.prevent="submitCreate">
+    <form class="veyq-form" @submit.prevent="submitCreate">
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <label>
         {{ t('common.name') }}
@@ -325,15 +325,16 @@ async function loadTenantUsers() {
           @update:model-value="updateCreatePermalink"
         />
       </label>
-      <div class="button-row">
-        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="saving" />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="closeFlow"
         />
+        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="saving" />
       </div>
     </form>
   </Dialog>
@@ -371,10 +372,10 @@ async function loadTenantUsers() {
         <div
           v-for="member in selectedGroup.members"
           :key="member.user.userId"
-          class="management-row"
+          class="veyq-list-row"
         >
-          <div class="management-row-main">
-            <strong class="management-row-title">{{ member.user.displayName }}</strong>
+          <div class="veyq-row-main">
+            <strong class="veyq-row-title">{{ member.user.displayName }}</strong>
           </div>
           <Select
             class="management-control"
@@ -426,7 +427,7 @@ async function loadTenantUsers() {
         />
       </div>
 
-      <div class="button-row">
+      <div class="veyq-button-row">
         <Button type="submit" :label="t('common.save')" icon="pi pi-save" :loading="saving" />
         <Button
           type="button"
@@ -441,7 +442,7 @@ async function loadTenantUsers() {
   </Dialog>
 
   <Dialog v-model:visible="deleteDialogVisible" :header="t('group.delete')" modal class="tenant-dialog">
-    <div v-if="selectedGroup" class="form">
+    <div v-if="selectedGroup" class="veyq-form">
       <p>
         {{ t('tenant.deleteConfirm', { name: selectedGroup.displayName }) }}
       </p>
@@ -453,7 +454,15 @@ async function loadTenantUsers() {
           :placeholder="selectedGroup.displayName"
         />
       </label>
-      <div class="button-row">
+      <div class="veyq-dialog-action-row">
+        <Button
+          type="button"
+          :label="t('common.cancel')"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          @click="deleteDialogVisible = false"
+        />
         <Button
           :label="t('common.delete')"
           icon="pi pi-trash"
@@ -461,13 +470,6 @@ async function loadTenantUsers() {
           :disabled="!canConfirmDeleteGroup"
           :loading="saving"
           @click="submitDeleteGroup"
-        />
-        <Button
-          type="button"
-          :label="t('common.cancel')"
-          severity="secondary"
-          outlined
-          @click="deleteDialogVisible = false"
         />
       </div>
     </div>

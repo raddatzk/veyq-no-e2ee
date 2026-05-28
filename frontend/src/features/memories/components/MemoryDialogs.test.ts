@@ -556,14 +556,14 @@ describe('Memory detail dialogs', () => {
         )
         .exists()
     ).toBe(true)
-    expect(wrapper.find('.management-row [aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
+    expect(wrapper.find('.veyq-list-row [aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
 
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('Neue Freigabe anlegen'))!
       .trigger('click')
     await flushPromises()
-    expect(wrapper.find('.form-grid select').text()).not.toContain('Uploader')
+    expect(wrapper.find('.veyq-form-grid select').text()).not.toContain('Uploader')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()

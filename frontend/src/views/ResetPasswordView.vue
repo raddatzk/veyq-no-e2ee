@@ -43,7 +43,7 @@ async function submit() {
   <Card class="login-card">
     <template #title>{{ t('auth.passwordResetTitle') }}</template>
     <template #content>
-      <form class="form" @submit.prevent="submit">
+      <form class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('auth.newPassword') }}
           <Password
@@ -63,7 +63,7 @@ async function submit() {
       <Message v-if="error" severity="error" :closable="false" class="form-message">
         {{ error }}
       </Message>
-      <div v-if="message" class="button-row">
+      <div v-if="message" class="veyq-button-row">
         <Button type="button" :label="t('auth.toLogin')" icon="pi pi-sign-in" @click="router.push('/login')" />
       </div>
     </template>

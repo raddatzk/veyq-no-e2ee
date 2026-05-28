@@ -329,8 +329,8 @@ function allowOsmTiles() {
 </script>
 
 <template>
-  <section class="memory-section">
-    <div class="memory-section-header">
+  <section class="veyq-section memory-section">
+    <div class="veyq-section-header memory-section-header">
       <h2>{{ t('map.title') }}</h2>
       <span>{{ geotaggedMedia.length }}</span>
     </div>
@@ -354,7 +354,7 @@ function allowOsmTiles() {
       </div>
     </div>
 
-    <div v-else class="memory-empty memory-empty-action">
+    <div v-else class="veyq-empty veyq-empty-action">
       <span class="pi pi-map-marker" />
       <span>{{ t('map.empty') }}</span>
       <small>{{ t('map.emptyAction') }}</small>

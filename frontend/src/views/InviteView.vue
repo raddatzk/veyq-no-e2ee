@@ -134,7 +134,7 @@ async function finishInvite() {
     <template #title>{{ t('auth.inviteTitle') }}</template>
     <template #content>
       <RegistrationPrivacyOptIns v-if="showPrivacyOptIns" @complete="finishPrivacyOptIns" />
-      <form v-else class="form" @submit.prevent="submit">
+      <form v-else class="veyq-form" @submit.prevent="submit">
         <div v-if="requiresPassword" class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
           <button
             type="button"

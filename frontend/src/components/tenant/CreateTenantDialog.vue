@@ -65,7 +65,7 @@ async function submit() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('setup.tenantCreate')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="submit">
+    <form class="veyq-form" @submit.prevent="submit">
       <label>
         {{ t('setup.tenantName') }}
         <InputText v-model="displayName" autocomplete="off" required />
@@ -84,15 +84,16 @@ async function submit() {
         <InputText v-model="domain" autocomplete="off" required />
       </label>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
-        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
+      <div class="veyq-dialog-action-row">
         <Button
           type="button"
           :label="t('common.cancel')"
+          icon="pi pi-times"
           severity="secondary"
           outlined
           @click="visible = false"
         />
+        <Button type="submit" :label="t('common.create')" icon="pi pi-plus" :loading="loading" />
       </div>
     </form>
   </Dialog>
