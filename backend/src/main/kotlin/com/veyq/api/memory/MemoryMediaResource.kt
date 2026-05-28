@@ -119,6 +119,9 @@ class MemoryMediaResource @Inject constructor(
     override fun memoryMediaPreview(tenantName: String, mediaId: String): Response =
         mediaService.mediaPreview(mediaId)
 
+    override fun memoryMediaPoster(tenantName: String, mediaId: String): Response =
+        mediaService.mediaPoster(mediaId)
+
     override fun createMemoryMediaUpload(
         tenantName: String,
         memoryId: String,

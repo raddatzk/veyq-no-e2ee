@@ -298,6 +298,9 @@ class PublicShareResource @Inject constructor(
     override fun publicShareMediaPreview(shareId: String, mediaId: String): Response =
         memoryShareService.publicShareMediaPreview(shareId, mediaId)
 
+    override fun publicShareMediaPoster(shareId: String, mediaId: String): Response =
+        memoryShareService.publicShareMediaPoster(shareId, mediaId)
+
     override fun createPublicShareMediaUpload(
         shareId: String,
         createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest,

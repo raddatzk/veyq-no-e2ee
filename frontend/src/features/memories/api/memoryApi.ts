@@ -1087,6 +1087,7 @@ function normalizeMemoryMedia(
     capturedAt?: string
     thumbnailUrl?: string
     previewUrl?: string
+    posterUrl?: string
     cameraMake?: string
     cameraModel?: string
     lensModel?: string
@@ -1099,6 +1100,7 @@ function normalizeMemoryMedia(
     | 'capturedAt'
     | 'thumbnailUrl'
     | 'previewUrl'
+    | 'posterUrl'
     | 'cameraMake'
     | 'cameraModel'
     | 'lensModel'
@@ -1113,6 +1115,7 @@ function normalizeMemoryMedia(
     capturedAt: media.capturedAt ?? null,
     thumbnailUrl: media.thumbnailUrl ?? null,
     previewUrl: media.previewUrl ?? null,
+    posterUrl: media.posterUrl ?? null,
     cameraMake: media.cameraMake ?? null,
     cameraModel: media.cameraModel ?? null,
     lensModel: media.lensModel ?? null,
@@ -1163,6 +1166,7 @@ function normalizePublicShareMedia(media: PublicShareMediaSummary): MemoryMedia 
     capturedAt: media.capturedAt ?? undefined,
     thumbnailUrl: media.thumbnailUrl ?? undefined,
     previewUrl: media.previewUrl ?? undefined,
+    posterUrl: media.posterUrl ?? undefined,
     cameraMake: undefined,
     cameraModel: undefined,
     lensModel: undefined,

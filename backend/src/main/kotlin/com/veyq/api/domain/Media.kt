@@ -105,6 +105,9 @@ class MediaBlob : PanacheEntityBase {
     @Column(name = "thumbnail_storage_key", length = 512)
     var thumbnailStorageKey: String? = null
 
+    @Column(name = "poster_storage_key", length = 512)
+    var posterStorageKey: String? = null
+
     @Column(name = "mime_type", nullable = false)
     lateinit var mimeType: String
 

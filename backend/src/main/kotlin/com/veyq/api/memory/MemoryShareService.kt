@@ -836,6 +836,11 @@ class MemoryShareService @Inject constructor(
         return mediaService.streamPreview(media)
     }
 
+    fun publicShareMediaPoster(shareId: String, mediaId: String): Response {
+        val media = resolvePublicMedia(shareId, mediaId)
+        return mediaService.streamPoster(media)
+    }
+
     private fun resolvePublicMedia(shareId: String, mediaId: String): Media {
         val access = requireAccess(resolveEnabledShare(shareId))
         return resolvePublicMedia(access, mediaId)

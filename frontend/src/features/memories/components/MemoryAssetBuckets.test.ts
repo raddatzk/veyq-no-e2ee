@@ -398,6 +398,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     contentUrl: '/api/tenant/media/media-1/content',
     thumbnailUrl: '/api/tenant/media/media-1/thumbnail',
     previewUrl: '/api/tenant/media/media-1/preview',
+    posterUrl: null,
     capturedAt: '2026-05-03T10:00:00Z',
     cameraMake: null,
     cameraModel: null,

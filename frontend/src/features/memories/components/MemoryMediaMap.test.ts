@@ -272,6 +272,7 @@ function media(options: { id?: string; longitude?: number; latitude?: number } =
     contentUrl: '/api/friends/memories/memory-1/media/media-1/content',
     thumbnailUrl: '/api/friends/memories/memory-1/media/media-1/thumbnail',
     previewUrl: '/api/friends/memories/memory-1/media/media-1/preview',
+    posterUrl: null,
     imageWidth: 1200,
     imageHeight: 800,
     createdAt: '2026-05-24T10:00:00Z'

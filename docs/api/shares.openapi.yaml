@@ -1728,6 +1728,38 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/{mediaId}/poster":
+    get:
+      tags: [PublicShares]
+      operationId: publicShareMediaPoster
+      summary: Stream public share media poster
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Streams a generated full-frame video poster for media visible through the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - The media belongs to the shared Memory subtree and is visible for the share role.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: JPEG poster bytes.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg poster>"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/media/{mediaId}/thumbnail":
     get:
       tags: [PublicShares]
@@ -2659,6 +2691,9 @@ components:
         previewUrl:
           type: string
           nullable: true
+        posterUrl:
+          type: string
+          nullable: true
         gpsLatitude:
           type: number
           format: double
@@ -2683,5 +2718,6 @@ components:
         contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
         thumbnailUrl: /api/public-shares/shr_abc123/media/med_abc123/thumbnail
         previewUrl: /api/public-shares/shr_abc123/media/med_abc123/preview
+        posterUrl: /api/public-shares/shr_abc123/media/med_abc123/poster
         gpsLatitude: 54.1825
         gpsLongitude: 7.8853

@@ -279,6 +279,11 @@ export interface PublicShareMediaContentRequest {
     range?: string;
 }
 
+export interface PublicShareMediaPosterRequest {
+    shareId: string;
+    mediaId: string;
+}
+
 export interface PublicShareMediaPreviewRequest {
     shareId: string;
     mediaId: string;
@@ -1288,6 +1293,32 @@ export interface PublicSharesApiInterface {
      * Stream public share media
      */
     publicShareMediaContent(requestParameters: PublicShareMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for publicShareMediaPoster without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMediaPosterRequestOpts(requestParameters: PublicShareMediaPosterRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams a generated full-frame video poster for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * @summary Stream public share media poster
+     * @param {string} shareId Public share id.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMediaPosterRaw(requestParameters: PublicShareMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams a generated full-frame video poster for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media poster
+     */
+    publicShareMediaPoster(requestParameters: PublicShareMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for publicShareMediaPreview without sending the request
@@ -3732,6 +3763,61 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async publicShareMediaContent(requestParameters: PublicShareMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.publicShareMediaContentRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for publicShareMediaPoster without sending the request
+     */
+    async publicShareMediaPosterRequestOpts(requestParameters: PublicShareMediaPosterRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling publicShareMediaPoster().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling publicShareMediaPoster().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/{mediaId}/poster`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams a generated full-frame video poster for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media poster
+     */
+    async publicShareMediaPosterRaw(requestParameters: PublicShareMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.publicShareMediaPosterRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams a generated full-frame video poster for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media poster
+     */
+    async publicShareMediaPoster(requestParameters: PublicShareMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.publicShareMediaPosterRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

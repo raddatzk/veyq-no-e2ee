@@ -1851,6 +1851,38 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/poster":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaPoster
+      summary: Download memory media poster
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media poster.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg poster>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memory-media/{mediaId}/thumbnail":
     get:
       tags:
@@ -3748,6 +3780,9 @@ components:
         previewUrl:
           type: string
           nullable: true
+        posterUrl:
+          type: string
+          nullable: true
         cameraMake:
           type: string
           nullable: true
@@ -3791,6 +3826,7 @@ components:
         contentUrl: /api/friends/memory-media/med_abc123/content
         thumbnailUrl: /api/friends/memory-media/med_abc123/thumbnail
         previewUrl: /api/friends/memory-media/med_abc123/preview
+        posterUrl: /api/friends/memory-media/med_abc123/poster
         cameraMake: Fujifilm
         cameraModel: X100VI
         lensModel: 23mm F2

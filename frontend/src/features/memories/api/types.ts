@@ -132,6 +132,7 @@ export type MemoryMedia = Omit<
   | 'capturedAt'
   | 'thumbnailUrl'
   | 'previewUrl'
+  | 'posterUrl'
   | 'cameraMake'
   | 'cameraModel'
   | 'lensModel'
@@ -143,6 +144,7 @@ export type MemoryMedia = Omit<
   capturedAt: string | null
   thumbnailUrl: string | null
   previewUrl: string | null
+  posterUrl: string | null
   cameraMake: string | null
   cameraModel: string | null
   lensModel: string | null

@@ -363,6 +363,9 @@ class MemoryServiceTest {
 
         val originalResponse = mediaService.streamOriginal(rootWithoutExtension, rangeHeader = null)
         assertThat(originalResponse.getHeaderString("Content-Disposition")).contains("Browser Upload.jpg")
+        assertThat(originalResponse.getHeaderString("Cache-Control")).isEqualTo("private, max-age=31536000, immutable")
+        val rangeResponse = mediaService.streamOriginal(rootWithoutExtension, rangeHeader = "bytes=0-3")
+        assertThat(rangeResponse.getHeaderString("Cache-Control")).isEqualTo("private, max-age=31536000, immutable")
 
         val directResponse = mediaService.downloadMemoryMedia(trip.id, includeChildren = false, locale = "de")
         assertThat(directResponse.getHeaderString("Content-Disposition")).contains("Download Trip.zip")
@@ -608,6 +611,32 @@ class MemoryServiceTest {
         assertThat(firstMedia.id).isNotEqualTo(secondMedia.id)
         assertThat(firstMedia.blob.id).isEqualTo(secondMedia.blob.id)
         assertThat(blobCount(tenant)).isEqualTo(1)
+    }
+
+    @Test
+    fun `video summaries expose poster url and poster response is cacheable`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("video-poster-trip", "Video Poster Trip"))
+        val media = createMedia(
+            owner = owner,
+            memory = memory(trip.id),
+            title = "Clip",
+            originalFilename = "clip.mp4",
+            mimeType = "video/mp4",
+        )
+        val posterStorageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/poster.jpg"
+        inTransaction {
+            media.blob.posterStorageKey = posterStorageKey
+        }
+        val posterPath = mediaConfig.storageDir.resolve(posterStorageKey)
+        Files.createDirectories(posterPath.parent)
+        Files.writeString(posterPath, "poster")
+
+        val summary = mediaService.listMemoryMedia(trip.id, includeChildren = false).single()
+        assertThat(summary.posterUrl).endsWith("/poster")
+
+        val response = mediaService.streamPoster(media)
+        assertThat(response.getHeaderString("Cache-Control")).isEqualTo("private, max-age=31536000, immutable")
+        assertThat(response.getHeaderString("Content-Disposition")).contains("poster.jpg")
     }
 
     @Test
@@ -1442,12 +1471,13 @@ class MemoryServiceTest {
         originalFilename: String? = "$title.jpg",
         cameraMake: String? = null,
         cameraModel: String? = null,
+        mimeType: String = "image/jpeg",
     ): Media =
         inTransaction {
             val blob = MediaBlob().also {
                 it.tenant = tenant
                 it.contentSha256 = "${UUID.randomUUID().toString().replace("-", "")}${UUID.randomUUID().toString().replace("-", "")}"
-                it.mimeType = "image/jpeg"
+                it.mimeType = mimeType
                 it.sizeBytes = 12
                 it.storageKey = "tenant-${tenant.id}/test-${UUID.randomUUID()}/original"
                 it.capturedAt = capturedAt

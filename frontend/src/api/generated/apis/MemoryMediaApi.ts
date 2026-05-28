@@ -136,6 +136,11 @@ export interface MemoryMediaContentRequest {
     range?: string;
 }
 
+export interface MemoryMediaPosterRequest {
+    tenantName: string;
+    mediaId: string;
+}
+
 export interface MemoryMediaPreviewRequest {
     tenantName: string;
     mediaId: string;
@@ -557,6 +562,32 @@ export interface MemoryMediaApiInterface {
      * Download memory media content
      */
     memoryMediaContent(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for memoryMediaPoster without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaPosterRequestOpts(requestParameters: MemoryMediaPosterRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * @summary Download memory media poster
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    memoryMediaPosterRaw(requestParameters: MemoryMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media poster
+     */
+    memoryMediaPoster(requestParameters: MemoryMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for memoryMediaPreview without sending the request
@@ -1592,6 +1623,61 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async memoryMediaContent(requestParameters: MemoryMediaContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.memoryMediaContentRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for memoryMediaPoster without sending the request
+     */
+    async memoryMediaPosterRequestOpts(requestParameters: MemoryMediaPosterRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling memoryMediaPoster().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling memoryMediaPoster().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memory-media/{mediaId}/poster`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media poster
+     */
+    async memoryMediaPosterRaw(requestParameters: MemoryMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryMediaPosterRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+     * Download memory media poster
+     */
+    async memoryMediaPoster(requestParameters: MemoryMediaPosterRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryMediaPosterRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

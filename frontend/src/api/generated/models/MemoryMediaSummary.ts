@@ -110,6 +110,12 @@ export interface MemoryMediaSummary {
      * @type {string}
      * @memberof MemoryMediaSummary
      */
+    posterUrl?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof MemoryMediaSummary
+     */
     cameraMake?: string;
     /**
      * 
@@ -188,6 +194,7 @@ export function MemoryMediaSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'contentUrl': json['contentUrl'],
         'thumbnailUrl': json['thumbnailUrl'] == null ? undefined : json['thumbnailUrl'],
         'previewUrl': json['previewUrl'] == null ? undefined : json['previewUrl'],
+        'posterUrl': json['posterUrl'] == null ? undefined : json['posterUrl'],
         'cameraMake': json['cameraMake'] == null ? undefined : json['cameraMake'],
         'cameraModel': json['cameraModel'] == null ? undefined : json['cameraModel'],
         'lensModel': json['lensModel'] == null ? undefined : json['lensModel'],
@@ -222,6 +229,7 @@ export function MemoryMediaSummaryToJSONTyped(value?: MemoryMediaSummary | null,
         'contentUrl': value['contentUrl'],
         'thumbnailUrl': value['thumbnailUrl'],
         'previewUrl': value['previewUrl'],
+        'posterUrl': value['posterUrl'],
         'cameraMake': value['cameraMake'],
         'cameraModel': value['cameraModel'],
         'lensModel': value['lensModel'],

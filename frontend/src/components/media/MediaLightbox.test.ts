@@ -6,10 +6,17 @@ import type { MemoryMedia } from '../../features/memories/api'
 describe('MediaLightbox', () => {
   const originalFullscreenEnabled = Object.getOwnPropertyDescriptor(document, 'fullscreenEnabled')
   const originalFullscreenElement = Object.getOwnPropertyDescriptor(document, 'fullscreenElement')
+  const originalDevicePixelRatio = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio')
+  const originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+  const originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight')
   const requestFullscreen = vi.fn()
+  const fetchMock = vi.fn()
 
   beforeEach(() => {
     requestFullscreen.mockResolvedValue(undefined)
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    setViewport(1200, 800, 1)
     Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
     HTMLElement.prototype.requestFullscreen = requestFullscreen
@@ -22,10 +29,14 @@ describe('MediaLightbox', () => {
   afterEach(() => {
     if (originalFullscreenEnabled) Object.defineProperty(document, 'fullscreenEnabled', originalFullscreenEnabled)
     if (originalFullscreenElement) Object.defineProperty(document, 'fullscreenElement', originalFullscreenElement)
+    if (originalDevicePixelRatio) Object.defineProperty(window, 'devicePixelRatio', originalDevicePixelRatio)
+    if (originalInnerWidth) Object.defineProperty(window, 'innerWidth', originalInnerWidth)
+    if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight)
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
-  it('shows the preview by default and opens the original only for fullscreen', async () => {
+  it('shows the preview by default and uses it fullscreen when it covers the capped DPR target', async () => {
     const wrapper = mount(MediaLightbox, {
       props: {
         tenantName: 'tenant',
@@ -49,15 +60,39 @@ describe('MediaLightbox', () => {
     await flushPromises()
 
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-1/content')
+    expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-1/preview')
     expect(wrapper.find('.media-lightbox-stage img').attributes('src')).toBe('/api/tenant/media/media-1/preview')
   })
 
-  it('keeps fullscreen open and emits navigation from fullscreen controls', async () => {
+  it('uses the original fullscreen when the preview is too small for DPR capped at 2', async () => {
+    setViewport(1600, 1000, 3)
     const wrapper = mount(MediaLightbox, {
       props: {
         tenantName: 'tenant',
-        media: media(),
+        media: media({ imageWidth: 5000, imageHeight: 3200 }),
+        canShowPrevious: false,
+        canShowNext: false
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="Original im Vollbild anzeigen"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-1/content')
+  })
+
+  it('keeps fullscreen open and emits navigation from fullscreen controls', async () => {
+    setViewport(1600, 1000, 2)
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media({ imageWidth: 5000, imageHeight: 3200 }),
         canShowPrevious: true,
         canShowNext: true
       },
@@ -72,14 +107,106 @@ describe('MediaLightbox', () => {
     await wrapper.get('button[aria-label="Original im Vollbild anzeigen"]').trigger('click')
     await flushPromises()
     await wrapper.get('.media-original-fullscreen .lightbox-nav-next').trigger('click')
-    await wrapper.setProps({ media: media({ id: 'media-2', contentUrl: '/api/tenant/media/media-2/content' }) })
+    await wrapper.setProps({ media: media({ id: 'media-2', contentUrl: '/api/tenant/media/media-2/content', imageWidth: 5000, imageHeight: 3200 }) })
     await flushPromises()
 
     expect(wrapper.emitted('next')).toHaveLength(1)
     expect(wrapper.find('.media-original-fullscreen').exists()).toBe(true)
     expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-2/content')
   })
+
+  it('preloads current previous two and next five media with adaptive image and video poster sources', async () => {
+    setViewport(1600, 1000, 2)
+    const mediaItems = Array.from({ length: 10 }, (_, index) =>
+      media({
+        id: `media-${index}`,
+        contentUrl: `/api/tenant/media/media-${index}/content`,
+        previewUrl: `/api/tenant/media/media-${index}/preview`,
+        thumbnailUrl: `/api/tenant/media/media-${index}/thumbnail`,
+        imageWidth: 5000,
+        imageHeight: 3200
+      })
+    )
+    mediaItems[4] = media({
+      id: 'media-4',
+      mimeType: 'video/mp4',
+      contentUrl: '/api/tenant/media/media-4/content',
+      thumbnailUrl: '/api/tenant/media/media-4/thumbnail',
+      previewUrl: '/api/tenant/media/media-4/preview',
+      posterUrl: '/api/tenant/media/media-4/poster',
+      imageWidth: null,
+      imageHeight: null
+    })
+
+    mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: mediaItems[3],
+        mediaItems,
+        selectedIndex: 3,
+        canShowPrevious: true,
+        canShowNext: true
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+    await flushPromises()
+
+    const urls = fetchMock.mock.calls.map((call) => call[0])
+    expect(urls).toEqual(
+      expect.arrayContaining([
+        '/api/tenant/media/media-1/content',
+        '/api/tenant/media/media-2/content',
+        '/api/tenant/media/media-3/content',
+        '/api/tenant/media/media-4/poster',
+        '/api/tenant/media/media-5/content',
+        '/api/tenant/media/media-6/content',
+        '/api/tenant/media/media-7/content',
+        '/api/tenant/media/media-8/content'
+      ])
+    )
+    expect(urls).not.toContain('/api/tenant/media/media-0/content')
+    expect(urls).not.toContain('/api/tenant/media/media-4/content')
+    expect(urls).not.toContain('/api/tenant/media/media-9/content')
+  })
+
+  it('aborts pending preloads when the lightbox unmounts', async () => {
+    const signals: AbortSignal[] = []
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.signal) signals.push(init.signal)
+      return new Promise(() => undefined)
+    })
+
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media({ imageWidth: 5000, imageHeight: 3200 }),
+        canShowPrevious: false,
+        canShowNext: false
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+    await flushPromises()
+
+    wrapper.unmount()
+
+    expect(signals.length).toBeGreaterThan(0)
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+  })
 })
+
+function setViewport(width: number, height: number, dpr: number) {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height })
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: dpr })
+}
 
 function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
   return {
@@ -95,6 +222,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     contentUrl: '/api/tenant/media/media-1/content',
     thumbnailUrl: '/api/tenant/media/media-1/thumbnail',
     previewUrl: '/api/tenant/media/media-1/preview',
+    posterUrl: null,
     cameraMake: null,
     cameraModel: null,
     lensModel: null,

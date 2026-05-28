@@ -15,6 +15,8 @@ import { memoryPathToTenantRoute } from '../../shared/utils/paths'
 const props = defineProps<{
   tenantName: string
   media: MemoryMedia
+  mediaItems?: MemoryMedia[]
+  selectedIndex?: number
   canShowPrevious: boolean
   canShowNext: boolean
   canEditMetadata?: boolean
@@ -35,11 +37,16 @@ const emit = defineEmits<{
 }>()
 
 const { locale, t } = useI18n()
+const PRELOAD_NEXT_COUNT = 5
+const PRELOAD_PREVIOUS_COUNT = 2
+const PREVIEW_MAX_EDGE = 1600
 const mediaUrl = computed(() => `${API_BASE}${props.media.contentUrl}`)
 const previewUrl = computed(() =>
   props.media.previewUrl ? `${API_BASE}${props.media.previewUrl}` : null
 )
+const posterUrl = computed(() => videoPosterUrl(props.media))
 const displayImageUrl = computed(() => previewUrl.value || mediaUrl.value)
+const fullscreenImageUrl = computed(() => imageFullscreenUrl(props.media))
 const isImage = computed(() => props.media.mimeType?.startsWith('image/'))
 const isVideo = computed(() => props.media.mimeType?.startsWith('video/'))
 const title = computed(() => props.media.title || props.media.id)
@@ -56,6 +63,9 @@ const fullscreenOpen = ref(false)
 const fullscreenOriginalLoaded = ref(false)
 const fullscreenError = ref('')
 const canUseFullscreen = ref(false)
+const viewportWidth = ref(0)
+const viewportHeight = ref(0)
+const loadedFullscreenSources = ref<Set<string>>(new Set())
 const displayCapturedAt = computed(() => props.media.capturedAt || '')
 const camera = computed(() =>
   [props.media.cameraMake, props.media.cameraModel].filter(Boolean).join(' ').trim()
@@ -122,11 +132,16 @@ const metadataRows = computed(() =>
 onMounted(() => {
   canUseFullscreen.value =
     document.fullscreenEnabled !== false && typeof document.documentElement.requestFullscreen === 'function'
+  updateViewportSize()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
+  window.addEventListener('resize', handleViewportResize)
+  syncPreloads()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  window.removeEventListener('resize', handleViewportResize)
+  abortAllPreloads()
 })
 
 watch(
@@ -136,10 +151,18 @@ watch(
     capturedAtInput.value = isoToDatetimeLocal(props.media.capturedAt)
     saveError.value = ''
     fullscreenError.value = ''
-    fullscreenOriginalLoaded.value = !isImage.value
+    fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
   },
   { immediate: true }
 )
+
+watch(
+  [() => props.media.id, () => props.selectedIndex, () => props.mediaItems, viewportWidth, viewportHeight],
+  () => syncPreloads(),
+  { flush: 'post' }
+)
+
+const preloadControllers = new Map<string, AbortController>()
 
 function safeFilename(value: string): string {
   return (
@@ -221,7 +244,8 @@ async function openOriginalFullscreen() {
   if (!canFullscreenOriginal.value) return
   fullscreenError.value = ''
   fullscreenOpen.value = true
-  fullscreenOriginalLoaded.value = !isImage.value
+  fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
+  syncPreloads()
   await nextTick()
   try {
     await fullscreenTarget.value?.requestFullscreen()
@@ -235,8 +259,115 @@ async function openOriginalFullscreen() {
 function handleFullscreenChange() {
   if (document.fullscreenElement !== fullscreenTarget.value) {
     fullscreenOpen.value = false
-    fullscreenOriginalLoaded.value = false
+    fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
   }
+}
+
+function handleViewportResize() {
+  updateViewportSize()
+}
+
+function updateViewportSize() {
+  viewportWidth.value = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
+  viewportHeight.value = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
+}
+
+function imageFullscreenUrl(media: MemoryMedia): string {
+  if (!media.mimeType?.startsWith('image/')) return `${API_BASE}${media.contentUrl}`
+  return canUsePreviewForFullscreen(media)
+    ? `${API_BASE}${media.previewUrl}`
+    : `${API_BASE}${media.contentUrl}`
+}
+
+function canUsePreviewForFullscreen(media: MemoryMedia): boolean {
+  if (!media.previewUrl || !media.imageWidth || !media.imageHeight) return false
+  const maxEdge = Math.max(media.imageWidth, media.imageHeight)
+  if (maxEdge <= 0) return false
+  const scale = Math.min(1, PREVIEW_MAX_EDGE / maxEdge)
+  const previewWidth = media.imageWidth * scale
+  const previewHeight = media.imageHeight * scale
+  const target = fullscreenTargetSize(media)
+  return previewWidth >= target.width && previewHeight >= target.height
+}
+
+function fullscreenTargetSize(media: MemoryMedia): { width: number; height: number } {
+  const width = viewportWidth.value || 1
+  const height = viewportHeight.value || 1
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  if (!media.imageWidth || !media.imageHeight) return { width: width * dpr, height: height * dpr }
+
+  const imageAspect = media.imageWidth / media.imageHeight
+  const viewportAspect = width / height
+  if (imageAspect > viewportAspect) {
+    return { width: width * dpr, height: (width / imageAspect) * dpr }
+  }
+  return { width: height * imageAspect * dpr, height: height * dpr }
+}
+
+function videoPosterUrl(media: MemoryMedia): string | null {
+  const url = media.posterUrl || media.previewUrl || media.thumbnailUrl
+  return url ? `${API_BASE}${url}` : null
+}
+
+function preloadMediaItems(): MemoryMedia[] {
+  const items = props.mediaItems?.length ? props.mediaItems : [props.media]
+  const index = props.selectedIndex ?? items.findIndex((item) => item.id === props.media.id)
+  const selectedIndex = index >= 0 ? index : 0
+  const start = Math.max(0, selectedIndex - PRELOAD_PREVIOUS_COUNT)
+  const end = Math.min(items.length - 1, selectedIndex + PRELOAD_NEXT_COUNT)
+  return items.slice(start, end + 1)
+}
+
+function preloadUrlForMedia(media: MemoryMedia): string | null {
+  if (media.mimeType?.startsWith('image/')) return imageFullscreenUrl(media)
+  if (media.mimeType?.startsWith('video/')) return videoPosterUrl(media)
+  return null
+}
+
+function syncPreloads() {
+  updateViewportSize()
+  const targetUrls = new Set(
+    preloadMediaItems()
+      .map(preloadUrlForMedia)
+      .filter((url): url is string => Boolean(url))
+  )
+
+  for (const [url, controller] of preloadControllers) {
+    if (!targetUrls.has(url)) {
+      controller.abort()
+      preloadControllers.delete(url)
+    }
+  }
+
+  targetUrls.forEach((url) => {
+    if (loadedFullscreenSources.value.has(url) || preloadControllers.has(url)) return
+    const controller = new AbortController()
+    preloadControllers.set(url, controller)
+    void fetch(url, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return
+        await response.blob()
+        loadedFullscreenSources.value = new Set([...loadedFullscreenSources.value, url])
+        if (url === fullscreenImageUrl.value) fullscreenOriginalLoaded.value = true
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+      })
+      .finally(() => {
+        if (preloadControllers.get(url) === controller) preloadControllers.delete(url)
+      })
+  })
+}
+
+function abortAllPreloads() {
+  preloadControllers.forEach((controller) => controller.abort())
+  preloadControllers.clear()
+}
+
+function markFullscreenImageLoaded() {
+  const url = fullscreenImageUrl.value
+  loadedFullscreenSources.value = new Set([...loadedFullscreenSources.value, url])
+  fullscreenOriginalLoaded.value = true
 }
 
 function onSheetPointerDown(event: PointerEvent) {
@@ -313,7 +444,7 @@ function onSheetPointerUp(event: PointerEvent) {
           <video
             v-else-if="isVideo"
             :src="mediaUrl"
-            :poster="previewUrl || undefined"
+            :poster="posterUrl || undefined"
             controls
             playsinline
             preload="metadata"
@@ -352,18 +483,19 @@ function onSheetPointerUp(event: PointerEvent) {
         </div>
         <img
           v-if="isImage"
-          :src="mediaUrl"
+          :src="fullscreenImageUrl"
           :alt="title"
           :class="{ 'media-original-loaded': fullscreenOriginalLoaded }"
-          @load="fullscreenOriginalLoaded = true"
+          @load="markFullscreenImageLoaded"
         />
         <video
           v-else-if="isVideo"
           :src="mediaUrl"
-          :poster="previewUrl || undefined"
+          :poster="posterUrl || undefined"
           controls
           autoplay
           playsinline
+          preload="metadata"
         />
         <button
           class="lightbox-nav lightbox-nav-next media-original-nav"

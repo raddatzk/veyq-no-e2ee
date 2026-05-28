@@ -364,6 +364,8 @@ function handleKeydown(event: KeyboardEvent) {
       v-if="selectedMedia"
       :tenant-name="tenantName"
       :media="selectedMedia"
+      :media-items="visibleMedia"
+      :selected-index="selectedIndex ?? undefined"
       :can-show-previous="canShowPrevious"
       :can-show-next="canShowNext"
       :can-edit-metadata="canEditMetadata"

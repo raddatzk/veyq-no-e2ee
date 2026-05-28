@@ -412,6 +412,7 @@ class OpenApiContractTest {
             "PATCH /api/{tenantName}/memories/{memoryId}/media/metadata-batch",
             "GET /api/{tenantName}/memory-media/{mediaId}/content",
             "GET /api/{tenantName}/memory-media/{mediaId}/preview",
+            "GET /api/{tenantName}/memory-media/{mediaId}/poster",
             "GET /api/{tenantName}/memory-media/{mediaId}/thumbnail",
             "GET /api/{tenantName}/profiles/{userPermalink}",
             "GET /api/{tenantName}/profiles/{userPermalink}/avatar",
@@ -468,6 +469,7 @@ class OpenApiContractTest {
             "POST /api/public-shares/{shareId}/media/uploads/{uploadId}/complete",
             "GET /api/public-shares/{shareId}/media/{mediaId}/content",
             "GET /api/public-shares/{shareId}/media/{mediaId}/preview",
+            "GET /api/public-shares/{shareId}/media/{mediaId}/poster",
             "GET /api/public-shares/{shareId}/media/{mediaId}/thumbnail",
         )
 

@@ -107,6 +107,12 @@ export interface PublicShareMediaSummary {
     previewUrl?: string;
     /**
      * 
+     * @type {string}
+     * @memberof PublicShareMediaSummary
+     */
+    posterUrl?: string;
+    /**
+     * 
      * @type {number}
      * @memberof PublicShareMediaSummary
      */
@@ -158,6 +164,7 @@ export function PublicShareMediaSummaryFromJSONTyped(json: any, ignoreDiscrimina
         'contentUrl': json['contentUrl'],
         'thumbnailUrl': json['thumbnailUrl'] == null ? undefined : json['thumbnailUrl'],
         'previewUrl': json['previewUrl'] == null ? undefined : json['previewUrl'],
+        'posterUrl': json['posterUrl'] == null ? undefined : json['posterUrl'],
         'gpsLatitude': json['gpsLatitude'] == null ? undefined : json['gpsLatitude'],
         'gpsLongitude': json['gpsLongitude'] == null ? undefined : json['gpsLongitude'],
     };
@@ -187,6 +194,7 @@ export function PublicShareMediaSummaryToJSONTyped(value?: PublicShareMediaSumma
         'contentUrl': value['contentUrl'],
         'thumbnailUrl': value['thumbnailUrl'],
         'previewUrl': value['previewUrl'],
+        'posterUrl': value['posterUrl'],
         'gpsLatitude': value['gpsLatitude'],
         'gpsLongitude': value['gpsLongitude'],
     };

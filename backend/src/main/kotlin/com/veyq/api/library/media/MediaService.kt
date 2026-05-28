@@ -1159,6 +1159,7 @@ class MediaService @Inject constructor(
                 .type(media.blob.mimeType)
                 .entity(streamRange(path, range))
                 .header("Accept-Ranges", "bytes")
+                .header("Cache-Control", MEDIA_CACHE_CONTROL)
                 .header("Content-Length", range.length)
                 .header("Content-Range", "bytes ${range.start}-${range.end}/$size")
                 .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
@@ -1168,6 +1169,7 @@ class MediaService @Inject constructor(
 
         return Response.ok(path.toFile(), media.blob.mimeType)
             .header("Accept-Ranges", "bytes")
+            .header("Cache-Control", MEDIA_CACHE_CONTROL)
             .header("Content-Length", media.blob.sizeBytes)
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(filename)}\"")
             .header("X-Content-Type-Options", "nosniff")
@@ -1182,6 +1184,11 @@ class MediaService @Inject constructor(
     fun mediaThumbnail(publicId: String): Response {
         val media = resolveAccessibleMedia(publicId)
         return streamThumbnail(media)
+    }
+
+    fun mediaPoster(publicId: String): Response {
+        val media = resolveAccessibleMedia(publicId)
+        return streamPoster(media)
     }
 
     fun streamThumbnail(media: Media): Response {
@@ -1205,6 +1212,16 @@ class MediaService @Inject constructor(
         )
     }
 
+    fun streamPoster(media: Media): Response {
+        return streamDerivative(
+            media = media,
+            path = posterPath(media.blob),
+            filenameSuffix = "poster",
+            description = "poster",
+            generate = { generatePoster(it, throwOnFailure = false) },
+        )
+    }
+
     private fun streamDerivative(
         media: Media,
         path: Path,
@@ -1219,7 +1236,7 @@ class MediaService @Inject constructor(
         }
 
         return Response.ok(path.toFile(), "image/jpeg")
-            .header("Cache-Control", "private, max-age=31536000, immutable")
+            .header("Cache-Control", MEDIA_CACHE_CONTROL)
             .header("Content-Length", Files.size(path))
             .header("Content-Disposition", "inline; filename=\"${safeHeaderFilename(media.publicId)}-$filenameSuffix.jpg\"")
             .header("X-Content-Type-Options", "nosniff")
@@ -1411,6 +1428,7 @@ class MediaService @Inject constructor(
         if (!canGeneratePreview(blob)) return
         generateThumbnail(blob, throwOnFailure = false)
         generatePreview(blob, throwOnFailure = false)
+        generatePoster(blob, throwOnFailure = false)
     }
 
     private fun generateThumbnail(blob: MediaBlob, throwOnFailure: Boolean): Boolean =
@@ -1434,10 +1452,22 @@ class MediaService @Inject constructor(
         )
     }
 
+    private fun generatePoster(blob: MediaBlob, throwOnFailure: Boolean): Boolean {
+        if (!canGeneratePoster(blob)) return false
+        return generateDerivative(
+            blob = blob,
+            targetPath = posterPath(blob),
+            maxEdge = null,
+            logLabel = "poster",
+            throwOnFailure = throwOnFailure,
+            assignStorageKey = { posterStorageKey = posterStorageKey(this) },
+        )
+    }
+
     private fun generateDerivative(
         blob: MediaBlob,
         targetPath: Path,
-        maxEdge: Int,
+        maxEdge: Int?,
         logLabel: String,
         throwOnFailure: Boolean,
         assignStorageKey: MediaBlob.() -> Unit,
@@ -1445,7 +1475,7 @@ class MediaService @Inject constructor(
         val originalPath = storagePath(blob.storageKey)
         if (!Files.isRegularFile(originalPath)) return false
         return when {
-            blob.mimeType.startsWith("image/") -> generateImageDerivative(blob, originalPath, targetPath, maxEdge, logLabel, throwOnFailure, assignStorageKey)
+            blob.mimeType.startsWith("image/") && maxEdge != null -> generateImageDerivative(blob, originalPath, targetPath, maxEdge, logLabel, throwOnFailure, assignStorageKey)
             blob.mimeType.startsWith("video/") -> generateVideoDerivative(blob, originalPath, targetPath, maxEdge, logLabel, throwOnFailure, assignStorageKey)
             else -> false
         }
@@ -1489,7 +1519,7 @@ class MediaService @Inject constructor(
         blob: MediaBlob,
         originalPath: Path,
         targetPath: Path,
-        maxEdge: Int,
+        maxEdge: Int?,
         logLabel: String,
         throwOnFailure: Boolean,
         assignStorageKey: MediaBlob.() -> Unit,
@@ -1498,7 +1528,7 @@ class MediaService @Inject constructor(
         val temp = Files.createTempFile(targetPath.parent, "$logLabel-", ".jpg")
         val logFile = Files.createTempFile(targetPath.parent, "$logLabel-", ".log")
         try {
-            val process = ProcessBuilder(
+            val command = mutableListOf(
                 mediaConfig.ffmpegPath,
                 "-hide_banner",
                 "-loglevel",
@@ -1510,12 +1540,16 @@ class MediaService @Inject constructor(
                 originalPath.toString(),
                 "-frames:v",
                 "1",
-                "-vf",
-                "scale=$maxEdge:$maxEdge:force_original_aspect_ratio=decrease",
-                "-q:v",
-                "3",
-                temp.toString(),
             )
+            if (maxEdge != null) {
+                command.add("-vf")
+                command.add("scale=$maxEdge:$maxEdge:force_original_aspect_ratio=decrease")
+            }
+            command.add("-q:v")
+            command.add(if (maxEdge == null) "2" else "3")
+            command.add(temp.toString())
+
+            val process = ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.to(logFile.toFile()))
                 .start()
@@ -1619,6 +1653,7 @@ class MediaService @Inject constructor(
             contentUrl = contentUrl(),
             thumbnailUrl = thumbnailUrl(),
             previewUrl = previewUrl(),
+            posterUrl = posterUrl(),
             cameraMake = blob.cameraMake,
             cameraModel = blob.cameraModel,
             lensModel = blob.lensModel,
@@ -1643,6 +1678,7 @@ class MediaService @Inject constructor(
             contentUrl = "/api/public-shares/${url(shareId)}/media/${url(publicId)}/content",
             thumbnailUrl = if (hasThumbnail(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/thumbnail" else null,
             previewUrl = if (canGeneratePreview(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/preview" else null,
+            posterUrl = if (canGeneratePoster(blob)) "/api/public-shares/${url(shareId)}/media/${url(publicId)}/poster" else null,
             gpsLatitude = blob.gpsLatitude,
             gpsLongitude = blob.gpsLongitude,
         )
@@ -1681,11 +1717,17 @@ class MediaService @Inject constructor(
     private fun Media.previewUrl(): String? =
         if (canGeneratePreview(blob)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/preview" else null
 
+    private fun Media.posterUrl(): String? =
+        if (canGeneratePoster(blob)) "/api/${url(tenant().name)}/memory-media/${url(publicId)}/poster" else null
+
     private fun hasThumbnail(blob: MediaBlob): Boolean =
         blob.thumbnailStorageKey != null
 
     private fun canGeneratePreview(blob: MediaBlob): Boolean =
         blob.mimeType.startsWith("image/") || blob.mimeType.startsWith("video/")
+
+    private fun canGeneratePoster(blob: MediaBlob): Boolean =
+        blob.mimeType.startsWith("video/")
 
     private fun thumbnailPath(blob: MediaBlob): Path =
         storagePath(blob.thumbnailStorageKey ?: thumbnailStorageKey(blob))
@@ -1699,6 +1741,12 @@ class MediaService @Inject constructor(
     private fun previewStorageKey(blob: MediaBlob): String =
         "tenant-${blob.tenant.id}/blobs/${blob.contentSha256}/preview.jpg"
 
+    private fun posterPath(blob: MediaBlob): Path =
+        storagePath(blob.posterStorageKey ?: posterStorageKey(blob))
+
+    private fun posterStorageKey(blob: MediaBlob): String =
+        "tenant-${blob.tenant.id}/blobs/${blob.contentSha256}/poster.jpg"
+
     private fun url(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
 
@@ -1710,6 +1758,7 @@ class MediaService @Inject constructor(
     companion object {
         private const val THUMBNAIL_MAX_EDGE = 360
         private const val PREVIEW_MAX_EDGE = 1600
+        private const val MEDIA_CACHE_CONTROL = "private, max-age=31536000, immutable"
         private val ARCHIVE_TIMESTAMP_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm-ss").withZone(ZoneOffset.UTC)
     }
