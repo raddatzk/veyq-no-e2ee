@@ -64,6 +64,18 @@
     color: var(--p-button-primary-hover-color, var(--app-backdrop-strong));
   }
 
+  .asset-bucket-action-row .asset-bucket-danger-button {
+    border-color: var(--app-danger-line);
+    background: var(--app-surface);
+    color: var(--app-danger);
+  }
+
+  .asset-bucket-action-row .asset-bucket-danger-button:hover:not(:disabled) {
+    border-color: var(--app-danger);
+    background: var(--app-danger-soft);
+    color: var(--app-danger-strong);
+  }
+
   .workspace-topbar-center,
   .upload-status-trigger,
   .workspace-action-button.p-button,

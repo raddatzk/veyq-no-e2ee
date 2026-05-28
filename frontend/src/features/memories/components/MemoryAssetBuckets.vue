@@ -501,7 +501,12 @@ async function deleteSelectedMedia() {
             <button v-if="canEditMetadata && activeBucket && !activeBucket.primary && updateBucket" type="button" @click="openRenameBucketDialog">
               <span class="pi pi-pencil" /> {{ t('common.edit') }}
             </button>
-            <button v-if="canDeleteMedia && activeBucket && deleteBucket" type="button" @click="openDeleteBucketDialog">
+            <button
+              v-if="canDeleteMedia && activeBucket && deleteBucket"
+              class="asset-bucket-danger-button"
+              type="button"
+              @click="openDeleteBucketDialog"
+            >
               <span class="pi pi-trash" /> {{ t('common.delete') }}
             </button>
           </div>
