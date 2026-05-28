@@ -267,15 +267,19 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('[data-testid="uploader-share-dialog"]').exists()).toBe(true)
   })
 
-  it('shows newly uploaded media immediately without duplicating after prop refresh', async () => {
-    const uploaded = media({ id: 'media-uploaded', title: 'Fresh upload' })
+  it('shows newly uploaded media immediately and updates only its bucket count', async () => {
+    const uploaded = media({ id: 'media-uploaded', title: 'Fresh upload', bucketId: 'bucket-source' })
     const wrapper = mount(MemoryDetail, {
       props: {
         tenantName: 'tenant',
         memory: memory(),
         header: header({ directMediaCount: 0, descendantMediaCount: 0 }),
         childMemories: [],
-        media: []
+        media: [],
+        mediaBuckets: [
+          mediaBucket({ id: 'bucket-source', displayName: 'Source', mediaCount: 0 }),
+          mediaBucket({ id: 'bucket-other', displayName: 'Other', mediaCount: 4 })
+        ]
       },
       global: { stubs: detailStubs() }
     })
@@ -289,14 +293,28 @@ describe('MemoryDetail', () => {
     expect(wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('media')).toEqual(mediaGridProps)
     expect(wrapper.findComponent({ name: 'MemoryCoverDialog' }).props('media')).toEqual(mediaGridProps)
     expect(wrapper.text()).toContain('1 Medien')
+    expect(bucketCountPairs(wrapper)).toEqual([
+      ['bucket-source', 1],
+      ['bucket-other', 4]
+    ])
 
-    await wrapper.setProps({ media: [uploaded] })
+    await wrapper.setProps({
+      media: [uploaded],
+      mediaBuckets: [
+        mediaBucket({ id: 'bucket-source', displayName: 'Source', mediaCount: 1 }),
+        mediaBucket({ id: 'bucket-other', displayName: 'Other', mediaCount: 4 })
+      ]
+    })
 
     const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
+    expect(bucketCountPairs(wrapper)).toEqual([
+      ['bucket-source', 1],
+      ['bucket-other', 4]
+    ])
   })
 
-  it('shows media uploaded directly into a visible bucket immediately in the gallery', async () => {
+  it('shows media uploaded directly into a visible child bucket and updates that count', async () => {
     const uploaded = media({
       id: 'media-uploaded-child',
       memoryId: 'child-mem-1',
@@ -314,7 +332,8 @@ describe('MemoryDetail', () => {
           mediaBucket({
             id: 'bucket-child',
             memoryId: 'child-mem-1',
-            displayName: 'Day 1 uploads'
+            displayName: 'Day 1 uploads',
+            mediaCount: 2
           })
         ]
       },
@@ -327,6 +346,7 @@ describe('MemoryDetail', () => {
     const mediaGridProps = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
     expect(mediaGridProps.map((item) => item.id)).toEqual(['media-uploaded-child'])
     expect(wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('media')).toEqual(mediaGridProps)
+    expect(bucketCountPairs(wrapper)).toEqual([['bucket-child', 3]])
     expect(wrapper.text()).toContain('1 Medien')
   })
 
@@ -388,8 +408,8 @@ describe('MemoryDetail', () => {
 
   it('wires tenant media deletion and removes deleted media locally', async () => {
     const deleteMedia = vi.fn().mockResolvedValue(undefined)
-    const first = media({ id: 'media-1' })
-    const second = media({ id: 'media-2' })
+    const first = media({ id: 'media-1', bucketId: 'bucket-source' })
+    const second = media({ id: 'media-2', bucketId: 'bucket-source' })
     const wrapper = mount(MemoryDetail, {
       props: {
         tenantName: 'tenant',
@@ -397,6 +417,7 @@ describe('MemoryDetail', () => {
         header: header({ directMediaCount: 2 }),
         childMemories: [],
         media: [first, second],
+        mediaBuckets: [mediaBucket({ id: 'bucket-source', displayName: 'Source', mediaCount: 2 })],
         deleteMedia
       },
       global: { stubs: detailStubs() }
@@ -410,6 +431,7 @@ describe('MemoryDetail', () => {
     expect(deleteMedia).toHaveBeenCalledWith('media-1', 'mem-1')
     const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-2'])
+    expect(bucketCountPairs(wrapper)).toEqual([['bucket-source', 1]])
     expect(wrapper.text()).toContain('1 Medien')
   })
 
@@ -800,6 +822,11 @@ function findButton(wrapper: ReturnType<typeof mount>, label: string, occurrence
     .filter((candidate) => candidate.text().includes(label) || candidate.attributes('aria-label') === label)[occurrence]
   if (!button) throw new Error(`Button not found: ${label}`)
   return button
+}
+
+function bucketCountPairs(wrapper: ReturnType<typeof mount>) {
+  const buckets = wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('buckets') as MemoryMediaBucket[]
+  return buckets.map((bucket) => [bucket.id, bucket.mediaCount])
 }
 
 function journal(overrides: Partial<MemoryJournal> = {}): MemoryJournal {

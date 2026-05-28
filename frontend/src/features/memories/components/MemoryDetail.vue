@@ -265,20 +265,39 @@ const visibleMedia = computed(() => {
   })
   return [...mediaById.values()]
 })
-const visibleMediaCountByBucket = computed(() =>
-  visibleMedia.value.reduce<Record<string, number>>((counts, media) => {
-    if (!media.bucketId) return counts
-    counts[media.bucketId] = (counts[media.bucketId] ?? 0) + 1
-    return counts
-  }, {})
-)
+const localMediaCountDeltaByBucket = computed(() => {
+  const deltas: Record<string, number> = {}
+  const addDelta = (bucketId: string | null | undefined, delta: number) => {
+    if (!bucketId) return
+    deltas[bucketId] = (deltas[bucketId] ?? 0) + delta
+  }
+
+  props.media.forEach((media) => {
+    if (deletedMediaIds.value.has(media.id)) {
+      addDelta(media.bucketId, -1)
+      return
+    }
+
+    const override = mediaOverrides.value[media.id]
+    if (override && override.bucketId !== media.bucketId) {
+      addDelta(media.bucketId, -1)
+      addDelta(override.bucketId, 1)
+    }
+  })
+
+  uploadedMediaList.value.forEach((media) => {
+    addDelta((mediaOverrides.value[media.id] || media).bucketId, 1)
+  })
+
+  return deltas
+})
 const visibleMediaBuckets = computed(() => {
   const merged = [...(props.mediaBuckets ?? []), ...Object.values(createdMediaBuckets.value)]
     .filter((bucket, index, buckets) => buckets.findIndex((item) => item.id === bucket.id) === index)
     .filter((bucket) => !deletedMediaBucketIds.value.has(bucket.id))
   return merged.map((bucket) => {
     const next = mediaBucketOverrides.value[bucket.id] || bucket
-    return { ...next, mediaCount: visibleMediaCountByBucket.value[bucket.id] ?? 0 }
+    return { ...next, mediaCount: Math.max(0, next.mediaCount + (localMediaCountDeltaByBucket.value[bucket.id] ?? 0)) }
   })
 })
 const visiblePlaylists = computed(() => props.playlists ?? [])
