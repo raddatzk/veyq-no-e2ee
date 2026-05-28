@@ -1148,7 +1148,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <button
               v-if="capabilities.canCreateChildMemory"
-              class="veyq-card veyq-card-interactive memory-create-card"
+              class="veyq-card veyq-card-interactive memory-create-card memory-create-card-memory"
               type="button"
               @click="$emit('createChildMemory')"
             >
