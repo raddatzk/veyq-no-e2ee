@@ -45,6 +45,7 @@ This document turns the Memory product context into follow-up topics for develop
 - Live search fields where useful.
 - Remote/shared Memory navigation that clearly shows source tenant/domain, current share access state and target-side visibility without making the source Memory look copied.
 - Email-domain masking in user search or invite flows where privacy requires it.
+- Dedicated public tenant contact fields and optional server-side audit logging for tenant terms/share notice acceptance, beyond the browser-local acceptance model in [ADR 0012](../adr/0012-share-notices-and-tenant-terms.md).
 
 ## Needs Technical Spikes
 
@@ -87,6 +88,7 @@ This document turns the Memory product context into follow-up topics for develop
 - Media maps exist for geotagged photos/videos with OpenStreetMap opt-in/opt-out stored as a global browser setting.
 - GPX tracks exist with activity types, public-share support, original download, archive inclusion and journal embeds.
 - Memory playlists exist with one Spotify, Apple Music, YouTube, SoundCloud or Deezer provider link, public-share support, external opening and journal embeds.
+- Public share notices and optional tenant-wide terms exist with multilingual Markdown, browser-local acceptance and a tenant terms template import flow.
 - Tenant user invitation, tenant switching and group management exist.
 - `includeChildren=true` aggregates media from descendant Memories while preserving direct asset ownership.
 - Album/Explorer APIs, frontend flows and database tables have been removed.

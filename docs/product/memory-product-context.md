@@ -135,6 +135,7 @@ Sharing ideas:
 - Granular permissions.
 - Public upload links similar to file-request links.
 - Example use case: a wedding DJ uploads their own photos into a wedding Memory.
+- Optional tenant-wide terms and share-specific notices before public visitors open or contribute to a share.
 
 Permission ideas:
 
@@ -153,6 +154,8 @@ Share roles can map onto those permissions, for example:
 - Editor links.
 
 Public shares must avoid social graph leakage. Public pages should not reveal where a person appears elsewhere unless the viewer is authorized for those other Memories.
+
+Tenant terms and share notices are Markdown-based, multilingual and accepted locally in the browser as defined by [ADR 0012](../adr/0012-share-notices-and-tenant-terms.md). Tenant terms are accepted per browser domain/tenant and share notices per share.
 
 ## Upload Ownership
 
