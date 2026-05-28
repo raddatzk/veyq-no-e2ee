@@ -281,6 +281,10 @@ setup_media_storage_env() {
       set_env MEDIA_STORAGE_MOUNT_TARGET "$(prompt_absolute_path "Container CIFS share mount path" "$(env_value MEDIA_STORAGE_MOUNT_TARGET "/data")")"
       set_env MEDIA_STORAGE_DIR "$(prompt_absolute_path "veyq media storage path inside the CIFS mount" "$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")")"
       set_env MEDIA_CIFS_DEVICE "$(prompt "CIFS share path" "$(env_value MEDIA_CIFS_DEVICE "//nas.example.com/veyq-media")")"
+      echo "CIFS mount options examples:"
+      echo "  username=veyq,password=change-cifs-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770"
+      echo "  credentials=/root/veyq-cifs.creds,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770"
+      echo "  credentials=/root/veyq-cifs.creds,vers=3.0,prefixpath=veyq,uid=1000,gid=1000,file_mode=0660,dir_mode=0770"
       set_env MEDIA_CIFS_OPTIONS "$(prompt "CIFS mount options" "$(env_value MEDIA_CIFS_OPTIONS "username=veyq,password=change-cifs-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770")")"
       ;;
   esac
