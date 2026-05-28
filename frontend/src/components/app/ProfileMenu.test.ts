@@ -84,9 +84,9 @@ describe('ProfileMenu', () => {
     })
 
     const languageItem = menuItem(wrapper, 'Sprache') as { items: Array<{ label: string; command: () => void }> }
-    expect(languageItem.items.map((item) => item.label)).toEqual(['Deutsch', 'English'])
+    expect(languageItem.items.map((item) => item.label)).toEqual(['Deutsch', 'Englisch'])
 
-    languageItem.items.find((item) => item.label === 'English')!.command()
+    languageItem.items.find((item) => item.label === 'Englisch')!.command()
 
     expect(i18n.global.locale.value).toBe('en')
   })

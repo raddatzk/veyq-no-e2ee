@@ -55,9 +55,9 @@ services:
       BCRYPT_MIN_COST: ${BCRYPT_MIN_COST:-10}
       BCRYPT_MAX_COST: ${BCRYPT_MAX_COST:-18}
       BCRYPT_BENCHMARK_SAMPLES: ${BCRYPT_BENCHMARK_SAMPLES:-2}
-      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:?Set WEBAUTHN_ORIGINS}
-      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:?Set WEBAUTHN_RP_ID}
-      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-veyq}
+      QUARKUS_WEBAUTHN_ORIGINS: ${QUARKUS_WEBAUTHN_ORIGINS:?Set QUARKUS_WEBAUTHN_ORIGINS}
+      QUARKUS_WEBAUTHN_RELYING_PARTY_ID: ${QUARKUS_WEBAUTHN_RELYING_PARTY_ID:?Set QUARKUS_WEBAUTHN_RELYING_PARTY_ID}
+      QUARKUS_WEBAUTHN_RELYING_PARTY_NAME: ${QUARKUS_WEBAUTHN_RELYING_PARTY_NAME:-veyq}
       MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
       MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
       MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
@@ -66,7 +66,6 @@ services:
       FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
       MEDIA_PREVIEW_TIMEOUT_SECONDS: ${MEDIA_PREVIEW_TIMEOUT_SECONDS:-15}
       VEYQ_SOURCE_URL: ${VEYQ_SOURCE_URL:-https://github.com/raddatzk/veyq}
-      VEYQ_SUPPORT_URL: ${VEYQ_SUPPORT_URL:-}
       VEYQ_VERSION: ${VEYQ_VERSION:-}
       VEYQ_REVISION: ${VEYQ_REVISION:-}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
@@ -101,8 +100,8 @@ services:
       context: ./reset
     container_name: veyq-reset
     environment:
-      RESET_USERNAME: ${RESET_USERNAME:?Set RESET_USERNAME}
-      RESET_PASSWORD: ${RESET_PASSWORD:?Set RESET_PASSWORD}
+      RESET_USERNAME: ${RESET_USERNAME:-}
+      RESET_PASSWORD: ${RESET_PASSWORD:-}
       RESET_RESTART_CONTAINER: ${RESET_RESTART_CONTAINER:-veyq}
       DB_HOST: veyq-db
       DB_PORT: 3306
@@ -119,7 +118,7 @@ services:
       - veyq-db
     labels:
       - traefik.enable=true
-      - traefik.http.routers.veyq-reset.rule=${RESET_TRAEFIK_RULE:?Set RESET_TRAEFIK_RULE}
+      - traefik.http.routers.veyq-reset.rule=${RESET_TRAEFIK_RULE:-}
       - traefik.http.routers.veyq-reset.entrypoints=websecure
       - traefik.http.routers.veyq-reset.tls.certresolver=letsencrypt
       - traefik.http.services.veyq-reset.loadbalancer.server.port=8081

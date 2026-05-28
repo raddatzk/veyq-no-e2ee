@@ -12,8 +12,6 @@ import java.util.Optional
 class SettingsService(
     @param:ConfigProperty(name = "veyq.source-url")
     private val sourceUrl: String,
-    @param:ConfigProperty(name = "veyq.support-url")
-    private val supportUrl: Optional<String>,
     @param:ConfigProperty(name = "veyq.version")
     private val version: Optional<String>,
     @param:ConfigProperty(name = "veyq.revision")
@@ -35,7 +33,7 @@ class SettingsService(
                 version = version.clean(),
                 revision = revision.clean(),
             ),
-            support = supportUrl.clean()?.let { ServerSupportSummary(URI.create(it)) },
+            support = ServerSupportSummary(URI.create(SPONSOR_URL)),
         )
     }
 
@@ -52,5 +50,6 @@ class SettingsService(
 
     companion object {
         private const val DEFAULT_SOURCE_URL = "https://github.com/raddatzk/veyq"
+        private const val SPONSOR_URL = "https://github.com/sponsors/raddatzk"
     }
 }

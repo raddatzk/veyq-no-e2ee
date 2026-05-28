@@ -55,7 +55,7 @@ install() {
 
   local setup_default="n"
   if [ ! -f .env ]; then
-    cp .env.example .env
+    cp .env.template .env
     chmod 600 .env
     echo "Created $VEYQ_DIR/.env"
     setup_default="y"
@@ -94,7 +94,7 @@ download_infra() {
   download "scripts/veyq-server.sh" "veyq-server.sh"
   chmod 755 "veyq-server.sh"
   download "infra/docker-compose.yml" "docker-compose.yml"
-  download "infra/.env.example" ".env.example"
+  download "infra/.env.template" ".env.template"
   mkdir -p reset
   download "infra/reset/Dockerfile" "reset/Dockerfile"
   download "infra/reset/app.py" "reset/app.py"
@@ -107,18 +107,17 @@ setup_env() {
 
   echo "Configuring $VEYQ_DIR/.env"
   local public_host letsencrypt_email image
-  public_host="$(prompt "Public veyq host, without protocol" "$(env_value WEBAUTHN_RP_ID "veyq.example.com")")"
+  public_host="$(prompt "Public veyq host, without protocol" "$(webauthn_rp_id_default)")"
   letsencrypt_email="$(prompt "Let's Encrypt email" "$(env_value LETSENCRYPT_EMAIL "admin@example.com")")"
   image="$(prompt "veyq image" "$(env_value VEYQ_IMAGE "ghcr.io/${VEYQ_REPO%/*}/veyq:latest")")"
 
   set_env VEYQ_IMAGE "$image"
   set_env LETSENCRYPT_EMAIL "$letsencrypt_email"
   set_env VEYQ_TRAEFIK_RULE "Host(\`${public_host}\`)"
-  set_env WEBAUTHN_ORIGINS "https://${public_host}"
-  set_env WEBAUTHN_RP_ID "$public_host"
-  set_env WEBAUTHN_RP_NAME "$(prompt "Passkey display name" "$(env_value WEBAUTHN_RP_NAME "veyq")")"
+  set_env QUARKUS_WEBAUTHN_ORIGINS "https://${public_host}"
+  set_env QUARKUS_WEBAUTHN_RELYING_PARTY_ID "$public_host"
+  set_env QUARKUS_WEBAUTHN_RELYING_PARTY_NAME "$(prompt "Passkey display name" "$(env_value QUARKUS_WEBAUTHN_RELYING_PARTY_NAME "veyq")")"
   set_env VEYQ_SOURCE_URL "$(prompt "Source URL for AGPL notices" "$(env_value VEYQ_SOURCE_URL "https://github.com/${VEYQ_REPO}")")"
-  set_env VEYQ_SUPPORT_URL "$(prompt "Optional donation/support URL" "$(env_value VEYQ_SUPPORT_URL "")")"
 
   set_env DB_PASSWORD "$(prompt_secret_or_random "Database app password" "$(env_value DB_PASSWORD "")")"
   set_env DB_ROOT_PASSWORD "$(prompt_secret_or_random "Database root password" "$(env_value DB_ROOT_PASSWORD "")")"
@@ -178,7 +177,7 @@ doctor() {
 
   local failed=0
   echo "Checking $VEYQ_DIR"
-  for key in VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD WEBAUTHN_ORIGINS WEBAUTHN_RP_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD; do
+  for key in VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD QUARKUS_WEBAUTHN_ORIGINS QUARKUS_WEBAUTHN_RELYING_PARTY_ID MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD; do
     if ! check_env_required "$key"; then
       failed=1
     fi
@@ -321,29 +320,50 @@ env_value() {
   local default="$2"
   local line
   line="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 || true)"
-  if [ -z "$line" ]; then
+  if [ -z "$line" ] || [ -z "${line#*=}" ]; then
     printf '%s' "$default"
   else
     printf '%s' "${line#*=}"
   fi
 }
 
+webauthn_rp_id_default() {
+  local value
+  value="$(env_value QUARKUS_WEBAUTHN_RELYING_PARTY_ID "veyq.example.com")"
+  if [ "$value" = "cloud.example.com" ]; then
+    printf '%s' "veyq.example.com"
+  else
+    printf '%s' "$value"
+  fi
+}
+
 set_env() {
   local key="$1"
   local value="$2"
-  local escaped
-  escaped="$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')"
+  local tmp
+  tmp="$(mktemp)"
   if grep -qE "^#?${key}=" .env; then
-    sed -i "s/^#\?${key}=.*/${key}=${escaped}/" .env
+    awk -v key="$key" -v value="$value" '
+      $0 ~ "^#?" key "=" {
+        print key "=" value
+        next
+      }
+      { print }
+    ' .env > "$tmp"
+    mv "$tmp" .env
   else
     printf '\n%s=%s\n' "$key" "$value" >> .env
+    rm -f "$tmp"
   fi
 }
 
 remove_env() {
   local key="$1"
+  local tmp
   if grep -qE "^${key}=" .env; then
-    sed -i "/^${key}=/d" .env
+    tmp="$(mktemp)"
+    awk -v key="$key" '$0 !~ "^" key "=" { print }' .env > "$tmp"
+    mv "$tmp" .env
   fi
 }
 

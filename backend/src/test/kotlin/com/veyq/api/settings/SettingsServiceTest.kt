@@ -7,10 +7,9 @@ import java.util.Optional
 class SettingsServiceTest {
 
     @Test
-    fun `server settings expose community license defaults without support link`() {
+    fun `server settings expose community license defaults and sponsor link`() {
         val settings = SettingsService(
             sourceUrl = "https://github.com/raddatzk/veyq",
-            supportUrl = Optional.empty(),
             version = Optional.empty(),
             revision = Optional.empty(),
         ).serverSettings()
@@ -19,14 +18,13 @@ class SettingsServiceTest {
         assertThat(settings.license.license).isEqualTo("AGPL-3.0-only")
         assertThat(settings.license.sourceUrl.toString()).isEqualTo("https://github.com/raddatzk/veyq")
         assertThat(settings.license.noticeUrl.toString()).isEqualTo("https://github.com/raddatzk/veyq/blob/main/NOTICE")
-        assertThat(settings.support).isNull()
+        assertThat(settings.support?.url.toString()).isEqualTo("https://github.com/sponsors/raddatzk")
     }
 
     @Test
-    fun `server settings expose optional support and build metadata`() {
+    fun `server settings expose fixed sponsor link and build metadata`() {
         val settings = SettingsService(
             sourceUrl = "https://example.test/source",
-            supportUrl = Optional.of("https://example.test/support"),
             version = Optional.of("v1.0.0"),
             revision = Optional.of("sha-123"),
         ).serverSettings()
@@ -34,6 +32,6 @@ class SettingsServiceTest {
         assertThat(settings.license.version).isEqualTo("v1.0.0")
         assertThat(settings.license.revision).isEqualTo("sha-123")
         assertThat(settings.license.trademarkPolicyUrl.toString()).isEqualTo("https://example.test/source/docs/legal/trademark-policy.md")
-        assertThat(settings.support?.url.toString()).isEqualTo("https://example.test/support")
+        assertThat(settings.support?.url.toString()).isEqualTo("https://github.com/sponsors/raddatzk")
     }
 }

@@ -45,7 +45,7 @@ Prevention: keep `.env` in every backup set and use the helper script from `/opt
 
 Symptom: `doctor` reports `Missing required .env value` or `Replace default secret in .env`.
 
-Likely cause: `.env.example` values such as `change-me`, `change-root-me`, `change-mail-me` or `change-reset-me` were not replaced.
+Likely cause: `.env.template` values such as `change-me`, `change-root-me`, `change-mail-me` or `change-reset-me` were not replaced.
 
 Inspect:
 
@@ -105,7 +105,7 @@ curl -Ik https://veyq.example.com/q/health
 
 Safe recovery: fix DNS, firewall rules, host routing and `VEYQ_TRAEFIK_RULE`, then restart Traefik and veyq with `sudo docker compose up -d`.
 
-Prevention: configure the final public host before first setup. Keep `VEYQ_TRAEFIK_RULE`, `WEBAUTHN_ORIGINS` and `WEBAUTHN_RP_ID` aligned to the same host unless there is an intentional multi-host setup.
+Prevention: configure the final public host before first setup. Keep `VEYQ_TRAEFIK_RULE`, `QUARKUS_WEBAUTHN_ORIGINS` and `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` aligned to the same host unless there is an intentional multi-host setup.
 
 ### Certificate issuance fails
 
@@ -132,17 +132,17 @@ Prevention: back up the `traefik-letsencrypt` volume with the database and media
 
 Symptom: the browser refuses passkey registration/login, shows a WebAuthn origin error, or a previously working passkey stops working after a domain change.
 
-Likely cause: `WEBAUTHN_ORIGINS` does not exactly include the HTTPS origin used in the browser, `WEBAUTHN_RP_ID` does not match the effective domain, or the deployment is served over plain HTTP outside localhost.
+Likely cause: `QUARKUS_WEBAUTHN_ORIGINS` does not exactly include the HTTPS origin used in the browser, `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` does not match the effective domain, or the deployment is served over plain HTTP outside localhost.
 
 Inspect:
 
 ```bash
 cd /opt/veyq
-sudo grep -E '^(WEBAUTHN_ORIGINS|WEBAUTHN_RP_ID|VEYQ_TRAEFIK_RULE)=' .env
+sudo grep -E '^(QUARKUS_WEBAUTHN_ORIGINS|QUARKUS_WEBAUTHN_RELYING_PARTY_ID|VEYQ_TRAEFIK_RULE)=' .env
 sudo docker compose logs --tail=200 veyq
 ```
 
-Safe recovery: set `WEBAUTHN_ORIGINS` to the browser origin, for example `https://veyq.example.com`, and set `WEBAUTHN_RP_ID` to the host without protocol, for example `veyq.example.com`. Restart veyq with `sudo docker compose up -d veyq`.
+Safe recovery: set `QUARKUS_WEBAUTHN_ORIGINS` to the browser origin, for example `https://veyq.example.com`, and set `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` to the host without protocol, for example `veyq.example.com`. Restart veyq with `sudo docker compose up -d veyq`.
 
 Prevention: do not change the public host after users create passkeys unless the passkey migration impact is accepted. Localhost development is the only expected HTTP exception.
 

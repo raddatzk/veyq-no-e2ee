@@ -28,7 +28,7 @@ describe('ServerSettingsPanel', () => {
     expect(wrapper.text()).not.toContain('veyq unterstützen')
   })
 
-  it('renders support action when a support URL is configured', async () => {
+  it('renders support action from server settings', async () => {
     getServerSettingsMock.mockResolvedValue(
       serverSettings({ support: { url: 'https://support.example.test/veyq' } })
     )

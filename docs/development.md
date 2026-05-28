@@ -93,7 +93,7 @@ Start the normal stack:
 
 ```bash
 cd infra
-cp .env.example .env
+cp .env.template .env
 # adjust .env
 docker compose up
 ```
@@ -119,20 +119,19 @@ curl -fsSL https://raw.githubusercontent.com/raddatzk/veyq/main/scripts/veyq-ser
   sudo VEYQ_REPO=raddatzk/veyq VEYQ_REF=main bash -s -- install
 ```
 
-Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files when running a fork. The script downloads `docker-compose.yml`, `.env.example` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.
+Set `VEYQ_REPO` to the actual GitHub repository that publishes the veyq image and infra files when running a fork. The script downloads `docker-compose.yml`, `.env.template` and reset-sidecar files into `/opt/veyq`, optionally prompts for common settings, pulls the configured image and starts the stack.
 
 Manual install:
 
-1. Copy `infra/.env.example` to `infra/.env`.
+1. Copy `infra/.env.template` to `infra/.env`.
 2. Set `VEYQ_IMAGE` to the published image, for example `ghcr.io/raddatzk/veyq:latest`.
 3. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
 4. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
-5. Set `WEBAUTHN_ORIGINS` to the HTTPS origin and `WEBAUTHN_RP_ID` to the host without protocol.
+5. Set `QUARKUS_WEBAUTHN_ORIGINS` to the HTTPS origin and `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` to the host without protocol.
 6. Set `VEYQ_SOURCE_URL` when running a fork or modified public deployment so AGPL source links point to the matching source.
-7. Optionally set `VEYQ_SUPPORT_URL` to show ServerOwners a voluntary support link.
-8. Configure SMTP through the `MAIL_*` variables before inviting users.
-9. Start with `docker compose up -d` from `infra/`.
-10. Open the configured host, create the first admin and create the first tenant.
+7. Configure SMTP through the `MAIL_*` variables before inviting users.
+8. Start with `docker compose up -d` from `infra/`.
+9. Open the configured host, create the first admin and create the first tenant.
 
 Upgrade with the helper script:
 
@@ -203,13 +202,13 @@ Required reset settings in `infra/.env`:
 
 - `RESET_USERNAME`: username for the reset page.
 - `RESET_PASSWORD`: password for the reset page.
-- `RESET_TRAEFIK_RULE`: Traefik host rule for the reset UI, for example `Host('reset.example.com')`. In the actual `.env`, use Traefik's backtick syntax as shown in `infra/.env.example`.
+- `RESET_TRAEFIK_RULE`: Traefik host rule for the reset UI, for example `Host('reset.example.com')`. In the actual `.env`, use Traefik's backtick syntax as shown in `infra/.env.template`.
 
 Required passkey settings for Compose:
 
-- `WEBAUTHN_ORIGINS`: comma-separated HTTPS origins allowed to use passkeys, for example `https://veyq.example.com`.
-- `WEBAUTHN_RP_ID`: relying-party domain, usually the host without protocol, for example `veyq.example.com`.
-- `WEBAUTHN_RP_NAME`: display name shown by authenticators. Defaults to `veyq`.
+- `QUARKUS_WEBAUTHN_ORIGINS`: comma-separated HTTPS origins allowed to use passkeys, for example `https://veyq.example.com`.
+- `QUARKUS_WEBAUTHN_RELYING_PARTY_ID`: relying-party domain, usually the host without protocol, for example `veyq.example.com`.
+- `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: display name shown by authenticators. Defaults to `veyq`.
 
 Optional reset setting:
 

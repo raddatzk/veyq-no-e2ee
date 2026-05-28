@@ -72,17 +72,17 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `VEYQ_REPO`, `VEYQ_REF`: GitHub repository and branch/tag/SHA used by the script to download server files; defaults to `raddatzk/veyq` and `main`.
 - `VEYQ_IMAGE`: runtime container image used by the production Compose stack, for example `ghcr.io/raddatzk/veyq:latest`.
 - `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS host.
-- `WEBAUTHN_ORIGINS`, `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_NAME`: passkey origin and relying-party settings. Keep these aligned with the public HTTPS host.
+- `QUARKUS_WEBAUTHN_ORIGINS`, `QUARKUS_WEBAUTHN_RELYING_PARTY_ID`, `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: passkey origin and relying-party settings. Keep these aligned with the public HTTPS host.
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
 - `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
-- `VEYQ_SOURCE_URL`, `VEYQ_SUPPORT_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license, optional support link and build metadata shown in server settings.
+- `VEYQ_SOURCE_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license and build metadata shown in server settings.
 - `MEDIA_STORAGE_DIR`, `MEDIA_CHUNK_SIZE`, `MEDIA_MAX_UPLOAD_SIZE`, `MEDIA_UPLOAD_SESSION_TTL_HOURS`, `MEDIA_UPLOAD_SESSION_CLEANUP_CRON`, `FFMPEG_PATH`, `MEDIA_PREVIEW_TIMEOUT_SECONDS`: media storage, upload and preview-generation settings.
 - `COOKIE_SECURE`, `COOKIE_ACCESS_TOKEN_NAME`, `COOKIE_REFRESH_TOKEN_NAME`, `ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_MINUTES`, `ACCESS_TOKEN_AUDIT_TTL_DAYS`, `REFRESH_TOKEN_AUDIT_TTL_DAYS`, `TOKEN_CLEANUP_CRON`: authentication cookie and token retention settings.
 - `INVITATION_TTL_DAYS`, `EMAIL_CHANGE_TTL_HOURS`, `RESET_PASSWORD_TTL_HOURS`, `USER_CLEANUP_CRON`, `USER_CLEANUP_RETENTION_DAYS`: user workflow token lifetimes and cleanup.
 - `BCRYPT_TARGET_MS`, `BCRYPT_MIN_COST`, `BCRYPT_MAX_COST`, `BCRYPT_BENCHMARK_SAMPLES`: password hashing benchmark and bounds.
 - `COMPOSE_PROFILES=reset`, `RESET_TRAEFIK_RULE`, `RESET_USERNAME`, `RESET_PASSWORD`, `RESET_RESTART_CONTAINER`: optional reset sidecar for disposable test instances only.
 
-See [`infra/.env.example`](infra/.env.example) for all defaults and comments.
+See [`infra/.env.template`](infra/.env.template) for all defaults and comments.
 
 ## Docker Compose Test Instance
 
@@ -90,7 +90,7 @@ The Docker Compose setup under [`infra`](infra) starts Traefik, MariaDB and the 
 
 ```bash
 cd infra
-cp .env.example .env
+cp .env.template .env
 # adjust .env
 docker compose up
 ```

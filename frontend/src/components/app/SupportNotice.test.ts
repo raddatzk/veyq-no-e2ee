@@ -15,7 +15,7 @@ describe('SupportNotice', () => {
     window.localStorage.clear()
   })
 
-  it('stays hidden when no support URL is configured', async () => {
+  it('stays hidden when the server omits the support link', async () => {
     getServerSettingsMock.mockResolvedValue(serverSettings())
 
     const wrapper = mount(SupportNotice, {
