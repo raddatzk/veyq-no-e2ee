@@ -71,6 +71,7 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `VEYQ_DIR`: install directory for downloaded Compose files and `.env`; defaults to the current directory.
 - `VEYQ_REPO`, `VEYQ_REF`: GitHub repository and branch/tag/SHA used by the script to download server files; defaults to `raddatzk/veyq` and `main`.
 - `VEYQ_IMAGE`: runtime container image used by the production Compose stack, for example `ghcr.io/raddatzk/veyq:latest`.
+- `VEYQ_AUTO_UPDATE_ENABLED`, `VEYQ_AUTO_UPDATE_INTERVAL_HOURS`, `VEYQ_AUTO_UPDATE_JITTER_MINUTES`, `VEYQ_UPDATER_NOTIFY_TOKEN`: optional internal updater sidecar settings. For automatic compatible updates, use a major-channel image such as `ghcr.io/raddatzk/veyq:1` and enable the `updater` Compose profile.
 - `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS host.
 - `QUARKUS_WEBAUTHN_ORIGINS`, `QUARKUS_WEBAUTHN_RELYING_PARTY_ID`, `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: passkey origin and relying-party settings. Keep these aligned with the public HTTPS host.
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
@@ -108,6 +109,8 @@ docker compose up
 
 Use `docker-compose.build.yml` when building the app image from local source instead of using `VEYQ_IMAGE`. The normal image-based Compose stack keeps MariaDB internal to the Compose network; the local build override publishes MariaDB on host port `3306` for development tools.
 
+Published veyq images use `<major>.<buildNumber>` tags, for example `1.123`. The moving major tag, for example `:1`, points to the newest compatible build in that major line. `latest` points to the newest build overall and is not the recommended auto-update channel for persistent self-hosted instances.
+
 The reset sidecar can clear veyq tables, delete media storage contents and restart the app container so the instance returns to the initial setup flow. See [`docs/development.md`](docs/development.md) before enabling it.
 
 ## API-First Development
@@ -131,6 +134,7 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend/fronten
 - [`docs/product/memory-ui-styleguide.md`](docs/product/memory-ui-styleguide.md): UI colors, shared CSS classes, component patterns and product-facing style rules.
 - [`docs/product/journal-markdown.md`](docs/product/journal-markdown.md): Journal Markdown and veyq embed syntax.
 - [`docs/product/playlists.md`](docs/product/playlists.md): Memory playlist links, permissions and API surface.
+- [`docs/product/capabilities.md`](docs/product/capabilities.md): Server capability IDs, current baseline and maintenance rules.
 - [`docs/product/future-work.md`](docs/product/future-work.md): ADR, API, UX and spike candidates.
 - [`docs/product/v1-scope.md`](docs/product/v1-scope.md): V1 release scope and deferred work.
 - [`docs/releases/v1.md`](docs/releases/v1.md): Draft V1 release notes, known limits and release checklist.

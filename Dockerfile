@@ -32,6 +32,10 @@ COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/res
 RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -x test
 
 FROM eclipse-temurin:21-jre-jammy AS runtime-jvm
+ARG VEYQ_VERSION=""
+ARG VEYQ_REVISION=""
+ENV VEYQ_VERSION="${VEYQ_VERSION}"
+ENV VEYQ_REVISION="${VEYQ_REVISION}"
 WORKDIR /work/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ffmpeg \
@@ -41,6 +45,10 @@ EXPOSE 8080
 ENTRYPOINT ["java", "-Dquarkus.http.host=0.0.0.0", "-jar", "/work/quarkus-app/quarkus-run.jar"]
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5 AS runtime-native
+ARG VEYQ_VERSION=""
+ARG VEYQ_REVISION=""
+ENV VEYQ_VERSION="${VEYQ_VERSION}"
+ENV VEYQ_REVISION="${VEYQ_REVISION}"
 WORKDIR /work/
 RUN (microdnf install -y curl ffmpeg-free || microdnf install -y curl ffmpeg) && microdnf clean all
 COPY --from=backend-build-native /code/backend/build/*-runner /work/application
