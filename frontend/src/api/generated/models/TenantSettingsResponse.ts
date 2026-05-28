@@ -37,6 +37,24 @@ export interface TenantSettingsResponse {
      * @memberof TenantSettingsResponse
      */
     displayName: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof TenantSettingsResponse
+     */
+    logoUrl?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof TenantSettingsResponse
+     */
+    termsVersion: number;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof TenantSettingsResponse
+     */
+    termsMarkdownByLocale?: { [key: string]: string; };
 }
 
 /**
@@ -46,6 +64,7 @@ export function instanceOfTenantSettingsResponse(value: object): value is Tenant
     if (!('tenantId' in value) || value['tenantId'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
+    if (!('termsVersion' in value) || value['termsVersion'] === undefined) return false;
     return true;
 }
 
@@ -62,6 +81,9 @@ export function TenantSettingsResponseFromJSONTyped(json: any, ignoreDiscriminat
         'tenantId': json['tenantId'],
         'name': json['name'],
         'displayName': json['displayName'],
+        'logoUrl': json['logoUrl'] == null ? undefined : json['logoUrl'],
+        'termsVersion': json['termsVersion'],
+        'termsMarkdownByLocale': json['termsMarkdownByLocale'] == null ? undefined : json['termsMarkdownByLocale'],
     };
 }
 
@@ -79,6 +101,9 @@ export function TenantSettingsResponseToJSONTyped(value?: TenantSettingsResponse
         'tenantId': value['tenantId'],
         'name': value['name'],
         'displayName': value['displayName'],
+        'logoUrl': value['logoUrl'],
+        'termsVersion': value['termsVersion'],
+        'termsMarkdownByLocale': value['termsMarkdownByLocale'],
     };
 }
 

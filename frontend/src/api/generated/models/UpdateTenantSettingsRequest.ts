@@ -25,6 +25,12 @@ export interface UpdateTenantSettingsRequest {
      * @memberof UpdateTenantSettingsRequest
      */
     displayName: string;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof UpdateTenantSettingsRequest
+     */
+    termsMarkdownByLocale?: { [key: string]: string; };
 }
 
 /**
@@ -46,6 +52,7 @@ export function UpdateTenantSettingsRequestFromJSONTyped(json: any, ignoreDiscri
     return {
         
         'displayName': json['displayName'],
+        'termsMarkdownByLocale': json['termsMarkdownByLocale'] == null ? undefined : json['termsMarkdownByLocale'],
     };
 }
 
@@ -61,6 +68,7 @@ export function UpdateTenantSettingsRequestToJSONTyped(value?: UpdateTenantSetti
     return {
         
         'displayName': value['displayName'],
+        'termsMarkdownByLocale': value['termsMarkdownByLocale'],
     };
 }
 

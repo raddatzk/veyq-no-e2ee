@@ -267,7 +267,10 @@ async function measureCompactGroupNav() {
         aria-haspopup="menu"
         @click="toggleCompactTenantMenu"
       >
-        <span class="sidebar-tenant-avatar">{{ tenantInitial(activeTenant.displayName) }}</span>
+        <span class="sidebar-tenant-avatar">
+          <img v-if="activeTenant.logoUrl" :src="activeTenant.logoUrl" alt="" />
+          <span v-else>{{ tenantInitial(activeTenant.displayName) }}</span>
+        </span>
         <span class="compact-menu-label">{{ activeTenant.displayName }}</span>
         <span class="pi pi-chevron-down compact-menu-chevron" />
       </button>
@@ -282,7 +285,10 @@ async function measureCompactGroupNav() {
             class="sidebar-tenant-link sidebar-tenant-link-active"
             :title="tenant.displayName"
           >
-            <span class="sidebar-tenant-avatar">{{ tenantInitial(tenant.displayName) }}</span>
+            <span class="sidebar-tenant-avatar">
+              <img v-if="tenant.logoUrl" :src="tenant.logoUrl" alt="" />
+              <span v-else>{{ tenantInitial(tenant.displayName) }}</span>
+            </span>
             <span class="sidebar-tenant-text">
               <strong>{{ tenant.displayName }}</strong>
               <small>{{ tenant.domain }}</small>
@@ -303,7 +309,10 @@ async function measureCompactGroupNav() {
             class="sidebar-tenant-link"
             :title="tenant.displayName"
           >
-            <span class="sidebar-tenant-avatar">{{ tenantInitial(tenant.displayName) }}</span>
+            <span class="sidebar-tenant-avatar">
+              <img v-if="tenant.logoUrl" :src="tenant.logoUrl" alt="" />
+              <span v-else>{{ tenantInitial(tenant.displayName) }}</span>
+            </span>
             <span class="sidebar-tenant-text">
               <strong>{{ tenant.displayName }}</strong>
               <small>{{ tenant.domain }}</small>
@@ -447,7 +456,10 @@ async function measureCompactGroupNav() {
     >
       <div class="mobile-nav-sheet">
         <header v-if="activeTenant" class="mobile-nav-sheet-header">
-          <span class="sidebar-tenant-avatar">{{ tenantInitial(activeTenant.displayName) }}</span>
+          <span class="sidebar-tenant-avatar">
+            <img v-if="activeTenant.logoUrl" :src="activeTenant.logoUrl" alt="" />
+            <span v-else>{{ tenantInitial(activeTenant.displayName) }}</span>
+          </span>
           <span>
             <strong>{{ activeTenant.displayName }}</strong>
             <small>{{ activeTenant.domain }}</small>
@@ -465,7 +477,10 @@ async function measureCompactGroupNav() {
               :class="{ 'mobile-nav-item-active': activeTenantName === tenant.name }"
               @click="closeMobileMenu"
             >
-              <span class="sidebar-tenant-avatar">{{ tenantInitial(tenant.displayName) }}</span>
+              <span class="sidebar-tenant-avatar">
+                <img v-if="tenant.logoUrl" :src="tenant.logoUrl" alt="" />
+                <span v-else>{{ tenantInitial(tenant.displayName) }}</span>
+              </span>
               <span>
                 <strong>{{ tenant.displayName }}</strong>
                 <small>{{ tenant.domain }}</small>

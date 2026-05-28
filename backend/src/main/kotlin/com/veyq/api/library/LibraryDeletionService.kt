@@ -44,6 +44,7 @@ class LibraryDeletionService @Inject constructor(
         tenantRepo.delete(tenant)
         tenantRepo.flush()
         deleteRecursively(storagePath("tenant-${tenant.id}"))
+        deleteRecursively(storagePath("tenants/${tenant.id}"))
         mediaService.deleteUploadSessionsForTenant(tenant.id)
     }
 
@@ -85,7 +86,7 @@ class LibraryDeletionService @Inject constructor(
         val distinctMedia = media.distinctBy { it.id }
         if (distinctMedia.isEmpty()) return
 
-        memoryRepo.update("coverMedia = null where coverMedia in ?1", distinctMedia)
+        memoryRepo.list("coverMedia in ?1", distinctMedia).forEach { it.coverMedia = null }
         val blobs = distinctMedia.map { it.blob }.distinctBy { it.id }
         distinctMedia.forEach { it.delete() }
         mediaRepo.flush()

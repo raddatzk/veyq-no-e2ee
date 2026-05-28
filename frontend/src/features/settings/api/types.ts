@@ -15,9 +15,11 @@ export type {
   PasskeySummary,
   PasskeysSummary,
   ServerRole,
+  TenantSettingsResponse,
   TenantRole,
   TenantUserStatus,
   TenantUserSummary,
+  UpdateTenantSettingsRequest,
   UpdateUserSettingsRequest,
   UserStatus as ManagedUserStatus,
   UserSummary as UserSettingsResponse

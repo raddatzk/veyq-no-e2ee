@@ -4,19 +4,28 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import ManagementList from '../../../shared/components/ManagementList.vue'
+import LocaleMarkdownEditor from '../../../shared/components/LocaleMarkdownEditor.vue'
+import { SUPPORTED_LOCALES, type SupportedLocale } from '../../../i18n'
+import { messages } from '../../../i18n/messages'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
 import { deleteTenant as deleteTenantApi, tenants as loadTenantSummaries } from '../../../api/tenantClient'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import {
+  deleteTenantLogo,
+  getTenantSettings,
   getTenantUsers,
   inviteTenantUser,
   reinviteTenantUser,
+  updateTenantLogo,
+  updateTenantSettings,
   updateTenantUserRole,
+  type TenantSettingsResponse,
   type TenantRole,
   type TenantUserSummary
 } from '../api'
@@ -25,12 +34,15 @@ const props = defineProps<{
   tenantName: string
 }>()
 
+type TermsTemplateClauseId = keyof typeof messages.de.share.termsTemplateMarkdown
+
 const router = useRouter()
 const { t } = useI18n()
 const { authState, setTenants } = useAuthState()
 const users = ref<TenantUserSummary[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const savingLogo = ref(false)
 const error = ref('')
 const message = ref('')
 const inviteDialogVisible = ref(false)
@@ -38,9 +50,20 @@ const deleteDialogVisible = ref(false)
 const deleteConfirmation = ref('')
 const inviteEmail = ref('')
 const inviteTenantRole = ref<TenantRole>('TenantMember')
+const tenantSettings = ref<TenantSettingsResponse | null>(null)
+const termsMarkdownByLocale = ref<Record<string, string>>({})
+const termsTemplateDialogVisible = ref(false)
+const termsTemplateLocale = ref('de')
+const selectedTemplateClauseIds = ref<string[]>([])
+const templateContactMode = ref<'owners' | 'custom'>('owners')
+const templateContactText = ref('')
+const templateImportMode = ref<'append' | 'replace'>('append')
 
 const tenantDisplayName = computed(
-  () => authState.tenants.find((tenant) => tenant.name === props.tenantName)?.displayName || props.tenantName
+  () =>
+    tenantSettings.value?.displayName ||
+    authState.tenants.find((tenant) => tenant.name === props.tenantName)?.displayName ||
+    props.tenantName
 )
 const canDeleteTenant = computed(() =>
   users.value.some(
@@ -58,6 +81,39 @@ const roleOptions = computed(() => [
   { label: t('tenant.roles.TenantOwner'), value: 'TenantOwner' },
   { label: t('tenant.roles.TenantMember'), value: 'TenantMember' }
 ])
+const localeOptions = computed(() =>
+  SUPPORTED_LOCALES.map((locale) => ({
+    label: t(`navigation.locales.${locale}`),
+    value: locale
+  }))
+)
+const tenantOwnerEmails = computed(() =>
+  users.value
+    .filter((user) => user.role === 'TenantOwner' && user.status === 'Active' && user.email)
+    .map((user) => user.email!)
+)
+const canSaveTerms = computed(() => Boolean(tenantSettings.value) && !saving.value)
+const templateClauses = computed(() => [
+  { id: 'purpose', label: t('share.termsTemplatePurpose'), markdown: termsTemplateMarkdown('purpose') },
+  { id: 'privacy', label: t('share.termsTemplatePrivacy'), markdown: termsTemplateMarkdown('privacy') },
+  { id: 'rights', label: t('share.termsTemplateRights'), markdown: termsTemplateMarkdown('rights') },
+  { id: 'children', label: t('share.termsTemplateChildren'), markdown: termsTemplateMarkdown('children') },
+  { id: 'illegal', label: t('share.termsTemplateIllegal'), markdown: termsTemplateMarkdown('illegal') },
+  { id: 'sharing', label: t('share.termsTemplateSharing'), markdown: termsTemplateMarkdown('sharing') },
+  { id: 'uploads', label: t('share.termsTemplateUploads'), markdown: termsTemplateMarkdown('uploads') },
+  { id: 'availability', label: t('share.termsTemplateAvailability'), markdown: termsTemplateMarkdown('availability') },
+  { id: 'moderation', label: t('share.termsTemplateModeration'), markdown: termsTemplateMarkdown('moderation') },
+  { id: 'external', label: t('share.termsTemplateExternal'), markdown: termsTemplateMarkdown('external') },
+  { id: 'contact', label: t('share.termsTemplateContact'), markdown: termsTemplateMarkdown('contact') }
+])
+const canImportTemplate = computed(() =>
+  Boolean(termsTemplateLocale.value.trim()) &&
+    selectedTemplateClauseIds.value.length > 0 &&
+    (
+      (templateContactMode.value === 'owners' && tenantOwnerEmails.value.length > 0) ||
+      (templateContactMode.value === 'custom' && Boolean(templateContactText.value.trim()))
+    )
+)
 
 onMounted(load)
 watch(() => props.tenantName, load)
@@ -67,12 +123,123 @@ async function load() {
   error.value = ''
   message.value = ''
   try {
-    users.value = await getTenantUsers(props.tenantName)
+    const [nextUsers, nextSettings] = await Promise.all([
+      getTenantUsers(props.tenantName),
+      getTenantSettings(props.tenantName)
+    ])
+    users.value = nextUsers
+    applyTenantSettings(nextSettings)
+    termsMarkdownByLocale.value = { ...(nextSettings.termsMarkdownByLocale || {}) }
   } catch (caught) {
     error.value = getErrorMessage(caught, t('tenant.membersLoadFailed'))
   } finally {
     loading.value = false
   }
+}
+
+async function uploadLogo(event: FileUploadSelectEvent) {
+  const file = event.files?.[0]
+  if (!file) return
+  savingLogo.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    applyTenantSettings(await updateTenantLogo(props.tenantName, file))
+    message.value = t('tenant.logoSaveSuccess')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('tenant.logoSaveFailed'))
+  } finally {
+    savingLogo.value = false
+  }
+}
+
+async function removeLogo() {
+  savingLogo.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    applyTenantSettings(await deleteTenantLogo(props.tenantName))
+    message.value = t('tenant.logoDeleteSuccess')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('tenant.logoDeleteFailed'))
+  } finally {
+    savingLogo.value = false
+  }
+}
+
+function openTemplateDialog() {
+  termsTemplateLocale.value =
+    Object.keys(termsMarkdownByLocale.value).find((locale) =>
+      SUPPORTED_LOCALES.includes(locale as (typeof SUPPORTED_LOCALES)[number])
+    ) || SUPPORTED_LOCALES[0]
+  selectedTemplateClauseIds.value = templateClauses.value.map((clause) => clause.id)
+  templateContactMode.value = 'owners'
+  templateContactText.value = ''
+  templateImportMode.value = 'append'
+  termsTemplateDialogVisible.value = true
+}
+
+function toggleTemplateClause(clauseId: string, checked: boolean) {
+  selectedTemplateClauseIds.value = checked
+    ? Array.from(new Set([...selectedTemplateClauseIds.value, clauseId]))
+    : selectedTemplateClauseIds.value.filter((id) => id !== clauseId)
+}
+
+function importTermsTemplate() {
+  if (!canImportTemplate.value) return
+  const locale = termsTemplateLocale.value.trim().toLowerCase()
+  const selected = templateClauses.value
+    .filter((clause) => selectedTemplateClauseIds.value.includes(clause.id))
+    .map((clause) => clause.markdown)
+    .join('\n\n')
+  const current = termsMarkdownByLocale.value[locale]?.trim()
+  termsMarkdownByLocale.value = {
+    ...termsMarkdownByLocale.value,
+    [locale]: templateImportMode.value === 'append' && current ? `${current}\n\n${selected}` : selected
+  }
+  termsTemplateDialogVisible.value = false
+}
+
+async function saveTerms() {
+  if (!tenantSettings.value) return
+  saving.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    tenantSettings.value = await updateTenantSettings(props.tenantName, {
+      displayName: tenantSettings.value.displayName,
+      termsMarkdownByLocale: termsMarkdownByLocale.value
+    })
+    applyTenantSettings(tenantSettings.value)
+    termsMarkdownByLocale.value = { ...(tenantSettings.value.termsMarkdownByLocale || {}) }
+    message.value = t('share.termsSaved')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('share.termsSaveFailed'))
+  } finally {
+    saving.value = false
+  }
+}
+
+function contactClauseMarkdown(): string {
+  return termsTemplateMarkdown('contact')
+}
+
+function termsTemplateMarkdown(clauseId: TermsTemplateClauseId): string {
+  return messages[templateLocale()].share.termsTemplateMarkdown[clauseId].replace('{contact}', templateContact())
+}
+
+function templateLocale(): SupportedLocale {
+  return SUPPORTED_LOCALES.includes(termsTemplateLocale.value as SupportedLocale)
+    ? termsTemplateLocale.value as SupportedLocale
+    : SUPPORTED_LOCALES[0]
+}
+
+function templateContact(): string {
+  const contact =
+    templateContactMode.value === 'owners'
+      ? tenantOwnerEmails.value.join(', ')
+      : templateContactText.value.trim()
+  return contact
 }
 
 function openInviteDialog() {
@@ -165,12 +332,26 @@ function upsertUser(user: TenantUserSummary) {
 function userSortLabel(user: TenantUserSummary): string {
   return user.email || user.user.displayName
 }
+
+function applyTenantSettings(settings: TenantSettingsResponse) {
+  tenantSettings.value = settings
+  setTenants(
+    authState.tenants.map((tenant) =>
+      tenant.name === settings.name
+        ? { ...tenant, displayName: settings.displayName, logoUrl: settings.logoUrl }
+        : tenant
+    )
+  )
+}
+
+function tenantInitial(value: string): string {
+  return value.trim().charAt(0).toUpperCase() || 'V'
+}
 </script>
 
 <template>
   <section class="settings-panel">
-    <h1>{{ t('tenant.title') }}</h1>
-    <p>{{ t('tenant.members') }}</p>
+    <h1>{{ tenantDisplayName }}</h1>
 
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
@@ -181,50 +362,108 @@ function userSortLabel(user: TenantUserSummary): string {
     </div>
 
     <template v-else>
-      <div class="settings-toolbar">
-        <Button :label="t('tenant.invite')" icon="pi pi-user-plus" @click="openInviteDialog" />
-      </div>
-
-      <ManagementList>
-        <div v-for="user in users" :key="user.user.userId" class="management-row">
-          <div class="management-row-main">
-            <strong class="management-row-title">{{ user.user.displayName }}</strong>
-            <span v-if="user.email" class="management-row-subtitle">{{ user.email }}</span>
-            <div class="management-row-meta">
-              <span
-                class="management-badge"
-                :class="user.status === 'Active' ? 'success' : 'warning'"
-              >
-                {{ user.status === 'Active' ? t('common.active') : t('common.pending') }}
-              </span>
-            </div>
-          </div>
-          <Select
-            class="management-control"
-            :model-value="user.role"
-            :options="roleOptions"
-            option-label="label"
-            option-value="value"
-            :aria-label="t('tenant.role')"
-            @update:model-value="changeRole(user, $event)"
-          />
-          <div class="management-actions">
+      <section v-if="tenantSettings" class="settings-form">
+        <h2>{{ t('tenant.logoTitle') }}</h2>
+        <p>{{ t('tenant.logoCopy') }}</p>
+        <div class="tenant-logo-settings">
+          <img v-if="tenantSettings.logoUrl" class="tenant-logo-image" :src="tenantSettings.logoUrl" alt="" />
+          <span v-else class="tenant-logo-fallback">{{ tenantInitial(tenantSettings.displayName) }}</span>
+          <div class="button-row">
+            <FileUpload
+              mode="basic"
+              accept="image/png,image/jpeg"
+              :choose-label="t('tenant.logoChoose')"
+              custom-upload
+              :disabled="savingLogo"
+              @select="uploadLogo"
+            />
             <Button
-              v-if="user.status === 'Pending'"
-              icon="pi pi-send"
+              type="button"
+              icon="pi pi-trash"
               severity="secondary"
-              outlined
-              size="small"
-              :aria-label="t('tenant.inviteResend')"
-              :title="t('tenant.inviteResend')"
-              :loading="saving"
-              @click="reinviteUser(user)"
+              text
+              :disabled="!tenantSettings.logoUrl"
+              :loading="savingLogo"
+              :aria-label="t('tenant.logoRemove')"
+              @click="removeLogo"
             />
           </div>
         </div>
-      </ManagementList>
+      </section>
 
-      <div v-if="canDeleteTenant" class="button-row">
+      <section class="settings-form">
+        <h2>{{ t('share.termsTitle') }}</h2>
+        <p>{{ t('share.termsCopy') }}</p>
+        <LocaleMarkdownEditor v-model="termsMarkdownByLocale" :label="t('share.termsLanguages')" compact />
+        <div class="button-row">
+          <Button
+            type="button"
+            :label="t('share.termsTemplateInsert')"
+            icon="pi pi-file-import"
+            severity="secondary"
+            outlined
+            @click="openTemplateDialog"
+          />
+          <Button
+            type="button"
+            :label="t('common.save')"
+            icon="pi pi-save"
+            :loading="saving"
+            :disabled="!canSaveTerms"
+            @click="saveTerms"
+          />
+        </div>
+      </section>
+
+      <section class="settings-form">
+        <div class="settings-section-header">
+          <div>
+            <h2>{{ t('tenant.members') }}</h2>
+          </div>
+          <Button :label="t('tenant.invite')" icon="pi pi-user-plus" @click="openInviteDialog" />
+        </div>
+        <ManagementList>
+          <div v-for="user in users" :key="user.user.userId" class="management-row">
+            <div class="management-row-main">
+              <strong class="management-row-title">{{ user.user.displayName }}</strong>
+              <span v-if="user.email" class="management-row-subtitle">{{ user.email }}</span>
+              <div class="management-row-meta">
+                <span
+                  class="management-badge"
+                  :class="user.status === 'Active' ? 'success' : 'warning'"
+                >
+                  {{ user.status === 'Active' ? t('common.active') : t('common.pending') }}
+                </span>
+              </div>
+            </div>
+            <Select
+              class="management-control"
+              :model-value="user.role"
+              :options="roleOptions"
+              option-label="label"
+              option-value="value"
+              :aria-label="t('tenant.role')"
+              @update:model-value="changeRole(user, $event)"
+            />
+            <div class="management-actions">
+              <Button
+                v-if="user.status === 'Pending'"
+                icon="pi pi-send"
+                severity="secondary"
+                outlined
+                size="small"
+                :aria-label="t('tenant.inviteResend')"
+                :title="t('tenant.inviteResend')"
+                :loading="saving"
+                @click="reinviteUser(user)"
+              />
+            </div>
+          </div>
+        </ManagementList>
+      </section>
+
+      <section v-if="canDeleteTenant" class="settings-form settings-danger-zone">
+        <h2>{{ t('tenant.delete') }}</h2>
         <Button
           :label="t('tenant.delete')"
           icon="pi pi-trash"
@@ -232,7 +471,7 @@ function userSortLabel(user: TenantUserSummary): string {
           outlined
           @click="openDeleteDialog"
         />
-      </div>
+      </section>
     </template>
 
     <Dialog v-model:visible="inviteDialogVisible" :header="t('tenant.invite')" modal class="tenant-dialog">
@@ -290,6 +529,74 @@ function userSortLabel(user: TenantUserSummary): string {
           />
         </div>
       </div>
+    </Dialog>
+
+    <Dialog v-model:visible="termsTemplateDialogVisible" :header="t('share.termsTemplateTitle')" modal class="tenant-dialog">
+      <form class="form" @submit.prevent="importTermsTemplate">
+        <label>
+          {{ t('share.noticeLocale') }}
+          <Select
+            v-model="termsTemplateLocale"
+            :options="localeOptions"
+            option-label="label"
+            option-value="value"
+          />
+        </label>
+        <fieldset class="terms-template-fieldset">
+          <legend>{{ t('share.termsTemplateClauses') }}</legend>
+          <label v-for="clause in templateClauses" :key="clause.id" class="checkbox-row">
+            <input
+              type="checkbox"
+              :checked="selectedTemplateClauseIds.includes(clause.id)"
+              @change="toggleTemplateClause(clause.id, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ clause.label }}</span>
+          </label>
+        </fieldset>
+        <fieldset class="terms-template-fieldset">
+          <legend>{{ t('share.termsTemplateContactChoice') }}</legend>
+          <label class="checkbox-row">
+            <input v-model="templateContactMode" type="radio" value="owners" />
+            <span>{{ t('share.termsTemplateUseTenantOwners') }}</span>
+          </label>
+          <label class="checkbox-row">
+            <input v-model="templateContactMode" type="radio" value="custom" />
+            <span>{{ t('share.termsTemplateUseCustomContact') }}</span>
+          </label>
+          <InputText
+            v-if="templateContactMode === 'custom'"
+            v-model="templateContactText"
+            autocomplete="off"
+            :placeholder="t('share.termsTemplateContactPlaceholder')"
+          />
+        </fieldset>
+        <fieldset class="terms-template-fieldset">
+          <legend>{{ t('share.termsTemplateImportMode') }}</legend>
+          <label class="checkbox-row">
+            <input v-model="templateImportMode" type="radio" value="append" />
+            <span>{{ t('share.termsTemplateAppend') }}</span>
+          </label>
+          <label class="checkbox-row">
+            <input v-model="templateImportMode" type="radio" value="replace" />
+            <span>{{ t('share.termsTemplateReplace') }}</span>
+          </label>
+        </fieldset>
+        <div class="button-row">
+          <Button
+            type="submit"
+            :label="t('share.termsTemplateInsert')"
+            icon="pi pi-file-import"
+            :disabled="!canImportTemplate"
+          />
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            severity="secondary"
+            outlined
+            @click="termsTemplateDialogVisible = false"
+          />
+        </div>
+      </form>
     </Dialog>
   </section>
 </template>

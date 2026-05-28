@@ -15,8 +15,10 @@ import type {
   ServerRole,
   ServerSettingsResponse,
   SettingsResponse,
+  TenantSettingsResponse,
   TenantRole,
   TenantUserSummary,
+  UpdateTenantSettingsRequest,
   UpdateUserSettingsRequest,
   UserSettingsResponse
 } from './types'
@@ -91,6 +93,27 @@ export function updateManagedUserRole(
 
 export function getTenantUsers(tenantName: string): Promise<TenantUserSummary[]> {
   return generatedCall(tenantsApi.tenantUsers({ tenantName })).then((summary) => summary.users)
+}
+
+export function getTenantSettings(tenantName: string): Promise<TenantSettingsResponse> {
+  return generatedCall(tenantsApi.getTenantSettings({ tenantName }))
+}
+
+export function updateTenantSettings(
+  tenantName: string,
+  request: UpdateTenantSettingsRequest
+): Promise<TenantSettingsResponse> {
+  return generatedCall(
+    tenantsApi.updateTenantSettings({ tenantName, updateTenantSettingsRequest: request })
+  )
+}
+
+export function updateTenantLogo(tenantName: string, file: Blob): Promise<TenantSettingsResponse> {
+  return generatedCall(tenantsApi.updateTenantLogo({ tenantName, file }))
+}
+
+export function deleteTenantLogo(tenantName: string): Promise<TenantSettingsResponse> {
+  return generatedCall(tenantsApi.deleteTenantLogo({ tenantName }))
 }
 
 export function inviteTenantUser(

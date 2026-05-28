@@ -169,6 +169,101 @@ paths:
         - Der aktuelle Benutzer muss TenantOwner sein.
 
         Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/logo":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantLogoImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Logo abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der Tenant muss ein Logo besitzen.
+      description: |-
+        Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der Tenant muss ein Logo besitzen.
+
+        Implementierungsstatus: implemented.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadTenantLogo"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '413':
+          "$ref": "./common.openapi.yaml#/components/responses/413"
+      summary: Tenant-Logo aktualisieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      description: |-
+        Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: implemented.
+    delete:
+      tags:
+      - Tenants
+      operationId: deleteTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Tenant-Logo loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      description: |-
+        Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: implemented.
   "/api/tenants/{tenantName}/me":
     get:
       tags:
@@ -501,6 +596,28 @@ components:
             "$ref": "#/components/schemas/UpdateTenantSettingsRequest"
           example:
             displayName: Friends & Family
+            termsMarkdownByLocale:
+              en: |-
+                # Terms for this area
+
+                Contact: Tenant Owner
+
+    UploadTenantLogo:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: JPEG or PNG tenant logo up to 5 MB.
+          example:
+            file: "<binary image bytes>"
 
     UpdateGroupSettings:
       required: true
@@ -584,6 +701,27 @@ components:
             tenantId: 42
             name: friends
             displayName: Friends
+            logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+            termsVersion: 1
+            termsMarkdownByLocale:
+              en: |-
+                # Terms for this area
+
+                Contact: Tenant Owner
+
+    TenantLogoImage:
+      description: Tenant logo image.
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+          example: "<binary jpeg logo>"
+        image/png:
+          schema:
+            type: string
+            format: binary
+          example: "<binary png logo>"
 
     TenantUserSettings:
       description: Current settings for a user in a tenant.
@@ -685,6 +823,8 @@ components:
           type: string
         domain:
           type: string
+        logoUrl:
+          type: string
         role:
           "$ref": "#/components/schemas/TenantRole"
         admins:
@@ -696,6 +836,7 @@ components:
         name: friends
         displayName: Friends
         domain: friends.example.test
+        logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
         role: TenantOwner
         admins:
           - userId: 1
@@ -720,6 +861,7 @@ components:
             name: friends
             displayName: Friends
             domain: friends.example.test
+            logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
             role: TenantOwner
             admins:
               - userId: 1
@@ -735,6 +877,7 @@ components:
       - tenantId
       - name
       - displayName
+      - termsVersion
       properties:
         tenantId:
           type: integer
@@ -743,10 +886,25 @@ components:
           type: string
         displayName:
           type: string
+        logoUrl:
+          type: string
+        termsVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        termsMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
       example:
         tenantId: 42
         name: friends
         displayName: Friends
+        logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+        termsVersion: 1
+        termsMarkdownByLocale:
+          en: |-
+            # Terms for this area
+
+            Contact: Tenant Owner
     TenantUserSettingsResponse:
       type: object
       additionalProperties: false
@@ -842,8 +1000,29 @@ components:
       properties:
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        termsMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
       example:
         displayName: Friends & Family
+        termsMarkdownByLocale:
+          en: |-
+            # Terms for this area
+
+            Contact: Tenant Owner
+    MarkdownByLocale:
+      type: object
+      additionalProperties:
+        type: string
+        maxLength: 20000
+      example:
+        de: |-
+          # Hinweise
+
+          Kontakt: Tenant Owner
+        en: |-
+          # Terms
+
+          Contact: Tenant Owner
     UpdateGroupSettingsRequest:
       type: object
       additionalProperties: false

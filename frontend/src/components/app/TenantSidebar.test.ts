@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   authState: {
     isAuthenticated: true,
     user: { serverRole: 'ServerMember' },
-    tenants: [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }]
+    tenants: [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }] as any[]
   }
 }))
 
@@ -179,6 +179,49 @@ describe('TenantSidebar', () => {
     expect(wrapper.text()).toContain('Travel')
     expect(wrapper.text()).toContain('Gruppe erstellen')
     expect(wrapper.text()).toContain('Favorite Memory')
+  })
+
+  it('renders tenant logo images when available', async () => {
+    mocks.authState.user.serverRole = 'ServerMember'
+    mocks.authState.tenants = [
+      {
+        id: 1,
+        name: 'tenant',
+        displayName: 'Tenant',
+        domain: 'tenant.test',
+        logoUrl: '/api/tenants/tenant/logo?v=1'
+      }
+    ]
+    mocks.getMemoryNavigation.mockResolvedValue({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [],
+      favoriteMemories: [],
+      folders: []
+    })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    expect(wrapper.find('img[src="/api/tenants/tenant/logo?v=1"]').exists()).toBe(true)
+    expect(wrapper.get('.compact-tenant-menu-button .sidebar-tenant-avatar').text()).toBe('')
+  })
+
+  it('keeps tenant initials as fallback without a logo', async () => {
+    mocks.authState.user.serverRole = 'ServerMember'
+    mocks.authState.tenants = [{ id: 1, name: 'tenant', displayName: 'Tenant', domain: 'tenant.test' }]
+    mocks.getMemoryNavigation.mockResolvedValue({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [],
+      favoriteMemories: [],
+      folders: []
+    })
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    expect(wrapper.get('.compact-tenant-menu-button .sidebar-tenant-avatar').text()).toBe('T')
   })
 
   it('emits create group without navigating away from the current page', async () => {

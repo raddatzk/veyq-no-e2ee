@@ -66,9 +66,17 @@ export interface DeleteTenantRequest {
     tenantName: string;
 }
 
+export interface DeleteTenantLogoRequest {
+    tenantName: string;
+}
+
 export interface GetGroupSettingsRequest {
     tenantName: string;
     groupName: string;
+}
+
+export interface GetTenantLogoRequest {
+    tenantName: string;
 }
 
 export interface GetTenantSettingsRequest {
@@ -97,6 +105,11 @@ export interface UpdateGroupSettingsOperationRequest {
     tenantName: string;
     groupName: string;
     updateGroupSettingsRequest: UpdateGroupSettingsRequest;
+}
+
+export interface UpdateTenantLogoRequest {
+    tenantName: string;
+    file: Blob;
 }
 
 export interface UpdateTenantSettingsOperationRequest {
@@ -170,6 +183,30 @@ export interface TenantsApiInterface {
     deleteTenant(requestParameters: DeleteTenantRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
+     * Creates request options for deleteTenantLogo without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    deleteTenantLogoRequestOpts(requestParameters: DeleteTenantLogoRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * @summary Tenant-Logo loeschen
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    deleteTenantLogoRaw(requestParameters: DeleteTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
+
+    /**
+     * Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo loeschen
+     */
+    deleteTenantLogo(requestParameters: DeleteTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
+
+    /**
      * Creates request options for getGroupSettings without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} groupName Permalink group name from the URL.
@@ -194,6 +231,30 @@ export interface TenantsApiInterface {
      * Gruppen-Einstellungen abrufen
      */
     getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
+
+    /**
+     * Creates request options for getTenantLogo without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    getTenantLogoRequestOpts(requestParameters: GetTenantLogoRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der Tenant muss ein Logo besitzen.  Implementierungsstatus: implemented.
+     * @summary Tenant-Logo abrufen
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    getTenantLogoRaw(requestParameters: GetTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der Tenant muss ein Logo besitzen.  Implementierungsstatus: implemented.
+     * Tenant-Logo abrufen
+     */
+    getTenantLogo(requestParameters: GetTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for getTenantSettings without sending the request
@@ -368,6 +429,32 @@ export interface TenantsApiInterface {
      * Gruppen-Einstellungen aktualisieren
      */
     updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse>;
+
+    /**
+     * Creates request options for updateTenantLogo without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {Blob} file JPEG or PNG tenant logo up to 5 MB.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    updateTenantLogoRequestOpts(requestParameters: UpdateTenantLogoRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * @summary Tenant-Logo aktualisieren
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {Blob} file JPEG or PNG tenant logo up to 5 MB.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantsApiInterface
+     */
+    updateTenantLogoRaw(requestParameters: UpdateTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>>;
+
+    /**
+     * Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo aktualisieren
+     */
+    updateTenantLogo(requestParameters: UpdateTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse>;
 
     /**
      * Creates request options for updateTenantSettings without sending the request
@@ -550,6 +637,53 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
     }
 
     /**
+     * Creates request options for deleteTenantLogo without sending the request
+     */
+    async deleteTenantLogoRequestOpts(requestParameters: DeleteTenantLogoRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteTenantLogo().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/tenants/{tenantName}/logo`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo loeschen
+     */
+    async deleteTenantLogoRaw(requestParameters: DeleteTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
+        const requestOptions = await this.deleteTenantLogoRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantSettingsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo loeschen
+     */
+    async deleteTenantLogo(requestParameters: DeleteTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
+        const response = await this.deleteTenantLogoRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for getGroupSettings without sending the request
      */
     async getGroupSettingsRequestOpts(requestParameters: GetGroupSettingsRequest): Promise<runtime.RequestOpts> {
@@ -601,6 +735,53 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      */
     async getGroupSettings(requestParameters: GetGroupSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
         const response = await this.getGroupSettingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getTenantLogo without sending the request
+     */
+    async getTenantLogoRequestOpts(requestParameters: GetTenantLogoRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getTenantLogo().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/tenants/{tenantName}/logo`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der Tenant muss ein Logo besitzen.  Implementierungsstatus: implemented.
+     * Tenant-Logo abrufen
+     */
+    async getTenantLogoRaw(requestParameters: GetTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.getTenantLogoRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein. - Der Tenant muss ein Logo besitzen.  Implementierungsstatus: implemented.
+     * Tenant-Logo abrufen
+     */
+    async getTenantLogo(requestParameters: GetTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getTenantLogoRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -958,6 +1139,81 @@ export class TenantsApi extends runtime.BaseAPI implements TenantsApiInterface {
      */
     async updateGroupSettings(requestParameters: UpdateGroupSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantGroupSettingsResponse> {
         const response = await this.updateGroupSettingsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateTenantLogo without sending the request
+     */
+    async updateTenantLogoRequestOpts(requestParameters: UpdateTenantLogoRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling updateTenantLogo().'
+            );
+        }
+
+        if (requestParameters['file'] == null) {
+            throw new runtime.RequiredError(
+                'file',
+                'Required parameter "file" was null or undefined when calling updateTenantLogo().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
+
+
+        let urlPath = `/api/tenants/{tenantName}/logo`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: formParams,
+        };
+    }
+
+    /**
+     * Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo aktualisieren
+     */
+    async updateTenantLogoRaw(requestParameters: UpdateTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TenantSettingsResponse>> {
+        const requestOptions = await this.updateTenantLogoRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TenantSettingsResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss TenantOwner sein.  Implementierungsstatus: implemented.
+     * Tenant-Logo aktualisieren
+     */
+    async updateTenantLogo(requestParameters: UpdateTenantLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantSettingsResponse> {
+        const response = await this.updateTenantLogoRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

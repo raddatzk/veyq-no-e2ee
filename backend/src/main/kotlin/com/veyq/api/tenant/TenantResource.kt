@@ -9,7 +9,19 @@ import com.veyq.api.generated.model.*
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import jakarta.ws.rs.Consumes
+import jakarta.ws.rs.DELETE
+import jakarta.ws.rs.FormParam
+import jakarta.ws.rs.GET
+import jakarta.ws.rs.PUT
+import jakarta.ws.rs.Path
 import jakarta.ws.rs.PathParam
+import jakarta.ws.rs.Produces
+import jakarta.ws.rs.core.MediaType
+import java.io.File
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 @ApplicationScoped
 class TenantResource @Inject constructor(
@@ -28,6 +40,37 @@ class TenantResource @Inject constructor(
 
     override fun getTenantSettings(tenantName: String): TenantSettingsResponse =
         tenantService.tenantSettings()
+
+    @GET
+    @Path("/{tenantName}/logo")
+    @Produces("image/png", "image/jpeg")
+    override fun getTenantLogo(@PathParam("tenantName") tenantName: String): File =
+        tenantService.tenantLogo()
+
+    @TenantOwnerRequired
+    @PUT
+    @Path("/{tenantName}/logo")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    override fun updateTenantLogo(
+        @PathParam("tenantName") tenantName: String,
+        @FormParam("file") fileInputStream: InputStream,
+    ): TenantSettingsResponse {
+        val temp = Files.createTempFile("veyq-tenant-logo-", ".tmp")
+        return try {
+            fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
+            tenantService.updateTenantLogo(temp)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    @TenantOwnerRequired
+    @DELETE
+    @Path("/{tenantName}/logo")
+    @Produces(MediaType.APPLICATION_JSON)
+    override fun deleteTenantLogo(@PathParam("tenantName") tenantName: String): TenantSettingsResponse =
+        tenantService.deleteTenantLogo()
 
     @TenantOwnerRequired
     @Transactional
@@ -71,16 +114,23 @@ class TenantResource @Inject constructor(
     ): TenantUserSummary =
         tenantUserService.updateTenantUserRole(tenantName, userId, request)
 
+    @GET
+    @Path("/{tenantName}/{groupName:(?!logo$)[^/]+}")
+    @Produces(MediaType.APPLICATION_JSON)
     override fun getGroupSettings(
-        tenantName: String,
-        groupName: String,
+        @PathParam("tenantName") tenantName: String,
+        @PathParam("groupName") groupName: String,
     ): TenantGroupSettingsResponse =
         tenantGroupService.groupSettings(tenantName, groupName)
 
     @GroupOwnerRequired
     @Transactional
+    @PUT
+    @Path("/{tenantName}/{groupName:(?!logo$)[^/]+}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
     override fun updateGroupSettings(
-        tenantName: String,
+        @PathParam("tenantName") tenantName: String,
         @PathParam("groupName") groupName: String,
         request: UpdateGroupSettingsRequest,
     ): TenantGroupSettingsResponse =

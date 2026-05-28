@@ -60,6 +60,12 @@ export interface TenantSummary {
     domain: string;
     /**
      * 
+     * @type {string}
+     * @memberof TenantSummary
+     */
+    logoUrl?: string;
+    /**
+     * 
      * @type {TenantRole}
      * @memberof TenantSummary
      */
@@ -101,6 +107,7 @@ export function TenantSummaryFromJSONTyped(json: any, ignoreDiscriminator: boole
         'name': json['name'],
         'displayName': json['displayName'],
         'domain': json['domain'],
+        'logoUrl': json['logoUrl'] == null ? undefined : json['logoUrl'],
         'role': TenantRoleFromJSON(json['role']),
         'admins': ((json['admins'] as Array<any>).map(UserSummaryFromJSON)),
     };
@@ -121,6 +128,7 @@ export function TenantSummaryToJSONTyped(value?: TenantSummary | null, ignoreDis
         'name': value['name'],
         'displayName': value['displayName'],
         'domain': value['domain'],
+        'logoUrl': value['logoUrl'],
         'role': TenantRoleToJSON(value['role']),
         'admins': ((value['admins'] as Array<any>).map(UserSummaryToJSON)),
     };

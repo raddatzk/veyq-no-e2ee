@@ -53,6 +53,15 @@
   align-items: center;
 }
 
+.support-notice .support-notice-actions a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.support-notice .support-notice-actions a span {
+  color: inherit;
+}
+
 .app-compact-header {
   display: contents;
 }
@@ -221,6 +230,13 @@
 .sidebar-tenant-link-active .sidebar-tenant-avatar {
   background: linear-gradient(135deg, #6d5dfc, #4338ca);
   color: #fff;
+}
+
+.sidebar-tenant-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 .sidebar-memory-thumb {

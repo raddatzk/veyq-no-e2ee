@@ -1,11 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteTenant, tenants } from '../../../api/tenantClient'
 import { authState } from '../../../authState'
 import {
+  deleteTenantLogo,
+  getTenantSettings,
   getTenantUsers,
   inviteTenantUser,
   reinviteTenantUser,
+  updateTenantLogo,
+  updateTenantSettings,
   updateTenantUserRole
 } from '../api'
 import TenantSettingsPanel from './TenantSettingsPanel.vue'
@@ -22,24 +26,172 @@ vi.mock('vue-router', () => ({
 
 vi.mock('../api', () => ({
   getTenantUsers: vi.fn(),
+  getTenantSettings: vi.fn(),
+  deleteTenantLogo: vi.fn(),
   inviteTenantUser: vi.fn(),
   reinviteTenantUser: vi.fn(),
+  updateTenantLogo: vi.fn(),
+  updateTenantSettings: vi.fn(),
   updateTenantUserRole: vi.fn()
 }))
 
+const deleteTenantLogoMock = vi.mocked(deleteTenantLogo)
 const getTenantUsersMock = vi.mocked(getTenantUsers)
+const getTenantSettingsMock = vi.mocked(getTenantSettings)
 const inviteTenantUserMock = vi.mocked(inviteTenantUser)
 const reinviteTenantUserMock = vi.mocked(reinviteTenantUser)
+const updateTenantLogoMock = vi.mocked(updateTenantLogo)
+const updateTenantSettingsMock = vi.mocked(updateTenantSettings)
 const updateTenantUserRoleMock = vi.mocked(updateTenantUserRole)
 const deleteTenantMock = vi.mocked(deleteTenant)
 const tenantsMock = vi.mocked(tenants)
 
 describe('TenantSettingsPanel', () => {
+  beforeEach(() => {
+    getTenantSettingsMock.mockResolvedValue(tenantSettings())
+  })
+
   afterEach(() => {
     vi.resetAllMocks()
     pushMock.mockReset()
     authState.user = null
     authState.tenants = []
+  })
+
+  it('saves tenant terms from the multilingual editor', async () => {
+    getTenantUsersMock.mockResolvedValue([])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings())
+    updateTenantSettingsMock.mockResolvedValue(
+      tenantSettings({ termsMarkdownByLocale: { de: '# Hinweise' }, termsVersion: 1 })
+    )
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.find('h1').text()).toBe('Friends')
+    await wrapper.find('select').setValue('de')
+    await wrapper.findAll('button').find((button) => button.text().includes('Sprache hinzufügen'))!.trigger('click')
+    await flushPromises()
+    await wrapper.find('textarea').setValue('# Hinweise')
+    await wrapper.findAll('button').find((button) => button.text() === 'Speichern')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').filter((button) => button.text() === 'Speichern').at(-1)!.trigger('click')
+    await flushPromises()
+
+    expect(updateTenantSettingsMock).toHaveBeenCalledWith('friends', {
+      displayName: 'Friends',
+      termsMarkdownByLocale: { de: '# Hinweise' }
+    })
+    expect(wrapper.text()).toContain('Nutzungsbedingungen wurden gespeichert.')
+  })
+
+  it('shows existing terms languages as editable rows', async () => {
+    getTenantUsersMock.mockResolvedValue([])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings({ termsMarkdownByLocale: { de: '# Alt' } }))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deutsch')
+    expect(wrapper.find('textarea').exists()).toBe(false)
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Bearbeiten'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('textarea').element.value).toBe('# Alt')
+  })
+
+  it('imports tenant owner email addresses into the contact template clause', async () => {
+    getTenantUsersMock.mockResolvedValue([
+      tenantUser(1, 'Kevin', 'kevin@example.test', 'TenantOwner')
+    ])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings())
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Vorlage einfügen'))!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('select').at(-1)!.setValue('en')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Englisch')
+    await wrapper.findAll('button').find((button) => button.text().includes('Bearbeiten'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('textarea').element.value).toContain('contact: kevin@example.test.')
+    expect(wrapper.find('textarea').element.value).toContain('## Purpose of this instance')
+    expect(wrapper.find('textarea').element.value).not.toContain('Tenant Owner: Kevin')
+  })
+
+  it('uploads a tenant logo and updates the tenant state', async () => {
+    authState.tenants = [
+      {
+        id: 10,
+        name: 'friends',
+        displayName: 'Friends',
+        domain: 'friends.test',
+        role: 'TenantOwner',
+        admins: []
+      }
+    ]
+    getTenantUsersMock.mockResolvedValue([])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings())
+    const file = new File(['logo'], 'logo.png', { type: 'image/png' })
+    updateTenantLogoMock.mockResolvedValue(tenantSettings({ logoUrl: '/api/tenants/friends/logo?v=1' }))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [file] })
+    await flushPromises()
+
+    expect(updateTenantLogoMock).toHaveBeenCalledWith('friends', file)
+    expect(authState.tenants[0].logoUrl).toBe('/api/tenants/friends/logo?v=1')
+    expect(wrapper.text()).toContain('Logo wurde gespeichert.')
+  })
+
+  it('removes a tenant logo and clears the tenant state', async () => {
+    authState.tenants = [
+      {
+        id: 10,
+        name: 'friends',
+        displayName: 'Friends',
+        domain: 'friends.test',
+        role: 'TenantOwner',
+        admins: [],
+        logoUrl: '/api/tenants/friends/logo?v=1'
+      }
+    ]
+    getTenantUsersMock.mockResolvedValue([])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings({ logoUrl: '/api/tenants/friends/logo?v=1' }))
+    deleteTenantLogoMock.mockResolvedValue(tenantSettings({ logoUrl: undefined }))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.find('button[aria-label="Logo entfernen"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteTenantLogoMock).toHaveBeenCalledWith('friends')
+    expect(authState.tenants[0].logoUrl).toBeUndefined()
+    expect(wrapper.text()).toContain('Logo wurde gelöscht.')
+  })
+
+  it('requires a custom contact when no tenant owner email is available', async () => {
+    getTenantUsersMock.mockResolvedValue([
+      tenantUser(1, 'Kevin', '', 'TenantOwner')
+    ])
+    getTenantSettingsMock.mockResolvedValue(tenantSettings())
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Vorlage einfügen'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('button').filter((button) => button.text() === 'Vorlage einfügen').at(-1)!.attributes('disabled')).toBeDefined()
   })
 
   it('invites a tenant user directly by email and role', async () => {
@@ -51,8 +203,8 @@ describe('TenantSettingsPanel', () => {
 
     expect(getTenantUsersMock).toHaveBeenCalledWith('friends')
     await wrapper.findAll('button').find((button) => button.text().includes('User einladen'))!.trigger('click')
-    await wrapper.find('input').setValue('invitee@example.test')
-    await wrapper.find('select').setValue('TenantOwner')
+    await wrapper.find('input[type="email"]').setValue('invitee@example.test')
+    await wrapper.findAll('select').at(-1)!.setValue('TenantOwner')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -90,7 +242,7 @@ describe('TenantSettingsPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
 
-    await wrapper.find('select').setValue('TenantOwner')
+    await wrapper.findAll('select').at(-1)!.setValue('TenantOwner')
     await flushPromises()
 
     expect(updateTenantUserRoleMock).toHaveBeenCalledWith('friends', 2, 'TenantOwner')
@@ -128,7 +280,7 @@ describe('TenantSettingsPanel', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Bereich löschen'))!
+      .find((button) => button.text().includes('Gefährliche Zone'))!
       .trigger('click')
     const deleteButton = () =>
       wrapper.findAll('button').find((button) => button.text() === 'Löschen')!
@@ -163,6 +315,11 @@ function mountPanel() {
           template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
           props: ['modelValue']
         },
+        FileUpload: {
+          name: 'FileUpload',
+          template: '<button type="button">{{ chooseLabel }}</button>',
+          props: ['chooseLabel']
+        },
         Message: { template: '<div><slot /></div>' },
         ProgressSpinner: { template: '<div />' },
         Select: {
@@ -173,6 +330,17 @@ function mountPanel() {
       }
     }
   })
+}
+
+function tenantSettings(overrides = {}) {
+  return {
+    tenantId: 10,
+    name: 'friends',
+    displayName: 'Friends',
+    termsVersion: 0,
+    termsMarkdownByLocale: undefined,
+    ...overrides
+  }
 }
 
 function tenantUser(

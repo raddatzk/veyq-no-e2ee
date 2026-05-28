@@ -26,10 +26,16 @@ import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasSize
+import org.hamcrest.Matchers.nullValue
+import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.awt.image.BufferedImage
 import java.time.Instant
 import java.util.UUID
+import java.nio.file.Files
+import java.nio.file.Path
+import javax.imageio.ImageIO
 
 @QuarkusTest
 class MultiTenantResourceTest {
@@ -162,6 +168,55 @@ class MultiTenantResourceTest {
             .`when`().delete("/api/tenants/$tenantName")
             .then()
             .statusCode(204)
+    }
+
+    @Test
+    fun `tenant owners manage logos and members can read them`() {
+        val ownerCookie = login(ownerEmail, ownerPassword)
+        val tenantName = "friends-$runId"
+        ensureTenant(ownerCookie, tenantName, "Friends")
+        createUser("member-$runId", "member123456", ServerRole.ServerMember)
+        addTenantMember(tenantName, "member-$runId")
+        val memberCookie = login("member-$runId@example.com", "member123456")
+        createUser("outside-$runId", "member123456", ServerRole.ServerMember)
+        val outsideCookie = login("outside-$runId@example.com", "member123456")
+        val logo = createLogoImage()
+
+        val logoUrl = given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", logo.toFile(), "image/png")
+            .`when`().put("/api/tenants/$tenantName/logo")
+            .then()
+            .statusCode(200)
+            .body("logoUrl", startsWith("/api/tenants/$tenantName/logo?v="))
+            .extract()
+            .path<String>("logoUrl")
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", memberCookie)
+            .`when`().get(logoUrl)
+            .then()
+            .statusCode(200)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", memberCookie)
+            .multiPart("file", logo.toFile(), "image/png")
+            .`when`().put("/api/tenants/$tenantName/logo")
+            .then()
+            .statusCode(403)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", outsideCookie)
+            .`when`().get(logoUrl)
+            .then()
+            .statusCode(403)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().delete("/api/tenants/$tenantName/logo")
+            .then()
+            .statusCode(200)
+            .body("logoUrl", nullValue())
     }
 
     @Test
@@ -385,6 +440,11 @@ class MultiTenantResourceTest {
                 tenantGroupMemberRepo.persist(it)
             }
             group
+        }
+
+    private fun createLogoImage(): Path =
+        Files.createTempFile("veyq-tenant-logo-", ".png").also { path ->
+            ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
         }
 
     private fun <T> inTransaction(block: () -> T): T {
