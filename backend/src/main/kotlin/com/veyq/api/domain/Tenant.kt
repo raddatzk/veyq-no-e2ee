@@ -27,6 +27,21 @@ class Tenant : PanacheEntityBase {
     @Column(nullable = false, unique = true)
     lateinit var domain: String
 
+    @Column(name = "logo_storage_key", length = 512)
+    var logoStorageKey: String? = null
+
+    @Column(name = "logo_content_type", length = 64)
+    var logoContentType: String? = null
+
+    @Column(name = "logo_updated_at")
+    var logoUpdatedAt: Instant? = null
+
+    @Column(name = "terms_markdown_by_locale", columnDefinition = "text")
+    var termsMarkdownByLocale: String? = null
+
+    @Column(name = "terms_version", nullable = false)
+    var termsVersion: Int = 0
+
     @OneToMany(mappedBy = "tenant", fetch = FetchType.LAZY)
     var members: MutableSet<TenantMember> = mutableSetOf()
 

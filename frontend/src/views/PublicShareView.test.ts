@@ -76,6 +76,7 @@ describe('PublicShareView', () => {
       canUpload: false,
       canEdit: false,
       canDelete: false,
+      notices: [],
       rootMemory: {
         id: 'mem-1',
         name: 'trip',
@@ -129,6 +130,148 @@ describe('PublicShareView', () => {
     expect(wrapper.find('.public-share-header').exists()).toBe(true)
     expect(wrapper.find('.public-share-header h1').text()).toBe('Trip')
     expect(wrapper.find('[data-testid="memory-detail"]').exists()).toBe(false)
+  })
+
+  it('requires accepting tenant terms before showing the share login', async () => {
+    getPublicShareMock.mockResolvedValue(
+      publicShare({
+        authenticated: false,
+        passwordRequired: true,
+        notices: [
+          {
+            scope: 'TENANT',
+            tenantName: 'friends',
+            tenantDomain: 'friends.example.test',
+            version: 2,
+            markdownByLocale: { de: '# Datenschutz\n\nBitte privat halten.' }
+          }
+        ]
+      })
+    )
+    const router = await publicShareRouter('/s/share-1')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Hinweise akzeptieren')
+    expect(wrapper.text()).toContain('Datenschutz')
+    expect(wrapper.find('.public-share-login').exists()).toBe(false)
+
+    await wrapper.find('.public-share-notice-gate button').trigger('click')
+    await flushPromises()
+
+    expect(
+      Object.keys(window.localStorage).some((key) =>
+        key.endsWith(':friends.example.test:2:de') && window.localStorage.getItem(key) === 'true'
+      )
+    ).toBe(true)
+    expect(wrapper.find('.public-share-login').exists()).toBe(true)
+  })
+
+  it('does not reuse share notice acceptance across shares', async () => {
+    window.localStorage.setItem('veyq:share-notice:share-2:1:de', 'true')
+    getPublicShareMock.mockResolvedValue(
+      publicShare({
+        authenticated: false,
+        passwordRequired: true,
+        notices: [
+          {
+            scope: 'SHARE',
+            tenantName: 'friends',
+            tenantDomain: 'friends.example.test',
+            version: 1,
+            markdownByLocale: { de: 'Share Hinweis' }
+          }
+        ]
+      })
+    )
+    const router = await publicShareRouter('/s/share-1')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Share Hinweis')
+    expect(wrapper.find('.public-share-login').exists()).toBe(false)
+  })
+
+  it('stores share notice acceptance for the current share', async () => {
+    getPublicShareMock.mockResolvedValue(
+      publicShare({
+        authenticated: false,
+        passwordRequired: true,
+        notices: [
+          {
+            scope: 'SHARE',
+            tenantName: 'friends',
+            tenantDomain: 'friends.example.test',
+            version: 4,
+            markdownByLocale: { de: 'Share Hinweis' }
+          }
+        ]
+      })
+    )
+    const router = await publicShareRouter('/s/share-1')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Share Hinweis')
+    expect(window.localStorage.getItem('veyq:share-notice:share-1:4:de')).toBeNull()
+
+    await wrapper.find('.public-share-notice-gate button').trigger('click')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('veyq:share-notice:share-1:4:de')).toBe('true')
+    expect(wrapper.find('.public-share-login').exists()).toBe(true)
+  })
+
+  it('reuses tenant term acceptance across shares on the same domain', async () => {
+    window.localStorage.setItem(
+      `veyq:tenant-terms:${window.location.origin}:friends.example.test:3:de`,
+      'true'
+    )
+    getPublicShareMock.mockResolvedValue(
+      publicShare({
+        authenticated: false,
+        passwordRequired: true,
+        notices: [
+          {
+            scope: 'TENANT',
+            tenantName: 'friends',
+            tenantDomain: 'friends.example.test',
+            version: 3,
+            markdownByLocale: { de: 'Tenant Terms' }
+          }
+        ]
+      })
+    )
+    const router = await publicShareRouter('/s/share-2')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Hinweise akzeptieren')
+    expect(wrapper.find('.public-share-login').exists()).toBe(true)
   })
 
   it('opens a password-protected viewer share without a display name', async () => {
@@ -271,6 +414,7 @@ function publicShare(overrides: Partial<PublicShareSummary> = {}): PublicShareSu
     canUpload: false,
     canEdit: false,
     canDelete: false,
+    notices: [],
     rootMemory: publicShareMemory(),
     ...overrides
   }

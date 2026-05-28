@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import DOMPurify from 'dompurify'
+import MarkdownIt from 'markdown-it'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
@@ -49,6 +51,7 @@ import {
   type MemoryMedia,
   type MemoryPlaylist,
   type MemoryTrack,
+  type PublicShareNotice,
   type PublicShareSummary
 } from '../features/memories/api'
 
@@ -65,6 +68,7 @@ const memoryHeader = ref<MemoryHeader | null>(null)
 const memoryJournal = ref<MemoryJournal | null>(null)
 const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
+const mediaLoading = ref(false)
 const playlists = ref<MemoryPlaylist[]>([])
 const tracks = ref<MemoryTrack[]>([])
 const password = ref('')
@@ -76,12 +80,20 @@ const privacyDialogOpen = ref(false)
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
+const acceptanceRevision = ref(0)
 const { visibleBatches } = useUploadQueue()
+const markdownRenderer = new MarkdownIt({ html: false, linkify: true, typographer: true })
+let memoryLoadSequence = 0
 
 const isUploaderOnly = computed(() => share.value?.role === 'UPLOADER')
 const hasShareAccess = computed(() => Boolean(share.value?.authenticated || share.value?.canViewGallery))
 const canShowLogin = computed(() =>
-  Boolean(share.value && !share.value.authenticated && (share.value.passwordRequired || share.value.displayNameRequired))
+  Boolean(
+    noticesAccepted.value &&
+      share.value &&
+      !share.value.authenticated &&
+      (share.value.passwordRequired || share.value.displayNameRequired)
+  )
 )
 const canSubmitLogin = computed(() =>
   Boolean(
@@ -90,7 +102,17 @@ const canSubmitLogin = computed(() =>
       (!share.value.displayNameRequired || displayName.value.trim())
   )
 )
-const canShowMemoryDetail = computed(() => Boolean(hasShareAccess.value && memory.value && !isUploaderOnly.value))
+const activeNotices = computed(() => (share.value?.notices || []).map(renderNotice).filter(Boolean) as RenderedNotice[])
+const pendingNotices = computed(() => {
+  const revision = acceptanceRevision.value
+  if (revision < 0) return []
+  return activeNotices.value.filter((notice) => !isNoticeAccepted(notice))
+})
+const noticesAccepted = computed(() => pendingNotices.value.length === 0)
+const canShowNoticeGate = computed(() => Boolean(share.value && !noticesAccepted.value))
+const canShowMemoryDetail = computed(() =>
+  Boolean(noticesAccepted.value && hasShareAccess.value && memory.value && !isUploaderOnly.value)
+)
 const publicShareUploadBatches = computed(() =>
   visibleBatches.value.filter(
     (batch) => batch.context.type === 'public-share-root' && batch.context.shareId === shareId.value
@@ -135,7 +157,7 @@ async function loadShare() {
       await router.replace(share.value.redirectUrl)
       return
     }
-    if (hasShareAccess.value) await loadProtectedContent()
+    if (hasShareAccess.value && noticesAccepted.value) await loadProtectedContent()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.loadFailed'))
   } finally {
@@ -159,7 +181,7 @@ async function login() {
       await router.replace(share.value.redirectUrl)
       return
     }
-    await loadProtectedContent()
+    if (noticesAccepted.value) await loadProtectedContent()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.loginFailed'))
   } finally {
@@ -168,6 +190,7 @@ async function login() {
 }
 
 async function closeShare() {
+  memoryLoadSequence += 1
   await logoutPublicShare(shareId.value)
   message.value = ''
   memory.value = null
@@ -175,41 +198,89 @@ async function closeShare() {
   memoryJournal.value = null
   childMemories.value = []
   media.value = []
+  mediaLoading.value = false
   playlists.value = []
   tracks.value = []
   await loadShare()
 }
 
 async function loadProtectedContent() {
+  if (!noticesAccepted.value) return
   if (isUploaderOnly.value) return
   await loadCurrentMemory()
 }
 
+async function acceptNotices() {
+  pendingNotices.value.forEach((notice) => window.localStorage.setItem(notice.storageKey, 'true'))
+  acceptanceRevision.value += 1
+  if (hasShareAccess.value) await loadProtectedContent()
+}
+
 async function loadCurrentMemory() {
+  const sequence = ++memoryLoadSequence
   error.value = ''
   message.value = ''
   loading.value = true
+  memory.value = null
+  memoryHeader.value = null
+  memoryJournal.value = null
+  childMemories.value = []
+  media.value = []
+  mediaLoading.value = false
+  playlists.value = []
+  tracks.value = []
   try {
     const current = await getPublicShareMemoryByPath(shareId.value, sharePath.value)
+    if (sequence !== memoryLoadSequence) return
     memory.value = current
-    const [header, journal, children, memoryMedia, memoryTracks, memoryPlaylists] = await Promise.all([
-      getPublicShareMemoryHeader(shareId.value, current.id),
-      getPublicShareMemoryJournal(shareId.value, current.id),
-      listPublicShareChildMemories(shareId.value, current.id),
-      listPublicShareMemoryMedia(shareId.value, current.id),
-      listPublicShareMemoryTracks(shareId.value, current.id),
-      listPublicShareMemoryPlaylists(shareId.value, current.id)
-    ])
-    memoryHeader.value = header
-    memoryJournal.value = journal
-    childMemories.value = children
-    media.value = memoryMedia
-    tracks.value = memoryTracks
-    playlists.value = memoryPlaylists
+    mediaLoading.value = true
+    void loadCurrentMemoryDetails(sequence, current)
   } catch (unknownError) {
-    error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
+    if (sequence === memoryLoadSequence) error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
   } finally {
-    loading.value = false
+    if (sequence === memoryLoadSequence) loading.value = false
+  }
+}
+
+async function loadCurrentMemoryDetails(sequence: number, current: Memory) {
+  await Promise.all([
+    loadCurrentMemoryDetailPart(sequence, () => getPublicShareMemoryHeader(shareId.value, current.id), (header) => {
+      memoryHeader.value = header
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => getPublicShareMemoryJournal(shareId.value, current.id), (journal) => {
+      memoryJournal.value = journal
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareChildMemories(shareId.value, current.id), (children) => {
+      childMemories.value = children
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMedia(shareId.value, current.id), (memoryMedia) => {
+      media.value = memoryMedia
+      mediaLoading.value = false
+    }, () => {
+      mediaLoading.value = false
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryTracks(shareId.value, current.id), (memoryTracks) => {
+      tracks.value = memoryTracks
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryPlaylists(shareId.value, current.id), (memoryPlaylists) => {
+      playlists.value = memoryPlaylists
+    })
+  ])
+}
+
+async function loadCurrentMemoryDetailPart<T>(
+  sequence: number,
+  loadPart: () => Promise<T>,
+  applyPart: (value: T) => void,
+  finalize?: () => void
+) {
+  try {
+    const value = await loadPart()
+    if (sequence === memoryLoadSequence) applyPart(value)
+  } catch (unknownError) {
+    if (sequence === memoryLoadSequence) error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
+  } finally {
+    if (sequence === memoryLoadSequence) finalize?.()
   }
 }
 
@@ -290,6 +361,49 @@ function routePathToSharePath(value: unknown): string {
 function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): string {
   return `${API_BASE}/api/public-shares/${encodeURIComponent(shareId.value)}/memories/${encodeURIComponent(memoryId)}/download?includeChildren=${includeChildren}&locale=${encodeURIComponent(locale.value)}`
 }
+
+type RenderedNotice = {
+  notice: PublicShareNotice
+  locale: string
+  html: string
+  storageKey: string
+}
+
+function renderNotice(notice: PublicShareNotice): RenderedNotice | null {
+  const resolved = resolveNoticeMarkdown(notice.markdownByLocale)
+  if (!resolved) return null
+  return {
+    notice,
+    locale: resolved.locale,
+    html: DOMPurify.sanitize(markdownRenderer.render(resolved.markdown)),
+    storageKey: noticeAcceptanceKey(notice, resolved.locale)
+  }
+}
+
+function resolveNoticeMarkdown(markdownByLocale: Record<string, string>): { locale: string; markdown: string } | null {
+  const entries = Object.entries(markdownByLocale || {}).filter(([, markdown]) => markdown.trim())
+  if (!entries.length) return null
+  const requested = locale.value.toLowerCase()
+  const base = requested.split('-')[0]
+  const match =
+    entries.find(([entryLocale]) => entryLocale.toLowerCase() === requested) ||
+    entries.find(([entryLocale]) => entryLocale.toLowerCase() === base) ||
+    entries.find(([entryLocale]) => entryLocale.toLowerCase() === 'en') ||
+    entries[0]
+  return { locale: match[0].toLowerCase(), markdown: match[1] }
+}
+
+function noticeAcceptanceKey(notice: PublicShareNotice, renderedLocale: string): string {
+  if (notice.scope === 'TENANT') {
+    const tenantKey = notice.tenantDomain || notice.tenantName
+    return `veyq:tenant-terms:${window.location.origin}:${tenantKey}:${notice.version}:${renderedLocale}`
+  }
+  return `veyq:share-notice:${shareId.value}:${notice.version}:${renderedLocale}`
+}
+
+function isNoticeAccepted(notice: RenderedNotice): boolean {
+  return window.localStorage.getItem(notice.storageKey) === 'true'
+}
 </script>
 
 <template>
@@ -319,7 +433,30 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <form v-if="canShowLogin" class="public-share-login" @submit.prevent="login">
+    <section v-if="canShowNoticeGate" class="public-share-notice-gate">
+      <div class="public-share-login-copy">
+        <h2>{{ t('share.noticeAcceptTitle') }}</h2>
+        <p class="public-share-copy">{{ t('share.noticeAcceptCopy') }}</p>
+      </div>
+      <article
+        v-for="notice in pendingNotices"
+        :key="notice.storageKey"
+        class="public-share-notice"
+      >
+        <h3>
+          {{ notice.notice.scope === 'TENANT' ? t('share.noticeTenantTitle') : t('share.noticeShareTitle') }}
+        </h3>
+        <div class="markdown-body" v-html="notice.html" />
+      </article>
+      <Button
+        type="button"
+        :label="t('share.noticeAccept')"
+        icon="pi pi-check"
+        @click="acceptNotices"
+      />
+    </section>
+
+    <form v-else-if="canShowLogin" class="public-share-login" @submit.prevent="login">
       <div class="public-share-login-copy">
         <h2>{{ t('share.loginTitle') }}</h2>
         <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
@@ -346,13 +483,13 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       />
     </form>
 
-    <div v-else-if="loading" class="memory-loading">
+    <div v-else-if="loading && !memory" class="memory-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('share.loading') }}</span>
     </div>
 
     <form
-      v-else-if="share?.authenticated && isUploaderOnly"
+      v-else-if="noticesAccepted && share?.authenticated && isUploaderOnly"
       class="public-share-upload"
       @submit.prevent="uploadToRoot"
     >
@@ -408,6 +545,7 @@ function publicShareDownloadUrl(memoryId: string, includeChildren: boolean): str
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :media-loading="mediaLoading"
       :playlists="playlists"
       :tracks="tracks"
       :active-tab="activeMemoryTab"

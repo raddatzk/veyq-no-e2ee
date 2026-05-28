@@ -102,6 +102,121 @@ class MemoryShareResourceTest {
     }
 
     @Test
+    fun `tenant terms and share notices are versioned and exposed before share login`() {
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body(
+                """
+                {
+                  "displayName":"${tenant.displayName}",
+                  "termsMarkdownByLocale": {
+                    "DE": "  # Datenschutz  ",
+                    "en": "Contact: Tenant Owner"
+                  }
+                }
+                """.trimIndent()
+            )
+            .`when`().put("/api/tenants/${tenant.name}/settings")
+            .then()
+            .statusCode(200)
+            .body("termsVersion", equalTo(1))
+            .body("termsMarkdownByLocale.de", equalTo("# Datenschutz"))
+            .body("termsMarkdownByLocale.en", equalTo("Contact: Tenant Owner"))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body(
+                """
+                {
+                  "displayName":"${tenant.displayName}",
+                  "termsMarkdownByLocale": {
+                    "de": "# Datenschutz",
+                    "en": "Contact: Tenant Owner"
+                  }
+                }
+                """.trimIndent()
+            )
+            .`when`().put("/api/tenants/${tenant.name}/settings")
+            .then()
+            .statusCode(200)
+            .body("termsVersion", equalTo(1))
+
+        val shareId = given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body(
+                """
+                {
+                  "role":"VIEWER",
+                  "password":"share-password123",
+                  "noticeMarkdownByLocale": {
+                    "de": " Bitte privat halten. "
+                  }
+                }
+                """.trimIndent()
+            )
+            .`when`().post("/api/${tenant.name}/memories/${memory.publicId}/shares")
+            .then()
+            .statusCode(200)
+            .body("noticeVersion", equalTo(1))
+            .body("noticeMarkdownByLocale.de", equalTo("Bitte privat halten."))
+            .extract()
+            .path<String>("id")
+
+        given()
+            .`when`().get("/api/public-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("authenticated", equalTo(false))
+            .body("rootMemory", nullValue())
+            .body("notices", hasSize<Any>(2))
+            .body("notices[0].scope", equalTo("TENANT"))
+            .body("notices[0].tenantName", equalTo(tenant.name))
+            .body("notices[0].tenantDomain", equalTo(tenant.domain))
+            .body("notices[0].version", equalTo(1))
+            .body("notices[0].markdownByLocale.de", equalTo("# Datenschutz"))
+            .body("notices[1].scope", equalTo("SHARE"))
+            .body("notices[1].version", equalTo(1))
+            .body("notices[1].markdownByLocale.de", equalTo("Bitte privat halten."))
+    }
+
+    @Test
+    fun `share notice can be updated and cleared`() {
+        val shareId = createShare("VIEWER")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body("""{"noticeMarkdownByLocale":{"fr":"Bonjour"}}""")
+            .`when`().put("/api/${tenant.name}/memory-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("noticeVersion", equalTo(1))
+            .body("noticeMarkdownByLocale.fr", equalTo("Bonjour"))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body("""{"noticeMarkdownByLocale":{"fr":"Bonjour"}}""")
+            .`when`().put("/api/${tenant.name}/memory-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("noticeVersion", equalTo(1))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .body("""{"noticeMarkdownByLocale":{}}""")
+            .`when`().put("/api/${tenant.name}/memory-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("noticeVersion", equalTo(2))
+            .body("noticeMarkdownByLocale", nullValue())
+    }
+
+    @Test
     fun `share login is rate limited and success clears failures`() {
         val shareId = createShare("VIEWER")
 

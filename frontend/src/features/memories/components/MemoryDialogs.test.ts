@@ -513,7 +513,13 @@ describe('Memory detail dialogs', () => {
 
   it('manages existing shares through compact row actions', async () => {
     listMemorySharesMock.mockResolvedValue([
-      share({ id: 'shr-1', name: 'Family', role: 'VIEWER', hasPassword: true }),
+      share({
+        id: 'shr-1',
+        name: 'Family',
+        role: 'VIEWER',
+        hasPassword: true,
+        noticeMarkdownByLocale: { de: 'asdf', en: 'asdf' }
+      }),
       share({ id: 'shr-upload', name: 'Drop Zone', role: 'UPLOADER', hasPassword: false })
     ])
     createMemoryShareMock.mockResolvedValue(share({ id: 'shr-2', hasPassword: false }))
@@ -531,7 +537,6 @@ describe('Memory detail dialogs', () => {
 
     expect(wrapper.text()).toContain('Family')
     expect(wrapper.text()).not.toContain('Drop Zone')
-    expect(wrapper.find('.form-grid select').text()).not.toContain('Uploader')
     expect(wrapper.find('.management-control').text()).not.toContain('Uploader')
     expect(wrapper.find('[aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
     expect(
@@ -553,15 +558,44 @@ describe('Memory detail dialogs', () => {
     ).toBe(true)
     expect(wrapper.find('.management-row [aria-label="Viewer: Kann die geteilte Memory und ihre Medien ansehen."]').exists()).toBe(true)
 
-    await wrapper.find('button').trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Neue Freigabe anlegen'))!
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.form-grid select').text()).not.toContain('Uploader')
+
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
       name: null,
       role: 'VIEWER',
-      password: null
+      password: null,
+      noticeMarkdownByLocale: {}
     })
 
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Neue Freigabe anlegen'))!
+      .trigger('click')
+    await flushPromises()
     await wrapper.find('input[aria-label="Passwortschutz aktivieren"]').setValue(true)
+    await flushPromises()
+
+    await wrapper.findAll('select').at(-1)!.setValue('de')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Sprache hinzufügen'))!
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Deutsch')
+    expect(wrapper.findAll('textarea')).toHaveLength(1)
+
+    await wrapper.find('textarea').setValue('Hinweis')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Speichern')!
+      .trigger('click')
     await flushPromises()
     const createButton = wrapper
       .findAll('button')
@@ -569,12 +603,13 @@ describe('Memory detail dialogs', () => {
     expect(createButton.attributes('disabled')).toBeDefined()
 
     await wrapper.find('input[autocomplete="new-password"]').setValue('share-password123')
-    await createButton.trigger('click')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(createMemoryShareMock).toHaveBeenCalledWith('tenant', 'mem-1', {
       name: null,
       role: 'VIEWER',
-      password: 'share-password123'
+      password: 'share-password123',
+      noticeMarkdownByLocale: { de: 'Hinweis' }
     })
 
     await wrapper.find('.management-control').setValue('CONTRIBUTOR')
@@ -611,6 +646,22 @@ describe('Memory detail dialogs', () => {
     await wrapper.findAll('form').at(-1)!.trigger('submit')
     await flushPromises()
     expect(updateMemoryShareMock).toHaveBeenCalledWith('tenant', 'shr-1', { password: '' })
+
+    await wrapper.find('button[aria-label="Hinweis bearbeiten"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Deutsch')
+    expect(wrapper.text()).toContain('Englisch')
+    expect(wrapper.find('textarea').exists()).toBe(false)
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Bearbeiten'))!.trigger('click')
+    await flushPromises()
+    await wrapper.find('textarea').setValue('updated de')
+    await wrapper.findAll('button').find((button) => button.text() === 'Speichern')!.trigger('click')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+    expect(updateMemoryShareMock).toHaveBeenLastCalledWith('tenant', 'shr-1', {
+      noticeMarkdownByLocale: { de: 'updated de', en: 'asdf' }
+    })
   })
 
   it('manages uploader shares separately from memory shares', async () => {
@@ -792,6 +843,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     mimeType: 'image/jpeg',
     sizeBytes: 12,
     contentUrl: '/api/tenant/memories/mem-1/media/media-1/content',
+    thumbnailUrl: '/api/tenant/memories/mem-1/media/media-1/thumbnail',
     previewUrl: '/api/tenant/memories/mem-1/media/media-1/preview',
     capturedAt: null,
     capturedAtOverride: false,
@@ -815,6 +867,7 @@ function share(overrides: Partial<MemoryShareSummary> = {}): MemoryShareSummary 
     enabled: true,
     shareUrl: '/s/shr-1',
     hasPassword: true,
+    noticeVersion: 0,
     createdAt: '2026-05-24T10:00:00Z',
     updatedAt: '2026-05-24T10:00:00Z',
     ...overrides

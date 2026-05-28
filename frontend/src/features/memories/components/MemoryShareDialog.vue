@@ -8,6 +8,7 @@ import Message from 'primevue/message'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import ManagementList from '../../../shared/components/ManagementList.vue'
+import LocaleMarkdownEditor from '../../../shared/components/LocaleMarkdownEditor.vue'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import {
   createMemoryShare,
@@ -36,15 +37,19 @@ const name = ref('')
 const role = ref<MemoryShareRole>('VIEWER')
 const passwordEnabled = ref(false)
 const password = ref('')
+const noticeMarkdownByLocale = ref<Record<string, string>>({})
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
+const createDialogVisible = ref(false)
 const renameDialogVisible = ref(false)
 const passwordDialogVisible = ref(false)
+const noticeDialogVisible = ref(false)
 const selectedShare = ref<MemoryShareSummary | null>(null)
 const editName = ref('')
 const editPasswordEnabled = ref(false)
 const editPassword = ref('')
+const editNoticeMarkdownByLocale = ref<Record<string, string>>({})
 
 const roleOptions = computed<ShareRoleOption[]>(() => [
   {
@@ -74,6 +79,8 @@ watch(
     role.value = 'VIEWER'
     passwordEnabled.value = false
     password.value = ''
+    noticeMarkdownByLocale.value = {}
+    createDialogVisible.value = false
     error.value = ''
     message.value = ''
     void loadShares()
@@ -101,17 +108,31 @@ async function createShare() {
     await createMemoryShare(props.tenantName, props.memory.id, {
       name: name.value.trim() || null,
       role: role.value,
-      password: passwordEnabled.value ? password.value.trim() : null
+      password: passwordEnabled.value ? password.value.trim() : null,
+      noticeMarkdownByLocale: noticeMarkdownByLocale.value
     })
     name.value = ''
     passwordEnabled.value = false
     password.value = ''
+    noticeMarkdownByLocale.value = {}
+    createDialogVisible.value = false
     await loadShares()
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('share.createFailed'))
   } finally {
     loading.value = false
   }
+}
+
+function openCreateDialog() {
+  name.value = ''
+  role.value = 'VIEWER'
+  passwordEnabled.value = false
+  password.value = ''
+  noticeMarkdownByLocale.value = {}
+  error.value = ''
+  message.value = ''
+  createDialogVisible.value = true
 }
 
 async function setRole(share: MemoryShareSummary, nextRole: MemoryShareRole) {
@@ -135,6 +156,12 @@ function openPasswordDialog(share: MemoryShareSummary) {
   passwordDialogVisible.value = true
 }
 
+function openNoticeDialog(share: MemoryShareSummary) {
+  selectedShare.value = share
+  editNoticeMarkdownByLocale.value = { ...(share.noticeMarkdownByLocale || {}) }
+  noticeDialogVisible.value = true
+}
+
 async function saveName() {
   if (!selectedShare.value) return
   await updateShare(selectedShare.value, { name: editName.value.trim() || null })
@@ -152,9 +179,23 @@ async function savePassword() {
   editPassword.value = ''
 }
 
+async function saveNotice() {
+  if (!selectedShare.value) return
+  await updateShare(selectedShare.value, { noticeMarkdownByLocale: editNoticeMarkdownByLocale.value })
+  noticeDialogVisible.value = false
+  selectedShare.value = null
+  editNoticeMarkdownByLocale.value = {}
+}
+
 async function updateShare(
   share: MemoryShareSummary,
-  request: { name?: string | null; role?: MemoryShareRole; enabled?: boolean; password?: string | null }
+  request: {
+    name?: string | null
+    role?: MemoryShareRole
+    enabled?: boolean
+    password?: string | null
+    noticeMarkdownByLocale?: Record<string, string>
+  }
 ) {
   error.value = ''
   message.value = ''
@@ -213,61 +254,11 @@ const canSavePassword = computed(() => {
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
       <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-      <div class="form-grid">
-        <label>
-          {{ t('common.name') }}
-          <InputText v-model="name" autocomplete="off" :placeholder="t('common.optional')" />
-        </label>
-        <label>
-          {{ t('common.role') }}
-          <Select v-model="role" :options="roleOptions" option-label="label" option-value="value">
-            <template #value="{ value }">
-              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
-                <span>{{ roleOptionByValue(value)?.label }}</span>
-                <span
-                  v-tooltip="roleOptionByValue(value)?.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-            <template #option="{ option }">
-              <span class="share-role-option">
-                <span>{{ option.label }}</span>
-                <span
-                  v-tooltip="option.description"
-                  class="share-role-info"
-                  tabindex="0"
-                  :aria-label="roleInfoLabel(option)"
-                >
-                  <i class="pi pi-info-circle" aria-hidden="true" />
-                </span>
-              </span>
-            </template>
-          </Select>
-        </label>
-      </div>
-      <label class="toggle-row">
-        <span>
-          <strong>{{ t('share.passwordProtection') }}</strong>
-          <small>{{ t('share.passwordProtectionHint') }}</small>
-        </span>
-        <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
-      </label>
-      <label v-if="passwordEnabled">
-        {{ t('common.password') }}
-        <InputText v-model="password" type="password" autocomplete="new-password" required />
-      </label>
       <Button
         type="button"
-        :label="t('share.create')"
-        icon="pi pi-share-alt"
-        :loading="loading"
-        :disabled="!canCreateShare"
-        @click="createShare"
+        :label="t('share.createNew')"
+        icon="pi pi-plus"
+        @click="openCreateDialog"
       />
 
       <ManagementList>
@@ -287,6 +278,12 @@ const canSavePassword = computed(() => {
                 :class="share.enabled ? 'success' : 'warning'"
               >
                 {{ share.enabled ? t('common.active') : t('common.disabled') }}
+              </span>
+              <span
+                class="management-badge"
+                :class="share.noticeMarkdownByLocale ? 'success' : 'muted'"
+              >
+                {{ share.noticeMarkdownByLocale ? t('share.noticeConfigured') : t('share.noticeNotConfigured') }}
               </span>
             </div>
           </div>
@@ -364,10 +361,86 @@ const canSavePassword = computed(() => {
               :title="t('share.passwordChange')"
               @click="openPasswordDialog(share)"
             />
+            <Button
+              icon="pi pi-file-edit"
+              severity="secondary"
+              outlined
+              size="small"
+              :aria-label="t('share.noticeEdit')"
+              :title="t('share.noticeEdit')"
+              @click="openNoticeDialog(share)"
+            />
           </div>
         </div>
       </ManagementList>
     </div>
+  </Dialog>
+
+  <Dialog v-model:visible="createDialogVisible" :header="t('share.createNew')" modal class="tenant-dialog share-dialog">
+    <form class="form" @submit.prevent="createShare">
+      <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
+
+      <div class="form-grid">
+        <label>
+          {{ t('common.name') }}
+          <InputText v-model="name" autocomplete="off" :placeholder="t('common.optional')" />
+        </label>
+        <label>
+          {{ t('common.role') }}
+          <Select v-model="role" :options="roleOptions" option-label="label" option-value="value">
+            <template #value="{ value }">
+              <span v-if="roleOptionByValue(value)" class="share-role-option share-role-value">
+                <span>{{ roleOptionByValue(value)?.label }}</span>
+                <span
+                  v-tooltip="roleOptionByValue(value)?.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(roleOptionByValue(value)!)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+            <template #option="{ option }">
+              <span class="share-role-option">
+                <span>{{ option.label }}</span>
+                <span
+                  v-tooltip="option.description"
+                  class="share-role-info"
+                  tabindex="0"
+                  :aria-label="roleInfoLabel(option)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </span>
+              </span>
+            </template>
+          </Select>
+        </label>
+      </div>
+      <label class="toggle-row">
+        <span>
+          <strong>{{ t('share.passwordProtection') }}</strong>
+          <small>{{ t('share.passwordProtectionHint') }}</small>
+        </span>
+        <ToggleSwitch v-model="passwordEnabled" :aria-label="t('share.passwordProtectionEnable')" />
+      </label>
+      <label v-if="passwordEnabled">
+        {{ t('common.password') }}
+        <InputText v-model="password" type="password" autocomplete="new-password" required />
+      </label>
+      <LocaleMarkdownEditor
+        v-model="noticeMarkdownByLocale"
+        :label="t('share.noticeTitle')"
+        compact
+      />
+      <Button
+        type="submit"
+        :label="t('share.create')"
+        icon="pi pi-share-alt"
+        :loading="loading"
+        :disabled="!canCreateShare"
+      />
+    </form>
   </Dialog>
 
   <Dialog v-model:visible="renameDialogVisible" :header="t('share.rename')" modal class="tenant-dialog">
@@ -417,6 +490,33 @@ const canSavePassword = computed(() => {
             icon="pi pi-save"
             :loading="loading"
             :disabled="!canSavePassword"
+          />
+        </div>
+      </div>
+    </form>
+  </Dialog>
+
+  <Dialog v-model:visible="noticeDialogVisible" :header="t('share.noticeEdit')" modal class="tenant-dialog share-notice-dialog">
+    <form class="form" @submit.prevent="saveNotice">
+      <LocaleMarkdownEditor
+        v-model="editNoticeMarkdownByLocale"
+        :label="t('share.noticeTitle')"
+        compact
+      />
+      <div class="dialog-action-row">
+        <div class="dialog-action-group">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            severity="secondary"
+            text
+            @click="noticeDialogVisible = false"
+          />
+          <Button
+            type="submit"
+            :label="t('common.save')"
+            icon="pi pi-save"
+            :loading="loading"
           />
         </div>
       </div>

@@ -43,6 +43,12 @@ class MemoryShare : PanacheEntityBase {
     @Column(name = "password_hash")
     var passwordHash: String? = null
 
+    @Column(name = "notice_markdown_by_locale", columnDefinition = "text")
+    var noticeMarkdownByLocale: String? = null
+
+    @Column(name = "notice_version", nullable = false)
+    var noticeVersion: Int = 0
+
     @Column(nullable = false)
     var enabled: Boolean = true
 

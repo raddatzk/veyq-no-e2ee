@@ -21,6 +21,8 @@ import type {
   PublicShareMemorySummary,
   PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
+  PublicShareNotice,
+  PublicShareNoticeScope,
   PublicShareSummary,
   PublicShareTreeResponse,
   PendingMemoryMediaUploadSession,
@@ -52,6 +54,8 @@ export type {
   MemoryTrackActivityType,
   PublicShareMemorySummary,
   PublicShareMediaSummary,
+  PublicShareNotice,
+  PublicShareNoticeScope,
   PublicShareSummary,
   PublicShareTreeResponse,
   SearchResultSummary,
@@ -120,6 +124,7 @@ export type UploadMemoryTrackRequest = {
 export type MemoryMedia = Omit<
   MemoryMediaSummary,
   | 'capturedAt'
+  | 'thumbnailUrl'
   | 'previewUrl'
   | 'cameraMake'
   | 'cameraModel'
@@ -130,6 +135,7 @@ export type MemoryMedia = Omit<
   | 'gpsLongitude'
 > & {
   capturedAt: string | null
+  thumbnailUrl: string | null
   previewUrl: string | null
   cameraMake: string | null
   cameraModel: string | null

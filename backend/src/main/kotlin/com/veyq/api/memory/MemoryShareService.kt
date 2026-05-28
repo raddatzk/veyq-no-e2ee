@@ -9,6 +9,7 @@ import com.veyq.api.auth.cookie.CookieConfig
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.auth.token.TokenConfig
 import com.veyq.api.common.HashingService
+import com.veyq.api.common.NoticeMarkdown
 import com.veyq.api.common.UpdateMemoryShareRequestReader
 import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryShareRequest
@@ -21,6 +22,8 @@ import com.veyq.api.generated.model.PublicShareCoverCrop
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.PublicShareMemoryHeaderSummary
 import com.veyq.api.generated.model.PublicShareMemorySummary
+import com.veyq.api.generated.model.PublicShareNotice
+import com.veyq.api.generated.model.PublicShareNoticeScope
 import com.veyq.api.generated.model.PublicShareSummary
 import com.veyq.api.generated.model.PublicShareTreeResponse
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
@@ -73,6 +76,7 @@ class MemoryShareService @Inject constructor(
     private val cookieConfig: CookieConfig,
     private val tokenConfig: TokenConfig,
     private val rateLimitService: RateLimitService,
+    private val noticeMarkdown: NoticeMarkdown,
 ) {
     private val random = SecureRandom()
 
@@ -94,6 +98,9 @@ class MemoryShareService @Inject constructor(
             it.rootMemory = memory
             it.role = request.role.toDomain()
             it.passwordHash = optionalPasswordHash(request.password)
+            val notice = noticeMarkdown.normalize(request.noticeMarkdownByLocale)
+            it.noticeMarkdownByLocale = noticeMarkdown.serialize(notice)
+            it.noticeVersion = if (notice.isEmpty()) 0 else 1
             it.enabled = true
             it.createdBy = user()
             shareRepo.persist(it)
@@ -116,6 +123,13 @@ class MemoryShareService @Inject constructor(
         if (updateFieldPresent("password")) {
             share.passwordHash = optionalPasswordHash(request.password)
             revokeShareIdentities(share)
+        }
+        if (updateFieldPresent("noticeMarkdownByLocale")) {
+            val notice = noticeMarkdown.normalize(request.noticeMarkdownByLocale)
+            if (noticeMarkdown.changed(share.noticeMarkdownByLocale, notice)) {
+                share.noticeMarkdownByLocale = noticeMarkdown.serialize(notice)
+                share.noticeVersion += 1
+            }
         }
         return toManagedSummary(share)
     }
@@ -719,6 +733,11 @@ class MemoryShareService @Inject constructor(
         return mediaService.streamOriginal(media, range)
     }
 
+    fun publicShareMediaThumbnail(shareId: String, mediaId: String): Response {
+        val media = resolvePublicMedia(shareId, mediaId)
+        return mediaService.streamThumbnail(media)
+    }
+
     fun publicShareMediaPreview(shareId: String, mediaId: String): Response {
         val media = resolvePublicMedia(shareId, mediaId)
         return mediaService.streamPreview(media)
@@ -1069,7 +1088,7 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun deleteMedia(media: Media) {
-        memoryRepo.update("coverMedia = null where coverMedia = ?1", media)
+        memoryRepo.list("coverMedia = ?1", media).forEach { it.coverMedia = null }
         val blob = media.blob
         media.delete()
         mediaRepo.flush()
@@ -1122,6 +1141,8 @@ class MemoryShareService @Inject constructor(
             enabled = share.enabled,
             shareUrl = "/s/${share.publicId}",
             hasPassword = share.passwordHash != null,
+            noticeVersion = share.noticeVersion,
+            noticeMarkdownByLocale = noticeMarkdown.deserialize(share.noticeMarkdownByLocale).takeIf { it.isNotEmpty() },
             createdAt = share.createdAt.toApiOffsetDateTime(),
             updatedAt = share.updatedAt.toApiOffsetDateTime(),
         )
@@ -1137,8 +1158,35 @@ class MemoryShareService @Inject constructor(
             canUpload = access.canUpload,
             canEdit = access.canEdit,
             canDelete = access.canDelete,
+            notices = publicShareNotices(access.share),
             rootMemory = if (canExposePublicRootMemory(access)) toPublicMemorySummary(access.share.rootMemory, access.share) else null,
             redirectUrl = access.authenticatedUser?.let { "/${access.share.tenant.name}${access.share.rootMemory.pathRelativeToTenant()}" },
+        )
+
+    private fun publicShareNotices(share: MemoryShare): List<PublicShareNotice> =
+        listOfNotNull(
+            noticeMarkdown.deserialize(share.tenant.termsMarkdownByLocale)
+                .takeIf { it.isNotEmpty() }
+                ?.let {
+                    PublicShareNotice(
+                        scope = PublicShareNoticeScope.TENANT,
+                        tenantName = share.tenant.name,
+                        tenantDomain = share.tenant.domain,
+                        version = share.tenant.termsVersion,
+                        markdownByLocale = it,
+                    )
+                },
+            noticeMarkdown.deserialize(share.noticeMarkdownByLocale)
+                .takeIf { it.isNotEmpty() }
+                ?.let {
+                    PublicShareNotice(
+                        scope = PublicShareNoticeScope.SHARE,
+                        tenantName = share.tenant.name,
+                        tenantDomain = share.tenant.domain,
+                        version = share.noticeVersion,
+                        markdownByLocale = it,
+                    )
+                },
         )
 
     private fun toPublicMemorySummary(memory: Memory, share: MemoryShare): PublicShareMemorySummary =

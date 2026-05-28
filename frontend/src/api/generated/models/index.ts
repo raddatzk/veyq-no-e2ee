@@ -69,6 +69,8 @@ export * from './PublicShareLoginRequest';
 export * from './PublicShareMediaSummary';
 export * from './PublicShareMemoryHeaderSummary';
 export * from './PublicShareMemorySummary';
+export * from './PublicShareNotice';
+export * from './PublicShareNoticeScope';
 export * from './PublicShareSummary';
 export * from './PublicShareTreeResponse';
 export * from './PublicUserSummary';

@@ -51,6 +51,12 @@ export interface UpdateMemoryShareRequest {
      * @memberof UpdateMemoryShareRequest
      */
     password?: string;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof UpdateMemoryShareRequest
+     */
+    noticeMarkdownByLocale?: { [key: string]: string; };
 }
 
 
@@ -76,6 +82,7 @@ export function UpdateMemoryShareRequestFromJSONTyped(json: any, ignoreDiscrimin
         'role': json['role'] == null ? undefined : MemoryShareRoleFromJSON(json['role']),
         'enabled': json['enabled'] == null ? undefined : json['enabled'],
         'password': json['password'] == null ? undefined : json['password'],
+        'noticeMarkdownByLocale': json['noticeMarkdownByLocale'] == null ? undefined : json['noticeMarkdownByLocale'],
     };
 }
 
@@ -94,6 +101,7 @@ export function UpdateMemoryShareRequestToJSONTyped(value?: UpdateMemoryShareReq
         'role': MemoryShareRoleToJSON(value['role']),
         'enabled': value['enabled'],
         'password': value['password'],
+        'noticeMarkdownByLocale': value['noticeMarkdownByLocale'],
     };
 }
 

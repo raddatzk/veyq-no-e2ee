@@ -45,6 +45,12 @@ export interface CreateMemoryShareRequest {
      * @memberof CreateMemoryShareRequest
      */
     password?: string;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof CreateMemoryShareRequest
+     */
+    noticeMarkdownByLocale?: { [key: string]: string; };
 }
 
 
@@ -70,6 +76,7 @@ export function CreateMemoryShareRequestFromJSONTyped(json: any, ignoreDiscrimin
         'name': json['name'] == null ? undefined : json['name'],
         'role': MemoryShareRoleFromJSON(json['role']),
         'password': json['password'] == null ? undefined : json['password'],
+        'noticeMarkdownByLocale': json['noticeMarkdownByLocale'] == null ? undefined : json['noticeMarkdownByLocale'],
     };
 }
 
@@ -87,6 +94,7 @@ export function CreateMemoryShareRequestToJSONTyped(value?: CreateMemoryShareReq
         'name': value['name'],
         'role': MemoryShareRoleToJSON(value['role']),
         'password': value['password'],
+        'noticeMarkdownByLocale': value['noticeMarkdownByLocale'],
     };
 }
 

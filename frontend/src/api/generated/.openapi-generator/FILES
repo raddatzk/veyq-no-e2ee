@@ -89,6 +89,8 @@ models/PublicShareLoginRequest.ts
 models/PublicShareMediaSummary.ts
 models/PublicShareMemoryHeaderSummary.ts
 models/PublicShareMemorySummary.ts
+models/PublicShareNotice.ts
+models/PublicShareNoticeScope.ts
 models/PublicShareSummary.ts
 models/PublicShareTreeResponse.ts
 models/PublicUserSummary.ts

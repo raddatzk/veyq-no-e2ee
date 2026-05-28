@@ -27,6 +27,13 @@ import {
     MemoryShareRoleToJSON,
     MemoryShareRoleToJSONTyped,
 } from './MemoryShareRole';
+import type { PublicShareNotice } from './PublicShareNotice';
+import {
+    PublicShareNoticeFromJSON,
+    PublicShareNoticeFromJSONTyped,
+    PublicShareNoticeToJSON,
+    PublicShareNoticeToJSONTyped,
+} from './PublicShareNotice';
 
 /**
  * 
@@ -90,6 +97,12 @@ export interface PublicShareSummary {
     canDelete: boolean;
     /**
      * 
+     * @type {Array<PublicShareNotice>}
+     * @memberof PublicShareSummary
+     */
+    notices: Array<PublicShareNotice>;
+    /**
+     * 
      * @type {string}
      * @memberof PublicShareSummary
      */
@@ -117,6 +130,7 @@ export function instanceOfPublicShareSummary(value: object): value is PublicShar
     if (!('canUpload' in value) || value['canUpload'] === undefined) return false;
     if (!('canEdit' in value) || value['canEdit'] === undefined) return false;
     if (!('canDelete' in value) || value['canDelete'] === undefined) return false;
+    if (!('notices' in value) || value['notices'] === undefined) return false;
     return true;
 }
 
@@ -139,6 +153,7 @@ export function PublicShareSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'canUpload': json['canUpload'],
         'canEdit': json['canEdit'],
         'canDelete': json['canDelete'],
+        'notices': ((json['notices'] as Array<any>).map(PublicShareNoticeFromJSON)),
         'redirectUrl': json['redirectUrl'] == null ? undefined : json['redirectUrl'],
         'rootMemory': json['rootMemory'] == null ? undefined : PublicShareMemorySummaryFromJSON(json['rootMemory']),
     };
@@ -164,6 +179,7 @@ export function PublicShareSummaryToJSONTyped(value?: PublicShareSummary | null,
         'canUpload': value['canUpload'],
         'canEdit': value['canEdit'],
         'canDelete': value['canDelete'],
+        'notices': ((value['notices'] as Array<any>).map(PublicShareNoticeToJSON)),
         'redirectUrl': value['redirectUrl'],
         'rootMemory': PublicShareMemorySummaryToJSON(value['rootMemory']),
     };

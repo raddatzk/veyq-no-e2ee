@@ -71,6 +71,18 @@ export interface MemoryShareSummary {
     hasPassword: boolean;
     /**
      * 
+     * @type {number}
+     * @memberof MemoryShareSummary
+     */
+    noticeVersion: number;
+    /**
+     * 
+     * @type {{ [key: string]: string; }}
+     * @memberof MemoryShareSummary
+     */
+    noticeMarkdownByLocale?: { [key: string]: string; };
+    /**
+     * 
      * @type {string}
      * @memberof MemoryShareSummary
      */
@@ -95,6 +107,7 @@ export function instanceOfMemoryShareSummary(value: object): value is MemoryShar
     if (!('enabled' in value) || value['enabled'] === undefined) return false;
     if (!('shareUrl' in value) || value['shareUrl'] === undefined) return false;
     if (!('hasPassword' in value) || value['hasPassword'] === undefined) return false;
+    if (!('noticeVersion' in value) || value['noticeVersion'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -117,6 +130,8 @@ export function MemoryShareSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         'enabled': json['enabled'],
         'shareUrl': json['shareUrl'],
         'hasPassword': json['hasPassword'],
+        'noticeVersion': json['noticeVersion'],
+        'noticeMarkdownByLocale': json['noticeMarkdownByLocale'] == null ? undefined : json['noticeMarkdownByLocale'],
         'createdAt': json['createdAt'],
         'updatedAt': json['updatedAt'],
     };
@@ -140,6 +155,8 @@ export function MemoryShareSummaryToJSONTyped(value?: MemoryShareSummary | null,
         'enabled': value['enabled'],
         'shareUrl': value['shareUrl'],
         'hasPassword': value['hasPassword'],
+        'noticeVersion': value['noticeVersion'],
+        'noticeMarkdownByLocale': value['noticeMarkdownByLocale'],
         'createdAt': value['createdAt'],
         'updatedAt': value['updatedAt'],
     };

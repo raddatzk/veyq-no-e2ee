@@ -38,6 +38,29 @@
   font-size: 1rem;
 }
 
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.settings-section-header h2 {
+  margin: 0;
+}
+
+.settings-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-danger-zone h2 {
+  color: var(--app-danger);
+}
+
 .settings-form label {
   display: grid;
   gap: 0.35rem;
@@ -46,6 +69,121 @@
 .settings-form label span {
   font-weight: 600;
   color: var(--app-text);
+}
+
+.locale-markdown-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+}
+
+.locale-markdown-editor-header,
+.locale-markdown-editor-add,
+.locale-markdown-editor-entry span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.locale-markdown-editor-add {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  justify-content: stretch;
+}
+
+.locale-markdown-editor-add .p-select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.locale-markdown-editor-add .p-button {
+  min-width: max-content;
+}
+
+.locale-markdown-editor-list,
+.locale-markdown-editor-entry {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.locale-markdown-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+
+.locale-markdown-editor-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.locale-markdown-editor-entry textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 0.75rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+  color: var(--app-text);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.locale-markdown-editor-empty {
+  margin: 0;
+  color: var(--app-muted);
+}
+
+.locale-markdown-editor + .button-row {
+  margin-top: 1rem;
+}
+
+.locale-markdown-dialog {
+  width: min(64rem, calc(100vw - 2rem));
+}
+
+.share-notice-dialog {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+.locale-markdown-dialog textarea {
+  min-height: min(52vh, 34rem);
+}
+
+.terms-template-fieldset {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+}
+
+.terms-template-fieldset legend {
+  padding: 0 0.25rem;
+  font-weight: 700;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .passkey-list {
@@ -498,14 +636,17 @@
   width: 100%;
 }
 
-.profile-avatar-settings {
+.profile-avatar-settings,
+.tenant-logo-settings {
   display: flex;
   align-items: center;
   gap: 0.9rem;
 }
 
 .profile-avatar-image,
-.profile-avatar-fallback {
+.profile-avatar-fallback,
+.tenant-logo-image,
+.tenant-logo-fallback {
   display: grid;
   place-items: center;
   width: 4rem;
@@ -518,7 +659,8 @@
   font-weight: 800;
 }
 
-.profile-avatar-image {
+.profile-avatar-image,
+.tenant-logo-image {
   object-fit: cover;
 }
 
@@ -541,6 +683,21 @@
 
   .settings-toolbar {
     justify-content: flex-start;
+  }
+
+  .settings-section-header,
+  .settings-danger-zone,
+  .locale-markdown-editor-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .locale-markdown-editor-add {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .locale-markdown-editor-add .p-button {
+    width: 100%;
   }
 
   .settings-table {

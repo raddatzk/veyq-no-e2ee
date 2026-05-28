@@ -370,6 +370,18 @@ export function updateMemoryMediaMetadataBatch(
   ).then((response) => response.media.map(normalizeMemoryMedia))
 }
 
+export function deleteMemoryMedia(
+  tenantName: string,
+  memoryId: string,
+  mediaId: string
+): Promise<void> {
+  return generatedCall(memoryMediaApi.deleteMemoryMedia({ tenantName, memoryId, mediaId }))
+}
+
+export function deleteAllMemoryMedia(tenantName: string, memoryId: string): Promise<void> {
+  return generatedCall(memoryMediaApi.deleteAllMemoryMedia({ tenantName, memoryId }))
+}
+
 export function listMemoryShares(tenantName: string, memoryId: string) {
   return generatedCall(memorySharesApi.listMemoryShares({ tenantName, memoryId }))
 }
@@ -377,12 +389,18 @@ export function listMemoryShares(tenantName: string, memoryId: string) {
 export function createMemoryShare(
   tenantName: string,
   memoryId: string,
-  request: { name?: string | null; role: MemoryShareRole; password?: string | null }
+  request: {
+    name?: string | null
+    role: MemoryShareRole
+    password?: string | null
+    noticeMarkdownByLocale?: Record<string, string>
+  }
 ) {
   const createMemoryShareRequest = {
     name: request.name,
     role: request.role,
-    password: request.password
+    password: request.password,
+    noticeMarkdownByLocale: request.noticeMarkdownByLocale
   } as unknown as GeneratedCreateMemoryShareRequest
 
   return generatedCall(
@@ -397,7 +415,13 @@ export function createMemoryShare(
 export function updateMemoryShare(
   tenantName: string,
   shareId: string,
-  request: { name?: string | null; role?: MemoryShareRole; enabled?: boolean; password?: string | null }
+  request: {
+    name?: string | null
+    role?: MemoryShareRole
+    enabled?: boolean
+    password?: string | null
+    noticeMarkdownByLocale?: Record<string, string>
+  }
 ) {
   return generatedCall(
     memorySharesApi.updateMemoryShare({
@@ -407,7 +431,8 @@ export function updateMemoryShare(
         name: request.name === null ? '' : request.name,
         role: request.role,
         enabled: request.enabled,
-        password: request.password === null ? '' : request.password
+        password: request.password === null ? '' : request.password,
+        noticeMarkdownByLocale: request.noticeMarkdownByLocale
       }
     })
   )
@@ -901,6 +926,7 @@ function normalizeMemoryHeader(
 function normalizeMemoryMedia(
   media: {
     capturedAt?: string
+    thumbnailUrl?: string
     previewUrl?: string
     cameraMake?: string
     cameraModel?: string
@@ -912,6 +938,7 @@ function normalizeMemoryMedia(
   } & Omit<
     MemoryMedia,
     | 'capturedAt'
+    | 'thumbnailUrl'
     | 'previewUrl'
     | 'cameraMake'
     | 'cameraModel'
@@ -925,6 +952,7 @@ function normalizeMemoryMedia(
   return {
     ...media,
     capturedAt: media.capturedAt ?? null,
+    thumbnailUrl: media.thumbnailUrl ?? null,
     previewUrl: media.previewUrl ?? null,
     cameraMake: media.cameraMake ?? null,
     cameraModel: media.cameraModel ?? null,
@@ -974,6 +1002,7 @@ function normalizePublicShareMedia(media: PublicShareMediaSummary): MemoryMedia 
   return normalizeMemoryMedia({
     ...media,
     capturedAt: media.capturedAt ?? undefined,
+    thumbnailUrl: media.thumbnailUrl ?? undefined,
     previewUrl: media.previewUrl ?? undefined,
     cameraMake: undefined,
     cameraModel: undefined,

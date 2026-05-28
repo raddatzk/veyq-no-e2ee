@@ -50,7 +50,7 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant and see the addressed Memory.
       description: |-
-        Creates a public share for the addressed Memory subtree. Password protection is optional.
+        Creates a public share for the addressed Memory subtree. Password protection and share-specific notices are optional.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -81,9 +81,10 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant and see the addressed Memory.
       description: |-
-        Updates public share role, enabled state, internal name or password.
+        Updates public share role, enabled state, internal name, password or share-specific notice.
         Missing `name` or `password` fields leave the current value unchanged.
         `null` or an empty string removes the corresponding name/password value.
+        Missing `noticeMarkdownByLocale` leaves the current notice unchanged. An empty map clears the notice.
         Managed shares are not deleted in V1; set `enabled=false` to revoke a share link.
 
         Vorbedingungen:
@@ -1515,6 +1516,32 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/media/{mediaId}/thumbnail":
+    get:
+      tags: [PublicShares]
+      operationId: publicShareMediaThumbnail
+      summary: Stream public share media thumbnail
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is required for protected content.
+      description: |-
+        Streams a generated media thumbnail for media visible through the share.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - The media belongs to the shared Memory subtree and is visible for the share role.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: JPEG thumbnail bytes.
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
 components:
   parameters:
     MemoryId:
@@ -1942,10 +1969,17 @@ components:
           type: string
           nullable: true
           minLength: 0
+        noticeMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
       example:
         name: Family review
         role: VIEWER
         password: share-password123
+        noticeMarkdownByLocale:
+          en: |-
+            # Notice for this share
+
+            Please keep this Memory private.
     UpdateMemoryShareRequest:
       type: object
       additionalProperties: false
@@ -1963,11 +1997,18 @@ components:
           type: string
           nullable: true
           minLength: 0
+        noticeMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
       example:
         name: Family uploads
         role: CONTRIBUTOR
         enabled: true
         password: new-share-password123
+        noticeMarkdownByLocale:
+          en: |-
+            # Upload notice
+
+            Upload only media you may share.
     PublicShareLoginRequest:
       type: object
       additionalProperties: false
@@ -1984,7 +2025,7 @@ components:
     MemoryShareSummary:
       type: object
       additionalProperties: false
-      required: [id, memoryId, role, enabled, shareUrl, hasPassword, createdAt, updatedAt]
+      required: [id, memoryId, role, enabled, shareUrl, hasPassword, noticeVersion, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -2001,6 +2042,12 @@ components:
           type: string
         hasPassword:
           type: boolean
+        noticeVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        noticeMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
         createdAt:
           type: string
           format: date-time
@@ -2015,12 +2062,18 @@ components:
         enabled: true
         shareUrl: /s/shr_abc123
         hasPassword: true
+        noticeVersion: 1
+        noticeMarkdownByLocale:
+          en: |-
+            # Notice for this share
+
+            Please keep this Memory private.
         createdAt: "2026-05-24T10:00:00Z"
         updatedAt: "2026-05-24T10:00:00Z"
     PublicShareSummary:
       type: object
       additionalProperties: false
-      required: [id, role, authenticated, passwordRequired, displayNameRequired, canViewGallery, canUpload, canEdit, canDelete]
+      required: [id, role, authenticated, passwordRequired, displayNameRequired, canViewGallery, canUpload, canEdit, canDelete, notices]
       properties:
         id:
           type: string
@@ -2040,6 +2093,10 @@ components:
           type: boolean
         canDelete:
           type: boolean
+        notices:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PublicShareNotice"
         redirectUrl:
           type: string
           nullable: true
@@ -2057,6 +2114,16 @@ components:
         canUpload: false
         canEdit: false
         canDelete: false
+        notices:
+          - scope: TENANT
+            tenantName: friends
+            tenantDomain: friends.example.test
+            version: 1
+            markdownByLocale:
+              en: |-
+                # Terms for this area
+
+                Contact: Tenant Owner
         rootMemory:
           id: mem_abc123
           name: summer-trip
@@ -2067,6 +2134,50 @@ components:
           mediaCount: 3
           startDate: "2026-05-03"
           endDate: "2026-05-05"
+    PublicShareNoticeScope:
+      type: string
+      enum: [TENANT, SHARE]
+    PublicShareNotice:
+      type: object
+      additionalProperties: false
+      required: [scope, tenantName, tenantDomain, version, markdownByLocale]
+      properties:
+        scope:
+          "$ref": "#/components/schemas/PublicShareNoticeScope"
+        tenantName:
+          type: string
+        tenantDomain:
+          type: string
+        version:
+          type: integer
+          format: int32
+          minimum: 0
+        markdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
+      example:
+        scope: TENANT
+        tenantName: friends
+        tenantDomain: friends.example.test
+        version: 1
+        markdownByLocale:
+          en: |-
+            # Terms for this area
+
+            Contact: Tenant Owner
+    MarkdownByLocale:
+      type: object
+      additionalProperties:
+        type: string
+        maxLength: 20000
+      example:
+        de: |-
+          # Hinweis
+
+          Bitte privat halten.
+        en: |-
+          # Notice
+
+          Please keep this private.
     PublicShareTreeResponse:
       type: object
       additionalProperties: false
@@ -2290,6 +2401,9 @@ components:
           format: int64
         contentUrl:
           type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
         previewUrl:
           type: string
           nullable: true
@@ -2314,6 +2428,7 @@ components:
         mimeType: image/jpeg
         sizeBytes: 2048000
         contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+        thumbnailUrl: /api/public-shares/shr_abc123/media/med_abc123/thumbnail
         previewUrl: /api/public-shares/shr_abc123/media/med_abc123/preview
         gpsLatitude: 54.1825
         gpsLongitude: 7.8853

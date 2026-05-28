@@ -235,6 +235,11 @@ export interface PublicShareMediaPreviewRequest {
     mediaId: string;
 }
 
+export interface PublicShareMediaThumbnailRequest {
+    shareId: string;
+    mediaId: string;
+}
+
 export interface PublicShareMemoryCoverContentRequest {
     shareId: string;
     memoryId: string;
@@ -1111,6 +1116,32 @@ export interface PublicSharesApiInterface {
      * Stream public share media preview
      */
     publicShareMediaPreview(requestParameters: PublicShareMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for publicShareMediaThumbnail without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} mediaId Public media id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMediaThumbnailRequestOpts(requestParameters: PublicShareMediaThumbnailRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Streams a generated media thumbnail for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * @summary Stream public share media thumbnail
+     * @param {string} shareId Public share id.
+     * @param {string} mediaId Public media id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    publicShareMediaThumbnailRaw(requestParameters: PublicShareMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Streams a generated media thumbnail for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media thumbnail
+     */
+    publicShareMediaThumbnail(requestParameters: PublicShareMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for publicShareMemoryCoverContent without sending the request
@@ -3208,6 +3239,60 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async publicShareMediaPreview(requestParameters: PublicShareMediaPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.publicShareMediaPreviewRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for publicShareMediaThumbnail without sending the request
+     */
+    async publicShareMediaThumbnailRequestOpts(requestParameters: PublicShareMediaThumbnailRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling publicShareMediaThumbnail().'
+            );
+        }
+
+        if (requestParameters['mediaId'] == null) {
+            throw new runtime.RequiredError(
+                'mediaId',
+                'Required parameter "mediaId" was null or undefined when calling publicShareMediaThumbnail().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/media/{mediaId}/thumbnail`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"mediaId"}}`, encodeURIComponent(String(requestParameters['mediaId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Streams a generated media thumbnail for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media thumbnail
+     */
+    async publicShareMediaThumbnailRaw(requestParameters: PublicShareMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.publicShareMediaThumbnailRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Streams a generated media thumbnail for media visible through the share.  Vorbedingungen: - The share is enabled. - The media belongs to the shared Memory subtree and is visible for the share role.
+     * Stream public share media thumbnail
+     */
+    async publicShareMediaThumbnail(requestParameters: PublicShareMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.publicShareMediaThumbnailRaw(requestParameters, initOverrides);
     }
 
     /**
