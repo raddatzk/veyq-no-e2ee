@@ -7,7 +7,9 @@ import WorkspaceTopbar from './WorkspaceTopbar.vue'
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  searchTenant: vi.fn()
+  searchTenant: vi.fn(),
+  getCapabilityNotifications: vi.fn(),
+  dismissCapabilityNotification: vi.fn()
 }))
 const routeState = vi.hoisted(() => ({
   name: 'tenant' as string | null,
@@ -23,11 +25,20 @@ vi.mock('../../features/memories/api', () => ({
   searchTenant: mocks.searchTenant
 }))
 
+vi.mock('../../features/settings/api', () => ({
+  getCapabilityNotifications: mocks.getCapabilityNotifications,
+  dismissCapabilityNotification: mocks.dismissCapabilityNotification
+}))
+
 describe('WorkspaceTopbar', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mocks.push.mockReset()
     mocks.searchTenant.mockReset()
+    mocks.getCapabilityNotifications.mockReset()
+    mocks.dismissCapabilityNotification.mockReset()
+    mocks.getCapabilityNotifications.mockResolvedValue([])
+    mocks.dismissCapabilityNotification.mockResolvedValue(undefined)
     routeState.name = 'tenant'
     routeState.params = { tenantName: 'friends' }
   })
@@ -262,6 +273,51 @@ describe('WorkspaceTopbar', () => {
     expect(text.indexOf('450 Medien')).toBeLessThan(text.indexOf('1 Medien'))
     expect(text).toContain('Teneriffa.jpg')
     expect(text).toContain('Wartet')
+  })
+
+  it('shows capability notifications behind a topbar mail icon', async () => {
+    mocks.getCapabilityNotifications.mockResolvedValue([
+      {
+        capability: {
+          id: 'memory.media-upload-eta',
+          introducedInVersion: '1.0',
+          audience: 'ALL_USERS'
+        }
+      }
+    ])
+    const wrapper = mountTopbar()
+    await flushPromises()
+
+    expect(wrapper.find('.notification-trigger').exists()).toBe(true)
+    expect(wrapper.find('.notification-badge').text()).toBe('1')
+    expect(wrapper.text()).not.toContain('Upload-Restzeit-Prognose')
+
+    await wrapper.find('.notification-trigger').trigger('click')
+
+    expect(wrapper.text()).toContain('Nachrichten')
+    expect(wrapper.text()).toContain('Upload-Restzeit-Prognose')
+    expect(wrapper.text()).toContain('Aktive Medien-Uploads')
+  })
+
+  it('dismisses capability notifications from the topbar panel', async () => {
+    mocks.getCapabilityNotifications.mockResolvedValue([
+      {
+        capability: {
+          id: 'memory.media-upload-eta',
+          introducedInVersion: '1.0',
+          audience: 'ALL_USERS'
+        }
+      }
+    ])
+    const wrapper = mountTopbar()
+    await flushPromises()
+    await wrapper.find('.notification-trigger').trigger('click')
+
+    await wrapper.find('[aria-label="Upload-Restzeit-Prognose ausblenden"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.dismissCapabilityNotification).toHaveBeenCalledWith('memory.media-upload-eta')
+    expect(wrapper.find('.notification-trigger').exists()).toBe(false)
   })
 
   it('closes the upload popover with escape and outside click', async () => {

@@ -4,7 +4,6 @@ import { RouterView, useRoute } from 'vue-router'
 import { useAuthState } from '../../shared/state/useAuthState'
 import CreateGroupFlowDialog from '../../features/settings/components/CreateGroupFlowDialog.vue'
 import CreateTenantDialog from '../tenant/CreateTenantDialog.vue'
-import CapabilityNotice from './CapabilityNotice.vue'
 import SupportNotice from './SupportNotice.vue'
 import TenantSidebar from './TenantSidebar.vue'
 import WorkspaceTopbar from './WorkspaceTopbar.vue'
@@ -44,7 +43,6 @@ function refreshNavigation() {
     </div>
     <div class="app-workspace">
       <main class="content">
-        <CapabilityNotice />
         <SupportNotice v-if="authState.user?.serverRole === 'ServerOwner'" />
         <RouterView />
       </main>

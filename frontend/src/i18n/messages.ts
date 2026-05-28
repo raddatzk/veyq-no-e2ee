@@ -27,6 +27,11 @@ export const messages = {
       disabled: 'Deaktiviert',
       upload: 'Hochladen'
     },
+    notifications: {
+      title: 'Nachrichten',
+      count: '{count} Nachrichten',
+      dismiss: '{title} ausblenden'
+    },
     auth: {
       accountCreateWithPasskey: 'Account mit Passkey erstellen',
       acceptInvite: 'Einladung annehmen',
@@ -796,6 +801,11 @@ export const messages = {
       pending: 'Pending',
       disabled: 'Disabled',
       upload: 'Upload'
+    },
+    notifications: {
+      title: 'Messages',
+      count: '{count} messages',
+      dismiss: 'Dismiss {title}'
     },
     auth: {
       accountCreateWithPasskey: 'Create account with passkey',
