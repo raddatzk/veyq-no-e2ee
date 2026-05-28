@@ -2,8 +2,12 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoryMediaApi
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
+import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
+import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
 import com.veyq.api.library.media.MediaService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -23,6 +27,29 @@ class MemoryMediaResource @Inject constructor(
 ) : MemoryMediaApi {
     override fun listMemoryMedia(tenantName: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(mediaService.listMemoryMedia(memoryId, includeChildren ?: false)).build()
+
+    override fun listMemoryMediaBuckets(tenantName: String, memoryId: String): Response =
+        Response.ok(mediaService.listMemoryMediaBuckets(memoryId)).build()
+
+    override fun createMemoryMediaBucket(
+        tenantName: String,
+        memoryId: String,
+        createMemoryMediaBucketRequest: CreateMemoryMediaBucketRequest,
+    ): Response =
+        Response.ok(mediaService.createMemoryMediaBucket(memoryId, createMemoryMediaBucketRequest)).build()
+
+    override fun updateMemoryMediaBucket(
+        tenantName: String,
+        memoryId: String,
+        bucketId: String,
+        updateMemoryMediaBucketRequest: UpdateMemoryMediaBucketRequest,
+    ): Response =
+        Response.ok(mediaService.updateMemoryMediaBucket(memoryId, bucketId, updateMemoryMediaBucketRequest)).build()
+
+    override fun deleteMemoryMediaBucket(tenantName: String, memoryId: String, bucketId: String): Response {
+        mediaService.deleteMemoryMediaBucket(memoryId, bucketId)
+        return Response.noContent().build()
+    }
 
     override fun downloadMemoryMedia(tenantName: String, memoryId: String, includeChildren: Boolean?, locale: String?): Response =
         mediaService.downloadMemoryMedia(memoryId, includeChildren ?: false, locale)
@@ -64,6 +91,22 @@ class MemoryMediaResource @Inject constructor(
 
     override fun deleteAllMemoryMedia(tenantName: String, memoryId: String): Response {
         mediaService.deleteAllMemoryMedia(memoryId)
+        return Response.noContent().build()
+    }
+
+    override fun moveMemoryMedia(
+        tenantName: String,
+        memoryId: String,
+        moveMemoryMediaRequest: MoveMemoryMediaRequest,
+    ): Response =
+        Response.ok(mediaService.moveMemoryMedia(memoryId, moveMemoryMediaRequest)).build()
+
+    override fun deleteMemoryMediaBatch(
+        tenantName: String,
+        memoryId: String,
+        deleteMemoryMediaBatchRequest: DeleteMemoryMediaBatchRequest,
+    ): Response {
+        mediaService.deleteMemoryMediaBatch(memoryId, deleteMemoryMediaBatchRequest)
         return Response.noContent().build()
     }
 

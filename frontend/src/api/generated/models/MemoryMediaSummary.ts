@@ -40,6 +40,12 @@ export interface MemoryMediaSummary {
      */
     memoryId: string;
     /**
+     * Public id of the media bucket that contains this media.
+     * @type {string}
+     * @memberof MemoryMediaSummary
+     */
+    bucketId?: string;
+    /**
      * 
      * @type {string}
      * @memberof MemoryMediaSummary
@@ -171,6 +177,7 @@ export function MemoryMediaSummaryFromJSONTyped(json: any, ignoreDiscriminator: 
         
         'id': json['id'],
         'memoryId': json['memoryId'],
+        'bucketId': json['bucketId'] == null ? undefined : json['bucketId'],
         'title': json['title'],
         'uploader': MediaUploaderFromJSON(json['uploader']),
         'createdAt': json['createdAt'],
@@ -204,6 +211,7 @@ export function MemoryMediaSummaryToJSONTyped(value?: MemoryMediaSummary | null,
         
         'id': value['id'],
         'memoryId': value['memoryId'],
+        'bucketId': value['bucketId'],
         'title': value['title'],
         'uploader': MediaUploaderToJSON(value['uploader']),
         'createdAt': value['createdAt'],

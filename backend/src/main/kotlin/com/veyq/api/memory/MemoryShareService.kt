@@ -14,9 +14,15 @@ import com.veyq.api.common.UpdateMemoryShareRequestReader
 import com.veyq.api.domain.*
 import com.veyq.api.generated.model.CreateMemoryShareRequest
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
+import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
+import com.veyq.api.generated.model.MemoryMediaBatchResponse
+import com.veyq.api.generated.model.MemoryMediaBucketSummary
+import com.veyq.api.generated.model.MemoryMediaSummary
 import com.veyq.api.generated.model.MemoryMediaUploadSession
 import com.veyq.api.generated.model.MemoryShareSummary
+import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.PendingMemoryMediaUploadSession
 import com.veyq.api.generated.model.PublicShareCoverCrop
 import com.veyq.api.generated.model.PublicShareLoginRequest
@@ -27,6 +33,7 @@ import com.veyq.api.generated.model.PublicShareNoticeScope
 import com.veyq.api.generated.model.PublicShareSummary
 import com.veyq.api.generated.model.PublicShareTreeResponse
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryShareRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
@@ -331,6 +338,52 @@ class MemoryShareService @Inject constructor(
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
     }
 
+    fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String): List<MemoryMediaBucketSummary> {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val visibleMedia = mediaRepo.listByMemory(memory).filter { isPublicMediaVisible(access, it) }
+        return mediaService.listPublicShareBuckets(memory, visibleMedia)
+    }
+
+    @Transactional
+    fun createPublicShareMemoryMediaBucket(
+        shareId: String,
+        memoryId: String,
+        request: CreateMemoryMediaBucketRequest,
+    ): MemoryMediaBucketSummary {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val parent = mediaService.resolveBucketForPublicShareUpload(memory, request.parentBucketId)
+            ?: throw BadRequestException("parentBucketId is required", "MEDIA_BUCKET_PARENT_REQUIRED")
+        requireBucketManageAccess(access, parent)
+        return mediaService.createMemoryMediaBucket(memory.publicId, request)
+    }
+
+    @Transactional
+    fun updatePublicShareMemoryMediaBucket(
+        shareId: String,
+        memoryId: String,
+        bucketId: String,
+        request: UpdateMemoryMediaBucketRequest,
+    ): MemoryMediaBucketSummary {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val bucket = mediaService.resolveBucketForPublicShareUpload(memory, bucketId)
+            ?: throw NotFoundException("Bucket not found")
+        requireBucketManageAccess(access, bucket)
+        return mediaService.updateMemoryMediaBucket(memory.publicId, bucketId, request)
+    }
+
+    @Transactional
+    fun deletePublicShareMemoryMediaBucket(shareId: String, memoryId: String, bucketId: String) {
+        val access = requireUploadAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val bucket = mediaService.resolveBucketForPublicShareUpload(memory, bucketId)
+            ?: throw NotFoundException("Bucket not found")
+        requireBucketManageAccess(access, bucket)
+        mediaService.deleteMemoryMediaBucket(memory.publicId, bucketId)
+    }
+
     fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean, locale: String?): Response {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
@@ -468,6 +521,7 @@ class MemoryShareService @Inject constructor(
             uploadPath = uploadPath,
             originalFilename = originalFilename,
             title = title,
+            targetBucket = null,
             uploaderUser = access.authenticatedUser,
             shareIdentity = access.shareIdentity,
         )
@@ -492,10 +546,15 @@ class MemoryShareService @Inject constructor(
     ): MemoryMediaUploadSession {
         val access = requireAccess(resolveEnabledShare(shareId))
         if (!access.canUpload) throw ForbiddenException("Share does not allow uploads")
+        val targetBucket = request.bucketId?.let {
+            mediaService.resolveBucketForPublicShareUpload(access.share.rootMemory, it)
+                .also { bucket -> if (bucket != null) requireBucketManageAccess(access, bucket) }
+        }
         return mediaService.createPublicShareMediaUpload(
             shareId = access.share.publicId,
             memory = access.share.rootMemory,
             request = request,
+            targetBucket = targetBucket,
             uploaderUser = access.authenticatedUser,
             shareIdentity = access.shareIdentity,
         )
@@ -508,10 +567,15 @@ class MemoryShareService @Inject constructor(
     ): MemoryMediaUploadSession {
         val access = requireUploadAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
+        val targetBucket = request.bucketId?.let {
+            mediaService.resolveBucketForPublicShareUpload(memory, it)
+                .also { bucket -> if (bucket != null) requireBucketManageAccess(access, bucket) }
+        }
         return mediaService.createPublicShareMediaUpload(
             shareId = access.share.publicId,
             memory = memory,
             request = request,
+            targetBucket = targetBucket,
             uploaderUser = access.authenticatedUser,
             shareIdentity = access.shareIdentity,
         )
@@ -710,10 +774,11 @@ class MemoryShareService @Inject constructor(
         mediaId: String,
         request: UpdateMemoryMediaMetadataRequest,
     ): com.veyq.api.generated.model.PublicShareMediaSummary {
-        val access = requireEditAccess(resolveEnabledShare(shareId))
+        val access = requireAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val media = resolvePublicMedia(access, mediaId)
         if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        requireMediaManageAccess(access, media)
         media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
         return mediaService.publicShareSummary(media, access.share.publicId)
@@ -721,11 +786,40 @@ class MemoryShareService @Inject constructor(
 
     @Transactional
     fun deletePublicShareMedia(shareId: String, memoryId: String, mediaId: String) {
-        val access = requireDeleteAccess(resolveEnabledShare(shareId))
+        val access = requireAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val media = resolvePublicMedia(access, mediaId)
         if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
-        deleteMedia(media)
+        requireMediaManageAccess(access, media)
+        mediaService.deletePublicMedia(media)
+    }
+
+    @Transactional
+    fun movePublicShareMemoryMedia(shareId: String, memoryId: String, request: MoveMemoryMediaRequest): MemoryMediaBatchResponse {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val target = mediaService.resolveBucketForPublicShareUpload(memory, request.targetBucketId)
+            ?: throw NotFoundException("Bucket not found")
+        requireBucketManageAccess(access, target)
+        val moved = request.mediaIds.map { mediaId ->
+            val media = resolvePublicMedia(access, mediaId)
+            if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+            requireMediaManageAccess(access, media)
+            mediaService.movePublicMedia(media, target)
+        }
+        return MemoryMediaBatchResponse(media = moved.map { mediaService.publicShareSummary(it, access.share.publicId).toMemoryMediaSummary() })
+    }
+
+    @Transactional
+    fun deletePublicShareMemoryMediaBatch(shareId: String, memoryId: String, request: DeleteMemoryMediaBatchRequest) {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        request.mediaIds.map { mediaId ->
+            val media = resolvePublicMedia(access, mediaId)
+            if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+            requireMediaManageAccess(access, media)
+            media
+        }.forEach(mediaService::deletePublicMedia)
     }
 
     fun publicShareMediaContent(shareId: String, mediaId: String, range: String?): Response {
@@ -761,6 +855,37 @@ class MemoryShareService @Inject constructor(
         if (access.canViewGallery) return true
         return access.shareIdentity != null && media.shareIdentity?.id == access.shareIdentity.id
     }
+
+    private fun requireMediaManageAccess(access: ShareAccess, media: Media) {
+        if (access.authenticatedUser != null || access.canDelete) return
+        val ownShareMedia = access.shareIdentity != null && media.shareIdentity?.id == access.shareIdentity.id
+        if (!ownShareMedia) throw ForbiddenException("Share does not allow managing this media")
+    }
+
+    private fun requireBucketManageAccess(access: ShareAccess, bucket: MemoryMediaBucket) {
+        if (access.authenticatedUser != null || access.canDelete) return
+        val ownShareBucket = access.shareIdentity != null && bucket.shareIdentity?.id == access.shareIdentity.id
+        if (!ownShareBucket) throw ForbiddenException("Share does not allow managing this bucket")
+    }
+
+    private fun com.veyq.api.generated.model.PublicShareMediaSummary.toMemoryMediaSummary(): MemoryMediaSummary =
+        MemoryMediaSummary(
+            id = id,
+            memoryId = memoryId,
+            bucketId = bucketId,
+            title = title,
+            uploader = uploader,
+            createdAt = createdAt,
+            capturedAt = capturedAt,
+            capturedAtOverride = capturedAtOverride,
+            mimeType = mimeType,
+            sizeBytes = sizeBytes,
+            contentUrl = contentUrl,
+            thumbnailUrl = thumbnailUrl,
+            previewUrl = previewUrl,
+            gpsLatitude = gpsLatitude,
+            gpsLongitude = gpsLongitude,
+        )
 
     private fun ownIdentityMedia(access: ShareAccess): List<Media> =
         access.shareIdentity?.let { identity ->
@@ -812,10 +937,10 @@ class MemoryShareService @Inject constructor(
                 share = share,
                 shareIdentity = null,
                 authenticatedUser = authenticatedUser,
-                canViewGallery = canViewFull(share.role),
-                canUpload = canUpload(share.role),
-                canEdit = canEdit(share.role),
-                canDelete = canDelete(share.role),
+                canViewGallery = true,
+                canUpload = true,
+                canEdit = true,
+                canDelete = true,
             )
         }
 
@@ -989,6 +1114,7 @@ class MemoryShareService @Inject constructor(
             uploadPath = uploadPath,
             originalFilename = originalFilename,
             title = title,
+            targetBucket = null,
             uploaderUser = access.authenticatedUser,
             shareIdentity = access.shareIdentity,
         )

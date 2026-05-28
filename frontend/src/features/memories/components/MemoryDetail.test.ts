@@ -1,6 +1,6 @@
 import { config, flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia } from '../api'
+import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia, MemoryMediaBucket } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
 const apiMocks = vi.hoisted(() => ({
@@ -117,11 +117,15 @@ describe('MemoryDetail', () => {
       global: { stubs: detailStubs() }
     })
 
-    await findButton(wrapper, 'Favorisieren').trigger('click')
+    const favoriteButton = findButton(wrapper, 'Favorisieren')
+    expect(favoriteButton.attributes('type')).toBe('button')
+
+    await favoriteButton.trigger('click')
     await flushPromises()
 
     expect(apiMocks.favoriteMemory).toHaveBeenCalledWith('tenant', 'mem-1')
-    expect(wrapper.emitted('changed')?.[0]).toEqual([expect.objectContaining({ favorite: true })])
+    expect(findButton(wrapper, 'Favorit entfernen').exists()).toBe(true)
+    expect(wrapper.emitted('changed')).toBeUndefined()
   })
 
   it('removes the current memory from favorites', async () => {
@@ -141,7 +145,8 @@ describe('MemoryDetail', () => {
     await flushPromises()
 
     expect(apiMocks.unfavoriteMemory).toHaveBeenCalledWith('tenant', 'mem-1')
-    expect(wrapper.emitted('changed')?.[0]).toEqual([expect.objectContaining({ favorite: false })])
+    expect(findButton(wrapper, 'Favorisieren').exists()).toBe(true)
+    expect(wrapper.emitted('changed')).toBeUndefined()
   })
 
   it('hides favorite actions when favorites are disabled', () => {
@@ -289,6 +294,43 @@ describe('MemoryDetail', () => {
 
     const refreshedMedia = wrapper.findComponent({ name: 'MediaGrid' }).props('media') as MemoryMedia[]
     expect(refreshedMedia.map((item) => item.id)).toEqual(['media-uploaded'])
+  })
+
+  it('updates bucket counts after moving media locally', async () => {
+    const moveMedia = vi.fn().mockResolvedValue([
+      media({ id: 'media-1', bucketId: 'bucket-target' })
+    ])
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header({ directMediaCount: 2 }),
+        childMemories: [],
+        media: [
+          media({ id: 'media-1', bucketId: 'bucket-source' }),
+          media({ id: 'media-2', bucketId: 'bucket-source' })
+        ],
+        mediaBuckets: [
+          mediaBucket({ id: 'bucket-source', displayName: 'Source', mediaCount: 2 }),
+          mediaBucket({ id: 'bucket-target', displayName: 'Target', mediaCount: 0, primary: false })
+        ],
+        moveMedia
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    const buckets = wrapper.findComponent({ name: 'MemoryAssetBuckets' })
+    await (buckets.props('moveMedia') as (mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>)(
+      ['media-1'],
+      'bucket-target'
+    )
+    await flushPromises()
+
+    const updatedBuckets = wrapper.findComponent({ name: 'MemoryAssetBuckets' }).props('buckets') as MemoryMediaBucket[]
+    expect(updatedBuckets.map((bucket) => [bucket.id, bucket.mediaCount])).toEqual([
+      ['bucket-source', 1],
+      ['bucket-target', 1]
+    ])
   })
 
   it('wires tenant media deletion and removes deleted media locally', async () => {
@@ -599,7 +641,7 @@ function detailStubs() {
     Button: {
       props: ['label', 'icon', 'disabled'],
       emits: ['click'],
-      template: '<button type="button" v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
+      template: '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\', $event)"><span v-if="icon" :class="icon" />{{ label }}</button>'
     },
     Menu: {
       props: ['model'],
@@ -668,7 +710,23 @@ function detailStubs() {
       props: ['media', 'deleteMedia'],
       template: '<div />'
     },
-    MemoryAssetBuckets: { name: 'MemoryAssetBuckets', props: ['media'], template: '<div />' },
+    MemoryAssetBuckets: {
+      name: 'MemoryAssetBuckets',
+      props: [
+        'media',
+        'buckets',
+        'canUpload',
+        'canEditMetadata',
+        'canDeleteMedia',
+        'updateMetadataBatch',
+        'createBucket',
+        'updateBucket',
+        'deleteBucket',
+        'moveMedia',
+        'deleteMediaBatch'
+      ],
+      template: '<div />'
+    },
     MemoryCard: { template: '<article />' },
     MemoryCoverImage: { template: '<img :alt="alt" />', props: ['alt'] },
     DeleteMemoryDialog: { template: '<div />' },
@@ -760,6 +818,20 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: null,
     gpsLatitude: null,
     gpsLongitude: null,
+    ...overrides
+  }
+}
+
+function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBucket {
+  return {
+    id: 'bucket-source',
+    memoryId: 'mem-1',
+    displayName: 'Source',
+    primary: true,
+    uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
+    mediaCount: 0,
+    createdAt: '2026-05-24T16:30:00Z',
+    updatedAt: '2026-05-24T16:30:00Z',
     ...overrides
   }
 }

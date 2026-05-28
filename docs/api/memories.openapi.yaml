@@ -821,6 +821,208 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media-buckets":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: listMemoryMediaBuckets
+      summary: List memory media buckets
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Lists the persistent uploader buckets and subbuckets for one Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucketList"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags:
+        - MemoryMedia
+      operationId: createMemoryMediaBucket
+      summary: Create a memory media subbucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryMediaBucket"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucket"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/memories/{memoryId}/media-buckets/{bucketId}":
+    put:
+      tags:
+        - MemoryMedia
+      operationId: updateMemoryMediaBucket
+      summary: Rename a memory media subbucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Renames a non-primary media bucket.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/BucketId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaBucket"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucket"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMediaBucket
+      summary: Delete a memory media bucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes a bucket subtree and contained media. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/BucketId"
+      responses:
+        '204':
+          description: Bucket deleted.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/move":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: moveMemoryMedia
+      summary: Move selected memory media to a bucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Moves selected media in one Memory to another bucket in the same Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveMemoryMedia"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBatch"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/batch":
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMediaBatch
+      summary: Delete selected memory media
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes selected media directly assigned to one Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/DeleteMemoryMediaBatch"
+      responses:
+        '204':
+          description: Selected media deleted.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/{memoryId}/media/uploads":
     post:
       tags:
@@ -1692,6 +1894,14 @@ components:
         type: string
       description: Public media id.
       example: med_abc123
+    BucketId:
+      in: path
+      required: true
+      name: bucketId
+      schema:
+        type: string
+      description: Public media bucket id.
+      example: bkt_abc123
     TrackId:
       in: path
       required: true
@@ -1911,6 +2121,43 @@ components:
             mimeType: video/mp4
             sizeBytes: 73400320
             title: Beach
+            bucketId: bkt_abc123
+    CreateMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryMediaBucketRequest"
+          example:
+            parentBucketId: bkt_primary123
+            displayName: Drone shots
+    UpdateMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryMediaBucketRequest"
+          example:
+            displayName: Drone highlights
+    MoveMemoryMedia:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveMemoryMediaRequest"
+          example:
+            mediaIds:
+              - med_abc123
+            targetBucketId: bkt_abc123
+    DeleteMemoryMediaBatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/DeleteMemoryMediaBatchRequest"
+          example:
+            mediaIds:
+              - med_abc123
     UploadMediaChunk:
       required: true
       content:
@@ -2190,6 +2437,36 @@ components:
             uploadedBytes: 33554432
             createdAt: '2026-05-03T12:00:00Z'
             updatedAt: '2026-05-03T12:03:00Z'
+    MemoryMediaBucket:
+      description: Memory media bucket.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaBucketSummary"
+          example: &memoryMediaBucketExample
+            id: bkt_abc123
+            memoryId: mem_abc123
+            parentBucketId: null
+            displayName: Kevin
+            primary: true
+            uploader:
+              type: USER
+              displayName: Kevin
+              permalink: kevin
+              userId: 1
+            mediaCount: 4
+            createdAt: '2026-05-03T12:00:00Z'
+            updatedAt: '2026-05-03T12:00:00Z'
+    MemoryMediaBucketList:
+      description: Memory media buckets.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryMediaBucketSummary"
+          example:
+            - *memoryMediaBucketExample
     MemoryMediaSummaries:
       description: Memory media summaries.
       content:
@@ -2985,11 +3262,76 @@ components:
         title:
           type: string
           nullable: true
+        bucketId:
+          type: string
+          nullable: true
+          description: Optional target media bucket id. When omitted, the uploader primary bucket is used.
       example:
         filename: beach.mp4
         mimeType: video/mp4
         sizeBytes: 73400320
         title: Beach
+        bucketId: bkt_abc123
+    CreateMemoryMediaBucketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - parentBucketId
+        - displayName
+      properties:
+        parentBucketId:
+          type: string
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+      example:
+        parentBucketId: bkt_primary123
+        displayName: Drone shots
+    UpdateMemoryMediaBucketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+      example:
+        displayName: Drone highlights
+    MoveMemoryMediaRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mediaIds
+        - targetBucketId
+      properties:
+        mediaIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        targetBucketId:
+          type: string
+      example:
+        mediaIds:
+          - med_abc123
+        targetBucketId: bkt_abc123
+    DeleteMemoryMediaBatchRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mediaIds
+      properties:
+        mediaIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      example:
+        mediaIds:
+          - med_abc123
     MemoryMediaUploadSession:
       type: object
       additionalProperties: false
@@ -3032,6 +3374,9 @@ components:
           type: integer
           format: int64
         title:
+          type: string
+          nullable: true
+        bucketId:
           type: string
           nullable: true
         chunkSizeBytes:
@@ -3366,6 +3711,10 @@ components:
         memoryId:
           type: string
           description: Public id of the Memory that owns this media.
+        bucketId:
+          type: string
+          nullable: true
+          description: Public id of the media bucket that contains this media.
         title:
           type: string
         uploader:
@@ -3420,6 +3769,7 @@ components:
       example:
         id: med_abc123
         memoryId: mem_abc123
+        bucketId: bkt_abc123
         title: Beach
         uploader:
           type: USER
@@ -3441,3 +3791,52 @@ components:
         imageHeight: 4160
         gpsLatitude: 54.1825
         gpsLongitude: 7.8853
+    MemoryMediaBucketSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - memoryId
+        - displayName
+        - primary
+        - uploader
+        - mediaCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        parentBucketId:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        primary:
+          type: boolean
+        uploader:
+          "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
+        mediaCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: bkt_abc123
+        memoryId: mem_abc123
+        parentBucketId: null
+        displayName: Kevin
+        primary: true
+        uploader:
+          type: USER
+          displayName: Kevin
+          permalink: kevin
+          userId: 1
+        mediaCount: 4
+        createdAt: '2026-05-03T12:00:00Z'
+        updatedAt: '2026-05-03T12:00:00Z'

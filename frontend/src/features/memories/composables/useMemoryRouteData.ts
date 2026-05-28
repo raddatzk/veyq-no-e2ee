@@ -7,12 +7,14 @@ import {
   listChildMemories,
   listMemoriesByFolder,
   listMemoryMedia,
+  listMemoryMediaBuckets,
   listMemoryPlaylists,
   listMemoryTracks,
   type Memory,
   type MemoryHeader,
   type MemoryJournal,
   type MemoryMedia,
+  type MemoryMediaBucket,
   type MemoryNavigationResponse,
   type MemoryPlaylist,
   type MemoryTrack
@@ -38,6 +40,7 @@ export function useMemoryRouteData(
   const memoryBreadcrumbs = ref<MemoryRouteBreadcrumb[]>([])
   const childMemories = ref<Memory[]>([])
   const media = ref<MemoryMedia[]>([])
+  const mediaBuckets = ref<MemoryMediaBucket[]>([])
   const mediaLoading = ref(false)
   const playlists = ref<MemoryPlaylist[]>([])
   const tracks = ref<MemoryTrack[]>([])
@@ -69,6 +72,7 @@ export function useMemoryRouteData(
     memoryBreadcrumbs.value = []
     childMemories.value = []
     media.value = []
+    mediaBuckets.value = []
     mediaLoading.value = false
     playlists.value = []
     tracks.value = []
@@ -121,6 +125,9 @@ export function useMemoryRouteData(
         mediaLoading.value = false
       }, () => {
         mediaLoading.value = false
+      }),
+      loadMemoryDetailPart(sequence, () => listMemoryMediaBuckets(tenantName.value, loadedMemory.id), (buckets) => {
+        mediaBuckets.value = buckets
       }),
       loadMemoryDetailPart(sequence, () => listMemoryTracks(tenantName.value, loadedMemory.id), (memoryTracks) => {
         tracks.value = memoryTracks
@@ -187,6 +194,7 @@ export function useMemoryRouteData(
     load,
     loading,
     media,
+    mediaBuckets,
     mediaLoading,
     playlists,
     tracks,

@@ -158,6 +158,7 @@ type MemoryDetailApiOptions = {
   memory?: typeof weddingMemory
   childMemories?: unknown[]
   media?: unknown[]
+  mediaBuckets?: unknown[]
   tracks?: unknown[]
   playlists?: unknown[]
   journalMarkdown?: string
@@ -491,6 +492,11 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
       return
     }
 
+    if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/media-buckets`) {
+      await fulfillJson(route, options.mediaBuckets ?? [])
+      return
+    }
+
     if (method === 'GET' && url.pathname === `/api/friends/memories/${memory.id}/tracks`) {
       await fulfillJson(route, options.tracks ?? [])
       return
@@ -621,6 +627,17 @@ export async function mockResponsiveSettingsApi(page: Page) {
       return
     }
 
+    if (method === 'GET' && url.pathname === '/api/tenants/friends/settings') {
+      await fulfillJson(route, {
+        tenantId: tenant.id,
+        name: tenant.name,
+        displayName: tenant.displayName,
+        termsVersion: 0,
+        termsMarkdownByLocale: undefined
+      })
+      return
+    }
+
     if (method === 'GET' && url.pathname === '/api/friends/groups') {
       await fulfillJson(route, {
         groups: [
@@ -669,6 +686,7 @@ export async function mockPublicViewerShareApi(
         authenticated: false,
         passwordRequired: false,
         displayNameRequired: false,
+        notices: [],
         canViewGallery: true,
         canUpload: false,
         canEdit: false,
@@ -722,6 +740,11 @@ export async function mockPublicViewerShareApi(
 
     if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media`) {
       await fulfillJson(route, options.media ?? [])
+      return
+    }
+
+    if (method === 'GET' && url.pathname === `/api/public-shares/shr-e2e/memories/${weddingMemory.id}/media-buckets`) {
+      await fulfillJson(route, [])
       return
     }
 
@@ -787,6 +810,7 @@ export async function mockPublicUploaderShareApi(
         authenticated: true,
         passwordRequired: false,
         displayNameRequired: false,
+        notices: [],
         canViewGallery: false,
         canUpload: true,
         canEdit: false,

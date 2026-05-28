@@ -44,6 +44,12 @@ export interface PublicShareMediaSummary {
      * @type {string}
      * @memberof PublicShareMediaSummary
      */
+    bucketId?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof PublicShareMediaSummary
+     */
     title: string;
     /**
      * 
@@ -141,6 +147,7 @@ export function PublicShareMediaSummaryFromJSONTyped(json: any, ignoreDiscrimina
         
         'id': json['id'],
         'memoryId': json['memoryId'],
+        'bucketId': json['bucketId'] == null ? undefined : json['bucketId'],
         'title': json['title'],
         'uploader': MediaUploaderFromJSON(json['uploader']),
         'createdAt': json['createdAt'],
@@ -169,6 +176,7 @@ export function PublicShareMediaSummaryToJSONTyped(value?: PublicShareMediaSumma
         
         'id': value['id'],
         'memoryId': value['memoryId'],
+        'bucketId': value['bucketId'],
         'title': value['title'],
         'uploader': MediaUploaderToJSON(value['uploader']),
         'createdAt': value['createdAt'],

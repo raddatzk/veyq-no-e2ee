@@ -10,6 +10,75 @@ import java.time.Instant
 
 @Entity
 @Table(
+    name = "veyq_memory_media_bucket",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uq_veyq_memory_media_bucket_parent_name",
+            columnNames = ["memory_id", "parent_bucket_id", "name"],
+        ),
+    ],
+)
+class MemoryMediaBucket : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @Column(name = "public_id", nullable = false, unique = true, length = 16, updatable = false)
+    lateinit var publicId: String
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    lateinit var tenant: Tenant
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "memory_id", nullable = false)
+    lateinit var memory: Memory
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_bucket_id")
+    var parentBucket: MemoryMediaBucket? = null
+
+    @Column(nullable = false)
+    lateinit var name: String
+
+    @Column(name = "display_name", nullable = false)
+    lateinit var displayName: String
+
+    @Column(name = "primary_bucket", nullable = false)
+    var primaryBucket: Boolean = false
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uploader_user_id")
+    var uploaderUser: User? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "share_identity_id")
+    var shareIdentity: MemoryShareIdentity? = null
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @Column(name = "updated_at", nullable = false)
+    lateinit var updatedAt: Instant
+
+    @PrePersist
+    fun beforePersist() {
+        if (!::publicId.isInitialized) {
+            publicId = NanoIdUtils.randomNanoId(16)
+        }
+        val now = Instant.now()
+        createdAt = now
+        updatedAt = now
+    }
+
+    @PreUpdate
+    fun beforeUpdate() {
+        updatedAt = Instant.now()
+    }
+}
+
+@Entity
+@Table(
     name = "veyq_media_blob",
     uniqueConstraints = [
         UniqueConstraint(name = "uq_veyq_media_blob_tenant_sha256", columnNames = ["tenant_id", "content_sha256"]),
@@ -115,6 +184,10 @@ class Media : PanacheEntityBase {
     @JoinColumn(name = "memory_id")
     var memory: Memory? = null
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bucket_id")
+    var bucket: MemoryMediaBucket? = null
+
     @Column(nullable = false)
     lateinit var title: String
 
@@ -157,6 +230,34 @@ class Media : PanacheEntityBase {
 class MediaBlobRepo : PanacheRepository<MediaBlob> {
     fun findByTenantAndSha256(tenant: Tenant, sha256: String): MediaBlob? =
         find("tenant = ?1 and contentSha256 = ?2", tenant, sha256).firstResult()
+}
+
+@ApplicationScoped
+class MemoryMediaBucketRepo : PanacheRepository<MemoryMediaBucket> {
+    fun findByTenantAndPublicId(tenant: Tenant, publicId: String): MemoryMediaBucket? =
+        find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
+
+    fun listByMemory(memory: Memory): List<MemoryMediaBucket> =
+        list("memory = ?1 order by primaryBucket desc, displayName, createdAt", memory)
+
+    fun listByMemories(memories: Collection<Memory>): List<MemoryMediaBucket> {
+        if (memories.isEmpty()) return emptyList()
+        return list("memory in ?1 order by primaryBucket desc, displayName, createdAt", memories)
+    }
+
+    fun findPrimaryByUser(memory: Memory, user: User): MemoryMediaBucket? =
+        find("memory = ?1 and primaryBucket = true and uploaderUser = ?2 and shareIdentity is null", memory, user).firstResult()
+
+    fun findPrimaryByShareIdentity(memory: Memory, identity: MemoryShareIdentity): MemoryMediaBucket? =
+        find("memory = ?1 and primaryBucket = true and shareIdentity = ?2 and uploaderUser is null", memory, identity).firstResult()
+
+    fun listChildren(parent: MemoryMediaBucket): List<MemoryMediaBucket> =
+        list("parentBucket = ?1 order by displayName, createdAt", parent)
+
+    fun nameExists(memory: Memory, parent: MemoryMediaBucket?, name: String): Boolean =
+        count("memory = ?1 and parentBucket ${if (parent == null) "is null" else "= ?2"} and name = ?${if (parent == null) "2" else "3"}",
+            *if (parent == null) arrayOf(memory, name) else arrayOf(memory, parent, name)
+        ) > 0
 }
 
 data class ArchiveMediaRow(

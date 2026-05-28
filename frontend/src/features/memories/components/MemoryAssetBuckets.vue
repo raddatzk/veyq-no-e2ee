@@ -2,13 +2,14 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from 'primevue/dialog'
-import { updateMemoryMediaMetadataBatch, type MemoryMedia } from '../api'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
+import type { MemoryMedia, MemoryMediaBucket } from '../api'
+import { updateMemoryMediaMetadataBatch } from '../api'
 import { API_BASE } from '../../../api/httpClient'
 
-type UploaderBucket = {
-  key: string
-  label: string
-  media: MemoryMedia[]
+type BucketRow = MemoryMediaBucket & {
+  depth: number
 }
 
 type CameraBucket = {
@@ -21,48 +22,76 @@ const props = defineProps<{
   tenantName: string
   memoryId: string
   media: MemoryMedia[]
+  buckets: MemoryMediaBucket[]
+  canUpload?: boolean
+  canEditMetadata?: boolean
+  canDeleteMedia?: boolean
   updateMetadataBatch?: (
     memoryId: string,
     mediaIds: string[],
     capturedAtOffsetSeconds: number
   ) => Promise<MemoryMedia[]>
+  createBucket?: (parentBucketId: string, displayName: string) => Promise<MemoryMediaBucket>
+  updateBucket?: (bucketId: string, displayName: string) => Promise<MemoryMediaBucket>
+  deleteBucket?: (bucketId: string) => Promise<void>
+  moveMedia?: (mediaIds: string[], targetBucketId: string) => Promise<MemoryMedia[]>
+  deleteMediaBatch?: (mediaIds: string[]) => Promise<void>
 }>()
 
 const emit = defineEmits<{
   updated: [media: MemoryMedia[]]
+  uploadBucket: [bucketId: string]
 }>()
 
 const { locale, t } = useI18n()
-const activeUploaderKey = ref('')
+const activeBucketId = ref('')
 const activeCameraKey = ref('')
 const selectedMediaIds = ref<Set<string>>(new Set())
 const correctedReferenceTime = ref('')
 const isOffsetDialogOpen = ref(false)
+const isBucketDialogOpen = ref(false)
+const isDeleteBucketDialogOpen = ref(false)
+const isDeleteMediaDialogOpen = ref(false)
+const isMoveDialogOpen = ref(false)
+const selectionActionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const mediaActionMenu = ref<InstanceType<typeof Menu> | null>(null)
+const activeMediaActionId = ref('')
+const bucketDialogMode = ref<'create' | 'rename'>('create')
+const bucketName = ref('')
+const deleteBucketName = ref('')
 const isSaving = ref(false)
 const saveError = ref('')
+const moveTargetBucketId = ref('')
+const deleteMediaIds = ref<string[]>([])
 
-const uploaderBuckets = computed<UploaderBucket[]>(() => {
-  const buckets = new Map<string, UploaderBucket>()
-  props.media.forEach((media) => {
-    const key = uploaderKey(media)
-    const existing = buckets.get(key)
-    if (existing) {
-      existing.media.push(media)
-    } else {
-      buckets.set(key, { key, label: uploaderLabel(media), media: [media] })
-    }
+const bucketRows = computed<BucketRow[]>(() => {
+  const children = new Map<string | null, MemoryMediaBucket[]>()
+  props.buckets.forEach((bucket) => {
+    const key = bucket.parentBucketId ?? null
+    children.set(key, [...(children.get(key) ?? []), bucket])
   })
-
-  return [...buckets.values()].sort((a, b) => a.label.localeCompare(b.label, locale.value))
+  children.forEach((items) => items.sort((a, b) => a.displayName.localeCompare(b.displayName, locale.value)))
+  const rows: BucketRow[] = []
+  const visit = (bucket: MemoryMediaBucket, depth: number) => {
+    rows.push({ ...bucket, depth })
+    ;(children.get(bucket.id) ?? []).forEach((child) => visit(child, depth + 1))
+  }
+  ;(children.get(null) ?? []).forEach((bucket) => visit(bucket, 0))
+  return rows
 })
 
-const activeUploader = computed(() =>
-  uploaderBuckets.value.find((bucket) => bucket.key === activeUploaderKey.value) ?? uploaderBuckets.value[0] ?? null
+const activeBucket = computed(() =>
+  props.buckets.find((bucket) => bucket.id === activeBucketId.value) ?? props.buckets[0] ?? null
 )
+
+const directBucketMedia = computed(() => {
+  if (!activeBucket.value) return []
+  return props.media.filter((media) => media.bucketId === activeBucket.value?.id)
+})
 
 const cameraBuckets = computed<CameraBucket[]>(() => {
   const cameras = new Map<string, CameraBucket>()
-  activeUploader.value?.media.forEach((media) => {
+  directBucketMedia.value.forEach((media) => {
     const key = cameraKey(media)
     const existing = cameras.get(key)
     if (existing) {
@@ -71,14 +100,12 @@ const cameraBuckets = computed<CameraBucket[]>(() => {
       cameras.set(key, { key, label: cameraLabel(media), count: 1 })
     }
   })
-
   return [...cameras.values()].sort((a, b) => a.label.localeCompare(b.label, locale.value))
 })
 
 const filteredMedia = computed(() => {
-  if (!activeUploader.value) return []
-  if (!activeCameraKey.value) return activeUploader.value.media
-  return activeUploader.value.media.filter((media) => cameraKey(media) === activeCameraKey.value)
+  if (!activeCameraKey.value) return directBucketMedia.value
+  return directBucketMedia.value.filter((media) => cameraKey(media) === activeCameraKey.value)
 })
 
 const selectedMedia = computed(() => props.media.filter((media) => selectedMediaIds.value.has(media.id)))
@@ -93,8 +120,9 @@ const offsetSeconds = computed(() => {
   return Math.trunc((corrected - referenceTimestamp.value.getTime()) / 1000)
 })
 const canUpdateBatch = computed(() => Boolean(props.updateMetadataBatch || props.tenantName))
-const canSubmit = computed(
+const canSubmitOffset = computed(
   () =>
+    Boolean(props.canEditMetadata) &&
     canUpdateBatch.value &&
     selectedMediaIds.value.size > 0 &&
     Boolean(referenceMedia.value) &&
@@ -107,17 +135,77 @@ const selectedCountLabel = computed(() =>
 )
 const hasVisibleSelection = computed(() => filteredMedia.value.some((media) => selectedMediaIds.value.has(media.id)))
 const offsetPreview = computed(() => formatOffset(offsetSeconds.value))
+const moveTargets = computed(() =>
+  bucketRows.value.filter((bucket) => bucket.id !== activeBucket.value?.id)
+)
+const canSubmitBucketDelete = computed(
+  () =>
+    Boolean(activeBucket.value) &&
+    Boolean(props.canDeleteMedia) &&
+    Boolean(props.deleteBucket) &&
+    deleteBucketName.value.trim() === activeBucket.value?.displayName &&
+    !isSaving.value
+)
+const deleteMediaCount = computed(() => deleteMediaIds.value.length)
+const selectionActionItems = computed<MenuItem[]>(() => [
+  {
+    label: t('media.shiftCapturedAt'),
+    icon: 'pi pi-clock',
+    disabled: !selectedMediaIds.value.size || !props.canEditMetadata,
+    command: openOffsetDialog
+  },
+  {
+    label: t('media.moveSelected'),
+    icon: 'pi pi-arrow-right-arrow-left',
+    disabled: !selectedMediaIds.value.size || !props.canEditMetadata || !moveTargets.value.length || !props.moveMedia,
+    command: openMoveDialog
+  },
+  {
+    label: t('media.deleteSelected'),
+    icon: 'pi pi-trash',
+    disabled: !selectedMediaIds.value.size || !props.canDeleteMedia || !props.deleteMediaBatch,
+    command: () => {
+      openDeleteSelectedMediaDialog()
+    }
+  }
+])
+const mediaActionItems = computed<MenuItem[]>(() => [
+  {
+    label: t('media.shiftCapturedAt'),
+    icon: 'pi pi-clock',
+    disabled: !props.canEditMetadata,
+    command: () => {
+      openSingleMediaOffsetDialog()
+    }
+  },
+  {
+    label: t('media.moveMedia'),
+    icon: 'pi pi-arrow-right-arrow-left',
+    disabled: !props.canEditMetadata || !moveTargets.value.length || !props.moveMedia,
+    command: () => {
+      openSingleMediaMoveDialog()
+    }
+  },
+  {
+    label: t('media.deleteMedia'),
+    icon: 'pi pi-trash',
+    disabled: !props.canDeleteMedia || !props.deleteMediaBatch,
+    command: () => {
+      openSingleMediaDeleteDialog()
+    }
+  }
+])
 
 watch(
-  uploaderBuckets,
-  (buckets) => {
-    if (!buckets.length) {
-      activeUploaderKey.value = ''
+  bucketRows,
+  (rows) => {
+    if (!rows.length) {
+      activeBucketId.value = ''
       activeCameraKey.value = ''
       return
     }
-    if (!buckets.some((bucket) => bucket.key === activeUploaderKey.value)) {
-      activeUploaderKey.value = buckets[0].key
+    if (!rows.some((bucket) => bucket.id === activeBucketId.value)) {
+      activeBucketId.value = rows[0].id
       activeCameraKey.value = ''
     }
   },
@@ -137,20 +225,6 @@ watch(
     selectedMediaIds.value = new Set([...selectedMediaIds.value].filter((mediaId) => visibleIds.has(mediaId)))
   }
 )
-
-function uploaderKey(media: MemoryMedia): string {
-  if (media.uploader.type === 'USER' && media.uploader.userId !== null && media.uploader.userId !== undefined) {
-    return `USER:${media.uploader.userId}`
-  }
-  if (media.uploader.type === 'ANONYMOUS' && media.uploader.displayName) {
-    return `ANONYMOUS:${normalizeKey(media.uploader.displayName)}`
-  }
-  return 'UNKNOWN'
-}
-
-function uploaderLabel(media: MemoryMedia): string {
-  return media.uploader.displayName?.trim() || t('media.unknownUploader')
-}
 
 function cameraKey(media: MemoryMedia): string {
   const label = cameraName(media)
@@ -193,19 +267,12 @@ function isoToDatetimeLocal(date: Date): string {
 function formatOffset(seconds: number): string {
   const sign = seconds < 0 ? '-' : '+'
   let remaining = Math.abs(seconds)
-  const weeks = Math.floor(remaining / 604_800)
-  remaining -= weeks * 604_800
   const days = Math.floor(remaining / 86_400)
   remaining -= days * 86_400
   const hours = Math.floor(remaining / 3_600)
   remaining -= hours * 3_600
   const minutes = Math.floor(remaining / 60)
-  const parts = [
-    weeks ? `${weeks}W` : '',
-    days ? `${days}T` : '',
-    hours ? `${hours}h` : '',
-    minutes ? `${minutes}m` : ''
-  ].filter(Boolean)
+  const parts = [days ? `${days}T` : '', hours ? `${hours}h` : '', minutes ? `${minutes}m` : ''].filter(Boolean)
   return parts.length ? `${sign}${parts.join(' ')}` : '+0m'
 }
 
@@ -235,13 +302,34 @@ function openOffsetDialog() {
   isOffsetDialogOpen.value = true
 }
 
-function openMediaOptions(mediaId: string) {
-  selectedMediaIds.value = new Set([mediaId])
+function selectSingleMediaActionTarget(): boolean {
+  if (!activeMediaActionId.value) return false
+  selectedMediaIds.value = new Set([activeMediaActionId.value])
+  return true
+}
+
+function openSingleMediaOffsetDialog() {
+  if (!selectSingleMediaActionTarget()) return
   openOffsetDialog()
 }
 
+function openSingleMediaMoveDialog() {
+  if (!selectSingleMediaActionTarget()) return
+  openMoveDialog()
+}
+
+function openSingleMediaDeleteDialog() {
+  if (!selectSingleMediaActionTarget()) return
+  openDeleteSelectedMediaDialog()
+}
+
+function openMediaOptions(event: MouseEvent, mediaId: string) {
+  activeMediaActionId.value = mediaId
+  mediaActionMenu.value?.toggle(event)
+}
+
 async function applyOffset() {
-  if (!canSubmit.value) return
+  if (!canSubmitOffset.value) return
   isSaving.value = true
   saveError.value = ''
   try {
@@ -260,32 +348,157 @@ async function applyOffset() {
     isSaving.value = false
   }
 }
+
+function openCreateBucketDialog() {
+  if (!activeBucket.value || !activeBucket.value.primary) return
+  bucketDialogMode.value = 'create'
+  bucketName.value = ''
+  saveError.value = ''
+  isBucketDialogOpen.value = true
+}
+
+function openRenameBucketDialog() {
+  if (!activeBucket.value || activeBucket.value.primary) return
+  bucketDialogMode.value = 'rename'
+  bucketName.value = activeBucket.value.displayName
+  saveError.value = ''
+  isBucketDialogOpen.value = true
+}
+
+async function submitBucketDialog() {
+  if (!activeBucket.value || !bucketName.value.trim()) return
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    if (bucketDialogMode.value === 'create') {
+      await props.createBucket?.(activeBucket.value.id, bucketName.value)
+    } else {
+      await props.updateBucket?.(activeBucket.value.id, bucketName.value)
+    }
+    isBucketDialogOpen.value = false
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : t('media.bucketSaveFailed')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+function openDeleteBucketDialog() {
+  if (!activeBucket.value || !props.canDeleteMedia || !props.deleteBucket) return
+  deleteBucketName.value = ''
+  saveError.value = ''
+  isDeleteBucketDialogOpen.value = true
+}
+
+async function deleteActiveBucket() {
+  if (!activeBucket.value || !canSubmitBucketDelete.value || !props.deleteBucket) return
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    await props.deleteBucket(activeBucket.value.id)
+    isDeleteBucketDialogOpen.value = false
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : t('media.bucketDeleteFailed')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+function openMoveDialog() {
+  if (!props.canEditMetadata || !selectedMediaIds.value.size) return
+  moveTargetBucketId.value = moveTargets.value[0]?.id ?? ''
+  saveError.value = ''
+  isMoveDialogOpen.value = true
+}
+
+function toggleSelectionActionMenu(event: MouseEvent) {
+  selectionActionMenu.value?.toggle(event)
+}
+
+async function submitMove() {
+  if (!props.moveMedia || !moveTargetBucketId.value || !selectedMediaIds.value.size) return
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    const updated = await props.moveMedia([...selectedMediaIds.value], moveTargetBucketId.value)
+    emit('updated', updated)
+    selectedMediaIds.value = new Set()
+    isMoveDialogOpen.value = false
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : t('media.moveFailed')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+function openDeleteSelectedMediaDialog() {
+  if (!props.canDeleteMedia || !props.deleteMediaBatch || !selectedMediaIds.value.size) return
+  deleteMediaIds.value = [...selectedMediaIds.value]
+  saveError.value = ''
+  isDeleteMediaDialogOpen.value = true
+}
+
+async function deleteSelectedMedia() {
+  if (!props.canDeleteMedia || !props.deleteMediaBatch || !deleteMediaIds.value.length) return
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    await props.deleteMediaBatch(deleteMediaIds.value)
+    const deletedIds = new Set(deleteMediaIds.value)
+    selectedMediaIds.value = new Set([...selectedMediaIds.value].filter((mediaId) => !deletedIds.has(mediaId)))
+    deleteMediaIds.value = []
+    isDeleteMediaDialogOpen.value = false
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : t('media.deleteFailed')
+  } finally {
+    isSaving.value = false
+  }
+}
 </script>
 
 <template>
-  <section class="memory-section asset-buckets">
-    <div class="memory-section-header">
+  <section class="veyq-section memory-section asset-buckets">
+    <div class="veyq-section-header memory-section-header">
       <h2>{{ t('media.buckets') }}</h2>
       <span>{{ media.length }}</span>
     </div>
 
-    <div v-if="uploaderBuckets.length" class="asset-bucket-layout">
+    <div v-if="bucketRows.length" class="asset-bucket-layout">
       <nav class="asset-bucket-list" :aria-label="t('media.uploaderBuckets')">
         <button
-          v-for="bucket in uploaderBuckets"
-          :key="bucket.key"
+          v-for="bucket in bucketRows"
+          :key="bucket.id"
           class="asset-bucket-button"
-          :class="{ 'asset-bucket-button-active': bucket.key === activeUploaderKey }"
+          :class="{ 'asset-bucket-button-active': bucket.id === activeBucketId, 'asset-bucket-button-child': bucket.depth > 0 }"
           type="button"
-          @click="activeUploaderKey = bucket.key; activeCameraKey = ''"
+          :style="{ marginLeft: `${bucket.depth * 28}px`, width: `calc(100% - ${bucket.depth * 28}px)` }"
+          @click="activeBucketId = bucket.id; activeCameraKey = ''"
         >
-          <span class="pi pi-user" />
-          <strong>{{ bucket.label }}</strong>
-          <small>{{ bucket.media.length }}</small>
+          <span class="pi" :class="bucket.primary ? 'pi-user' : 'pi-folder'" />
+          <strong>{{ bucket.displayName }}</strong>
+          <small>{{ bucket.mediaCount }}</small>
         </button>
       </nav>
 
       <div class="asset-bucket-detail">
+        <div class="asset-bucket-action-row">
+          <strong>{{ activeBucket?.displayName }}</strong>
+          <div>
+            <button v-if="canUpload && activeBucket" class="asset-bucket-upload-button" type="button" @click="$emit('uploadBucket', activeBucket.id)">
+              <span class="pi pi-upload" /> {{ t('common.upload') }}
+            </button>
+            <button v-if="canUpload && activeBucket?.primary && createBucket" type="button" @click="openCreateBucketDialog">
+              <span class="pi pi-folder-plus" /> {{ t('media.createBucket') }}
+            </button>
+            <button v-if="canEditMetadata && activeBucket && !activeBucket.primary && updateBucket" type="button" @click="openRenameBucketDialog">
+              <span class="pi pi-pencil" /> {{ t('common.edit') }}
+            </button>
+            <button v-if="canDeleteMedia && activeBucket && deleteBucket" type="button" @click="openDeleteBucketDialog">
+              <span class="pi pi-trash" /> {{ t('common.delete') }}
+            </button>
+          </div>
+        </div>
+
         <div class="asset-camera-filter" :aria-label="t('media.cameraFilters')">
           <button
             class="asset-camera-chip"
@@ -294,7 +507,7 @@ async function applyOffset() {
             @click="activeCameraKey = ''"
           >
             {{ t('media.allCameras') }}
-            <span>{{ activeUploader?.media.length ?? 0 }}</span>
+            <span>{{ directBucketMedia.length }}</span>
           </button>
           <button
             v-for="camera in cameraBuckets"
@@ -322,10 +535,12 @@ async function applyOffset() {
             type="button"
             :aria-label="t('media.options')"
             :disabled="!selectedMediaIds.size"
-            @click="openOffsetDialog"
+            aria-haspopup="menu"
+            @click="toggleSelectionActionMenu"
           >
             <span class="pi pi-ellipsis-v" />
           </button>
+          <Menu ref="selectionActionMenu" :model="selectionActionItems" popup />
         </div>
 
         <div class="asset-bucket-media">
@@ -350,19 +565,22 @@ async function applyOffset() {
               <small>{{ formatDate(item.capturedAt) }}</small>
             </div>
             <button
+              v-if="canEditMetadata || canDeleteMedia"
               class="asset-card-options-button"
               type="button"
               :aria-label="t('media.options')"
-              @click="openMediaOptions(item.id)"
+              aria-haspopup="menu"
+              @click="openMediaOptions($event, item.id)"
             >
               <span class="pi pi-ellipsis-v" />
             </button>
           </article>
+          <Menu ref="mediaActionMenu" :model="mediaActionItems" popup />
         </div>
       </div>
     </div>
 
-    <div v-else class="memory-empty">{{ t('media.empty') }}</div>
+    <div v-else class="veyq-empty">{{ t('media.empty') }}</div>
 
     <Dialog
       v-model:visible="isOffsetDialogOpen"
@@ -387,9 +605,105 @@ async function applyOffset() {
         <input id="asset-corrected-time" v-model="correctedReferenceTime" type="datetime-local" />
         <span>{{ selectedMediaIds.size ? t('media.selectedCount', { count: selectedMediaIds.size }) : t('media.noneSelected') }}</span>
         <span>{{ t('media.offsetPreview') }}: {{ offsetPreview }}</span>
-        <button type="submit" :disabled="!canSubmit">
+        <button type="submit" :disabled="!canSubmitOffset">
           {{ t('media.applyOffset') }}
         </button>
+      </form>
+      <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
+    </Dialog>
+
+    <Dialog v-model:visible="isBucketDialogOpen" :header="t('media.bucketDialogTitle')" modal class="tenant-dialog asset-action-dialog">
+      <form class="veyq-form asset-dialog-form" @submit.prevent="submitBucketDialog">
+        <label for="asset-bucket-name">{{ t('media.bucketName') }}</label>
+        <input id="asset-bucket-name" v-model="bucketName" type="text" />
+        <div class="veyq-dialog-action-row">
+          <button class="veyq-dialog-button veyq-dialog-button-secondary" type="button" :disabled="isSaving" @click="isBucketDialogOpen = false">
+            <span class="pi pi-times" aria-hidden="true" />
+            <span>{{ t('common.cancel') }}</span>
+          </button>
+          <button class="veyq-dialog-button veyq-dialog-button-primary" type="submit" :disabled="!bucketName.trim() || isSaving">
+            <span class="pi pi-save" aria-hidden="true" />
+            <span>{{ t('common.save') }}</span>
+          </button>
+        </div>
+      </form>
+      <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="isDeleteBucketDialogOpen"
+      :header="t('media.deleteBucketTitle')"
+      modal
+      class="tenant-dialog asset-action-dialog"
+    >
+      <form class="veyq-form asset-dialog-form" @submit.prevent="deleteActiveBucket">
+        <p class="asset-dialog-copy">
+          {{ t('media.deleteBucketCopy', { bucket: activeBucket?.displayName }) }}
+        </p>
+        <label for="asset-delete-bucket-name">{{ t('media.deleteBucketNameLabel') }}</label>
+        <input
+          id="asset-delete-bucket-name"
+          v-model="deleteBucketName"
+          type="text"
+          :placeholder="activeBucket?.displayName"
+          autocomplete="off"
+        />
+        <div class="veyq-dialog-action-row">
+          <button class="veyq-dialog-button veyq-dialog-button-secondary" type="button" :disabled="isSaving" @click="isDeleteBucketDialogOpen = false">
+            <span class="pi pi-times" aria-hidden="true" />
+            <span>{{ t('common.cancel') }}</span>
+          </button>
+          <button class="veyq-dialog-button veyq-dialog-button-danger" type="submit" :disabled="!canSubmitBucketDelete">
+            <span class="pi pi-trash" aria-hidden="true" />
+            <span>{{ t('media.deleteBucketConfirmAction') }}</span>
+          </button>
+        </div>
+      </form>
+      <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
+    </Dialog>
+
+    <Dialog v-model:visible="isMoveDialogOpen" :header="t('media.moveSelected')" modal class="tenant-dialog asset-action-dialog">
+      <form class="veyq-form asset-dialog-form" @submit.prevent="submitMove">
+        <label for="asset-move-target">{{ t('media.moveTargetBucket') }}</label>
+        <select id="asset-move-target" v-model="moveTargetBucketId">
+          <option v-for="bucket in moveTargets" :key="bucket.id" :value="bucket.id">
+            {{ '— '.repeat(bucket.depth) }}{{ bucket.displayName }}
+          </option>
+        </select>
+        <div class="veyq-dialog-action-row">
+          <button class="veyq-dialog-button veyq-dialog-button-secondary" type="button" :disabled="isSaving" @click="isMoveDialogOpen = false">
+            <span class="pi pi-times" aria-hidden="true" />
+            <span>{{ t('common.cancel') }}</span>
+          </button>
+          <button class="veyq-dialog-button veyq-dialog-button-primary" type="submit" :disabled="!moveTargetBucketId || isSaving">
+            <span class="pi pi-arrow-right-arrow-left" aria-hidden="true" />
+            <span>{{ t('media.moveSelected') }}</span>
+          </button>
+        </div>
+      </form>
+      <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="isDeleteMediaDialogOpen"
+      :header="t('media.deleteMediaTitle')"
+      modal
+      class="tenant-dialog asset-action-dialog"
+    >
+      <form class="veyq-form asset-dialog-form" @submit.prevent="deleteSelectedMedia">
+        <p class="asset-dialog-copy">
+          {{ t('media.deleteMediaCopy', { count: deleteMediaCount }) }}
+        </p>
+        <div class="veyq-dialog-action-row">
+          <button class="veyq-dialog-button veyq-dialog-button-secondary" type="button" :disabled="isSaving" @click="isDeleteMediaDialogOpen = false">
+            <span class="pi pi-times" aria-hidden="true" />
+            <span>{{ t('common.cancel') }}</span>
+          </button>
+          <button class="veyq-dialog-button veyq-dialog-button-danger" type="submit" :disabled="!deleteMediaCount || isSaving">
+            <span class="pi pi-trash" aria-hidden="true" />
+            <span>{{ t('media.deleteMediaConfirmAction') }}</span>
+          </button>
+        </div>
       </form>
       <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
     </Dialog>

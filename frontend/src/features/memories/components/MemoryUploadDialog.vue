@@ -13,6 +13,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
   tenantName: string
   memoryId: string | null
+  bucketId?: string | null
   uploadMedia?: (
     memoryId: string,
     request: UploadMemoryMediaRequest,
@@ -70,7 +71,7 @@ async function submit() {
       files: [...files.value],
       context: { type: 'memory', tenantName: props.tenantName, memoryId },
       uploadFile: (file, options) => {
-        const request = { file, title: file.name }
+        const request = { file, title: file.name, bucketId: props.bucketId ?? undefined }
         return props.uploadMedia
           ? props.uploadMedia(memoryId, request, options)
           : uploadMemoryMedia(props.tenantName, memoryId, request, options)
@@ -95,7 +96,7 @@ async function submit() {
 
 <template>
   <Dialog v-model:visible="visible" :header="t('media.uploadTitle')" modal class="tenant-dialog">
-    <form class="form" @submit.prevent="submit">
+    <form class="veyq-form" @submit.prevent="submit">
       <div class="memory-upload-picker">
         <FileUpload
           ref="picker"
@@ -141,21 +142,22 @@ async function submit() {
         </ul>
       </div>
       <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
-      <div class="button-row">
+      <div class="veyq-dialog-action-row">
+        <Button
+          type="button"
+          :label="t('common.cancel')"
+          icon="pi pi-times"
+          severity="secondary"
+          outlined
+          :disabled="loading"
+          @click="visible = false"
+        />
         <Button
           type="submit"
           :label="t('common.upload')"
           icon="pi pi-upload"
           :disabled="files.length === 0 || loading"
           :loading="loading"
-        />
-        <Button
-          type="button"
-          :label="t('common.cancel')"
-          severity="secondary"
-          outlined
-          :disabled="loading"
-          @click="visible = false"
         />
       </div>
     </form>

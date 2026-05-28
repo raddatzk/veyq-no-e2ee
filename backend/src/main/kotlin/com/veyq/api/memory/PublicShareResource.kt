@@ -2,11 +2,15 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.PublicSharesApi
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
 import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreatePublicShareMemoryRequest
+import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
 import com.veyq.api.generated.model.MemoryTrackActivityType
+import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
 import com.veyq.api.generated.model.UpdateMemoryTrackRequest
@@ -82,6 +86,29 @@ class PublicShareResource @Inject constructor(
 
     override fun listPublicShareMemoryMedia(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.listPublicShareMemoryMedia(shareId, memoryId)).build()
+
+    override fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String): Response =
+        Response.ok(memoryShareService.listPublicShareMemoryMediaBuckets(shareId, memoryId)).build()
+
+    override fun createPublicShareMemoryMediaBucket(
+        shareId: String,
+        memoryId: String,
+        createMemoryMediaBucketRequest: CreateMemoryMediaBucketRequest,
+    ): Response =
+        Response.ok(memoryShareService.createPublicShareMemoryMediaBucket(shareId, memoryId, createMemoryMediaBucketRequest)).build()
+
+    override fun updatePublicShareMemoryMediaBucket(
+        shareId: String,
+        memoryId: String,
+        bucketId: String,
+        updateMemoryMediaBucketRequest: UpdateMemoryMediaBucketRequest,
+    ): Response =
+        Response.ok(memoryShareService.updatePublicShareMemoryMediaBucket(shareId, memoryId, bucketId, updateMemoryMediaBucketRequest)).build()
+
+    override fun deletePublicShareMemoryMediaBucket(shareId: String, memoryId: String, bucketId: String): Response {
+        memoryShareService.deletePublicShareMemoryMediaBucket(shareId, memoryId, bucketId)
+        return Response.noContent().build()
+    }
 
     override fun downloadPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean?, locale: String?): Response =
         memoryShareService.downloadPublicShareMemoryMedia(shareId, memoryId, includeChildren ?: false, locale)
@@ -245,6 +272,22 @@ class PublicShareResource @Inject constructor(
 
     override fun deletePublicShareMedia(shareId: String, memoryId: String, mediaId: String): Response =
         memoryShareService.deletePublicShareMedia(shareId, memoryId, mediaId).let { Response.noContent().build() }
+
+    override fun movePublicShareMemoryMedia(
+        shareId: String,
+        memoryId: String,
+        moveMemoryMediaRequest: MoveMemoryMediaRequest,
+    ): Response =
+        Response.ok(memoryShareService.movePublicShareMemoryMedia(shareId, memoryId, moveMemoryMediaRequest)).build()
+
+    override fun deletePublicShareMemoryMediaBatch(
+        shareId: String,
+        memoryId: String,
+        deleteMemoryMediaBatchRequest: DeleteMemoryMediaBatchRequest,
+    ): Response =
+        memoryShareService.deletePublicShareMemoryMediaBatch(shareId, memoryId, deleteMemoryMediaBatchRequest).let {
+            Response.noContent().build()
+        }
 
     override fun publicShareMediaContent(shareId: String, mediaId: String, range: String?): Response =
         memoryShareService.publicShareMediaContent(shareId, mediaId, range)

@@ -57,6 +57,12 @@ export interface PendingMemoryMediaUploadSession {
     title?: string;
     /**
      * 
+     * @type {string}
+     * @memberof PendingMemoryMediaUploadSession
+     */
+    bucketId?: string;
+    /**
+     * 
      * @type {number}
      * @memberof PendingMemoryMediaUploadSession
      */
@@ -120,6 +126,7 @@ export function PendingMemoryMediaUploadSessionFromJSONTyped(json: any, ignoreDi
         'mimeType': json['mimeType'],
         'sizeBytes': json['sizeBytes'],
         'title': json['title'] == null ? undefined : json['title'],
+        'bucketId': json['bucketId'] == null ? undefined : json['bucketId'],
         'chunkSizeBytes': json['chunkSizeBytes'],
         'uploadedChunks': json['uploadedChunks'],
         'uploadedBytes': json['uploadedBytes'],
@@ -145,6 +152,7 @@ export function PendingMemoryMediaUploadSessionToJSONTyped(value?: PendingMemory
         'mimeType': value['mimeType'],
         'sizeBytes': value['sizeBytes'],
         'title': value['title'],
+        'bucketId': value['bucketId'],
         'chunkSizeBytes': value['chunkSizeBytes'],
         'uploadedChunks': value['uploadedChunks'],
         'uploadedBytes': value['uploadedBytes'],

@@ -15,28 +15,43 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateMemoryMediaBucketRequest,
   CreateMemoryMediaUploadRequest,
+  DeleteMemoryMediaBatchRequest,
   ErrorResponse,
   MemoryMediaBatchResponse,
+  MemoryMediaBucketSummary,
   MemoryMediaSummary,
   MemoryMediaUploadSession,
+  MoveMemoryMediaRequest,
   PendingMemoryMediaUploadSession,
+  UpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest,
 } from '../models/index';
 import {
+    CreateMemoryMediaBucketRequestFromJSON,
+    CreateMemoryMediaBucketRequestToJSON,
     CreateMemoryMediaUploadRequestFromJSON,
     CreateMemoryMediaUploadRequestToJSON,
+    DeleteMemoryMediaBatchRequestFromJSON,
+    DeleteMemoryMediaBatchRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     MemoryMediaBatchResponseFromJSON,
     MemoryMediaBatchResponseToJSON,
+    MemoryMediaBucketSummaryFromJSON,
+    MemoryMediaBucketSummaryToJSON,
     MemoryMediaSummaryFromJSON,
     MemoryMediaSummaryToJSON,
     MemoryMediaUploadSessionFromJSON,
     MemoryMediaUploadSessionToJSON,
+    MoveMemoryMediaRequestFromJSON,
+    MoveMemoryMediaRequestToJSON,
     PendingMemoryMediaUploadSessionFromJSON,
     PendingMemoryMediaUploadSessionToJSON,
+    UpdateMemoryMediaBucketRequestFromJSON,
+    UpdateMemoryMediaBucketRequestToJSON,
     UpdateMemoryMediaMetadataBatchRequestFromJSON,
     UpdateMemoryMediaMetadataBatchRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
@@ -55,6 +70,12 @@ export interface CompleteMemoryMediaUploadRequest {
     uploadId: string;
 }
 
+export interface CreateMemoryMediaBucketOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    createMemoryMediaBucketRequest: CreateMemoryMediaBucketRequest;
+}
+
 export interface CreateMemoryMediaUploadOperationRequest {
     tenantName: string;
     memoryId: string;
@@ -70,6 +91,18 @@ export interface DeleteMemoryMediaRequest {
     tenantName: string;
     memoryId: string;
     mediaId: string;
+}
+
+export interface DeleteMemoryMediaBatchOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    deleteMemoryMediaBatchRequest: DeleteMemoryMediaBatchRequest;
+}
+
+export interface DeleteMemoryMediaBucketRequest {
+    tenantName: string;
+    memoryId: string;
+    bucketId: string;
 }
 
 export interface DownloadMemoryMediaRequest {
@@ -91,6 +124,11 @@ export interface ListMemoryMediaRequest {
     includeChildren?: boolean;
 }
 
+export interface ListMemoryMediaBucketsRequest {
+    tenantName: string;
+    memoryId: string;
+}
+
 export interface MemoryMediaContentRequest {
     tenantName: string;
     mediaId: string;
@@ -105,6 +143,19 @@ export interface MemoryMediaPreviewRequest {
 export interface MemoryMediaThumbnailRequest {
     tenantName: string;
     mediaId: string;
+}
+
+export interface MoveMemoryMediaOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    moveMemoryMediaRequest: MoveMemoryMediaRequest;
+}
+
+export interface UpdateMemoryMediaBucketOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    bucketId: string;
+    updateMemoryMediaBucketRequest: UpdateMemoryMediaBucketRequest;
 }
 
 export interface UpdateMemoryMediaMetadataOperationRequest {
@@ -199,6 +250,34 @@ export interface MemoryMediaApiInterface {
     completeMemoryMediaUpload(requestParameters: CompleteMemoryMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
 
     /**
+     * Creates request options for createMemoryMediaBucket without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaBucketRequest} createMemoryMediaBucketRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    createMemoryMediaBucketRequestOpts(requestParameters: CreateMemoryMediaBucketOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Create a memory media subbucket
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaBucketRequest} createMemoryMediaBucketRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    createMemoryMediaBucketRaw(requestParameters: CreateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>>;
+
+    /**
+     * Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Create a memory media subbucket
+     */
+    createMemoryMediaBucket(requestParameters: CreateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary>;
+
+    /**
      * Creates request options for createMemoryMediaUpload without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -279,6 +358,62 @@ export interface MemoryMediaApiInterface {
      * Delete one memory media item
      */
     deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deleteMemoryMediaBatch without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {DeleteMemoryMediaBatchRequest} deleteMemoryMediaBatchRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaBatchRequestOpts(requestParameters: DeleteMemoryMediaBatchOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Delete selected memory media
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {DeleteMemoryMediaBatchRequest} deleteMemoryMediaBatchRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaBatchRaw(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete selected memory media
+     */
+    deleteMemoryMediaBatch(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deleteMemoryMediaBucket without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaBucketRequestOpts(requestParameters: DeleteMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Delete a memory media bucket
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    deleteMemoryMediaBucketRaw(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete a memory media bucket
+     */
+    deleteMemoryMediaBucket(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for downloadMemoryMedia without sending the request
@@ -367,6 +502,32 @@ export interface MemoryMediaApiInterface {
     listMemoryMedia(requestParameters: ListMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaSummary>>;
 
     /**
+     * Creates request options for listMemoryMediaBuckets without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    listMemoryMediaBucketsRequestOpts(requestParameters: ListMemoryMediaBucketsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary List memory media buckets
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    listMemoryMediaBucketsRaw(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>>;
+
+    /**
+     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * List memory media buckets
+     */
+    listMemoryMediaBuckets(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>>;
+
+    /**
      * Creates request options for memoryMediaContent without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} mediaId Public media id.
@@ -445,6 +606,64 @@ export interface MemoryMediaApiInterface {
      * Download memory media thumbnail
      */
     memoryMediaThumbnail(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for moveMemoryMedia without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryMediaRequest} moveMemoryMediaRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    moveMemoryMediaRequestOpts(requestParameters: MoveMemoryMediaOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Moves selected media in one Memory to another bucket in the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Move selected memory media to a bucket
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryMediaRequest} moveMemoryMediaRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    moveMemoryMediaRaw(requestParameters: MoveMemoryMediaOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>>;
+
+    /**
+     * Moves selected media in one Memory to another bucket in the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Move selected memory media to a bucket
+     */
+    moveMemoryMedia(requestParameters: MoveMemoryMediaOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse>;
+
+    /**
+     * Creates request options for updateMemoryMediaBucket without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {UpdateMemoryMediaBucketRequest} updateMemoryMediaBucketRequest 
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    updateMemoryMediaBucketRequestOpts(requestParameters: UpdateMemoryMediaBucketOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Renames a non-primary media bucket.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * @summary Rename a memory media subbucket
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {UpdateMemoryMediaBucketRequest} updateMemoryMediaBucketRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoryMediaApiInterface
+     */
+    updateMemoryMediaBucketRaw(requestParameters: UpdateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>>;
+
+    /**
+     * Renames a non-primary media bucket.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Rename a memory media subbucket
+     */
+    updateMemoryMediaBucket(requestParameters: UpdateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary>;
 
     /**
      * Creates request options for updateMemoryMediaMetadata without sending the request
@@ -699,6 +918,71 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Creates request options for createMemoryMediaBucket without sending the request
+     */
+    async createMemoryMediaBucketRequestOpts(requestParameters: CreateMemoryMediaBucketOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling createMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling createMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['createMemoryMediaBucketRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryMediaBucketRequest',
+                'Required parameter "createMemoryMediaBucketRequest" was null or undefined when calling createMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media-buckets`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryMediaBucketRequestToJSON(requestParameters['createMemoryMediaBucketRequest']),
+        };
+    }
+
+    /**
+     * Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Create a memory media subbucket
+     */
+    async createMemoryMediaBucketRaw(requestParameters: CreateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>> {
+        const requestOptions = await this.createMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBucketSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Create a memory media subbucket
+     */
+    async createMemoryMediaBucket(requestParameters: CreateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary> {
+        const response = await this.createMemoryMediaBucketRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for createMemoryMediaUpload without sending the request
      */
     async createMemoryMediaUploadRequestOpts(requestParameters: CreateMemoryMediaUploadOperationRequest): Promise<runtime.RequestOpts> {
@@ -877,6 +1161,132 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deleteMemoryMediaRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deleteMemoryMediaBatch without sending the request
+     */
+    async deleteMemoryMediaBatchRequestOpts(requestParameters: DeleteMemoryMediaBatchOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteMemoryMediaBatch().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deleteMemoryMediaBatch().'
+            );
+        }
+
+        if (requestParameters['deleteMemoryMediaBatchRequest'] == null) {
+            throw new runtime.RequiredError(
+                'deleteMemoryMediaBatchRequest',
+                'Required parameter "deleteMemoryMediaBatchRequest" was null or undefined when calling deleteMemoryMediaBatch().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/batch`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DeleteMemoryMediaBatchRequestToJSON(requestParameters['deleteMemoryMediaBatchRequest']),
+        };
+    }
+
+    /**
+     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete selected memory media
+     */
+    async deleteMemoryMediaBatchRaw(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteMemoryMediaBatchRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete selected memory media
+     */
+    async deleteMemoryMediaBatch(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteMemoryMediaBatchRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deleteMemoryMediaBucket without sending the request
+     */
+    async deleteMemoryMediaBucketRequestOpts(requestParameters: DeleteMemoryMediaBucketRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling deleteMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deleteMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['bucketId'] == null) {
+            throw new runtime.RequiredError(
+                'bucketId',
+                'Required parameter "bucketId" was null or undefined when calling deleteMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media-buckets/{bucketId}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"bucketId"}}`, encodeURIComponent(String(requestParameters['bucketId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete a memory media bucket
+     */
+    async deleteMemoryMediaBucketRaw(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deleteMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Delete a memory media bucket
+     */
+    async deleteMemoryMediaBucket(requestParameters: DeleteMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteMemoryMediaBucketRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -1065,6 +1475,61 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
+     * Creates request options for listMemoryMediaBuckets without sending the request
+     */
+    async listMemoryMediaBucketsRequestOpts(requestParameters: ListMemoryMediaBucketsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling listMemoryMediaBuckets().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling listMemoryMediaBuckets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media-buckets`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * List memory media buckets
+     */
+    async listMemoryMediaBucketsRaw(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>> {
+        const requestOptions = await this.listMemoryMediaBucketsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemoryMediaBucketSummaryFromJSON));
+    }
+
+    /**
+     * Lists the persistent uploader buckets and subbuckets for one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * List memory media buckets
+     */
+    async listMemoryMediaBuckets(requestParameters: ListMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>> {
+        const response = await this.listMemoryMediaBucketsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for memoryMediaContent without sending the request
      */
     async memoryMediaContentRequestOpts(requestParameters: MemoryMediaContentRequest): Promise<runtime.RequestOpts> {
@@ -1230,6 +1695,144 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
      */
     async memoryMediaThumbnail(requestParameters: MemoryMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.memoryMediaThumbnailRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for moveMemoryMedia without sending the request
+     */
+    async moveMemoryMediaRequestOpts(requestParameters: MoveMemoryMediaOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling moveMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling moveMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['moveMemoryMediaRequest'] == null) {
+            throw new runtime.RequiredError(
+                'moveMemoryMediaRequest',
+                'Required parameter "moveMemoryMediaRequest" was null or undefined when calling moveMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media/move`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: MoveMemoryMediaRequestToJSON(requestParameters['moveMemoryMediaRequest']),
+        };
+    }
+
+    /**
+     * Moves selected media in one Memory to another bucket in the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Move selected memory media to a bucket
+     */
+    async moveMemoryMediaRaw(requestParameters: MoveMemoryMediaOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>> {
+        const requestOptions = await this.moveMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBatchResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Moves selected media in one Memory to another bucket in the same Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Move selected memory media to a bucket
+     */
+    async moveMemoryMedia(requestParameters: MoveMemoryMediaOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse> {
+        const response = await this.moveMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updateMemoryMediaBucket without sending the request
+     */
+    async updateMemoryMediaBucketRequestOpts(requestParameters: UpdateMemoryMediaBucketOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling updateMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updateMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['bucketId'] == null) {
+            throw new runtime.RequiredError(
+                'bucketId',
+                'Required parameter "bucketId" was null or undefined when calling updateMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['updateMemoryMediaBucketRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryMediaBucketRequest',
+                'Required parameter "updateMemoryMediaBucketRequest" was null or undefined when calling updateMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/media-buckets/{bucketId}`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"bucketId"}}`, encodeURIComponent(String(requestParameters['bucketId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryMediaBucketRequestToJSON(requestParameters['updateMemoryMediaBucketRequest']),
+        };
+    }
+
+    /**
+     * Renames a non-primary media bucket.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Rename a memory media subbucket
+     */
+    async updateMemoryMediaBucketRaw(requestParameters: UpdateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>> {
+        const requestOptions = await this.updateMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBucketSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Renames a non-primary media bucket.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Rename a memory media subbucket
+     */
+    async updateMemoryMediaBucket(requestParameters: UpdateMemoryMediaBucketOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary> {
+        const response = await this.updateMemoryMediaBucketRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

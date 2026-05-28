@@ -43,6 +43,12 @@ export interface CreateMemoryMediaUploadRequest {
      * @memberof CreateMemoryMediaUploadRequest
      */
     title?: string;
+    /**
+     * Optional target media bucket id. When omitted, the uploader primary bucket is used.
+     * @type {string}
+     * @memberof CreateMemoryMediaUploadRequest
+     */
+    bucketId?: string;
 }
 
 /**
@@ -69,6 +75,7 @@ export function CreateMemoryMediaUploadRequestFromJSONTyped(json: any, ignoreDis
         'mimeType': json['mimeType'],
         'sizeBytes': json['sizeBytes'],
         'title': json['title'] == null ? undefined : json['title'],
+        'bucketId': json['bucketId'] == null ? undefined : json['bucketId'],
     };
 }
 
@@ -87,6 +94,7 @@ export function CreateMemoryMediaUploadRequestToJSONTyped(value?: CreateMemoryMe
         'mimeType': value['mimeType'],
         'sizeBytes': value['sizeBytes'],
         'title': value['title'],
+        'bucketId': value['bucketId'],
     };
 }
 

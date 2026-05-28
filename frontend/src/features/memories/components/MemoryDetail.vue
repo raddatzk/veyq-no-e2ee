@@ -14,9 +14,14 @@ import type { MenuItem } from 'primevue/menuitem'
 import MediaGrid from '../../../components/media/MediaGrid.vue'
 import { API_BASE } from '../../../shared/api/httpClient'
 import {
+  createMemoryMediaBucket as createTenantMemoryMediaBucket,
+  deleteMemoryMediaBatch as deleteTenantMemoryMediaBatch,
+  deleteMemoryMediaBucket as deleteTenantMemoryMediaBucket,
   deleteMemoryMedia as deleteTenantMemoryMedia,
   favoriteMemory,
+  moveMemoryMedia as moveTenantMemoryMedia,
   unfavoriteMemory,
+  updateMemoryMediaBucket as updateTenantMemoryMediaBucket,
   updateMemoryMediaMetadata,
   updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch,
   uploadMemoryTrack as uploadTenantMemoryTrack,
@@ -32,11 +37,16 @@ import type {
   MemoryHeader,
   MemoryJournal,
   MemoryMedia,
+  MemoryMediaBucket,
   MemoryPlaylist,
   MemoryTrack,
   CreateMemoryPlaylistRequest,
   SetMemoryCoverRequest,
+  CreateMemoryMediaBucketRequest,
+  DeleteMemoryMediaBatchRequest,
+  MoveMemoryMediaRequest,
   UpdateMemoryMediaMetadataBatchRequest,
+  UpdateMemoryMediaBucketRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryPlaylistRequest,
@@ -98,6 +108,7 @@ const props = defineProps<{
   journal?: MemoryJournal | null
   childMemories: Memory[]
   media: MemoryMedia[]
+  mediaBuckets?: MemoryMediaBucket[]
   mediaLoading?: boolean
   playlists?: MemoryPlaylist[]
   tracks?: MemoryTrack[]
@@ -123,6 +134,11 @@ const props = defineProps<{
     request: UpdateMemoryMediaMetadataBatchRequest
   ) => Promise<MemoryMedia[]>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+  createMediaBucket?: (memoryId: string, request: CreateMemoryMediaBucketRequest) => Promise<MemoryMediaBucket>
+  updateMediaBucket?: (bucketId: string, memoryId: string, request: UpdateMemoryMediaBucketRequest) => Promise<MemoryMediaBucket>
+  deleteMediaBucket?: (bucketId: string, memoryId: string) => Promise<void>
+  moveMedia?: (memoryId: string, request: MoveMemoryMediaRequest) => Promise<MemoryMedia[]>
+  deleteMediaBatch?: (memoryId: string, request: DeleteMemoryMediaBatchRequest) => Promise<void>
   uploadTrack?: (memoryId: string, request: UploadMemoryTrackRequest) => Promise<MemoryTrack>
   updateTrack?: (trackId: string, memoryId: string, request: UpdateMemoryTrackRequest) => Promise<MemoryTrack>
   deleteTrack?: (trackId: string, memoryId: string) => Promise<void>
@@ -149,6 +165,7 @@ const shareOpen = ref(false)
 const uploaderShareOpen = ref(false)
 const participantsOpen = ref(false)
 const uploadOpen = ref(false)
+const uploadBucketId = ref<string | null>(null)
 const downloadOpen = ref(false)
 const actionMenu = ref<InstanceType<typeof Menu> | null>(null)
 const secondaryActionMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -157,6 +174,9 @@ const favoriteOverride = ref<boolean | null>(null)
 const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 const uploadedMedia = ref<Record<string, MemoryMedia>>({})
 const deletedMediaIds = ref<Set<string>>(new Set())
+const mediaBucketOverrides = ref<Record<string, MemoryMediaBucket>>({})
+const createdMediaBuckets = ref<Record<string, MemoryMediaBucket>>({})
+const deletedMediaBucketIds = ref<Set<string>>(new Set())
 const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalDraft = ref('')
@@ -238,6 +258,22 @@ const mediaCountLabel = computed(() => `${localTotalMediaCount.value} ${t('memor
 const visibleMedia = computed(() => {
   const merged = [...props.media, ...uploadedMediaList.value].filter((media) => !deletedMediaIds.value.has(media.id))
   return merged.map((media) => mediaOverrides.value[media.id] || media)
+})
+const visibleMediaCountByBucket = computed(() =>
+  visibleMedia.value.reduce<Record<string, number>>((counts, media) => {
+    if (!media.bucketId) return counts
+    counts[media.bucketId] = (counts[media.bucketId] ?? 0) + 1
+    return counts
+  }, {})
+)
+const visibleMediaBuckets = computed(() => {
+  const merged = [...(props.mediaBuckets ?? []), ...Object.values(createdMediaBuckets.value)]
+    .filter((bucket, index, buckets) => buckets.findIndex((item) => item.id === bucket.id) === index)
+    .filter((bucket) => !deletedMediaBucketIds.value.has(bucket.id))
+  return merged.map((bucket) => {
+    const next = mediaBucketOverrides.value[bucket.id] || bucket
+    return { ...next, mediaCount: visibleMediaCountByBucket.value[bucket.id] ?? 0 }
+  })
 })
 const visiblePlaylists = computed(() => props.playlists ?? [])
 const visibleTracks = computed(() => props.tracks ?? [])
@@ -352,6 +388,9 @@ watch(
     uploadedMedia.value = {}
     mediaOverrides.value = {}
     deletedMediaIds.value = new Set()
+    mediaBucketOverrides.value = {}
+    createdMediaBuckets.value = {}
+    deletedMediaBucketIds.value = new Set()
   }
 )
 
@@ -405,6 +444,16 @@ function addUploadedMedia(media: MemoryMedia) {
   uploadedMedia.value = { ...uploadedMedia.value, [media.id]: media }
 }
 
+function openBucketUpload(bucketId: string) {
+  uploadBucketId.value = bucketId
+  uploadOpen.value = true
+}
+
+function openMemoryUpload() {
+  uploadBucketId.value = null
+  uploadOpen.value = true
+}
+
 async function submitMediaDelete(mediaId: string, memoryId: string): Promise<void> {
   if (props.deleteMedia) {
     await props.deleteMedia(mediaId, memoryId)
@@ -422,6 +471,83 @@ function markMediaDeleted(media: MemoryMedia) {
     Object.entries(mediaOverrides.value).filter(([mediaId]) => mediaId !== media.id)
   )
   emit('mediaDeleted', media)
+}
+
+async function submitMediaBucketCreate(
+  parentBucketId: string,
+  displayName: string
+): Promise<MemoryMediaBucket> {
+  const request = { parentBucketId, displayName }
+  const bucket = props.createMediaBucket
+    ? await props.createMediaBucket(props.memory.id, request)
+    : await createTenantMemoryMediaBucket(props.tenantName, props.memory.id, request)
+  createdMediaBuckets.value = { ...createdMediaBuckets.value, [bucket.id]: bucket }
+  return bucket
+}
+
+async function submitMediaBucketUpdate(
+  bucketId: string,
+  displayName: string
+): Promise<MemoryMediaBucket> {
+  const request = { displayName }
+  const bucket = props.updateMediaBucket
+    ? await props.updateMediaBucket(bucketId, props.memory.id, request)
+    : await updateTenantMemoryMediaBucket(props.tenantName, props.memory.id, bucketId, request)
+  mediaBucketOverrides.value = { ...mediaBucketOverrides.value, [bucket.id]: bucket }
+  return bucket
+}
+
+async function submitMediaBucketDelete(bucketId: string): Promise<void> {
+  const bucket = visibleMediaBuckets.value.find((candidate) => candidate.id === bucketId)
+  if (props.deleteMediaBucket) {
+    await props.deleteMediaBucket(bucketId, props.memory.id)
+  } else {
+    await deleteTenantMemoryMediaBucket(props.tenantName, props.memory.id, bucketId)
+  }
+  if (bucket && !bucket.primary) {
+    deletedMediaBucketIds.value = new Set([...deletedMediaBucketIds.value, bucketId])
+  }
+  const deletedBucketIds = new Set([bucketId])
+  let changed = true
+  while (changed) {
+    changed = false
+    visibleMediaBuckets.value.forEach((bucket) => {
+      if (bucket.parentBucketId && deletedBucketIds.has(bucket.parentBucketId) && !deletedBucketIds.has(bucket.id)) {
+        deletedBucketIds.add(bucket.id)
+        changed = true
+      }
+    })
+  }
+  deletedMediaIds.value = new Set([
+    ...deletedMediaIds.value,
+    ...visibleMedia.value.filter((media) => media.bucketId && deletedBucketIds.has(media.bucketId)).map((media) => media.id)
+  ])
+  if (bucket?.primary) {
+    mediaBucketOverrides.value = {
+      ...mediaBucketOverrides.value,
+      [bucket.id]: { ...bucket }
+    }
+  }
+}
+
+async function submitMediaMove(mediaIds: string[], targetBucketId: string): Promise<MemoryMedia[]> {
+  const request = { mediaIds, targetBucketId }
+  const moved = props.moveMedia
+    ? await props.moveMedia(props.memory.id, request)
+    : await moveTenantMemoryMedia(props.tenantName, props.memory.id, request)
+  mergeUpdatedMedia(moved)
+  return moved
+}
+
+async function submitMediaBatchDelete(mediaIds: string[]): Promise<void> {
+  const request = { mediaIds }
+  if (props.deleteMediaBatch) {
+    await props.deleteMediaBatch(props.memory.id, request)
+  } else {
+    await deleteTenantMemoryMediaBatch(props.tenantName, props.memory.id, request)
+  }
+  const deleted = visibleMedia.value.filter((media) => mediaIds.includes(media.id))
+  deleted.forEach(markMediaDeleted)
 }
 
 function submitTrackUpload(request: UploadMemoryTrackRequest): Promise<MemoryTrack> {
@@ -491,7 +617,6 @@ async function toggleFavorite() {
       : await favoriteMemory(props.tenantName, props.memory.id)
     favoriteOverride.value = updated.favorite
     notifyMemoryFavoritesChanged()
-    emit('changed', updated)
   } finally {
     favoriteSaving.value = false
   }
@@ -633,7 +758,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canFavorite"
                 v-tooltip.bottom="favoriteActionLabel"
-                class="memory-icon-action memory-action-inline"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline"
                 :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
                 :aria-label="favoriteActionLabel"
                 :severity="detailHeader.favorite ? 'warn' : 'secondary'"
@@ -644,11 +770,12 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               />
               <Button
                 v-if="capabilities.canUpload"
+                type="button"
                 icon="pi pi-upload"
                 :label="t('memory.upload')"
                 class="memory-upload-action"
                 size="small"
-                @click="uploadOpen = true"
+                @click="openMemoryUpload"
               />
               <MemoryHeaderPlaylistPlayer
                 v-if="visiblePlaylists.length > 0"
@@ -657,7 +784,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="canDownloadMemory"
                 v-tooltip.bottom="t('memory.download')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-download"
                 :aria-label="t('memory.download')"
                 severity="secondary"
@@ -668,7 +796,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canEdit"
                 v-tooltip.bottom="t('common.edit')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-pencil"
                 :aria-label="t('common.edit')"
                 severity="secondary"
@@ -679,7 +808,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canManageCover"
                 v-tooltip.bottom="t('memory.cover')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-image"
                 :aria-label="t('memory.cover')"
                 severity="secondary"
@@ -690,7 +820,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canManageParticipants"
                 v-tooltip.bottom="t('memory.participantsManage')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-users"
                 :aria-label="t('memory.participantsManage')"
                 severity="secondary"
@@ -701,7 +832,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canShare"
                 v-tooltip.bottom="t('share.uploadRequest')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-user-plus"
                 :aria-label="t('share.uploadRequest')"
                 severity="secondary"
@@ -712,7 +844,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canShare"
                 v-tooltip.bottom="t('share.title')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-share-alt"
                 :aria-label="t('share.title')"
                 severity="secondary"
@@ -723,7 +856,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
                 v-tooltip.bottom="t('common.delete')"
-                class="memory-icon-action memory-action-inline memory-action-collapsible"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-trash"
                 :aria-label="t('common.delete')"
                 severity="danger"
@@ -734,7 +868,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="secondaryOverflowActionItems.length"
                 v-tooltip.bottom="t('common.more')"
-                class="memory-icon-action memory-actions-overflow memory-actions-overflow-secondary"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-actions-overflow memory-actions-overflow-secondary"
                 icon="pi pi-ellipsis-h"
                 :aria-label="t('common.more')"
                 severity="secondary"
@@ -747,7 +882,8 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <Button
                 v-if="overflowActionItems.length"
                 v-tooltip.bottom="t('common.more')"
-                class="memory-icon-action memory-actions-overflow memory-actions-overflow-mobile"
+                type="button"
+                class="veyq-icon-button memory-icon-action memory-actions-overflow memory-actions-overflow-mobile"
                 icon="pi pi-ellipsis-h"
                 :aria-label="t('common.more')"
                 severity="secondary"
@@ -777,25 +913,26 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
     <Tabs v-model:value="selectedTab" class="memory-tabs">
       <TabList>
         <Tab value="gallery">{{ t('memory.gallery') }}</Tab>
-        <Tab value="buckets">{{ t('media.buckets') }}</Tab>
         <Tab value="map">{{ t('map.title') }}</Tab>
         <Tab value="tracks">{{ t('track.title') }}</Tab>
         <Tab value="playlists">{{ t('playlist.title') }}</Tab>
         <Tab value="journal">{{ t('memory.journal') }}</Tab>
         <Tab value="children">{{ t('memory.children') }}</Tab>
+        <Tab value="buckets">{{ t('media.buckets') }}</Tab>
         <Tab value="info">{{ t('memory.info') }}</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="gallery">
-          <div v-if="visibleMedia.length === 0 && !mediaLoading" class="memory-empty memory-empty-action">
+          <div v-if="visibleMedia.length === 0 && !mediaLoading" class="veyq-empty veyq-empty-action">
             <span class="pi pi-images" />
             <span>{{ t('memory.galleryEmptyAction') }}</span>
             <Button
               v-if="capabilities.canUpload"
+              type="button"
               icon="pi pi-upload"
               :label="t('memory.upload')"
               size="small"
-              @click="uploadOpen = true"
+              @click="openMemoryUpload"
             />
           </div>
           <MediaGrid
@@ -815,8 +952,18 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             :tenant-name="tenantName"
             :memory-id="memory.id"
             :media="visibleMedia"
+            :buckets="visibleMediaBuckets"
+            :can-upload="capabilities.canUpload"
+            :can-edit-metadata="capabilities.canEditMediaMetadata"
+            :can-delete-media="capabilities.canDeleteMedia"
             :update-metadata-batch="canBatchUpdateMediaMetadata ? submitMediaMetadataBatch : undefined"
+            :create-bucket="submitMediaBucketCreate"
+            :update-bucket="submitMediaBucketUpdate"
+            :delete-bucket="submitMediaBucketDelete"
+            :move-media="submitMediaMove"
+            :delete-media-batch="submitMediaBatchDelete"
             @updated="mergeUpdatedMedia"
+            @upload-bucket="openBucketUpload"
           />
         </TabPanel>
         <TabPanel value="map">
@@ -860,6 +1007,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <div class="memory-journal-actions">
                 <Button
                   v-if="capabilities.canEditJournal && journalEditing"
+                  type="button"
                   icon="pi pi-images"
                   :label="t('memory.journalInsertMedia')"
                   severity="secondary"
@@ -869,6 +1017,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                 />
                 <Button
                   v-if="capabilities.canEditJournal && !journalEditing"
+                  type="button"
                   icon="pi pi-pencil"
                   :label="journalHasContent ? t('common.edit') : t('memory.journalStart')"
                   severity="secondary"
@@ -940,10 +1089,11 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                   :child-memories="childMemories"
                   @open-memory="$emit('openMemory', $event)"
                 />
-                <p v-else class="memory-empty">{{ t('memory.journalEmptyPreview') }}</p>
+                <p v-else class="veyq-empty">{{ t('memory.journalEmptyPreview') }}</p>
               </div>
               <div class="memory-journal-editor-actions">
                 <Button
+                  type="button"
                   icon="pi pi-check"
                   :label="t('common.save')"
                   :loading="journalSaving"
@@ -951,6 +1101,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                   @click="submitJournal"
                 />
                 <Button
+                  type="button"
                   icon="pi pi-times"
                   :label="t('common.cancel')"
                   severity="secondary"
@@ -976,6 +1127,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <p>{{ t('memory.journalEmpty') }}</p>
               <Button
                 v-if="capabilities.canEditJournal"
+                type="button"
                 icon="pi pi-pencil"
                 :label="t('memory.journalStart')"
                 severity="secondary"
@@ -996,7 +1148,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
             />
             <button
               v-if="capabilities.canCreateChildMemory"
-              class="memory-create-card"
+              class="veyq-card veyq-card-interactive memory-create-card"
               type="button"
               @click="$emit('createChildMemory')"
             >
@@ -1004,7 +1156,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
               <strong>{{ t('memory.childCreate') }}</strong>
             </button>
           </div>
-          <div v-if="childMemories.length === 0 && !capabilities.canCreateChildMemory" class="memory-empty">
+          <div v-if="childMemories.length === 0 && !capabilities.canCreateChildMemory" class="veyq-empty">
             <span class="pi pi-sitemap" />
             <span>{{ t('memory.childrenEmpty') }}</span>
           </div>
@@ -1062,6 +1214,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
       v-model:visible="uploadOpen"
       :tenant-name="tenantName"
       :memory-id="memory.id"
+      :bucket-id="uploadBucketId"
       :upload-media="uploadMedia"
       @uploaded="addUploadedMedia"
       @saved="$emit('changed', memory)"

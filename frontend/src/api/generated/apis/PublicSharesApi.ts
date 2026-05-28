@@ -15,15 +15,20 @@
 
 import * as runtime from '../runtime';
 import type {
+  CreateMemoryMediaBucketRequest,
   CreateMemoryMediaUploadRequest,
   CreateMemoryPlaylistRequest,
   CreatePublicShareMemoryRequest,
+  DeleteMemoryMediaBatchRequest,
   ErrorResponse,
   MemoryJournalSummary,
+  MemoryMediaBatchResponse,
+  MemoryMediaBucketSummary,
   MemoryMediaUploadSession,
   MemoryPlaylistSummary,
   MemoryTrackActivityType,
   MemoryTrackSummary,
+  MoveMemoryMediaRequest,
   PendingMemoryMediaUploadSession,
   PublicShareLoginRequest,
   PublicShareMediaSummary,
@@ -32,22 +37,31 @@ import type {
   PublicShareSummary,
   PublicShareTreeResponse,
   UpdateMemoryJournalRequest,
+  UpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataRequest,
   UpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest,
   UpdatePublicShareMemoryRequest,
 } from '../models/index';
 import {
+    CreateMemoryMediaBucketRequestFromJSON,
+    CreateMemoryMediaBucketRequestToJSON,
     CreateMemoryMediaUploadRequestFromJSON,
     CreateMemoryMediaUploadRequestToJSON,
     CreateMemoryPlaylistRequestFromJSON,
     CreateMemoryPlaylistRequestToJSON,
     CreatePublicShareMemoryRequestFromJSON,
     CreatePublicShareMemoryRequestToJSON,
+    DeleteMemoryMediaBatchRequestFromJSON,
+    DeleteMemoryMediaBatchRequestToJSON,
     ErrorResponseFromJSON,
     ErrorResponseToJSON,
     MemoryJournalSummaryFromJSON,
     MemoryJournalSummaryToJSON,
+    MemoryMediaBatchResponseFromJSON,
+    MemoryMediaBatchResponseToJSON,
+    MemoryMediaBucketSummaryFromJSON,
+    MemoryMediaBucketSummaryToJSON,
     MemoryMediaUploadSessionFromJSON,
     MemoryMediaUploadSessionToJSON,
     MemoryPlaylistSummaryFromJSON,
@@ -56,6 +70,8 @@ import {
     MemoryTrackActivityTypeToJSON,
     MemoryTrackSummaryFromJSON,
     MemoryTrackSummaryToJSON,
+    MoveMemoryMediaRequestFromJSON,
+    MoveMemoryMediaRequestToJSON,
     PendingMemoryMediaUploadSessionFromJSON,
     PendingMemoryMediaUploadSessionToJSON,
     PublicShareLoginRequestFromJSON,
@@ -72,6 +88,8 @@ import {
     PublicShareTreeResponseToJSON,
     UpdateMemoryJournalRequestFromJSON,
     UpdateMemoryJournalRequestToJSON,
+    UpdateMemoryMediaBucketRequestFromJSON,
+    UpdateMemoryMediaBucketRequestToJSON,
     UpdateMemoryMediaMetadataRequestFromJSON,
     UpdateMemoryMediaMetadataRequestToJSON,
     UpdateMemoryPlaylistRequestFromJSON,
@@ -115,6 +133,12 @@ export interface CreatePublicShareMediaUploadRequest {
     createMemoryMediaUploadRequest: CreateMemoryMediaUploadRequest;
 }
 
+export interface CreatePublicShareMemoryMediaBucketRequest {
+    shareId: string;
+    memoryId: string;
+    createMemoryMediaBucketRequest: CreateMemoryMediaBucketRequest;
+}
+
 export interface CreatePublicShareMemoryMediaUploadRequest {
     shareId: string;
     memoryId: string;
@@ -136,6 +160,18 @@ export interface DeletePublicShareMediaRequest {
 export interface DeletePublicShareMemoryRequest {
     shareId: string;
     memoryId: string;
+}
+
+export interface DeletePublicShareMemoryMediaBatchRequest {
+    shareId: string;
+    memoryId: string;
+    deleteMemoryMediaBatchRequest: DeleteMemoryMediaBatchRequest;
+}
+
+export interface DeletePublicShareMemoryMediaBucketRequest {
+    shareId: string;
+    memoryId: string;
+    bucketId: string;
 }
 
 export interface DeletePublicShareMemoryPlaylistRequest {
@@ -205,6 +241,11 @@ export interface ListPublicShareMemoryMediaRequest {
     memoryId: string;
 }
 
+export interface ListPublicShareMemoryMediaBucketsRequest {
+    shareId: string;
+    memoryId: string;
+}
+
 export interface ListPublicShareMemoryPlaylistsRequest {
     shareId: string;
     memoryId: string;
@@ -222,6 +263,12 @@ export interface LoginPublicShareRequest {
 
 export interface LogoutPublicShareRequest {
     shareId: string;
+}
+
+export interface MovePublicShareMemoryMediaRequest {
+    shareId: string;
+    memoryId: string;
+    moveMemoryMediaRequest: MoveMemoryMediaRequest;
 }
 
 export interface PublicShareMediaContentRequest {
@@ -288,6 +335,13 @@ export interface UpdatePublicShareMemoryJournalRequest {
     shareId: string;
     memoryId: string;
     updateMemoryJournalRequest: UpdateMemoryJournalRequest;
+}
+
+export interface UpdatePublicShareMemoryMediaBucketRequest {
+    shareId: string;
+    memoryId: string;
+    bucketId: string;
+    updateMemoryMediaBucketRequest: UpdateMemoryMediaBucketRequest;
 }
 
 export interface UpdatePublicShareMemoryPlaylistRequest {
@@ -510,6 +564,34 @@ export interface PublicSharesApiInterface {
     createPublicShareMediaUpload(requestParameters: CreatePublicShareMediaUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUploadSession>;
 
     /**
+     * Creates request options for createPublicShareMemoryMediaBucket without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaBucketRequest} createMemoryMediaBucketRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryMediaBucketRequestOpts(requestParameters: CreatePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Creates a subbucket below a bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Create a public share Memory media subbucket
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {CreateMemoryMediaBucketRequest} createMemoryMediaBucketRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    createPublicShareMemoryMediaBucketRaw(requestParameters: CreatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>>;
+
+    /**
+     * Creates a subbucket below a bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Create a public share Memory media subbucket
+     */
+    createPublicShareMemoryMediaBucket(requestParameters: CreatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary>;
+
+    /**
      * Creates request options for createPublicShareMemoryMediaUpload without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -618,6 +700,62 @@ export interface PublicSharesApiInterface {
      * Delete a submemory through a public share
      */
     deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deletePublicShareMemoryMediaBatch without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {DeleteMemoryMediaBatchRequest} deleteMemoryMediaBatchRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryMediaBatchRequestOpts(requestParameters: DeletePublicShareMemoryMediaBatchRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Delete selected public share Memory media
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {DeleteMemoryMediaBatchRequest} deleteMemoryMediaBatchRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryMediaBatchRaw(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete selected public share Memory media
+     */
+    deletePublicShareMemoryMediaBatch(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for deletePublicShareMemoryMediaBucket without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryMediaBucketRequestOpts(requestParameters: DeletePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Delete a public share Memory media bucket
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    deletePublicShareMemoryMediaBucketRaw(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete a public share Memory media bucket
+     */
+    deletePublicShareMemoryMediaBucket(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for deletePublicShareMemoryPlaylist without sending the request
@@ -962,6 +1100,32 @@ export interface PublicSharesApiInterface {
     listPublicShareMemoryMedia(requestParameters: ListPublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<PublicShareMediaSummary>>;
 
     /**
+     * Creates request options for listPublicShareMemoryMediaBuckets without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryMediaBucketsRequestOpts(requestParameters: ListPublicShareMemoryMediaBucketsRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary List public share Memory media buckets
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    listPublicShareMemoryMediaBucketsRaw(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>>;
+
+    /**
+     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * List public share Memory media buckets
+     */
+    listPublicShareMemoryMediaBuckets(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>>;
+
+    /**
      * Creates request options for listPublicShareMemoryPlaylists without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -1062,6 +1226,34 @@ export interface PublicSharesApiInterface {
      * Close a public share identity session
      */
     logoutPublicShare(requestParameters: LogoutPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
+    /**
+     * Creates request options for movePublicShareMemoryMedia without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryMediaRequest} moveMemoryMediaRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    movePublicShareMemoryMediaRequestOpts(requestParameters: MovePublicShareMemoryMediaRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Moves selected media to another bucket when the current identity can manage both the selected media and target bucket.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Move public share Memory media to a bucket
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryMediaRequest} moveMemoryMediaRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    movePublicShareMemoryMediaRaw(requestParameters: MovePublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>>;
+
+    /**
+     * Moves selected media to another bucket when the current identity can manage both the selected media and target bucket.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Move public share Memory media to a bucket
+     */
+    movePublicShareMemoryMedia(requestParameters: MovePublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse>;
 
     /**
      * Creates request options for publicShareMediaContent without sending the request
@@ -1370,6 +1562,36 @@ export interface PublicSharesApiInterface {
      * Update public share Memory journal
      */
     updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
+
+    /**
+     * Creates request options for updatePublicShareMemoryMediaBucket without sending the request
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {UpdateMemoryMediaBucketRequest} updateMemoryMediaBucketRequest 
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryMediaBucketRequestOpts(requestParameters: UpdatePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Renames a non-primary bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Rename a public share Memory media bucket
+     * @param {string} shareId Public share id.
+     * @param {string} memoryId Public Memory id.
+     * @param {string} bucketId Public media bucket id.
+     * @param {UpdateMemoryMediaBucketRequest} updateMemoryMediaBucketRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PublicSharesApiInterface
+     */
+    updatePublicShareMemoryMediaBucketRaw(requestParameters: UpdatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>>;
+
+    /**
+     * Renames a non-primary bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Rename a public share Memory media bucket
+     */
+    updatePublicShareMemoryMediaBucket(requestParameters: UpdatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary>;
 
     /**
      * Creates request options for updatePublicShareMemoryPlaylist without sending the request
@@ -1947,6 +2169,71 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates request options for createPublicShareMemoryMediaBucket without sending the request
+     */
+    async createPublicShareMemoryMediaBucketRequestOpts(requestParameters: CreatePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling createPublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling createPublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['createMemoryMediaBucketRequest'] == null) {
+            throw new runtime.RequiredError(
+                'createMemoryMediaBucketRequest',
+                'Required parameter "createMemoryMediaBucketRequest" was null or undefined when calling createPublicShareMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media-buckets`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateMemoryMediaBucketRequestToJSON(requestParameters['createMemoryMediaBucketRequest']),
+        };
+    }
+
+    /**
+     * Creates a subbucket below a bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Create a public share Memory media subbucket
+     */
+    async createPublicShareMemoryMediaBucketRaw(requestParameters: CreatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>> {
+        const requestOptions = await this.createPublicShareMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBucketSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Creates a subbucket below a bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Create a public share Memory media subbucket
+     */
+    async createPublicShareMemoryMediaBucket(requestParameters: CreatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary> {
+        const response = await this.createPublicShareMemoryMediaBucketRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for createPublicShareMemoryMediaUpload without sending the request
      */
     async createPublicShareMemoryMediaUploadRequestOpts(requestParameters: CreatePublicShareMemoryMediaUploadRequest): Promise<runtime.RequestOpts> {
@@ -2190,6 +2477,132 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async deletePublicShareMemory(requestParameters: DeletePublicShareMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.deletePublicShareMemoryRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deletePublicShareMemoryMediaBatch without sending the request
+     */
+    async deletePublicShareMemoryMediaBatchRequestOpts(requestParameters: DeletePublicShareMemoryMediaBatchRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling deletePublicShareMemoryMediaBatch().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deletePublicShareMemoryMediaBatch().'
+            );
+        }
+
+        if (requestParameters['deleteMemoryMediaBatchRequest'] == null) {
+            throw new runtime.RequiredError(
+                'deleteMemoryMediaBatchRequest',
+                'Required parameter "deleteMemoryMediaBatchRequest" was null or undefined when calling deletePublicShareMemoryMediaBatch().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/batch`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+            body: DeleteMemoryMediaBatchRequestToJSON(requestParameters['deleteMemoryMediaBatchRequest']),
+        };
+    }
+
+    /**
+     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete selected public share Memory media
+     */
+    async deletePublicShareMemoryMediaBatchRaw(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deletePublicShareMemoryMediaBatchRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete selected public share Memory media
+     */
+    async deletePublicShareMemoryMediaBatch(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deletePublicShareMemoryMediaBatchRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for deletePublicShareMemoryMediaBucket without sending the request
+     */
+    async deletePublicShareMemoryMediaBucketRequestOpts(requestParameters: DeletePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling deletePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling deletePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['bucketId'] == null) {
+            throw new runtime.RequiredError(
+                'bucketId',
+                'Required parameter "bucketId" was null or undefined when calling deletePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media-buckets/{bucketId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"bucketId"}}`, encodeURIComponent(String(requestParameters['bucketId'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete a public share Memory media bucket
+     */
+    async deletePublicShareMemoryMediaBucketRaw(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deletePublicShareMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Deletes a non-primary bucket, descendant buckets and contained media when the current identity can manage that bucket.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Delete a public share Memory media bucket
+     */
+    async deletePublicShareMemoryMediaBucket(requestParameters: DeletePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deletePublicShareMemoryMediaBucketRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -2917,6 +3330,61 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
+     * Creates request options for listPublicShareMemoryMediaBuckets without sending the request
+     */
+    async listPublicShareMemoryMediaBucketsRequestOpts(requestParameters: ListPublicShareMemoryMediaBucketsRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling listPublicShareMemoryMediaBuckets().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling listPublicShareMemoryMediaBuckets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media-buckets`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * List public share Memory media buckets
+     */
+    async listPublicShareMemoryMediaBucketsRaw(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemoryMediaBucketSummary>>> {
+        const requestOptions = await this.listPublicShareMemoryMediaBucketsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemoryMediaBucketSummaryFromJSON));
+    }
+
+    /**
+     * Lists media buckets visible to the current public-share identity for one Memory.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * List public share Memory media buckets
+     */
+    async listPublicShareMemoryMediaBuckets(requestParameters: ListPublicShareMemoryMediaBucketsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemoryMediaBucketSummary>> {
+        const response = await this.listPublicShareMemoryMediaBucketsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for listPublicShareMemoryPlaylists without sending the request
      */
     async listPublicShareMemoryPlaylistsRequestOpts(requestParameters: ListPublicShareMemoryPlaylistsRequest): Promise<runtime.RequestOpts> {
@@ -3127,6 +3595,71 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async logoutPublicShare(requestParameters: LogoutPublicShareRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.logoutPublicShareRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for movePublicShareMemoryMedia without sending the request
+     */
+    async movePublicShareMemoryMediaRequestOpts(requestParameters: MovePublicShareMemoryMediaRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling movePublicShareMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling movePublicShareMemoryMedia().'
+            );
+        }
+
+        if (requestParameters['moveMemoryMediaRequest'] == null) {
+            throw new runtime.RequiredError(
+                'moveMemoryMediaRequest',
+                'Required parameter "moveMemoryMediaRequest" was null or undefined when calling movePublicShareMemoryMedia().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media/move`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: MoveMemoryMediaRequestToJSON(requestParameters['moveMemoryMediaRequest']),
+        };
+    }
+
+    /**
+     * Moves selected media to another bucket when the current identity can manage both the selected media and target bucket.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Move public share Memory media to a bucket
+     */
+    async movePublicShareMemoryMediaRaw(requestParameters: MovePublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBatchResponse>> {
+        const requestOptions = await this.movePublicShareMemoryMediaRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBatchResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Moves selected media to another bucket when the current identity can manage both the selected media and target bucket.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Move public share Memory media to a bucket
+     */
+    async movePublicShareMemoryMedia(requestParameters: MovePublicShareMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBatchResponse> {
+        const response = await this.movePublicShareMemoryMediaRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**
@@ -3810,6 +4343,79 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
      */
     async updatePublicShareMemoryJournal(requestParameters: UpdatePublicShareMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary> {
         const response = await this.updatePublicShareMemoryJournalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for updatePublicShareMemoryMediaBucket without sending the request
+     */
+    async updatePublicShareMemoryMediaBucketRequestOpts(requestParameters: UpdatePublicShareMemoryMediaBucketRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['shareId'] == null) {
+            throw new runtime.RequiredError(
+                'shareId',
+                'Required parameter "shareId" was null or undefined when calling updatePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling updatePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['bucketId'] == null) {
+            throw new runtime.RequiredError(
+                'bucketId',
+                'Required parameter "bucketId" was null or undefined when calling updatePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        if (requestParameters['updateMemoryMediaBucketRequest'] == null) {
+            throw new runtime.RequiredError(
+                'updateMemoryMediaBucketRequest',
+                'Required parameter "updateMemoryMediaBucketRequest" was null or undefined when calling updatePublicShareMemoryMediaBucket().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/media-buckets/{bucketId}`;
+        urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+        urlPath = urlPath.replace(`{${"bucketId"}}`, encodeURIComponent(String(requestParameters['bucketId'])));
+
+        return {
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateMemoryMediaBucketRequestToJSON(requestParameters['updateMemoryMediaBucketRequest']),
+        };
+    }
+
+    /**
+     * Renames a non-primary bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Rename a public share Memory media bucket
+     */
+    async updatePublicShareMemoryMediaBucketRaw(requestParameters: UpdatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaBucketSummary>> {
+        const requestOptions = await this.updatePublicShareMemoryMediaBucketRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryMediaBucketSummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Renames a non-primary bucket the current share identity can manage.  Vorbedingungen: - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Rename a public share Memory media bucket
+     */
+    async updatePublicShareMemoryMediaBucket(requestParameters: UpdatePublicShareMemoryMediaBucketRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaBucketSummary> {
+        const response = await this.updatePublicShareMemoryMediaBucketRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

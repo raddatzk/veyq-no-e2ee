@@ -32,6 +32,7 @@ models/CoverCrop.ts
 models/CreateFolderRequest.ts
 models/CreateGroupRequest.ts
 models/CreateManagedUserRequest.ts
+models/CreateMemoryMediaBucketRequest.ts
 models/CreateMemoryMediaUploadRequest.ts
 models/CreateMemoryPlaylistRequest.ts
 models/CreateMemoryRequest.ts
@@ -39,6 +40,7 @@ models/CreateMemoryShareRequest.ts
 models/CreatePasskeyRequest.ts
 models/CreatePublicShareMemoryRequest.ts
 models/CreateTenantRequest.ts
+models/DeleteMemoryMediaBatchRequest.ts
 models/ErrorResponse.ts
 models/ForgotPasswordRequest.ts
 models/GroupMemberRequest.ts
@@ -56,6 +58,7 @@ models/MemoryFolder.ts
 models/MemoryHeaderSummary.ts
 models/MemoryJournalSummary.ts
 models/MemoryMediaBatchResponse.ts
+models/MemoryMediaBucketSummary.ts
 models/MemoryMediaSummary.ts
 models/MemoryMediaUploadSession.ts
 models/MemoryNavigationBreadcrumb.ts
@@ -76,6 +79,7 @@ models/MemoryTrackBounds.ts
 models/MemoryTrackGeometry.ts
 models/MemoryTrackSummary.ts
 models/MoveFolderRequest.ts
+models/MoveMemoryMediaRequest.ts
 models/PasskeyAssertionResponse.ts
 models/PasskeyAttestationResponse.ts
 models/PasskeyInvitationOptionsRequest.ts
@@ -121,6 +125,7 @@ models/UpdateGroupRequest.ts
 models/UpdateGroupSettingsRequest.ts
 models/UpdateManagedUserRoleRequest.ts
 models/UpdateMemoryJournalRequest.ts
+models/UpdateMemoryMediaBucketRequest.ts
 models/UpdateMemoryMediaMetadataBatchRequest.ts
 models/UpdateMemoryMediaMetadataRequest.ts
 models/UpdateMemoryPlaylistRequest.ts

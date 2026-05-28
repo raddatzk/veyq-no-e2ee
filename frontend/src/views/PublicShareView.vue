@@ -20,8 +20,11 @@ import { getErrorMessage } from '../shared/utils/errors'
 import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
 import {
   createPublicShareChildMemory,
+  createPublicShareMemoryMediaBucket,
   createPublicShareMemoryPlaylist,
   deletePublicShareMedia,
+  deletePublicShareMemoryMediaBatch,
+  deletePublicShareMemoryMediaBucket,
   deletePublicShareMemory,
   deletePublicShareMemoryPlaylist,
   getPublicShare,
@@ -30,13 +33,16 @@ import {
   getPublicShareMemoryByPath,
   listPublicShareChildMemories,
   listPublicShareMemoryMedia,
+  listPublicShareMemoryMediaBuckets,
   listPublicShareMemoryPlaylists,
   listPublicShareMemoryTracks,
   loginPublicShare,
   logoutPublicShare,
   removePublicShareMemoryCover,
+  movePublicShareMemoryMedia,
   setPublicShareMemoryCover,
   updatePublicShareMediaMetadata,
+  updatePublicShareMemoryMediaBucket,
   updatePublicShareMemory,
   updatePublicShareMemoryJournal,
   updatePublicShareMemoryPlaylist,
@@ -49,6 +55,7 @@ import {
   type MemoryHeader,
   type MemoryJournal,
   type MemoryMedia,
+  type MemoryMediaBucket,
   type MemoryPlaylist,
   type MemoryTrack,
   type PublicShareNotice,
@@ -68,6 +75,7 @@ const memoryHeader = ref<MemoryHeader | null>(null)
 const memoryJournal = ref<MemoryJournal | null>(null)
 const childMemories = ref<Memory[]>([])
 const media = ref<MemoryMedia[]>([])
+const mediaBuckets = ref<MemoryMediaBucket[]>([])
 const mediaLoading = ref(false)
 const playlists = ref<MemoryPlaylist[]>([])
 const tracks = ref<MemoryTrack[]>([])
@@ -129,8 +137,8 @@ const capabilities = computed(() => ({
   canShare: false,
   canManageCover: Boolean(share.value?.canEdit),
   canEditJournal: Boolean(share.value?.canDelete),
-  canEditMediaMetadata: Boolean(share.value?.canEdit),
-  canDeleteMedia: Boolean(share.value?.canDelete),
+  canEditMediaMetadata: Boolean(share.value?.canUpload || share.value?.canEdit),
+  canDeleteMedia: Boolean(share.value?.canUpload || share.value?.canDelete),
   canEditTracks: Boolean(share.value?.canEdit),
   canEditPlaylists: Boolean(share.value?.canEdit),
   canDeleteCurrentMemory: Boolean(share.value?.canDelete && memory.value?.id !== share.value.rootMemory?.id),
@@ -198,6 +206,7 @@ async function closeShare() {
   memoryJournal.value = null
   childMemories.value = []
   media.value = []
+  mediaBuckets.value = []
   mediaLoading.value = false
   playlists.value = []
   tracks.value = []
@@ -258,6 +267,9 @@ async function loadCurrentMemoryDetails(sequence: number, current: Memory) {
       mediaLoading.value = false
     }, () => {
       mediaLoading.value = false
+    }),
+    loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMediaBuckets(shareId.value, current.id), (buckets) => {
+      mediaBuckets.value = buckets
     }),
     loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryTracks(shareId.value, current.id), (memoryTracks) => {
       tracks.value = memoryTracks
@@ -407,7 +419,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
 </script>
 
 <template>
-  <section class="public-share-view">
+  <section class="veyq-page public-share-view">
     <header
       v-if="canShowLogin"
       class="public-share-header"
@@ -433,7 +445,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
-    <section v-if="canShowNoticeGate" class="public-share-notice-gate">
+    <section v-if="canShowNoticeGate" class="veyq-surface public-share-notice-gate">
       <div class="public-share-login-copy">
         <h2>{{ t('share.noticeAcceptTitle') }}</h2>
         <p class="public-share-copy">{{ t('share.noticeAcceptCopy') }}</p>
@@ -441,7 +453,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       <article
         v-for="notice in pendingNotices"
         :key="notice.storageKey"
-        class="public-share-notice"
+        class="veyq-surface public-share-notice"
       >
         <h3>
           {{ notice.notice.scope === 'TENANT' ? t('share.noticeTenantTitle') : t('share.noticeShareTitle') }}
@@ -457,7 +469,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       />
     </section>
 
-    <form v-else-if="canShowLogin" class="public-share-login" @submit.prevent="login">
+    <form v-else-if="canShowLogin" class="veyq-surface public-share-login" @submit.prevent="login">
       <div class="public-share-login-copy">
         <h2>{{ t('share.loginTitle') }}</h2>
         <p class="public-share-copy">{{ t('share.loginCopy') }}</p>
@@ -484,14 +496,14 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       />
     </form>
 
-    <div v-else-if="loading && !memory" class="memory-loading">
+    <div v-else-if="loading && !memory" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('share.loading') }}</span>
     </div>
 
     <form
       v-else-if="noticesAccepted && share?.authenticated && isUploaderOnly"
-      class="public-share-upload"
+      class="veyq-surface public-share-upload"
       @submit.prevent="uploadToRoot"
     >
       <div class="public-share-upload-copy">
@@ -546,6 +558,7 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :media-buckets="mediaBuckets"
       :media-loading="mediaLoading"
       :playlists="playlists"
       :tracks="tracks"
@@ -559,6 +572,11 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       :delete-memory="(memoryId) => deletePublicShareMemory(shareId, memoryId)"
       :update-media-metadata="(mediaId, memoryId, request) => updatePublicShareMediaMetadata(shareId, memoryId, mediaId, request)"
       :delete-media="(mediaId, memoryId) => deletePublicShareMedia(shareId, memoryId, mediaId)"
+      :create-media-bucket="(memoryId, request) => createPublicShareMemoryMediaBucket(shareId, memoryId, request)"
+      :update-media-bucket="(bucketId, memoryId, request) => updatePublicShareMemoryMediaBucket(shareId, memoryId, bucketId, request)"
+      :delete-media-bucket="(bucketId, memoryId) => deletePublicShareMemoryMediaBucket(shareId, memoryId, bucketId)"
+      :move-media="(memoryId, request) => movePublicShareMemoryMedia(shareId, memoryId, request)"
+      :delete-media-batch="(memoryId, request) => deletePublicShareMemoryMediaBatch(shareId, memoryId, request)"
       :upload-track="(memoryId, request) => uploadPublicShareMemoryTrack(shareId, memoryId, request)"
       :update-track="(trackId, memoryId, request) => updatePublicShareMemoryTrack(shareId, memoryId, trackId, request)"
       :delete-track="(trackId, memoryId) => deletePublicShareMemoryTrack(shareId, memoryId, trackId)"

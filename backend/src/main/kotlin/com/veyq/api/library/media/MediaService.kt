@@ -1,6 +1,7 @@
 package com.veyq.api.library.media
 
 import com.veyq.api.auth.BadRequestException
+import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.domain.ArchiveMediaKeyset
 import com.veyq.api.domain.ArchiveMediaRow
@@ -12,6 +13,8 @@ import com.veyq.api.domain.MediaBlob
 import com.veyq.api.domain.MediaBlobRepo
 import com.veyq.api.domain.MediaRepo
 import com.veyq.api.domain.Memory
+import com.veyq.api.domain.MemoryMediaBucket
+import com.veyq.api.domain.MemoryMediaBucketRepo
 import com.veyq.api.domain.MemoryShareIdentity
 import com.veyq.api.domain.MemoryShareIdentityRepo
 import com.veyq.api.domain.MemoryRepo
@@ -22,14 +25,19 @@ import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
+import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
+import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
 import com.veyq.api.generated.model.MediaUploader
+import com.veyq.api.generated.model.MemoryMediaBucketSummary
 import com.veyq.api.generated.model.MemoryMediaUploadSession
 import com.veyq.api.generated.model.MemoryMediaBatchResponse
 import com.veyq.api.generated.model.MemoryMediaSummary
+import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.PendingMemoryMediaUploadSession
 import com.veyq.api.generated.model.PublicShareMediaSummary
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.LibraryScopes
@@ -68,6 +76,7 @@ class MediaService @Inject constructor(
     private val mediaRepo: MediaRepo,
     private val trackRepo: MemoryTrackRepo,
     private val mediaBlobRepo: MediaBlobRepo,
+    private val bucketRepo: MemoryMediaBucketRepo,
     private val memoryRepo: MemoryRepo,
     private val userRepo: UserRepo,
     private val shareIdentityRepo: MemoryShareIdentityRepo,
@@ -92,6 +101,8 @@ class MediaService @Inject constructor(
         val mimeType: String,
         val sizeBytes: Long,
         val title: String?,
+        val bucketId: Long?,
+        val bucketPublicId: String?,
         val uploaderUserId: Long?,
         val shareIdentityId: Long?,
         val shareId: String?,
@@ -104,6 +115,7 @@ class MediaService @Inject constructor(
         val memoryId: Long,
         val originalFilename: String?,
         val title: String?,
+        val bucketId: Long?,
         val uploaderUserId: Long?,
         val shareIdentityId: Long?,
         val sizeBytes: Long,
@@ -113,15 +125,94 @@ class MediaService @Inject constructor(
         val metadata: ExtractedMediaMetadata,
     )
 
+    @Transactional
     fun listMemoryMedia(memoryId: String, includeChildren: Boolean): List<MemoryMediaSummary> {
         val memory = resolveVisibleMemory(memoryId)
         val memories = if (includeChildren) descendantsAndSelf(memory) else listOf(memory)
+        ensureBucketsForMemories(memories)
         return memories
             .filter(::isMemoryVisible)
             .flatMap { mediaRepo.listByMemory(it) }
             .distinctBy { it.id }
             .sortedWith(compareBy<Media> { it.capturedAt ?: it.createdAt }.thenBy { it.createdAt })
             .map { it.toMemorySummary() }
+    }
+
+    @Transactional
+    fun listMemoryMediaBuckets(memoryId: String): List<MemoryMediaBucketSummary> {
+        val memory = resolveVisibleMemory(memoryId)
+        ensureBucketsForMemories(listOf(memory))
+        return bucketSummaries(memory, bucketRepo.listByMemory(memory))
+    }
+
+    @Transactional
+    fun createMemoryMediaBucket(memoryId: String, request: CreateMemoryMediaBucketRequest): MemoryMediaBucketSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val parent = resolveBucketInMemory(memory, request.parentBucketId)
+        if (!parent.primaryBucket) {
+            throw BadRequestException("Subbuckets must be created below a primary bucket", "MEDIA_BUCKET_PARENT_INVALID")
+        }
+        val name = bucketName(request.displayName)
+        if (bucketRepo.nameExists(memory, parent, name)) throw ConflictException("Bucket name already exists")
+        val bucket = MemoryMediaBucket().also {
+            it.tenant = memory.tenant
+            it.memory = memory
+            it.parentBucket = parent
+            it.name = name
+            it.displayName = requiredBucketDisplayName(request.displayName)
+            it.primaryBucket = false
+            it.uploaderUser = parent.uploaderUser
+            it.shareIdentity = parent.shareIdentity
+            bucketRepo.persist(it)
+        }
+        bucketRepo.flush()
+        return bucket.toSummary(mediaCountsByBucket(listOf(memory)))
+    }
+
+    @Transactional
+    fun updateMemoryMediaBucket(memoryId: String, bucketId: String, request: UpdateMemoryMediaBucketRequest): MemoryMediaBucketSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val bucket = resolveBucketInMemory(memory, bucketId)
+        if (bucket.primaryBucket) throw BadRequestException("Primary buckets cannot be renamed", "MEDIA_BUCKET_PRIMARY_IMMUTABLE")
+        val name = bucketName(request.displayName)
+        if (name != bucket.name && bucketRepo.nameExists(memory, bucket.parentBucket, name)) {
+            throw ConflictException("Bucket name already exists")
+        }
+        bucket.name = name
+        bucket.displayName = requiredBucketDisplayName(request.displayName)
+        return bucket.toSummary(mediaCountsByBucket(listOf(memory)))
+    }
+
+    @Transactional
+    fun deleteMemoryMediaBucket(memoryId: String, bucketId: String) {
+        val memory = resolveVisibleMemory(memoryId)
+        val bucket = resolveBucketInMemory(memory, bucketId)
+        if (bucket.primaryBucket) {
+            deleteBucketContents(bucket)
+        } else {
+            deleteBucketTree(bucket)
+        }
+    }
+
+    @Transactional
+    fun moveMemoryMedia(memoryId: String, request: MoveMemoryMediaRequest): MemoryMediaBatchResponse {
+        val memory = resolveVisibleMemory(memoryId)
+        val target = resolveBucketInMemory(memory, request.targetBucketId)
+        val mediaIds = normalizedMediaIds(request.mediaIds)
+        val moved = mediaIds.map { mediaId ->
+            val media = resolveMediaInMemory(memory, mediaId)
+            media.bucket = target
+            media
+        }
+        return MemoryMediaBatchResponse(media = moved.map { it.toMemorySummary() })
+    }
+
+    @Transactional
+    fun deleteMemoryMediaBatch(memoryId: String, request: DeleteMemoryMediaBatchRequest) {
+        val memory = resolveVisibleMemory(memoryId)
+        normalizedMediaIds(request.mediaIds)
+            .map { resolveMediaInMemory(memory, it) }
+            .forEach(::deleteMedia)
     }
 
     fun downloadMemoryMedia(memoryId: String, includeChildren: Boolean, locale: String?): Response {
@@ -212,6 +303,7 @@ class MediaService @Inject constructor(
             uploadPath = upload.uploadedFile(),
             originalFilename = upload.fileName(),
             title = title,
+            targetBucket = null,
             uploaderUser = user(),
             shareIdentity = null,
         ).toMemorySummary()
@@ -224,6 +316,7 @@ class MediaService @Inject constructor(
         uploadPath: Path,
         originalFilename: String?,
         title: String?,
+        targetBucket: MemoryMediaBucket?,
         uploaderUser: User?,
         shareIdentity: MemoryShareIdentity?,
     ): PublicShareMediaSummary =
@@ -232,15 +325,18 @@ class MediaService @Inject constructor(
             uploadPath = uploadPath,
             originalFilename = originalFilename,
             title = title,
+            targetBucket = targetBucket,
             uploaderUser = uploaderUser,
             shareIdentity = shareIdentity,
         ).toPublicShareSummary(shareId)
 
     fun createMemoryMediaUpload(memoryId: String, request: CreateMemoryMediaUploadRequest): MemoryMediaUploadSession {
         val memory = resolveVisibleMemory(memoryId)
+        val targetBucket = request.bucketId?.let { resolveBucketInMemory(memory, it) }
         return createUploadSession(
             memory = memory,
             request = request,
+            targetBucket = targetBucket,
             uploaderUser = user(),
             shareIdentity = null,
             shareId = null,
@@ -251,10 +347,11 @@ class MediaService @Inject constructor(
         shareId: String,
         memory: Memory,
         request: CreateMemoryMediaUploadRequest,
+        targetBucket: MemoryMediaBucket?,
         uploaderUser: User?,
         shareIdentity: MemoryShareIdentity?,
     ): MemoryMediaUploadSession =
-        createUploadSession(memory, request, uploaderUser, shareIdentity, shareId)
+        createUploadSession(memory, request, targetBucket, uploaderUser, shareIdentity, shareId)
 
     fun memoryMediaUploadStatus(memoryId: String, uploadId: String): PendingMemoryMediaUploadSession {
         val memory = resolveVisibleMemory(memoryId)
@@ -310,6 +407,7 @@ class MediaService @Inject constructor(
                 uploadPath = temp,
                 originalFilename = session.filename,
                 title = session.title,
+                bucketId = session.bucketId,
                 uploaderUserId = uploaderUser.id,
                 shareIdentityId = null,
             )
@@ -340,6 +438,7 @@ class MediaService @Inject constructor(
                 uploadPath = temp,
                 originalFilename = session.filename,
                 title = session.title,
+                bucketId = session.bucketId,
                 uploaderUserId = uploaderUser?.id,
                 shareIdentityId = shareIdentity?.id,
             )
@@ -414,6 +513,7 @@ class MediaService @Inject constructor(
         uploadPath: Path,
         originalFilename: String?,
         title: String?,
+        targetBucket: MemoryMediaBucket?,
         uploaderUser: User?,
         shareIdentity: MemoryShareIdentity?,
     ): Media {
@@ -428,11 +528,13 @@ class MediaService @Inject constructor(
         val contentSha256 = sha256(uploadPath)
         val blob = mediaBlobRepo.findByTenantAndSha256(memory.tenant, contentSha256)
             ?: createMediaBlob(memory, uploadPath, mediaType.mimeType, size, contentSha256)
+        val bucket = targetBucket ?: ensurePrimaryBucket(memory, uploaderUser, shareIdentity)
 
         val media = Media().also {
             it.tenant = memory.tenant
             applyScope(it, LibraryScopes.scope(memory))
             it.memory = memory
+            it.bucket = bucket
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                 ?: "Upload"
@@ -454,6 +556,7 @@ class MediaService @Inject constructor(
         uploadPath: Path,
         originalFilename: String?,
         title: String?,
+        bucketId: Long?,
         uploaderUserId: Long?,
         shareIdentityId: Long?,
     ): PreparedMemoryUpload {
@@ -477,6 +580,7 @@ class MediaService @Inject constructor(
             memoryId = memoryId,
             originalFilename = originalFilename,
             title = title,
+            bucketId = bucketId,
             uploaderUserId = uploaderUserId,
             shareIdentityId = shareIdentityId,
             sizeBytes = size,
@@ -499,11 +603,15 @@ class MediaService @Inject constructor(
 
         val blob = mediaBlobRepo.findByTenantAndSha256(memory.tenant, prepared.contentSha256)
             ?: createPreparedMediaBlob(memory, prepared)
+        val bucket = prepared.bucketId?.let { bucketRepo.findById(it) ?: throw NotFoundException("Bucket not found") }
+            ?: ensurePrimaryBucket(memory, uploaderUser, shareIdentity)
+        if (bucket.memory.id != memory.id) throw NotFoundException("Bucket not found")
 
         return Media().also {
             it.tenant = memory.tenant
             applyScope(it, LibraryScopes.scope(memory))
             it.memory = memory
+            it.bucket = bucket
             it.title = prepared.title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: prepared.originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
                 ?: "Upload"
@@ -558,6 +666,7 @@ class MediaService @Inject constructor(
     private fun createUploadSession(
         memory: Memory,
         request: CreateMemoryMediaUploadRequest,
+        targetBucket: MemoryMediaBucket?,
         uploaderUser: User?,
         shareIdentity: MemoryShareIdentity?,
         shareId: String?,
@@ -581,6 +690,8 @@ class MediaService @Inject constructor(
             mimeType = mimeType,
             sizeBytes = request.sizeBytes,
             title = request.title?.trim()?.takeIf { it.isNotBlank() },
+            bucketId = targetBucket?.id,
+            bucketPublicId = targetBucket?.publicId,
             uploaderUserId = uploaderUser?.id,
             shareIdentityId = shareIdentity?.id,
             shareId = shareId,
@@ -660,6 +771,8 @@ class MediaService @Inject constructor(
             it["createdAt"] = session.createdAt.toString()
             it["updatedAt"] = session.updatedAt.toString()
             session.title?.let { title -> it["title"] = title }
+            session.bucketId?.let { bucketId -> it["bucketId"] = bucketId.toString() }
+            session.bucketPublicId?.let { bucketId -> it["bucketPublicId"] = bucketId }
             session.uploaderUserId?.let { userId -> it["uploaderUserId"] = userId.toString() }
             session.shareIdentityId?.let { identityId -> it["shareIdentityId"] = identityId.toString() }
             session.shareId?.let { shareId -> it["shareId"] = shareId }
@@ -706,6 +819,8 @@ class MediaService @Inject constructor(
             mimeType = properties.getProperty("mimeType"),
             sizeBytes = properties.getProperty("sizeBytes").toLong(),
             title = properties.getProperty("title"),
+            bucketId = properties.getProperty("bucketId")?.toLong(),
+            bucketPublicId = properties.getProperty("bucketPublicId"),
             uploaderUserId = properties.getProperty("uploaderUserId")?.toLong(),
             shareIdentityId = properties.getProperty("shareIdentityId")?.toLong(),
             shareId = properties.getProperty("shareId"),
@@ -761,6 +876,7 @@ class MediaService @Inject constructor(
             mimeType = mimeType,
             sizeBytes = sizeBytes,
             title = title,
+            bucketId = bucketPublicId,
             chunkSizeBytes = mediaConfig.chunkSizeBytes,
             uploadedChunks = uploadedChunks,
             uploadedBytes = uploadedBytes,
@@ -790,12 +906,22 @@ class MediaService @Inject constructor(
     private fun uploadChunkCount(session: UploadSession): Int =
         ((session.sizeBytes + mediaConfig.chunkSizeBytes - 1) / mediaConfig.chunkSizeBytes).toInt()
 
+    fun resolveBucketForPublicShareUpload(memory: Memory, bucketId: String?): MemoryMediaBucket? =
+        bucketId?.let { resolveBucketInMemory(memory, it) }
+
+    fun listPublicShareBuckets(memory: Memory, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> {
+        ensureBucketsForMedia(memory, visibleMedia)
+        val visibleBucketIds = visibleMedia.mapNotNull { it.bucket?.id }.toSet()
+        val buckets = bucketRepo.listByMemory(memory).filter { bucket ->
+            bucket.id in visibleBucketIds || bucketRepo.listChildren(bucket).isNotEmpty()
+        }
+        return bucketSummaries(memory, buckets)
+    }
+
     @Transactional
     fun updateMemoryMediaMetadata(memoryId: String, publicId: String, request: UpdateMemoryMediaMetadataRequest): MemoryMediaSummary {
         val memory = resolveVisibleMemory(memoryId)
-        val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
-            ?: throw NotFoundException("Media not found")
-        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        val media = resolveMediaInMemory(memory, publicId)
 
         media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
@@ -808,13 +934,10 @@ class MediaService @Inject constructor(
         request: UpdateMemoryMediaMetadataBatchRequest,
     ): MemoryMediaBatchResponse {
         val memory = resolveVisibleMemory(memoryId)
-        val mediaIds = request.mediaIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
-        if (mediaIds.isEmpty()) throw BadRequestException("mediaIds must not be empty", "MEDIA_BATCH_EMPTY")
+        val mediaIds = normalizedMediaIds(request.mediaIds)
 
         val updated = mediaIds.map { publicId ->
-            val media = mediaRepo.findByTenantAndPublicId(tenant(), publicId)
-                ?: throw NotFoundException("Media not found")
-            if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+            val media = resolveMediaInMemory(memory, publicId)
 
             media.capturedAt = (media.capturedAt ?: media.createdAt).plusSeconds(request.capturedAtOffsetSeconds)
             media.capturedAtOverride = true
@@ -826,9 +949,7 @@ class MediaService @Inject constructor(
     @Transactional
     fun deleteMemoryMedia(memoryId: String, mediaId: String) {
         val memory = resolveVisibleMemory(memoryId)
-        val media = mediaRepo.findByTenantAndPublicId(tenant(), mediaId)
-            ?: throw NotFoundException("Media not found")
-        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        val media = resolveMediaInMemory(memory, mediaId)
         deleteMedia(media)
     }
 
@@ -836,6 +957,167 @@ class MediaService @Inject constructor(
     fun deleteAllMemoryMedia(memoryId: String) {
         val memory = resolveVisibleMemory(memoryId)
         mediaRepo.listByMemory(memory).forEach(::deleteMedia)
+    }
+
+    fun deletePublicMedia(media: Media) {
+        deleteMedia(media)
+    }
+
+    fun movePublicMedia(media: Media, targetBucket: MemoryMediaBucket): Media {
+        if (media.memory?.id != targetBucket.memory.id) throw NotFoundException("Bucket not found")
+        media.bucket = targetBucket
+        return media
+    }
+
+    private fun resolveMediaInMemory(memory: Memory, publicId: String): Media {
+        val media = mediaRepo.findByTenantAndPublicId(memory.tenant, publicId)
+            ?: throw NotFoundException("Media not found")
+        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        return media
+    }
+
+    private fun resolveBucketInMemory(memory: Memory, publicId: String): MemoryMediaBucket {
+        val bucket = bucketRepo.findByTenantAndPublicId(memory.tenant, publicId)
+            ?: throw NotFoundException("Bucket not found")
+        if (bucket.memory.id != memory.id) throw NotFoundException("Bucket not found")
+        return bucket
+    }
+
+    private fun ensureBucketsForMemories(memories: Collection<Memory>) {
+        memories.forEach { memory -> ensureBucketsForMedia(memory, mediaRepo.listByMemory(memory)) }
+    }
+
+    private fun ensureBucketsForMedia(memory: Memory, media: List<Media>) {
+        media.filter { it.bucket == null }.forEach { item ->
+            item.bucket = ensurePrimaryBucket(memory, item.uploaderUser, item.shareIdentity)
+        }
+    }
+
+    private fun ensurePrimaryBucket(
+        memory: Memory,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): MemoryMediaBucket {
+        if ((uploaderUser == null) == (shareIdentity == null)) {
+            throw BadRequestException("Exactly one uploader source is required")
+        }
+        return when {
+            uploaderUser != null -> bucketRepo.findPrimaryByUser(memory, uploaderUser)
+                ?: createPrimaryBucket(memory, uploaderUser, null)
+            shareIdentity != null -> bucketRepo.findPrimaryByShareIdentity(memory, shareIdentity)
+                ?: createPrimaryBucket(memory, null, shareIdentity)
+            else -> throw BadRequestException("Exactly one uploader source is required")
+        }
+    }
+
+    private fun createPrimaryBucket(
+        memory: Memory,
+        uploaderUser: User?,
+        shareIdentity: MemoryShareIdentity?,
+    ): MemoryMediaBucket {
+        val displayName = uploaderUser?.displayName ?: shareIdentity?.displayName ?: "Unknown"
+        val ownerKey = uploaderUser?.id?.let { "user-$it" } ?: shareIdentity?.id?.let { "share-$it" } ?: "unknown"
+        val baseName = "primary-$ownerKey"
+        val name = uniqueBucketName(memory, null, baseName)
+        return MemoryMediaBucket().also {
+            it.tenant = memory.tenant
+            it.memory = memory
+            it.parentBucket = null
+            it.name = name
+            it.displayName = displayName
+            it.primaryBucket = true
+            it.uploaderUser = uploaderUser
+            it.shareIdentity = shareIdentity
+            bucketRepo.persist(it)
+            bucketRepo.flush()
+        }
+    }
+
+    private fun bucketSummaries(memory: Memory, buckets: List<MemoryMediaBucket>): List<MemoryMediaBucketSummary> {
+        val bucketSet = buckets.toMutableSet()
+        buckets.forEach { bucket ->
+            generateSequence(bucket.parentBucket) { it.parentBucket }
+                .filter { it.memory.id == memory.id }
+                .forEach(bucketSet::add)
+        }
+        val counts = mediaCountsByBucket(listOf(memory))
+        return bucketSet.sortedWith(compareBy<MemoryMediaBucket> { it.parentBucket?.id ?: 0L }.thenBy { it.displayName })
+            .map { it.toSummary(counts) }
+    }
+
+    private fun mediaCountsByBucket(memories: Collection<Memory>): Map<Long, Int> =
+        memories.flatMap { mediaRepo.listByMemory(it) }
+            .mapNotNull { media -> media.bucket?.id }
+            .groupingBy { it }
+            .eachCount()
+
+    private fun MemoryMediaBucket.toSummary(counts: Map<Long, Int>): MemoryMediaBucketSummary =
+        MemoryMediaBucketSummary(
+            id = publicId,
+            memoryId = memory.publicId,
+            parentBucketId = parentBucket?.publicId,
+            displayName = displayName,
+            primary = primaryBucket,
+            uploader = bucketUploader(),
+            mediaCount = counts[id] ?: 0,
+            createdAt = createdAt.toApiOffsetDateTime(),
+            updatedAt = updatedAt.toApiOffsetDateTime(),
+        )
+
+    private fun MemoryMediaBucket.bucketUploader(): MediaUploader =
+        when {
+            uploaderUser != null -> MediaUploader(
+                type = MediaUploader.Type.USER,
+                displayName = uploaderUser!!.displayName,
+                userId = uploaderUser!!.id,
+            )
+            shareIdentity != null -> MediaUploader(
+                type = MediaUploader.Type.ANONYMOUS,
+                displayName = shareIdentity!!.displayName,
+                userId = null,
+            )
+            else -> MediaUploader(type = MediaUploader.Type.ANONYMOUS, displayName = "Unknown", userId = null)
+        }
+
+    private fun deleteBucketTree(bucket: MemoryMediaBucket) {
+        deleteBucketContents(bucket)
+        bucket.delete()
+        bucketRepo.flush()
+    }
+
+    private fun deleteBucketContents(bucket: MemoryMediaBucket) {
+        bucketRepo.listChildren(bucket).forEach(::deleteBucketTree)
+        mediaRepo.list("bucket", bucket).forEach(::deleteMedia)
+        bucketRepo.flush()
+    }
+
+    private fun normalizedMediaIds(mediaIds: List<String>): List<String> =
+        mediaIds.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+            .also { if (it.isEmpty()) throw BadRequestException("mediaIds must not be empty", "MEDIA_BATCH_EMPTY") }
+
+    private fun requiredBucketDisplayName(value: String?): String =
+        value?.trim()?.takeIf { it.isNotBlank() && it.length <= 120 }
+            ?: throw BadRequestException("displayName is required", "MEDIA_BUCKET_NAME_REQUIRED")
+
+    private fun bucketName(value: String?): String {
+        val base = requiredBucketDisplayName(value)
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), "-")
+            .trim('-')
+            .take(120)
+            .trim('-')
+        return base.takeIf { it.isNotBlank() } ?: throw BadRequestException("Invalid bucket name", "MEDIA_BUCKET_NAME_INVALID")
+    }
+
+    private fun uniqueBucketName(memory: Memory, parent: MemoryMediaBucket?, baseName: String): String {
+        var candidate = baseName.take(120).trim('-').ifBlank { "bucket" }
+        var suffix = 2
+        while (bucketRepo.nameExists(memory, parent, candidate)) {
+            val tail = "-$suffix"
+            candidate = "${baseName.take(120 - tail.length).trim('-')}$tail"
+            suffix += 1
+        }
+        return candidate
     }
 
     fun mediaContent(publicId: String, rangeHeader: String?): Response {
@@ -1314,6 +1596,7 @@ class MediaService @Inject constructor(
         MemoryMediaSummary(
             id = publicId,
             memoryId = memory?.publicId ?: "",
+            bucketId = bucket?.publicId,
             title = title,
             uploader = uploader(),
             createdAt = createdAt.toApiOffsetDateTime(),
@@ -1337,6 +1620,7 @@ class MediaService @Inject constructor(
         PublicShareMediaSummary(
             id = publicId,
             memoryId = memory?.publicId ?: "",
+            bucketId = bucket?.publicId,
             title = title,
             uploader = uploader(),
             createdAt = createdAt.toApiOffsetDateTime(),

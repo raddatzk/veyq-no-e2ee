@@ -13,11 +13,13 @@ import {
 } from '../../../api/generatedClient'
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
+  CreateMemoryMediaBucketRequest,
   CreateMemoryMediaUploadRequest,
   CreateMemoryPlaylistRequest as GeneratedCreateMemoryPlaylistRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateMemoryShareRequest as GeneratedCreateMemoryShareRequest,
   CreatePublicShareMemoryRequest as GeneratedCreatePublicShareMemoryRequest,
+  DeleteMemoryMediaBatchRequest,
   MemoryMediaSummary,
   MemoryParticipantSummary,
   MemoryMediaUploadSession,
@@ -28,6 +30,8 @@ import type {
   PublicShareMemoryHeaderSummary,
   PublicShareMediaSummary,
   PublicShareMemorySummary,
+  MoveMemoryMediaRequest,
+  UpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
   UpdateMemoryPlaylistRequest as GeneratedUpdateMemoryPlaylistRequest,
@@ -45,14 +49,19 @@ import type {
   MemoryHeader,
   MemoryJournal,
   MemoryMedia,
+  MemoryMediaBucket,
   MemoryNavigationResponse,
   MemoryPlaylist,
   MemoryTrack,
   SearchResultSummary,
   SetMemoryCoverRequest,
+  CreateMemoryMediaBucketRequest as FeatureCreateMemoryMediaBucketRequest,
+  DeleteMemoryMediaBatchRequest as FeatureDeleteMemoryMediaBatchRequest,
+  MoveMemoryMediaRequest as FeatureMoveMemoryMediaRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryMediaBucketRequest as FeatureUpdateMemoryMediaBucketRequest,
   UpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest,
   UpdateMemoryRequest,
@@ -243,6 +252,51 @@ export function listMemoryMedia(
   ).then((media) => media.map(normalizeMemoryMedia))
 }
 
+export function listMemoryMediaBuckets(
+  tenantName: string,
+  memoryId: string
+): Promise<MemoryMediaBucket[]> {
+  return generatedCall(memoryMediaApi.listMemoryMediaBuckets({ tenantName, memoryId }))
+}
+
+export function createMemoryMediaBucket(
+  tenantName: string,
+  memoryId: string,
+  request: FeatureCreateMemoryMediaBucketRequest
+): Promise<MemoryMediaBucket> {
+  return generatedCall(
+    memoryMediaApi.createMemoryMediaBucket({
+      tenantName,
+      memoryId,
+      createMemoryMediaBucketRequest: request as CreateMemoryMediaBucketRequest
+    })
+  )
+}
+
+export function updateMemoryMediaBucket(
+  tenantName: string,
+  memoryId: string,
+  bucketId: string,
+  request: FeatureUpdateMemoryMediaBucketRequest
+): Promise<MemoryMediaBucket> {
+  return generatedCall(
+    memoryMediaApi.updateMemoryMediaBucket({
+      tenantName,
+      memoryId,
+      bucketId,
+      updateMemoryMediaBucketRequest: request as UpdateMemoryMediaBucketRequest
+    })
+  )
+}
+
+export function deleteMemoryMediaBucket(
+  tenantName: string,
+  memoryId: string,
+  bucketId: string
+): Promise<void> {
+  return generatedCall(memoryMediaApi.deleteMemoryMediaBucket({ tenantName, memoryId, bucketId }))
+}
+
 export function uploadMemoryMedia(
   tenantName: string,
   memoryId: string,
@@ -255,6 +309,34 @@ export function uploadMemoryMedia(
     request,
     options,
   ).then(normalizeMemoryMedia)
+}
+
+export function moveMemoryMedia(
+  tenantName: string,
+  memoryId: string,
+  request: FeatureMoveMemoryMediaRequest
+): Promise<MemoryMedia[]> {
+  return generatedCall(
+    memoryMediaApi.moveMemoryMedia({
+      tenantName,
+      memoryId,
+      moveMemoryMediaRequest: request as MoveMemoryMediaRequest
+    })
+  ).then((response) => response.media.map(normalizeMemoryMedia))
+}
+
+export function deleteMemoryMediaBatch(
+  tenantName: string,
+  memoryId: string,
+  request: FeatureDeleteMemoryMediaBatchRequest
+): Promise<void> {
+  return generatedCall(
+    memoryMediaApi.deleteMemoryMediaBatch({
+      tenantName,
+      memoryId,
+      deleteMemoryMediaBatchRequest: request as DeleteMemoryMediaBatchRequest
+    })
+  )
 }
 
 export function listMemoryTracks(tenantName: string, memoryId: string): Promise<MemoryTrack[]> {
@@ -574,6 +656,51 @@ export function listPublicShareMemoryMedia(
   )
 }
 
+export function listPublicShareMemoryMediaBuckets(
+  shareId: string,
+  memoryId: string
+): Promise<MemoryMediaBucket[]> {
+  return generatedCall(publicSharesApi.listPublicShareMemoryMediaBuckets({ shareId, memoryId }))
+}
+
+export function createPublicShareMemoryMediaBucket(
+  shareId: string,
+  memoryId: string,
+  request: FeatureCreateMemoryMediaBucketRequest
+): Promise<MemoryMediaBucket> {
+  return generatedCall(
+    publicSharesApi.createPublicShareMemoryMediaBucket({
+      shareId,
+      memoryId,
+      createMemoryMediaBucketRequest: request as CreateMemoryMediaBucketRequest
+    })
+  )
+}
+
+export function updatePublicShareMemoryMediaBucket(
+  shareId: string,
+  memoryId: string,
+  bucketId: string,
+  request: FeatureUpdateMemoryMediaBucketRequest
+): Promise<MemoryMediaBucket> {
+  return generatedCall(
+    publicSharesApi.updatePublicShareMemoryMediaBucket({
+      shareId,
+      memoryId,
+      bucketId,
+      updateMemoryMediaBucketRequest: request as UpdateMemoryMediaBucketRequest
+    })
+  )
+}
+
+export function deletePublicShareMemoryMediaBucket(
+  shareId: string,
+  memoryId: string,
+  bucketId: string
+): Promise<void> {
+  return generatedCall(publicSharesApi.deletePublicShareMemoryMediaBucket({ shareId, memoryId, bucketId }))
+}
+
 export function listPublicShareMemoryTracks(
   shareId: string,
   memoryId: string
@@ -733,6 +860,34 @@ export function deletePublicShareMedia(
   return generatedCall(publicSharesApi.deletePublicShareMedia({ shareId, memoryId, mediaId }))
 }
 
+export function movePublicShareMemoryMedia(
+  shareId: string,
+  memoryId: string,
+  request: FeatureMoveMemoryMediaRequest
+): Promise<MemoryMedia[]> {
+  return generatedCall(
+    publicSharesApi.movePublicShareMemoryMedia({
+      shareId,
+      memoryId,
+      moveMemoryMediaRequest: request as MoveMemoryMediaRequest
+    })
+  ).then((response) => response.media.map(normalizeMemoryMedia))
+}
+
+export function deletePublicShareMemoryMediaBatch(
+  shareId: string,
+  memoryId: string,
+  request: FeatureDeleteMemoryMediaBatchRequest
+): Promise<void> {
+  return generatedCall(
+    publicSharesApi.deletePublicShareMemoryMediaBatch({
+      shareId,
+      memoryId,
+      deleteMemoryMediaBatchRequest: request as DeleteMemoryMediaBatchRequest
+    })
+  )
+}
+
 export function abortMemoryMediaUploadSession(
   tenantName: string,
   memoryId: string,
@@ -810,12 +965,13 @@ async function uploadChunkedMedia<T>(
   return callApi<T>(`${basePath}/${encodeURIComponent(session.uploadId)}/complete`, { method: 'POST' })
 }
 
-function createUploadSessionRequest(request: { file: File; title?: string | null }): CreateMemoryMediaUploadRequest {
+function createUploadSessionRequest(request: { file: File; title?: string | null; bucketId?: string | null }): CreateMemoryMediaUploadRequest {
   return {
     filename: request.file.name || 'Upload',
     mimeType: request.file.type || 'application/octet-stream',
     sizeBytes: request.file.size,
-    title: request.title ?? undefined
+    title: request.title ?? undefined,
+    bucketId: request.bucketId ?? undefined
   }
 }
 

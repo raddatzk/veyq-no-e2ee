@@ -1,11 +1,11 @@
 export const MEMORY_DETAIL_TABS = [
   'gallery',
-  'buckets',
   'map',
   'tracks',
   'playlists',
   'journal',
   'children',
+  'buckets',
   'info'
 ] as const
 

@@ -539,6 +539,204 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media-buckets":
+    get:
+      tags: [PublicShares]
+      operationId: listPublicShareMemoryMediaBuckets
+      summary: List public share Memory media buckets
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Lists media buckets visible to the current public-share identity for one Memory.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaBucketList"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags: [PublicShares]
+      operationId: createPublicShareMemoryMediaBucket
+      summary: Create a public share Memory media subbucket
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Creates a subbucket below a bucket the current share identity can manage.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreatePublicShareMemoryMediaBucket"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaBucket"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media-buckets/{bucketId}":
+    put:
+      tags: [PublicShares]
+      operationId: updatePublicShareMemoryMediaBucket
+      summary: Rename a public share Memory media bucket
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Renames a non-primary bucket the current share identity can manage.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/BucketId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePublicShareMemoryMediaBucket"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaBucket"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags: [PublicShares]
+      operationId: deletePublicShareMemoryMediaBucket
+      summary: Delete a public share Memory media bucket
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Deletes a bucket subtree and contained media when the current identity can manage that bucket. For system-managed primary buckets, the primary bucket remains as an empty uploader identity bucket while its media and subbuckets are deleted.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR`, `MANAGER` or `UPLOADER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "./memories.openapi.yaml#/components/parameters/BucketId"
+      responses:
+        "204":
+          description: Bucket deleted.
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/move":
+    post:
+      tags: [PublicShares]
+      operationId: movePublicShareMemoryMedia
+      summary: Move public share Memory media to a bucket
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Moves selected media to another bucket when the current identity can manage both the selected media and target bucket.
+
+        Vorbedingungen:
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/MovePublicShareMemoryMedia"
+      responses:
+        "200":
+          "$ref": "./memories.openapi.yaml#/components/responses/MemoryMediaBatch"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/batch":
+    delete:
+      tags: [PublicShares]
+      operationId: deletePublicShareMemoryMediaBatch
+      summary: Delete selected public share Memory media
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Deletes selected media when the current identity can manage each selected item.
+
+        Vorbedingungen:
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/DeletePublicShareMemoryMediaBatch"
+      responses:
+        "204":
+          description: Selected media deleted.
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads":
     post:
       tags: [PublicShares]
@@ -1632,6 +1830,43 @@ components:
             mimeType: video/mp4
             sizeBytes: 73400320
             title: Ceremony
+            bucketId: bkt_abc123
+    CreatePublicShareMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/CreateMemoryMediaBucketRequest"
+          example:
+            parentBucketId: bkt_primary123
+            displayName: Phone uploads
+    UpdatePublicShareMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaBucketRequest"
+          example:
+            displayName: Phone highlights
+    MovePublicShareMemoryMedia:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/MoveMemoryMediaRequest"
+          example:
+            mediaIds:
+              - med_abc123
+            targetBucketId: bkt_abc123
+    DeletePublicShareMemoryMediaBatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/DeleteMemoryMediaBatchRequest"
+          example:
+            mediaIds:
+              - med_abc123
     UploadPublicShareMediaChunk:
       required: true
       content:
@@ -2381,6 +2616,9 @@ components:
           type: string
         memoryId:
           type: string
+        bucketId:
+          type: string
+          nullable: true
         title:
           type: string
         uploader:
@@ -2418,6 +2656,7 @@ components:
       example:
         id: med_abc123
         memoryId: mem_abc123
+        bucketId: bkt_abc123
         title: Ceremony
         uploader:
           type: ANONYMOUS

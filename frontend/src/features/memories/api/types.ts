@@ -1,8 +1,10 @@
 import type {
   CoverCrop,
+  CreateMemoryMediaBucketRequest as GeneratedCreateMemoryMediaBucketRequest,
   CreateMemoryMediaUploadRequest,
   CreateMemoryRequest as GeneratedCreateMemoryRequest,
   CreateFolderRequest as GeneratedCreateFolderRequest,
+  DeleteMemoryMediaBatchRequest as GeneratedDeleteMemoryMediaBatchRequest,
   MemoryFolder,
   MemoryHeaderSummary,
   MemoryJournalSummary,
@@ -10,6 +12,7 @@ import type {
   MemoryPlaylistSummary,
   MemoryTrackActivityType,
   MemoryTrackSummary,
+  MemoryMediaBucketSummary,
   MemoryMediaUploadSession,
   MediaUploader,
   MemoryNavigationResponse as GeneratedMemoryNavigationResponse,
@@ -31,7 +34,9 @@ import type {
   MemorySummary,
   MemoryScopeRoot,
   MoveFolderRequest as GeneratedMoveFolderRequest,
+  MoveMemoryMediaRequest as GeneratedMoveMemoryMediaRequest,
   UpdateFolderRequest as GeneratedUpdateFolderRequest,
+  UpdateMemoryMediaBucketRequest as GeneratedUpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest as GeneratedUpdateMemoryJournalRequest,
   UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
@@ -60,6 +65,7 @@ export type {
   PublicShareTreeResponse,
   SearchResultSummary,
   MemoryJournalSummary,
+  MemoryMediaBucketSummary,
   MemoryMediaUploadSession,
   PendingMemoryMediaUploadSession,
   CreateMemoryMediaUploadRequest,
@@ -182,10 +188,16 @@ export type UpdateMemoryMediaMetadataRequest = Omit<
 }
 
 export type UpdateMemoryMediaMetadataBatchRequest = GeneratedUpdateMemoryMediaMetadataBatchRequest
+export type MemoryMediaBucket = MemoryMediaBucketSummary
+export type CreateMemoryMediaBucketRequest = GeneratedCreateMemoryMediaBucketRequest
+export type UpdateMemoryMediaBucketRequest = GeneratedUpdateMemoryMediaBucketRequest
+export type MoveMemoryMediaRequest = GeneratedMoveMemoryMediaRequest
+export type DeleteMemoryMediaBatchRequest = GeneratedDeleteMemoryMediaBatchRequest
 
 export type UploadMemoryMediaRequest = {
   file: File
   title?: string | null
+  bucketId?: string | null
 }
 
 export type UploadMediaProgress = {

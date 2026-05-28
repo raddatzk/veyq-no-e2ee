@@ -36,6 +36,7 @@ const {
   load,
   loading,
   media,
+  mediaBuckets,
   mediaLoading,
   memories,
   memory,
@@ -91,10 +92,10 @@ function handleMemoryCreated(createdMemory: Memory) {
 </script>
 
 <template>
-  <div class="memory-page memory-page">
+  <div class="veyq-page memory-page">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
-    <div v-if="loading && !memory && !navigation" class="memory-loading">
+    <div v-if="loading && !memory && !navigation" class="veyq-loading">
       <ProgressSpinner class="small-spinner" />
       <span>{{ t('memory.loading') }}</span>
     </div>
@@ -107,6 +108,7 @@ function handleMemoryCreated(createdMemory: Memory) {
       :journal="memoryJournal"
       :child-memories="childMemories"
       :media="media"
+      :media-buckets="mediaBuckets"
       :media-loading="mediaLoading"
       :playlists="playlists"
       :tracks="tracks"

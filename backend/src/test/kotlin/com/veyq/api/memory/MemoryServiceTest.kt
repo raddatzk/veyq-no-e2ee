@@ -27,10 +27,13 @@ import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreateFolderRequest
+import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
 import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
+import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
+import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
@@ -463,6 +466,109 @@ class MemoryServiceTest {
                         mediaIds = listOf(media.publicId),
                         capturedAtOffsetSeconds = 60,
                     ),
+                )
+            }
+    }
+
+    @Test
+    fun `legacy media listing creates primary bucket for uploader and assigns media`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-legacy-trip", "Bucket Legacy Trip"))
+        val media = createMedia(owner, memory(trip.id), "Legacy Photo")
+
+        val buckets = mediaService.listMemoryMediaBuckets(trip.id)
+        val listedMedia = mediaService.listMemoryMedia(trip.id, includeChildren = false)
+
+        assertThat(buckets).hasSize(1)
+        assertThat(buckets.single().primary).isTrue()
+        assertThat(buckets.single().displayName).isEqualTo(owner.displayName)
+        assertThat(buckets.single().mediaCount).isEqualTo(1)
+        assertThat(listedMedia.single().id).isEqualTo(media.publicId)
+        assertThat(listedMedia.single().bucketId).isEqualTo(buckets.single().id)
+    }
+
+    @Test
+    fun `moves selected media into subbucket and deletes selected media`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-move-trip", "Bucket Move Trip"))
+        val first = createMedia(owner, memory(trip.id), "First Photo")
+        val second = createMedia(owner, memory(trip.id), "Second Photo")
+        val primary = mediaService.listMemoryMediaBuckets(trip.id).single { it.primary }
+        val subbucket = mediaService.createMemoryMediaBucket(
+            trip.id,
+            CreateMemoryMediaBucketRequest(parentBucketId = primary.id, displayName = "Phone imports"),
+        )
+
+        val moved = mediaService.moveMemoryMedia(
+            trip.id,
+            MoveMemoryMediaRequest(mediaIds = listOf(first.publicId), targetBucketId = subbucket.id),
+        )
+
+        assertThat(moved.media.single().bucketId).isEqualTo(subbucket.id)
+        assertThat(mediaService.listMemoryMediaBuckets(trip.id).map { it.displayName to it.mediaCount })
+            .contains(
+                owner.displayName to 1,
+                "Phone imports" to 1,
+            )
+
+        mediaService.deleteMemoryMediaBatch(trip.id, DeleteMemoryMediaBatchRequest(mediaIds = listOf(second.publicId)))
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, first.publicId)).isNotNull
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.publicId)).isNull()
+    }
+
+    @Test
+    fun `deleting subbucket deletes contained media and keeps primary bucket`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-delete-trip", "Bucket Delete Trip"))
+        val media = createMedia(owner, memory(trip.id), "Subbucket Photo")
+        val primary = mediaService.listMemoryMediaBuckets(trip.id).single { it.primary }
+        val subbucket = mediaService.createMemoryMediaBucket(
+            trip.id,
+            CreateMemoryMediaBucketRequest(parentBucketId = primary.id, displayName = "Drone"),
+        )
+        mediaService.moveMemoryMedia(trip.id, MoveMemoryMediaRequest(listOf(media.publicId), subbucket.id))
+
+        mediaService.deleteMemoryMediaBucket(trip.id, subbucket.id)
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, media.publicId)).isNull()
+        assertThat(mediaService.listMemoryMediaBuckets(trip.id)).extracting("id").containsExactly(primary.id)
+    }
+
+    @Test
+    fun `deleting primary bucket deletes media and subbuckets but keeps primary bucket`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-delete-primary-trip", "Bucket Delete Primary Trip"))
+        val primaryMedia = createMedia(owner, memory(trip.id), "Primary Photo")
+        val subbucketMedia = createMedia(owner, memory(trip.id), "Subbucket Photo")
+        val primary = mediaService.listMemoryMediaBuckets(trip.id).single { it.primary }
+        val subbucket = mediaService.createMemoryMediaBucket(
+            trip.id,
+            CreateMemoryMediaBucketRequest(parentBucketId = primary.id, displayName = "Phone"),
+        )
+        mediaService.moveMemoryMedia(trip.id, MoveMemoryMediaRequest(listOf(subbucketMedia.publicId), subbucket.id))
+
+        mediaService.deleteMemoryMediaBucket(trip.id, primary.id)
+
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, primaryMedia.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, subbucketMedia.publicId)).isNull()
+        val remaining = mediaService.listMemoryMediaBuckets(trip.id).single()
+        assertThat(remaining.id).isEqualTo(primary.id)
+        assertThat(remaining.primary).isTrue()
+        assertThat(remaining.mediaCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `rejects nested media buckets below subbuckets`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("bucket-nested-trip", "Bucket Nested Trip"))
+        createMedia(owner, memory(trip.id), "Primary Photo")
+        val primary = mediaService.listMemoryMediaBuckets(trip.id).single { it.primary }
+        val subbucket = mediaService.createMemoryMediaBucket(
+            trip.id,
+            CreateMemoryMediaBucketRequest(parentBucketId = primary.id, displayName = "Phone"),
+        )
+
+        assertThatExceptionOfType(BadRequestException::class.java)
+            .isThrownBy {
+                mediaService.createMemoryMediaBucket(
+                    trip.id,
+                    CreateMemoryMediaBucketRequest(parentBucketId = subbucket.id, displayName = "Nested"),
                 )
             }
     }
