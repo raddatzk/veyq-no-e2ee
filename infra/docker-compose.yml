@@ -80,7 +80,7 @@ services:
     volumes:
       - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
         source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
-        target: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
+        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
     depends_on:
       - veyq-db
     healthcheck:
@@ -116,7 +116,7 @@ services:
     volumes:
       - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
         source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
-        target: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
+        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - veyq-db

@@ -178,7 +178,7 @@ backup() {
   cp .env "backups/${name}.env"
   compose exec -T veyq-db mariadb-dump -u root -p"${db_root_password}" "${db_name}" > "backups/${name}.sql"
   docker run --rm -v "$(media_backup_mount):/data:ro" -v "$PWD/backups:/backup" alpine \
-    tar czf "/backup/${name}-media.tgz" -C /data .
+    tar czf "/backup/${name}-media.tgz" -C "$(media_backup_path)" .
   echo "Wrote backups/${name}.env, backups/${name}.sql and backups/${name}-media.tgz"
 }
 
@@ -266,14 +266,20 @@ setup_media_storage_env() {
     docker-volume)
       set_env MEDIA_STORAGE_MOUNT_TYPE "volume"
       set_env MEDIA_STORAGE_SOURCE "veyq-media"
+      remove_env MEDIA_STORAGE_MOUNT_TARGET
+      remove_env MEDIA_STORAGE_DIR
       ;;
     host-path)
       set_env MEDIA_STORAGE_MOUNT_TYPE "bind"
       set_env MEDIA_STORAGE_SOURCE "$(prompt_absolute_path "Host media storage path" "$(env_value MEDIA_STORAGE_SOURCE "/mnt/veyq-media")")"
+      remove_env MEDIA_STORAGE_MOUNT_TARGET
+      remove_env MEDIA_STORAGE_DIR
       ;;
     cifs-volume)
       set_env MEDIA_STORAGE_MOUNT_TYPE "volume"
       set_env MEDIA_STORAGE_SOURCE "veyq-media-cifs"
+      set_env MEDIA_STORAGE_MOUNT_TARGET "$(prompt_absolute_path "Container CIFS share mount path" "$(env_value MEDIA_STORAGE_MOUNT_TARGET "/data")")"
+      set_env MEDIA_STORAGE_DIR "$(prompt_absolute_path "veyq media storage path inside the CIFS mount" "$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")")"
       set_env MEDIA_CIFS_DEVICE "$(prompt "CIFS share path" "$(env_value MEDIA_CIFS_DEVICE "//nas.example.com/veyq-media")")"
       set_env MEDIA_CIFS_OPTIONS "$(prompt "CIFS mount options" "$(env_value MEDIA_CIFS_OPTIONS "username=veyq,password=change-cifs-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770")")"
       ;;
@@ -353,13 +359,33 @@ media_backup_mount() {
   esac
 }
 
+media_backup_path() {
+  local storage_dir mount_target
+  storage_dir="$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")"
+  mount_target="$(env_value MEDIA_STORAGE_MOUNT_TARGET "/data/veyq-media")"
+  if [ "$storage_dir" = "$mount_target" ]; then
+    printf '%s' "/data"
+    return 0
+  fi
+  case "$storage_dir" in
+    "$mount_target"/*)
+      printf '%s' "/data/${storage_dir#"$mount_target"/}"
+      ;;
+    *)
+      echo "MEDIA_STORAGE_DIR must be inside MEDIA_STORAGE_MOUNT_TARGET for backups." >&2
+      exit 1
+      ;;
+  esac
+}
+
 check_media_storage_env() {
   local failed=0
-  local mode mount_type source storage_dir
+  local mode mount_type source storage_dir mount_target
   mode="$(media_storage_mode)"
   mount_type="$(env_value MEDIA_STORAGE_MOUNT_TYPE "volume")"
   source="$(env_value MEDIA_STORAGE_SOURCE "veyq-media")"
   storage_dir="$(env_value MEDIA_STORAGE_DIR "/data/veyq-media")"
+  mount_target="$(env_value MEDIA_STORAGE_MOUNT_TARGET "/data/veyq-media")"
 
   case "$storage_dir" in
     /*) ;;
@@ -368,6 +394,24 @@ check_media_storage_env() {
       failed=1
       ;;
   esac
+
+  case "$mount_target" in
+    /*) ;;
+    *)
+      echo "MEDIA_STORAGE_MOUNT_TARGET must be an absolute container path." >&2
+      failed=1
+      ;;
+  esac
+
+  if [ "$storage_dir" != "$mount_target" ]; then
+    case "$storage_dir" in
+      "$mount_target"/*) ;;
+      *)
+        echo "MEDIA_STORAGE_DIR must be inside MEDIA_STORAGE_MOUNT_TARGET." >&2
+        failed=1
+        ;;
+    esac
+  fi
 
   case "$mode" in
     docker-volume)
