@@ -354,6 +354,7 @@ const secondaryOverflowActionItems = computed<MenuItem[]>(() => {
       ? {
           label: t('common.delete'),
           icon: 'pi pi-trash',
+          class: 'memory-menu-danger',
           command: () => {
             deleteOpen.value = true
           }
@@ -872,7 +873,7 @@ function mediaTagRangeAtPosition(markdown: string, position: number): MediaInser
                 v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
                 v-tooltip.bottom="t('common.delete')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button memory-icon-action memory-danger-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-trash"
                 :aria-label="t('common.delete')"
                 severity="danger"

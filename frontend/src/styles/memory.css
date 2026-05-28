@@ -961,6 +961,17 @@
   white-space: nowrap;
 }
 
+.memory-danger-action.p-button.p-button-outlined {
+  border-color: var(--app-danger-line);
+  color: var(--app-danger);
+}
+
+.memory-danger-action.p-button.p-button-outlined:not(:disabled):hover {
+  border-color: var(--app-danger);
+  background: var(--app-danger-soft);
+  color: var(--app-danger-strong);
+}
+
 .memory-actions-overflow.p-button {
   display: none;
 }
