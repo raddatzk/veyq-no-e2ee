@@ -205,6 +205,14 @@
   align-self: start;
 }
 
+.passkey-row-actions .p-button {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding-inline: 0;
+}
+
 .passkey-row span {
   overflow-wrap: anywhere;
 }
@@ -603,9 +611,45 @@
 
 .profile-avatar-settings,
 .tenant-logo-settings {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 0.9rem;
+}
+
+.profile-avatar-settings .veyq-button-row,
+.tenant-logo-settings .veyq-button-row {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 2.4rem;
+  align-items: center;
+}
+
+.profile-avatar-settings .p-fileupload,
+.profile-avatar-settings .p-fileupload-basic,
+.tenant-logo-settings .p-fileupload,
+.tenant-logo-settings .p-fileupload-basic {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.profile-avatar-settings .p-fileupload-file-name,
+.profile-avatar-settings .p-fileupload input[type='file'],
+.tenant-logo-settings .p-fileupload-file-name,
+.tenant-logo-settings .p-fileupload input[type='file'] {
+  display: none;
+}
+
+.profile-avatar-settings .p-fileupload-choose,
+.tenant-logo-settings .p-fileupload-choose {
+  max-width: 100%;
+}
+
+.profile-avatar-settings .veyq-button-row > .p-button,
+.tenant-logo-settings .veyq-button-row > .p-button {
+  width: 2.4rem;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding-inline: 0;
 }
 
 .profile-avatar-image,
@@ -644,6 +688,17 @@
 
   .passkey-row-actions > .p-button {
     justify-self: start;
+  }
+
+  .profile-avatar-settings,
+  .tenant-logo-settings {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-avatar-settings .veyq-button-row,
+  .tenant-logo-settings .veyq-button-row {
+    grid-template-columns: minmax(0, 1fr) 2.4rem;
+    width: 100%;
   }
 
   .settings-entry {
