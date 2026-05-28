@@ -33,25 +33,39 @@ class ResetPasswordService @Inject constructor(
 
     @Transactional
     fun requestNewPassword(user: User, tenant: Tenant) {
+        requestReset(user, tenant, ResetKind.Password)
+    }
+
+    @Transactional
+    fun requestNewPasskey(user: User, tenant: Tenant) {
+        requestReset(user, tenant, ResetKind.Passkey)
+    }
+
+    private fun requestReset(user: User, tenant: Tenant, kind: ResetKind) {
         val now = Instant.now()
         resetPasswordTokenRepo.listOpenByUser(user).forEach { it.revokedAt = now }
 
         val token = newForgotPasswordToken()
         ResetPasswordToken().also {
             it.user = user
+            it.resetDomain = tenant.domain
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
             it.expiresAt = now.plus(Duration.ofHours(userConfig.resetPasswordTtlHours))
             it.persistAndFlush()
         }
 
-        val resetUrl = "https://${tenant.domain}/password/reset/${user.id}#$token"
+        val resetUrl = when (kind) {
+            ResetKind.Password -> "https://${tenant.domain}/password/reset/${user.id}#$token"
+            ResetKind.Passkey -> "https://${tenant.domain}/passkey/reset/${user.id}#$token"
+        }
 
         transactionSynchronizationRegistry.registerInterposedSynchronization(object : Synchronization {
             override fun beforeCompletion() = Unit
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
+                    // The existing reset mail copy is generic enough for passkey recovery and keeps token handling identical.
                     mailService.sendPasswordResetMail(user, resetUrl, tenant)
                 }
             }
@@ -60,10 +74,28 @@ class ResetPasswordService @Inject constructor(
 
     @Transactional
     fun checkToken(userId: Long, token: String, now: Instant) {
+        val targetToken = requireOpenToken(userId, token, now, lockForUpdate = true)
+
+        targetToken.apply {
+            acceptedAt = Instant.now()
+        }
+    }
+
+    fun requireOpenToken(
+        userId: Long,
+        token: String,
+        now: Instant,
+        lockForUpdate: Boolean = false,
+    ): ResetPasswordToken {
         val user = userRepo.findById(userId)
             ?: throw ForbiddenException("incorrect token")
 
-        val targetToken = resetPasswordTokenRepo.findByTokenHash(HashingService.sha256(token))
+        val tokenHash = HashingService.sha256(token)
+        val targetToken = if (lockForUpdate) {
+            resetPasswordTokenRepo.findByTokenHashForUpdate(tokenHash)
+        } else {
+            resetPasswordTokenRepo.findByTokenHash(tokenHash)
+        }
             ?: throw ForbiddenException("incorrect token")
 
         if (targetToken.revokedAt != null || targetToken.acceptedAt != null || !targetToken.expiresAt.isAfter(now)) {
@@ -73,14 +105,21 @@ class ResetPasswordService @Inject constructor(
             throw ForbiddenException("incorrect token")
         }
 
-        targetToken.apply {
-            acceptedAt = Instant.now()
-        }
+        return targetToken
+    }
+
+    fun acceptToken(userId: Long, token: String, now: Instant) {
+        requireOpenToken(userId, token, now, lockForUpdate = true).acceptedAt = Instant.now()
     }
 
     private fun newForgotPasswordToken(): String {
         val bytes = ByteArray(32)
         random.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    }
+
+    private enum class ResetKind {
+        Password,
+        Passkey,
     }
 }

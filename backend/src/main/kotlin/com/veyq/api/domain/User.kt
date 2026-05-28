@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.*
+import jakarta.persistence.LockModeType
 import java.time.Instant
 
 enum class ServerRole {
@@ -110,6 +111,9 @@ class PasskeyCredential : PanacheEntityBase {
     @Column(name = "display_name", nullable = false)
     lateinit var displayName: String
 
+    @Column(name = "relying_party_id")
+    var relyingPartyId: String? = null
+
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
@@ -131,8 +135,72 @@ class PasskeyCredentialRepo : PanacheRepository<PasskeyCredential> {
     fun countByUser(user: User): Long =
         count("user = ?1", user)
 
+    fun countByUserAndRelyingPartyId(user: User, relyingPartyId: String): Long =
+        count("user = ?1 and relyingPartyId = ?2", user, relyingPartyId)
+
+    fun listByUserAndRelyingPartyId(user: User, relyingPartyId: String): List<PasskeyCredential> =
+        list("user = ?1 and relyingPartyId = ?2 order by createdAt desc", user, relyingPartyId)
+
     fun findByIdAndUser(id: Long, user: User): PasskeyCredential? =
         find("id = ?1 and user = ?2", id, user).firstResult()
+}
+
+@Entity
+@Table(name = "veyq_passkey_link_token")
+class PasskeyLinkToken : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @Column(name = "code_hash", nullable = false, unique = true, length = 64)
+    lateinit var codeHash: String
+
+    @Column(name = "grant_hash", unique = true, length = 64)
+    var grantHash: String? = null
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    lateinit var user: User
+
+    @Column(name = "auth_domain", nullable = false)
+    lateinit var authDomain: String
+
+    @Column(name = "target_domain", nullable = false)
+    lateinit var targetDomain: String
+
+    @Column(name = "redirect_path", nullable = false, length = 1024)
+    lateinit var redirectPath: String
+
+    @Column(name = "expires_at", nullable = false)
+    lateinit var expiresAt: Instant
+
+    @Column(name = "exchanged_at")
+    var exchangedAt: Instant? = null
+
+    @Column(name = "consumed_at")
+    var consumedAt: Instant? = null
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+}
+
+@ApplicationScoped
+class PasskeyLinkTokenRepo : PanacheRepository<PasskeyLinkToken> {
+    fun findByCodeHash(codeHash: String): PasskeyLinkToken? =
+        find("codeHash", codeHash).firstResult()
+
+    fun findByCodeHashForUpdate(codeHash: String): PasskeyLinkToken? =
+        find("codeHash", codeHash)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult()
+
+    fun findByGrantHash(grantHash: String): PasskeyLinkToken? =
+        find("grantHash", grantHash).firstResult()
+
+    fun findByGrantHashForUpdate(grantHash: String): PasskeyLinkToken? =
+        find("grantHash", grantHash)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult()
 }
 
 @Entity
@@ -145,6 +213,9 @@ class ResetPasswordToken : PanacheEntityBase {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     lateinit var user: User
+
+    @Column(name = "reset_domain")
+    var resetDomain: String? = null
 
     @Column(name = "token_hash", nullable = false, unique = true)
     lateinit var tokenHash: String
@@ -166,6 +237,11 @@ class ResetPasswordToken : PanacheEntityBase {
 class ResetPasswordTokenRepo : PanacheRepository<ResetPasswordToken> {
     fun findByTokenHash(tokenHash: String): ResetPasswordToken? =
         find("tokenHash", tokenHash).firstResult()
+
+    fun findByTokenHashForUpdate(tokenHash: String): ResetPasswordToken? =
+        find("tokenHash", tokenHash)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .firstResult()
 
     fun listOpenByUser(user: User): List<ResetPasswordToken> =
         list("user = ?1 and acceptedAt is null and revokedAt is null", user)

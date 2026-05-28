@@ -105,7 +105,7 @@ curl -Ik https://veyq.example.com/q/health
 
 Safe recovery: fix DNS, firewall rules, host routing and `VEYQ_TRAEFIK_RULE`, then restart Traefik and veyq with `sudo docker compose up -d`.
 
-Prevention: configure the final public host before first setup. Keep `VEYQ_TRAEFIK_RULE`, `QUARKUS_WEBAUTHN_ORIGINS` and `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` aligned to the same host unless there is an intentional multi-host setup.
+Prevention: configure the final public host before first setup. Passkeys are bound to the tenant domain where they are created, so changing or adding domains requires users to register passkeys for the new domain.
 
 ### Certificate issuance fails
 
@@ -128,23 +128,40 @@ Prevention: back up the `traefik-letsencrypt` volume with the database and media
 
 ## Passkeys
 
+### Multi-domain passkey behavior
+
+Passkeys are bound to the browser origin and relying-party ID where they are created. For veyq tenants this means a passkey created on `memories.example.com` cannot be used directly on `memories.other.example`, even when both domains point to the same veyq deployment and the same user account.
+
+veyq handles initial access on another tenant domain with a narrow link flow:
+
+1. The target domain shows local passkey login and other eligible tenant domains.
+2. The user chooses an existing domain, for example `memories.example.com`, and authenticates there.
+3. The authenticated domain creates a short-lived one-time link code for the target domain.
+4. The browser carries that code back to the target domain in the URL fragment.
+5. The target domain exchanges the code for a short-lived grant and can only use that grant to create one passkey for the target domain.
+6. After the new target-domain passkey is registered, veyq sets normal auth cookies for the target domain.
+
+The link code and grant are not normal session credentials. They cannot read memories, change settings, create passwords, administer tenants or call general protected APIs. The code is single-use, the grant is bound to the target domain, and veyq rejects the flow when the user is not a member of the target tenant or already has a passkey for that target domain.
+
+Passkey reset is separate from cross-domain linking. A user can request a passkey reset email on a tenant domain. The reset token is bound to that domain, creates a new passkey only for that domain, replaces existing passkeys for that same domain and then signs the user in normally.
+
 ### Passkey registration or login fails
 
 Symptom: the browser refuses passkey registration/login, shows a WebAuthn origin error, or a previously working passkey stops working after a domain change.
 
-Likely cause: `QUARKUS_WEBAUTHN_ORIGINS` does not exactly include the HTTPS origin used in the browser, `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` does not match the effective domain, or the deployment is served over plain HTTP outside localhost.
+Likely cause: the requested host is not configured as a tenant domain, forwarded host/proto headers are not reaching veyq correctly, or the deployment is served over plain HTTP outside localhost.
 
 Inspect:
 
 ```bash
 cd /opt/veyq
-sudo grep -E '^(QUARKUS_WEBAUTHN_ORIGINS|QUARKUS_WEBAUTHN_RELYING_PARTY_ID|VEYQ_TRAEFIK_RULE)=' .env
+sudo grep -E '^(VEYQ_TRAEFIK_RULE|QUARKUS_WEBAUTHN_RELYING_PARTY_NAME)=' .env
 sudo docker compose logs --tail=200 veyq
 ```
 
-Safe recovery: set `QUARKUS_WEBAUTHN_ORIGINS` to the browser origin, for example `https://veyq.example.com`, and set `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` to the host without protocol, for example `veyq.example.com`. Restart veyq with `sudo docker compose up -d veyq`.
+Safe recovery: confirm the browser host is one of the configured tenant domains, confirm Traefik forwards `X-Forwarded-Host` and `X-Forwarded-Proto`, keep `QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING`, `QUARKUS_HTTP_PROXY_ALLOW_X_FORWARDED` and `QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST` enabled for Compose deployments, and restart veyq with `sudo docker compose up -d veyq`.
 
-Prevention: do not change the public host after users create passkeys unless the passkey migration impact is accepted. Localhost development is the only expected HTTP exception.
+Prevention: tell users to add a passkey on each tenant domain they use. Localhost development is the only expected HTTP exception.
 
 ## Database
 

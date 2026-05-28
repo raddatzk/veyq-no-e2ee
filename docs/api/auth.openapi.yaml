@@ -89,6 +89,146 @@ paths:
         - Das initiale Setup muss abgeschlossen sein.
 
         Implementierungsstatus: implemented.
+  "/api/auth/passkeys/domains":
+    get:
+      tags:
+      - Auth
+      operationId: passkeyLoginDomains
+      security: []
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyLoginDomains"
+      summary: Verfuegbare Passkey-Login-Domains auflisten
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Listet die Tenant-Domains, die als Passkey-Login-Quelle verwendet werden koennen.
+
+        Vorbedingungen:
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/auth/passkeys/link":
+    post:
+      tags:
+      - Auth
+      operationId: createPasskeyLink
+      security:
+      - accessTokenCookie: []
+      requestBody:
+        "$ref": "#/components/requestBodies/CreatePasskeyLink"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyLink"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Kurzlebigen Passkey-Link-Code erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger Access-Token Cookie muss auf der Auth-Domain vorhanden sein.
+      - Ziel-Domain muss eine Tenant-Domain sein.
+      description: |-
+        Erzeugt einen kurzlebigen Einmal-Code, der auf der Ziel-Domain gegen eine Passkey-Link-Berechtigung getauscht wird.
+
+        Vorbedingungen:
+        - Ein gueltiger Access-Token Cookie muss auf der Auth-Domain vorhanden sein.
+        - Ziel-Domain muss eine Tenant-Domain sein.
+
+        Implementierungsstatus: implemented.
+  "/api/auth/passkeys/link/exchange":
+    post:
+      tags:
+      - Auth
+      operationId: exchangePasskeyLinkCode
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/ExchangePasskeyLinkCode"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyLinkGrant"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Passkey-Link-Code tauschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Der Code muss gueltig, noch nicht getauscht und fuer die aktuelle Ziel-Domain ausgestellt sein.
+      description: |-
+        Tauscht einen URL-Code auf der Ziel-Domain gegen eine enge Passkey-Link-Berechtigung, die nur fuer Registrierungs-Challenge und Abschluss verwendet werden kann.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Code muss gueltig, noch nicht getauscht und fuer die aktuelle Ziel-Domain ausgestellt sein.
+
+        Implementierungsstatus: implemented.
+  "/api/auth/passkeys/link/options":
+    post:
+      tags:
+      - Auth
+      operationId: createPasskeyLinkOptions
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyLinkOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+      summary: Passkey-Link-Registrierungs-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
+      description: |-
+        Erzeugt eine Registrierungs-Challenge fuer eine gueltige Passkey-Link-Berechtigung.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
+
+        Implementierungsstatus: implemented.
+  "/api/auth/passkeys/link/complete":
+    post:
+      tags:
+      - Auth
+      operationId: completePasskeyLink
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/CompletePasskeyLink"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Ziel-Domain-Passkey anlegen und anmelden
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
+      - Zuvor muss eine Passkey-Link-Registrierungs-Challenge erzeugt worden sein.
+      description: |-
+        Loest eine Passkey-Link-Berechtigung ein, speichert den Ziel-Domain-Passkey und setzt normale Auth-Cookies.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Die Passkey-Link-Berechtigung muss gueltig und fuer die aktuelle Ziel-Domain ausgestellt sein.
+        - Zuvor muss eine Passkey-Link-Registrierungs-Challenge erzeugt worden sein.
+
+        Implementierungsstatus: implemented.
   "/api/auth/logout":
     post:
       tags:
@@ -178,6 +318,47 @@ components:
               clientDataJSON: client-data
               authenticatorData: authenticator-data
               signature: signature
+    CreatePasskeyLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreatePasskeyLinkRequest"
+          example:
+            targetOrigin: https://memories.affenbande-climbing.team
+            redirectPath: /friends
+    PasskeyLinkOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLinkOptionsRequest"
+          example:
+            grant: passkey-link-grant
+    ExchangePasskeyLinkCode:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ExchangePasskeyLinkCodeRequest"
+          example:
+            code: passkey-link-code
+    CompletePasskeyLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CompletePasskeyLinkRequest"
+          example:
+            grant: passkey-link-grant
+            displayName: Apple Passwords
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
 
   schemas:
     LoginRequest:
@@ -250,6 +431,99 @@ components:
         clientDataJSON: client-data
         authenticatorData: authenticator-data
         signature: signature
+    PasskeyLoginDomainsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - domains
+      properties:
+        domains:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PasskeyLoginDomain"
+      example:
+        domains:
+          - domain: memories.raddatz.me
+            origin: https://memories.raddatz.me
+            current: false
+    PasskeyLoginDomain:
+      type: object
+      additionalProperties: false
+      required:
+        - domain
+        - origin
+        - current
+      properties:
+        domain:
+          type: string
+        origin:
+          type: string
+        current:
+          type: boolean
+    CreatePasskeyLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - targetOrigin
+      properties:
+        targetOrigin:
+          type: string
+        redirectPath:
+          type: string
+    PasskeyLinkResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - targetOrigin
+        - redirectPath
+      properties:
+        code:
+          type: string
+        targetOrigin:
+          type: string
+        redirectPath:
+          type: string
+    ExchangePasskeyLinkCodeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+      properties:
+        code:
+          type: string
+    PasskeyLinkGrantResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - grant
+        - redirectPath
+      properties:
+        grant:
+          type: string
+        redirectPath:
+          type: string
+    PasskeyLinkOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - grant
+      properties:
+        grant:
+          type: string
+    CompletePasskeyLinkRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - grant
+        - credential
+      properties:
+        grant:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        credential:
+          "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationRequest"
   responses:
     PasskeyLoginOptions:
       description: Passkey login options.
@@ -261,3 +535,43 @@ components:
             challenge: challenge
             timeout: 300000
             userVerification: required
+    PasskeyRegistrationOptions:
+      description: Passkey registration options.
+      content:
+        application/json:
+          schema:
+            "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationOptionsResponse"
+          example:
+            challenge: challenge
+            timeout: 300000
+            attestation: none
+    PasskeyLoginDomains:
+      description: Passkey login domains.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLoginDomainsResponse"
+          example:
+            domains:
+              - domain: memories.raddatz.me
+                origin: https://memories.raddatz.me
+                current: false
+    PasskeyLink:
+      description: Passkey link code.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLinkResponse"
+          example:
+            code: passkey-link-code
+            targetOrigin: https://memories.affenbande-climbing.team
+            redirectPath: /friends
+    PasskeyLinkGrant:
+      description: Passkey link grant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyLinkGrantResponse"
+          example:
+            grant: passkey-link-grant
+            redirectPath: /friends

@@ -375,6 +375,7 @@ function formatTimestamp(value?: string) {
                 <span>{{ t('auth.passkeyDisplayName') }}</span>
                 <InputText v-model="passkeyNames[passkey.passkeyId]" autocomplete="off" required />
               </label>
+              <span v-if="passkey.domain">{{ t('profile.domain') }}: {{ passkey.domain }}</span>
               <span>{{ t('profile.createdAt') }}: {{ formatTimestamp(passkey.createdAt) }}</span>
               <span>{{ t('profile.lastUsedAt') }}: {{ formatTimestamp(passkey.lastUsedAt) }}</span>
             </div>

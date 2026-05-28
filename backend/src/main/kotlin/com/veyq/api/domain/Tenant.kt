@@ -54,6 +54,12 @@ class TenantRepo : PanacheRepository<Tenant> {
     fun findByName(name: String): Tenant? =
         find("name", name).firstResult()
 
+    fun findByDomain(domain: String): Tenant? =
+        find("domain", domain).firstResult()
+
+    fun listAllOrderByDomain(): List<Tenant> =
+        list("order by domain")
+
     fun existsByName(name: String): Boolean =
         count("name", name) > 0
 

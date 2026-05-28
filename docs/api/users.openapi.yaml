@@ -396,6 +396,96 @@ paths:
         - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
 
         Implementierungsstatus: implemented.
+  "/api/users/passkeys/forgot":
+    post:
+      tags:
+        - Users
+      operationId: forgotPasskey
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/ForgotPassword"
+      responses:
+        '204':
+          description: Passkey reset email sent.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+      summary: Passkey-Reset anfordern
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passkey-Reset anfordern.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/passkeys/reset/options":
+    post:
+      tags:
+        - Users
+      operationId: createResetPasskeyOptions
+      security: []
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyResetOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Passkey-Reset-Registrierungs-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+      description: |-
+        Erzeugt eine Registrierungs-Challenge fuer einen Passkey-Reset.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/passkeys/reset":
+    post:
+      tags:
+        - Users
+      operationId: resetMyPasskey
+      security: []
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/ResetPasskey"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Passkey zuruecksetzen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+        - Zuvor muss eine Passkey-Reset-Registrierungs-Challenge erzeugt worden sein.
+      description: |-
+        Legt einen neuen Passkey fuer die aktuelle Domain an, ersetzt vorhandene Passkeys dieser Domain und setzt normale Auth-Cookies.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+        - Zuvor muss eine Passkey-Reset-Registrierungs-Challenge erzeugt worden sein.
+
+        Implementierungsstatus: implemented.
   "/api/{tenantName}/profiles/{userPermalink}":
     get:
       tags:
@@ -782,6 +872,32 @@ components:
           example:
             email: kevin@example.test
 
+    PasskeyResetOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyResetOptionsRequest"
+          example:
+            token: reset-token
+
+    ResetPasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ResetPasskeyRequest"
+          example:
+            displayName: Apple Passwords
+            token: reset-token
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
+
     CreateManagedUser:
       required: true
       content:
@@ -987,6 +1103,40 @@ components:
       example:
         email: kevin@example.test
 
+    PasskeyResetOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: reset-token
+
+    ResetPasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - credential
+      properties:
+        token:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        token: reset-token
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object
+
     UpdateUserSettingsRequest:
       type: object
       additionalProperties: false
@@ -1096,11 +1246,15 @@ components:
           type: string
         lastUsedAt:
           type: string
+        domain:
+          type: string
+          nullable: true
       example:
         passkeyId: 12
         displayName: MacBook Touch ID
         createdAt: "2026-05-22T10:00:00Z"
         lastUsedAt: null
+        domain: memories.raddatz.me
     PasskeyRegistrationOptionsResponse:
       type: object
       additionalProperties: true

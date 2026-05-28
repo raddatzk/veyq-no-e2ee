@@ -245,12 +245,13 @@ describe('UserSettingsForm', () => {
 
   it('renders existing passkey names as editable fields', async () => {
     getMySettingsMock.mockResolvedValue(userSettings('owner@example.test'))
-    listMyPasskeysMock.mockResolvedValue({ passkeys: [passkey(7, 'Laptop')] })
+    listMyPasskeysMock.mockResolvedValue({ passkeys: [passkey(7, 'Laptop', 'memories.raddatz.me')] })
 
     const wrapper = mount(UserSettingsForm, { global: { stubs: formStubs() } })
     await flushPromises()
 
     expect(wrapper.findAll('input').some((input) => input.element.value === 'Laptop')).toBe(true)
+    expect(wrapper.text()).toContain('memories.raddatz.me')
   })
 
   it('requires a passkey name before renaming a passkey', async () => {
@@ -302,12 +303,13 @@ function userSettings(email: string, pendingEmail?: string, avatarUrl?: string, 
   } as const
 }
 
-function passkey(passkeyId: number, displayName: string) {
+function passkey(passkeyId: number, displayName: string, domain?: string) {
   return {
     passkeyId,
     displayName,
     createdAt: '2026-05-25T10:00:00Z',
-    lastUsedAt: undefined
+    lastUsedAt: undefined,
+    domain
   }
 }
 

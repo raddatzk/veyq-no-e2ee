@@ -14,6 +14,8 @@ import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.CreatePasskeyRequest
 import com.veyq.api.generated.model.PasskeyAssertionResponse
 import com.veyq.api.generated.model.PasskeyAttestationResponse
+import com.veyq.api.generated.model.PasskeyLoginDomain
+import com.veyq.api.generated.model.PasskeyLoginDomainsResponse
 import com.veyq.api.generated.model.PasskeyLoginRequest
 import com.veyq.api.generated.model.PasskeyRegistrationRequest
 import com.veyq.api.generated.model.PasskeySummary
@@ -37,8 +39,10 @@ class PasskeyService @Inject constructor(
     private val authService: AuthService,
     private val webAuthnSecurity: WebAuthnSecurity,
     private val webAuthnConfig: WebAuthnRunTimeConfig,
+    private val passkeyHostService: PasskeyHostService,
 ) {
     fun loginOptions(routingContext: RoutingContext): String {
+        passkeyHostService.requireAllowedCurrentDomain(routingContext)
         resetChallenge(routingContext)
         val options = webAuthnSecurity.getLoginChallenge(null, routingContext).await().indefinitely()
         return webAuthnSecurity.toJsonString(options)
@@ -46,6 +50,7 @@ class PasskeyService @Inject constructor(
 
     @Transactional
     fun login(request: PasskeyLoginRequest, routingContext: RoutingContext): LoginContext {
+        val relyingPartyId = passkeyHostService.requireAllowedCurrentDomain(routingContext)
         val credentialRecord = try {
             webAuthnSecurity.login(request.toJsonObject(), routingContext).await().indefinitely()
         } catch (caught: Exception) {
@@ -55,19 +60,27 @@ class PasskeyService @Inject constructor(
             ?: throw UnauthorizedException("Invalid passkey")
         val user = userRepo.findById(credential.user.id)
             ?: throw UnauthorizedException("Invalid passkey")
+        if (credential.relyingPartyId != null && credential.relyingPartyId != relyingPartyId) {
+            throw UnauthorizedException("Invalid passkey")
+        }
 
         credential.counter = credentialRecord.counter
         credential.lastUsedAt = Instant.now()
+        if (credential.relyingPartyId == null) {
+            credential.relyingPartyId = relyingPartyId
+        }
 
         return authService.loginUser(user)
     }
 
     fun registrationOptions(routingContext: RoutingContext): String {
+        passkeyHostService.requireAllowedCurrentDomain(routingContext)
         val user = currentUser()
         return registrationOptionsForUser(user, routingContext)
     }
 
     fun registrationOptionsForUser(user: User, routingContext: RoutingContext): String {
+        passkeyHostService.requireAllowedCurrentDomain(routingContext)
         resetChallenge(routingContext)
         val options = webAuthnSecurity
             .getRegisterChallenge(user.email, user.displayName, routingContext)
@@ -75,6 +88,9 @@ class PasskeyService @Inject constructor(
             .indefinitely()
         return webAuthnSecurity.toJsonString(options)
     }
+
+    fun currentRelyingPartyId(routingContext: RoutingContext): String =
+        passkeyHostService.requireAllowedCurrentDomain(routingContext)
 
     fun listMyPasskeys(): PasskeysSummary =
         PasskeysSummary(passkeyCredentialRepo.listByUser(currentUser()).map { it.toSummary() })
@@ -92,6 +108,7 @@ class PasskeyService @Inject constructor(
         credentialRequest: PasskeyRegistrationRequest,
         routingContext: RoutingContext,
     ): PasskeySummary {
+        val relyingPartyId = passkeyHostService.requireAllowedCurrentDomain(routingContext)
         val credentialRecord = try {
             webAuthnSecurity
                 .register(user.id.toString(), credentialRequest.toJsonObject(), routingContext)
@@ -116,11 +133,35 @@ class PasskeyService @Inject constructor(
             it.aaguid = aaguid
             it.transports = credentialRecord.transports?.joinToString(",") { transport -> transport.value }
             it.displayName = optionalPasskeyDisplayName(displayName) ?: suggestedPasskeyDisplayName(aaguid)
+            it.relyingPartyId = relyingPartyId
             it.createdAt = Instant.now()
             it.persistAndFlush()
         }
 
         return credential.toSummary()
+    }
+
+    @Transactional
+    fun resetPasskeyForUser(
+        user: User,
+        displayName: String?,
+        credentialRequest: PasskeyRegistrationRequest,
+        routingContext: RoutingContext,
+    ): PasskeySummary {
+        val relyingPartyId = currentRelyingPartyId(routingContext)
+        val replacement = createPasskeyForUser(user, displayName, credentialRequest, routingContext)
+        passkeyCredentialRepo.listByUserAndRelyingPartyId(user, relyingPartyId)
+            .filter { it.id != replacement.passkeyId }
+            .forEach { it.delete() }
+        return replacement
+    }
+
+    fun loginDomains(routingContext: RoutingContext): PasskeyLoginDomainsResponse {
+        val currentDomain = passkeyHostService.requireAllowedCurrentDomain(routingContext)
+        return PasskeyLoginDomainsResponse(
+            passkeyHostService.loginDomains(currentDomain)
+                .map { (domain, origin) -> PasskeyLoginDomain(domain, origin, false) },
+        )
     }
 
     @Transactional
@@ -169,6 +210,7 @@ fun PasskeyCredential.toSummary(): PasskeySummary =
         displayName,
         createdAt.toString(),
         lastUsedAt?.toString(),
+        relyingPartyId,
     )
 
 internal fun requiredPasskeyDisplayName(value: String): String =

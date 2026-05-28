@@ -72,8 +72,8 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `VEYQ_REPO`, `VEYQ_REF`: GitHub repository and branch/tag/SHA used by the script to download server files; defaults to `raddatzk/veyq` and `main`.
 - `VEYQ_IMAGE`: runtime container image used by the production Compose stack, for example `ghcr.io/raddatzk/veyq:latest`.
 - `VEYQ_AUTO_UPDATE_ENABLED`, `VEYQ_AUTO_UPDATE_INTERVAL_HOURS`, `VEYQ_AUTO_UPDATE_JITTER_MINUTES`, `VEYQ_UPDATER_NOTIFY_TOKEN`: optional internal updater sidecar settings. For automatic compatible updates, use a major-channel image such as `ghcr.io/raddatzk/veyq:1` and enable the `updater` Compose profile.
-- `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS host.
-- `QUARKUS_WEBAUTHN_ORIGINS`, `QUARKUS_WEBAUTHN_RELYING_PARTY_ID`, `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: passkey origin and relying-party settings. Keep these aligned with the public HTTPS host.
+- `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS tenant hosts.
+- `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: passkey display name shown by authenticators. Passkey origins and relying-party IDs are derived from the current verified tenant host.
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
 - `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
 - `VEYQ_SOURCE_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license and build metadata shown in server settings.

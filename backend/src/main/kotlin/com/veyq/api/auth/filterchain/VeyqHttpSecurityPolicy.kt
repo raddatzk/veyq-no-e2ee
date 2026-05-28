@@ -39,9 +39,16 @@ class VeyqHttpSecurityPolicy(
         return path == "/api/auth/login" ||
                 path == "/api/auth/passkeys/login/options" ||
                 path == "/api/auth/passkeys/login" ||
+                path == "/api/auth/passkeys/domains" ||
+                path == "/api/auth/passkeys/link/exchange" ||
+                path == "/api/auth/passkeys/link/options" ||
+                path == "/api/auth/passkeys/link/complete" ||
                 path.startsWith("/api/invitations/") ||
                 path == "/api/users/password/forgot" ||
                 (path.startsWith("/api/users/") && path.endsWith("/password/reset")) ||
+                path == "/api/users/passkeys/forgot" ||
+                (path.startsWith("/api/users/") && path.endsWith("/passkeys/reset/options")) ||
+                (path.startsWith("/api/users/") && path.endsWith("/passkeys/reset")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/accept")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/options")) ||
                 (path.startsWith("/api/users/") && path.endsWith("/invite/passkey/accept")) ||

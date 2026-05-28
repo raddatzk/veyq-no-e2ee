@@ -12,7 +12,9 @@ import com.veyq.api.generated.model.CreateManagedUserRequest
 import com.veyq.api.generated.model.CreatePasskeyRequest
 import com.veyq.api.generated.model.ForgotPasswordRequest
 import com.veyq.api.generated.model.PasskeyInvitationOptionsRequest
+import com.veyq.api.generated.model.PasskeyResetOptionsRequest
 import com.veyq.api.generated.model.ResetPasswordRequest
+import com.veyq.api.generated.model.ResetPasskeyRequest
 import com.veyq.api.generated.model.UpdateManagedUserRoleRequest
 import com.veyq.api.generated.model.UpdatePasskeyRequest
 import com.veyq.api.generated.model.UpdateUserSettingsRequest
@@ -88,6 +90,21 @@ class UserResource(
     override fun resetMyPassword(userId: Long, request: ResetPasswordRequest): Response? {
         userService.resetMyPassword(userId, request)
         return Response.noContent().build()
+    }
+
+    override fun forgotPasskey(request: ForgotPasswordRequest): Response {
+        userService.forgotPasskey(request, routingContext)
+        return Response.noContent().build()
+    }
+
+    override fun createResetPasskeyOptions(userId: Long, request: PasskeyResetOptionsRequest): Response =
+        Response.ok(userService.createResetPasskeyOptions(userId, request, routingContext), MediaType.APPLICATION_JSON).build()
+
+    override fun resetMyPasskey(userId: Long, request: ResetPasskeyRequest): Response {
+        val (response, accessCookie, refreshCookie) = userService.resetMyPasskey(userId, request, routingContext)
+        return Response.ok(response)
+            .cookie(accessCookie, refreshCookie)
+            .build()
     }
 
     @ServerRolesRequired(ServerRole.ServerOwner)

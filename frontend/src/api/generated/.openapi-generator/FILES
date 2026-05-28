@@ -30,6 +30,7 @@ models/CapabilityAudience.ts
 models/CapabilityNotification.ts
 models/CapabilityNotificationsResponse.ts
 models/ChangePasswordRequest.ts
+models/CompletePasskeyLinkRequest.ts
 models/ConfirmEmailChangeRequest.ts
 models/CoverCrop.ts
 models/CreateFolderRequest.ts
@@ -40,11 +41,13 @@ models/CreateMemoryMediaUploadRequest.ts
 models/CreateMemoryPlaylistRequest.ts
 models/CreateMemoryRequest.ts
 models/CreateMemoryShareRequest.ts
+models/CreatePasskeyLinkRequest.ts
 models/CreatePasskeyRequest.ts
 models/CreatePublicShareMemoryRequest.ts
 models/CreateTenantRequest.ts
 models/DeleteMemoryMediaBatchRequest.ts
 models/ErrorResponse.ts
+models/ExchangePasskeyLinkCodeRequest.ts
 models/ForgotPasswordRequest.ts
 models/GroupMemberRequest.ts
 models/GroupMemberSummary.ts
@@ -86,8 +89,14 @@ models/MoveMemoryMediaRequest.ts
 models/PasskeyAssertionResponse.ts
 models/PasskeyAttestationResponse.ts
 models/PasskeyInvitationOptionsRequest.ts
+models/PasskeyLinkGrantResponse.ts
+models/PasskeyLinkOptionsRequest.ts
+models/PasskeyLinkResponse.ts
+models/PasskeyLoginDomain.ts
+models/PasskeyLoginDomainsResponse.ts
 models/PasskeyLoginRequest.ts
 models/PasskeyRegistrationRequest.ts
+models/PasskeyResetOptionsRequest.ts
 models/PasskeySummary.ts
 models/PasskeysSummary.ts
 models/PendingMemoryMediaUploadSession.ts
@@ -101,6 +110,7 @@ models/PublicShareNoticeScope.ts
 models/PublicShareSummary.ts
 models/PublicShareTreeResponse.ts
 models/PublicUserSummary.ts
+models/ResetPasskeyRequest.ts
 models/ResetPasswordRequest.ts
 models/SearchResultSummary.ts
 models/ServerCapability.ts

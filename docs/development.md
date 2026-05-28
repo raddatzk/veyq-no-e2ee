@@ -127,11 +127,10 @@ Manual install:
 2. Set `VEYQ_IMAGE` to the published image, for example `ghcr.io/raddatzk/veyq:latest`.
 3. Set unique values for `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MAIL_PASSWORD` and, if enabled, `RESET_PASSWORD`.
 4. Set `VEYQ_TRAEFIK_RULE` to the public host, for example ``Host(`veyq.example.com`)``.
-5. Set `QUARKUS_WEBAUTHN_ORIGINS` to the HTTPS origin and `QUARKUS_WEBAUTHN_RELYING_PARTY_ID` to the host without protocol.
-6. Set `VEYQ_SOURCE_URL` when running a fork or modified public deployment so AGPL source links point to the matching source.
-7. Configure SMTP through the `MAIL_*` variables before inviting users.
-8. Start with `docker compose up -d` from `infra/`.
-9. Open the configured host, create the first admin and create the first tenant.
+5. Set `VEYQ_SOURCE_URL` when running a fork or modified public deployment so AGPL source links point to the matching source.
+6. Configure SMTP through the `MAIL_*` variables before inviting users.
+7. Start with `docker compose up -d` from `infra/`.
+8. Open the configured host, create the first admin and create the first tenant.
 
 ### Media Storage Options
 
@@ -268,11 +267,10 @@ Required reset settings in `infra/.env`:
 - `RESET_PASSWORD`: password for the reset page.
 - `RESET_TRAEFIK_RULE`: Traefik host rule for the reset UI, for example `Host('reset.example.com')`. In the actual `.env`, use Traefik's backtick syntax as shown in `infra/.env.template`.
 
-Required passkey settings for Compose:
+Optional passkey setting for Compose:
 
-- `QUARKUS_WEBAUTHN_ORIGINS`: comma-separated HTTPS origins allowed to use passkeys, for example `https://veyq.example.com`.
-- `QUARKUS_WEBAUTHN_RELYING_PARTY_ID`: relying-party domain, usually the host without protocol, for example `veyq.example.com`.
-- `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: display name shown by authenticators. Defaults to `veyq`.
+- `QUARKUS_WEBAUTHN_RELYING_PARTY_NAME`: display name shown by authenticators. Defaults to `veyq`. Passkeys are bound to the current tenant domain.
+- `QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING`, `QUARKUS_HTTP_PROXY_ALLOW_X_FORWARDED`, `QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST`: enabled by default in Compose so WebAuthn sees the public HTTPS host behind Traefik.
 
 Optional reset setting:
 

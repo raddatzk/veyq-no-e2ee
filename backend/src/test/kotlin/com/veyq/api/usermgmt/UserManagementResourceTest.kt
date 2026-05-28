@@ -5,6 +5,7 @@ import com.veyq.api.domain.ResetPasswordTokenRepo
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.PasskeyCredential
 import com.veyq.api.domain.PasskeyCredentialRepo
+import com.veyq.api.domain.PasskeyLinkTokenRepo
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
 import com.veyq.api.domain.TenantMemberId
@@ -48,6 +49,7 @@ class UserManagementResourceTest {
     @Inject lateinit var emailChangeRepo: UserEmailChangeRepo
     @Inject lateinit var resetPasswordTokenRepo: ResetPasswordTokenRepo
     @Inject lateinit var passkeyCredentialRepo: PasskeyCredentialRepo
+    @Inject lateinit var passkeyLinkTokenRepo: PasskeyLinkTokenRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var entityManager: EntityManager
@@ -535,6 +537,263 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `passkey domains list other tenant domains`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        createTenant("mgmt-alt-$runId", "Alternate $runId", "alt-$runId.example.test", owner)
+
+        given()
+            .header("Host", tenant.domain)
+            .`when`().get("/api/auth/passkeys/domains")
+            .then()
+            .statusCode(200)
+            .body("domains.domain", hasItem("alt-$runId.example.test"))
+            .body("domains.domain", not(hasItem(tenant.domain)))
+    }
+
+    @Test
+    fun `passkey domains reject unknown hosts`() {
+        given()
+            .header("Host", "unknown-$runId.example.test")
+            .`when`().get("/api/auth/passkeys/domains")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `passkey registration options reject unknown hosts`() {
+        given()
+            .header("Host", "unknown-$runId.example.test")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/users/me/passkeys/options")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `passkey link code is exchanged into target-domain grant`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val targetTenant = createTenant("mgmt-link-$runId", "Link $runId", "link-$runId.example.test", owner)
+        val code = createPasskeyLink(targetTenant.domain, "/${targetTenant.name}")
+
+        entityManager.clear()
+        val storedToken = passkeyLinkTokenRepo.listAll().single { it.targetDomain == targetTenant.domain }
+        assertThat(storedToken.codeHash).doesNotContain(code)
+        assertThat(storedToken.codeHash).hasSize(64)
+        assertThat(storedToken.grantHash).isNull()
+        assertThat(storedToken.authDomain).isEqualTo(tenant.domain)
+        assertThat(storedToken.targetDomain).isEqualTo(targetTenant.domain)
+        assertThat(storedToken.redirectPath).isEqualTo("/${targetTenant.name}")
+        assertExpiresAround(storedToken.expiresAt, Duration.ofMinutes(5))
+
+        given()
+            .header("Host", tenant.domain)
+            .contentType("application/json")
+            .body("""{"code":"$code"}""")
+            .`when`().post("/api/auth/passkeys/link/exchange")
+            .then()
+            .statusCode(403)
+
+        val grant = given()
+            .header("Host", targetTenant.domain)
+            .contentType("application/json")
+            .body("""{"code":"$code"}""")
+            .`when`().post("/api/auth/passkeys/link/exchange")
+            .then()
+            .statusCode(200)
+            .body("redirectPath", equalTo("/${targetTenant.name}"))
+            .extract()
+            .path<String>("grant")
+
+        entityManager.clear()
+        val exchangedToken = passkeyLinkTokenRepo.listAll().single { it.targetDomain == targetTenant.domain }
+        assertThat(exchangedToken.grantHash).doesNotContain(grant)
+        assertThat(exchangedToken.grantHash).hasSize(64)
+        assertThat(exchangedToken.exchangedAt).isNotNull
+
+        given()
+            .header("Host", targetTenant.domain)
+            .contentType("application/json")
+            .body("""{"grant":"$grant"}""")
+            .`when`().post("/api/auth/passkeys/link/options")
+            .then()
+            .statusCode(200)
+
+        given()
+            .header("Host", targetTenant.domain)
+            .contentType("application/json")
+            .body("""{"code":"$code"}""")
+            .`when`().post("/api/auth/passkeys/link/exchange")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
+    fun `passkey link creation rejects unauthenticated same unknown and malformed targets`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val targetTenant = createTenant("mgmt-link-reject-$runId", "Link Reject $runId", "link-reject-$runId.example.test", owner)
+
+        given()
+            .header("Host", tenant.domain)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(401)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${tenant.domain}","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(400)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://unknown-$runId.example.test","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(403)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}/login","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(400)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"//evil.example.test"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
+    fun `passkey link token requires accepted target tenant membership`() {
+        val outsider = createUser("link-outsider-$runId", "admin1234567", ServerRole.ServerMember)
+        val outsiderCookie = login(outsider.email, "admin1234567")
+        val targetTenant = createTenant("mgmt-link-member-$runId", "Link Member $runId", "link-member-$runId.example.test", userRepo.findByEmail("mgmt-owner-$runId@example.com")!!)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", outsiderCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(403)
+
+        inTransaction {
+            TenantMember().also {
+                it.id = TenantMemberId(targetTenant.id, outsider.id)
+                it.tenant = targetTenant
+                it.user = outsider
+                it.role = TenantRole.TenantMember
+                it.acceptedAt = null
+                tenantMemberRepo.persist(it)
+            }
+        }
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", outsiderCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `passkey link creation rejects existing passkey for target domain`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val targetTenant = createTenant("mgmt-link-existing-$runId", "Link Existing $runId", "link-existing-$runId.example.test", owner)
+        createPasskey(owner, "Existing Target", targetTenant.domain)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"/"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(409)
+    }
+
+    @Test
+    fun `passkey link grant is rejected if target passkey appears after exchange`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val targetTenant = createTenant("mgmt-link-race-$runId", "Link Race $runId", "link-race-$runId.example.test", owner)
+        val grant = exchangePasskeyLink(createPasskeyLink(targetTenant.domain), targetTenant.domain)
+        createPasskey(owner, "Existing Target", targetTenant.domain)
+
+        given()
+            .header("Host", targetTenant.domain)
+            .contentType("application/json")
+            .body("""{"grant":"$grant"}""")
+            .`when`().post("/api/auth/passkeys/link/options")
+            .then()
+            .statusCode(409)
+    }
+
+    @Test
+    fun `passkey link token cannot be used as a normal session`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val targetTenant = createTenant("mgmt-link-session-$runId", "Link Session $runId", "link-session-$runId.example.test", owner)
+        val code = createPasskeyLink(targetTenant.domain)
+
+        given()
+            .header("Host", targetTenant.domain)
+            .header("Authorization", "Bearer $code")
+            .`when`().get("/api/users/me")
+            .then()
+            .statusCode(401)
+    }
+
+    @Test
+    fun `passkey link options reject consumed and expired tokens`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val consumedTenant = createTenant("mgmt-link-consumed-$runId", "Link Consumed $runId", "link-consumed-$runId.example.test", owner)
+        val consumedGrant = exchangePasskeyLink(createPasskeyLink(consumedTenant.domain), consumedTenant.domain)
+
+        inTransaction {
+            passkeyLinkTokenRepo.listAll().single { it.targetDomain == consumedTenant.domain }.consumedAt = Instant.now()
+        }
+
+        given()
+            .header("Host", consumedTenant.domain)
+            .contentType("application/json")
+            .body("""{"grant":"$consumedGrant"}""")
+            .`when`().post("/api/auth/passkeys/link/options")
+            .then()
+            .statusCode(400)
+
+        val expiredTenant = createTenant("mgmt-link-expired-$runId", "Link Expired $runId", "link-expired-$runId.example.test", owner)
+        val expiredGrant = exchangePasskeyLink(createPasskeyLink(expiredTenant.domain), expiredTenant.domain)
+
+        inTransaction {
+            passkeyLinkTokenRepo.listAll().single { it.targetDomain == expiredTenant.domain }.expiresAt = Instant.now().minusSeconds(1)
+        }
+
+        given()
+            .header("Host", expiredTenant.domain)
+            .contentType("application/json")
+            .body("""{"grant":"$expiredGrant"}""")
+            .`when`().post("/api/auth/passkeys/link/options")
+            .then()
+            .statusCode(400)
+    }
+
+    @Test
     fun `user can rename own passkey`() {
         val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
         val passkey = createPasskey(currentUser, "Laptop")
@@ -710,6 +969,83 @@ class UserManagementResourceTest {
             .statusCode(400)
             .body("code", equalTo("BAD_REQUEST"))
             .body("message", equalTo("Password reset token is no longer valid"))
+    }
+
+    @Test
+    fun `passkey reset sends domain-bound reset link and options reject wrong domain`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        createPasskey(currentUser, "Laptop", tenant.domain)
+
+        given()
+            .header("Host", tenant.domain)
+            .contentType("application/json")
+            .body("""{"email":"${currentUser.email}"}""")
+            .`when`().post("/api/users/passkeys/forgot")
+            .then()
+            .statusCode(204)
+
+        val message = mailbox.getMailMessagesSentTo(currentUser.email).last()
+        assertThat(message.text).contains("https://${tenant.domain}/passkey/reset/${currentUser.id}#")
+        val token = message.text.substringAfter("#").trim()
+
+        entityManager.clear()
+        val resetToken = resetPasswordTokenRepo.listOpenByUser(userRepo.findById(currentUser.id)!!).single()
+        assertThat(resetToken.resetDomain).isEqualTo(tenant.domain)
+
+        val altTenant = createTenant("mgmt-passkey-reset-$runId", "Passkey Reset $runId", "passkey-reset-$runId.example.test", currentUser)
+
+        given()
+            .header("Host", altTenant.domain)
+            .contentType("application/json")
+            .body("""{"token":"$token"}""")
+            .`when`().post("/api/users/${currentUser.id}/passkeys/reset/options")
+            .then()
+            .statusCode(403)
+
+        given()
+            .header("Host", tenant.domain)
+            .contentType("application/json")
+            .body("""{"token":"$token"}""")
+            .`when`().post("/api/users/${currentUser.id}/passkeys/reset/options")
+            .then()
+            .statusCode(200)
+    }
+
+    @Test
+    fun `passkey reset uses the request domain for multi-tenant users`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        createPasskey(currentUser, "Laptop", tenant.domain)
+        val altTenant = createTenant("mgmt-passkey-reset-domain-$runId", "Passkey Reset Domain $runId", "passkey-reset-domain-$runId.example.test", currentUser)
+
+        given()
+            .header("Host", altTenant.domain)
+            .contentType("application/json")
+            .body("""{"email":"${currentUser.email}"}""")
+            .`when`().post("/api/users/passkeys/forgot")
+            .then()
+            .statusCode(204)
+
+        val message = mailbox.getMailMessagesSentTo(currentUser.email).last()
+        assertThat(message.text).contains("https://${altTenant.domain}/passkey/reset/${currentUser.id}#")
+
+        entityManager.clear()
+        val resetToken = resetPasswordTokenRepo.listOpenByUser(userRepo.findById(currentUser.id)!!).single()
+        assertThat(resetToken.resetDomain).isEqualTo(altTenant.domain)
+    }
+
+    @Test
+    fun `passkey reset is not sent for password-only users`() {
+        val currentUser = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+
+        given()
+            .header("Host", tenant.domain)
+            .contentType("application/json")
+            .body("""{"email":"${currentUser.email}"}""")
+            .`when`().post("/api/users/passkeys/forgot")
+            .then()
+            .statusCode(204)
+
+        assertThat(mailbox.getMailMessagesSentTo(currentUser.email)).isEmpty()
     }
 
     @Test
@@ -1172,7 +1508,7 @@ class UserManagementResourceTest {
             user
         }
 
-    private fun createPasskey(user: User, displayName: String): PasskeyCredential =
+    private fun createPasskey(user: User, displayName: String, relyingPartyId: String? = null): PasskeyCredential =
         inTransaction {
             PasskeyCredential().also {
                 it.user = userRepo.findById(user.id)!!
@@ -1182,6 +1518,7 @@ class UserManagementResourceTest {
                 it.counter = 0
                 it.aaguid = "00000000-0000-0000-0000-000000000000"
                 it.displayName = displayName
+                it.relyingPartyId = relyingPartyId
                 it.createdAt = Instant.now()
                 passkeyCredentialRepo.persist(it)
             }
@@ -1232,6 +1569,30 @@ class UserManagementResourceTest {
             }
             tenant
         }
+
+    private fun createPasskeyLink(targetDomain: String, redirectPath: String = "/${targetDomain.substringBefore(".")}"): String =
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://$targetDomain","redirectPath":"$redirectPath"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(200)
+            .body("targetOrigin", equalTo("https://$targetDomain"))
+            .extract()
+            .path<String>("code")
+
+    private fun exchangePasskeyLink(code: String, targetDomain: String): String =
+        given()
+            .header("Host", targetDomain)
+            .contentType("application/json")
+            .body("""{"code":"$code"}""")
+            .`when`().post("/api/auth/passkeys/link/exchange")
+            .then()
+            .statusCode(200)
+            .extract()
+            .path<String>("grant")
 
     private fun createAvatarImage(): Path =
         Files.createTempFile("veyq-avatar-", ".png").also { path ->

@@ -7,6 +7,7 @@ import InviteView from './views/InviteView.vue'
 import EmailConfirmView from './views/EmailConfirmView.vue'
 import PublicShareView from './views/PublicShareView.vue'
 import ResetPasswordView from './views/ResetPasswordView.vue'
+import ResetPasskeyView from './views/ResetPasskeyView.vue'
 import SettingsView from './views/SettingsView.vue'
 import SetupView from './views/SetupView.vue'
 import TenantRouteView from './views/TenantRouteView.vue'
@@ -20,6 +21,7 @@ const router = createRouter({
     { path: '/invite/:userId', name: 'invite', component: InviteView },
     { path: '/s/:shareId/:pathMatch(.*)*', name: 'public-share', component: PublicShareView },
     { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
+    { path: '/passkey/reset/:userId', name: 'passkey-reset', component: ResetPasskeyView },
     { path: '/email/confirm', name: 'email-confirm', component: EmailConfirmView },
     { path: '/settings', name: 'server-settings', component: SettingsView },
     { path: '/~me', name: 'user-settings', component: SettingsView },
@@ -63,6 +65,7 @@ function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
     to.name !== 'invite' &&
     to.name !== 'public-share' &&
     to.name !== 'password-reset' &&
+    to.name !== 'passkey-reset' &&
     to.name !== 'email-confirm'
   )
 }

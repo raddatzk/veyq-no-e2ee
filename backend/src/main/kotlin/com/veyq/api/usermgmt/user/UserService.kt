@@ -1,6 +1,7 @@
 package com.veyq.api.usermgmt.user
 
 import com.veyq.api.auth.*
+import com.veyq.api.auth.passkey.PasskeyHostService
 import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.auth.filterchain.RequestContext
 import com.veyq.api.common.Permalinks
@@ -46,6 +47,7 @@ class UserService @Inject constructor(
     private val resetPasswordService: ResetPasswordService,
     private val emailChangeService: EmailChangeService,
     private val rateLimitService: RateLimitService,
+    private val passkeyHostService: PasskeyHostService,
     private val passkeyService: PasskeyService,
     private val memoryService: MemoryService,
     private val mediaConfig: MediaConfig,
@@ -201,6 +203,18 @@ class UserService @Inject constructor(
         resetPasswordService.requestNewPassword(user, tenant)
     }
 
+    fun forgotPasskey(request: ForgotPasswordRequest, routingContext: RoutingContext) {
+        val email = request.email.trim().lowercase()
+        rateLimitService.checkForgotPassword(email)
+        val user = userRepo.findByEmail(email)?.takeIf { passkeyCredentialRepo.countByUser(it) > 0 } ?: return
+        val domain = passkeyHostService.requireAllowedCurrentDomain(routingContext)
+        val tenant = user.tenantMemberships
+            .firstOrNull { it.acceptedAt != null && it.tenant.domain == domain }
+            ?.tenant
+            ?: return
+        resetPasswordService.requestNewPasskey(user, tenant)
+    }
+
     @Transactional
     fun resetMyPassword(userId: Long, request: ResetPasswordRequest) {
         val user = findUser(userId)
@@ -219,6 +233,41 @@ class UserService @Inject constructor(
 
         passwordService.setPassword(user, request.password, now)
         rateLimitService.recordTokenSuccess("password-reset", target)
+    }
+
+    @Transactional
+    fun createResetPasskeyOptions(
+        userId: Long,
+        request: PasskeyResetOptionsRequest,
+        routingContext: RoutingContext,
+    ): String {
+        val token = validatePasskeyResetToken(userId, request.token, routingContext)
+        return passkeyService.registrationOptionsForUser(token.user, routingContext)
+    }
+
+    @Transactional
+    fun resetMyPasskey(
+        userId: Long,
+        request: ResetPasskeyRequest,
+        routingContext: RoutingContext,
+    ): LoginContext {
+        val now = Instant.now()
+        val target = userId.toString()
+        rateLimitService.checkTokenFailureAllowed("passkey-reset", target)
+        val token = try {
+            validatePasskeyResetToken(userId, request.token, routingContext, now, lockForUpdate = true)
+        } catch (exception: ForbiddenException) {
+            rateLimitService.recordTokenFailure("passkey-reset", target)
+            throw exception
+        } catch (exception: BadRequestException) {
+            rateLimitService.recordTokenFailure("passkey-reset", target)
+            throw exception
+        }
+
+        passkeyService.resetPasskeyForUser(token.user, request.displayName, request.credential, routingContext)
+        token.acceptedAt = now
+        rateLimitService.recordTokenSuccess("passkey-reset", target)
+        return authService.loginUser(token.user)
     }
 
     @Transactional
@@ -357,6 +406,26 @@ class UserService @Inject constructor(
         }
 
         return targetUser
+    }
+
+    private fun validatePasskeyResetToken(
+        userId: Long,
+        token: String,
+        routingContext: RoutingContext,
+        now: Instant = Instant.now(),
+        lockForUpdate: Boolean = false,
+    ): com.veyq.api.domain.ResetPasswordToken {
+        val resetToken = resetPasswordService.requireOpenToken(userId, token, now, lockForUpdate)
+        val relyingPartyId = passkeyService.currentRelyingPartyId(routingContext)
+        if (resetToken.resetDomain != relyingPartyId) {
+            throw ForbiddenException("Passkey reset token is not valid for this domain")
+        }
+        val hasAcceptedMembership = tenantMemberRepo.listByUser(resetToken.user)
+            .any { it.acceptedAt != null && it.tenant.domain == relyingPartyId }
+        if (!hasAcceptedMembership) {
+            throw ForbiddenException("User is not member of this tenant")
+        }
+        return resetToken
     }
 
     private fun normalizeEmail(email: String?): String =
