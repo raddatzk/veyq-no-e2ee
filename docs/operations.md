@@ -392,7 +392,7 @@ ls -lah backups | tail
 
 Safe recovery: inspect the failed stage first. If the app is unhealthy after a new image started, preserve logs and use the matching pre-update backup artifacts. Do not reset the database. If needed, set `VEYQ_IMAGE` to the previous exact `<major>.<buildNumber>` or `sha-*` tag and run `sudo docker compose up -d veyq`.
 
-For a root-owned `.env`, repair ownership once, keep restrictive permissions, then rerun the command with the same user that owns the install directory:
+The current updater sidecar repairs a root-owned `.env` to the install-directory owner on startup when the install directory itself is not root-owned. To repair manually, keep restrictive permissions, then rerun the command with the same user that owns the install directory:
 
 ```bash
 cd /opt/veyq

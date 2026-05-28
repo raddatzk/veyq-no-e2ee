@@ -209,7 +209,7 @@ veyq images are tagged as `<major>.<buildNumber>`, where `major` comes from the 
 
 To enable automatic compatible updates, set `VEYQ_IMAGE` to the major tag, add `updater` to `COMPOSE_PROFILES`, set `VEYQ_AUTO_UPDATE_ENABLED=true` and provide `VEYQ_UPDATER_NOTIFY_TOKEN`. The setup script can generate the token. The updater sidecar is not exposed through Traefik and checks for updates every `VEYQ_AUTO_UPDATE_INTERVAL_HOURS` with random jitter.
 
-The auto-updater only updates the `veyq` application container. It reconciles safe `.env` defaults, runs `doctor`, compares the remote and local image digests, creates a backup, pulls the new image, restarts veyq and waits for the health check. Successful updates are written to the server update log; failed updates create a ServerOwner notification.
+The auto-updater only updates the `veyq` application container. It reconciles safe `.env` defaults, runs `doctor`, compares the remote and local image digests, creates a backup, pulls the new image, restarts veyq and waits for the health check. Successful updates are written to the server update log; failed updates create a ServerOwner notification. The sidecar installs its tools as root, then runs the helper as the owner of `.env` so additive `.env` updates, logs and backups do not become root-owned. If an older sidecar already left `.env` owned by root, the new sidecar repairs it to the install-directory owner on startup when the install directory itself is not root-owned.
 
 Back up at least these state locations before upgrading or testing destructive flows:
 

@@ -137,6 +137,8 @@ services:
       VEYQ_UPDATER_NOTIFY_TOKEN: ${VEYQ_UPDATER_NOTIFY_TOKEN:-}
       VEYQ_INTERNAL_URL: http://veyq:8080
       VEYQ_DIR: /veyq
+      VEYQ_UPDATER_UID: ${VEYQ_UPDATER_UID:-}
+      VEYQ_UPDATER_GID: ${VEYQ_UPDATER_GID:-}
     volumes:
       - ./:/veyq
       - /var/run/docker.sock:/var/run/docker.sock
@@ -145,13 +147,38 @@ services:
       - -c
       - |
         set -eu
-        apk add --no-cache bash curl docker-cli docker-cli-buildx docker-cli-compose >/dev/null
+        apk add --no-cache bash curl docker-cli docker-cli-buildx docker-cli-compose su-exec >/dev/null
+
+        env_uid="$$(stat -c '%u' /veyq/.env 2>/dev/null || stat -c '%u' /veyq)"
+        env_gid="$$(stat -c '%g' /veyq/.env 2>/dev/null || stat -c '%g' /veyq)"
+        dir_uid="$$(stat -c '%u' /veyq)"
+        dir_gid="$$(stat -c '%g' /veyq)"
+        if [ "$$env_uid" = "0" ] && [ "$$dir_uid" != "0" ]; then
+          chown "$$dir_uid:$$dir_gid" /veyq/.env 2>/dev/null || true
+          env_uid="$$dir_uid"
+          env_gid="$$dir_gid"
+        fi
+
+        run_uid="$${VEYQ_UPDATER_UID:-$$env_uid}"
+        socket_gid="$$(stat -c '%g' /var/run/docker.sock 2>/dev/null || printf '%s' "$$env_gid")"
+        run_gid="$${VEYQ_UPDATER_GID:-$$socket_gid}"
+        group_name="$$(awk -F: -v gid="$$run_gid" '$$3 == gid { print $$1; exit }' /etc/group)"
+        if [ -z "$$group_name" ]; then
+          group_name="veyq-updater"
+          addgroup -g "$$run_gid" "$$group_name"
+        fi
+        if ! awk -F: -v uid="$$run_uid" '$$3 == uid { found = 1 } END { exit found ? 0 : 1 }' /etc/passwd; then
+          adduser -D -H -u "$$run_uid" -G "$$group_name" veyq-updater
+        fi
+        mkdir -p /veyq/logs /veyq/backups
+        chown "$$run_uid:$$run_gid" /veyq/logs /veyq/backups 2>/dev/null || true
+
         while true; do
           jitter_minutes="$${VEYQ_AUTO_UPDATE_JITTER_MINUTES:-30}"
           if [ "$$jitter_minutes" -gt 0 ]; then
             sleep "$$(awk -v max="$$jitter_minutes" 'BEGIN { srand(); print int(rand() * (max * 60 + 1)) }')"
           fi
-          /veyq/veyq-server.sh auto-upgrade || true
+          su-exec "$$run_uid:$$run_gid" /veyq/veyq-server.sh auto-upgrade || true
           interval_hours="$${VEYQ_AUTO_UPDATE_INTERVAL_HOURS:-6}"
           if [ "$$interval_hours" -lt 1 ]; then
             interval_hours=1
