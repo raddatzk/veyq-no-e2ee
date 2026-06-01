@@ -1,7 +1,10 @@
 import { mount } from '@vue/test-utils'
+import { CompletionContext } from '@codemirror/autocomplete'
+import { EditorState } from '@codemirror/state'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import MemoryJournalLiveEditor from './MemoryJournalLiveEditor.vue'
+import type { Memory, MemoryJournalLiveSession, MemoryPlaylist, MemoryTrack } from '../api'
 import { createJournalEmbedTypeCompletionSource } from '../utils/journalEmbedCompletion'
 
 const hocuspocus = vi.hoisted(() => ({
@@ -125,25 +128,14 @@ describe('MemoryJournalLiveEditor', () => {
         session: liveSession(),
         media: [],
         childMemories: [
-          {
-            id: 'chapter-1',
-            displayName: 'Day 2',
-            path: '/trip/day-2'
-          }
-        ] as any,
+          memory({ id: 'chapter-1', displayName: 'Day 2', path: '/trip/day-2' })
+        ],
         playlists: [
-          {
-            id: 'playlist-1',
-            title: 'Roadtrip Mix'
-          }
-        ] as any,
+          playlist({ id: 'playlist-1', title: 'Roadtrip Mix' })
+        ],
         tracks: [
-          {
-            id: 'track-1',
-            title: 'Summit Route',
-            distanceMeters: 1200
-          }
-        ] as any
+          track({ id: 'track-1', title: 'Summit Route', distanceMeters: 1200 })
+        ]
       }
     })
     await nextTick()
@@ -206,12 +198,8 @@ describe('MemoryJournalLiveEditor', () => {
         childMemories: [],
         playlists: [],
         tracks: [
-          {
-            id: 'track-1',
-            title: 'Summit Route',
-            distanceMeters: 1200
-          }
-        ] as any
+          track({ id: 'track-1', title: 'Summit Route', distanceMeters: 1200 })
+        ]
       }
     })
     await nextTick()
@@ -245,12 +233,8 @@ describe('MemoryJournalLiveEditor', () => {
         childMemories: [],
         playlists: [],
         tracks: [
-          {
-            id: 'track-1',
-            title: 'Summit Route',
-            distanceMeters: 1200
-          }
-        ] as any
+          track({ id: 'track-1', title: 'Summit Route', distanceMeters: 1200 })
+        ]
       }
     })
     await nextTick()
@@ -293,11 +277,7 @@ describe('MemoryJournalLiveEditor', () => {
       onMedia,
       onEmbed
     })
-    const result = source({
-      pos: 2,
-      explicit: false,
-      matchBefore: () => ({ from: 0, to: 2, text: '::' })
-    } as any)
+    const result = source(new CompletionContext(EditorState.create({ doc: '::' }), 2, false))
 
     expect(result?.from).toBe(0)
     expect(result?.filter).toBe(false)
@@ -334,17 +314,13 @@ describe('MemoryJournalLiveEditor', () => {
       onMedia: vi.fn(),
       onEmbed: vi.fn()
     })
-    const result = source({
-      pos: 3,
-      explicit: false,
-      matchBefore: () => ({ from: 0, to: 3, text: '::c' })
-    } as any)
+    const result = source(new CompletionContext(EditorState.create({ doc: '::c' }), 3, false))
 
     expect(result?.options.map((option) => option.label)).toEqual(['Kapitel'])
   })
 })
 
-function liveSession() {
+function liveSession(): MemoryJournalLiveSession {
   return {
     memoryId: 'mem-1',
     documentId: 'journal-1',
@@ -354,5 +330,69 @@ function liveSession() {
     color: '#5b6ee1',
     expiresAt: '2026-06-01T12:00:00Z',
     canEdit: true
+  }
+}
+
+function memory(overrides: Partial<Memory> = {}): Memory {
+  return {
+    id: 'mem-1',
+    parentId: null,
+    name: 'trip',
+    displayName: 'Trip',
+    path: '/trip',
+    coverMediaId: null,
+    coverUrl: null,
+    coverCrop: null,
+    startDate: '2026-05-03',
+    endDate: '2026-05-05',
+    childCount: 0,
+    mediaCount: 0,
+    favorite: false,
+    scope: { type: 'TENANT' },
+    ...overrides
+  }
+}
+
+function playlist(overrides: Partial<MemoryPlaylist> = {}): MemoryPlaylist {
+  return {
+    id: 'playlist-1',
+    memoryId: 'mem-1',
+    title: 'Roadtrip Mix',
+    featured: false,
+    provider: 'YOUTUBE',
+    url: 'https://www.youtube.com/playlist?list=PL1234567890abcdef',
+    externalId: 'PL1234567890abcdef',
+    createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
+    ...overrides
+  }
+}
+
+function track(overrides: Partial<MemoryTrack> = {}): MemoryTrack {
+  return {
+    id: 'track-1',
+    memoryId: 'mem-1',
+    title: 'Summit Route',
+    activityType: 'HIKING',
+    originalFilename: 'summit-route.gpx',
+    distanceMeters: 1200,
+    pointCount: 42,
+    bounds: {
+      minLatitude: 52.1,
+      minLongitude: 13.1,
+      maxLatitude: 52.2,
+      maxLongitude: 13.2
+    },
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [13.1, 52.1],
+        [13.2, 52.2]
+      ]
+    },
+    contentUrl: '/api/memories/mem-1/tracks/track-1/content',
+    createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
+    ...overrides
   }
 }
