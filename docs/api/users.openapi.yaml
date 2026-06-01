@@ -1787,11 +1787,16 @@ components:
       additionalProperties: false
       required:
         - email
+        - requiresLogin
       properties:
         email:
           "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        requiresLogin:
+          type: boolean
+          description: True when the invitation targets an existing account and must be accepted after login.
       example:
         email: invitee@example.test
+        requiresLogin: false
     PasskeyInvitationOptionsRequest:
       type: object
       additionalProperties: false

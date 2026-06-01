@@ -29,6 +29,7 @@ const { t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const displayName = ref('')
 const invitedEmail = ref('')
+const inviteRequiresLogin = ref(false)
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -61,9 +62,12 @@ async function loadInvitationMetadata() {
   if (!requiresPassword.value) return
   if (!Number.isInteger(userId.value) || !token.value) return
   try {
-    invitedEmail.value = (await invitationMetadata(userId.value, token.value)).email
+    const metadata = await invitationMetadata(userId.value, token.value)
+    invitedEmail.value = metadata.email
+    inviteRequiresLogin.value = Boolean(metadata.requiresLogin)
   } catch {
     invitedEmail.value = ''
+    inviteRequiresLogin.value = false
   }
 }
 
@@ -74,6 +78,10 @@ async function submit() {
     return
   }
   const inviteDisplayName = displayName.value.trim()
+  if (inviteRequiresLogin.value) {
+    await router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
   if (requiresPassword.value && !inviteDisplayName) {
     error.value = t('auth.displayNameRequired')
     return
@@ -269,7 +277,12 @@ async function finishInvite() {
         :action="`/api/users/${userId}/invite/accept`"
         @submit.prevent="submit"
       >
-        <div v-if="requiresPassword" class="auth-method-switch" role="tablist" :aria-label="t('auth.authMethod')">
+        <div
+          v-if="requiresPassword && !inviteRequiresLogin"
+          class="auth-method-switch"
+          role="tablist"
+          :aria-label="t('auth.authMethod')"
+        >
           <button
             type="button"
             :class="{ active: authMethod === 'passkey' }"
@@ -289,7 +302,13 @@ async function finishInvite() {
             {{ t('common.password') }}
           </button>
         </div>
-        <label v-if="requiresPassword && authMethod === 'password' && invitedEmail" for="invite-email">
+        <Message v-if="inviteRequiresLogin" severity="info" :closable="false">
+          {{ t('auth.inviteExistingAccountLogin') }}
+        </Message>
+        <label
+          v-if="requiresPassword && invitedEmail && (inviteRequiresLogin || authMethod === 'password')"
+          for="invite-email"
+        >
           {{ t('common.email') }}
           <InputText
             id="invite-email"
@@ -301,11 +320,11 @@ async function finishInvite() {
             required
           />
         </label>
-        <label v-if="requiresPassword">
+        <label v-if="requiresPassword && !inviteRequiresLogin">
           {{ t('auth.displayName') }}
           <InputText v-model="displayName" name="name" autocomplete="name" required />
         </label>
-        <label v-if="requiresPassword && authMethod === 'password'" for="invite-new-password">
+        <label v-if="requiresPassword && !inviteRequiresLogin && authMethod === 'password'" for="invite-new-password">
           {{ t('common.password') }}
           <Password
             v-model="password"
@@ -320,7 +339,9 @@ async function finishInvite() {
         <Button
           type="submit"
           :label="
-            requiresPassword
+            inviteRequiresLogin
+              ? t('auth.login')
+              : requiresPassword
               ? authMethod === 'passkey'
                 ? t('auth.accountCreateWithPasskey')
                 : t('auth.setPassword')

@@ -127,7 +127,7 @@ acceptanceCriteria:
             kind: negative
             ref: frontend/src/views/LoginView.test.ts
   - id: auth.local-accounts-passkeys.invitation-acceptance
-    statement: Tenant invitations can be accepted with password or passkey.
+    statement: Tenant invitations can create a new password or passkey account, while invitations for existing accounts require login before acceptance.
     coverage:
       backend:
         integration:
@@ -135,6 +135,12 @@ acceptanceCriteria:
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
           - testName: passkey only user can accept tenant invitation without display name
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant owner invites and activates existing tenant user by email
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant creation invites existing owner account through login flow
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
       frontend:
@@ -153,6 +159,9 @@ acceptanceCriteria:
             ref: frontend/src/views/InviteView.test.ts
           - testName: accepts an invitation for an already signed-in user without privacy opt-ins
             kind: negative
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: sends existing invited accounts to login instead of account creation
+            kind: positive
             ref: frontend/src/views/InviteView.test.ts
   - id: auth.local-accounts-passkeys.own-passkey-management
     statement: Users can list, rename and delete their own passkeys but cannot manage another user’s passkeys.

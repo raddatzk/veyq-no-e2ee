@@ -382,8 +382,11 @@ class UserService @Inject constructor(
 
     @Transactional
     fun invitationMetadata(userId: Long, request: InvitationMetadataRequest): InvitationMetadataResponse {
-        val invitation = checkPendingInvitation(userId, request.token)
-        return InvitationMetadataResponse(email = invitation.user.email)
+        val invitation = checkOpenInvitation(userId, request.token)
+        return InvitationMetadataResponse(
+            email = invitation.user.email,
+            requiresLogin = userHasLogin(invitation.user),
+        )
     }
 
     @Transactional
@@ -447,6 +450,18 @@ class UserService @Inject constructor(
 
         return invitation
     }
+
+    private fun checkOpenInvitation(userId: Long, token: String): UserInvitation {
+        val targetUser = findUser(userId)
+        val invitation = invitationService.checkToken(token, Instant.now())
+        if (invitation.user != targetUser) {
+            throw UnauthorizedException("User is already accepted")
+        }
+        return invitation
+    }
+
+    private fun userHasLogin(user: User): Boolean =
+        user.passwordSetAt != null || passkeyCredentialRepo.countByUser(user) > 0
 
     private fun activateTenantForInitialOwnerIfNeeded(tenant: Tenant, role: TenantRole, timestamp: Instant) {
         if (tenant.activatedAt == null && role == TenantRole.TenantOwner) {

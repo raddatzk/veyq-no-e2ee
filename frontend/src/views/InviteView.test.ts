@@ -289,6 +289,38 @@ describe('InviteView', () => {
     expect(router.currentRoute.value.path).toBe('/')
   })
 
+  it('sends existing invited accounts to login instead of account creation', async () => {
+    invitationMetadataMock.mockResolvedValue({
+      email: 'invitee@example.test',
+      requiresLogin: true
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/login', name: 'login', component: { template: '<div />' } },
+        { path: '/invite/:userId', component: InviteView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/invite/42#invite-token')
+    await router.isReady()
+
+    const wrapper = mount(InviteView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Diese Einladung gehört zu einem bestehenden Account')
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Passkey')).toBe(false)
+    expect((wrapper.find('input[name="email"]').element as HTMLInputElement).value).toBe('invitee@example.test')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(acceptInvitationMock).not.toHaveBeenCalled()
+    expect(acceptInvitationWithPasskeyMock).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/invite/42#invite-token')
+  })
+
   it('requires a display name before starting passkey invitation acceptance', async () => {
     const router = createRouter({
       history: createMemoryHistory(),

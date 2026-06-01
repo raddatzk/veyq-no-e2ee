@@ -25,6 +25,12 @@ export interface InvitationMetadataResponse {
      * @memberof InvitationMetadataResponse
      */
     email: string;
+    /**
+     * True when the invitation targets an existing account and must be accepted after login.
+     * @type {boolean}
+     * @memberof InvitationMetadataResponse
+     */
+    requiresLogin: boolean;
 }
 
 /**
@@ -32,6 +38,7 @@ export interface InvitationMetadataResponse {
  */
 export function instanceOfInvitationMetadataResponse(value: object): value is InvitationMetadataResponse {
     if (!('email' in value) || value['email'] === undefined) return false;
+    if (!('requiresLogin' in value) || value['requiresLogin'] === undefined) return false;
     return true;
 }
 
@@ -46,6 +53,7 @@ export function InvitationMetadataResponseFromJSONTyped(json: any, ignoreDiscrim
     return {
         
         'email': json['email'],
+        'requiresLogin': json['requiresLogin'],
     };
 }
 
@@ -61,6 +69,7 @@ export function InvitationMetadataResponseToJSONTyped(value?: InvitationMetadata
     return {
         
         'email': value['email'],
+        'requiresLogin': value['requiresLogin'],
     };
 }
 

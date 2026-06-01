@@ -58,9 +58,14 @@ class TenantService @Inject constructor(
         val name = request.name.trim().lowercase()
         if (!TenantName.isValid(name)) throw BadRequestException("Invalid tenant name")
         val tenant = createPendingTenant(name, request.displayName, request.domain)
-        val owner = findOrCreatePendingUser(request.ownerEmail)
+        val ownerLookup = findOrCreatePendingUser(request.ownerEmail)
+        val owner = ownerLookup.user
         addUserToTenant(tenant, owner, TenantRole.TenantOwner, acceptedAt = null)
-        invitationService.createAndSendInvitation(owner, tenant)
+        if (ownerLookup.created) {
+            invitationService.createAndSendInvitationWithUserCompletion(owner, tenant)
+        } else {
+            invitationService.createAndSendInvitation(owner, tenant)
+        }
 
         return tenant.toCreationResponse(owner.email)
     }
@@ -129,9 +134,10 @@ class TenantService @Inject constructor(
         return tenant
     }
 
-    private fun findOrCreatePendingUser(email: String?): User {
+    private fun findOrCreatePendingUser(email: String?): PendingUserLookup {
         val normalizedEmail = normalizeEmail(email)
-        return userRepo.findByEmail(normalizedEmail) ?: User().also {
+        userRepo.findByEmail(normalizedEmail)?.let { return PendingUserLookup(it, created = false) }
+        val user = User().also {
             it.email = normalizedEmail
             it.displayName = normalizedEmail.substringBefore("@").ifBlank { normalizedEmail }
             it.permalink = uniquePermalink(it.displayName)
@@ -141,6 +147,7 @@ class TenantService @Inject constructor(
             it.persistAndFlush()
             capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(it)
         }
+        return PendingUserLookup(user, created = true)
     }
 
     private fun normalizeEmail(email: String?): String =
@@ -329,6 +336,8 @@ class TenantService @Inject constructor(
     private companion object {
         private const val MAX_LOGO_BYTES = 5L * 1024L * 1024L
     }
+
+    private data class PendingUserLookup(val user: User, val created: Boolean)
 }
 
 fun Tenant.logoUrl(): String? =

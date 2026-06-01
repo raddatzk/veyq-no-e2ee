@@ -54,7 +54,8 @@ class TenantUserService @Inject constructor(
     @Transactional
     fun inviteTenantUser(tenantName: String, request: InviteTenantUserRequest): TenantUserSummary {
         val tenant = tenant()
-        val targetUser = findOrCreatePendingUser(request.email)
+        val targetUserLookup = findOrCreatePendingUser(request.email)
+        val targetUser = targetUserLookup.user
         tenantMemberRepo.findByTenantAndUser(tenant, targetUser)?.let { existing ->
             if (existing.status != TenantMemberStatus.Removed) {
                 throw ConflictException("User is already member of this tenant")
@@ -78,7 +79,11 @@ class TenantUserService @Inject constructor(
             tenantMemberRepo.persist(it)
         }
 
-        invitationService.createAndSendInvitationWithUserCompletion(targetUser, tenant)
+        if (targetUserLookup.created) {
+            invitationService.createAndSendInvitationWithUserCompletion(targetUser, tenant)
+        } else {
+            invitationService.createAndSendInvitation(targetUser, tenant)
+        }
 
         return membership.toTenantUserSummary(includeManagementFields = true)
     }
@@ -141,9 +146,10 @@ class TenantUserService @Inject constructor(
     private fun tenant() = requestContext.tenant!!
     private fun user() = requestContext.user!!
 
-    private fun findOrCreatePendingUser(email: String): User {
+    private fun findOrCreatePendingUser(email: String): PendingUserLookup {
         val normalizedEmail = normalizeEmail(email)
-        return userRepo.findByEmail(normalizedEmail) ?: User().also {
+        userRepo.findByEmail(normalizedEmail)?.let { return PendingUserLookup(it, created = false) }
+        val user = User().also {
             it.email = normalizedEmail
             it.displayName = normalizedEmail.substringBefore("@").ifBlank { normalizedEmail }
             it.permalink = uniquePermalink(it.displayName)
@@ -153,6 +159,7 @@ class TenantUserService @Inject constructor(
             it.persistAndFlush()
             capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(it)
         }
+        return PendingUserLookup(user, created = true)
     }
 
     private fun normalizeEmail(email: String?): String =
@@ -210,5 +217,7 @@ class TenantUserService @Inject constructor(
             ApiTenantRole.TenantOwner -> TenantRole.TenantOwner
             ApiTenantRole.TenantMember -> TenantRole.TenantMember
         }
+
+    private data class PendingUserLookup(val user: User, val created: Boolean)
 
 }

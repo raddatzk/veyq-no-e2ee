@@ -224,6 +224,7 @@ class UserManagementResourceTest {
             .then()
             .statusCode(200)
             .body("email", equalTo("invitee-$runId@example.com"))
+            .body("requiresLogin", equalTo(false))
 
         given()
             .contentType("application/json")
@@ -1181,6 +1182,8 @@ class UserManagementResourceTest {
             .body("status", equalTo("Pending"))
 
         val firstInviteMessage = mailbox.getMailMessagesSentTo(existingUser.email).single()
+        assertThat(firstInviteMessage.text).contains("Über diesen Link kannst du ganz einfach beitreten")
+        assertThat(firstInviteMessage.text).doesNotContain("Vervollständige deinen Account")
         val token = firstInviteMessage.text.substringAfter("/invite/${existingUser.id}#").trim()
         val pendingMembership = tenantMemberRepo.findByTenantAndUser(tenant, existingUser)!!
         assertThat(pendingMembership.acceptedAt).isNull()
@@ -1213,6 +1216,15 @@ class UserManagementResourceTest {
             .text
             .substringAfter("/invite/${existingUser.id}#")
             .trim()
+
+        given()
+            .contentType("application/json")
+            .body("""{"token":"$latestToken"}""")
+            .`when`().post("/api/users/${existingUser.id}/invite/metadata")
+            .then()
+            .statusCode(200)
+            .body("email", equalTo(existingUser.email))
+            .body("requiresLogin", equalTo(true))
 
         given()
             .contentType("application/json")
@@ -1355,6 +1367,8 @@ class UserManagementResourceTest {
 
         val createdUser = userRepo.findById(createdUserId)!!
         assertThat(createdUser.role).isEqualTo(ServerRole.ServerMember)
+        val message = mailbox.getMailMessagesSentTo("tenant-created-$runId@example.com").single()
+        assertThat(message.text).contains("Vervollständige deinen Account")
 
         entityManager.clear()
         val createdMembership = tenantMemberRepo.findByTenantAndUser(tenant, createdUser)!!
@@ -1790,6 +1804,7 @@ class UserManagementResourceTest {
         val token = mailbox.getMailMessagesSentTo(invitedEmail)
             .single()
             .text
+            .also { assertThat(it).contains("Vervollständige deinen Account") }
             .substringAfter("/invite/${invitedUser.id}#")
             .trim()
 
@@ -1813,6 +1828,48 @@ class UserManagementResourceTest {
             .body("tenants.name", hasItem(tenantName))
             .body("tenants.role", hasItem("TenantOwner"))
             .body("tenants.admins.email.flatten()", hasItem(invitedEmail))
+    }
+
+    @Test
+    fun `tenant creation invites existing owner account through login flow`() {
+        val tenantName = "existing-owner-$runId"
+        val ownerEmail = "mgmt-owner-$runId@example.com"
+        val owner = userRepo.findByEmail(ownerEmail) ?: throw IllegalStateException("Owner not found")
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"$tenantName","displayName":"Existing Owner","domain":"$tenantName.example.test","ownerEmail":"$ownerEmail"}""")
+            .`when`().post("/api/tenants")
+            .then()
+            .statusCode(200)
+            .body("status", equalTo("Pending"))
+            .body("invitedOwnerEmail", equalTo(ownerEmail))
+
+        val message = mailbox.getMailMessagesSentTo(ownerEmail).single()
+        assertThat(message.text).contains("Über diesen Link kannst du ganz einfach beitreten")
+        assertThat(message.text).doesNotContain("Vervollständige deinen Account")
+        val token = message.text.substringAfter("/invite/${owner.id}#").trim()
+
+        given()
+            .contentType("application/json")
+            .body("""{"token":"$token"}""")
+            .`when`().post("/api/users/${owner.id}/invite/metadata")
+            .then()
+            .statusCode(200)
+            .body("email", equalTo(ownerEmail))
+            .body("requiresLogin", equalTo(true))
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"token":"$token"}""")
+            .`when`().post("/api/users/${owner.id}/invite/accept")
+            .then()
+            .statusCode(200)
+
+        entityManager.clear()
+        assertThat(tenantRepo.findByName(tenantName)?.activatedAt).isNotNull()
     }
 
     private data class LifecycleContent(
