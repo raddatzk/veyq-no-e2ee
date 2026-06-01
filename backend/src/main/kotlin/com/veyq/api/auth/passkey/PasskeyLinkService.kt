@@ -136,8 +136,11 @@ class PasskeyLinkService(
     private fun requireMembership(user: User, targetDomain: String) {
         val tenant = tenantRepo.findByDomain(targetDomain)
             ?: throw ForbiddenException("Target domain is not available")
-        tenantMemberRepo.findByTenantAndUser(tenant, user)?.takeIf { it.status == TenantMemberStatus.Active }
+        val membership = tenantMemberRepo.findByTenantAndUser(tenant, user)
             ?: throw ForbiddenException("User is not member of this tenant")
+        if (membership.status != TenantMemberStatus.Active && membership.status != TenantMemberStatus.Pending) {
+            throw ForbiddenException("User is not member of this tenant")
+        }
     }
 
     private fun requireNoTargetPasskey(user: User, targetDomain: String) {

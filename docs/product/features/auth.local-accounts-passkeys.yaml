@@ -143,6 +143,12 @@ acceptanceCriteria:
           - testName: tenant creation invites existing owner account through login flow
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token allows pending target tenant membership
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token rejects removed target tenant membership
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
       frontend:
         unit:
           - testName: asks for TOTP setup before privacy opt-ins after password invitation acceptance
@@ -284,8 +290,8 @@ acceptanceCriteria:
           - testName: passkey link creation rejects unauthenticated same unknown and malformed targets
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
-          - testName: passkey link token requires accepted target tenant membership
-            kind: positive
+          - testName: passkey link token requires target tenant membership
+            kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
           - testName: passkey link creation rejects existing passkey for target domain
             kind: negative

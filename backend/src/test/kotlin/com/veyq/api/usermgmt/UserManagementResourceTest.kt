@@ -796,7 +796,7 @@ class UserManagementResourceTest {
     }
 
     @Test
-    fun `passkey link token requires accepted target tenant membership`() {
+    fun `passkey link token requires target tenant membership`() {
         val outsider = createUser("link-outsider-$runId", "admin1234567", ServerRole.ServerMember)
         val outsiderCookie = login(outsider.email, "admin1234567")
         val targetTenant = createTenant("mgmt-link-member-$runId", "Link Member $runId", "link-member-$runId.example.test", userRepo.findByEmail("mgmt-owner-$runId@example.com")!!)
@@ -809,21 +809,65 @@ class UserManagementResourceTest {
             .`when`().post("/api/auth/passkeys/link")
             .then()
             .statusCode(403)
+    }
+
+    @Test
+    fun `passkey link token allows pending target tenant membership`() {
+        val owner = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!
+        val tenantName = "mgmt-link-invite-$runId"
+        val targetDomain = "link-invite-$runId.example.test"
+
+        given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"name":"$tenantName","displayName":"Link Invite $runId","domain":"$targetDomain","ownerEmail":"${owner.email}"}""")
+            .`when`().post("/api/tenants")
+            .then()
+            .statusCode(200)
+            .body("status", equalTo("Pending"))
+
+        val targetTenant = tenantRepo.findByName(tenantName) ?: throw IllegalStateException("Tenant not found")
+        assertThat(targetTenant.activatedAt).isNull()
+        assertThat(tenantMemberRepo.findByTenantAndUser(targetTenant, owner)!!.status).isEqualTo(TenantMemberStatus.Pending)
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .contentType("application/json")
+            .body("""{"targetOrigin":"https://$targetDomain","redirectPath":"/invite/${owner.id}#invite-token"}""")
+            .`when`().post("/api/auth/passkeys/link")
+            .then()
+            .statusCode(200)
+            .body("targetOrigin", equalTo("https://$targetDomain"))
+    }
+
+    @Test
+    fun `passkey link token rejects removed target tenant membership`() {
+        val removedUser = createUser("link-removed-$runId", "admin1234567", ServerRole.ServerMember)
+        val removedUserCookie = login(removedUser.email, "admin1234567")
+        val targetTenant = createTenant(
+            "mgmt-link-removed-$runId",
+            "Link Removed $runId",
+            "link-removed-$runId.example.test",
+            userRepo.findByEmail("mgmt-owner-$runId@example.com")!!,
+        )
 
         inTransaction {
             TenantMember().also {
-                it.id = TenantMemberId(targetTenant.id, outsider.id)
+                it.id = TenantMemberId(targetTenant.id, removedUser.id)
                 it.tenant = targetTenant
-                it.user = outsider
+                it.user = removedUser
                 it.role = TenantRole.TenantMember
-                it.acceptedAt = null
+                it.acceptedAt = Instant.now().minusSeconds(60)
+                it.status = TenantMemberStatus.Removed
+                it.removedAt = Instant.now()
                 tenantMemberRepo.persist(it)
             }
         }
 
         given()
             .header("Host", tenant.domain)
-            .cookie("VEYQ_ACCESS_TOKEN", outsiderCookie)
+            .cookie("VEYQ_ACCESS_TOKEN", removedUserCookie)
             .contentType("application/json")
             .body("""{"targetOrigin":"https://${targetTenant.domain}","redirectPath":"/"}""")
             .`when`().post("/api/auth/passkeys/link")
