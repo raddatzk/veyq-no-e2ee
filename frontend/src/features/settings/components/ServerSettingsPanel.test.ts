@@ -89,6 +89,23 @@ describe('ServerSettingsPanel', () => {
     expect(wrapper.find('a[href="https://support.example.test/veyq"]').text()).toContain('Unterstützen')
   })
 
+  it('renders translated mobile handoff capability', async () => {
+    mockServerPanel(
+      serverSettings({
+        capabilities: [{ id: 'auth.mobile-handoff', audience: 'mobile' }]
+      })
+    )
+
+    const wrapper = mount(ServerSettingsPanel, {
+      global: { stubs: primeStubs() }
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Mobiler Login-Handoff')
+    expect(wrapper.text()).toContain('Native mobile Apps über den Browser-Login mit einer Server-Session verbinden.')
+    expect(wrapper.text()).not.toContain('auth.mobile-handoff')
+  })
+
   it('disables and enables managed users from the server user list', async () => {
     mockServerPanel()
     getManagedUsersMock.mockResolvedValue({

@@ -593,6 +593,10 @@ export const messages = {
           title: 'TOTP für Passwort-Login',
           description: 'Passwort-Logins mit einem Authenticator-Code als zweitem Faktor absichern.'
         },
+        auth_mobile_handoff: {
+          title: 'Mobiler Login-Handoff',
+          description: 'Native mobile Apps über den Browser-Login mit einer Server-Session verbinden.'
+        },
         spaces_tenant_group_personal: {
           title: 'Mandanten-, Gruppen- und persönliche Bereiche',
           description: 'Mandantenweite, gruppenbezogene und persönliche Memory-Bereiche mit rollenbasiertem Zugriff erstellen.'
@@ -1538,6 +1542,10 @@ export const messages = {
         auth_totp_mfa: {
           title: 'TOTP for password login',
           description: 'Protect password logins with an authenticator code as a second factor.'
+        },
+        auth_mobile_handoff: {
+          title: 'Mobile login handoff',
+          description: 'Connect native mobile apps to a server session through browser login.'
         },
         spaces_tenant_group_personal: {
           title: 'Tenant, group and personal spaces',
