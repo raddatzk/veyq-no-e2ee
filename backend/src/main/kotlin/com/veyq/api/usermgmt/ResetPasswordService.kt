@@ -46,12 +46,13 @@ class ResetPasswordService @Inject constructor(
         resetPasswordTokenRepo.listOpenByUser(user).forEach { it.revokedAt = now }
 
         val token = newForgotPasswordToken()
+        val expiresAt = now.plus(Duration.ofHours(userConfig.resetPasswordTtlHours))
         ResetPasswordToken().also {
             it.user = user
             it.resetDomain = tenant.domain
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
-            it.expiresAt = now.plus(Duration.ofHours(userConfig.resetPasswordTtlHours))
+            it.expiresAt = expiresAt
             it.persistAndFlush()
         }
 
@@ -66,7 +67,7 @@ class ResetPasswordService @Inject constructor(
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
                     // The existing reset mail copy is generic enough for passkey recovery and keeps token handling identical.
-                    mailService.sendPasswordResetMail(user, resetUrl, tenant)
+                    mailService.sendPasswordResetMail(user, resetUrl, expiresAt, tenant)
                 }
             }
         })

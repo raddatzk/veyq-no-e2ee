@@ -54,11 +54,20 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import javax.imageio.ImageIO
 
 @QuarkusTest
 class UserManagementResourceTest {
+    companion object {
+        private val MAIL_LINK_EXPIRY_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm 'UTC'", Locale.GERMAN)
+                .withZone(ZoneOffset.UTC)
+    }
+
     @Inject lateinit var userRepo: UserRepo
     @Inject lateinit var tenantRepo: TenantRepo
     @Inject lateinit var tenantMemberRepo: TenantMemberRepo
@@ -213,9 +222,10 @@ class UserManagementResourceTest {
 
         val message = mailbox.getMailMessagesSentTo("invitee-$runId@example.com").single()
         assertThat(message.text).contains("https://${tenant.domain}/invite/$invitedUserId#")
-        val token = message.text.substringAfter("/invite/$invitedUserId#").trim()
+        val token = invitationTokenFromText(message.text, invitedUserId)
         val pendingInvitation = invitationRepo.listAll().single { it.user.email == "invitee-$runId@example.com" }
         assertExpiresAround(pendingInvitation.expiresAt, Duration.ofDays(7))
+        assertMailContainsLinkExpiry(message.text, pendingInvitation.expiresAt)
 
         given()
             .contentType("application/json")
@@ -281,6 +291,7 @@ class UserManagementResourceTest {
         val token = emailChangeTokenFromMailbox(pendingEmail)
         val pendingChange = emailChangeRepo.findLatestOpenByUser(userRepo.findByEmail(currentEmail)!!)!!
         assertExpiresAround(pendingChange.expiresAt, Duration.ofHours(24))
+        assertMailContainsLinkExpiry(mailbox.getMailMessagesSentTo(pendingEmail).last().text, pendingChange.expiresAt)
 
         given()
             .contentType("application/json")
@@ -420,10 +431,11 @@ class UserManagementResourceTest {
         assertThat(message.text).contains("#")
         val resetPath = message.text.substringAfter("${tenant.domain}/password/reset/").trim()
         val resetUserId = resetPath.substringBefore("#").toLong()
-        val resetToken = resetPath.substringAfter("#")
+        val resetToken = resetPath.substringAfter("#").substringBefore("\n").trim()
         assertThat(resetToken).doesNotContain("/")
         val resetPasswordToken = resetPasswordTokenRepo.listOpenByUser(userRepo.findByEmail(currentEmail)!!).single()
         assertExpiresAround(resetPasswordToken.expiresAt, Duration.ofHours(2))
+        assertMailContainsLinkExpiry(message.text, resetPasswordToken.expiresAt)
 
         given()
             .contentType("application/json")
@@ -1148,11 +1160,12 @@ class UserManagementResourceTest {
 
         val message = mailbox.getMailMessagesSentTo(currentUser.email).last()
         assertThat(message.text).contains("https://${tenant.domain}/passkey/reset/${currentUser.id}#")
-        val token = message.text.substringAfter("#").trim()
+        val token = message.text.substringAfter("#").substringBefore("\n").trim()
 
         entityManager.clear()
         val resetToken = resetPasswordTokenRepo.listOpenByUser(userRepo.findById(currentUser.id)!!).single()
         assertThat(resetToken.resetDomain).isEqualTo(tenant.domain)
+        assertMailContainsLinkExpiry(message.text, resetToken.expiresAt)
 
         val altTenant = createTenant("mgmt-passkey-reset-$runId", "Passkey Reset $runId", "passkey-reset-$runId.example.test", currentUser)
 
@@ -1228,7 +1241,7 @@ class UserManagementResourceTest {
         val firstInviteMessage = mailbox.getMailMessagesSentTo(existingUser.email).single()
         assertThat(firstInviteMessage.text).contains("Über diesen Link kannst du ganz einfach beitreten")
         assertThat(firstInviteMessage.text).doesNotContain("Vervollständige deinen Account")
-        val token = firstInviteMessage.text.substringAfter("/invite/${existingUser.id}#").trim()
+        val token = invitationTokenFromText(firstInviteMessage.text, existingUser.id)
         val pendingMembership = tenantMemberRepo.findByTenantAndUser(tenant, existingUser)!!
         assertThat(pendingMembership.acceptedAt).isNull()
 
@@ -1258,8 +1271,7 @@ class UserManagementResourceTest {
         val latestToken = mailbox.getMailMessagesSentTo(existingUser.email)
             .last()
             .text
-            .substringAfter("/invite/${existingUser.id}#")
-            .trim()
+            .let { invitationTokenFromText(it, existingUser.id) }
 
         given()
             .contentType("application/json")
@@ -1322,8 +1334,7 @@ class UserManagementResourceTest {
         val token = mailbox.getMailMessagesSentTo(existingUser.email)
             .single()
             .text
-            .substringAfter("/invite/${existingUser.id}#")
-            .trim()
+            .let { invitationTokenFromText(it, existingUser.id) }
 
         given()
             .contentType("application/json")
@@ -1361,8 +1372,7 @@ class UserManagementResourceTest {
         val token = mailbox.getMailMessagesSentTo("passkey-invitee-$runId@example.com")
             .single()
             .text
-            .substringAfter("/invite/$invitedUserId#")
-            .trim()
+            .let { invitationTokenFromText(it, invitedUserId) }
 
         given()
             .contentType("application/json")
@@ -1860,8 +1870,7 @@ class UserManagementResourceTest {
             .single()
             .text
             .also { assertThat(it).contains("Vervollständige deinen Account") }
-            .substringAfter("/invite/${invitedUser.id}#")
-            .trim()
+            .let { invitationTokenFromText(it, invitedUser.id) }
 
         val invitedOwnerCookie = given()
             .contentType("application/json")
@@ -1904,7 +1913,7 @@ class UserManagementResourceTest {
         val message = mailbox.getMailMessagesSentTo(ownerEmail).single()
         assertThat(message.text).contains("Über diesen Link kannst du ganz einfach beitreten")
         assertThat(message.text).doesNotContain("Vervollständige deinen Account")
-        val token = message.text.substringAfter("/invite/${owner.id}#").trim()
+        val token = invitationTokenFromText(message.text, owner.id)
 
         given()
             .contentType("application/json")
@@ -2131,13 +2140,20 @@ class UserManagementResourceTest {
     private fun emailChangeTokenFromMailbox(pendingEmail: String): String {
         val message = mailbox.getMailMessagesSentTo(pendingEmail).last()
         assertThat(message.text).contains("/email/confirm#")
-        return message.text.substringAfter("/email/confirm#").trim()
+        return message.text.substringAfter("/email/confirm#").substringBefore("\n").trim()
     }
 
     private fun resetPasswordTokenFromMailbox(email: String): String {
         val message = mailbox.getMailMessagesSentTo(email).last()
         assertThat(message.text).contains("/password/reset/")
-        return message.text.substringAfter("#").trim()
+        return message.text.substringAfter("#").substringBefore("\n").trim()
+    }
+
+    private fun invitationTokenFromText(text: String, userId: Long): String =
+        text.substringAfter("/invite/$userId#").substringBefore("\n").trim()
+
+    private fun assertMailContainsLinkExpiry(text: String, expiresAt: Instant) {
+        assertThat(text).contains("Dieser Link ist gültig bis ${MAIL_LINK_EXPIRY_FORMATTER.format(expiresAt)}.")
     }
 
     private fun ownerUserId(): Long = userRepo.findByEmail("mgmt-owner-$runId@example.com")!!.id

@@ -37,12 +37,13 @@ class EmailChangeService @Inject constructor(
         emailChangeRepo.listOpenByUser(user).forEach { it.revokedAt = now }
 
         val token = newEmailChangeToken()
+        val expiresAt = now.plus(Duration.ofHours(userConfig.emailChangeTtlHours))
         UserEmailChange().also {
             it.user = user
             it.pendingEmail = pendingEmail
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
-            it.expiresAt = now.plus(Duration.ofHours(userConfig.emailChangeTtlHours))
+            it.expiresAt = expiresAt
             emailChangeRepo.persist(it)
         }
 
@@ -55,7 +56,7 @@ class EmailChangeService @Inject constructor(
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
-                    mailService.sendEmailChangeConfirmationMail(user, pendingEmail, confirmUrl, tenant)
+                    mailService.sendEmailChangeConfirmationMail(user, pendingEmail, confirmUrl, expiresAt, tenant)
                 }
             }
         })

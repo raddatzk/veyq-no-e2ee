@@ -127,7 +127,7 @@ acceptanceCriteria:
             kind: negative
             ref: frontend/src/views/LoginView.test.ts
   - id: auth.local-accounts-passkeys.invitation-acceptance
-    statement: Tenant invitations can create a new password or passkey account, while invitations for existing accounts require login before acceptance.
+    statement: Tenant invitation emails include the link expiration time, can create a new password or passkey account, and require login before acceptance for existing accounts.
     coverage:
       backend:
         integration:
@@ -222,7 +222,7 @@ acceptanceCriteria:
       - reason: Backend covers the confirmed passkey delete negative paths, but no integration test currently drives a browser-grade WebAuthn assertion to prove the successful server-side delete path end to end.
         followUp: Add a WebAuthn integration harness for successful authenticated passkey-management assertions.
   - id: auth.local-accounts-passkeys.password-reset-and-change
-    statement: Password reset and password change flows enforce token validity, rate limits and current-password rules.
+    statement: Password reset emails include the link expiration time, and password reset and password change flows enforce token validity, rate limits and current-password rules.
     coverage:
       backend:
         integration:

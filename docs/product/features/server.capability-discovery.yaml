@@ -118,3 +118,6 @@ acceptanceCriteria:
           - testName: renders support action from server settings
             kind: positive
             ref: frontend/src/features/settings/components/ServerSettingsPanel.test.ts
+          - testName: renders translated mobile handoff capability
+            kind: positive
+            ref: frontend/src/features/settings/components/ServerSettingsPanel.test.ts

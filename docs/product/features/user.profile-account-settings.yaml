@@ -10,8 +10,8 @@ entryPoints:
 acceptanceCriteria:
   - id: user.profile-account-settings.profile-avatar-email-permalink
     statement: >-
-      Users can manage avatar, profile visibility, email confirmation, display name and permalink settings with
-      validation.
+      Users can manage avatar, profile visibility, email confirmation with link expiration notices, display name
+      and permalink settings with validation.
     coverage:
       backend:
         integration:

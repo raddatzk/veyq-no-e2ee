@@ -32,14 +32,19 @@ class InvitationService @Inject constructor(
     @Transactional
     fun createAndSendInvitationWithUserCompletion(user: User, tenant: Tenant) {
 
-        val inviteUrl = createInvitation(user, tenant)
+        val invitationLink = createInvitation(user, tenant)
 
         transactionSynchronizationRegistry.registerInterposedSynchronization(object : Synchronization {
             override fun beforeCompletion() = Unit
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
-                    mailService.sendInvitationMailWithUserCompletion(user, inviteUrl, tenant)
+                    mailService.sendInvitationMailWithUserCompletion(
+                        user,
+                        invitationLink.url,
+                        invitationLink.expiresAt,
+                        tenant,
+                    )
                 }
             }
         })
@@ -47,34 +52,38 @@ class InvitationService @Inject constructor(
 
     @Transactional
     fun createAndSendInvitation(user: User, tenant: Tenant) {
-        val inviteUrl = createInvitation(user, tenant)
+        val invitationLink = createInvitation(user, tenant)
 
         transactionSynchronizationRegistry.registerInterposedSynchronization(object : Synchronization {
             override fun beforeCompletion() = Unit
 
             override fun afterCompletion(status: Int) {
                 if (status == Status.STATUS_COMMITTED) {
-                    mailService.sendInvitationMail(user, inviteUrl, tenant)
+                    mailService.sendInvitationMail(user, invitationLink.url, invitationLink.expiresAt, tenant)
                 }
             }
         })
     }
 
-    private fun createInvitation(user: User, tenant: Tenant): String {
+    private fun createInvitation(user: User, tenant: Tenant): InvitationLink {
         val now = Instant.now()
         invitationRepo.listOpenByUserAndTenant(user, tenant).forEach { it.revokedAt = now }
 
         val token = newInvitationToken()
+        val expiresAt = now.plus(Duration.ofDays(userConfig.invitationTtlDays))
         UserInvitation().also {
             it.user = user
             it.tenant = tenant
             it.tokenHash = HashingService.sha256(token)
             it.createdAt = now
-            it.expiresAt = now.plus(Duration.ofDays(userConfig.invitationTtlDays))
+            it.expiresAt = expiresAt
             invitationRepo.persist(it)
         }
 
-        return "https://${tenant.domain}/invite/${user.id}#$token"
+        return InvitationLink(
+            url = "https://${tenant.domain}/invite/${user.id}#$token",
+            expiresAt = expiresAt,
+        )
     }
 
     fun findByToken(token: String): UserInvitation? =
@@ -102,4 +111,9 @@ class InvitationService @Inject constructor(
         random.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
+
+    private data class InvitationLink(
+        val url: String,
+        val expiresAt: Instant,
+    )
 }

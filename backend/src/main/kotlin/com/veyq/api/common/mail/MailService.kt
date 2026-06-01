@@ -9,6 +9,10 @@ import io.quarkus.mailer.runtime.MailersRuntimeConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import org.jboss.logging.Logger
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @ApplicationScoped
 class MailService @Inject constructor(
@@ -23,9 +27,12 @@ class MailService @Inject constructor(
 
     companion object {
         private val LOG: Logger = Logger.getLogger(MailService::class.java)
+        private val LINK_EXPIRY_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm 'UTC'", Locale.GERMAN)
+                .withZone(ZoneOffset.UTC)
     }
 
-    fun sendInvitationMailWithUserCompletion(user: User, inviteUrl: String, tenant: Tenant) {
+    fun sendInvitationMailWithUserCompletion(user: User, inviteUrl: String, expiresAt: Instant, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 user.email,
@@ -37,6 +44,8 @@ class MailService @Inject constructor(
                 Vervollständige deinen Account und tritt über diesen Link bei:
 
                 $inviteUrl
+
+                Dieser Link ist gültig bis ${formatLinkExpiry(expiresAt)}.
                 """.trimIndent(),
             ).setFrom(sender(tenant.displayName)),
             purpose = "invitation",
@@ -44,7 +53,7 @@ class MailService @Inject constructor(
         )
     }
 
-    fun sendInvitationMail(user: User, inviteUrl: String, tenant: Tenant) {
+    fun sendInvitationMail(user: User, inviteUrl: String, expiresAt: Instant, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 user.email,
@@ -56,6 +65,8 @@ class MailService @Inject constructor(
                 Über diesen Link kannst du ganz einfach beitreten:
 
                 $inviteUrl
+
+                Dieser Link ist gültig bis ${formatLinkExpiry(expiresAt)}.
                 """.trimIndent(),
             ).setFrom(sender(tenant.displayName)),
             purpose = "invitation",
@@ -63,7 +74,7 @@ class MailService @Inject constructor(
         )
     }
 
-    fun sendPasswordResetMail(user: User, resetUrl: String, tenant: Tenant) {
+    fun sendPasswordResetMail(user: User, resetUrl: String, expiresAt: Instant, tenant: Tenant) {
         sendSafely(
             Mail.withText(
                 user.email,
@@ -74,6 +85,8 @@ class MailService @Inject constructor(
                     du kannst dein Passwort über diesen Link zurücksetzen:
                     
                     $resetUrl
+
+                    Dieser Link ist gültig bis ${formatLinkExpiry(expiresAt)}.
                 """.trimIndent()
             ).setFrom(sender(tenant.displayName)),
             purpose = "password reset",
@@ -81,7 +94,13 @@ class MailService @Inject constructor(
         )
     }
 
-    fun sendEmailChangeConfirmationMail(user: User, pendingEmail: String, confirmUrl: String, tenant: Tenant) {
+    fun sendEmailChangeConfirmationMail(
+        user: User,
+        pendingEmail: String,
+        confirmUrl: String,
+        expiresAt: Instant,
+        tenant: Tenant,
+    ) {
         sendSafely(
             Mail.withText(
                 pendingEmail,
@@ -92,6 +111,8 @@ class MailService @Inject constructor(
                     bestätige deine neue Email-Adresse äber diesen Link:
 
                     $confirmUrl
+
+                    Dieser Link ist gültig bis ${formatLinkExpiry(expiresAt)}.
                 """.trimIndent()
             ).setFrom(sender(tenant.displayName)),
             purpose = "email change confirmation",
@@ -115,4 +136,7 @@ class MailService @Inject constructor(
             .replace(Regex("[\\r\\n<>]"), " ")
             .trim()
             .ifBlank { "veyq" }
+
+    private fun formatLinkExpiry(expiresAt: Instant): String =
+        LINK_EXPIRY_FORMATTER.format(expiresAt)
 }
