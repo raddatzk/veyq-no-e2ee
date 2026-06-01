@@ -654,7 +654,7 @@ paths:
       - Der aktuelle Benutzer muss ServerOwner sein.
       x-required-role: ServerOwner
       description: |-
-        Verwaltete Benutzer auflisten.
+        Verwaltete Benutzer auflisten. Interne System-Accounts wie die globale Deleted-User-Ersatzidentitaet werden nicht ausgeliefert.
 
         Vorbedingungen:
         - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.

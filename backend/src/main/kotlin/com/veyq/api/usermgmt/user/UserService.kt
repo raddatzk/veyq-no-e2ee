@@ -216,7 +216,7 @@ class UserService @Inject constructor(
     }
 
     fun getAllUsers(): ManagedUsersSummary {
-        return ManagedUsersSummary(userRepo.listAllOrderByEmail().map { it.toManagedUserSummary() })
+        return ManagedUsersSummary(userRepo.listManagedOrderByEmail().map { it.toManagedUserSummary() })
     }
 
     fun forgotPassword(request: ForgotPasswordRequest) {

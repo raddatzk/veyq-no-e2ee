@@ -54,6 +54,14 @@ acceptanceCriteria:
           - testName: updates managed user server roles
             kind: positive
             ref: frontend/src/features/settings/components/ServerSettingsPanel.test.ts
+  - id: user.account-lifecycle.system-users-hidden
+    statement: ServerOwner user management lists only human-managed accounts and hides internal system accounts such as the global deleted-user replacement identity.
+    coverage:
+      backend:
+        integration:
+          - testName: server admin user list excludes system users
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
   - id: user.account-lifecycle.tenant-soft-remove
     statement: Tenant owners can soft-remove tenant users so active access stops but historical user-owned media and buckets remain attached for later rejoin.
     coverage:

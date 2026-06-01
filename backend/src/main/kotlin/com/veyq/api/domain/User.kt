@@ -83,8 +83,8 @@ class UserRepo : PanacheRepository<User> {
     fun findByPermalink(permalink: String): User? =
         find("permalink", permalink).firstResult()
 
-    fun listAllOrderByEmail(): List<User> =
-        list("order by email")
+    fun listManagedOrderByEmail(): List<User> =
+        list("systemUser = false order by email")
 
     fun searchByNameOrEmail(query: String): List<User> {
         val pattern = "%${query.lowercase()}%"

@@ -1560,6 +1560,17 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `server admin user list excludes system users`() {
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/users")
+            .then()
+            .statusCode(200)
+            .body("users.email", hasItem("mgmt-owner-$runId@example.com"))
+            .body("users.email", not(hasItem("deleted-user@system.veyq.local")))
+    }
+
+    @Test
     fun `server admin disables and enables user sessions`() {
         val member = createUser("disable-member-$runId", "admin1234567", ServerRole.ServerMember)
         val memberCookie = login(member.email, "admin1234567")

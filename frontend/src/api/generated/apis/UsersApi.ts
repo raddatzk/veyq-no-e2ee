@@ -624,7 +624,7 @@ export interface UsersApiInterface {
     getAllUsersRequestOpts(): Promise<runtime.RequestOpts>;
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten. Interne System-Accounts wie die globale Deleted-User-Ersatzidentitaet werden nicht ausgeliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * @summary Verwaltete Benutzer auflisten
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -633,7 +633,7 @@ export interface UsersApiInterface {
     getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>>;
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten. Interne System-Accounts wie die globale Deleted-User-Ersatzidentitaet werden nicht ausgeliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary>;
@@ -1754,7 +1754,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten. Interne System-Accounts wie die globale Deleted-User-Ersatzidentitaet werden nicht ausgeliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     async getAllUsersRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ManagedUsersSummary>> {
@@ -1765,7 +1765,7 @@ export class UsersApi extends runtime.BaseAPI implements UsersApiInterface {
     }
 
     /**
-     * Verwaltete Benutzer auflisten.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
+     * Verwaltete Benutzer auflisten. Interne System-Accounts wie die globale Deleted-User-Ersatzidentitaet werden nicht ausgeliefert.  Vorbedingungen: - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Benutzer muss ServerOwner sein.  Implementierungsstatus: partial.
      * Verwaltete Benutzer auflisten
      */
     async getAllUsers(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ManagedUsersSummary> {
