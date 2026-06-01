@@ -20,7 +20,6 @@ const name = ref('')
 const displayName = ref('')
 const domain = ref('')
 const ownerEmail = ref('')
-const permalinkTouched = ref(false)
 const error = ref('')
 const message = ref('')
 const loading = ref(false)
@@ -33,9 +32,7 @@ const canSubmit = computed(
 )
 
 watch(displayName, (value) => {
-  if (!permalinkTouched.value) {
-    name.value = toPermalink(value)
-  }
+  name.value = toPermalink(value)
 })
 
 watch(visible, (isVisible) => {
@@ -46,14 +43,8 @@ watch(visible, (isVisible) => {
     displayName.value = ''
     domain.value = window.location.host
     ownerEmail.value = ''
-    permalinkTouched.value = false
   }
 })
-
-function updatePermalink(value: string | undefined) {
-  permalinkTouched.value = true
-  name.value = toPermalink(value || '')
-}
 
 async function submit() {
   const tenantName = name.value.trim()
@@ -84,15 +75,6 @@ async function submit() {
       <label>
         {{ t('setup.tenantName') }}
         <InputText v-model="displayName" autocomplete="off" required />
-      </label>
-      <label>
-        {{ t('common.permalink') }}
-        <InputText
-          :model-value="name"
-          autocomplete="off"
-          required
-          @update:model-value="updatePermalink"
-        />
       </label>
       <label>
         {{ t('common.domain') }}

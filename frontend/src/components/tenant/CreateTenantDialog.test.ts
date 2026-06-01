@@ -35,9 +35,11 @@ describe('CreateTenantDialog', () => {
       global: { stubs: dialogStubs() }
     })
 
+    expect(wrapper.text()).not.toContain('Adresse')
+
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('Friends')
-    await inputs[2].setValue('friends.example.test')
+    await inputs[1].setValue('friends.example.test')
 
     const createButton = buttonByText(wrapper, 'Erstellen')
     expect(createButton.attributes('disabled')).toBeDefined()
@@ -45,7 +47,7 @@ describe('CreateTenantDialog', () => {
     await flushPromises()
     expect(createTenantMock).not.toHaveBeenCalled()
 
-    await inputs[3].setValue('owner@example.test')
+    await inputs[2].setValue('owner@example.test')
     expect(createButton.attributes('disabled')).toBeUndefined()
     await wrapper.find('form').trigger('submit')
     await flushPromises()

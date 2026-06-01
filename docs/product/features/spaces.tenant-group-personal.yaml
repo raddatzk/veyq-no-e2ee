@@ -10,7 +10,7 @@ entryPoints:
   - frontend/src/components/app/TenantSidebar.vue
 acceptanceCriteria:
   - id: spaces.tenant-group-personal.tenant-create-owner-only
-    statement: Tenant creation requires server owner authority, valid unique tenant identity and an invited owner email before submission.
+    statement: Tenant creation requires server owner authority, valid unique tenant identity and an invited owner email before submission, while the workspace dialog derives the internal tenant address instead of exposing a permalink field.
     coverage:
       backend:
         integration:
