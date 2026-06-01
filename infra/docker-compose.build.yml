@@ -1,0 +1,15 @@
+services:
+  veyq-db:
+    ports:
+      - "3306:3306"
+
+  veyq:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ${VEYQ_BUILD_TARGET:-runtime-jvm}
+
+  veyq-collaboration:
+    build:
+      context: ../collaboration
+      dockerfile: Dockerfile

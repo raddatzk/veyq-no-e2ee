@@ -1,0 +1,79 @@
+id: memory.tracks
+title: Memory GPX Tracks
+status: implemented
+capabilities:
+  - memory.tracks
+productArea: GPX track upload, labeling, listing, download and embeds.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+  - frontend/src/features/memories/components/MemoryTracksPanel.vue
+acceptanceCriteria:
+  - id: memory.tracks.parse-valid-gpx
+    statement: Valid GPX parses route metadata.
+    coverage:
+      backend:
+        unit:
+          - testName: parses route metadata from gpx track points
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
+          - testName: keeps elevation metadata empty when gpx has no elevation
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
+  - id: memory.tracks.reject-invalid-gpx
+    statement: GPX without enough points is rejected.
+    coverage:
+      backend:
+        unit:
+          - testName: rejects gpx without enough points
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
+  - id: memory.tracks.panel-upload
+    statement: Track panel uploads a selected GPX file with inferred title/default activity type.
+    coverage:
+      frontend:
+        unit:
+          - testName: uploads a selected GPX file with inferred title and default activity type
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+          - testName: shows an actionable empty state for editable memories
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+  - id: memory.tracks.panel-update-delete
+    statement: Track panel updates and deletes existing tracks.
+    coverage:
+      frontend:
+        unit:
+          - testName: updates and deletes existing tracks
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+          - testName: shows progress and blocks duplicate track deletion while pending
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+  - id: memory.tracks.summary-rendering
+    statement: Track panel renders distance, duration, ascent and descent.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows distance duration ascent and descent for tracks
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+  - id: memory.tracks.public-visible
+    statement: Public shares can list visible tracks when role permits.
+    coverage:
+      frontend:
+        integration:
+          - testName: major line 1 public viewer share shows map tracks and playlist privacy gates
+            kind: positive
+            ref: frontend/e2e/major-1-smoke.spec.ts
+  - id: memory.tracks.embed-rendering
+    statement: Track embeds render in public responsive flow.
+    coverage:
+      frontend:
+        integration:
+          - testName: major line 1 public viewer share shows map tracks and playlist privacy gates
+            kind: positive
+            ref: frontend/e2e/major-1-smoke.spec.ts
+gaps:
+  - reason: Public-share role denial for tracks is not separated into explicit negative acceptance criteria.
+    followUp: Add role-denial ACs and backend.integration coverage for track read/write permissions.

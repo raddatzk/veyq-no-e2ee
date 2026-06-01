@@ -1,0 +1,753 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Server API
+  version: 0.2.0
+  description: API-first target contract for server-level settings and administration metadata.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Server
+paths:
+  "/.well-known/veyq":
+    get:
+      tags:
+      - Server
+      summary: veyq instance discovery metadata abrufen
+      operationId: getWellKnownVeyq
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Die angefragte Domain gehoert zur veyq-Instanz.
+      description: |-
+        Liefert minimale oeffentliche Discovery-Metadaten, mit denen native Apps eine selbst gehostete veyq-Instanz erkennen und die relevanten API- und Mobile-Login-Einstiegspunkte finden koennen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Die angefragte Domain gehoert zur veyq-Instanz.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/InstanceDiscovery"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/client-capabilities":
+    get:
+      tags:
+      - Server
+      summary: Oeffentliche Client-Capabilities abrufen
+      operationId: getClientCapabilities
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - ServerOwner-only Capabilities duerfen nicht enthalten sein.
+      description: |-
+        Liefert nicht-sensitive, oeffentliche Capabilities fuer native und andere generische Clients. Die Antwort beschreibt nur, welche Client-Funktionen die Instanz grundsaetzlich unterstuetzt; konkrete Memory- oder Share-Berechtigungen muessen weiterhin aus den jeweiligen Ressourcen gelesen werden.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - ServerOwner-only Capabilities duerfen nicht enthalten sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/ClientCapabilities"
+  "/api/settings/server":
+    get:
+      tags:
+      - Server
+      summary: Server-Einstellungen abrufen
+      description: |-
+        Liefert serverweite Einstellungen und Feature-Schalter fuer den Administrationsbereich.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+      operationId: getServerSettings
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      responses:
+        '200':
+          "$ref": "#/components/responses/ServerSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/update-events":
+    get:
+      tags:
+      - Server
+      summary: Server update log abrufen
+      operationId: listServerUpdateEvents
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Liefert die letzten Auto-Update-Ereignisse fuer die Serveradministration.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/ServerUpdateEvents"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/notifications":
+    get:
+      tags:
+      - Server
+      summary: Aktive ServerOwner-Hinweise abrufen
+      operationId: listServerNotifications
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Liefert aktive ServerOwner-Hinweise, aktuell fuer fehlgeschlagene Auto-Updates.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/ServerNotifications"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/settings/server/notifications/{notificationId}":
+    delete:
+      tags:
+      - Server
+      summary: ServerOwner-Hinweis loeschen
+      operationId: deleteServerNotification
+      x-implementation-status: implemented
+      x-required-role: ServerOwner
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      description: |-
+        Loescht einen aktiven ServerOwner-Hinweis.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: implemented.
+      parameters:
+      - "$ref": "#/components/parameters/NotificationId"
+      responses:
+        '204':
+          description: Hinweis geloescht.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/notifications/capabilities":
+    get:
+      tags:
+      - Server
+      summary: Persoenliche Capability-Hinweise abrufen
+      operationId: listCapabilityNotifications
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      description: |-
+        Liefert persoenliche Hinweise auf noch nicht ausgeblendete Server-Capabilities.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+
+        Implementierungsstatus: implemented.
+      responses:
+        '200':
+          "$ref": "#/components/responses/CapabilityNotifications"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+  "/api/notifications/capabilities/{capabilityId}":
+    delete:
+      tags:
+      - Server
+      summary: Persoenlichen Capability-Hinweis ausblenden
+      operationId: dismissCapabilityNotification
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      description: |-
+        Blendet einen persoenlichen Capability-Hinweis fuer den aktuellen Benutzer aus.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+
+        Implementierungsstatus: implemented.
+      parameters:
+      - "$ref": "#/components/parameters/CapabilityId"
+      responses:
+        '204':
+          description: Capability-Hinweis ausgeblendet.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/internal/updater/update-completed":
+    post:
+      tags:
+      - Server
+      summary: Internen erfolgreichen Auto-Update-Status erfassen
+      operationId: reportUpdaterUpdateCompleted
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+      description: |-
+        Erfasst ein erfolgreich abgeschlossenes Auto-Update als Log-Eintrag.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+
+        Implementierungsstatus: implemented.
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdaterUpdateCompleted"
+      responses:
+        '204':
+          description: Update-Ereignis erfasst.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+  "/api/internal/updater/update-failed":
+    post:
+      tags:
+      - Server
+      summary: Internen fehlgeschlagenen Auto-Update-Status erfassen
+      operationId: reportUpdaterUpdateFailed
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+      description: |-
+        Erfasst ein fehlgeschlagenes Auto-Update und erzeugt einen ServerOwner-Hinweis.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_UPDATER_NOTIFY_TOKEN Bearer Token muss gesendet werden.
+
+        Implementierungsstatus: implemented.
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdaterUpdateFailed"
+      responses:
+        '204':
+          description: Update-Ereignis erfasst.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: VEYQ_ACCESS_TOKEN
+
+  responses:
+    InstanceDiscovery:
+      description: Oeffentliche veyq Instance-Discovery-Metadaten.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/WellKnownVeyqResponse"
+          example:
+            product: veyq
+            apiBaseUrl: https://memories.example.test/api
+            clientCapabilitiesUrl: https://memories.example.test/api/client-capabilities
+            mobileLoginUrl: https://memories.example.test/login?handoff=mobile
+            mobileCallbackScheme: veyq
+    ClientCapabilities:
+      description: Oeffentliche Client-Capabilities der Instanz.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ClientCapabilitiesResponse"
+          example:
+            capabilities:
+            - id: memory.core
+              introducedInVersion: 1.0
+              audience: ALL_USERS
+            - id: memory.media-resumable-upload
+              introducedInVersion: 1.0
+              audience: ALL_USERS
+            compatibility:
+              serverMajor: 1
+    ServerSettings:
+      description: Server settings
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ServerSettingsResponse"
+          example:
+            displayName: veyq
+            userManagementAvailable: true
+            license:
+              edition: COMMUNITY
+              license: AGPL-3.0-only
+              sourceUrl: https://github.com/raddatzk/veyq
+              noticeUrl: https://github.com/raddatzk/veyq/blob/main/NOTICE
+              trademarkPolicyUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/trademark-policy.md
+              commercialBoundaryUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md
+              version: 0.1.0
+              revision: sha-unknown
+    ServerUpdateEvents:
+      description: Server update log
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ServerUpdateEventsResponse"
+          example:
+            events:
+            - id: 1
+              status: COMPLETED
+              fromVersion: 1.122
+              toVersion: 1.123
+              image: ghcr.io/raddatzk/veyq:1
+              digest: sha256:example
+              occurredAt: "2026-05-28T09:00:00Z"
+    ServerNotifications:
+      description: Aktive ServerOwner-Hinweise
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ServerNotificationsResponse"
+          example:
+            notifications:
+            - id: 1
+              type: AUTO_UPDATE_FAILED
+              createdAt: "2026-05-28T09:00:00Z"
+              updateEvent:
+                id: 2
+                status: FAILED
+                image: ghcr.io/raddatzk/veyq:1
+                stage: HEALTHCHECK
+                occurredAt: "2026-05-28T09:00:00Z"
+    CapabilityNotifications:
+      description: Persoenliche Capability-Hinweise
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CapabilityNotificationsResponse"
+          example:
+            notifications:
+            - capability:
+                id: memory.playlists
+                introducedInVersion: 1.0
+                audience: ALL_USERS
+
+  requestBodies:
+    UpdaterUpdateCompleted:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdaterUpdateCompletedRequest"
+          example:
+            fromVersion: 1.122
+            toVersion: 1.123
+            image: ghcr.io/raddatzk/veyq:1
+            digest: sha256:example
+            occurredAt: "2026-05-28T09:00:00Z"
+    UpdaterUpdateFailed:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdaterUpdateFailedRequest"
+          example:
+            fromVersion: 1.122
+            image: ghcr.io/raddatzk/veyq:1
+            digest: sha256:example
+            stage: HEALTHCHECK
+            occurredAt: "2026-05-28T09:00:00Z"
+
+  parameters:
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    CapabilityId:
+      name: capabilityId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    WellKnownVeyqResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - product
+      - apiBaseUrl
+      - clientCapabilitiesUrl
+      - mobileLoginUrl
+      - mobileCallbackScheme
+      properties:
+        product:
+          type: string
+          enum:
+          - veyq
+          description: Identifiziert die angefragte Domain als veyq-Instanz.
+        apiBaseUrl:
+          type: string
+          format: uri
+          description: Absolute Basis-URL fuer API-Aufrufe dieser Instanz.
+        clientCapabilitiesUrl:
+          type: string
+          format: uri
+          description: Absolute URL fuer oeffentliche Client-Capability-Discovery.
+        mobileLoginUrl:
+          type: string
+          format: uri
+          description: Browserbasierter Login-Einstieg fuer native Mobile-Session-Handoff-Flows.
+        mobileCallbackScheme:
+          type: string
+          description: Custom URL scheme, das die offizielle native App fuer Mobile-Callbacks registriert.
+      example:
+        product: veyq
+        apiBaseUrl: https://memories.example.test/api
+        clientCapabilitiesUrl: https://memories.example.test/api/client-capabilities
+        mobileLoginUrl: https://memories.example.test/login?handoff=mobile
+        mobileCallbackScheme: veyq
+
+    ClientCapabilitiesResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - capabilities
+      properties:
+        capabilities:
+          type: array
+          description: Nicht-sensitive ALL_USERS-Capabilities, die generische Clients vor Login oder Feature-Aktivierung auswerten duerfen.
+          items:
+            "$ref": "#/components/schemas/ServerCapability"
+        compatibility:
+          "$ref": "#/components/schemas/ClientCompatibilitySummary"
+      example:
+        capabilities:
+        - id: memory.core
+          introducedInVersion: 1.0
+          audience: ALL_USERS
+        - id: memory.media-resumable-upload
+          introducedInVersion: 1.0
+          audience: ALL_USERS
+        compatibility:
+          serverMajor: 1
+
+    ClientCompatibilitySummary:
+      type: object
+      additionalProperties: false
+      properties:
+        serverMajor:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Aktuelle Server-Major-Line als Hinweis fuer Support- und Update-Meldungen. Feature-Aktivierung erfolgt weiterhin ueber Capabilities.
+      example:
+        serverMajor: 1
+
+    ServerSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      - userManagementAvailable
+      - license
+      - capabilities
+      properties:
+        displayName:
+          type: string
+          description: Anzeigename des Servers.
+          examples:
+          - veyq
+        userManagementAvailable:
+          type: boolean
+          description: Gibt an, ob die Benutzerverwaltung fuer den aktuellen Server verfuegbar ist.
+          examples:
+          - true
+        license:
+          "$ref": "#/components/schemas/ServerLicenseSummary"
+        support:
+          "$ref": "#/components/schemas/ServerSupportSummary"
+        version:
+          type: string
+          description: Laufende veyq-Version.
+        revision:
+          type: string
+          description: Laufende Build- oder Commit-Revision.
+        capabilities:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerCapability"
+      example:
+        displayName: veyq
+        userManagementAvailable: true
+        license:
+          edition: COMMUNITY
+          license: AGPL-3.0-only
+          sourceUrl: https://github.com/raddatzk/veyq
+          noticeUrl: https://github.com/raddatzk/veyq/blob/main/NOTICE
+          trademarkPolicyUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/trademark-policy.md
+          commercialBoundaryUrl: https://github.com/raddatzk/veyq/blob/main/docs/legal/commercial-boundary.md
+          version: 0.1.0
+          revision: sha-unknown
+        version: 1.123
+        revision: sha-abcdef
+        capabilities: []
+
+    ServerLicenseSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - edition
+      - license
+      - sourceUrl
+      - noticeUrl
+      - trademarkPolicyUrl
+      - commercialBoundaryUrl
+      properties:
+        edition:
+          type: string
+          enum:
+          - COMMUNITY
+          description: Edition der laufenden veyq-Instanz.
+        license:
+          type: string
+          description: SPDX-Lizenzkennung der Community Edition.
+          examples:
+          - AGPL-3.0-only
+        sourceUrl:
+          type: string
+          format: uri
+          description: Link zum passenden Quellcode der laufenden Instanz.
+        noticeUrl:
+          type: string
+          format: uri
+          description: Link zu Projekt- und Markenhinweisen.
+        trademarkPolicyUrl:
+          type: string
+          format: uri
+          description: Link zur veyq Trademark Policy.
+        commercialBoundaryUrl:
+          type: string
+          format: uri
+          description: Link zur Community-/Commercial-Grenze.
+        version:
+          type: string
+          description: Optional gesetzte veyq-Version.
+        revision:
+          type: string
+          description: Optional gesetzte Build- oder Commit-Revision.
+
+    ServerSupportSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Freiwilliger Spenden- oder Support-Link fuer veyq.
+
+    ServerCapability:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - introducedInVersion
+      - audience
+      properties:
+        id:
+          type: string
+        introducedInVersion:
+          type: string
+        audience:
+          "$ref": "#/components/schemas/CapabilityAudience"
+
+    CapabilityAudience:
+      type: string
+      enum:
+      - ALL_USERS
+      - SERVER_OWNER
+
+    ServerUpdateEventsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - events
+      properties:
+        events:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerUpdateEvent"
+
+    ServerUpdateEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - image
+      - occurredAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          "$ref": "#/components/schemas/UpdateStatus"
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        stage:
+          "$ref": "#/components/schemas/UpdateFailureStage"
+        occurredAt:
+          type: string
+          format: date-time
+
+    UpdateStatus:
+      type: string
+      enum:
+      - COMPLETED
+      - FAILED
+
+    UpdateFailureStage:
+      type: string
+      enum:
+      - DOCTOR
+      - DIGEST_CHECK
+      - BACKUP
+      - PULL
+      - START
+      - HEALTHCHECK
+      - NOTIFY
+
+    ServerNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - notifications
+      properties:
+        notifications:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ServerNotification"
+
+    ServerNotification:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - type
+      - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          "$ref": "#/components/schemas/ServerNotificationType"
+        updateEvent:
+          "$ref": "#/components/schemas/ServerUpdateEvent"
+        createdAt:
+          type: string
+          format: date-time
+
+    ServerNotificationType:
+      type: string
+      enum:
+      - AUTO_UPDATE_FAILED
+
+    CapabilityNotificationsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - notifications
+      properties:
+        notifications:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CapabilityNotification"
+
+    CapabilityNotification:
+      type: object
+      additionalProperties: false
+      required:
+      - capability
+      properties:
+        capability:
+          "$ref": "#/components/schemas/ServerCapability"
+
+    UpdaterUpdateCompletedRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - image
+      - occurredAt
+      properties:
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+
+    UpdaterUpdateFailedRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - image
+      - stage
+      - occurredAt
+      properties:
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+        image:
+          type: string
+        digest:
+          type: string
+        stage:
+          "$ref": "#/components/schemas/UpdateFailureStage"
+        occurredAt:
+          type: string
+          format: date-time

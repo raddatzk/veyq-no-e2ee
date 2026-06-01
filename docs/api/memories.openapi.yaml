@@ -1,0 +1,4056 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Memories API
+  version: 0.1.0
+  description: Memory-first API for the veyq product model. Memories are the only rich content objects; folders remain organizational containers.
+servers:
+  - url: /
+security:
+  - accessTokenCookie: []
+tags:
+  - name: MemoryNavigation
+  - name: Folders
+  - name: Memories
+  - name: MemoryParticipants
+  - name: MemoryMedia
+  - name: MemoryTracks
+  - name: MemoryPlaylists
+  - name: Search
+paths:
+  "/api/{tenantName}/search":
+    get:
+      tags:
+        - Search
+      operationId: searchTenant
+      summary: Search visible memories, folders and journals
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Searches visible Memories, organizational folders and Memory journals inside the addressed tenant. Results are filtered by the current user's visible scopes and never include public-share-only or cross-tenant content.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/SearchQuery"
+        - "$ref": "#/components/parameters/SearchLimit"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SearchResults"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+  "/api/{tenantName}/memory-navigation":
+    get:
+      tags:
+        - MemoryNavigation
+      operationId: getMemoryNavigation
+      summary: Load memory navigation for a tenant path
+      x-implementation-status: implemented
+      x-preconditions: &memoryPreconditions
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Returns the current memory navigation location, its breadcrumb chain, visible scope roots and child folders.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/NavigationPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryNavigation"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/folders":
+    post:
+      tags:
+        - Folders
+      operationId: createFolder
+      summary: Create an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Creates an organizational folder for grouping Memories. Folders are not rich content objects.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ziel-Scope sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags:
+        - Folders
+      operationId: deleteFolder
+      summary: Delete an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Deletes a visible organizational folder.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/FolderPathParam"
+      responses:
+        '204':
+          description: Folder deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/folders/update":
+    post:
+      tags:
+        - Folders
+      operationId: updateFolder
+      summary: Update an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Updates the name or display name of a visible organizational folder.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/folders/move":
+    post:
+      tags:
+        - Folders
+      operationId: moveFolder
+      summary: Move an organizational folder
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Moves a visible organizational folder inside the same scope.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf Quelle und Ziel sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveFolder"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Folder"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/memories":
+    get:
+      tags:
+        - Memories
+      operationId: listMemories
+      summary: List root memories
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: &memoryDescription |-
+        Lists root Memories visible to the current tenant member. Root Memories belong to a tenant, group or personal scope.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemorySummaries"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+    post:
+      tags:
+        - Memories
+      operationId: createMemory
+      summary: Create a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Creates a Memory. If `parentId` is present, the new Memory is created below that parent and inherits the parent's scope. If `parentId` is omitted, `scope` chooses the root scope and defaults to `TENANT`.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemory"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/memories/by-folder":
+    get:
+      tags:
+        - Memories
+      operationId: listMemoriesByFolder
+      summary: List memories in a folder path
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/FolderPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemorySummaries"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/by-path":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryByPath
+      summary: Get a memory by folder path and memory name
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Resolves a Memory by its canonical UI path, for example `/travel/summer-trip` or `/travel/summer-trip/day-one`.
+        The path may contain organizational folder segments followed by one or more nested Memory name segments.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryPath"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}":
+    get:
+      tags:
+        - Memories
+      operationId: getMemory
+      summary: Get a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Returns one visible Memory by public id. The response includes direct child and direct media counts, not aggregated subtree counts.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    put:
+      tags:
+        - Memories
+      operationId: updateMemory
+      summary: Update a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Updates Memory display metadata or parent. Moving across scopes and moving a Memory below itself or one of its descendants is rejected.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemory"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags:
+        - Memories
+      operationId: deleteMemory
+      summary: Delete a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Deletes the Memory, its descendant Memories and media owned by those Memories.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '204':
+          description: Memory deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/favorite":
+    put:
+      tags:
+        - Memories
+      operationId: favoriteMemory
+      summary: Favorite a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Marks one visible Memory as a favorite for the current user.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - Memories
+      operationId: unfavoriteMemory
+      summary: Remove a memory favorite
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Removes the current user's favorite marker from one visible Memory. The operation is idempotent.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/children":
+    get:
+      tags:
+        - Memories
+      operationId: listChildMemories
+      summary: List child memories
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists direct child Memories visible below the requested parent Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemorySummaries"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/header":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryHeader
+      summary: Get memory header
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Returns the detail header for one visible Memory. The response separates direct media from visible descendant media for aggregate header display.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryHeader"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/participants":
+    get:
+      tags:
+        - MemoryParticipants
+      operationId: listMemoryParticipants
+      summary: List memory participants
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists registered users explicitly attached as participants to one visible Memory. Participants whose user is no longer eligible for the Memory scope are omitted.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryParticipants"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/participant-candidates":
+    get:
+      tags:
+        - MemoryParticipants
+      operationId: listMemoryParticipantCandidates
+      summary: List eligible participant candidates
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists registered users who can be added as participants to the Memory according to the Memory scope. Tenant Memories expose accepted tenant members, group Memories expose members of that group and personal Memories expose only the personal-scope user.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryParticipants"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/participants/{userId}":
+    put:
+      tags:
+        - MemoryParticipants
+      operationId: addMemoryParticipant
+      summary: Add a memory participant
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Adds one registered user as participant to a visible Memory when that user is eligible for the Memory scope. The operation is idempotent.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UserId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryParticipant"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryParticipants
+      operationId: removeMemoryParticipant
+      summary: Remove a memory participant
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Removes one participant from a visible Memory. The operation is idempotent.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UserId"
+      responses:
+        '204':
+          description: Participant removed.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/journal":
+    get:
+      tags:
+        - Memories
+      operationId: getMemoryJournal
+      summary: Get memory journal
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Returns the Markdown journal for one visible Memory. Each Memory has exactly one journal; Memories without saved journal text return an empty Markdown string.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryJournal"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    put:
+      tags:
+        - Memories
+      operationId: updateMemoryJournal
+      summary: Update memory journal
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Replaces the Markdown journal for one visible Memory. veyq `::` embed tokens are validated against content visible inside the current Memory context.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryJournal"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryJournal"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/journal/live-session":
+    post:
+      tags:
+        - Memories
+      operationId: createMemoryJournalLiveSession
+      summary: Create memory journal live editing session
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see and edit the addressed Memory.
+      description: |-
+        Issues a short-lived, Memory-bound editor session for collaborative Markdown journal editing. The returned token is scoped to the addressed Memory journal document and is accepted only by the live journal collaboration service.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see and edit the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryJournalLiveSession"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: listMemoryMedia
+      summary: List memory media
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Lists media directly assigned to a Memory. When `includeChildren=true`, media from visible descendant Memories is included and ordered by corrected capture time, then creation time.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include media assigned to visible descendant Memories.
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaSummaries"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags:
+        - MemoryMedia
+      operationId: uploadMemoryMedia
+      summary: Upload media into a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Uploads one image or video directly into the target Memory. The created media belongs to exactly that Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadMemoryMedia"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMedia"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteAllMemoryMedia
+      summary: Delete all direct media from a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '204':
+          description: Direct Memory media deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/updates":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: waitForMemoryMediaUpdates
+      summary: Wait for newly created memory media
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Long-polls for media created after the supplied `createdAt` plus media id cursor. The response contains only newly created media, ordered by creation time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include media assigned to visible descendant Memories.
+        - in: query
+          name: afterCreatedAt
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Creation timestamp of the newest media item already known to the client.
+        - in: query
+          name: afterMediaId
+          required: false
+          schema:
+            type: string
+          description: Public id of the newest media item already known to the client, used as a stable tie-breaker.
+        - in: query
+          name: timeoutSeconds
+          required: false
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 30
+          description: Maximum time to hold the request before returning an empty update set.
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaUpdates"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media-buckets":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: listMemoryMediaBuckets
+      summary: List memory media buckets
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Lists the persistent uploader buckets and subbuckets for one Memory. When `includeChildren=true`, buckets from visible descendant Memories are included. The listing is read-only: it does not create an empty primary bucket for the current user before the user uploads media or creates a subbucket.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include buckets assigned to visible descendant Memories.
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucketList"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags:
+        - MemoryMedia
+      operationId: createMemoryMediaBucket
+      summary: Create a memory media subbucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Creates a subbucket below an existing primary or nested uploader bucket. Primary buckets are system-managed. Clients may pass the reserved current-user placeholder id `__veyq_self_primary_bucket__` as `parentBucketId`; the server then creates or reuses the current user's primary bucket before creating the requested subbucket below it.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryMediaBucket"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucket"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+  "/api/{tenantName}/memories/{memoryId}/media-buckets/{bucketId}":
+    put:
+      tags:
+        - MemoryMedia
+      operationId: updateMemoryMediaBucket
+      summary: Rename a memory media subbucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Renames a non-primary media bucket.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/BucketId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaBucket"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBucket"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMediaBucket
+      summary: Delete a memory media bucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes a bucket subtree and contained media. Registered-user primary buckets remain as empty uploader identity buckets while their media and subbuckets are deleted. Anonymous share primary buckets are removed completely and recreated on a later upload by the same share identity.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/BucketId"
+      responses:
+        '204':
+          description: Bucket deleted.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/move":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: moveMemoryMedia
+      summary: Move selected memory media to a bucket
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Moves selected media in one Memory to another bucket in the same Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveMemoryMedia"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBatch"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/batch":
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMediaBatch
+      summary: Delete selected memory media
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes selected media directly assigned to one Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/DeleteMemoryMediaBatch"
+      responses:
+        '204':
+          description: Selected media deleted.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: createMemoryMediaUpload
+      summary: Create a resumable media upload session
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Creates a resumable upload session for one image or video that will be assigned to the addressed Memory when completed.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryMediaUpload"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaUploadSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: getMemoryMediaUpload
+      summary: Get a resumable media upload session
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+      description: |-
+        Returns progress information for a resumable upload session owned by the current user.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PendingMemoryMediaUploadSession"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: abortMemoryMediaUpload
+      summary: Abort a resumable media upload session
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+      description: |-
+        Deletes an unfinished resumable upload session and its temporary chunks.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '204':
+          description: Upload session aborted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/chunks/{chunkIndex}":
+    put:
+      tags:
+        - MemoryMedia
+      operationId: uploadMemoryMediaChunk
+      summary: Upload one media chunk
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+      description: |-
+        Stores one chunk for a resumable media upload session. Chunks may be retried with the same index.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The upload session belongs to the addressed Memory and current user.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+        - "$ref": "#/components/parameters/ChunkIndex"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadMediaChunk"
+      responses:
+        '204':
+          description: Upload chunk stored.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/uploads/{uploadId}/complete":
+    post:
+      tags:
+        - MemoryMedia
+      operationId: completeMemoryMediaUpload
+      summary: Complete a resumable media upload session
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - All chunks for the upload session have been stored.
+      description: |-
+        Assembles all stored chunks, validates the final file and creates the Memory media asset.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - All chunks for the upload session have been stored.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/UploadId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMedia"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/download":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: downloadMemoryMedia
+      summary: Download memory media originals
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Streams a ZIP archive containing original media files assigned to the addressed Memory. When `includeChildren=true`, original media from visible descendant Memories is included. Preview files, cover-only uploads and journal content are not included.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include original media assigned to visible descendant Memories.
+        - in: query
+          name: locale
+          required: false
+          schema:
+            type: string
+            enum: [de, en]
+          description: Preferred UI locale for the generated ZIP filename.
+      responses:
+        '200':
+          description: ZIP archive with original media files.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename for the generated ZIP archive.
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+              example: "<binary zip archive>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/tracks":
+    get:
+      tags:
+        - MemoryTracks
+      operationId: listMemoryTracks
+      summary: List Memory tracks
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Lists GPX tracks assigned directly to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryTracks"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags:
+        - MemoryTracks
+      operationId: uploadMemoryTrack
+      summary: Upload a GPX track
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Uploads one GPX track, stores the original GPX file and extracts display geometry, distance, timing and bounds metadata.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadMemoryTrack"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryTrack"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/tracks/{trackId}":
+    put:
+      tags:
+        - MemoryTracks
+      operationId: updateMemoryTrack
+      summary: Update Memory track metadata
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Updates the editable title and activity type for an existing Memory track.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/TrackId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryTrack"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryTrack"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryTracks
+      operationId: deleteMemoryTrack
+      summary: Delete a Memory track
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/TrackId"
+      responses:
+        '204':
+          description: Memory track deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/tracks/{trackId}/content":
+    get:
+      tags:
+        - MemoryTracks
+      operationId: memoryTrackContent
+      summary: Download original Memory track GPX
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Streams the original GPX file for a Memory track.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/TrackId"
+      responses:
+        '200':
+          description: Original GPX file.
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+              example: "<gpx version=\"1.1\"></gpx>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/playlists":
+    get:
+      tags:
+        - MemoryPlaylists
+      operationId: listMemoryPlaylists
+      summary: List Memory playlists
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Lists playlist context assigned directly to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryPlaylists"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    post:
+      tags:
+        - MemoryPlaylists
+      operationId: createMemoryPlaylist
+      summary: Create Memory playlist
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Creates a Memory playlist from a supported external playlist URL.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateMemoryPlaylist"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryPlaylist"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/playlists/{playlistId}":
+    put:
+      tags:
+        - MemoryPlaylists
+      operationId: updateMemoryPlaylist
+      summary: Update Memory playlist
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Updates editable Memory playlist metadata and optionally replaces the external playlist URL.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/PlaylistId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryPlaylist"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryPlaylist"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - MemoryPlaylists
+      operationId: deleteMemoryPlaylist
+      summary: Delete Memory playlist
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+      description: |-
+        Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/PlaylistId"
+      responses:
+        '204':
+          description: Memory playlist deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/cover":
+    put:
+      tags:
+        - Memories
+      operationId: setMemoryCover
+      summary: Upload memory cover image
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Sets a Memory cover source and a 16:9 crop. The source is either an uploaded original image or an existing Memory image.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadMemoryCover"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+    delete:
+      tags:
+        - Memories
+      operationId: removeMemoryCover
+      summary: Remove memory cover image
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Removes the explicit cover image from the Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/cover/content":
+    get:
+      tags:
+        - Memories
+      operationId: memoryCoverContent
+      summary: Stream memory cover image
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the explicit Memory cover image when one is set.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      responses:
+        '200':
+          description: Memory cover image bytes.
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+              example: "<binary image bytes>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata":
+    patch:
+      tags:
+        - MemoryMedia
+      operationId: updateMemoryMediaMetadata
+      summary: Correct memory media metadata
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Corrects the capture timestamp for media that belongs directly to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaMetadata"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMedia"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}":
+    delete:
+      tags:
+        - MemoryMedia
+      operationId: deleteMemoryMedia
+      summary: Delete one memory media item
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+        - The media belongs directly to the addressed Memory.
+      description: |-
+        Deletes one media item directly assigned to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+        - The current user can see the addressed Memory.
+        - The media belongs directly to the addressed Memory.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '204':
+          description: Memory media deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/metadata-batch":
+    patch:
+      tags:
+        - MemoryMedia
+      operationId: updateMemoryMediaMetadataBatch
+      summary: Correct memory media metadata in batches
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Applies a capture timestamp offset to selected media that belongs directly to the addressed Memory.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaMetadataBatch"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMediaBatch"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/content":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaContent
+      summary: Download memory media content
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the original file for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+        - in: header
+          name: Range
+          required: false
+          schema:
+            type: string
+          description: Optional HTTP byte range.
+      responses:
+        '200':
+          description: Media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<binary media content>"
+        '206':
+          description: Partial media content.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              example: "<partial binary media content>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/preview":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaPreview
+      summary: Download memory media preview
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated JPEG preview for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media preview.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg preview>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/poster":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaPoster
+      summary: Download memory media poster
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated full-frame JPEG poster for a video media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media poster.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg poster>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memory-media/{mediaId}/thumbnail":
+    get:
+      tags:
+        - MemoryMedia
+      operationId: memoryMediaThumbnail
+      summary: Download memory media thumbnail
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Streams the generated JPEG thumbnail for a media asset that belongs to a visible Memory.
+
+        Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf die zugeordnete Memory sehen.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MediaId"
+      responses:
+        '200':
+          description: Media thumbnail.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+              example: "<binary jpeg thumbnail>"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+components:
+  parameters:
+    MemoryId:
+      in: path
+      required: true
+      name: memoryId
+      schema:
+        type: string
+      description: Public Memory id.
+      example: mem_abc123
+    MediaId:
+      in: path
+      required: true
+      name: mediaId
+      schema:
+        type: string
+      description: Public media id.
+      example: med_abc123
+    BucketId:
+      in: path
+      required: true
+      name: bucketId
+      schema:
+        type: string
+      description: Public media bucket id.
+      example: bkt_abc123
+    TrackId:
+      in: path
+      required: true
+      name: trackId
+      schema:
+        type: string
+      description: Public track id.
+      example: trk_abc123
+    PlaylistId:
+      in: path
+      required: true
+      name: playlistId
+      schema:
+        type: string
+      description: Public playlist id.
+      example: ply_abc123
+    UserId:
+      in: path
+      required: true
+      name: userId
+      schema:
+        type: integer
+        format: int64
+      description: Registered user id.
+      example: 7
+    FolderPath:
+      in: query
+      required: false
+      name: folderPath
+      schema:
+        type: string
+        default: "/"
+      description: Organizational folder path. Empty or omitted addresses the tenant root.
+      example: /summer
+    NavigationPath:
+      in: query
+      required: false
+      name: path
+      schema:
+        type: string
+        default: "/"
+      description: Organizational navigation path. Empty or omitted loads the tenant root.
+      example: /@family/summer
+    FolderPathParam:
+      in: query
+      required: true
+      name: path
+      schema:
+        type: string
+      description: Canonical folder path.
+      example: /@family/summer
+    MemoryPath:
+      in: query
+      required: true
+      name: path
+      schema:
+        type: string
+      description: Canonical Memory UI path with folder segments followed by one or more Memory name segments.
+      example: /summer/beach-day
+    SearchQuery:
+      in: query
+      required: true
+      name: q
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 120
+      description: Search query. Matching is case-insensitive.
+      example: beach
+    SearchLimit:
+      in: query
+      required: false
+      name: limit
+      schema:
+        type: integer
+        format: int32
+        default: 20
+        minimum: 1
+        maximum: 50
+      description: Maximum number of results to return.
+      example: 20
+    UploadId:
+      in: path
+      required: true
+      name: uploadId
+      schema:
+        type: string
+      description: Resumable upload session id.
+    ChunkIndex:
+      in: path
+      required: true
+      name: chunkIndex
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+      description: Zero-based upload chunk index.
+  requestBodies:
+    CreateMemory:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryRequest"
+          example:
+            folderPath: /summer
+            name: summer-trip
+            displayName: Summer Trip
+    UpdateMemory:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryRequest"
+          example:
+            name: summer-trip-2026
+            displayName: Summer Trip 2026
+    UploadMemoryCover:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - cropX
+              - cropY
+              - cropWidth
+              - cropHeight
+            properties:
+              file:
+                type: string
+                format: binary
+                description: Cover original image file. Mutually exclusive with `mediaId`.
+              mediaId:
+                type: string
+                description: Existing Memory media id to use as cover source. Mutually exclusive with `file`.
+              cropX:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop x offset.
+              cropY:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop y offset.
+              cropWidth:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop width. Must form a 16:9 rectangle with `cropHeight`.
+              cropHeight:
+                type: number
+                format: double
+                minimum: 0
+                maximum: 1
+                description: Normalized crop height. Must form a 16:9 rectangle with `cropWidth`.
+          example:
+            mediaId: med_abc123
+            cropX: 0
+            cropY: 0.125
+            cropWidth: 1
+            cropHeight: 0.5625
+    UploadMemoryMedia:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+              title:
+                type: string
+                nullable: true
+          example:
+            title: Beach
+    UploadMemoryTrack:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - file
+              - title
+              - activityType
+            properties:
+              file:
+                type: string
+                format: binary
+                description: GPX file.
+              title:
+                type: string
+                minLength: 1
+                maxLength: 160
+              activityType:
+                "$ref": "#/components/schemas/MemoryTrackActivityType"
+          example:
+            title: Alpine ridge day 2
+            activityType: HIKING
+    CreateMemoryMediaUpload:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryMediaUploadRequest"
+          example:
+            filename: beach.mp4
+            mimeType: video/mp4
+            sizeBytes: 73400320
+            title: Beach
+            bucketId: bkt_abc123
+    CreateMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryMediaBucketRequest"
+          example:
+            parentBucketId: bkt_primary123
+            displayName: Drone shots
+    UpdateMemoryMediaBucket:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryMediaBucketRequest"
+          example:
+            displayName: Drone highlights
+    MoveMemoryMedia:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveMemoryMediaRequest"
+          example:
+            mediaIds:
+              - med_abc123
+            targetBucketId: bkt_abc123
+    DeleteMemoryMediaBatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/DeleteMemoryMediaBatchRequest"
+          example:
+            mediaIds:
+              - med_abc123
+    UploadMediaChunk:
+      required: true
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+          example: "<binary media chunk>"
+    UpdateMemoryMediaMetadata:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryMediaMetadataRequest"
+          example:
+            capturedAt: '2026-05-03T12:30:00Z'
+    UpdateMemoryMediaMetadataBatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryMediaMetadataBatchRequest"
+          example:
+            mediaIds:
+              - med_abc123
+              - med_def456
+            capturedAtOffsetSeconds: 7200
+    UpdateMemoryJournal:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryJournalRequest"
+          example:
+            markdown: |-
+              # Beach day
+
+              We started early.
+
+              ::media:med_abc123 Sunset
+              ::media:med_abc123,med_def456 Highlights
+    UpdateMemoryTrack:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryTrackRequest"
+          example:
+            title: Alpine ridge day 2
+            activityType: HIKING
+    CreateMemoryPlaylist:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateMemoryPlaylistRequest"
+          example:
+            title: Roadtrip soundtrack
+            note: Songs from the van.
+            url: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+    UpdateMemoryPlaylist:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryPlaylistRequest"
+          example:
+            title: Roadtrip soundtrack
+            note: Songs from the van.
+    CreateFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateFolderRequest"
+          example:
+            parentPath: /@family
+            name: summer
+            displayName: Summer
+    UpdateFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateFolderRequest"
+          example:
+            path: /@family/summer
+            displayName: Summer 2026
+    MoveFolder:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveFolderRequest"
+          example:
+            path: /@family/summer
+            newParentPath: /@family/archive
+  responses:
+    MemoryNavigation:
+      description: Memory navigation state.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryNavigationResponse"
+          example:
+            location:
+              kind: TENANT
+              path: /
+              displayName: Friends
+            breadcrumbs:
+              - kind: TENANT
+                path: /
+                displayName: Friends
+                label: Friends
+            scopeRoots:
+              - kind: USER
+                name: me
+                displayName: Kevin
+                path: /~me
+            favoriteMemories: []
+            folders: []
+    Folder:
+      description: Organizational folder.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryFolder"
+          example:
+            id: fol_abc123
+            name: summer
+            displayName: Summer
+            path: /@family/summer
+    Memory:
+      description: Memory.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemorySummary"
+          example: &memoryExample
+            id: mem_abc123
+            parentId: null
+            name: summer-trip
+            displayName: Summer Trip
+            path: /summer-trip
+            coverMediaId: med_abc123
+            startDate: '2026-05-03'
+            endDate: '2026-05-05'
+            childCount: 1
+            mediaCount: 12
+            favorite: true
+            scope:
+              type: TENANT
+    MemoryHeader:
+      description: Memory detail header.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryHeaderSummary"
+          example:
+            id: mem_abc123
+            displayName: Summer Trip
+            path: /summer-trip
+            coverUrl: /api/friends/memories/mem_abc123/cover/content
+            coverCrop:
+              x: 0
+              y: 0
+              width: 1
+              height: 1
+            startDate: '2026-05-03'
+            endDate: '2026-05-05'
+            directMediaCount: 12
+            descendantMediaCount: 20
+            childMemoryCount: 3
+            favorite: true
+            scope:
+              type: TENANT
+            participants:
+              - userId: 7
+                displayName: Florian
+                permalink: florian
+                initials: F
+    MemoryParticipant:
+      description: Memory participant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryParticipantSummary"
+          example: &memoryParticipantExample
+            userId: 7
+            displayName: Florian
+            permalink: florian
+            initials: F
+    MemoryParticipants:
+      description: Memory participants.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryParticipantSummary"
+          example:
+            - *memoryParticipantExample
+    MemoryJournal:
+      description: Memory journal.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryJournalSummary"
+          example:
+            memoryId: mem_abc123
+            markdown: "# Beach day\n\nWe started early."
+            updatedAt: '2026-05-24T10:00:00Z'
+    MemoryJournalLiveSession:
+      description: Live journal editing session.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryJournalLiveSession"
+          example:
+            memoryId: mem_abc123
+            documentId: tenant/friends/memory/mem_abc123/journal
+            websocketUrl: /api/collaboration/journal
+            token: eyJhbGciOiJIUzI1NiJ9...
+            expiresAt: '2026-05-24T10:15:00Z'
+            displayName: Florian
+            color: '#5b6ee1'
+            canEdit: true
+    MemorySummaries:
+      description: Memory summaries.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemorySummary"
+          example:
+            - *memoryExample
+    MemoryMedia:
+      description: Memory media.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaSummary"
+          example: &memoryMediaExample
+            id: med_abc123
+            memoryId: mem_abc123
+            title: Beach
+            uploader:
+              type: USER
+              displayName: Kevin
+              permalink: kevin
+              userId: 1
+            createdAt: '2026-05-03T12:00:00Z'
+            capturedAt: '2026-05-03T11:45:00Z'
+            capturedAtOverride: false
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+            contentUrl: /api/friends/memory-media/med_abc123/content
+            previewUrl: /api/friends/memory-media/med_abc123/preview
+    MemoryMediaUploadSession:
+      description: Created resumable media upload session.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaUploadSession"
+          example: &memoryMediaUploadSessionExample
+            uploadId: 8c7a6f8e-75de-4d63-a36d-f77256b4416a
+            chunkSizeBytes: 16777216
+    PendingMemoryMediaUploadSession:
+      description: Resumable media upload session status.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PendingMemoryMediaUploadSession"
+          example:
+            uploadId: 8c7a6f8e-75de-4d63-a36d-f77256b4416a
+            memoryId: mem_abc123
+            filename: beach.mp4
+            mimeType: video/mp4
+            sizeBytes: 73400320
+            title: Beach
+            chunkSizeBytes: 16777216
+            uploadedChunks:
+              - 0
+              - 1
+            uploadedBytes: 33554432
+            createdAt: '2026-05-03T12:00:00Z'
+            updatedAt: '2026-05-03T12:03:00Z'
+    MemoryMediaBucket:
+      description: Memory media bucket.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaBucketSummary"
+          example: &memoryMediaBucketExample
+            id: bkt_abc123
+            memoryId: mem_abc123
+            parentBucketId: null
+            displayName: Kevin
+            primary: true
+            uploader:
+              type: USER
+              displayName: Kevin
+              permalink: kevin
+              userId: 1
+            mediaCount: 4
+            createdAt: '2026-05-03T12:00:00Z'
+            updatedAt: '2026-05-03T12:00:00Z'
+    MemoryMediaBucketList:
+      description: Memory media buckets.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryMediaBucketSummary"
+          example:
+            - *memoryMediaBucketExample
+    MemoryMediaSummaries:
+      description: Memory media summaries.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryMediaSummary"
+          example:
+            - *memoryMediaExample
+    MemoryMediaUpdates:
+      description: Newly created memory media updates.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaUpdatesResponse"
+          example:
+            media:
+              - *memoryMediaExample
+    MemoryTrack:
+      description: Memory GPX track.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryTrackSummary"
+          example: &memoryTrackExample
+            id: trk_abc123
+            memoryId: mem_abc123
+            title: Alpine ridge day 2
+            activityType: HIKING
+            originalFilename: ridge-day-2.gpx
+            distanceMeters: 12430
+            ascentMeters: 820
+            descentMeters: 610
+            pointCount: 812
+            startedAt: '2026-05-03T08:30:00Z'
+            endedAt: '2026-05-03T12:20:00Z'
+            bounds:
+              minLatitude: 47.426
+              minLongitude: 10.982
+              maxLatitude: 47.451
+              maxLongitude: 11.034
+            geometry:
+              type: LineString
+              coordinates:
+                - [10.982, 47.426]
+                - [11.034, 47.451]
+            contentUrl: /api/friends/memories/mem_abc123/tracks/trk_abc123/content
+            createdAt: '2026-05-03T12:30:00Z'
+            updatedAt: '2026-05-03T12:30:00Z'
+    MemoryTracks:
+      description: Memory GPX tracks.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryTrackSummary"
+          example:
+            - *memoryTrackExample
+    MemoryPlaylist:
+      description: Memory playlist.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryPlaylistSummary"
+          example: &memoryPlaylistExample
+            id: ply_abc123
+            memoryId: mem_abc123
+            title: Roadtrip soundtrack
+            note: Songs from the van.
+            provider: SPOTIFY
+            url: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+            externalId: 37i9dQZF1DXcBWIGoYBM5M
+            createdAt: '2026-05-03T12:30:00Z'
+            updatedAt: '2026-05-03T12:30:00Z'
+    MemoryPlaylists:
+      description: Memory playlists.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/MemoryPlaylistSummary"
+          example:
+            - *memoryPlaylistExample
+    MemoryMediaBatch:
+      description: Updated memory media.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MemoryMediaBatchResponse"
+          example:
+            media:
+              - *memoryMediaExample
+    SearchResults:
+      description: Search results.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              "$ref": "#/components/schemas/SearchResultSummary"
+          example:
+            - kind: MEMORY
+              id: mem_abc123
+              displayName: Beach Day
+              path: /summer-trip/beach-day
+              scope:
+                type: TENANT
+              coverUrl: /api/friends/memories/mem_abc123/cover/content
+              matchTypes:
+                - TITLE
+                - JOURNAL
+              journalSnippet: "...the beach picnic started just before sunset..."
+            - kind: FOLDER
+              id: fol_abc123
+              displayName: Summer
+              path: /summer
+              scope:
+                type: TENANT
+              matchTypes:
+                - TITLE
+  schemas:
+    MemoryNavigationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - location
+        - breadcrumbs
+        - scopeRoots
+        - favoriteMemories
+        - folders
+      properties:
+        location:
+          "$ref": "#/components/schemas/MemoryNavigationLocation"
+        breadcrumbs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryNavigationBreadcrumb"
+        scopeRoots:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryScopeRoot"
+        favoriteMemories:
+          type: array
+          description: Memories favorited by the current user and visible in the current tenant.
+          items:
+            "$ref": "#/components/schemas/MemorySummary"
+        folders:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryFolder"
+      example:
+        location:
+          kind: TENANT
+          path: /
+          displayName: Friends
+        breadcrumbs:
+          - kind: TENANT
+            path: /
+            displayName: Friends
+            label: Friends
+        scopeRoots:
+          - kind: USER
+            name: me
+            displayName: Kevin
+            path: /~me
+        favoriteMemories: []
+        folders:
+          - id: fol_abc123
+            name: summer
+            displayName: Summer
+            path: /summer
+    MemoryNavigationLocation:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+      properties:
+        kind:
+          "$ref": "#/components/schemas/MemoryNavigationKind"
+        path:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        kind: TENANT
+        path: /
+        displayName: Friends
+    MemoryNavigationBreadcrumb:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - path
+        - displayName
+        - label
+      properties:
+        kind:
+          "$ref": "#/components/schemas/MemoryNavigationKind"
+        path:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        label:
+          type: string
+      example:
+        kind: FOLDER
+        path: /summer
+        displayName: Summer
+        label: Summer
+    MemoryNavigationKind:
+      type: string
+      enum:
+        - TENANT
+        - GROUP
+        - USER
+        - FOLDER
+    MemoryScopeRoot:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - name
+        - displayName
+        - path
+      properties:
+        kind:
+          type: string
+          enum:
+            - GROUP
+            - USER
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+      example:
+        kind: GROUP
+        name: family
+        displayName: Family
+        path: /@family
+    MemoryFolder:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - displayName
+        - path
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+      example:
+        id: fol_abc123
+        name: summer
+        displayName: Summer
+        path: /@family/summer
+    CreateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - displayName
+      properties:
+        parentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        scope:
+          "$ref": "#/components/schemas/MemoryScopeRequest"
+          nullable: true
+      example:
+        parentPath: /@family
+        name: summer
+        displayName: Summer
+        scope:
+          type: GROUP
+          groupName: family
+    UpdateFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+      properties:
+        path:
+          type: string
+        name:
+          type: string
+          nullable: true
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+          nullable: true
+      example:
+        path: /@family/summer
+        name: summer-2026
+        displayName: Summer 2026
+    MoveFolderRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - newParentPath
+      properties:
+        path:
+          type: string
+        newParentPath:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+      example:
+        path: /@family/summer
+        newParentPath: /@family/archive
+        name: summer-2026
+    SearchResultSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - id
+        - displayName
+        - path
+        - scope
+        - matchTypes
+      properties:
+        kind:
+          type: string
+          enum:
+            - MEMORY
+            - FOLDER
+        id:
+          type: string
+          description: Public Memory or folder id.
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+          description: Canonical UI path to navigate to this result.
+        scope:
+          "$ref": "#/components/schemas/MemoryScope"
+        coverUrl:
+          type: string
+          nullable: true
+          description: Renderable Memory cover URL. Only present for Memory results with a cover.
+        coverCrop:
+          "$ref": "#/components/schemas/CoverCrop"
+        matchTypes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - TITLE
+              - PATH
+              - JOURNAL
+        journalSnippet:
+          type: string
+          nullable: true
+          description: Plain-text snippet from matching journal Markdown.
+      example:
+        kind: MEMORY
+        id: mem_abc123
+        displayName: Beach Day
+        path: /summer-trip/beach-day
+        scope:
+          type: TENANT
+        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        matchTypes:
+          - TITLE
+          - JOURNAL
+        journalSnippet: "...the beach picnic started just before sunset..."
+    MemorySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - displayName
+        - startDate
+        - endDate
+        - path
+        - childCount
+        - mediaCount
+        - favorite
+      properties:
+        id:
+          type: string
+          description: Public Memory id.
+        parentId:
+          type: string
+          nullable: true
+          description: Public parent Memory id, or null for root Memories.
+        name:
+          type: string
+          description: URL-safe sibling name inside the parent and scope.
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+          description: Scope-prefixed display path used by the current implementation.
+        coverMediaId:
+          type: string
+          nullable: true
+          description: Public id of the cover media if one is set.
+        coverUrl:
+          type: string
+          nullable: true
+          description: URL for the renderable Memory cover source if one is set.
+        coverCrop:
+          "$ref": "#/components/schemas/CoverCrop"
+        startDate:
+          type: string
+          format: date
+          description: User-defined Memory start date.
+        endDate:
+          type: string
+          format: date
+          description: User-defined Memory end date.
+        childCount:
+          type: integer
+          format: int32
+        mediaCount:
+          type: integer
+          format: int32
+        favorite:
+          type: boolean
+          description: Whether the current user has favorited this Memory.
+        scope:
+          "$ref": "#/components/schemas/MemoryScope"
+      example:
+        id: mem_abc123
+        parentId: null
+        name: summer-trip
+        displayName: Summer Trip
+        path: /summer-trip
+        coverMediaId: med_abc123
+        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        coverCrop:
+          x: 0
+          y: 0.125
+          width: 1
+          height: 0.5625
+        startDate: '2026-05-03'
+        endDate: '2026-05-05'
+        childCount: 1
+        mediaCount: 12
+        favorite: true
+        scope:
+          type: TENANT
+    MemoryHeaderSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - displayName
+        - path
+        - startDate
+        - endDate
+        - directMediaCount
+        - descendantMediaCount
+        - childMemoryCount
+        - favorite
+        - scope
+        - participants
+      properties:
+        id:
+          type: string
+          description: Public Memory id.
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        path:
+          type: string
+        coverUrl:
+          type: string
+          nullable: true
+        coverCrop:
+          "$ref": "#/components/schemas/CoverCrop"
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        directMediaCount:
+          type: integer
+          format: int32
+          description: Media directly assigned to this Memory.
+        descendantMediaCount:
+          type: integer
+          format: int32
+          description: Media assigned to visible descendant Memories.
+        childMemoryCount:
+          type: integer
+          format: int32
+          description: Direct visible child Memories.
+        favorite:
+          type: boolean
+          description: Whether the current user has favorited this Memory.
+        scope:
+          "$ref": "#/components/schemas/MemoryScope"
+        participants:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryParticipantSummary"
+      example:
+        id: mem_abc123
+        displayName: Summer Trip
+        path: /summer-trip
+        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        coverCrop:
+          x: 0
+          y: 0.125
+          width: 1
+          height: 0.5625
+        startDate: '2026-05-03'
+        endDate: '2026-05-05'
+        directMediaCount: 12
+        descendantMediaCount: 20
+        childMemoryCount: 3
+        favorite: true
+        scope:
+          type: TENANT
+        participants:
+          - userId: 7
+            displayName: Florian
+            permalink: florian
+            initials: F
+    MemoryParticipantSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - permalink
+        - initials
+      properties:
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+        initials:
+          type: string
+          minLength: 1
+          maxLength: 4
+        avatarUrl:
+          type: string
+          nullable: true
+      example:
+        userId: 7
+        displayName: Florian
+        permalink: florian
+        initials: F
+        avatarUrl: /api/friends/profiles/florian/avatar?v=2026-05-27T10%3A00%3A00Z
+    MemoryJournalSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - memoryId
+        - markdown
+        - updatedAt
+      properties:
+        memoryId:
+          type: string
+          description: Public Memory id that owns this journal.
+        markdown:
+          type: string
+          description: Markdown journal body with optional veyq `::` embed tokens.
+          maxLength: 200000
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        memoryId: mem_abc123
+        markdown: |-
+          # Beach day
+
+          We started early.
+
+          ::media:med_abc123 Sunset
+        updatedAt: '2026-05-24T10:00:00Z'
+    UpdateMemoryJournalRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - markdown
+      properties:
+        markdown:
+          type: string
+          description: Complete replacement Markdown journal body.
+          maxLength: 200000
+      example:
+        markdown: |-
+          # Beach day
+
+          We started early.
+
+          ::media:med_abc123 Sunset
+    MemoryJournalLiveSession:
+      type: object
+      additionalProperties: false
+      required:
+        - memoryId
+        - documentId
+        - websocketUrl
+        - token
+        - expiresAt
+        - displayName
+        - color
+        - canEdit
+      properties:
+        memoryId:
+          type: string
+          description: Public Memory id that owns this journal.
+        documentId:
+          type: string
+          description: Stable live collaboration document id scoped to the Memory journal.
+        websocketUrl:
+          type: string
+          description: WebSocket URL for the journal collaboration service.
+        token:
+          type: string
+          description: Short-lived bearer token for this journal document.
+        expiresAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+          description: Presence display name for the current editor.
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+          description: Stable presence color for the current editor.
+        canEdit:
+          type: boolean
+          description: Whether this session can write journal changes.
+      example:
+        memoryId: mem_abc123
+        documentId: tenant/friends/memory/mem_abc123/journal
+        websocketUrl: /api/collaboration/journal
+        token: eyJhbGciOiJIUzI1NiJ9...
+        expiresAt: '2026-05-24T10:15:00Z'
+        displayName: Florian
+        color: '#5b6ee1'
+        canEdit: true
+    MemoryScope:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - TENANT
+            - GROUP
+            - USER
+        groupName:
+          type: string
+          nullable: true
+      example:
+        type: GROUP
+        groupName: family
+    CoverCrop:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required:
+        - x
+        - y
+        - width
+        - height
+      properties:
+        x:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        y:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        width:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        height:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+      example:
+        x: 0
+        y: 0.125
+        width: 1
+        height: 0.5625
+    CreateMemoryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - displayName
+        - startDate
+        - endDate
+      properties:
+        parentId:
+          type: string
+          nullable: true
+          description: Parent Memory id. When present, the created Memory inherits the parent scope.
+        folderPath:
+          type: string
+          nullable: true
+          description: Organizational folder path for new top-level Memories. Ignored when `parentId` is present.
+        name:
+          type: string
+          description: URL-safe sibling name.
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        startDate:
+          type: string
+          format: date
+          description: User-defined Memory start date.
+        endDate:
+          type: string
+          format: date
+          description: User-defined Memory end date.
+        scope:
+          "$ref": "#/components/schemas/MemoryScopeRequest"
+          nullable: true
+          description: Root scope for new root Memories. Ignored for child Memories because children inherit parent scope.
+      example:
+        folderPath: /summer
+        name: summer-trip
+        displayName: Summer Trip
+        startDate: '2026-05-03'
+        endDate: '2026-05-05'
+        scope:
+          type: TENANT
+    UpdateMemoryRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        parentId:
+          type: string
+          nullable: true
+          description: New parent Memory id. Cross-scope moves and cycles are rejected.
+        name:
+          type: string
+          nullable: true
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+          nullable: true
+        startDate:
+          type: string
+          format: date
+          nullable: true
+          description: New user-defined Memory start date. When omitted, the current start date is kept.
+        endDate:
+          type: string
+          format: date
+          nullable: true
+          description: New user-defined Memory end date. When omitted, the current end date is kept.
+      example:
+        parentId: mem_parent123
+        name: summer-trip-2026
+        displayName: Summer Trip 2026
+        startDate: '2026-05-03'
+        endDate: '2026-05-06'
+    MemoryScopeRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        groupName:
+          type: string
+          nullable: true
+      example:
+        type: GROUP
+        groupName: family
+    UpdateMemoryMediaMetadataRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Corrected capture timestamp. Null clears the timestamp while still marking it as user-corrected.
+      example:
+        capturedAt: '2026-05-03T12:30:00Z'
+    UpdateMemoryMediaMetadataBatchRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mediaIds
+        - capturedAtOffsetSeconds
+      properties:
+        mediaIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: Public ids of media that belong directly to the addressed Memory.
+        capturedAtOffsetSeconds:
+          type: integer
+          format: int64
+          description: Signed offset in seconds applied to each selected media capture timestamp.
+      example:
+        mediaIds:
+          - med_abc123
+          - med_def456
+        capturedAtOffsetSeconds: 7200
+    CreateMemoryMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - filename
+        - mimeType
+        - sizeBytes
+      properties:
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+          nullable: true
+        bucketId:
+          type: string
+          nullable: true
+          description: Optional target media bucket id. When omitted, the uploader primary bucket is used and created lazily when needed.
+      example:
+        filename: beach.mp4
+        mimeType: video/mp4
+        sizeBytes: 73400320
+        title: Beach
+        bucketId: bkt_abc123
+    CreateMemoryMediaBucketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - parentBucketId
+        - displayName
+      properties:
+        parentBucketId:
+          type: string
+          description: Parent media bucket id. The reserved id `__veyq_self_primary_bucket__` targets the current user's lazily created primary bucket.
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+      example:
+        parentBucketId: bkt_primary123
+        displayName: Drone shots
+    UpdateMemoryMediaBucketRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+      example:
+        displayName: Drone highlights
+    MoveMemoryMediaRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mediaIds
+        - targetBucketId
+      properties:
+        mediaIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        targetBucketId:
+          type: string
+      example:
+        mediaIds:
+          - med_abc123
+        targetBucketId: bkt_abc123
+    DeleteMemoryMediaBatchRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - mediaIds
+      properties:
+        mediaIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      example:
+        mediaIds:
+          - med_abc123
+    MemoryMediaUploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - chunkSizeBytes
+      properties:
+        uploadId:
+          type: string
+        chunkSizeBytes:
+          type: integer
+          format: int64
+      example:
+        uploadId: 8c7a6f8e-75de-4d63-a36d-f77256b4416a
+        chunkSizeBytes: 16777216
+    PendingMemoryMediaUploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        - uploadId
+        - memoryId
+        - filename
+        - mimeType
+        - sizeBytes
+        - chunkSizeBytes
+        - uploadedChunks
+        - uploadedBytes
+        - createdAt
+        - updatedAt
+      properties:
+        uploadId:
+          type: string
+        memoryId:
+          type: string
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        title:
+          type: string
+          nullable: true
+        bucketId:
+          type: string
+          nullable: true
+        chunkSizeBytes:
+          type: integer
+          format: int64
+        uploadedChunks:
+          type: array
+          items:
+            type: integer
+            format: int32
+        uploadedBytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        uploadId: 8c7a6f8e-75de-4d63-a36d-f77256b4416a
+        memoryId: mem_abc123
+        filename: beach.mp4
+        mimeType: video/mp4
+        sizeBytes: 73400320
+        title: Beach
+        chunkSizeBytes: 16777216
+        uploadedChunks:
+          - 0
+          - 1
+        uploadedBytes: 33554432
+        createdAt: '2026-05-03T12:00:00Z'
+        updatedAt: '2026-05-03T12:03:00Z'
+    MemoryMediaBatchResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - media
+      properties:
+        media:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryMediaSummary"
+      example:
+        media:
+          - id: med_abc123
+            memoryId: mem_abc123
+            title: Beach
+            uploader:
+              type: USER
+              displayName: Kevin
+              permalink: kevin
+              userId: 1
+            createdAt: '2026-05-03T12:00:00Z'
+            capturedAt: '2026-05-03T11:45:00Z'
+            capturedAtOverride: false
+            mimeType: image/jpeg
+            sizeBytes: 2048000
+            contentUrl: /api/friends/memory-media/med_abc123/content
+            previewUrl: /api/friends/memory-media/med_abc123/preview
+    MemoryTrackActivityType:
+      type: string
+      enum:
+        - HIKING
+        - WALKING
+        - RUNNING
+        - CYCLING
+        - MOUNTAIN_BIKING
+        - ROAD_CYCLING
+        - GRAVEL_CYCLING
+        - SKIING
+        - WATER
+        - OTHER
+      example: HIKING
+    MemoryTrackBounds:
+      type: object
+      additionalProperties: false
+      required:
+        - minLatitude
+        - minLongitude
+        - maxLatitude
+        - maxLongitude
+      properties:
+        minLatitude:
+          type: number
+          format: double
+        minLongitude:
+          type: number
+          format: double
+        maxLatitude:
+          type: number
+          format: double
+        maxLongitude:
+          type: number
+          format: double
+      example:
+        minLatitude: 47.426
+        minLongitude: 10.982
+        maxLatitude: 47.451
+        maxLongitude: 11.034
+    MemoryTrackGeometry:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [LineString]
+        coordinates:
+          type: array
+          minItems: 2
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+              format: double
+          description: GeoJSON LineString coordinates in longitude, latitude order.
+      example:
+        type: LineString
+        coordinates:
+          - [10.982, 47.426]
+          - [11.034, 47.451]
+    MemoryTrackSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - memoryId
+        - title
+        - activityType
+        - originalFilename
+        - distanceMeters
+        - pointCount
+        - bounds
+        - geometry
+        - contentUrl
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        title:
+          type: string
+        activityType:
+          "$ref": "#/components/schemas/MemoryTrackActivityType"
+        originalFilename:
+          type: string
+        distanceMeters:
+          type: integer
+          format: int64
+        ascentMeters:
+          type: integer
+          format: int64
+          nullable: true
+        descentMeters:
+          type: integer
+          format: int64
+          nullable: true
+        pointCount:
+          type: integer
+          format: int32
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        bounds:
+          "$ref": "#/components/schemas/MemoryTrackBounds"
+        geometry:
+          "$ref": "#/components/schemas/MemoryTrackGeometry"
+        contentUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: trk_abc123
+        memoryId: mem_abc123
+        title: Alpine ridge day 2
+        activityType: HIKING
+        originalFilename: ridge-day-2.gpx
+        distanceMeters: 12430
+        ascentMeters: 820
+        descentMeters: 610
+        pointCount: 812
+        startedAt: '2026-05-03T08:30:00Z'
+        endedAt: '2026-05-03T12:20:00Z'
+        bounds:
+          minLatitude: 47.426
+          minLongitude: 10.982
+          maxLatitude: 47.451
+          maxLongitude: 11.034
+        geometry:
+          type: LineString
+          coordinates:
+            - [10.982, 47.426]
+            - [11.034, 47.451]
+        contentUrl: /api/friends/memories/mem_abc123/tracks/trk_abc123/content
+        createdAt: '2026-05-03T12:30:00Z'
+        updatedAt: '2026-05-03T12:30:00Z'
+    MemoryPlaylistProvider:
+      type: string
+      enum:
+        - SPOTIFY
+        - APPLE_MUSIC
+        - YOUTUBE
+        - SOUNDCLOUD
+        - DEEZER
+      example: SPOTIFY
+    MemoryPlaylistSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - memoryId
+        - title
+        - featured
+        - provider
+        - url
+        - externalId
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        title:
+          type: string
+        note:
+          type: string
+          nullable: true
+        featured:
+          type: boolean
+        provider:
+          "$ref": "#/components/schemas/MemoryPlaylistProvider"
+        url:
+          type: string
+        externalId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateMemoryPlaylistRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+          nullable: true
+        note:
+          type: string
+          maxLength: 1000
+          nullable: true
+        featured:
+          type: boolean
+        url:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    UpdateMemoryPlaylistRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        note:
+          type: string
+          maxLength: 1000
+          nullable: true
+        featured:
+          type: boolean
+        url:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    UpdateMemoryTrackRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - activityType
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        activityType:
+          "$ref": "#/components/schemas/MemoryTrackActivityType"
+      example:
+        title: Alpine ridge day 2
+        activityType: HIKING
+    MemoryMediaSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - memoryId
+        - title
+        - uploader
+        - createdAt
+        - capturedAtOverride
+        - mimeType
+        - sizeBytes
+        - contentUrl
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+          description: Public id of the Memory that owns this media.
+        bucketId:
+          type: string
+          nullable: true
+          description: Public id of the media bucket that contains this media.
+        title:
+          type: string
+        uploader:
+          "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
+        createdAt:
+          type: string
+          format: date-time
+        capturedAt:
+          type: string
+          format: date-time
+          nullable: true
+        capturedAtOverride:
+          type: boolean
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        contentUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+        previewUrl:
+          type: string
+          nullable: true
+        posterUrl:
+          type: string
+          nullable: true
+        cameraMake:
+          type: string
+          nullable: true
+        cameraModel:
+          type: string
+          nullable: true
+        lensModel:
+          type: string
+          nullable: true
+        imageWidth:
+          type: integer
+          format: int32
+          nullable: true
+        imageHeight:
+          type: integer
+          format: int32
+          nullable: true
+        gpsLatitude:
+          type: number
+          format: double
+          nullable: true
+        gpsLongitude:
+          type: number
+          format: double
+          nullable: true
+      example:
+        id: med_abc123
+        memoryId: mem_abc123
+        bucketId: bkt_abc123
+        title: Beach
+        uploader:
+          type: USER
+          displayName: Kevin
+          permalink: kevin
+          userId: 1
+        createdAt: '2026-05-03T12:00:00Z'
+        capturedAt: '2026-05-03T11:45:00Z'
+        capturedAtOverride: false
+        mimeType: image/jpeg
+        sizeBytes: 2048000
+        contentUrl: /api/friends/memory-media/med_abc123/content
+        thumbnailUrl: /api/friends/memory-media/med_abc123/thumbnail
+        previewUrl: /api/friends/memory-media/med_abc123/preview
+        posterUrl: /api/friends/memory-media/med_abc123/poster
+        cameraMake: Fujifilm
+        cameraModel: X100VI
+        lensModel: 23mm F2
+        imageWidth: 6240
+        imageHeight: 4160
+        gpsLatitude: 54.1825
+        gpsLongitude: 7.8853
+    MemoryMediaUpdatesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - media
+      properties:
+        media:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemoryMediaSummary"
+    MemoryMediaBucketSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - memoryId
+        - displayName
+        - primary
+        - uploader
+        - mediaCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        memoryId:
+          type: string
+        parentBucketId:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+        primary:
+          type: boolean
+        uploader:
+          "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
+        mediaCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: bkt_abc123
+        memoryId: mem_abc123
+        parentBucketId: null
+        displayName: Kevin
+        primary: true
+        uploader:
+          type: USER
+          displayName: Kevin
+          permalink: kevin
+          userId: 1
+        mediaCount: 4
+        createdAt: '2026-05-03T12:00:00Z'
+        updatedAt: '2026-05-03T12:00:00Z'

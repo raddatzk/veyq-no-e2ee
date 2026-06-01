@@ -1,0 +1,73 @@
+id: frontend.localization-theme
+title: Frontend Localization And Theme
+status: implemented
+capabilities: []
+productArea: Locale selection, localized labels and light/dark/system theme behavior.
+entryPoints:
+  - frontend/src/i18n/index.ts
+  - frontend/src/shared/state/useThemeState.ts
+acceptanceCriteria:
+  - id: frontend.localization-theme.locale-switching
+    statement: Users can choose supported UI languages from the profile menu and public share visitors can choose supported UI languages from the public share action menu.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows language choices and switches locale
+            kind: positive
+            ref: frontend/src/components/app/ProfileMenu.test.ts
+          - testName: exposes public share language and theme controls
+            kind: positive
+            ref: frontend/src/views/PublicShareView.test.ts
+  - id: frontend.localization-theme.theme-selection
+    statement: Users can choose and persist theme preference from the profile menu and public share visitors can choose and persist theme preference from the public share action menu.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows theme choices and stores the selected theme
+            kind: positive
+            ref: frontend/src/components/app/ProfileMenu.test.ts
+          - testName: exposes public share language and theme controls
+            kind: positive
+            ref: frontend/src/views/PublicShareView.test.ts
+  - id: frontend.localization-theme.locale-selection-and-labels
+    statement: Locale selection persists supported languages and localizes feature labels.
+    coverage:
+      frontend:
+        unit:
+          - testName: prefers stored locale before browser language
+            kind: positive
+            ref: frontend/src/i18n/index.test.ts
+          - testName: uses supported browser languages and falls back to German
+            kind: positive
+            ref: frontend/src/i18n/index.test.ts
+          - testName: stores locale and updates document language
+            kind: positive
+            ref: frontend/src/i18n/index.test.ts
+          - testName: localizes upload eta capability labels
+            kind: positive
+            ref: frontend/src/i18n/index.test.ts
+  - id: frontend.localization-theme.theme-favicon
+    statement: Theme state keeps favicon and explicit/system theme selection in sync.
+    coverage:
+      frontend:
+        unit:
+          - testName: sets the light favicon when system preference resolves to light
+            kind: positive
+            ref: frontend/src/shared/state/useThemeState.test.ts
+          - testName: replaces the active favicon for an explicit dark theme
+            kind: positive
+            ref: frontend/src/shared/state/useThemeState.test.ts
+          - testName: replaces the active favicon when switching back to light
+            kind: positive
+            ref: frontend/src/shared/state/useThemeState.test.ts
+          - testName: replaces the active favicon when system preference changes
+            kind: positive
+            ref: frontend/src/shared/state/useThemeState.test.ts
+  - id: frontend.localization-theme.localized-auth-ui
+    statement: Authentication screens render localized labels.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders authentication labels in English
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts

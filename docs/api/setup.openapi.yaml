@@ -1,0 +1,254 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Setup API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer veyq Setup API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+tags:
+- name: Setup
+paths:
+  "/api/setup":
+    get:
+      tags:
+      - Setup
+      operationId: status
+      responses:
+        '200':
+          "$ref": "#/components/responses/SetupStatus"
+      summary: Setup-Status abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      description: |-
+        Setup-Status abrufen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+
+        Implementierungsstatus: partial.
+  "/api/setup/admin":
+    post:
+      tags:
+      - Setup
+      operationId: createAdmin
+      requestBody:
+        "$ref": "#/components/requestBodies/AdminSetup"
+      responses:
+        '200':
+          "$ref": "#/components/responses/User"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Initialen Server-Owner anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup darf noch nicht abgeschlossen sein.
+      description: |-
+        Initialen Server-Owner anlegen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup darf noch nicht abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/setup/admin/passkey/options":
+    post:
+      tags:
+      - Setup
+      operationId: createAdminPasskeyOptions
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/AdminPasskeySetupOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Passkey-Optionen fuer initialen Server-Owner erzeugen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup darf noch nicht abgeschlossen sein.
+      description: |-
+        Passkey-Optionen fuer initialen Server-Owner erzeugen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup darf noch nicht abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/setup/admin/passkey":
+    post:
+      tags:
+      - Setup
+      operationId: createAdminWithPasskey
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/AdminPasskeySetup"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Initialen Server-Owner mit Passkey anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup darf noch nicht abgeschlossen sein.
+      description: |-
+        Initialen Server-Owner mit Passkey anlegen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup darf noch nicht abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+components:
+  requestBodies:
+    AdminSetup:
+      description: Create initial admin
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AdminSetupRequest"
+          example:
+            email: admin@example.test
+            displayName: Administrator
+            password: admin1234567
+    AdminPasskeySetupOptions:
+      description: Create passkey setup options for initial admin
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AdminPasskeySetupOptionsRequest"
+          example:
+            email: admin@example.test
+            displayName: Administrator
+    AdminPasskeySetup:
+      description: Create initial admin with passkey
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AdminPasskeySetupRequest"
+          example:
+            email: admin@example.test
+            displayName: Administrator
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
+
+  responses:
+    SetupStatus:
+      description: Current setup status
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/SetupStatusSummary"
+          example:
+            setupRequired: false
+
+    User:
+      description: User
+      content:
+        application/json:
+          schema:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          example:
+            userId: 1
+            email: admin@example.test
+            displayName: Administrator
+            serverRole: ServerOwner
+            passkeyCount: 0
+            hasPassword: true
+    PasskeyRegistrationOptions:
+      description: Passkey registration options.
+      content:
+        application/json:
+          schema:
+            "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationOptionsResponse"
+          example:
+            challenge: challenge
+            timeout: 300000
+            attestation: none
+  schemas:
+    SetupStatusSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - setupRequired
+      properties:
+        setupRequired:
+          type: boolean
+      example:
+        setupRequired: false
+    AdminSetupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - password
+      - displayName
+      - email
+      properties:
+        password:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: admin@example.test
+        displayName: Administrator
+        password: admin1234567
+    AdminPasskeySetupOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      - email
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: admin@example.test
+        displayName: Administrator
+    AdminPasskeySetupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      - email
+      - credential
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        passkeyDisplayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        credential:
+          "$ref": "./users.openapi.yaml#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        email: admin@example.test
+        displayName: Administrator
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object

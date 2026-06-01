@@ -1,0 +1,12 @@
+"Add shared media to a Memory." = "Add shared media to a Memory.";
+"Chapter in %@" = "Chapter in %@";
+"Choose Memory" = "Choose Memory";
+"Close" = "Close";
+"No photos or videos were shared." = "No photos or videos were shared.";
+"Open veyq once, then share again to choose a Memory here." = "Open veyq once, then share again to choose a Memory here.";
+"Preparing import for %@..." = "Preparing import for %@...";
+"Preparing shared media..." = "Preparing shared media...";
+"Shared media could not be prepared." = "Shared media could not be prepared.";
+"Some chapters may be missing. Open a Memory in veyq first to make its chapters available here." = "Some chapters may be missing. Open a Memory in veyq first to make its chapters available here.";
+"The selected Memory could not be saved." = "The selected Memory could not be saved.";
+"The veyq App Group is not available for this build. Check the app and extension signing capabilities for group.com.veyq.ios." = "The veyq App Group is not available for this build. Check the app and extension signing capabilities for group.com.veyq.ios.";

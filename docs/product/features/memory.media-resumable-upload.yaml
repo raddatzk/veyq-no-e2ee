@@ -1,0 +1,113 @@
+id: memory.media-resumable-upload
+title: Resumable Memory Media Uploads
+status: implemented
+capabilities:
+  - memory.media-resumable-upload
+productArea: Chunked resumable Memory media upload.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+  - frontend/src/features/memories/composables/useUploadQueue.ts
+acceptanceCriteria:
+  - id: memory.media-resumable-upload.private-complete
+    statement: Private Memory chunk upload resumes existing chunks and completes media.
+    coverage:
+      backend:
+        integration:
+          - testName: memory chunk upload resumes existing chunks and completes media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testShareImportTargetsIncludeChapters
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testShareImportTargetsDoNotFetchUnknownChapters
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadQueueItemDecodesLegacyQueueWithoutProgressMetadata
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadingQueueItemRestoresAsQueuedForLaunchResume
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadQueuePresenterShowsMissingLocalFileAsNonRetryable
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientRestartsExpiredUploadSession
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-resumable-upload.invalid-chunk-rejected
+    statement: Out-of-range chunk indexes are rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: memory chunk upload rejects out of range chunk index
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-resumable-upload.failed-complete-keeps-session
+    statement: Failed completion keeps the upload session.
+    coverage:
+      backend:
+        integration:
+          - testName: failed memory chunk complete keeps upload session
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testAPIClientRetriesTransientChunkAndCompleteFailures
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-resumable-upload.abort-cleans-session
+    statement: Abort deletes upload session and chunks.
+    coverage:
+      backend:
+        integration:
+          - testName: memory chunk upload abort deletes session and chunks
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-resumable-upload.memory-delete-cleans-sessions
+    statement: Deleting Memory trees removes pending upload sessions.
+    coverage:
+      backend:
+        integration:
+          - testName: deleting memory removes pending upload sessions for memory tree
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-resumable-upload.tenant-delete-scoped-cleanup
+    statement: Tenant deletion removes only that tenant’s pending upload sessions.
+    coverage:
+      backend:
+        integration:
+          - testName: deleting tenant removes only pending upload sessions for that tenant
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-resumable-upload.public-uploader-complete
+    statement: Uploader-only public shares can complete root resumable media upload.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader share can complete root resumable media upload
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+      frontend:
+        integration:
+          - testName: major line 1 uploader-only public share uploads without exposing the gallery
+            kind: positive
+            ref: frontend/e2e/major-1-smoke.spec.ts
+  - id: memory.media-resumable-upload.public-session-isolation
+    statement: Public upload sessions are isolated by share identity and share id.
+    coverage:
+      backend:
+        integration:
+          - testName: public share upload sessions are isolated by share identity and share id
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.media-resumable-upload.private-session-boundaries
+    statement: Private upload sessions reject invalid status and are cleaned up with Memory or tenant lifecycle events.
+    coverage:
+      backend:
+        integration:
+          - testName: invalid upload session status returns not found
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt

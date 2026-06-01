@@ -1,0 +1,28 @@
+id: platform.security-pipeline
+title: Platform Security Pipeline
+status: implemented
+capabilities: []
+productArea: Request authentication and authorization filters for setup, tenant and group routes.
+entryPoints:
+  - backend/src/main/kotlin/com/veyq/api/security
+acceptanceCriteria:
+  - id: platform.security-pipeline.route-authorization
+    statement: Setup, tenant, tenant-owner and group-owner routes enforce authentication and membership requirements.
+    coverage:
+      backend:
+        integration:
+          - testName: security policy permits public setup status and denies protected API without auth
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/SecurityPipelineTest.kt
+          - testName: setup filter returns stable setup required code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/security/SecurityPipelineTest.kt
+          - testName: tenant membership filter handles unauthenticated missing outsider and member cases
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/SecurityPipelineTest.kt
+          - testName: tenant owner required allows tenant owner and rejects tenant member
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/SecurityPipelineTest.kt
+          - testName: group owner required allows group owner and rejects member missing group and outsider
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/SecurityPipelineTest.kt

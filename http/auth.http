@@ -1,0 +1,17 @@
+### Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### Current user
+GET {{baseUrl}}/api/me
+
+### Refresh the current session
+POST {{baseUrl}}/api/auth/refresh
+
+### Logout
+POST {{baseUrl}}/api/auth/logout

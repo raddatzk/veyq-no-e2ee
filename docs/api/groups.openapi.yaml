@@ -1,0 +1,387 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Groups API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer veyq Groups API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Groups
+paths:
+  "/api/{tenantName}/groups":
+    get:
+      tags:
+      - Groups
+      operationId: getGroups
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Groups"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppen eines Tenants auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen eines Tenants auflisten. TenantOwner sehen alle Gruppen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Groups
+      operationId: createGroup
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateGroup"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Group"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Gruppe anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/{tenantName}/groups/{groupName}":
+    get:
+      tags:
+      - Groups
+      operationId: getGroup
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Group"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppe abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe abrufen. TenantOwner koennen jede Gruppe abrufen, TenantMember nur Gruppen mit eigener Gruppenmitgliedschaft.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    delete:
+      tags:
+      - Groups
+      operationId: deleteGroup
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      responses:
+        '204':
+          description: Group deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppe löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe rekursiv und final löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Groups
+      operationId: updateGroup
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateGroup"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Group"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppe aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppe aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: VEYQ_ACCESS_TOKEN
+
+  responses:
+    Groups:
+      description: Tenant groups
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/GroupsSummary"
+          example:
+            groups:
+            - id: 99
+              name: family
+              displayName: Family
+
+    Group:
+      description: Single group
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/GroupSummary"
+          example:
+            id: 99
+            name: family
+            displayName: Family
+            members:
+            - user:
+                userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                serverRole: ServerOwner
+              role: GroupOwner
+
+  requestBodies:
+    CreateGroup:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateGroupRequest"
+          example:
+            name: family
+            displayName: Family
+
+    UpdateGroup:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateGroupRequest"
+          example:
+            name: family
+            displayName: Family
+            members:
+            - id: 7
+              role: GroupOwner
+  schemas:
+    GroupRole:
+      type: string
+      enum:
+      - GroupOwner
+      - GroupMember
+    CreateGroupRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - displayName
+      properties:
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        name: family
+        displayName: Family
+    GroupMemberRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - role
+      properties:
+        id:
+          type: integer
+          format: int64
+        role:
+          "$ref": "#/components/schemas/GroupRole"
+      example:
+        id: 7
+        role: GroupOwner
+    UpdateGroupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      properties:
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        members:
+          type: array
+          uniqueItems: true
+          items:
+            "$ref": "#/components/schemas/GroupMemberRequest"
+      example:
+        name: family
+        displayName: Family
+        members:
+          - id: 7
+            role: GroupOwner
+    GroupMemberSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - user
+      properties:
+        user:
+          "$ref": "./common.openapi.yaml#/components/schemas/PublicUserSummary"
+        role:
+          description: Present only for group owners, tenant owners and server owners.
+          "$ref": "#/components/schemas/GroupRole"
+      example:
+        user:
+          userId: 1
+          displayName: Kevin
+          permalink: kevin
+        role: GroupOwner
+    GroupSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - members
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        members:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GroupMemberSummary"
+      example:
+        id: 99
+        name: family
+        displayName: Family
+        members:
+          - user:
+              userId: 1
+              displayName: Kevin
+              permalink: kevin
+            role: GroupOwner
+    SimplifiedGroupSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        id: 99
+        name: family
+        displayName: Family
+    GroupsSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - groups
+      properties:
+        groups:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SimplifiedGroupSummary"
+      example:
+        groups:
+          - id: 99
+            name: family
+            displayName: Family

@@ -1,0 +1,106 @@
+id: memory.playlists
+title: Memory Playlists
+status: implemented
+capabilities:
+  - memory.playlists
+productArea: External Memory playlist links and journal playlist embeds.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+  - frontend/src/features/memories/components/MemoryPlaylistsPanel.vue
+acceptanceCriteria:
+  - id: memory.playlists.parse-supported
+    statement: Supported provider URLs parse.
+    coverage:
+      backend:
+        unit:
+          - testName: parses supported playlist urls
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/playlist/MemoryPlaylistUrlParserTest.kt
+  - id: memory.playlists.reject-unsupported
+    statement: Unsupported, non-HTTPS or fragment URLs are rejected.
+    coverage:
+      backend:
+        unit:
+          - testName: rejects unsupported playlist urls
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/playlist/MemoryPlaylistUrlParserTest.kt
+          - testName: rejects non-https playlist urls
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/playlist/MemoryPlaylistUrlParserTest.kt
+          - testName: rejects urls with fragments
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/playlist/MemoryPlaylistUrlParserTest.kt
+  - id: memory.playlists.crud-single-provider
+    statement: Memory playlists can be created, updated and deleted with one provider link.
+    coverage:
+      backend:
+        integration:
+          - testName: creates updates and deletes memory playlist with single provider link
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      frontend:
+        unit:
+          - testName: edits playlist metadata and url
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryPlaylistsPanel.test.ts
+  - id: memory.playlists.header-player
+    statement: Header player renders provider links without loading iframes or external playback.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders a provider link without loading an iframe or consent prompt
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryHeaderPlaylistPlayer.test.ts
+          - testName: starts with the featured playlist and cycles between playlists
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryHeaderPlaylistPlayer.test.ts
+  - id: memory.playlists.public-viewer-read
+    statement: Public viewers can read playlists.
+    coverage:
+      backend:
+        integration:
+          - testName: public share viewers can read playlists but uploader only shares cannot
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.playlists.uploader-denied
+    statement: Uploader-only shares cannot read playlists.
+    coverage:
+      backend:
+        integration:
+          - testName: public share viewers can read playlists but uploader only shares cannot
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.playlists.public-embed-rendering
+    statement: Playlist embeds render in public responsive flow.
+    coverage:
+      frontend:
+        integration:
+          - testName: major line 1 public viewer share shows map tracks and playlist privacy gates
+            kind: positive
+            ref: frontend/e2e/major-1-smoke.spec.ts
+  - id: memory.playlists.featured-playlist
+    statement: Memory playlists expose a single featured playlist.
+    coverage:
+      backend:
+        unit:
+          - testName: memory playlists expose a single featured playlist
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.playlists.panel-ui
+    statement: Playlist panel renders empty states, compact cards, metadata editing and featured playlist selection.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders compact playlist cards without embeds
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryPlaylistsPanel.test.ts
+          - testName: shows supported providers in empty and add states
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryPlaylistsPanel.test.ts
+          - testName: marks a playlist as the featured header playlist
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryPlaylistsPanel.test.ts
+          - testName: shows progress and blocks duplicate playlist deletion while pending
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryPlaylistsPanel.test.ts

@@ -1,0 +1,303 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Common API Components
+  version: 0.1.0
+  description: Shared API-first components used by veyq backend API specs.
+paths: {}
+components:
+  parameters:
+    TenantName:
+      in: path
+      required: true
+      description: Permalink tenant name from the URL.
+      name: tenantName
+      schema:
+        type: string
+      example: familie
+
+    GroupName:
+      in: path
+      required: true
+      description: Permalink group name from the URL.
+      name: groupName
+      schema:
+        type: string
+      example: holidays
+
+  responses:
+    LoginSession:
+      description: Login succeeded and auth cookies were set.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/LoginSession"
+          example:
+            user:
+              userId: 1
+              email: kevin@example.test
+              displayName: Kevin
+              permalink: kevin
+              serverRole: ServerOwner
+              passkeyCount: 1
+              hasPassword: true
+              totpEnabled: false
+            accessTokenExpiresAt: "2026-05-29T12:15:00Z"
+
+    '400':
+      description: Der Request ist syntaktisch oder fachlich ungueltig.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: BAD_REQUEST
+            message: Invalid request
+    '401':
+      description: Der Request ist nicht authentifiziert.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: UNAUTHORIZED
+            message: Authentication required
+    '403':
+      description: Der Benutzer erfuellt die benoetigte Rolle oder Mitgliedschaft nicht.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: FORBIDDEN
+            message: Insufficient permissions
+
+    '404':
+      description: Die angeforderte Ressource existiert nicht oder ist fuer den Benutzer nicht sichtbar.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: NOT_FOUND
+            message: Resource not found
+
+    '409':
+      description: Es besteht ein Konflikt mit der bestehenden Ressource
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: CONFLICT
+            message: Conflict with existing resource
+
+    '413':
+      description: Der Upload ueberschreitet die erlaubte Groesse.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: UPLOAD_TOO_LARGE
+            message: Upload too large
+
+    '416':
+      description: Der angeforderte Byte-Range ist fuer das Medium nicht erfuellbar.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: RANGE_NOT_SATISFIABLE
+            message: Requested range not satisfiable
+
+  schemas:
+    LoginSession:
+      description: Authenticated session summary returned after login or token refresh.
+      type: object
+      additionalProperties: false
+      required:
+        - user
+        - accessTokenExpiresAt
+      properties:
+        user:
+          "$ref": "#/components/schemas/UserSummary"
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+          description: Expiration time of the access-token cookie. This is not a token value.
+      example:
+        user:
+          userId: 1
+          email: kevin@example.test
+          displayName: Kevin
+          permalink: kevin
+          serverRole: ServerOwner
+          passkeyCount: 1
+          hasPassword: true
+        accessTokenExpiresAt: "2026-05-29T12:15:00Z"
+
+    UserSummary:
+      description: Current authenticated user.
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - email
+        - displayName
+        - permalink
+        - serverRole
+        - passkeyCount
+        - hasPassword
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          "$ref": "#/components/schemas/EmailAddress"
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
+        avatarUrl:
+          type: string
+          nullable: true
+        serverRole:
+          "$ref": "#/components/schemas/ServerRole"
+        pendingEmail:
+          "$ref": "#/components/schemas/EmailAddress"
+        passkeyCount:
+          type: integer
+          format: int32
+          minimum: 0
+        hasPassword:
+          type: boolean
+          description: Whether the user has set a password login method.
+        totpEnabled:
+          type: boolean
+          description: Whether password login requires a TOTP second factor.
+      example:
+        userId: 1
+        email: kevin@example.test
+        displayName: Kevin
+        permalink: kevin
+        avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+        serverRole: ServerOwner
+        passkeyCount: 1
+        hasPassword: true
+        totpEnabled: true
+
+    PublicUserSummary:
+      description: Privacy-preserving user reference for tenant and group member lists.
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - displayName
+        - permalink
+      properties:
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
+      example:
+        userId: 1
+        displayName: Kevin
+        permalink: kevin
+
+    MediaUploader:
+      description: Privacy-preserving uploader attribution generated from a registered user or anonymous share identity.
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - displayName
+      properties:
+        type:
+          type: string
+          enum:
+            - USER
+            - ANONYMOUS
+        displayName:
+          "$ref": "#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "#/components/schemas/Permalink"
+          nullable: true
+        userId:
+          type: integer
+          format: int64
+          nullable: true
+      example:
+        type: USER
+        displayName: Kevin
+        permalink: kevin
+        userId: 1
+
+    Permalink:
+      type: string
+      description: URL-safe stable permalink segment.
+      minLength: 1
+      maxLength: 120
+      pattern: '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+      example: kevin
+      x-normalization:
+        - trim
+        - lowercase
+
+    EmailAddress:
+      type: string
+      description: Email address. The backend trims whitespace and stores it lowercase.
+      example: admin@example.com
+      x-normalization:
+        - trim
+        - lowercase
+      x-field-extra-annotation:
+        - '@field:com.veyq.api.common.validation.Email'
+
+    Password:
+      type: string
+      description: User account password. Account passwords require at least 10 characters and are checked against the configured compromised-password provider when they are set or changed.
+      minLength: 10
+      x-field-extra-annotation:
+        - '@field:com.veyq.api.common.validation.Password'
+
+    DisplayName:
+      type: string
+      x-field-extra-annotation:
+        - '@field:com.veyq.api.common.validation.Normalize'
+
+    Name:
+      type: string
+      x-field-extra-annotation:
+        - '@field:com.veyq.api.common.validation.Normalize'
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          minLength: 1
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          example: MEMORY_COVER_CROP_INVALID
+        message:
+          type: string
+          description: English fallback message. Frontends should prefer localized text for the code.
+          example: Cover crop is invalid
+      example:
+        code: PASSWORD_COMPROMISED
+        message: Password appears in known breaches
+
+    ServerRole:
+      type: string
+      enum:
+        - ServerOwner
+        - ServerMember

@@ -1,0 +1,1830 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Users API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer veyq Users API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Users
+- name: Profiles
+paths:
+  "/api/users/me":
+    get:
+      tags:
+      - Users
+      operationId: me
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Aktuellen Benutzer abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Aktuellen Benutzer abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Users
+      operationId: updateMySettings
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateUserSettings"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Eigene Benutzer-Einstellungen aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene Benutzer-Einstellungen aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/me/avatar":
+    get:
+      tags:
+      - Users
+      operationId: getMyAvatar
+      responses:
+        '200':
+          "$ref": "#/components/responses/AvatarImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenes Profilbild abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ein Profilbild besitzen.
+      description: |-
+        Liefert das eigene Profilbild fuer globale User-Settings und das Profilmenue.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ein Profilbild besitzen.
+
+        Implementierungsstatus: implemented.
+    put:
+      tags:
+      - Users
+      operationId: updateMyAvatar
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadAvatar"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '413':
+          "$ref": "./common.openapi.yaml#/components/responses/413"
+      summary: Eigenes Profilbild aktualisieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Speichert ein neues eigenes Profilbild. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Profilbild wird ersetzt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+    delete:
+      tags:
+      - Users
+      operationId: deleteMyAvatar
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigenes Profilbild loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Entfernt das eigene Profilbild. Der Initialen-Fallback bleibt erhalten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/email/confirm":
+    post:
+      tags:
+      - Users
+      operationId: confirmMyEmailChange
+      requestBody:
+        "$ref": "#/components/requestBodies/ConfirmEmailChange"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Neue eigene E-Mail-Adresse bestaetigen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
+      description: |-
+        Neue eigene E-Mail-Adresse bestaetigen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Token muss zu einer offenen E-Mail-Aenderung des aktuellen Benutzers gehoeren.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/password/change":
+    post:
+      tags:
+      - Users
+      operationId: changeMyPassword
+      requestBody:
+        "$ref": "#/components/requestBodies/ChangePassword"
+      responses:
+        '204':
+          description: Password changed.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigenes Passwort ändern
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigenes Passwort ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/password/delete":
+    post:
+      tags:
+      - Users
+      operationId: deleteMyPassword
+      requestBody:
+        "$ref": "#/components/requestBodies/DeleteMyPassword"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Eigenes Passwort loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ein Passwort und mindestens einen Passkey haben.
+      - Das aktuelle Passwort muss bestaetigt werden.
+      description: |-
+        Entfernt den Passwort-Login des aktuellen Benutzers. Falls TOTP fuer
+        Passwort-Login aktiv ist, wird TOTP dabei ebenfalls entfernt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ein Passwort und mindestens einen Passkey haben.
+        - Das aktuelle Passwort muss bestaetigt werden.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/delete":
+    post:
+      tags:
+      - Users
+      operationId: deleteMyAccount
+      requestBody:
+        "$ref": "#/components/requestBodies/DeleteMyAccount"
+      responses:
+        '204':
+          description: Account deleted and anonymized.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Eigenen Account löschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss per Passwort oder Passkey frisch bestaetigt werden.
+      - Der letzte aktive ServerOwner darf nicht gelöscht werden.
+      - Pro Tenant muss mindestens ein aktiver TenantOwner verbleiben.
+      description: |-
+        Löscht den eigenen globalen Account. User-private Inhalte werden entfernt,
+        tenant-sichtbare Attributionen werden auf den globalen gelöschten Benutzer
+        übertragen und die E-Mail-Adresse wird für spätere Nutzung freigegeben.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss per Passwort oder Passkey frisch bestaetigt werden.
+        - Der letzte aktive ServerOwner darf nicht gelöscht werden.
+        - Pro Tenant muss mindestens ein aktiver TenantOwner verbleiben.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys":
+    get:
+      tags:
+      - Users
+      operationId: listMyPasskeys
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkeys"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigene Passkeys auflisten
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene Passkeys auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+    post:
+      tags:
+      - Users
+      operationId: createMyPasskey
+      requestBody:
+        "$ref": "#/components/requestBodies/CreatePasskey"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkey"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Eigenen Passkey speichern
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.
+      description: |-
+        Eigenen Passkey speichern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Zuvor muss eine Passkey-Registrierungs-Challenge erzeugt worden sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys/options":
+    post:
+      tags:
+      - Users
+      operationId: createMyPasskeyOptions
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Passkey-Registrierungs-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passkey-Registrierungs-Challenge erzeugen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys/{passkeyId}":
+    put:
+      tags:
+      - Users
+      operationId: updateMyPasskey
+      parameters:
+      - "$ref": "#/components/parameters/PasskeyId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePasskey"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Passkey"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenen Passkey umbenennen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Passkey muss dem aktuellen Benutzer gehoeren.
+      description: |-
+        Eigenen Passkey umbenennen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Passkey muss dem aktuellen Benutzer gehoeren.
+
+        Implementierungsstatus: implemented.
+  "/api/users/me/passkeys/{passkeyId}/delete":
+    post:
+      tags:
+      - Users
+      operationId: deleteMyPasskey
+      parameters:
+      - "$ref": "#/components/parameters/PasskeyId"
+      requestBody:
+        "$ref": "#/components/requestBodies/DeleteMyPasskey"
+      responses:
+        '200':
+          "$ref": "#/components/responses/SimpleUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Eigenen Passkey loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der Passkey muss dem aktuellen Benutzer gehoeren.
+      - Der aktuelle Benutzer muss per Passkey bestaetigt werden.
+      - Nach der Loeschung muss mindestens eine Login-Methode verbleiben.
+      description: |-
+        Eigenen Passkey nach frischer Passkey-Bestaetigung loeschen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Passkey muss dem aktuellen Benutzer gehoeren.
+        - Der aktuelle Benutzer muss per Passkey bestaetigt werden.
+        - Nach der Loeschung muss mindestens eine Login-Methode verbleiben.
+
+        Implementierungsstatus: implemented.
+  "/api/users/password/forgot":
+    post:
+      tags:
+        - Users
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/ForgotPassword"
+      responses:
+        '204':
+          description: Email sent.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+      summary: Passwort-Reset anfordern
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passwort-Reset anfordern.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/password/reset":
+    post:
+      tags:
+        - Users
+      operationId: resetMyPassword
+      security: []
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/ResetPassword"
+      responses:
+        '204':
+          description: Password reset.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Passwort zuruecksetzen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Passwort zuruecksetzen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der Reset-Token muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/passkeys/forgot":
+    post:
+      tags:
+        - Users
+      operationId: forgotPasskey
+      security: []
+      requestBody:
+        "$ref": "#/components/requestBodies/ForgotPassword"
+      responses:
+        '204':
+          description: Passkey reset email sent.
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+      summary: Passkey-Reset anfordern
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Passkey-Reset anfordern.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/passkeys/reset/options":
+    post:
+      tags:
+        - Users
+      operationId: createResetPasskeyOptions
+      security: []
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyResetOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Passkey-Reset-Registrierungs-Challenge erzeugen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+      description: |-
+        Erzeugt eine Registrierungs-Challenge fuer einen Passkey-Reset.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/passkeys/reset":
+    post:
+      tags:
+        - Users
+      operationId: resetMyPasskey
+      security: []
+      parameters:
+        - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/ResetPasskey"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Passkey zuruecksetzen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+        - Zuvor muss eine Passkey-Reset-Registrierungs-Challenge erzeugt worden sein.
+      description: |-
+        Legt einen neuen Passkey fuer die aktuelle Domain an, ersetzt vorhandene Passkeys dieser Domain und setzt normale Auth-Cookies.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Der Reset-Token muss gueltig und fuer die aktuelle Domain ausgestellt sein.
+        - Zuvor muss eine Passkey-Reset-Registrierungs-Challenge erzeugt worden sein.
+
+        Implementierungsstatus: implemented.
+  "/api/{tenantName}/profiles/{userPermalink}":
+    get:
+      tags:
+        - Profiles
+      operationId: getUserProfile
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/UserPermalink"
+      responses:
+        '200':
+          "$ref": "#/components/responses/UserProfile"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Öffentliches User-Profil im Tenant abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+      description: |-
+        Liefert die Kopfdaten eines im Tenant sichtbaren User-Profils und die sichtbaren root-Memories, bei denen dieser User explizit Teilnehmer ist. Child-Memories werden auf ihre naechste sichtbare root-Memory abgebildet und dedupliziert.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+
+        Implementierungsstatus: implemented.
+  "/api/{tenantName}/profiles/{userPermalink}/avatar":
+    get:
+      tags:
+        - Profiles
+      operationId: getUserProfileAvatar
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/UserPermalink"
+      responses:
+        '200':
+          "$ref": "#/components/responses/AvatarImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Profilbild im Tenant abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+        - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.
+      description: |-
+        Liefert das Profilbild eines im Tenant sichtbaren User-Profils. Unsichtbare Profile und Profile ohne Bild werden als nicht gefunden behandelt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des adressierten Tenants sein.
+        - Das Profil muss im adressierten Tenant sichtbar sein und ein Profilbild besitzen.
+
+        Implementierungsstatus: implemented.
+  "/api/users":
+    get:
+      tags:
+      - Users
+      operationId: getAllUsers
+      responses:
+        '200':
+          "$ref": "#/components/responses/ManagedUsers"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Verwaltete Benutzer auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      description: |-
+        Verwaltete Benutzer auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Users
+      operationId: createManagedUser
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateManagedUser"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ManagedUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Globalen Pending-User anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      description: |-
+        Globalen Pending-User anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/role":
+    put:
+      tags:
+      - Users
+      operationId: updateManagedUser
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateManagedUserRole"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ManagedUsers"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Server-Rolle eines Benutzers ändern
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      description: |-
+        Server-Rolle eines Benutzers ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/disable":
+    post:
+      tags:
+      - Users
+      operationId: disableManagedUser
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ManagedUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Benutzer deaktivieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      - Der letzte aktive ServerOwner darf nicht deaktiviert werden.
+      x-required-role: ServerOwner
+      description: |-
+        Deaktiviert einen globalen Benutzer. Sichtbare Attributionen bleiben erhalten,
+        bestehende Sessions werden widerrufen und neue Authentifizierung wird blockiert.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+        - Der letzte aktive ServerOwner darf nicht deaktiviert werden.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/enable":
+    post:
+      tags:
+      - Users
+      operationId: enableManagedUser
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/ManagedUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Benutzer reaktivieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      - Der Benutzer darf nicht gelöscht sein.
+      x-required-role: ServerOwner
+      description: |-
+        Reaktiviert einen deaktivierten globalen Benutzer. Gelöschte Benutzer können nicht
+        reaktiviert werden.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+        - Der Benutzer darf nicht gelöscht sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/invite/accept":
+    post:
+      tags:
+      - Users
+      operationId: acceptInvitation
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/AcceptInvitation"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Einladung annehmen und Passwort setzen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Einladung annehmen und Passwort setzen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/invite/metadata":
+    post:
+      tags:
+      - Users
+      operationId: invitationMetadata
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/InvitationMetadata"
+      responses:
+        '200':
+          "$ref": "#/components/responses/InvitationMetadata"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Einladungs-Metadaten laden
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Liefert minimale Einladungs-Metadaten fuer die Registrierungsoberflaeche.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: implemented.
+  "/api/users/{userId}/invite/passkey/options":
+    post:
+      tags:
+      - Users
+      operationId: createInvitationPasskeyOptions
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/PasskeyInvitationOptions"
+      responses:
+        '200':
+          "$ref": "#/components/responses/PasskeyRegistrationOptions"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Passkey-Optionen fuer Einladung erzeugen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Passkey-Optionen fuer Einladung erzeugen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: partial.
+  "/api/users/{userId}/invite/passkey/accept":
+    post:
+      tags:
+      - Users
+      operationId: acceptInvitationWithPasskey
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/AcceptPasskeyInvitation"
+      responses:
+        '200':
+          "$ref": "./common.openapi.yaml#/components/responses/LoginSession"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Einladung mit Passkey annehmen
+      x-implementation-status: partial
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+      description: |-
+        Einladung mit Passkey annehmen.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Die Invitation muss existieren, nicht abgelaufen, nicht widerrufen und noch nicht akzeptiert sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: VEYQ_ACCESS_TOKEN
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Internal ID of the current user
+      example: 12345
+    PasskeyId:
+      name: passkeyId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+      description: Internal ID of an own passkey
+      example: 12
+    UserPermalink:
+      name: userPermalink
+      in: path
+      required: true
+      schema:
+        "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+      description: Public user profile permalink.
+      example: kevin
+
+  requestBodies:
+    UpdateUserSettings:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateUserSettingsRequest"
+          example:
+            displayName: Kevin Raddatz
+            permalink: kevin
+            email: kevin@example.test
+    UploadAvatar:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: JPEG or PNG profile image up to 5 MB.
+          example:
+            file: "<binary image bytes>"
+
+    ChangePassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ChangePasswordRequest"
+          example:
+            currentPassword: admin1234567
+            newPassword: new-admin1234567
+    DeleteMyPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/DeleteMyPasswordRequest"
+          example:
+            password: current-password
+    DeleteMyAccount:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/DeleteMyAccountRequest"
+          example:
+            password: current-password
+    DeleteMyPasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/DeleteMyPasskeyRequest"
+          example:
+            passkey:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                authenticatorData: authenticator-data
+                signature: signature
+    CreatePasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreatePasskeyRequest"
+          example:
+            displayName: MacBook Touch ID
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
+    UpdatePasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdatePasskeyRequest"
+          example:
+            displayName: MacBook Touch ID
+
+    ConfirmEmailChange:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ConfirmEmailChangeRequest"
+          example:
+            token: email-change-token
+
+    ResetPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ResetPasswordRequest"
+          example:
+            password: welcome123456
+            token: reset-token
+
+    ForgotPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ForgotPasswordRequest"
+          example:
+            email: kevin@example.test
+
+    PasskeyResetOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyResetOptionsRequest"
+          example:
+            token: reset-token
+
+    ResetPasskey:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ResetPasskeyRequest"
+          example:
+            displayName: Apple Passwords
+            token: reset-token
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
+
+    CreateManagedUser:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateManagedUserRequest"
+          example:
+            email: invitee@example.test
+
+    UpdateManagedUserRole:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateManagedUserRoleRequest"
+          example:
+            serverRole: ServerMember
+
+    AcceptInvitation:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AcceptInvitationRequest"
+          example:
+            displayName: Invitee
+            password: welcome123456
+            token: invitation-token
+    InvitationMetadata:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/InvitationMetadataRequest"
+          example:
+            token: invitation-token
+    PasskeyInvitationOptions:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyInvitationOptionsRequest"
+          example:
+            token: invitation-token
+    AcceptPasskeyInvitation:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/AcceptPasskeyInvitationRequest"
+          example:
+            displayName: Invitee
+            token: invitation-token
+            credential:
+              id: credential-id
+              rawId: credential-id
+              type: public-key
+              response:
+                clientDataJSON: client-data
+                attestationObject: attestation-object
+
+  responses:
+    ManagedUsers:
+      description: Managed users.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ManagedUsersSummary"
+          example:
+            users:
+            - userId: 2
+              email: invitee@example.test
+              displayName: Invitee
+              serverRole: ServerMember
+              status: Pending
+              tenants:
+              - tenantId: 42
+                name: friends
+                displayName: Friends
+
+    ManagedUser:
+      description: Managed user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ManagedUserSummary"
+          example:
+            userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            serverRole: ServerMember
+            status: Pending
+            tenants:
+            - tenantId: 42
+              name: friends
+              displayName: Friends
+
+    InvitationMetadata:
+      description: Invitation metadata.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/InvitationMetadataResponse"
+          example:
+            email: invitee@example.test
+
+    SimpleUser:
+      description: Simple user
+      content:
+        application/json:
+          schema:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+          example:
+            userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            permalink: kevin
+            avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+            serverRole: ServerOwner
+            passkeyCount: 1
+            hasPassword: true
+    UserProfile:
+      description: Public user profile.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UserProfileSummary"
+          example:
+            displayName: Kevin
+            permalink: kevin
+            initials: KR
+            avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+            memories:
+              - id: mem_abc123
+                parentId: null
+                name: summer-trip
+                displayName: Summer Trip
+                path: /summer-trip
+                startDate: "2026-05-03"
+                endDate: "2026-05-05"
+                childCount: 1
+                mediaCount: 12
+                favorite: true
+    Passkeys:
+      description: Own passkeys.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeysSummary"
+          example:
+            passkeys:
+            - passkeyId: 12
+              displayName: MacBook Touch ID
+              createdAt: "2026-05-22T10:00:00Z"
+              lastUsedAt: "2026-05-22T10:05:00Z"
+    Passkey:
+      description: Own passkey.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeySummary"
+          example:
+            passkeyId: 12
+            displayName: MacBook Touch ID
+            createdAt: "2026-05-22T10:00:00Z"
+            lastUsedAt: null
+    PasskeyRegistrationOptions:
+      description: Passkey registration options.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PasskeyRegistrationOptionsResponse"
+          example:
+            challenge: challenge
+            timeout: 300000
+            attestation: none
+    AvatarImage:
+      description: Profile avatar image.
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+          example: "<binary jpeg avatar>"
+        image/png:
+          schema:
+            type: string
+            format: binary
+          example: "<binary png avatar>"
+
+  schemas:
+    UserStatus:
+      type: string
+      enum:
+        - Pending
+        - Active
+        - Disabled
+        - Deleted
+
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - password
+        - token
+      properties:
+        password:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+        token:
+          type: string
+      example:
+        password: welcome123456
+
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: kevin@example.test
+
+    PasskeyResetOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: reset-token
+
+    ResetPasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - credential
+      properties:
+        token:
+          type: string
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        token: reset-token
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object
+
+    UpdateUserSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - permalink
+        - email
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        displayName: Kevin Raddatz
+        permalink: kevin
+        email: kevin@example.test
+
+    UserProfileSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - permalink
+        - initials
+        - memories
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        permalink:
+          "$ref": "./common.openapi.yaml#/components/schemas/Permalink"
+        initials:
+          type: string
+          minLength: 1
+          maxLength: 4
+        avatarUrl:
+          type: string
+          nullable: true
+        memories:
+          type: array
+          description: Visible root Memories where this profile user participates. Child-Memory participation is represented by the nearest visible root Memory.
+          items:
+            "$ref": "./memories.openapi.yaml#/components/schemas/MemorySummary"
+      example:
+        displayName: Kevin
+        permalink: kevin
+        initials: K
+        avatarUrl: /api/friends/profiles/kevin/avatar?v=2026-05-27T10%3A00%3A00Z
+        memories: []
+
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+          description: Required when the user already has a password. Omitted when setting the first password for a passkey-only account.
+        newPassword:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+      example:
+        currentPassword: admin1234567
+        newPassword: new-admin1234567
+
+    DeleteMyPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          description: Current password.
+      example:
+        password: current-password
+
+    DeleteMyAccountRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        password:
+          type: string
+          description: Current password. Required unless a passkey assertion is supplied.
+        passkey:
+          "$ref": "#/components/schemas/PasskeyLoginRequest"
+      example:
+        password: current-password
+
+    DeleteMyPasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - passkey
+      properties:
+        passkey:
+          "$ref": "#/components/schemas/PasskeyLoginRequest"
+      example:
+        passkey:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            authenticatorData: authenticator-data
+            signature: signature
+
+    ConfirmEmailChangeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: email-change-token
+    PasskeysSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeys
+      properties:
+        passkeys:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PasskeySummary"
+      example:
+        passkeys:
+          - passkeyId: 12
+            displayName: MacBook Touch ID
+            createdAt: "2026-05-22T10:00:00Z"
+            lastUsedAt: "2026-05-22T10:05:00Z"
+    PasskeySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - passkeyId
+        - displayName
+        - createdAt
+      properties:
+        passkeyId:
+          type: integer
+          format: int64
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        createdAt:
+          type: string
+        lastUsedAt:
+          type: string
+        domain:
+          type: string
+          nullable: true
+      example:
+        passkeyId: 12
+        displayName: MacBook Touch ID
+        createdAt: "2026-05-22T10:00:00Z"
+        lastUsedAt: null
+        domain: memories.raddatz.me
+    PasskeyRegistrationOptionsResponse:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialCreationOptions encoded for browser WebAuthn APIs.
+      example:
+        challenge: challenge
+        timeout: 300000
+        attestation: none
+    CreatePasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - credential
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object
+    UpdatePasskeyRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        displayName: MacBook Touch ID
+    PasskeyRegistrationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - rawId
+        - type
+        - response
+      properties:
+        id:
+          type: string
+        rawId:
+          type: string
+        type:
+          type: string
+        response:
+          "$ref": "#/components/schemas/PasskeyAttestationResponse"
+      example:
+        id: credential-id
+        rawId: credential-id
+        type: public-key
+        response:
+          clientDataJSON: client-data
+          attestationObject: attestation-object
+    PasskeyAttestationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - clientDataJSON
+        - attestationObject
+      properties:
+        clientDataJSON:
+          type: string
+        attestationObject:
+          type: string
+      example:
+        clientDataJSON: client-data
+        attestationObject: attestation-object
+    PasskeyLoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - rawId
+        - type
+        - response
+      properties:
+        id:
+          type: string
+        rawId:
+          type: string
+        type:
+          type: string
+        response:
+          "$ref": "#/components/schemas/PasskeyAssertionResponse"
+      example:
+        id: credential-id
+        rawId: credential-id
+        type: public-key
+        response:
+          clientDataJSON: client-data
+          authenticatorData: authenticator-data
+          signature: signature
+    PasskeyAssertionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - clientDataJSON
+        - authenticatorData
+        - signature
+      properties:
+        clientDataJSON:
+          type: string
+        authenticatorData:
+          type: string
+        signature:
+          type: string
+        userHandle:
+          type: string
+      example:
+        clientDataJSON: client-data
+        authenticatorData: authenticator-data
+        signature: signature
+
+    ManagedUserTenantSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - tenantId
+        - name
+        - displayName
+      properties:
+        tenantId:
+          type: integer
+          format: int64
+        name:
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        tenantId: 42
+        name: friends
+        displayName: Friends
+
+    ManagedUsersSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - users
+      properties:
+        users:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ManagedUserSummary"
+      example:
+        users:
+          - userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            serverRole: ServerMember
+            status: Pending
+            tenants:
+              - tenantId: 42
+                name: friends
+                displayName: Friends
+
+    ManagedUserSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - email
+        - displayName
+        - serverRole
+        - status
+        - tenants
+      properties:
+        userId:
+          type: integer
+          format: int64
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        serverRole:
+          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
+        status:
+          "$ref": "#/components/schemas/UserStatus"
+        tenants:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ManagedUserTenantSummary"
+      example:
+        userId: 2
+        email: invitee@example.test
+        displayName: Invitee
+        serverRole: ServerMember
+        status: Pending
+        tenants:
+          - tenantId: 42
+            name: friends
+            displayName: Friends
+
+    CreateManagedUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: invitee@example.test
+
+    UpdateManagedUserRoleRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - serverRole
+      properties:
+        serverRole:
+          "$ref": "./common.openapi.yaml#/components/schemas/ServerRole"
+      example:
+        serverRole: ServerMember
+
+    AcceptInvitationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        password:
+          "$ref": "./common.openapi.yaml#/components/schemas/Password"
+        token:
+          type: string
+      example:
+        displayName: Invitee
+        password: welcome123456
+        token: invitation-token
+    InvitationMetadataRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: invitation-token
+    InvitationMetadataResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        email: invitee@example.test
+    PasskeyInvitationOptionsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+      example:
+        token: invitation-token
+    AcceptPasskeyInvitationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+        - token
+        - credential
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        passkeyDisplayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        token:
+          type: string
+        credential:
+          "$ref": "#/components/schemas/PasskeyRegistrationRequest"
+      example:
+        displayName: Invitee
+        token: invitation-token
+        credential:
+          id: credential-id
+          rawId: credential-id
+          type: public-key
+          response:
+            clientDataJSON: client-data
+            attestationObject: attestation-object

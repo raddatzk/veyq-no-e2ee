@@ -1,0 +1,113 @@
+id: memory.media-upload-eta
+title: Media Upload ETA
+status: implemented
+capabilities:
+  - memory.media-upload-eta
+productArea: Client-side remaining-time estimates for active uploads.
+entryPoints:
+  - frontend/src/features/memories/composables/useUploadQueue.ts
+  - frontend/src/features/memories/components/UploadStatusMenu.vue
+acceptanceCriteria:
+  - id: memory.media-upload-eta.queue-progress-visible
+    statement: Active upload queue exposes progress and ETA state in UI.
+    coverage:
+      frontend:
+        unit:
+          - testName: uploads files sequentially and tracks status progress
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: renders remaining time for active uploads
+            kind: positive
+            ref: frontend/src/features/memories/components/UploadStatusMenu.test.ts
+          - testName: runs multiple started batches through the same sequential runner
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: orders batches by start time for queue display
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: calls onFileComplete for successful uploads only
+            kind: negative
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: cancels all active and queued uploads
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: keeps interrupted browser uploads queued while the tab is alive
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: marks failed uploads and cancels the remaining queued files in the batch
+            kind: negative
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: exposes visible active queue counts
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: estimates remaining upload time from measured progress
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: uses active upload speed for batch remaining time including queued files
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+          - testName: does not count resumed bytes as newly transferred speed
+            kind: negative
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+      ios:
+        unit:
+          - testName: testUploadQueueItemDecodesLegacyQueueWithoutProgressMetadata
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadQueuePresenterShowsEtaForActiveUpload
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadQueuePresenterDetectsStalledUpload
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-upload-eta.popover-live-updates
+    statement: Upload popover updates as uploads start and finish.
+    coverage:
+      frontend:
+        unit:
+          - testName: updates the open upload popover when a new upload starts
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+          - testName: updates the open upload popover and badge as uploads finish
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+          - testName: shows upload batches in queue order when a later upload is added
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+          - testName: closes the upload popover with escape and outside click
+            kind: negative
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+  - id: memory.media-upload-eta.cancel-active-uploads
+    statement: Active uploads expose cancel actions.
+    coverage:
+      frontend:
+        unit:
+          - testName: cancels individual queued and active files
+            kind: positive
+            ref: frontend/src/features/memories/composables/useUploadQueue.test.ts
+  - id: memory.media-upload-eta.capability-visible
+    statement: Upload ETA capability is visible to regular users.
+    coverage:
+      backend:
+        unit:
+          - testName: upload eta capability is visible to regular users
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/settings/CapabilityRegistryTest.kt
+  - id: memory.media-upload-eta.capability-announced
+    statement: Upload ETA capability is announced as new.
+    coverage:
+      backend:
+        unit:
+          - testName: upload eta capability is announced as new
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/settings/CapabilityRegistryTest.kt
+      frontend:
+        unit:
+          - testName: shows capability notifications behind a topbar mail icon
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+  - id: memory.media-upload-eta.unknown-stalled-display
+    statement: Unknown or stalled upload ETA states remain understandable to users.
+    gaps:
+      - reason: No current test proves unknown or stalled ETA display behavior.
+        followUp: Add frontend.unit coverage for unknown and stalled upload ETA states.

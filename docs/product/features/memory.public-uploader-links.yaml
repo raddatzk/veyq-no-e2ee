@@ -1,0 +1,89 @@
+id: memory.public-uploader-links
+title: Public Uploader Links
+status: implemented
+capabilities:
+  - memory.public-uploader-links
+  - memory.public-sharing
+  - memory.media-resumable-upload
+productArea: Upload-only public links.
+entryPoints:
+  - docs/api/shares.openapi.yaml
+  - frontend/src/views/PublicShareView.vue
+acceptanceCriteria:
+  - id: memory.public-uploader-links.no-full-view
+    statement: Uploader-only shares cannot load full Memory view.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader cannot load full memory view
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.no-header
+    statement: Uploader-only shares cannot load public Memory header.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader cannot load public share memory header
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.no-journal
+    statement: Uploader-only shares cannot read journal.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader only share cannot read journal
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.no-playlists
+    statement: Uploader-only shares cannot read playlists.
+    coverage:
+      backend:
+        integration:
+          - testName: public share viewers can read playlists but uploader only shares cannot
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.no-zip
+    statement: Uploader-only shares cannot download ZIP.
+    coverage:
+      backend:
+        integration:
+          - testName: viewer share can download visible original media as zip and uploader share cannot
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.own-media-only
+    statement: Uploader shares see only their own uploaded media.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader share sees only own uploaded media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.upload-flow
+    statement: Uploader-only public share can upload without exposing gallery.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader share can complete root resumable media upload
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+      frontend:
+        integration:
+          - testName: major line 1 uploader-only public share uploads without exposing the gallery
+            kind: positive
+            ref: frontend/e2e/major-1-smoke.spec.ts
+  - id: memory.public-uploader-links.session-isolation
+    statement: Upload sessions are isolated by share identity and share id.
+    coverage:
+      backend:
+        integration:
+          - testName: public share upload sessions are isolated by share identity and share id
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-uploader-links.share-request-ui
+    statement: Memory detail can open uploader share requests from the header action.
+    coverage:
+      frontend:
+        unit:
+          - testName: opens uploader share requests from the header action
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts

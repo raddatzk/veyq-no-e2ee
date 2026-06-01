@@ -1,0 +1,84 @@
+id: memory.journal-live-sync
+title: Memory Journal Live Sync
+status: implemented
+capabilities:
+  - memory.journal-live-sync
+productArea: Collaborative Markdown journals.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+  - frontend/src/features/memories/components/MemoryJournalLiveEditor.vue
+acceptanceCriteria:
+  - id: memory.journal-live-sync.internal-session
+    statement: Visible internal Memory journals can issue short-lived live editing sessions bound to one journal document.
+    coverage:
+      backend:
+        integration:
+          - testName: creates and validates an internal journal live session
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-live-sync.snapshot-validation
+    statement: Live snapshots persist only when Markdown and veyq `::` embeds pass the existing journal validation rules.
+    coverage:
+      backend:
+        integration:
+          - testName: rejects invalid journal live snapshot without replacing current markdown
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-live-sync.public-manager
+    statement: Public Manager shares can create live journal sessions while non-manager roles cannot.
+    coverage:
+      backend:
+        integration:
+          - testName: public share journal live sessions require manager access
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.journal-live-sync.ui-editor
+    statement: The web Journal editor uses live sync when a session is available and falls back to REST editing when it is not.
+    coverage:
+      frontend:
+        unit:
+          - testName: starts a journal live session when editing
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: falls back to textarea journal editing when live session creation fails
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: falls back to textarea journal editing when live editor cannot connect
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: marks local edits as saved after the live snapshot debounce window
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: shows an edit action after media tags without adding it to markdown
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: shows compact chips for chapter playlist and track embeds
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: opens embed picker events for typed journal embed triggers
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: highlights a pill on first backspace and deletes it on the second backspace
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: highlights a pill on first delete and deletes it on the second delete
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+  - id: memory.journal-live-sync.sidecar-runtime
+    statement: The collaboration sidecar starts with the supported Hocuspocus server API and keeps journal documents in memory only while active.
+    coverage:
+      collaboration:
+        unit:
+          - testName: uses the current Hocuspocus server constructor API
+            kind: positive
+            ref: collaboration/test/serverApi.test.js
+          - testName: authenticates without counting a connection until the connected hook runs
+            kind: positive
+            ref: collaboration/test/documentRegistry.test.js
+          - testName: persists changed markdown once on disconnect and evicts idle documents
+            kind: positive
+            ref: collaboration/test/documentRegistry.test.js
+          - testName: stores debounced snapshots with the latest document text
+            kind: positive
+            ref: collaboration/test/documentRegistry.test.js

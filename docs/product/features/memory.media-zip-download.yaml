@@ -1,0 +1,56 @@
+id: memory.media-zip-download
+title: Memory Media ZIP Downloads
+status: implemented
+capabilities:
+  - memory.media-zip-download
+productArea: ZIP downloads for direct and descendant Memory media.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+acceptanceCriteria:
+  - id: memory.media-zip-download.private-direct-and-descendants
+    statement: Private ZIP download includes direct media and optional descendant media.
+    coverage:
+      backend:
+        integration:
+          - testName: downloads original media as zip with optional descendants and unique filenames
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-zip-download.unique-filenames
+    statement: ZIP archive filenames are unique.
+    coverage:
+      backend:
+        integration:
+          - testName: downloads original media as zip with optional descendants and unique filenames
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-zip-download.public-viewer-download
+    statement: Public viewer shares can download visible original media as ZIP.
+    coverage:
+      backend:
+        integration:
+          - testName: viewer share can download visible original media as zip and uploader share cannot
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.media-zip-download.public-uploader-denied
+    statement: Uploader-only shares cannot download ZIP archives.
+    coverage:
+      backend:
+        integration:
+          - testName: viewer share can download visible original media as zip and uploader share cannot
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.media-zip-download.private-ui-download
+    statement: Memory detail exposes direct and subtree original archive download choices.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows download choices for direct and subtree original archives
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: uses public share download urls and can hide the download action
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+gaps:
+  - reason: Private ZIP download has backend coverage but no browser UI coverage yet.
+    followUp: Add frontend.integration or e2e.browser coverage if the private ZIP action becomes a critical UI workflow.

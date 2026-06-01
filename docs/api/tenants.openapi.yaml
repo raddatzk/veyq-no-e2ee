@@ -1,0 +1,1156 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Tenants API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer veyq Tenants API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+- url: "/"
+security:
+- accessTokenCookie: []
+tags:
+- name: Tenants
+paths:
+  "/api/tenants":
+    get:
+      tags:
+      - Tenants
+      operationId: myTenants
+      responses:
+        '200':
+          "$ref": "#/components/responses/Tenants"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+      summary: Eigene Tenants auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      description: |-
+        Eigene Tenants auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: partial.
+    post:
+      tags:
+      - Tenants
+      operationId: createTenant
+      requestBody:
+        "$ref": "#/components/requestBodies/CreateTenant"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantCreation"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Tenant anlegen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss ServerOwner sein.
+      x-required-role: ServerOwner
+      description: |-
+        Tenant anlegen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss ServerOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}":
+    delete:
+      tags:
+      - Tenants
+      operationId: deleteTenant
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '204':
+          description: Tenant deleted.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant löschen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant rekursiv und final löschen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/settings":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantSettings
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Einstellungen abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Einstellungen abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantSettings
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateTenantSettings"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Einstellungen aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Einstellungen aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/logo":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantLogoImage"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Logo abrufen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der Tenant muss ein Logo besitzen.
+      description: |-
+        Liefert das Tenant-Logo fuer Navigation und Tenant-Einstellungen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der Tenant muss ein Logo besitzen.
+
+        Implementierungsstatus: implemented.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UploadTenantLogo"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '413':
+          "$ref": "./common.openapi.yaml#/components/responses/413"
+      summary: Tenant-Logo aktualisieren
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      description: |-
+        Speichert ein neues Tenant-Logo. Erlaubt sind JPEG- und PNG-Dateien bis 5 MB. Das alte Logo wird ersetzt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: implemented.
+    delete:
+      tags:
+      - Tenants
+      operationId: deleteTenantLogo
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+      summary: Tenant-Logo loeschen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner sein.
+      description: |-
+        Entfernt das Tenant-Logo und setzt die Navigation auf den Initialen-Fallback zurueck.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner sein.
+
+        Implementierungsstatus: implemented.
+  "/api/tenants/{tenantName}/me":
+    get:
+      tags:
+      - Tenants
+      operationId: getTenantUserSettings
+      parameters:
+      - "$ref": "#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUserSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Benutzereinstellungen im Tenant abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Benutzereinstellungen im Tenant abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantUserSettings
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUserSettings"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Benutzereinstellungen im Tenant aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Benutzereinstellungen im Tenant aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users":
+    get:
+      tags:
+      - Tenants
+      operationId: tenantUsers
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUsers"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Mitglieder auflisten
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Mitglieder auflisten.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/invite":
+    post:
+      tags:
+      - Tenants
+      operationId: inviteTenantUser
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      requestBody:
+        "$ref": "#/components/requestBodies/InviteTenantUser"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: User in Tenant einladen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      x-required-membership: TenantMember
+      description: |-
+        User per E-Mail mit Zielrolle in Tenant einladen. Falls die E-Mail bereits
+        zu einem globalen User gehoert, wird dieser User eingeladen; andernfalls
+        wird ein globaler Pending-User angelegt.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}/reinvite":
+    post:
+      tags:
+      - Tenants
+      operationId: reinviteTenantUser
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Pending-User erneut einladen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      - Der User muss bereits Pending-Mitglied dieses Tenants sein.
+      x-required-membership: TenantMember
+      description: |-
+        Pending-User erneut einladen, ohne die Tenant-Rolle zu ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+        - Der User muss bereits Pending-Mitglied dieses Tenants sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}/role":
+    put:
+      tags:
+      - Tenants
+      operationId: updateTenantUserRole
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateTenantUserRole"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantUser"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Tenant-Rolle eines Mitglieds ändern
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      x-required-membership: TenantMember
+      description: |-
+        Tenant-Rolle eines Mitglieds ändern.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+
+        Implementierungsstatus: partial.
+  "/api/tenants/{tenantName}/users/{userId}":
+    delete:
+      tags:
+      - Tenants
+      operationId: removeTenantUser
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "#/components/parameters/UserId"
+      responses:
+        '204':
+          description: Tenant membership soft-removed.
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
+      summary: Tenant-Mitglied entfernen
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+      - Der User muss Mitglied dieses Tenants sein.
+      - Der letzte aktive TenantOwner darf nicht entfernt werden.
+      x-required-membership: TenantMember
+      description: |-
+        Entfernt einen User per Soft-Remove aus dem Tenant. Die globale Identitaet,
+        historische Medien- und Bucket-Zuordnungen bleiben erhalten, damit ein spaeterer
+        Wiedereintritt dieselben Inhalte wieder dem User zuordnen kann. Nur aktive
+        Memberships gewähren Tenant-Zugriff.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss TenantOwner im Tenant-Pfad sein.
+        - Der User muss Mitglied dieses Tenants sein.
+        - Der letzte aktive TenantOwner darf nicht entfernt werden.
+
+        Implementierungsstatus: implemented.
+  "/api/tenants/{tenantName}/{groupName}":
+    get:
+      tags:
+      - Tenants
+      operationId: getGroupSettings
+      parameters:
+      - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+      - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantGroupSettings"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppen-Einstellungen abrufen
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen-Einstellungen abrufen.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+
+        Implementierungsstatus: partial.
+    put:
+      tags:
+      - Tenants
+      operationId: updateGroupSettings
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "./common.openapi.yaml#/components/parameters/GroupName"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateGroupSettings"
+      responses:
+        '200':
+          "$ref": "#/components/responses/TenantGroupSettings"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Gruppen-Einstellungen aktualisieren
+      x-implementation-status: partial
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+      - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+      x-required-membership: TenantMember
+      description: |-
+        Gruppen-Einstellungen aktualisieren.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Benutzer muss Mitglied des Tenant-Pfads sein.
+        - Der aktuelle Benutzer muss GroupOwner der Zielgruppe sein.
+
+        Implementierungsstatus: partial.
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: VEYQ_ACCESS_TOKEN
+  parameters:
+    TenantName:
+      name: tenantName
+      in: path
+      required: true
+      schema:
+        type: string
+    GroupName:
+      name: groupName
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  requestBodies:
+    CreateTenant:
+      required: true
+      description: New tenant
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/CreateTenantRequest"
+          example:
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+
+    UpdateTenantSettings:
+      required: true
+      description: Update Tenant settings
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateTenantSettingsRequest"
+          example:
+            displayName: Friends & Family
+            termsMarkdownByLocale:
+              en: |-
+                # Terms for this area
+
+                Contact: Tenant Owner
+
+    UploadTenantLogo:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - file
+            properties:
+              file:
+                type: string
+                format: binary
+                description: JPEG or PNG tenant logo up to 5 MB.
+          example:
+            file: "<binary image bytes>"
+
+    UpdateGroupSettings:
+      required: true
+      description: Update group settings
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateGroupSettingsRequest"
+          example:
+            displayName: Friends & Family
+
+    UpdateTenantUserRole:
+      required: true
+      description: Update tenant user role
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateTenantUserRoleRequest"
+          example:
+            role: TenantMember
+    InviteTenantUser:
+      required: true
+      description: Invite user to tenant with target role
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/InviteTenantUserRequest"
+          example:
+            email: invitee@example.test
+            role: TenantMember
+
+  responses:
+    Tenants:
+      description: Tenants visible to the current user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantsSummary"
+          example:
+            tenants:
+              - id: 42
+                name: friends
+                displayName: Friends
+                domain: friends.example.test
+                role: TenantOwner
+                admins:
+                  - userId: 1
+                    email: kevin@example.test
+                    displayName: Kevin
+                    permalink: kevin
+                    serverRole: ServerOwner
+                    passkeyCount: 1
+                    hasPassword: true
+
+    Tenant:
+      description: Created tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantSummary"
+          example:
+            id: 42
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+            role: TenantOwner
+            admins:
+              - userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                permalink: kevin
+                serverRole: ServerOwner
+                passkeyCount: 1
+                hasPassword: true
+
+    TenantCreation:
+      description: Pending tenant creation.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantCreationResponse"
+          example:
+            id: 42
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+            status: Pending
+            invitedOwnerEmail: invitee@example.test
+
+    TenantSettings:
+      description: Tenant settings.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantSettingsResponse"
+          example:
+            tenantId: 42
+            name: friends
+            displayName: Friends
+            logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+            termsVersion: 1
+            termsMarkdownByLocale:
+              en: |-
+                # Terms for this area
+
+                Contact: Tenant Owner
+
+    TenantLogoImage:
+      description: Tenant logo image.
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+          example: "<binary jpeg logo>"
+        image/png:
+          schema:
+            type: string
+            format: binary
+          example: "<binary png logo>"
+
+    TenantUserSettings:
+      description: Current settings for a user in a tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUserSettingsResponse"
+          example:
+            tenantId: 42
+            tenantName: friends
+            userId: 1
+            displayName: Kevin
+
+    TenantGroupSettings:
+      description: Current settings for a group in a tenant.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantGroupSettingsResponse"
+          example:
+            groupId: 99
+            name: family
+            displayName: Family
+    TenantUsers:
+      description: Tenant users.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUsersSummary"
+          example:
+            users:
+              - userId: 2
+                email: invitee@example.test
+                displayName: Invitee
+                role: TenantMember
+                status: Pending
+    TenantUser:
+      description: Tenant user.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/TenantUserSummary"
+          example:
+            userId: 2
+            email: invitee@example.test
+            displayName: Invitee
+            role: TenantMember
+            status: Pending
+  schemas:
+    TenantRole:
+      type: string
+      enum:
+      - TenantOwner
+      - TenantMember
+    TenantUserStatus:
+      type: string
+      enum:
+      - Pending
+      - Active
+      - Disabled
+      - Removed
+    CreateTenantRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - displayName
+      - domain
+      - ownerEmail
+      properties:
+        name:
+          type: string
+          x-field-extra-annotation:
+            - '@field:com.veyq.api.common.validation.Normalize'
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        domain:
+          type: string
+          x-field-extra-annotation:
+            - '@field:com.veyq.api.common.validation.Host'
+        ownerEmail:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        name: friends
+        displayName: Friends
+        domain: friends.example.test
+        ownerEmail: owner@example.test
+    TenantCreationResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - domain
+      - status
+      - invitedOwnerEmail
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+        domain:
+          type: string
+        status:
+          "$ref": "#/components/schemas/TenantUserStatus"
+        invitedOwnerEmail:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+      example:
+        id: 42
+        name: friends
+        displayName: Friends
+        domain: friends.example.test
+        status: Pending
+        invitedOwnerEmail: owner@example.test
+    TenantSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - displayName
+      - domain
+      - role
+      - admins
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+        domain:
+          type: string
+        logoUrl:
+          type: string
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+        admins:
+          type: array
+          items:
+            "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+      example:
+        id: 42
+        name: friends
+        displayName: Friends
+        domain: friends.example.test
+        logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+        role: TenantOwner
+        admins:
+          - userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            permalink: kevin
+            serverRole: ServerOwner
+            passkeyCount: 1
+            hasPassword: true
+    TenantsSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - tenants
+      properties:
+        tenants:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TenantSummary"
+      example:
+        tenants:
+          - id: 42
+            name: friends
+            displayName: Friends
+            domain: friends.example.test
+            logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+            role: TenantOwner
+            admins:
+              - userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                permalink: kevin
+                serverRole: ServerOwner
+                passkeyCount: 1
+                hasPassword: true
+    TenantSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - tenantId
+      - name
+      - displayName
+      - termsVersion
+      properties:
+        tenantId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+        logoUrl:
+          type: string
+        termsVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        termsMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
+      example:
+        tenantId: 42
+        name: friends
+        displayName: Friends
+        logoUrl: /api/tenants/friends/logo?v=2026-05-27T10%3A00%3A00Z
+        termsVersion: 1
+        termsMarkdownByLocale:
+          en: |-
+            # Terms for this area
+
+            Contact: Tenant Owner
+    TenantUserSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - tenantId
+      - tenantName
+      - userId
+      - displayName
+      properties:
+        tenantId:
+          type: integer
+          format: int64
+        tenantName:
+          type: string
+        userId:
+          type: integer
+          format: int64
+        displayName:
+          type: string
+      example:
+        tenantId: 42
+        tenantName: friends
+        userId: 1
+        displayName: Kevin
+    TenantGroupSettingsResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - groupId
+      - name
+      - displayName
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayName:
+          type: string
+      example:
+        groupId: 99
+        name: family
+        displayName: Family
+    TenantUsersSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - users
+      properties:
+        users:
+          type: array
+          items:
+            "$ref": "#/components/schemas/TenantUserSummary"
+      example:
+        users:
+          - user:
+              userId: 2
+              displayName: Invitee
+              permalink: invitee
+            email: invitee@example.test
+            role: TenantMember
+            status: Pending
+    TenantUserSummary:
+      type: object
+      additionalProperties: false
+      required:
+      - user
+      properties:
+        user:
+          "$ref": "./common.openapi.yaml#/components/schemas/PublicUserSummary"
+        email:
+          description: Present only for tenant owners and server owners.
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        role:
+          description: Present only for tenant owners and server owners.
+          "$ref": "#/components/schemas/TenantRole"
+        status:
+          description: Present only for tenant owners and server owners.
+          "$ref": "#/components/schemas/TenantUserStatus"
+      example:
+        user:
+          userId: 2
+          displayName: Invitee
+          permalink: invitee
+        email: invitee@example.test
+        role: TenantMember
+        status: Pending
+    UpdateTenantSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+        termsMarkdownByLocale:
+          "$ref": "#/components/schemas/MarkdownByLocale"
+      example:
+        displayName: Friends & Family
+        termsMarkdownByLocale:
+          en: |-
+            # Terms for this area
+
+            Contact: Tenant Owner
+    MarkdownByLocale:
+      type: object
+      additionalProperties:
+        type: string
+        maxLength: 20000
+      example:
+        de: |-
+          # Hinweise
+
+          Kontakt: Tenant Owner
+        en: |-
+          # Terms
+
+          Contact: Tenant Owner
+    UpdateGroupSettingsRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - displayName
+      properties:
+        displayName:
+          "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
+      example:
+        displayName: Friends & Family
+    UpdateTenantUserRoleRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - role
+      properties:
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+      example:
+        role: TenantMember
+    InviteTenantUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - role
+      properties:
+        email:
+          "$ref": "./common.openapi.yaml#/components/schemas/EmailAddress"
+        role:
+          "$ref": "#/components/schemas/TenantRole"
+      example:
+        email: invitee@example.test
+        role: TenantMember

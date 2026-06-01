@@ -1,0 +1,238 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: veyq-traefik
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL:?Set LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+
+  veyq-db:
+    image: mariadb:10.11
+    container_name: veyq-db
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-veyq}
+      MARIADB_USER: ${DB_USER:-veyq}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
+    volumes:
+      - veyq-db:/var/lib/mysql
+
+  veyq:
+    image: ${VEYQ_IMAGE:?Set VEYQ_IMAGE}
+    container_name: veyq
+    environment:
+      DB_URL: jdbc:mariadb://veyq-db:3306/${DB_NAME:-veyq}
+      DB_USER: ${DB_USER:-veyq}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_ACCESS_TOKEN_NAME: ${COOKIE_ACCESS_TOKEN_NAME:-VEYQ_ACCESS_TOKEN}
+      COOKIE_REFRESH_TOKEN_NAME: ${COOKIE_REFRESH_TOKEN_NAME:-VEYQ_REFRESH_TOKEN}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_MINUTES: ${REFRESH_TOKEN_TTL_MINUTES:-43200}
+      ACCESS_TOKEN_AUDIT_TTL_DAYS: ${ACCESS_TOKEN_AUDIT_TTL_DAYS:-30}
+      REFRESH_TOKEN_AUDIT_TTL_DAYS: ${REFRESH_TOKEN_AUDIT_TTL_DAYS:-90}
+      TOKEN_CLEANUP_CRON: "${TOKEN_CLEANUP_CRON:-0 0 0 * * ?}"
+      INVITATION_TTL_DAYS: ${INVITATION_TTL_DAYS:-7}
+      EMAIL_CHANGE_TTL_HOURS: ${EMAIL_CHANGE_TTL_HOURS:-24}
+      RESET_PASSWORD_TTL_HOURS: ${RESET_PASSWORD_TTL_HOURS:-2}
+      USER_CLEANUP_CRON: "${USER_CLEANUP_CRON:-0 0 0 * * ?}"
+      USER_CLEANUP_RETENTION_DAYS: ${USER_CLEANUP_RETENTION_DAYS:-30}
+      ARGON2_TARGET_MS: ${ARGON2_TARGET_MS:-500}
+      ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-65536}
+      ARGON2_MIN_ITERATIONS: ${ARGON2_MIN_ITERATIONS:-2}
+      ARGON2_MAX_ITERATIONS: ${ARGON2_MAX_ITERATIONS:-10}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+      ARGON2_BENCHMARK_SAMPLES: ${ARGON2_BENCHMARK_SAMPLES:-2}
+      PWNED_PASSWORDS_ENABLED: ${PWNED_PASSWORDS_ENABLED:-true}
+      PWNED_PASSWORDS_ENDPOINT: ${PWNED_PASSWORDS_ENDPOINT:-https://api.pwnedpasswords.com/range}
+      PWNED_PASSWORDS_TIMEOUT_MS: ${PWNED_PASSWORDS_TIMEOUT_MS:-2000}
+      PWNED_PASSWORDS_FAIL_CLOSED: ${PWNED_PASSWORDS_FAIL_CLOSED:-false}
+      WEBAUTHN_RELYING_PARTY_NAME: ${WEBAUTHN_RELYING_PARTY_NAME:-veyq}
+      PROXY_ADDRESS_FORWARDING: ${PROXY_ADDRESS_FORWARDING:-true}
+      PROXY_ALLOW_X_FORWARDED: ${PROXY_ALLOW_X_FORWARDED:-true}
+      PROXY_ENABLE_FORWARDED_HOST: ${PROXY_ENABLE_FORWARDED_HOST:-true}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
+      MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
+      MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
+      MEDIA_UPLOAD_SESSION_CLEANUP_CRON: "${MEDIA_UPLOAD_SESSION_CLEANUP_CRON:-0 0 * * * ?}"
+      MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
+      FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
+      MEDIA_PREVIEW_TIMEOUT_SECONDS: ${MEDIA_PREVIEW_TIMEOUT_SECONDS:-15}
+      JOURNAL_LIVE_WEBSOCKET_URL: ${JOURNAL_LIVE_WEBSOCKET_URL:-/api/collaboration/journal}
+      JOURNAL_LIVE_TOKEN_SECRET: ${JOURNAL_LIVE_TOKEN_SECRET:-dev-only-change-me}
+      JOURNAL_LIVE_TOKEN_TTL_MINUTES: ${JOURNAL_LIVE_TOKEN_TTL_MINUTES:-15}
+      JOURNAL_LIVE_SIDECAR_SECRET: ${JOURNAL_LIVE_SIDECAR_SECRET:-}
+      VEYQ_SOURCE_URL: ${VEYQ_SOURCE_URL:-https://github.com/raddatzk/veyq}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD}
+      MAIL_LOGIN: ${MAIL_LOGIN:-REQUIRED}
+      MAIL_TLS: ${MAIL_TLS:-true}
+    expose:
+      - "8080"
+    volumes:
+      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
+        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
+        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
+    depends_on:
+      - veyq-db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.veyq.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}
+      - traefik.http.routers.veyq.entrypoints=websecure
+      - traefik.http.routers.veyq.tls.certresolver=letsencrypt
+      - traefik.http.services.veyq.loadbalancer.server.port=8080
+
+  veyq-collaboration:
+    image: ${VEYQ_COLLABORATION_IMAGE:-ghcr.io/raddatzk/veyq-collaboration:latest}
+    profiles: ["collaboration"]
+    container_name: veyq-collaboration
+    environment:
+      VEYQ_BACKEND_URL: http://veyq:8080
+      PORT: 8082
+      HEALTH_PORT: 8083
+      JOURNAL_SNAPSHOT_DEBOUNCE_MS: ${JOURNAL_SNAPSHOT_DEBOUNCE_MS:-750}
+      JOURNAL_DOCUMENT_IDLE_EVICTION_MS: ${JOURNAL_DOCUMENT_IDLE_EVICTION_MS:-300000}
+      JOURNAL_LIVE_SIDECAR_SECRET: ${JOURNAL_LIVE_SIDECAR_SECRET:-}
+    expose:
+      - "8082"
+      - "8083"
+    depends_on:
+      - veyq
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.veyq-collaboration.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE} && PathPrefix(`/api/collaboration/journal`)
+      - traefik.http.routers.veyq-collaboration.entrypoints=websecure
+      - traefik.http.routers.veyq-collaboration.tls.certresolver=letsencrypt
+      - traefik.http.services.veyq-collaboration.loadbalancer.server.port=8082
+
+  veyq-reset:
+    profiles: ["reset"]
+    build:
+      context: ./reset
+    container_name: veyq-reset
+    environment:
+      RESET_USERNAME: ${RESET_USERNAME:-}
+      RESET_PASSWORD: ${RESET_PASSWORD:-}
+      RESET_RESTART_CONTAINER: ${RESET_RESTART_CONTAINER:-veyq}
+      DB_HOST: veyq-db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-veyq}
+      DB_USER: ${DB_USER:-veyq}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
+    expose:
+      - "8081"
+    volumes:
+      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
+        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
+        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - veyq-db
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.veyq-reset.rule=${RESET_TRAEFIK_RULE:-}
+      - traefik.http.routers.veyq-reset.entrypoints=websecure
+      - traefik.http.routers.veyq-reset.tls.certresolver=letsencrypt
+      - traefik.http.services.veyq-reset.loadbalancer.server.port=8081
+
+  veyq-updater:
+    profiles: ["updater"]
+    image: alpine:3.22
+    container_name: veyq-updater
+    working_dir: /veyq
+    environment:
+      VEYQ_AUTO_UPDATE_ENABLED: ${VEYQ_AUTO_UPDATE_ENABLED:-false}
+      VEYQ_AUTO_UPDATE_INTERVAL_HOURS: ${VEYQ_AUTO_UPDATE_INTERVAL_HOURS:-6}
+      VEYQ_AUTO_UPDATE_JITTER_MINUTES: ${VEYQ_AUTO_UPDATE_JITTER_MINUTES:-30}
+      VEYQ_UPDATER_NOTIFY_TOKEN: ${VEYQ_UPDATER_NOTIFY_TOKEN:-}
+      VEYQ_INTERNAL_URL: http://veyq:8080
+      VEYQ_DIR: /veyq
+      VEYQ_UPDATER_UID: ${VEYQ_UPDATER_UID:-}
+      VEYQ_UPDATER_GID: ${VEYQ_UPDATER_GID:-}
+    volumes:
+      - ./:/veyq
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        apk add --no-cache bash curl docker-cli docker-cli-buildx docker-cli-compose su-exec >/dev/null
+
+        env_uid="$$(stat -c '%u' /veyq/.env 2>/dev/null || stat -c '%u' /veyq)"
+        env_gid="$$(stat -c '%g' /veyq/.env 2>/dev/null || stat -c '%g' /veyq)"
+        dir_uid="$$(stat -c '%u' /veyq)"
+        dir_gid="$$(stat -c '%g' /veyq)"
+        if [ "$$env_uid" = "0" ] && [ "$$dir_uid" != "0" ]; then
+          chown "$$dir_uid:$$dir_gid" /veyq/.env 2>/dev/null || true
+          env_uid="$$dir_uid"
+          env_gid="$$dir_gid"
+        fi
+
+        run_uid="$${VEYQ_UPDATER_UID:-$$env_uid}"
+        socket_gid="$$(stat -c '%g' /var/run/docker.sock 2>/dev/null || printf '%s' "$$env_gid")"
+        run_gid="$${VEYQ_UPDATER_GID:-$$socket_gid}"
+        group_name="$$(awk -F: -v gid="$$run_gid" '$$3 == gid { print $$1; exit }' /etc/group)"
+        if [ -z "$$group_name" ]; then
+          group_name="veyq-updater"
+          addgroup -g "$$run_gid" "$$group_name"
+        fi
+        if ! awk -F: -v uid="$$run_uid" '$$3 == uid { found = 1 } END { exit found ? 0 : 1 }' /etc/passwd; then
+          adduser -D -H -u "$$run_uid" -G "$$group_name" veyq-updater
+        fi
+        mkdir -p /veyq/logs /veyq/backups
+        chown "$$run_uid:$$run_gid" /veyq/logs /veyq/backups 2>/dev/null || true
+
+        while true; do
+          jitter_minutes="$${VEYQ_AUTO_UPDATE_JITTER_MINUTES:-30}"
+          if [ "$$jitter_minutes" -gt 0 ]; then
+            sleep "$$(awk -v max="$$jitter_minutes" 'BEGIN { srand(); print int(rand() * (max * 60 + 1)) }')"
+          fi
+          su-exec "$$run_uid:$$run_gid" /veyq/veyq-server.sh auto-upgrade || true
+          interval_hours="$${VEYQ_AUTO_UPDATE_INTERVAL_HOURS:-6}"
+          if [ "$$interval_hours" -lt 1 ]; then
+            interval_hours=1
+          fi
+          sleep "$$(( interval_hours * 3600 ))"
+        done
+
+volumes:
+  veyq-db:
+  veyq-media:
+  veyq-media-cifs:
+    driver: local
+    driver_opts:
+      type: cifs
+      o: ${MEDIA_CIFS_OPTIONS:-}
+      device: ${MEDIA_CIFS_DEVICE:-//example.invalid/veyq-media}
+  traefik-letsencrypt:

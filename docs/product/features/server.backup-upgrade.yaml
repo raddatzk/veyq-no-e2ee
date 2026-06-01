@@ -1,0 +1,32 @@
+id: server.backup-upgrade
+title: Server Backup And Upgrade
+status: implemented
+capabilities:
+  - server.backup-upgrade
+productArea: Helper-script backup and upgrade workflow.
+entryPoints:
+  - scripts/veyq-server.sh
+  - docs/development.md
+acceptanceCriteria:
+  - id: server.backup-upgrade.backup-before-upgrade
+    statement: Upgrade workflow should create a backup before replacing the app container.
+    gaps:
+      - reason: >-
+          No automated Feature Trust test currently proves backup-before-upgrade behavior; script references do not
+          count as coverage.
+        followUp: Add a fixture-based operator integration test or dedicated script test harness.
+  - id: server.backup-upgrade.media-and-db-covered
+    statement: Backup workflow should cover database and media storage.
+    gaps:
+      - reason: No automated Feature Trust test currently proves database and media backup coverage.
+        followUp: Add a restore-oriented operator test with fixture database and media storage.
+  - id: server.backup-upgrade.doctor-validation
+    statement: Operator should run doctor validation around env changes/upgrades.
+    gaps:
+      - reason: No automated Feature Trust test currently proves doctor validation around upgrades.
+        followUp: Add operator integration coverage for doctor checks before and after env changes.
+gaps:
+  - reason: >-
+      No automated tests currently prove backup/upgrade ACs; script and workflow references are intentionally not
+      counted as Feature Trust coverage.
+    followUp: Introduce real operator automation tests before marking this feature strongly covered.

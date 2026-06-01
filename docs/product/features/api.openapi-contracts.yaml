@@ -1,0 +1,81 @@
+id: api.openapi-contracts
+title: API-First OpenAPI Contracts
+status: implemented
+capabilities: []
+productArea: API-first OpenAPI contracts and generated backend/frontend API usage.
+entryPoints:
+  - docs/api
+  - backend/gradle/openapi.gradle.kts
+  - frontend/scripts/generate-openapi.mjs
+acceptanceCriteria:
+  - id: api.openapi-contracts.operation-quality
+    statement: OpenAPI operations carry descriptions, examples, preconditions and implementation status.
+    coverage:
+      backend:
+        integration:
+          - testName: openapi operations carry descriptions examples preconditions and implementation status
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.resources-covered
+    statement: Implemented backend resource endpoints are covered by OpenAPI specs.
+    coverage:
+      backend:
+        integration:
+          - testName: implemented backend resource endpoints are covered by openapi specs
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.stable-errors
+    statement: Common error response exposes stable codes and fallback messages.
+    coverage:
+      backend:
+        integration:
+          - testName: common error response exposes stable codes and fallback messages
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.generated-interfaces
+    statement: Backend resources implement generated OpenAPI interfaces.
+    coverage:
+      backend:
+        integration:
+          - testName: backend api resources implement their generated openapi interfaces
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.generated-models
+    statement: Generated interfaces use generated payload models for JSON contracts.
+    coverage:
+      backend:
+        integration:
+          - testName: generated interfaces use generated payload models for json contracts
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.shared-packages
+    statement: Backend OpenAPI code uses one shared generated API/model package.
+    coverage:
+      backend:
+        integration:
+          - testName: backend openapi code uses one shared generated api and model package
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: api.openapi-contracts.error-sanitization
+    statement: API errors expose stable codes and safe fallback messages without leaking implementation details.
+    coverage:
+      backend:
+        unit:
+          - testName: maps api exceptions with their stable code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: maps rate limits with retry after and stable code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: maps generic web exceptions to generic status codes
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: does not expose sql constraint details
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: does not expose unhandled exception details
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+gaps:
+  - reason: Generated frontend artifact freshness should be covered by a future deterministic validator.
+    followUp: Add the validator before treating frontend generation freshness as proven.

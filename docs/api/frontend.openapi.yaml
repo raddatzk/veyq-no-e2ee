@@ -1,0 +1,110 @@
+---
+openapi: 3.1.0
+info:
+  title: veyq Frontend API
+  version: 0.1.0
+  description: >-
+    API-first Zielvertrag fuer veyq Frontend API. Operationen enthalten Beispiele, Vorbedingungen und den aktuellen Implementierungsstatus.
+servers:
+  - url: "/"
+tags:
+  - name: Frontend
+paths:
+  "/api/frontend/bootstrap":
+    get:
+      tags:
+      - Frontend
+      operationId: entrypoint
+      summary: Frontend-Bootstrap laden
+      description: |-
+        Liefert die initialen Frontend-Daten fuer die aktuell angemeldete Session.
+
+        Vorbedingungen:
+        - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+        - Das initiale Setup muss abgeschlossen sein.
+
+        Implementierungsstatus: implemented.
+      x-implementation-status: implemented
+      x-preconditions:
+      - Ein gueltiger VEYQ_ACCESS_TOKEN Cookie muss vorhanden sein.
+      - Das initiale Setup muss abgeschlossen sein.
+      responses:
+        '200':
+          "$ref": "#/components/responses/Bootstrap"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+
+components:
+  responses:
+    Bootstrap:
+      description: Bootstrap information for the Frontend
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/BootstrapResponse"
+          example:
+            serverId: srv_123
+            user:
+              userId: 1
+              email: kevin@example.test
+              displayName: Kevin
+              permalink: kevin
+              serverRole: ServerOwner
+              passkeyCount: 1
+              hasPassword: true
+            tenants:
+            - id: 42
+              name: friends
+              displayName: Friends
+              domain: friends.example.test
+              role: TenantOwner
+              admins:
+              - userId: 1
+                email: kevin@example.test
+                displayName: Kevin
+                permalink: kevin
+                serverRole: ServerOwner
+                passkeyCount: 1
+                hasPassword: true
+
+  schemas:
+    BootstrapResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - serverId
+        - user
+        - tenants
+      properties:
+        serverId:
+          type: string
+        user:
+          "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
+        tenants:
+          type: array
+          items:
+            "$ref": "./tenants.openapi.yaml#/components/schemas/TenantSummary"
+      example:
+        serverId: srv_123
+        user:
+          userId: 1
+          email: kevin@example.test
+          displayName: Kevin
+          permalink: kevin
+          serverRole: ServerOwner
+          passkeyCount: 1
+          hasPassword: true
+        tenants:
+        - id: 42
+          name: friends
+          displayName: Friends
+          domain: friends.example.test
+          role: TenantOwner
+          admins:
+          - userId: 1
+            email: kevin@example.test
+            displayName: Kevin
+            permalink: kevin
+            serverRole: ServerOwner
+            passkeyCount: 1
+            hasPassword: true

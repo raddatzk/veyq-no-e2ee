@@ -1,0 +1,52 @@
+version: 2
+
+multi-ecosystem-groups:
+  app-runtime:
+    schedule:
+      interval: "daily"
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "app-runtime"
+    open-pull-requests-limit: 1
+
+  - package-ecosystem: "gradle"
+    directory: "/backend"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "app-runtime"
+    open-pull-requests-limit: 1
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "app-runtime"
+    open-pull-requests-limit: 1
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "app-runtime"
+    open-pull-requests-limit: 1
+
+  - package-ecosystem: "docker"
+    directory: "/infra/reset"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "app-runtime"
+    open-pull-requests-limit: 1
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 1

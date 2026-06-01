@@ -1,0 +1,317 @@
+name: Container
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+    tags:
+      - "v*"
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "!docs/api/**"
+      - "site/**"
+      - ".github"
+  pull_request:
+    branches:
+      - main
+      - "release/**"
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "!docs/api/**"
+      - "site/**"
+      - ".github"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('veyq-container-pr-{0}', github.event.pull_request.number) || 'veyq-container-release' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  version:
+    name: Compute veyq version
+    runs-on: ubuntu-latest
+    outputs:
+      major: ${{ steps.veyq-version.outputs.major }}
+      version: ${{ steps.veyq-version.outputs.version }}
+      publish_branch_tags: ${{ steps.veyq-version.outputs.publish_branch_tags }}
+      publish_latest: ${{ steps.veyq-version.outputs.publish_latest }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compute veyq version
+        id: veyq-version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          major="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$major" =~ ^[0-9]+$ ]]; then
+            echo "VERSION must contain a numeric major version, got: $major" >&2
+            exit 1
+          fi
+
+          publish_branch_tags=false
+          publish_latest=false
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            version="${major}.0"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            if [[ "$REF_NAME" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
+              version="${REF_NAME#v}"
+            else
+              version="${major}.0"
+            fi
+          else
+            if [[ "$REF_NAME" != "main" && "$REF_NAME" != "master" ]]; then
+              if [[ "$REF_NAME" =~ ^release/([0-9]+)\.x$ ]]; then
+                if [[ "${BASH_REMATCH[1]}" != "$major" ]]; then
+                  echo "Release branch $REF_NAME does not match VERSION major $major" >&2
+                  exit 1
+                fi
+              else
+                echo "Unsupported release branch: $REF_NAME" >&2
+                exit 1
+              fi
+            fi
+
+            versions_json="$(
+              gh api --paginate "/orgs/${OWNER}/packages/container/veyq/versions" 2>/dev/null ||
+                gh api --paginate "/users/${OWNER}/packages/container/veyq/versions" 2>/dev/null ||
+                printf '[]'
+            )"
+
+            highest="$(
+              jq -r --arg major "$major" '
+                if type == "array" then .[] else empty end |
+                .metadata?.container?.tags[]? |
+                select(test("^" + $major + "\\.[0-9]+$")) |
+                split(".")[1] |
+                tonumber
+              ' <<< "$versions_json" |
+                sort -n |
+                tail -1
+            )"
+
+            if [[ -z "$highest" ]]; then
+              version="${major}.1"
+            else
+              version="${major}.$((highest + 1))"
+            fi
+
+            publish_branch_tags=true
+            if [[ "$REF_NAME" == "main" || "$REF_NAME" == "master" ]]; then
+              publish_latest=true
+            fi
+          fi
+
+          echo "major=${major}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "publish_branch_tags=${publish_branch_tags}" >> "$GITHUB_OUTPUT"
+          echo "publish_latest=${publish_latest}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build veyq image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/veyq
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: runtime-jvm
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/${{ github.repository_owner }}/veyq:build-${{ github.sha }}-${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VEYQ_VERSION=${{ needs.version.outputs.version }}
+            VEYQ_REVISION=sha-${{ github.sha }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha,scope=veyq-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=veyq-${{ matrix.arch }}
+
+  build-collaboration:
+    name: Build collaboration image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/veyq-collaboration
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: collaboration
+          file: collaboration/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/${{ github.repository_owner }}/veyq-collaboration:build-${{ github.sha }}-${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha,scope=veyq-collaboration-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=veyq-collaboration-${{ matrix.arch }}
+
+  publish:
+    name: Publish multi-arch image
+    runs-on: ubuntu-latest
+    needs:
+      - version
+      - build
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/veyq
+          tags: |
+            type=ref,event=tag
+            type=raw,value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.publish_branch_tags == 'true' }}
+            type=raw,value=${{ needs.version.outputs.major }},enable=${{ needs.version.outputs.publish_branch_tags == 'true' }}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ needs.version.outputs.publish_latest == 'true' }}
+
+      - name: Create multi-arch manifest
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/veyq
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          mapfile -t tags <<< "$TAGS"
+          tag_args=()
+          for tag in "${tags[@]}"; do
+            tag_args+=("-t" "$tag")
+          done
+
+          docker buildx imagetools create \
+            "${tag_args[@]}" \
+            "$IMAGE:build-${GITHUB_SHA}-amd64" \
+            "$IMAGE:build-${GITHUB_SHA}-arm64"
+
+  publish-collaboration:
+    name: Publish multi-arch collaboration image
+    runs-on: ubuntu-latest
+    needs:
+      - version
+      - build-collaboration
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/veyq-collaboration
+          tags: |
+            type=ref,event=tag
+            type=raw,value=${{ needs.version.outputs.version }},enable=${{ needs.version.outputs.publish_branch_tags == 'true' }}
+            type=raw,value=${{ needs.version.outputs.major }},enable=${{ needs.version.outputs.publish_branch_tags == 'true' }}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ needs.version.outputs.publish_latest == 'true' }}
+
+      - name: Create multi-arch manifest
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/veyq-collaboration
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          mapfile -t tags <<< "$TAGS"
+          tag_args=()
+          for tag in "${tags[@]}"; do
+            tag_args+=("-t" "$tag")
+          done
+
+          docker buildx imagetools create \
+            "${tag_args[@]}" \
+            "$IMAGE:build-${GITHUB_SHA}-amd64" \
+            "$IMAGE:build-${GITHUB_SHA}-arm64"

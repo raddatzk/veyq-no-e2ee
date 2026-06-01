@@ -1,0 +1,136 @@
+id: platform.api-runtime
+title: Platform API Runtime
+status: implemented
+capabilities: []
+productArea: Frontend API runtime, HTTP error handling, upload transport and generated client mapping.
+entryPoints:
+  - frontend/src/shared/api/httpClient.ts
+  - frontend/src/api/generated
+  - frontend/src/features/memories/api/memoryApi.ts
+acceptanceCriteria:
+  - id: platform.api-runtime.media-range-requests
+    statement: Media range parsing accepts supported byte ranges and rejects invalid range requests.
+    coverage:
+      backend:
+        unit:
+          - testName: parses explicit open ended and suffix ranges
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaRangesTest.kt
+          - testName: rejects invalid ranges
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaRangesTest.kt
+  - id: platform.api-runtime.backend-api-formatting
+    statement: Backend API helpers encode path segments and UTC timestamps consistently across API summaries.
+    coverage:
+      backend:
+        unit:
+          - testName: encodes api path segments without form-style spaces
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiFormatTest.kt
+          - testName: maps instants to utc api offset date-times
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiFormatTest.kt
+  - id: platform.api-runtime.memory-client-mapping
+    statement: Memory API client mappers normalize generated payloads and forward calls with expected options.
+    coverage:
+      frontend:
+        unit:
+          - testName: maps folder and path based memory lookups through generatedCall
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: normalizes optional memory fields to null
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: normalizes memory header fields and forwards generated calls
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: normalizes public share memory header without scope
+            kind: negative
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: maps favorite toggles through generated clients
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: maps create and update request null values to generated undefined fields
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: normalizes memory media fields and forwards includeChildren
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: uploads memory media through a resumable chunk session without an empty optional title
+            kind: negative
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: updates memory media metadata in batches and normalizes returned media
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+          - testName: maps memory delete and cover operations through generated clients
+            kind: positive
+            ref: frontend/src/features/memories/api/memoryApi.test.ts
+  - id: platform.api-runtime.http-client-behavior
+    statement: HTTP client handles stable errors, auth refresh, multipart uploads, binary chunks, progress and cancellation.
+    coverage:
+      frontend:
+        unit:
+          - testName: parses stable error response codes
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: accepts legacy error response bodies during migration
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: falls back for non-json error responses
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: maps setup required responses to the setup error type
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: refreshes before a protected request when the stored access session is expired
+            kind: negative
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: deduplicates concurrent refreshes for expired access sessions
+            kind: negative
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: falls back to the original request and clears the marker when refresh fails
+            kind: negative
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: posts multipart form data with cookies and returns parsed JSON
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: maps JSON error responses through ApiError
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: emits upload progress callbacks
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: aborts uploads through AbortSignal with a cancellation error
+            kind: negative
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: keeps cancellation when an upload is aborted during auth refresh
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+          - testName: uploads binary chunks with content type, cookies and progress
+            kind: positive
+            ref: frontend/src/shared/api/httpClient.test.ts
+  - id: platform.api-runtime.error-localization
+    statement: Frontend error utilities localize known API codes and preserve safe fallback messages.
+    coverage:
+      frontend:
+        unit:
+          - testName: localizes known API error codes
+            kind: positive
+            ref: frontend/src/shared/utils/errors.test.ts
+          - testName: uses API fallback messages for unknown API error codes
+            kind: negative
+            ref: frontend/src/shared/utils/errors.test.ts
+          - testName: keeps regular error messages unchanged
+            kind: positive
+            ref: frontend/src/shared/utils/errors.test.ts
+  - id: platform.api-runtime.iso-date-handling
+    statement: ISO date utilities round-trip local dates without timezone shifts and reject invalid values.
+    coverage:
+      frontend:
+        unit:
+          - testName: round-trips ISO dates through local Date instances without timezone shifts
+            kind: negative
+            ref: frontend/src/shared/utils/isoDate.test.ts
+          - testName: keeps empty or invalid values empty
+            kind: negative
+            ref: frontend/src/shared/utils/isoDate.test.ts
