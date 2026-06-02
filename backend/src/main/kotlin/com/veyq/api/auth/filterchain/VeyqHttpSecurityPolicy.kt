@@ -49,6 +49,7 @@ class VeyqHttpSecurityPolicy(
                 path == "/api/client-capabilities" ||
                 path.startsWith("/api/collaboration/journal/session/") ||
                 path.startsWith("/api/invitations/") ||
+                path.startsWith("/api/tenant-registration-invites/") ||
                 path == "/api/users/password/forgot" ||
                 (path.startsWith("/api/users/") && path.endsWith("/password/reset")) ||
                 path == "/api/users/passkeys/forgot" ||

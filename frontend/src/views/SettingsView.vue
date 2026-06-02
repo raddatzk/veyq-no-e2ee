@@ -97,7 +97,7 @@ function frontendSettingsPath(path: string): string {
       <UserSettingsForm v-else-if="settings.subject.type === 'USER'" />
       <template v-else-if="settings.subject.type === 'TENANT'">
         <TenantSettingsPanel v-if="canManageTenant && !isCreatingGroup" :tenant-name="tenantName" />
-        <GroupSettingsPanel :tenant-name="tenantName" />
+        <GroupSettingsPanel v-else :tenant-name="tenantName" />
       </template>
       <GroupSettingsPanel
         v-else-if="settings.subject.type === 'GROUP'"

@@ -24,6 +24,7 @@ import com.veyq.api.domain.TenantMemberId
 import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.TenantMemberStatus
 import com.veyq.api.domain.TenantRepo
+import com.veyq.api.domain.TenantRegistrationInviteRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.TotpCredential
 import com.veyq.api.domain.TotpCredentialRepo
@@ -71,6 +72,7 @@ class UserManagementResourceTest {
     @Inject lateinit var userRepo: UserRepo
     @Inject lateinit var tenantRepo: TenantRepo
     @Inject lateinit var tenantMemberRepo: TenantMemberRepo
+    @Inject lateinit var tenantRegistrationInviteRepo: TenantRegistrationInviteRepo
     @Inject lateinit var invitationRepo: UserInvitationRepo
     @Inject lateinit var emailChangeRepo: UserEmailChangeRepo
     @Inject lateinit var resetPasswordTokenRepo: ResetPasswordTokenRepo
@@ -256,6 +258,171 @@ class UserManagementResourceTest {
             .`when`().post("/api/auth/login")
             .then()
             .statusCode(200)
+    }
+
+    @Test
+    fun `tenant registration invite allows new and existing users to join as members`() {
+        val created = given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"expiresInDays":14}""")
+            .`when`().post("/api/tenants/${tenant.name}/registration-invites")
+            .then()
+            .statusCode(200)
+            .body("invite.tenantName", equalTo(tenant.name))
+            .body("invite.status", equalTo("Active"))
+            .body("invite.registrationCount", equalTo(0))
+            .extract()
+            .`as`(Map::class.java)
+
+        @Suppress("UNCHECKED_CAST")
+        val invite = created["invite"] as Map<String, Any?>
+        val token = created["token"] as String
+        assertThat(created["joinUrl"]).isEqualTo("https://${tenant.domain}/join/$token")
+        assertThat(invite["joinUrl"]).isEqualTo("https://${tenant.domain}/join/$token")
+
+        given()
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/tenants/${tenant.name}/registration-invites")
+            .then()
+            .statusCode(200)
+            .body("invites[0].joinUrl", equalTo("https://${tenant.domain}/join/$token"))
+
+        val localCreated = given()
+            .contentType("application/json")
+            .header("Host", "localhost:8081")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body("""{"expiresInDays":14}""")
+            .`when`().post("/api/tenants/${tenant.name}/registration-invites")
+            .then()
+            .statusCode(200)
+            .extract()
+            .`as`(Map::class.java)
+        assertThat(localCreated["joinUrl"] as String).startsWith("http://localhost")
+
+        given()
+            .header("Host", tenant.domain)
+            .`when`().get("/api/tenant-registration-invites/$token")
+            .then()
+            .statusCode(200)
+            .body("tenantName", equalTo(tenant.name))
+            .body("tenantDomain", equalTo(tenant.domain))
+            .body("requiresLogin", equalTo(false))
+
+        given()
+            .header("Host", "localhost:8081")
+            .`when`().get("/api/tenant-registration-invites/$token")
+            .then()
+            .statusCode(200)
+            .body("tenantName", equalTo(tenant.name))
+            .body("tenantDomain", equalTo(tenant.domain))
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body("""{"email":"join-passkey-$runId@example.com","displayName":"Join Passkey"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/passkey-options")
+            .then()
+            .statusCode(200)
+            .body("rp.id", equalTo(tenant.domain))
+
+        entityManager.clear()
+        val stagedPasskeyUser = userRepo.findByEmail("join-passkey-$runId@example.com")
+        assertThat(stagedPasskeyUser).isNotNull
+        assertThat(stagedPasskeyUser?.passwordSetAt).isNull()
+        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, stagedPasskeyUser!!)).isNull()
+
+        val newUserCookie = given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body("""{"email":"join-new-$runId@example.com","displayName":"Join New","password":"welcome123456"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/join")
+            .then()
+            .statusCode(200)
+            .body("user.email", equalTo("join-new-$runId@example.com"))
+            .body("user.displayName", equalTo("Join New"))
+            .extract()
+            .cookie("VEYQ_ACCESS_TOKEN")
+
+        assertThat(newUserCookie).isNotBlank()
+        assertTenantMembership("join-new-$runId@example.com", tenant, TenantRole.TenantMember, TenantMemberStatus.Active)
+
+        val existing = createUser("join-existing-$runId", "member123456", ServerRole.ServerMember)
+        val existingCookie = login(existing.email, "member123456")
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .cookie("VEYQ_ACCESS_TOKEN", existingCookie)
+            .body("""{"email":"${existing.email}"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/join")
+            .then()
+            .statusCode(200)
+            .body("user.email", equalTo(existing.email))
+
+        assertTenantMembership(existing.email, tenant, TenantRole.TenantMember, TenantMemberStatus.Active)
+
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().get("/api/tenants/${tenant.name}/registration-invites")
+            .then()
+            .statusCode(200)
+            .body("invites.find { it.id == ${invite["id"]} }.registrationCount", equalTo(2))
+    }
+
+    @Test
+    fun `tenant registration invite rejects wrong domain revoked expired and exhausted links`() {
+        val token = createTenantRegistrationInviteToken(maxRegistrations = 1)
+
+        given()
+            .header("Host", "other-${tenant.domain}")
+            .`when`().get("/api/tenant-registration-invites/$token")
+            .then()
+            .statusCode(403)
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body("""{"email":"first-limit-$runId@example.com","displayName":"First Limit","password":"welcome123456"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/join")
+            .then()
+            .statusCode(200)
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body("""{"email":"second-limit-$runId@example.com","displayName":"Second Limit","password":"welcome123456"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/join")
+            .then()
+            .statusCode(400)
+
+        val revoked = createTenantRegistrationInvite(maxRegistrations = null)
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .`when`().post("/api/tenants/${tenant.name}/registration-invites/${revoked.id}/revoke")
+            .then()
+            .statusCode(200)
+            .body("status", equalTo("Revoked"))
+
+        given()
+            .header("Host", tenant.domain)
+            .`when`().get("/api/tenant-registration-invites/${revoked.token}")
+            .then()
+            .statusCode(400)
+
+        val expired = createTenantRegistrationInvite(maxRegistrations = null)
+        inTransaction {
+            tenantRegistrationInviteRepo.findByTokenHash(com.veyq.api.common.HashingService.sha256(expired.token))!!
+                .expiresAt = Instant.now().minus(Duration.ofDays(1))
+        }
+
+        given()
+            .header("Host", tenant.domain)
+            .`when`().get("/api/tenant-registration-invites/${expired.token}")
+            .then()
+            .statusCode(400)
     }
 
     @Test
@@ -2165,6 +2332,42 @@ class UserManagementResourceTest {
             .isBefore(expected.plus(Duration.ofMinutes(1)))
     }
 
+    private fun assertTenantMembership(email: String, tenant: Tenant, role: TenantRole, status: TenantMemberStatus) {
+        entityManager.clear()
+        val user = userRepo.findByEmail(email) ?: throw IllegalStateException("User not found")
+        val currentTenant = tenantRepo.findByName(tenant.name) ?: throw IllegalStateException("Tenant not found")
+        val membership = tenantMemberRepo.findByTenantAndUser(currentTenant, user)
+        assertThat(membership?.role).isEqualTo(role)
+        assertThat(membership?.status).isEqualTo(status)
+        assertThat(membership?.acceptedAt).isNotNull
+    }
+
+    private fun createTenantRegistrationInviteToken(maxRegistrations: Int?): String =
+        createTenantRegistrationInvite(maxRegistrations).token
+
+    private fun createTenantRegistrationInvite(maxRegistrations: Int?): TenantRegistrationInviteFixture {
+        val body = if (maxRegistrations == null) {
+            """{"expiresInDays":14}"""
+        } else {
+            """{"expiresInDays":14,"maxRegistrations":$maxRegistrations}"""
+        }
+        val response = given()
+            .contentType("application/json")
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .body(body)
+            .`when`().post("/api/tenants/${tenant.name}/registration-invites")
+            .then()
+            .statusCode(200)
+            .extract()
+            .`as`(Map::class.java)
+        @Suppress("UNCHECKED_CAST")
+        val invite = response["invite"] as Map<String, Any?>
+        return TenantRegistrationInviteFixture(
+            id = (invite["id"] as Number).toLong(),
+            token = response["token"] as String,
+        )
+    }
+
     private fun createUser(name: String, password: String, role: ServerRole): User =
         inTransaction {
             User().also {
@@ -2342,6 +2545,8 @@ class UserManagementResourceTest {
         Files.createTempFile("veyq-avatar-", ".png").also { path ->
             ImageIO.write(BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), "png", path.toFile())
         }
+
+    private data class TenantRegistrationInviteFixture(val id: Long, val token: String)
 
     private fun <T> inTransaction(block: () -> T): T {
         transaction.begin()

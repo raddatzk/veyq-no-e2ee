@@ -16,6 +16,7 @@ apis/SearchApi.ts
 apis/ServerApi.ts
 apis/SettingsApi.ts
 apis/SetupApi.ts
+apis/TenantRegistrationInvitesApi.ts
 apis/TenantsApi.ts
 apis/UsersApi.ts
 apis/index.ts
@@ -46,6 +47,7 @@ models/CreateMemoryShareRequest.ts
 models/CreatePasskeyLinkRequest.ts
 models/CreatePasskeyRequest.ts
 models/CreatePublicShareMemoryRequest.ts
+models/CreateTenantRegistrationInviteRequest.ts
 models/CreateTenantRequest.ts
 models/DeleteMemoryMediaBatchRequest.ts
 models/DeleteMyAccountRequest.ts
@@ -64,6 +66,8 @@ models/GroupsSummary.ts
 models/InvitationMetadataRequest.ts
 models/InvitationMetadataResponse.ts
 models/InviteTenantUserRequest.ts
+models/JoinTenantRegistrationInviteRequest.ts
+models/JoinTenantRegistrationInviteWithPasskeyRequest.ts
 models/LoginRequest.ts
 models/LoginSession.ts
 models/ManagedUserSummary.ts
@@ -149,6 +153,12 @@ models/SetupStatusSummary.ts
 models/SimplifiedGroupSummary.ts
 models/TenantCreationResponse.ts
 models/TenantGroupSettingsResponse.ts
+models/TenantRegistrationInviteCreatedResponse.ts
+models/TenantRegistrationInviteMetadataResponse.ts
+models/TenantRegistrationInvitePasskeyOptionsRequest.ts
+models/TenantRegistrationInviteStatus.ts
+models/TenantRegistrationInviteSummary.ts
+models/TenantRegistrationInvitesResponse.ts
 models/TenantRole.ts
 models/TenantSettingsResponse.ts
 models/TenantSummary.ts

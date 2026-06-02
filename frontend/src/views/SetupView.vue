@@ -62,6 +62,13 @@ const canSubmitTenant = computed(
     tenantDomain.value.trim().length > 0 &&
     tenantOwnerEmail.value.trim().length > 0
 )
+const canSubmitAdmin = computed(() => {
+  if (savingAdmin.value || savingAdminWithPasskey.value) return false
+  if (!email.value.trim()) return false
+  if (!displayName.value.trim()) return false
+  if (authMethod.value === 'password' && !password.value) return false
+  return true
+})
 
 watch(tenantDisplayName, (value) => {
   tenantName.value = toPermalink(value)
@@ -70,9 +77,17 @@ watch(tenantDisplayName, (value) => {
 async function submitAdmin() {
   error.value = ''
   if (savingAdmin.value || savingAdminWithPasskey.value) return
+  if (!email.value.trim()) {
+    error.value = t('auth.emailRequired')
+    return
+  }
   const adminDisplayName = displayName.value.trim()
   if (!adminDisplayName) {
     error.value = t('auth.displayNameRequired')
+    return
+  }
+  if (authMethod.value === 'password' && !password.value) {
+    error.value = t('auth.passwordRequired')
     return
   }
   const withPasskey = authMethod.value === 'passkey'
@@ -292,6 +307,7 @@ async function skipTenant() {
           :label="t('setup.adminCreateWithPasskey')"
           icon="pi pi-key"
           :loading="savingAdminWithPasskey"
+          :disabled="!canSubmitAdmin"
         />
         <Button
           v-else
@@ -299,6 +315,7 @@ async function skipTenant() {
           :label="t('setup.adminCreate')"
           icon="pi pi-user-plus"
           :loading="savingAdmin"
+          :disabled="!canSubmitAdmin"
         />
       </form>
       <PasskeyNameDialog

@@ -13,11 +13,13 @@ import jakarta.ws.rs.Consumes
 import jakarta.ws.rs.DELETE
 import jakarta.ws.rs.FormParam
 import jakarta.ws.rs.GET
+import jakarta.ws.rs.POST
 import jakarta.ws.rs.PUT
 import jakarta.ws.rs.Path
 import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.Response
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
@@ -28,6 +30,7 @@ class TenantResource @Inject constructor(
     private val tenantService: TenantService,
     private val tenantUserService: TenantUserService,
     private val tenantGroupService: TenantGroupService,
+    private val tenantRegistrationInviteService: TenantRegistrationInviteService,
 ) : TenantsApi {
 
     override fun myTenants(): TenantsSummary =
@@ -107,6 +110,34 @@ class TenantResource @Inject constructor(
         tenantUserService.reinviteTenantUser(tenantName, userId)
 
     @TenantOwnerRequired
+    @POST
+    @Path("/{tenantName}/registration-invites")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    fun createTenantRegistrationInvite(
+        @PathParam("tenantName") tenantName: String,
+        request: CreateTenantRegistrationInviteRequest,
+    ): Response =
+        Response.ok(tenantRegistrationInviteService.create(request)).build()
+
+    @TenantOwnerRequired
+    @GET
+    @Path("/{tenantName}/registration-invites")
+    @Produces(MediaType.APPLICATION_JSON)
+    fun listTenantRegistrationInvites(@PathParam("tenantName") tenantName: String): Response =
+        Response.ok(tenantRegistrationInviteService.list()).build()
+
+    @TenantOwnerRequired
+    @POST
+    @Path("/{tenantName}/registration-invites/{inviteId}/revoke")
+    @Produces(MediaType.APPLICATION_JSON)
+    fun revokeTenantRegistrationInvite(
+        @PathParam("tenantName") tenantName: String,
+        @PathParam("inviteId") inviteId: Long,
+    ): Response =
+        Response.ok(tenantRegistrationInviteService.revoke(inviteId)).build()
+
+    @TenantOwnerRequired
     override fun updateTenantUserRole(
         tenantName: String,
         userId: Long,
@@ -125,7 +156,7 @@ class TenantResource @Inject constructor(
     }
 
     @GET
-    @Path("/{tenantName}/{groupName:(?!logo$)[^/]+}")
+    @Path("/{tenantName}/{groupName:(?!logo$)(?!registration-invites$)[^/]+}")
     @Produces(MediaType.APPLICATION_JSON)
     override fun getGroupSettings(
         @PathParam("tenantName") tenantName: String,
@@ -136,7 +167,7 @@ class TenantResource @Inject constructor(
     @GroupOwnerRequired
     @Transactional
     @PUT
-    @Path("/{tenantName}/{groupName:(?!logo$)[^/]+}")
+    @Path("/{tenantName}/{groupName:(?!logo$)(?!registration-invites$)[^/]+}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     override fun updateGroupSettings(

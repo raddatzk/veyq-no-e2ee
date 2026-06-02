@@ -58,11 +58,13 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Tenant-scoped email delivery settings so invitation, account and share emails can use sender identity, reply-to/contact details and branding that match the tenant domain while falling back to instance SMTP defaults.
 - Localized email template model for invites, password resets, email changes and account/security notifications, including locale selection, tenant branding variables, safe fallbacks and template versioning.
 - Time-zone policy for Memory ZIP timestamps if locale-aware archive naming is not enough, including whether to store a user time zone in the profile or pass one per download.
+- Memory media download timestamp policy so user-corrected or overridden media timestamps are carried into downloaded originals or ZIP archive entries where the target format can represent them.
 - User account deletion/deactivation endpoints for [ADR 0017](../adr/0017-user-lifecycle-and-tenant-membership-removal.md), including permission checks, active-session invalidation, passkey/credential cleanup, tenant membership soft removal and anonymization of audit-relevant references.
 - Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
 - Organizational folder deletion behavior, including preconditions for non-empty folders, Memory reassignment or move requirements and permission/error semantics.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.
 - Live Memory event API for newly created, updated or deleted media, media buckets, tracks, playlists, journals, covers, child Memories and share-visible changes, with tenant/scope/public-share authorization filtering.
+- Uploader-only public share delete semantics so an uploader can remove media uploaded through the same share identity without gaining broader Memory delete access or visibility into other uploaders' assets.
 - Advanced track search, import and visualization beyond the current GPX upload/list/update/delete/content endpoints.
 - Person endpoints beyond current Memory participants that avoid cross-Memory graph leakage and return the same empty result shape for unknown, unauthorized and no-visible-match searches.
 - Persisted share endpoints for saving, listing, opening and removing remote/shared Memory entries in a target tenant, group or personal scope.
@@ -71,6 +73,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Instance branding metadata for native apps after Mobile V1.
 - TOTP recovery and policy endpoints beyond first password-login support, including recovery codes, ServerOwner reset/disable and tenant/server enforcement controls.
 - ServerOwner-only web-managed server configuration for selected `.env`-backed values, with `.env` remaining the bootstrap and recovery source. Candidate settings include SMTP configuration including password, auth cookie names and the secure-cookie flag. The API should define secret masking, validation, test-mail behavior and whether changes apply at runtime or require restart.
+- ServerOwner-only storage capacity reporting for server settings, showing available and used space for the configured media storage without exposing host filesystem details or cross-tenant usage breakdowns.
 - Ablage APIs for listing, folder creation, upload, download, rename/move and delete, with scope permissions and storage-key privacy.
 - Keep API-first contracts complete with preconditions, examples, error cases and `x-implementation-status`.
 - Preserve generated backend/frontend API model usage for new Memory APIs.
@@ -79,6 +82,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 
 - Memory detail next pass with combined media/track maps and richer contextual tabs.
 - Memory header with places, weather and richer track/participant summaries beyond the current cover, playlist and participant surfaces.
+- Video poster/title image selection that lets users choose the exact frame or an existing Memory gallery image used as the video's visible title image or preview.
 - Child Memory navigation without file-system feel.
 - Organizational folder delete UX, including confirmation copy, non-empty folder handling and clear guidance that Memories remain the primary content objects.
 - Parent Memory aggregation indicators.
@@ -95,9 +99,10 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Tenant email settings UI for tenant owners, including domain-aligned sender preview, reply-to/contact fields, test email, validation status and clear fallback behavior when tenant-specific settings are incomplete.
 - Email template management and review workflow, including correct German/English translations, preview/test-send support and copy QA for transactional mail across setup, invitation, password and account flows.
 - Dedicated public tenant contact fields and optional server-side audit logging for tenant terms/share notice acceptance, beyond the browser-local acceptance model in [ADR 0012](../adr/0012-share-notices-and-tenant-terms.md).
-- Password setup and change forms should ask users to enter the new password twice, with inline mismatch feedback before submitting setup, invitation acceptance, password reset or password change requests.
+- Password setup and change forms should ask users to enter the new password twice, provide a visibility toggle for password fields, and show inline mismatch feedback before submitting setup, invitation acceptance, password reset or password change requests.
 - TOTP recovery-code display, ServerOwner reset/disable authority and tenant/server enforcement controls beyond the current account-level enrollment and removal UI.
 - Account deletion/deactivation UX for [ADR 0017](../adr/0017-user-lifecycle-and-tenant-membership-removal.md), with explicit consequences for tenant access, owned settings, public profile visibility, personal-scope deletion and historical attribution.
+- Server settings storage capacity panel for ServerOwners, with clear free/used storage values, warning states for low disk space and copy that treats the values as operational instance health rather than user-facing quota.
 - Scope-root Ablage rubric alongside Memories and folders, using UI label `Ablage` and a language-neutral route segment such as `files`.
 
 ## Needs Technical Spikes

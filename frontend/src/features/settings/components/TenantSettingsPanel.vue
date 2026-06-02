@@ -12,10 +12,17 @@ import Select from 'primevue/select'
 import ManagementList from '../../../shared/components/ManagementList.vue'
 import LocaleMarkdownEditor from '../../../shared/components/LocaleMarkdownEditor.vue'
 import ConfirmationDialog from '../../../shared/components/ConfirmationDialog.vue'
+import GroupSettingsPanel from './GroupSettingsPanel.vue'
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../../../i18n'
 import { messages } from '../../../i18n/messages'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
 import { deleteTenant as deleteTenantApi, tenants as loadTenantSummaries } from '../../../api/tenantClient'
+import {
+  createTenantRegistrationInvite,
+  listTenantRegistrationInvites,
+  revokeTenantRegistrationInvite,
+  type TenantRegistrationInviteSummary
+} from '../../../api/tenantRegistrationInviteClient'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import {
   deleteTenantLogo,
@@ -48,12 +55,18 @@ const savingLogo = ref(false)
 const error = ref('')
 const message = ref('')
 const inviteDialogVisible = ref(false)
+const registrationInviteDialogVisible = ref(false)
 const removeUserDialogVisible = ref(false)
 const deleteDialogVisible = ref(false)
 const deleteConfirmation = ref('')
 const removingUser = ref<TenantUserSummary | null>(null)
 const inviteEmail = ref('')
 const inviteTenantRole = ref<TenantRole>('TenantMember')
+const registrationInvites = ref<TenantRegistrationInviteSummary[]>([])
+const registrationInviteExpiresInDays = ref('14')
+const registrationInviteMaxRegistrations = ref('')
+const revokingRegistrationInviteId = ref<number | null>(null)
+const copyingRegistrationInviteId = ref<number | null>(null)
 const tenantSettings = ref<TenantSettingsResponse | null>(null)
 const termsMarkdownByLocale = ref<Record<string, string>>({})
 const termsTemplateDialogVisible = ref(false)
@@ -131,7 +144,8 @@ async function load() {
   try {
     const [nextUsers, nextSettings] = await Promise.all([
       getTenantUsers(props.tenantName),
-      getTenantSettings(props.tenantName)
+      getTenantSettings(props.tenantName),
+      loadRegistrationInvites()
     ])
     users.value = nextUsers
     applyTenantSettings(nextSettings)
@@ -141,6 +155,10 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadRegistrationInvites() {
+  registrationInvites.value = await listTenantRegistrationInvites(props.tenantName)
 }
 
 async function uploadLogo(event: FileUploadSelectEvent) {
@@ -252,6 +270,14 @@ function openInviteDialog() {
   inviteDialogVisible.value = true
 }
 
+function openRegistrationInviteDialog() {
+  registrationInviteExpiresInDays.value = '14'
+  registrationInviteMaxRegistrations.value = ''
+  error.value = ''
+  message.value = ''
+  registrationInviteDialogVisible.value = true
+}
+
 function openDeleteDialog() {
   deleteConfirmation.value = ''
   error.value = ''
@@ -275,6 +301,67 @@ async function inviteUserByEmail() {
     }
   } finally {
     saving.value = false
+  }
+}
+
+async function createRegistrationInviteLink() {
+  saving.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    const maxRegistrations = registrationInviteMaxRegistrations.value.trim()
+      ? Number(registrationInviteMaxRegistrations.value)
+      : undefined
+    const created = await createTenantRegistrationInvite(
+      props.tenantName,
+      Number(registrationInviteExpiresInDays.value),
+      maxRegistrations
+    )
+    registrationInvites.value = [created.invite, ...registrationInvites.value]
+    registrationInviteDialogVisible.value = false
+    await copyRegistrationInvite(created.joinUrl)
+    message.value = t('tenant.registrationInviteCreated')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('tenant.registrationInviteCreateFailed'))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function copyRegistrationInvite(joinUrl: string) {
+  await navigator.clipboard?.writeText(joinUrl)
+}
+
+async function copyExistingRegistrationInvite(invite: TenantRegistrationInviteSummary) {
+  if (copyingRegistrationInviteId.value != null) return
+  copyingRegistrationInviteId.value = invite.id
+  error.value = ''
+  message.value = ''
+  try {
+    await copyRegistrationInvite(invite.joinUrl)
+    message.value = t('tenant.registrationInviteCopied')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('tenant.registrationInviteCopyFailed'))
+  } finally {
+    copyingRegistrationInviteId.value = null
+  }
+}
+
+async function revokeRegistrationInvite(invite: TenantRegistrationInviteSummary) {
+  if (revokingRegistrationInviteId.value != null) return
+  revokingRegistrationInviteId.value = invite.id
+  error.value = ''
+  message.value = ''
+  try {
+    const revoked = await revokeTenantRegistrationInvite(props.tenantName, invite.id)
+    registrationInvites.value = registrationInvites.value.map((item) =>
+      item.id === revoked.id ? revoked : item
+    )
+    message.value = t('tenant.registrationInviteRevoked')
+  } catch (caught) {
+    error.value = getErrorMessage(caught, t('tenant.registrationInviteRevokeFailed'))
+  } finally {
+    revokingRegistrationInviteId.value = null
   }
 }
 
@@ -406,12 +493,23 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
   if (status === 'Disabled' || status === 'Removed') return 'danger'
   return 'warning'
 }
+
+function registrationInviteStatusSeverity(status: TenantRegistrationInviteSummary['status']): string {
+  if (status === 'Active') return 'success'
+  if (status === 'Revoked' || status === 'Expired') return 'danger'
+  return 'warning'
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value))
+}
 </script>
 
 <template>
-  <section class="veyq-surface settings-panel">
-    <h1>{{ tenantDisplayName }}</h1>
-
+  <div class="tenant-settings-stack">
     <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
     <Message v-if="message" severity="success" :closable="false">{{ message }}</Message>
 
@@ -421,8 +519,12 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
     </div>
 
     <template v-else>
-      <section v-if="tenantSettings" class="settings-form">
-        <h2>{{ t('tenant.logoTitle') }}</h2>
+      <header class="tenant-settings-header">
+        <h1>{{ tenantDisplayName }}</h1>
+      </header>
+
+      <section v-if="tenantSettings" class="veyq-surface settings-panel">
+        <h1>{{ t('tenant.logoTitle') }}</h1>
         <p>{{ t('tenant.logoCopy') }}</p>
         <div class="tenant-logo-settings">
           <img v-if="tenantSettings.logoUrl" class="tenant-logo-image" :src="tenantSettings.logoUrl" alt="" />
@@ -450,36 +552,16 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
         </div>
       </section>
 
-      <section class="settings-form">
-        <h2>{{ t('share.termsTitle') }}</h2>
-        <p>{{ t('share.termsCopy') }}</p>
-        <LocaleMarkdownEditor v-model="termsMarkdownByLocale" :label="t('share.termsLanguages')" compact />
-        <div class="veyq-button-row">
-          <Button
-            type="button"
-            :label="t('share.termsTemplateInsert')"
-            icon="pi pi-file-import"
-            severity="secondary"
-            outlined
-            @click="openTemplateDialog"
-          />
-          <Button
-            type="button"
-            :label="t('common.save')"
-            icon="pi pi-save"
-            :loading="saving"
-            :disabled="!canSaveTerms"
-            @click="saveTerms"
-          />
-        </div>
-      </section>
-
-      <section class="settings-form">
+      <section class="veyq-surface settings-panel">
         <div class="settings-section-header">
           <div>
-            <h2>{{ t('tenant.members') }}</h2>
+            <h1>{{ t('tenant.members') }}</h1>
           </div>
-          <Button :label="t('tenant.invite')" icon="pi pi-user-plus" @click="openInviteDialog" />
+          <Button
+            :label="t('tenant.invite')"
+            icon="pi pi-user-plus"
+            @click="openInviteDialog"
+          />
         </div>
         <ManagementList>
           <div v-for="user in users" :key="user.user.userId" class="veyq-list-row">
@@ -533,8 +615,101 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
         </ManagementList>
       </section>
 
-      <section v-if="canDeleteTenant" class="settings-form settings-danger-zone">
-        <h2>{{ t('tenant.dangerZone') }}</h2>
+      <section class="veyq-surface settings-panel">
+        <div class="settings-section-header">
+          <div>
+            <h1>{{ t('tenant.registrationInvites') }}</h1>
+            <p>{{ t('tenant.registrationInvitesCopy') }}</p>
+          </div>
+          <Button
+            :label="t('tenant.registrationInviteCreate')"
+            icon="pi pi-link"
+            @click="openRegistrationInviteDialog"
+          />
+        </div>
+        <ManagementList v-if="registrationInvites.length > 0">
+          <div v-for="invite in registrationInvites" :key="invite.id" class="veyq-list-row">
+            <div class="veyq-row-main">
+              <strong class="veyq-row-title">
+                {{ t('tenant.registrationInviteRow', { id: invite.id }) }}
+              </strong>
+              <span class="veyq-row-subtitle">
+                {{ t('tenant.registrationInviteExpiresAt', { date: formatDateTime(invite.expiresAt) }) }}
+              </span>
+              <div class="veyq-row-meta">
+                <span
+                  class="veyq-badge"
+                  :class="registrationInviteStatusSeverity(invite.status)"
+                >
+                  {{ t(`tenant.registrationInviteStatus.${invite.status}`) }}
+                </span>
+                <span class="veyq-row-subtitle">
+                  {{
+                    t('tenant.registrationInviteUsage', {
+                      count: invite.registrationCount,
+                      max: invite.maxRegistrations ?? t('tenant.registrationInviteUnlimited')
+                    })
+                  }}
+                </span>
+              </div>
+            </div>
+            <div class="management-actions">
+              <Button
+                v-if="invite.status === 'Active'"
+                icon="pi pi-copy"
+                severity="secondary"
+                outlined
+                size="small"
+                :aria-label="t('tenant.registrationInviteCopy')"
+                :title="t('tenant.registrationInviteCopy')"
+                :loading="copyingRegistrationInviteId === invite.id"
+                @click="copyExistingRegistrationInvite(invite)"
+              />
+              <Button
+                v-if="invite.status === 'Active'"
+                icon="pi pi-ban"
+                severity="danger"
+                outlined
+                size="small"
+                :aria-label="t('tenant.registrationInviteRevoke')"
+                :title="t('tenant.registrationInviteRevoke')"
+                :loading="revokingRegistrationInviteId === invite.id"
+                @click="revokeRegistrationInvite(invite)"
+              />
+            </div>
+          </div>
+        </ManagementList>
+        <p v-else class="veyq-form-copy">{{ t('tenant.registrationInvitesEmpty') }}</p>
+      </section>
+
+      <GroupSettingsPanel :tenant-name="props.tenantName" />
+
+      <section class="veyq-surface settings-panel">
+        <h1>{{ t('share.termsTitle') }}</h1>
+        <p>{{ t('share.termsCopy') }}</p>
+        <LocaleMarkdownEditor v-model="termsMarkdownByLocale" :label="t('share.termsLanguages')" compact />
+        <div class="veyq-button-row">
+          <Button
+            type="button"
+            :label="t('share.termsTemplateInsert')"
+            icon="pi pi-file-import"
+            severity="secondary"
+            outlined
+            @click="openTemplateDialog"
+          />
+          <Button
+            type="button"
+            :label="t('common.save')"
+            icon="pi pi-save"
+            :loading="saving"
+            :disabled="!canSaveTerms"
+            @click="saveTerms"
+          />
+        </div>
+      </section>
+
+      <section v-if="canDeleteTenant" class="veyq-surface settings-panel settings-danger-zone">
+        <h1>{{ t('tenant.dangerZone') }}</h1>
         <Button
           :label="t('common.delete')"
           icon="pi pi-trash"
@@ -570,6 +745,52 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
             @click="inviteDialogVisible = false"
           />
           <Button type="submit" :label="t('tenant.invite')" icon="pi pi-send" :loading="saving" />
+        </div>
+      </form>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="registrationInviteDialogVisible"
+      :header="t('tenant.registrationInviteCreate')"
+      modal
+      class="tenant-dialog"
+    >
+      <form class="veyq-form" @submit.prevent="createRegistrationInviteLink">
+        <label>
+          {{ t('tenant.registrationInviteExpiresInDays') }}
+          <InputText
+            v-model="registrationInviteExpiresInDays"
+            type="number"
+            min="1"
+            max="365"
+            required
+          />
+        </label>
+        <label>
+          {{ t('tenant.registrationInviteMaxRegistrations') }}
+          <InputText
+            v-model="registrationInviteMaxRegistrations"
+            type="number"
+            min="1"
+            :placeholder="t('tenant.registrationInviteUnlimited')"
+          />
+        </label>
+        <p class="veyq-form-copy">{{ t('tenant.registrationInviteCreateCopy') }}</p>
+        <div class="veyq-dialog-action-row">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            icon="pi pi-times"
+            severity="secondary"
+            outlined
+            @click="registrationInviteDialogVisible = false"
+          />
+          <Button
+            type="submit"
+            :label="t('tenant.registrationInviteCreate')"
+            icon="pi pi-link"
+            :loading="saving"
+          />
         </div>
       </form>
     </Dialog>
@@ -679,5 +900,5 @@ function tenantUserStatusSeverity(status: TenantUserSummary['status']): string {
         </div>
       </form>
     </Dialog>
-  </section>
+  </div>
 </template>

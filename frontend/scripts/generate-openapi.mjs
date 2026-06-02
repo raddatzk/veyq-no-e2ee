@@ -16,6 +16,7 @@ const domains = [
   'setup',
   'users',
   'tenants',
+  'tenant-registration-invites',
   'groups',
   'memories',
   'shares',

@@ -18,6 +18,7 @@ import {
   ServerApi,
   SettingsApi,
   SetupApi,
+  TenantRegistrationInvitesApi,
   TenantsApi,
   UsersApi
 } from './generated'
@@ -29,6 +30,7 @@ export const authApi = new AuthApi(generatedConfiguration)
 export const setupApi = new SetupApi(generatedConfiguration)
 export const usersApi = new UsersApi(generatedConfiguration)
 export const tenantsApi = new TenantsApi(generatedConfiguration)
+export const tenantRegistrationInvitesApi = new TenantRegistrationInvitesApi(generatedConfiguration)
 export const groupsApi = new GroupsApi(generatedConfiguration)
 export const foldersApi = new FoldersApi(generatedConfiguration)
 export const memoriesApi = new MemoriesApi(generatedConfiguration)

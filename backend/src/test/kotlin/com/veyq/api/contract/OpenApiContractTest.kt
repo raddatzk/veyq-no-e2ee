@@ -21,6 +21,7 @@ import com.veyq.api.generated.api.ServerApi
 import com.veyq.api.generated.api.SettingsApi
 import com.veyq.api.generated.api.SetupApi
 import com.veyq.api.generated.api.TenantsApi
+import com.veyq.api.generated.api.TenantRegistrationInvitesApi
 import com.veyq.api.generated.api.UsersApi
 import com.veyq.api.library.folder.FolderResource
 import com.veyq.api.memory.MemoryMediaResource
@@ -371,6 +372,13 @@ class OpenApiContractTest {
             "POST /api/tenants/{tenantName}/users/{userId}/reinvite",
             "PUT /api/tenants/{tenantName}/users/{userId}/role",
             "DELETE /api/tenants/{tenantName}/users/{userId}",
+            "POST /api/tenants/{tenantName}/registration-invites",
+            "GET /api/tenants/{tenantName}/registration-invites",
+            "POST /api/tenants/{tenantName}/registration-invites/{inviteId}/revoke",
+            "GET /api/tenant-registration-invites/{token}",
+            "POST /api/tenant-registration-invites/{token}/join",
+            "POST /api/tenant-registration-invites/{token}/passkey-options",
+            "POST /api/tenant-registration-invites/{token}/join/passkey",
             "GET /api/tenants/{tenantName}/{groupName}",
             "PUT /api/tenants/{tenantName}/{groupName}",
             "GET /api/{tenantName}/groups",
@@ -534,6 +542,7 @@ class OpenApiContractTest {
                     else -> UsersApi::class.java
                 }
                 "tenants.openapi.yaml" -> TenantsApi::class.java
+                "tenant-registration-invites.openapi.yaml" -> TenantRegistrationInvitesApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
                     "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java

@@ -48,6 +48,13 @@ const needsPrivacyOptIn = ref(false)
 const userId = computed(() => Number(route.params.userId))
 const token = computed(() => route.hash.replace(/^#/, ''))
 const requiresPassword = computed(() => !authState.isAuthenticated)
+const canSubmitInvite = computed(() => {
+  if (loading.value) return false
+  if (!requiresPassword.value || inviteRequiresLogin.value) return true
+  if (!displayName.value.trim()) return false
+  if (authMethod.value === 'password' && !password.value) return false
+  return true
+})
 const newPasswordInputProps: Record<string, string> = {
   name: 'password',
   autocomplete: 'new-password',
@@ -84,6 +91,10 @@ async function submit() {
   }
   if (requiresPassword.value && !inviteDisplayName) {
     error.value = t('auth.displayNameRequired')
+    return
+  }
+  if (requiresPassword.value && authMethod.value === 'password' && !password.value) {
+    error.value = t('auth.passwordRequired')
     return
   }
   const createsAccount = requiresPassword.value
@@ -349,6 +360,7 @@ async function finishInvite() {
           "
           :icon="requiresPassword && authMethod === 'passkey' ? 'pi pi-key' : 'pi pi-sign-in'"
           :loading="loading"
+          :disabled="!canSubmitInvite"
         />
       </form>
       <Message v-if="error" severity="error" :closable="false" class="form-message">

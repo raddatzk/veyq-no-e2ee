@@ -25,6 +25,11 @@ In local dev, backend discovery points the iOS mobile-login handoff to the Vite 
 frontend dev server is reachable from that device. Non-dev deployments derive discovery URLs from
 the current request host so tenant domains remain authoritative.
 
+Tenant registration links keep their tenant-domain binding in normal deployments. In local dev,
+requests from `localhost`, `127.0.0.1` or `::1` may validate a tenant registration link for testing,
+and copied registration links use `VEYQ_PUBLIC_WEB_BASE_URL` when the admin request also comes from
+localhost.
+
 The Leaflet media map renders without external tile requests by default. Users can enable OpenStreetMap tiles once per browser; veyq stores that choice in local storage under `veyq:osm-tiles-enabled`.
 
 Backend checks:

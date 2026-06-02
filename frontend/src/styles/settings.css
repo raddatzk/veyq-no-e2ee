@@ -7,6 +7,24 @@
   gap: 1.35rem;
 }
 
+.tenant-settings-stack {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.tenant-settings-header {
+  display: grid;
+  gap: 0.25rem;
+  padding-inline: 0.15rem;
+}
+
+.tenant-settings-header h1 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: clamp(1.55rem, 1rem + 1vw, 2rem);
+  line-height: 1.12;
+}
+
 .settings-panel h1 {
   margin: 0;
   font-size: 1.25rem;

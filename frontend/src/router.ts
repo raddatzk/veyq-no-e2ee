@@ -9,6 +9,7 @@ import ResetPasswordView from './views/ResetPasswordView.vue'
 import ResetPasskeyView from './views/ResetPasskeyView.vue'
 import SettingsView from './views/SettingsView.vue'
 import SetupView from './views/SetupView.vue'
+import TenantJoinView from './views/TenantJoinView.vue'
 import TenantRouteView from './views/TenantRouteView.vue'
 
 const router = createRouter({
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/invite/:userId', name: 'invite', component: InviteView },
+    { path: '/join/:token', name: 'tenant-join', component: TenantJoinView },
     { path: '/s/:shareId/:pathMatch(.*)*', name: 'public-share', component: PublicShareView },
     { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
     { path: '/passkey/reset/:userId', name: 'passkey-reset', component: ResetPasskeyView },
@@ -54,6 +56,7 @@ function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
     to.name !== 'login' &&
     to.name !== 'setup' &&
     to.name !== 'invite' &&
+    to.name !== 'tenant-join' &&
     to.name !== 'public-share' &&
     to.name !== 'password-reset' &&
     to.name !== 'passkey-reset' &&

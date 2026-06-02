@@ -65,6 +65,6 @@ class PasskeyHostService(
         return if (host.contains(":") && !host.contains("::")) host.substringBefore(":") else host
     }
 
-    private fun isLocalhostDomain(domain: String): Boolean =
-        domain == "localhost" || domain == "127.0.0.1" || domain == "::1"
+    fun isLocalhostDomain(domain: String): Boolean =
+        domain == "localhost" || domain == "127.0.0.1" || domain == "::1" || domain == "0:0:0:0:0:0:0:1"
 }

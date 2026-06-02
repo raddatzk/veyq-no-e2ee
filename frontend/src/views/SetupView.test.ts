@@ -63,7 +63,7 @@ describe('SetupView', () => {
     window.localStorage.clear()
   })
 
-  it('requires a display name before starting passkey setup', async () => {
+  it('requires account fields before starting passkey setup', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -76,8 +76,15 @@ describe('SetupView', () => {
 
     const wrapper = mount(SetupView, { global: { plugins: [router], stubs: viewStubs() } })
     const inputs = wrapper.findAll('input')
+    const submitButton = buttonByText(wrapper, 'Admin mit Passkey erstellen')
+    expect(submitButton.attributes('disabled')).toBeDefined()
+
     await inputs[0].setValue('admin@example.test')
+    expect(submitButton.attributes('disabled')).toBeUndefined()
+
     await inputs[1].setValue('   ')
+    expect(submitButton.attributes('disabled')).toBeDefined()
+
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

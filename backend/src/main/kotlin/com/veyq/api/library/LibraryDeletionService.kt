@@ -13,6 +13,7 @@ import com.veyq.api.domain.TenantGroup
 import com.veyq.api.domain.TenantGroupMemberRepo
 import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.TenantMemberRepo
+import com.veyq.api.domain.TenantRegistrationInviteRepo
 import com.veyq.api.domain.TenantRepo
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
@@ -26,6 +27,7 @@ import java.util.Comparator
 class LibraryDeletionService @Inject constructor(
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
+    private val tenantRegistrationInviteRepo: TenantRegistrationInviteRepo,
     private val groupRepo: TenantGroupRepo,
     private val groupMemberRepo: TenantGroupMemberRepo,
     private val folderRepo: TenantFolderRepo,
@@ -36,6 +38,7 @@ class LibraryDeletionService @Inject constructor(
 ) {
     fun deleteTenant(tenant: Tenant) {
         deleteMedia(mediaRepo.list("tenant", tenant))
+        tenantRegistrationInviteRepo.deleteByTenant(tenant)
         tenantMemberRepo.delete("tenant", tenant)
         groupRepo.listByTenant(tenant).forEach { group -> groupMemberRepo.delete("group", group) }
         memoryRepo.delete("tenant", tenant)

@@ -1,6 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteTenant, tenants } from '../../../api/tenantClient'
+import {
+  createTenantRegistrationInvite,
+  listTenantRegistrationInvites,
+  revokeTenantRegistrationInvite
+} from '../../../api/tenantRegistrationInviteClient'
 import { authState } from '../../../authState'
 import {
   deleteTenantLogo,
@@ -18,6 +23,12 @@ import TenantSettingsPanel from './TenantSettingsPanel.vue'
 vi.mock('../../../api/tenantClient', () => ({
   deleteTenant: vi.fn(),
   tenants: vi.fn()
+}))
+
+vi.mock('../../../api/tenantRegistrationInviteClient', () => ({
+  createTenantRegistrationInvite: vi.fn(),
+  listTenantRegistrationInvites: vi.fn(),
+  revokeTenantRegistrationInvite: vi.fn()
 }))
 
 const pushMock = vi.fn()
@@ -48,10 +59,19 @@ const updateTenantSettingsMock = vi.mocked(updateTenantSettings)
 const updateTenantUserRoleMock = vi.mocked(updateTenantUserRole)
 const deleteTenantMock = vi.mocked(deleteTenant)
 const tenantsMock = vi.mocked(tenants)
+const createTenantRegistrationInviteMock = vi.mocked(createTenantRegistrationInvite)
+const listTenantRegistrationInvitesMock = vi.mocked(listTenantRegistrationInvites)
+const revokeTenantRegistrationInviteMock = vi.mocked(revokeTenantRegistrationInvite)
 
 describe('TenantSettingsPanel', () => {
   beforeEach(() => {
     getTenantSettingsMock.mockResolvedValue(tenantSettings())
+    getTenantUsersMock.mockResolvedValue([])
+    listTenantRegistrationInvitesMock.mockResolvedValue([])
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn() }
+    })
   })
 
   afterEach(() => {
@@ -71,7 +91,8 @@ describe('TenantSettingsPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
 
-    expect(wrapper.find('h1').text()).toBe('Friends')
+    expect(wrapper.find('.tenant-settings-header h1').text()).toBe('Friends')
+    expect(wrapper.findAll('.veyq-surface h1').at(0)!.text()).toBe('Logo')
     await wrapper.find('select').setValue('de')
     await wrapper.findAll('button').find((button) => button.text().includes('Sprache hinzufügen'))!.trigger('click')
     await flushPromises()
@@ -216,6 +237,50 @@ describe('TenantSettingsPanel', () => {
     expect(wrapper.text()).toContain('invitee@example.test')
   })
 
+  it('creates and copies a tenant registration link', async () => {
+    createTenantRegistrationInviteMock.mockResolvedValue({
+      invite: registrationInvite(12),
+      joinUrl: 'https://friends.test/join/token-123',
+      token: 'token-123'
+    })
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Registrierungslink erstellen'))!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('input').at(-2)!.setValue('30')
+    await wrapper.findAll('input').at(-1)!.setValue('100')
+    await wrapper.findAll('form').at(-1)!.trigger('submit')
+    await flushPromises()
+
+    expect(createTenantRegistrationInviteMock).toHaveBeenCalledWith('friends', 30, 100)
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join/token-123')
+    expect(wrapper.text()).toContain('Registrierungslink wurde erstellt und kopiert.')
+    expect(wrapper.text()).toContain('Registrierungslink #12')
+  })
+
+  it('lists and revokes tenant registration links', async () => {
+    listTenantRegistrationInvitesMock.mockResolvedValue([registrationInvite(12)])
+    revokeTenantRegistrationInviteMock.mockResolvedValue(registrationInvite(12, 'Revoked'))
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Registrierungslink #12')
+    await wrapper.find('button[aria-label="Link kopieren"]').trigger('click')
+    await flushPromises()
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join/invite-12')
+    expect(wrapper.text()).toContain('Registrierungslink wurde kopiert.')
+    await wrapper.find('button[aria-label="Link widerrufen"]').trigger('click')
+    await flushPromises()
+
+    expect(revokeTenantRegistrationInviteMock).toHaveBeenCalledWith('friends', 12)
+    expect(wrapper.text()).toContain('Widerrufen')
+    expect(wrapper.text()).toContain('Registrierungslink wurde widerrufen.')
+  })
+
   it('reinvites pending users without changing tenant role', async () => {
     getTenantUsersMock.mockResolvedValue([
       tenantUser(2, 'Invitee', 'invitee@example.test', 'TenantMember', 'Pending')
@@ -268,7 +333,7 @@ describe('TenantSettingsPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
 
-    await wrapper.findAll('select').at(-1)!.setValue('TenantOwner')
+    await wrapper.findAll('select').at(0)!.setValue('TenantOwner')
     await flushPromises()
 
     expect(updateTenantUserRoleMock).toHaveBeenCalledWith('friends', 2, 'TenantOwner')
@@ -340,6 +405,36 @@ describe('TenantSettingsPanel', () => {
     expect(tenantsMock).toHaveBeenCalled()
     expect(pushMock).toHaveBeenCalledWith('/')
   })
+
+  it('renders tenant setting blocks in the requested order', async () => {
+    const owner = {
+      userId: 1,
+      email: 'owner@example.test',
+      displayName: 'Owner',
+      permalink: 'owner',
+      serverRole: 'ServerMember' as const,
+      passkeyCount: 0,
+      hasPassword: true
+    }
+    authState.user = owner
+    getTenantUsersMock.mockResolvedValue([
+      tenantUser(1, 'Owner', 'owner@example.test', 'TenantOwner')
+    ])
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.find('.tenant-settings-header h1').text()).toBe('Friends')
+    const headings = wrapper.findAll('.veyq-surface h1').map((heading) => heading.text())
+    expect(headings).toEqual([
+      'Logo',
+      'Mitglieder',
+      'Registrierungslinks',
+      'Gruppen',
+      'Nutzungsbedingungen für Shares',
+      'Gefährliche Zone'
+    ])
+  })
 })
 
 function mountPanel() {
@@ -366,12 +461,15 @@ function mountPanel() {
           template: '<button type="button">{{ chooseLabel }}</button>',
           props: ['chooseLabel']
         },
+        GroupSettingsPanel: {
+          template: '<section class="veyq-surface settings-panel"><h1>Gruppen</h1></section>'
+        },
         Message: { template: '<div><slot /></div>' },
         ProgressSpinner: { template: '<div />' },
         Select: {
           props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
           emits: ['update:modelValue'],
-          template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option[optionValue]" :value="option[optionValue]">{{ option[optionLabel] }}</option></select>'
+          template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option[optionValue]" :value="option[optionValue]">{{ option[optionLabel] }}</option></select>'
         }
       }
     }
@@ -404,6 +502,25 @@ function tenantUser(
     },
     email,
     role,
+    status
+  } as const
+}
+
+function registrationInvite(
+  id: number,
+  status: 'Active' | 'Expired' | 'Revoked' | 'Exhausted' = 'Active'
+) {
+  return {
+    id,
+    tenantId: 10,
+    tenantName: 'friends',
+    createdByUserId: 1,
+    joinUrl: `https://friends.test/join/invite-${id}`,
+    expiresAt: '2026-06-15T12:00:00Z',
+    revokedAt: status === 'Revoked' ? '2026-06-03T12:00:00Z' : undefined,
+    maxRegistrations: 100,
+    registrationCount: 2,
+    createdAt: '2026-06-01T12:00:00Z',
     status
   } as const
 }

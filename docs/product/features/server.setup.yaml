@@ -18,7 +18,7 @@ acceptanceCriteria:
             ref: backend/src/test/kotlin/com/veyq/api/setup/SetupValidationTest.kt
       frontend:
         unit:
-          - testName: requires a display name before starting passkey setup
+          - testName: requires account fields before starting passkey setup
             kind: negative
             ref: frontend/src/views/SetupView.test.ts
           - testName: asks for TOTP setup before privacy opt-ins after password admin setup

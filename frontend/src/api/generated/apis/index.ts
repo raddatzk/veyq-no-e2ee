@@ -17,5 +17,6 @@ export * from './SearchApi';
 export * from './ServerApi';
 export * from './SettingsApi';
 export * from './SetupApi';
+export * from './TenantRegistrationInvitesApi';
 export * from './TenantsApi';
 export * from './UsersApi';

@@ -4,6 +4,7 @@ import com.veyq.api.domain.ResetPasswordTokenRepo
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.TenantRepo
+import com.veyq.api.domain.TenantRegistrationInviteRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.UserEmailChangeRepo
 import com.veyq.api.domain.UserInvitationRepo
@@ -22,6 +23,7 @@ class UserTokenCleanup @Inject constructor(
     private val userEmailChangeRepo: UserEmailChangeRepo,
     private val tenantRepo: TenantRepo,
     private val tenantMemberRepo: TenantMemberRepo,
+    private val tenantRegistrationInviteRepo: TenantRegistrationInviteRepo,
     private val userConfig: UserConfig,
 ) {
 
@@ -39,6 +41,7 @@ class UserTokenCleanup @Inject constructor(
     }
 
     private fun deleteInactiveTenant(tenant: Tenant) {
+        tenantRegistrationInviteRepo.deleteByTenant(tenant)
         userInvitationRepo.deleteByTenant(tenant)
         tenantMemberRepo.deleteByTenant(tenant)
         tenantRepo.deleteByIdValue(tenant.id)
