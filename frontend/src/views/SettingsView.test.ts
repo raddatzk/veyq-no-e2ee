@@ -4,6 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import SettingsView from './SettingsView.vue'
 import { getSettings } from '../features/settings/api'
 import { authState } from '../authState'
+import { clearWorkspaceToolbar, workspaceToolbar } from '../composables/useWorkspaceToolbar'
 
 vi.mock('../features/settings/api', () => ({
   getSettings: vi.fn()
@@ -19,6 +20,7 @@ describe('SettingsView', () => {
     authState.userLabel = ''
     authState.tenants = []
     authState.activeTenantName = ''
+    clearWorkspaceToolbar()
   })
 
   it('loads the settings context with the full global route path', async () => {
@@ -154,6 +156,40 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Group settings')
     expect(wrapper.text()).not.toContain('Tenant settings')
   })
+
+  it('ignores stale settings responses after switching tenants', async () => {
+    let resolveFriends: (value: ReturnType<typeof settingsResponse>) => void = () => {}
+    const friendsPromise = new Promise<ReturnType<typeof settingsResponse>>((resolve) => {
+      resolveFriends = resolve
+    })
+    getSettingsMock.mockImplementation((path) => {
+      if (path === '/friends/settings') return friendsPromise
+      return Promise.resolve(settingsResponse('/family/settings', 'TENANT', 'Family'))
+    })
+    authState.tenants = [
+      tenant('friends', 'Friends'),
+      tenant('family', 'Family')
+    ]
+    authState.activeTenantName = 'friends'
+    const router = testRouter()
+    await router.push('/settings')
+    await router.isReady()
+
+    mount(SettingsView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    authState.activeTenantName = 'family'
+    await flushPromises()
+    resolveFriends(settingsResponse('/friends/settings', 'TENANT', 'Friends'))
+    await flushPromises()
+
+    expect(getSettingsMock).toHaveBeenCalledWith('/friends/settings')
+    expect(getSettingsMock).toHaveBeenCalledWith('/family/settings')
+    expect(workspaceToolbar.breadcrumbs.map((breadcrumb) => breadcrumb.label)).toEqual([
+      'Einstellungen',
+      'Family'
+    ])
+  })
 })
 
 function testRouter() {
@@ -168,7 +204,7 @@ function testRouter() {
   })
 }
 
-function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT' | 'SERVER') {
+function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT' | 'SERVER', label = 'Friends') {
   return {
     location: {
       path,
@@ -177,8 +213,8 @@ function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT' | 'SER
     },
     subject: {
       type,
-      displayName: type === 'USER' ? 'Me' : type === 'TENANT' ? 'Friends' : type === 'SERVER' ? 'Server' : 'Family',
-      label: type === 'USER' ? '~Me' : type === 'TENANT' ? 'Friends' : type === 'SERVER' ? 'Server' : '@Family'
+      displayName: type === 'USER' ? 'Me' : type === 'TENANT' ? label : type === 'SERVER' ? 'Server' : 'Family',
+      label: type === 'USER' ? '~Me' : type === 'TENANT' ? label : type === 'SERVER' ? 'Server' : '@Family'
     },
     breadcrumbs: [
       {
@@ -186,8 +222,25 @@ function settingsResponse(path: string, type: 'USER' | 'GROUP' | 'TENANT' | 'SER
         path,
         displayName: 'Einstellungen',
         label: 'Einstellungen'
+      },
+      {
+        type,
+        path,
+        displayName: label,
+        label
       }
     ]
+  }
+}
+
+function tenant(name: string, displayName: string) {
+  return {
+    id: name === 'friends' ? 1 : 2,
+    name,
+    displayName,
+    domain: `${name}.example.test`,
+    role: 'TenantOwner' as const,
+    admins: []
   }
 }
 

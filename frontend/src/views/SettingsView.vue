@@ -35,18 +35,23 @@ const groupName = computed(() => {
 const settings = ref<SettingsResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
+let loadSequence = 0
 
 watch([backendSettingsPath, locale], loadSettings, { immediate: true })
 
 onBeforeUnmount(() => {
+  loadSequence += 1
   clearWorkspaceToolbar()
 })
 
 async function loadSettings() {
+  const sequence = ++loadSequence
   loading.value = true
   error.value = ''
+  clearWorkspaceToolbar()
   try {
     const response = await getSettings(backendSettingsPath.value)
+    if (sequence !== loadSequence) return
     settings.value = response
     setWorkspaceToolbar(
       response.breadcrumbs.map((breadcrumb) => ({
@@ -56,11 +61,12 @@ async function loadSettings() {
       []
     )
   } catch (caught) {
+    if (sequence !== loadSequence) return
     settings.value = null
     error.value = caught instanceof Error ? caught.message : t('settings.loadFailed')
     clearWorkspaceToolbar()
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 

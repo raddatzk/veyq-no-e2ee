@@ -18,6 +18,8 @@ type ToolbarOptions = {
 }
 
 export function useMemoryToolbar(options: ToolbarOptions) {
+  let lastContextKey = ''
+
   watch(
     [
       options.navigation,
@@ -39,8 +41,15 @@ export function useMemoryToolbar(options: ToolbarOptions) {
 
   function updateToolbar() {
     if (!options.tenantName.value) {
+      lastContextKey = ''
       clearWorkspaceToolbar()
       return
+    }
+
+    const contextKey = `${options.tenantName.value}:${options.routePath.value}`
+    if (contextKey !== lastContextKey) {
+      lastContextKey = contextKey
+      if (!options.memory.value && !options.navigation.value) clearWorkspaceToolbar()
     }
 
     if (options.memory.value) {

@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
-import { memoryBreadcrumbs } from './useMemoryToolbar'
-import type { Memory } from '../api'
+import { computed, effectScope, nextTick, ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { clearWorkspaceToolbar, workspaceToolbar } from '../../../composables/useWorkspaceToolbar'
+import { memoryBreadcrumbs, useMemoryToolbar } from './useMemoryToolbar'
+import type { Memory, MemoryNavigationResponse } from '../api'
 
 describe('memoryBreadcrumbs', () => {
+  afterEach(() => {
+    clearWorkspaceToolbar()
+  })
+
   it('includes the tenant and parent path segments before the memory label', () => {
     const navigateToPath = vi.fn()
     const breadcrumbs = memoryBreadcrumbs(
@@ -47,6 +53,44 @@ describe('memoryBreadcrumbs', () => {
       'Albanien'
     ])
   })
+
+  it('clears stale settings actions while a new tenant context is loading', async () => {
+    const tenantName = ref('friends')
+    const routePath = ref('/')
+    const navigation = ref<MemoryNavigationResponse | null>(navigationResponse('Friends'))
+    const memoryRef = ref<Memory | null>(null)
+    const memoryBreadcrumbsRef = ref([])
+    const loading = ref(false)
+    const openContextSettings = vi.fn()
+    const navigateToPath = vi.fn()
+    const scope = effectScope()
+
+    scope.run(() => {
+      useMemoryToolbar({
+        navigation,
+        memory: memoryRef,
+        memoryBreadcrumbs: memoryBreadcrumbsRef,
+        loading,
+        tenantName: computed(() => tenantName.value),
+        tenantLabel: computed(() => tenantName.value),
+        routePath: computed(() => routePath.value),
+        openContextSettings,
+        navigateToPath
+      })
+    })
+
+    expect(workspaceToolbar.actions.map((action) => action.key)).toEqual(['settings'])
+
+    tenantName.value = 'family'
+    loading.value = true
+    navigation.value = null
+    await nextTick()
+
+    expect(workspaceToolbar.active).toBe(false)
+    expect(workspaceToolbar.actions).toEqual([])
+
+    scope.stop()
+  })
 })
 
 function memory(overrides: Partial<Memory>): Memory {
@@ -66,5 +110,15 @@ function memory(overrides: Partial<Memory>): Memory {
     favorite: false,
     scope: null,
     ...overrides
+  }
+}
+
+function navigationResponse(label: string): MemoryNavigationResponse {
+  return {
+    location: { kind: 'TENANT', path: '/', displayName: label },
+    breadcrumbs: [{ kind: 'TENANT', path: '/', displayName: label, label }],
+    scopeRoots: [],
+    favoriteMemories: [],
+    folders: []
   }
 }

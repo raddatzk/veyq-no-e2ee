@@ -164,6 +164,9 @@ acceptanceCriteria:
           - testName: loads tenant settings context with tenant prefix in the path
             kind: positive
             ref: frontend/src/views/SettingsView.test.ts
+          - testName: ignores stale settings responses after switching tenants
+            kind: negative
+            ref: frontend/src/views/SettingsView.test.ts
           - testName: allows anonymous tenant registration links
             kind: positive
             ref: frontend/src/router.test.ts
