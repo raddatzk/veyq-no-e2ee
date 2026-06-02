@@ -287,6 +287,9 @@ acceptanceCriteria:
           - testName: lists updated memory media after updated cursor
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: memory media updates return changed media and current ids when media is deleted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: media updates endpoint accepts openapi date-time cursor
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryMediaResourceTest.kt
@@ -331,6 +334,12 @@ acceptanceCriteria:
           - testName: merges long-polled Memory media and refreshes buckets and header counts
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: removes deleted media from long-polled current media ids without refetching media
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: removes a deleted highlighted media from the highlighted filter view
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
           - testName: merges public share media live updates and refreshes header and buckets
             kind: positive
             ref: frontend/src/views/PublicShareView.test.ts

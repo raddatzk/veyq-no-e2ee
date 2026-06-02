@@ -25,6 +25,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.HexFormat
 import java.text.Normalizer
 import java.time.Instant
 import java.time.ZoneOffset
@@ -90,6 +91,11 @@ class MediaService @Inject constructor(
         val metadata: ExtractedMediaMetadata,
     )
 
+    data class MemoryMediaUpdates(
+        val media: List<MemoryMediaSummary>,
+        val currentMediaIds: List<String>?,
+    )
+
     @Transactional
     fun listMemoryMedia(memoryId: String, includeChildren: Boolean): List<MemoryMediaSummary> {
         val memory = resolveVisibleMemory(memoryId)
@@ -103,34 +109,46 @@ class MediaService @Inject constructor(
             .map { mediaResponseMapper.toMemorySummary(it, tenant().name) }
     }
 
-    fun waitForNewMemoryMedia(
+    fun waitForMemoryMediaUpdates(
         memoryId: String,
         includeChildren: Boolean,
         afterUpdatedAt: Instant?,
         afterMediaId: String?,
+        knownMediaSetHash: String?,
         timeoutSeconds: Long,
-    ): List<MemoryMediaSummary> {
+    ): MemoryMediaUpdates {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
         while (true) {
-            val media = self.get().listUpdatedMemoryMedia(memoryId, includeChildren, afterUpdatedAt, afterMediaId)
-            if (media.isNotEmpty() || System.nanoTime() >= deadline) return media
+            val updates = self.get().listMemoryMediaUpdates(
+                memoryId,
+                includeChildren,
+                afterUpdatedAt,
+                afterMediaId,
+                knownMediaSetHash,
+            )
+            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
             TimeUnit.MILLISECONDS.sleep(750)
         }
     }
 
     @Transactional
-    fun listUpdatedMemoryMedia(
+    fun listMemoryMediaUpdates(
         memoryId: String,
         includeChildren: Boolean,
         afterUpdatedAt: Instant?,
         afterMediaId: String?,
-    ): List<MemoryMediaSummary> {
+        knownMediaSetHash: String?,
+    ): MemoryMediaUpdates {
         val memory = resolveVisibleMemory(memoryId)
         val memories = if (includeChildren) descendantsAndSelf(memory).filter(::isMemoryVisible) else listOf(memory)
         ensureBucketsForMemories(memories)
-        return mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, LIVE_MEDIA_LIMIT)
+        val media = mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, LIVE_MEDIA_LIMIT)
             .distinctBy { it.id }
             .map { mediaResponseMapper.toMemorySummary(it, tenant().name) }
+        return MemoryMediaUpdates(
+            media = media,
+            currentMediaIds = currentMediaIdsIfChanged(memories, knownMediaSetHash),
+        )
     }
 
     @Transactional
@@ -1317,6 +1335,23 @@ class MediaService @Inject constructor(
         media.delete()
         mediaRepo.flush()
         deleteBlobIfUnreferenced(blob)
+    }
+
+    fun mediaSetHash(mediaIds: List<String>): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        mediaIds.sorted().forEach { mediaId ->
+            digest.update(mediaId.length.toString().toByteArray(Charsets.UTF_8))
+            digest.update(':'.code.toByte())
+            digest.update(mediaId.toByteArray(Charsets.UTF_8))
+            digest.update('\n'.code.toByte())
+        }
+        return HexFormat.of().formatHex(digest.digest())
+    }
+
+    private fun currentMediaIdsIfChanged(memories: List<Memory>, knownMediaSetHash: String?): List<String>? {
+        if (knownMediaSetHash.isNullOrBlank()) return null
+        val currentMediaIds = mediaRepo.listPublicIdsByMemories(memories).distinct().sorted()
+        return if (mediaSetHash(currentMediaIds) == knownMediaSetHash) null else currentMediaIds
     }
 
     private fun resolveAccessibleMedia(publicId: String): Media {

@@ -588,7 +588,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.
+        Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server's current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.
 
         Vorbedingungen:
         - The share is enabled.
@@ -617,6 +617,12 @@ paths:
           schema:
             type: string
           description: Public id of the newest media item already known to the client, used as a stable tie-breaker.
+        - in: query
+          name: knownMediaSetHash
+          required: false
+          schema:
+            type: string
+          description: SHA-256 hash of the client's sorted visible public media id set. If it differs from the current server set, the response includes `currentMediaIds`.
         - in: query
           name: timeoutSeconds
           required: false
@@ -2862,6 +2868,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/PublicShareMediaSummary"
+        currentMediaIds:
+          type: array
+          description: Sorted current visible public media ids, returned only when `knownMediaSetHash` differs from the server's current media id set.
+          items:
+            type: string
     PublicShareMediaSummary:
       type: object
       additionalProperties: false

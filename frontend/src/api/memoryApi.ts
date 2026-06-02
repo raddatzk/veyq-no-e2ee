@@ -275,14 +275,17 @@ export function waitForNewMemoryMedia(
   includeChildren: boolean,
   afterUpdatedAt?: string | null,
   afterMediaId?: string | null,
+  knownMediaSetHash?: string | null,
   signal?: AbortSignal
 ): Promise<MemoryMediaUpdatesResponse> {
   const params = new URLSearchParams({ includeChildren: String(includeChildren) })
   if (afterUpdatedAt) params.set('afterUpdatedAt', afterUpdatedAt)
   if (afterMediaId) params.set('afterMediaId', afterMediaId)
+  if (knownMediaSetHash) params.set('knownMediaSetHash', knownMediaSetHash)
   const path = `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
-  return callApi<{ media: MemoryMediaSummary[] }>(path, { signal }).then((response) => ({
-    media: response.media.map(normalizeMemoryMedia)
+  return callApi<{ media: MemoryMediaSummary[]; currentMediaIds?: string[] }>(path, { signal }).then((response) => ({
+    media: response.media.map(normalizeMemoryMedia),
+    currentMediaIds: response.currentMediaIds
   }))
 }
 
@@ -721,14 +724,17 @@ export function waitForNewPublicShareMemoryMedia(
   includeChildren: boolean,
   afterUpdatedAt?: string | null,
   afterMediaId?: string | null,
+  knownMediaSetHash?: string | null,
   signal?: AbortSignal
 ): Promise<MemoryMediaUpdatesResponse> {
   const params = new URLSearchParams({ includeChildren: String(includeChildren) })
   if (afterUpdatedAt) params.set('afterUpdatedAt', afterUpdatedAt)
   if (afterMediaId) params.set('afterMediaId', afterMediaId)
+  if (knownMediaSetHash) params.set('knownMediaSetHash', knownMediaSetHash)
   const path = `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
-  return callApi<{ media: PublicShareMediaSummary[] }>(path, { signal }).then((response) => ({
-    media: response.media.map(normalizePublicShareMedia)
+  return callApi<{ media: PublicShareMediaSummary[]; currentMediaIds?: string[] }>(path, { signal }).then((response) => ({
+    media: response.media.map(normalizePublicShareMedia),
+    currentMediaIds: response.currentMediaIds
   }))
 }
 

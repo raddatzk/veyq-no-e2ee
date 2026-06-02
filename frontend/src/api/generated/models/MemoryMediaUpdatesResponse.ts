@@ -33,6 +33,12 @@ export interface MemoryMediaUpdatesResponse {
      * @memberof MemoryMediaUpdatesResponse
      */
     media: Array<MemoryMediaSummary>;
+    /**
+     * Sorted current visible public media ids, returned only when `knownMediaSetHash` differs from the server's current media id set.
+     * @type {Array<string>}
+     * @memberof MemoryMediaUpdatesResponse
+     */
+    currentMediaIds?: Array<string>;
 }
 
 /**
@@ -54,6 +60,7 @@ export function MemoryMediaUpdatesResponseFromJSONTyped(json: any, ignoreDiscrim
     return {
         
         'media': ((json['media'] as Array<any>).map(MemoryMediaSummaryFromJSON)),
+        'currentMediaIds': json['currentMediaIds'] == null ? undefined : json['currentMediaIds'],
     };
 }
 
@@ -69,6 +76,7 @@ export function MemoryMediaUpdatesResponseToJSONTyped(value?: MemoryMediaUpdates
     return {
         
         'media': ((value['media'] as Array<any>).map(MemoryMediaSummaryToJSON)),
+        'currentMediaIds': value['currentMediaIds'],
     };
 }
 

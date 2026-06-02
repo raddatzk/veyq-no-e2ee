@@ -98,20 +98,25 @@ class PublicShareResource @Inject constructor(
         includeChildren: Boolean?,
         afterUpdatedAt: java.util.Date?,
         afterMediaId: String?,
+        knownMediaSetHash: String?,
         timeoutSeconds: Int?,
-    ): Response =
-        Response.ok(
+    ): Response {
+        val updates = memoryShareService.waitForPublicShareMemoryMediaUpdates(
+            shareId = shareId,
+            memoryId = memoryId,
+            includeChildren = includeChildren ?: false,
+            afterUpdatedAt = afterUpdatedAt?.toInstant(),
+            afterMediaId = afterMediaId,
+            knownMediaSetHash = knownMediaSetHash,
+            timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
+        )
+        return Response.ok(
             PublicShareMediaUpdatesResponse(
-                media = memoryShareService.waitForPublicShareMemoryMediaUpdates(
-                    shareId = shareId,
-                    memoryId = memoryId,
-                    includeChildren = includeChildren ?: false,
-                    afterUpdatedAt = afterUpdatedAt?.toInstant(),
-                    afterMediaId = afterMediaId,
-                    timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
-                )
+                media = updates.media,
+                currentMediaIds = updates.currentMediaIds,
             )
         ).build()
+    }
 
     override fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(memoryShareService.listPublicShareMemoryMediaBuckets(shareId, memoryId, includeChildren ?: false)).build()

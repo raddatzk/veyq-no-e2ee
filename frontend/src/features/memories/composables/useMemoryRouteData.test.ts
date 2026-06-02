@@ -125,6 +125,7 @@ describe('useMemoryRouteData', () => {
       true,
       '2026-05-03T12:00:00Z',
       'media-existing',
+      '1eee2587783688b1a385456d969a244dddcbf4ec41a43a80a273cdcbbff485db',
       expect.any(AbortSignal)
     )
     expect(listMemoryMediaMock).toHaveBeenCalledTimes(1)
@@ -133,6 +134,44 @@ describe('useMemoryRouteData', () => {
     expect(data?.media.value.map((item) => item.id)).toEqual(['media-fresh', 'media-existing'])
     expect(data?.mediaBuckets.value.map((bucket) => bucket.mediaCount)).toEqual([1])
     expect(data?.memoryHeader.value?.directMediaCount).toBe(1)
+  })
+
+  it('removes deleted media from long-polled current media ids without refetching media', async () => {
+    getMemoryByPathMock.mockResolvedValue(memory())
+    getMemoryHeaderMock
+      .mockResolvedValueOnce(memoryHeader({ directMediaCount: 2 }))
+      .mockResolvedValueOnce(memoryHeader({ directMediaCount: 1 }))
+    listMemoryMediaMock.mockResolvedValueOnce([
+      memoryMedia({ id: 'media-existing', updatedAt: '2026-05-03T12:00:00Z' }),
+      memoryMedia({ id: 'media-deleted', updatedAt: '2026-05-03T12:01:00Z', highlight: true })
+    ])
+    listMemoryMediaBucketsMock
+      .mockResolvedValueOnce([mediaBucket({ mediaCount: 2 })])
+      .mockResolvedValueOnce([mediaBucket({ mediaCount: 1 })])
+    const update = deferred<Awaited<ReturnType<typeof waitForNewMemoryMedia>>>()
+    waitForNewMemoryMediaMock.mockReturnValueOnce(update.promise).mockImplementation(() => new Promise(() => {}))
+
+    const tenantName = ref('tenant')
+    const routePath = ref('/trip')
+    let data: ReturnType<typeof useMemoryRouteData> | undefined
+    scope = effectScope()
+    scope.run(() => {
+      data = useMemoryRouteData(computed(() => tenantName.value), computed(() => routePath.value))
+    })
+
+    await flushPromises()
+
+    update.resolve({
+      media: [],
+      currentMediaIds: ['media-existing']
+    })
+    await flushPromises()
+
+    expect(listMemoryMediaMock).toHaveBeenCalledTimes(1)
+    expect(listMemoryMediaBucketsMock).toHaveBeenCalledTimes(2)
+    expect(getMemoryHeaderMock).toHaveBeenCalledTimes(2)
+    expect(data?.media.value.map((item) => item.id)).toEqual(['media-existing'])
+    expect(data?.media.value.some((item) => item.highlight)).toBe(false)
   })
 })
 

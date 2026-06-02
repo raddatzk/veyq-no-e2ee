@@ -33,6 +33,12 @@ export interface PublicShareMediaUpdatesResponse {
      * @memberof PublicShareMediaUpdatesResponse
      */
     media: Array<PublicShareMediaSummary>;
+    /**
+     * Sorted current visible public media ids, returned only when `knownMediaSetHash` differs from the server's current media id set.
+     * @type {Array<string>}
+     * @memberof PublicShareMediaUpdatesResponse
+     */
+    currentMediaIds?: Array<string>;
 }
 
 /**
@@ -54,6 +60,7 @@ export function PublicShareMediaUpdatesResponseFromJSONTyped(json: any, ignoreDi
     return {
         
         'media': ((json['media'] as Array<any>).map(PublicShareMediaSummaryFromJSON)),
+        'currentMediaIds': json['currentMediaIds'] == null ? undefined : json['currentMediaIds'],
     };
 }
 
@@ -69,6 +76,7 @@ export function PublicShareMediaUpdatesResponseToJSONTyped(value?: PublicShareMe
     return {
         
         'media': ((value['media'] as Array<any>).map(PublicShareMediaSummaryToJSON)),
+        'currentMediaIds': value['currentMediaIds'],
     };
 }
 

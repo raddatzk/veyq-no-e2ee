@@ -310,6 +310,14 @@ class MediaRepo : PanacheRepository<Media> {
         return list("memory in ?1 order by coalesce(capturedAt, createdAt), createdAt", memories)
     }
 
+    fun listPublicIdsByMemories(memories: List<Memory>): List<String> {
+        if (memories.isEmpty()) return emptyList()
+        return archiveEntityManager.createQuery(
+            "select m.publicId from Media m where m.memory in :memories order by m.publicId",
+            String::class.java,
+        ).setParameter("memories", memories).resultList
+    }
+
     fun listByMemoriesUpdatedAfter(
         memories: List<Memory>,
         afterUpdatedAt: Instant?,

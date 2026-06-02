@@ -428,6 +428,7 @@ describe('PublicShareView', () => {
       true,
       undefined,
       undefined,
+      expect.any(String),
       expect.any(AbortSignal)
     )
     expect(wrapper.find('[data-testid="memory-detail"]').attributes('data-media-count')).toBe('1')

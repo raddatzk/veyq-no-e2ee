@@ -39,6 +39,7 @@ import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaCapturedAtRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaHighlightRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
 import com.veyq.api.library.playlist.MemoryPlaylistService
@@ -217,14 +218,57 @@ class MemoryServiceTest {
         }
         val firstCursor = mediaService.listMemoryMedia(trip.id, true).first { it.id == first.publicId }
 
+        val updates = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = true,
+            afterUpdatedAt = firstCursor.updatedAt.toInstant(),
+            afterMediaId = first.publicId,
+            knownMediaSetHash = null,
+        )
+
         assertThat(
-            mediaService.listUpdatedMemoryMedia(
-                memoryId = trip.id,
-                includeChildren = true,
-                afterUpdatedAt = firstCursor.updatedAt.toInstant(),
-                afterMediaId = first.publicId,
-            )
-        ).extracting("id").containsExactly(second.publicId, child.publicId)
+            updates.media.map { it.id }
+        ).containsExactly(second.publicId, child.publicId)
+        assertThat(updates.currentMediaIds).isNull()
+    }
+
+    @Test
+    fun `memory media updates return changed media and current ids when media is deleted`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-delete-trip", "Live Delete Trip"))
+        val first = createMedia(
+            owner,
+            memory(trip.id),
+            "First",
+            createdAt = Instant.parse("2026-01-02T10:00:00Z"),
+        )
+        val second = createMedia(
+            owner,
+            memory(trip.id),
+            "Second",
+            createdAt = Instant.parse("2026-01-02T10:01:00Z"),
+        )
+        val initial = mediaService.listMemoryMedia(trip.id, false)
+        val cursor = initial.maxWith(compareBy({ it.updatedAt }, { it.id }))
+        val knownHash = mediaService.mediaSetHash(initial.map { it.id })
+
+        mediaService.deleteMemoryMedia(trip.id, second.publicId)
+        mediaService.updateMemoryMediaHighlight(
+            trip.id,
+            first.publicId,
+            UpdateMemoryMediaHighlightRequest(highlight = true),
+        )
+
+        val updates = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = cursor.updatedAt.toInstant(),
+            afterMediaId = cursor.id,
+            knownMediaSetHash = knownHash,
+        )
+
+        assertThat(updates.media.map { it.id }).containsExactly(first.publicId)
+        assertThat(updates.media.single().highlight).isTrue()
+        assertThat(updates.currentMediaIds).containsExactly(first.publicId)
     }
 
     @Test

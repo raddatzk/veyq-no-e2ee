@@ -428,6 +428,7 @@ export interface WaitForPublicShareMemoryMediaUpdatesRequest {
     includeChildren?: boolean;
     afterUpdatedAt?: string;
     afterMediaId?: string;
+    knownMediaSetHash?: string;
     timeoutSeconds?: number;
 }
 
@@ -1935,6 +1936,7 @@ export interface PublicSharesApiInterface {
      * @param {boolean} [includeChildren] Include media assigned to descendant Memories inside the shared subtree.
      * @param {string} [afterUpdatedAt] Updated timestamp of the newest media item already known to the client.
      * @param {string} [afterMediaId] Public id of the newest media item already known to the client, used as a stable tie-breaker.
+     * @param {string} [knownMediaSetHash] SHA-256 hash of the client\&#39;s sorted visible public media id set. If it differs from the current server set, the response includes &#x60;currentMediaIds&#x60;.
      * @param {number} [timeoutSeconds] Maximum time to hold the request before returning an empty update set.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
@@ -1942,13 +1944,14 @@ export interface PublicSharesApiInterface {
     waitForPublicShareMemoryMediaUpdatesRequestOpts(requestParameters: WaitForPublicShareMemoryMediaUpdatesRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * @summary Wait for public share Memory media updates
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
      * @param {boolean} [includeChildren] Include media assigned to descendant Memories inside the shared subtree.
      * @param {string} [afterUpdatedAt] Updated timestamp of the newest media item already known to the client.
      * @param {string} [afterMediaId] Public id of the newest media item already known to the client, used as a stable tie-breaker.
+     * @param {string} [knownMediaSetHash] SHA-256 hash of the client\&#39;s sorted visible public media id set. If it differs from the current server set, the response includes &#x60;currentMediaIds&#x60;.
      * @param {number} [timeoutSeconds] Maximum time to hold the request before returning an empty update set.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -1957,7 +1960,7 @@ export interface PublicSharesApiInterface {
     waitForPublicShareMemoryMediaUpdatesRaw(requestParameters: WaitForPublicShareMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaUpdatesResponse>>;
 
     /**
-     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Wait for public share Memory media updates
      */
     waitForPublicShareMemoryMediaUpdates(requestParameters: WaitForPublicShareMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaUpdatesResponse>;
@@ -5368,6 +5371,10 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
             queryParameters['afterMediaId'] = requestParameters['afterMediaId'];
         }
 
+        if (requestParameters['knownMediaSetHash'] != null) {
+            queryParameters['knownMediaSetHash'] = requestParameters['knownMediaSetHash'];
+        }
+
         if (requestParameters['timeoutSeconds'] != null) {
             queryParameters['timeoutSeconds'] = requestParameters['timeoutSeconds'];
         }
@@ -5388,7 +5395,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Wait for public share Memory media updates
      */
     async waitForPublicShareMemoryMediaUpdatesRaw(requestParameters: WaitForPublicShareMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaUpdatesResponse>> {
@@ -5399,7 +5406,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
      * Wait for public share Memory media updates
      */
     async waitForPublicShareMemoryMediaUpdates(requestParameters: WaitForPublicShareMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaUpdatesResponse> {

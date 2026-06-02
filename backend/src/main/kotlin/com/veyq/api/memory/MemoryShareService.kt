@@ -87,6 +87,11 @@ class MemoryShareService @Inject constructor(
     private val publicShareMemoryMapper: PublicShareMemoryMapper,
     private val memoryShareMapper: MemoryShareMapper,
 ) {
+    data class PublicShareMediaUpdates(
+        val media: List<com.veyq.api.generated.model.PublicShareMediaSummary>,
+        val currentMediaIds: List<String>?,
+    )
+
     private val random = SecureRandom()
 
     @Inject
@@ -364,36 +369,43 @@ class MemoryShareService @Inject constructor(
         includeChildren: Boolean,
         afterUpdatedAt: Instant?,
         afterMediaId: String?,
+        knownMediaSetHash: String?,
         timeoutSeconds: Long,
-    ): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
+    ): PublicShareMediaUpdates {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
         while (true) {
-            val media = self.get().listUpdatedPublicShareMemoryMedia(
+            val updates = self.get().listPublicShareMemoryMediaUpdates(
                 shareId,
                 memoryId,
                 includeChildren,
                 afterUpdatedAt,
                 afterMediaId,
+                knownMediaSetHash,
             )
-            if (media.isNotEmpty() || System.nanoTime() >= deadline) return media
+            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
             TimeUnit.MILLISECONDS.sleep(750)
         }
     }
 
     @Transactional
-    fun listUpdatedPublicShareMemoryMedia(
+    fun listPublicShareMemoryMediaUpdates(
         shareId: String,
         memoryId: String,
         includeChildren: Boolean,
         afterUpdatedAt: Instant?,
         afterMediaId: String?,
-    ): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
+        knownMediaSetHash: String?,
+    ): PublicShareMediaUpdates {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
-        return mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, PUBLIC_SHARE_LIVE_MEDIA_LIMIT)
+        val media = mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, PUBLIC_SHARE_LIVE_MEDIA_LIMIT)
             .filter { isPublicMediaVisible(access, it) }
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
+        return PublicShareMediaUpdates(
+            media = media,
+            currentMediaIds = publicShareCurrentMediaIdsIfChanged(access, memories, knownMediaSetHash),
+        )
     }
 
     @Transactional
@@ -931,6 +943,20 @@ class MemoryShareService @Inject constructor(
         if (!isDescendantOrSelf(memory, access.share.rootMemory)) return false
         if (access.canViewGallery) return true
         return access.shareIdentity != null && media.shareIdentity?.id == access.shareIdentity.id
+    }
+
+    private fun publicShareCurrentMediaIdsIfChanged(
+        access: ShareAccess,
+        memories: List<Memory>,
+        knownMediaSetHash: String?,
+    ): List<String>? {
+        if (knownMediaSetHash.isNullOrBlank()) return null
+        val currentMediaIds = mediaRepo.listByMemoriesOrdered(memories)
+            .filter { isPublicMediaVisible(access, it) }
+            .map { it.publicId }
+            .distinct()
+            .sorted()
+        return if (mediaService.mediaSetHash(currentMediaIds) == knownMediaSetHash) null else currentMediaIds
     }
 
     private fun requireMediaManageAccess(access: ShareAccess, media: Media) {

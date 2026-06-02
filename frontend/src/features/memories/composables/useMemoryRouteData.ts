@@ -21,6 +21,7 @@ import {
   type MemoryTrack
 } from '../api'
 import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
+import { mediaSetHash } from '../utils/mediaSetHash'
 
 export type MemoryRouteKind = 'folder' | 'memory'
 export type MemoryRouteBreadcrumb = {
@@ -198,17 +199,23 @@ export function useMemoryRouteData(
     while (!controller.signal.aborted && sequence === loadSequence && memory.value?.id === current.id) {
       const cursor = newestUpdatedAtCursor(media.value)
       try {
+        const knownMediaSetHash = await mediaSetHash(media.value.map((item) => item.id))
+        if (controller.signal.aborted || sequence !== loadSequence || memory.value?.id !== current.id) return
         const updates = await waitForNewMemoryMedia(
           tenantName.value,
           current.id,
           true,
           cursor?.updatedAt,
           cursor?.mediaId,
+          knownMediaSetHash,
           controller.signal
         )
         if (controller.signal.aborted || sequence !== loadSequence || memory.value?.id !== current.id) return
-        if (updates.media.length > 0) {
-          media.value = chronologicallySortedMedia(mergeMediaById(media.value, updates.media))
+        const mergedMedia = updates.media.length > 0 ? mergeMediaById(media.value, updates.media) : media.value
+        const nextMedia = removeMissingMedia(mergedMedia, updates.currentMediaIds)
+        const removedMedia = nextMedia.length !== mergedMedia.length
+        if (updates.media.length > 0 || removedMedia) {
+          media.value = chronologicallySortedMedia(nextMedia)
           const [header, buckets] = await Promise.all([
             getMemoryHeader(tenantName.value, current.id),
             listMemoryMediaBuckets(tenantName.value, current.id, true)
@@ -290,6 +297,12 @@ function mergeMediaById(current: MemoryMedia[], updates: MemoryMedia[]): MemoryM
   current.forEach((item) => byId.set(item.id, item))
   updates.forEach((item) => byId.set(item.id, item))
   return [...byId.values()]
+}
+
+function removeMissingMedia(current: MemoryMedia[], currentMediaIds?: string[]): MemoryMedia[] {
+  if (!currentMediaIds) return current
+  const currentIdSet = new Set(currentMediaIds)
+  return current.filter((item) => currentIdSet.has(item.id))
 }
 
 function chronologicallySortedMedia(media: MemoryMedia[]): MemoryMedia[] {

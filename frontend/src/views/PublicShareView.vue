@@ -21,6 +21,7 @@ import { API_BASE } from '../shared/api/httpClient'
 import { useThemeState, type ThemePreference } from '../shared/state/useThemeState'
 import { getErrorMessage } from '../shared/utils/errors'
 import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
+import { mediaSetHash } from '../features/memories/utils/mediaSetHash'
 import {
   createPublicShareChildMemory,
   createPublicShareMemoryJournalLiveSession,
@@ -353,17 +354,23 @@ async function watchMemoryMediaUpdates(
   while (!controller.signal.aborted && sequence === memoryLoadSequence && memory.value?.id === current.id) {
     const cursor = newestUpdatedAtCursor(media.value)
     try {
+      const knownMediaSetHash = await mediaSetHash(media.value.map((item) => item.id))
+      if (controller.signal.aborted || sequence !== memoryLoadSequence || memory.value?.id !== current.id) return
       const updates = await waitForNewPublicShareMemoryMedia(
         shareId.value,
         current.id,
         true,
         cursor?.updatedAt,
         cursor?.mediaId,
+        knownMediaSetHash,
         controller.signal
       )
       if (controller.signal.aborted || sequence !== memoryLoadSequence || memory.value?.id !== current.id) return
-      if (updates.media.length > 0) {
-        media.value = chronologicallySortedMedia(mergeMediaById(media.value, updates.media))
+      const mergedMedia = updates.media.length > 0 ? mergeMediaById(media.value, updates.media) : media.value
+      const nextMedia = removeMissingMedia(mergedMedia, updates.currentMediaIds)
+      const removedMedia = nextMedia.length !== mergedMedia.length
+      if (updates.media.length > 0 || removedMedia) {
+        media.value = chronologicallySortedMedia(nextMedia)
         const [header, buckets] = await Promise.all([
           getPublicShareMemoryHeader(shareId.value, current.id),
           listPublicShareMemoryMediaBuckets(shareId.value, current.id, true)
@@ -527,6 +534,12 @@ function mergeMediaById(current: MemoryMedia[], updates: MemoryMedia[]): MemoryM
   current.forEach((item) => byId.set(item.id, item))
   updates.forEach((item) => byId.set(item.id, item))
   return [...byId.values()]
+}
+
+function removeMissingMedia(current: MemoryMedia[], currentMediaIds?: string[]): MemoryMedia[] {
+  if (!currentMediaIds) return current
+  const currentIdSet = new Set(currentMediaIds)
+  return current.filter((item) => currentIdSet.has(item.id))
 }
 
 function chronologicallySortedMedia(media: MemoryMedia[]): MemoryMedia[] {

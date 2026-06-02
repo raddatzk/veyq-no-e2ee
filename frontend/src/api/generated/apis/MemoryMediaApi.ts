@@ -211,6 +211,7 @@ export interface WaitForMemoryMediaUpdatesRequest {
     includeChildren?: boolean;
     afterUpdatedAt?: string;
     afterMediaId?: string;
+    knownMediaSetHash?: string;
     timeoutSeconds?: number;
 }
 
@@ -878,6 +879,7 @@ export interface MemoryMediaApiInterface {
      * @param {boolean} [includeChildren] Include media assigned to visible descendant Memories.
      * @param {string} [afterUpdatedAt] Updated timestamp of the newest media item already known to the client.
      * @param {string} [afterMediaId] Public id of the newest media item already known to the client, used as a stable tie-breaker.
+     * @param {string} [knownMediaSetHash] SHA-256 hash of the client\&#39;s sorted visible public media id set. If it differs from the current server set, the response includes &#x60;currentMediaIds&#x60;.
      * @param {number} [timeoutSeconds] Maximum time to hold the request before returning an empty update set.
      * @throws {RequiredError}
      * @memberof MemoryMediaApiInterface
@@ -885,13 +887,14 @@ export interface MemoryMediaApiInterface {
     waitForMemoryMediaUpdatesRequestOpts(requestParameters: WaitForMemoryMediaUpdatesRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * @summary Wait for memory media updates
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
      * @param {boolean} [includeChildren] Include media assigned to visible descendant Memories.
      * @param {string} [afterUpdatedAt] Updated timestamp of the newest media item already known to the client.
      * @param {string} [afterMediaId] Public id of the newest media item already known to the client, used as a stable tie-breaker.
+     * @param {string} [knownMediaSetHash] SHA-256 hash of the client\&#39;s sorted visible public media id set. If it differs from the current server set, the response includes &#x60;currentMediaIds&#x60;.
      * @param {number} [timeoutSeconds] Maximum time to hold the request before returning an empty update set.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -900,7 +903,7 @@ export interface MemoryMediaApiInterface {
     waitForMemoryMediaUpdatesRaw(requestParameters: WaitForMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUpdatesResponse>>;
 
     /**
-     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Wait for memory media updates
      */
     waitForMemoryMediaUpdates(requestParameters: WaitForMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUpdatesResponse>;
@@ -2425,6 +2428,10 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
             queryParameters['afterMediaId'] = requestParameters['afterMediaId'];
         }
 
+        if (requestParameters['knownMediaSetHash'] != null) {
+            queryParameters['knownMediaSetHash'] = requestParameters['knownMediaSetHash'];
+        }
+
         if (requestParameters['timeoutSeconds'] != null) {
             queryParameters['timeoutSeconds'] = requestParameters['timeoutSeconds'];
         }
@@ -2445,7 +2452,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Wait for memory media updates
      */
     async waitForMemoryMediaUpdatesRaw(requestParameters: WaitForMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaUpdatesResponse>> {
@@ -2456,7 +2463,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server\'s current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
      * Wait for memory media updates
      */
     async waitForMemoryMediaUpdates(requestParameters: WaitForMemoryMediaUpdatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaUpdatesResponse> {

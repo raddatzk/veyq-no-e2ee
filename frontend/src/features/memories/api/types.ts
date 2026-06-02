@@ -229,6 +229,7 @@ export type UploadMediaOptions = {
 
 export type MemoryMediaUpdatesResponse = {
   media: MemoryMedia[]
+  currentMediaIds?: string[]
 }
 
 export type CreateFolderRequest = Omit<GeneratedCreateFolderRequest, 'parentPath' | 'scope'> & {

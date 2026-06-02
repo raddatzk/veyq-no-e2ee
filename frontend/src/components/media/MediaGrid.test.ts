@@ -72,6 +72,45 @@ describe('MediaGrid', () => {
 
     expect(wrapper.findComponent({ name: 'MediaLightbox' }).props('canHighlight')).toBe(false)
   })
+
+  it('removes a deleted highlighted media from the highlighted filter view', async () => {
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [
+          media({ id: 'media-highlight', title: 'Highlight', highlight: true }),
+          media({ id: 'media-regular', title: 'Regular', highlight: false })
+        ],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: true,
+          ProgressSpinner: true,
+          SelectButton: {
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+            template: '<button type="button" @click="$emit(\'update:modelValue\', \'highlighted\')">Highlights</button>'
+          }
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.find('.media-grid-filter-toggle button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
+
+    await wrapper.setProps({
+      media: [media({ id: 'media-regular', title: 'Regular', highlight: false })]
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(0)
+  })
 })
 
 function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {

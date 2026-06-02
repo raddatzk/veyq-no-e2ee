@@ -303,7 +303,8 @@ describe('memoryApi facade', () => {
           sizeBytes: 12,
           contentUrl: '/content'
         }
-      ]
+      ],
+      currentMediaIds: ['media-1', 'media-2']
     })
     const controller = new AbortController()
 
@@ -313,12 +314,14 @@ describe('memoryApi facade', () => {
       true,
       '2026-01-01T00:00:00Z',
       'media-1',
+      'known-hash',
       controller.signal
     )
 
     expect(updates.media[0].capturedAt).toBeNull()
+    expect(updates.currentMediaIds).toEqual(['media-1', 'media-2'])
     expect(mocks.callApi).toHaveBeenCalledWith(
-      '/api/tenant/memories/mem-1/media/updates?includeChildren=true&afterUpdatedAt=2026-01-01T00%3A00%3A00Z&afterMediaId=media-1',
+      '/api/tenant/memories/mem-1/media/updates?includeChildren=true&afterUpdatedAt=2026-01-01T00%3A00%3A00Z&afterMediaId=media-1&knownMediaSetHash=known-hash',
       { signal: controller.signal }
     )
   })

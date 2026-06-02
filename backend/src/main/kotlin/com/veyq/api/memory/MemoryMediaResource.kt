@@ -32,19 +32,24 @@ class MemoryMediaResource @Inject constructor(
         includeChildren: Boolean?,
         afterUpdatedAt: Date?,
         afterMediaId: String?,
+        knownMediaSetHash: String?,
         timeoutSeconds: Int?,
-    ): Response =
-        Response.ok(
+    ): Response {
+        val updates = mediaService.waitForMemoryMediaUpdates(
+            memoryId = memoryId,
+            includeChildren = includeChildren ?: false,
+            afterUpdatedAt = afterUpdatedAt?.toInstant(),
+            afterMediaId = afterMediaId,
+            knownMediaSetHash = knownMediaSetHash,
+            timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
+        )
+        return Response.ok(
             MemoryMediaUpdatesResponse(
-                media = mediaService.waitForNewMemoryMedia(
-                    memoryId = memoryId,
-                    includeChildren = includeChildren ?: false,
-                    afterUpdatedAt = afterUpdatedAt?.toInstant(),
-                    afterMediaId = afterMediaId,
-                    timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
-                )
+                media = updates.media,
+                currentMediaIds = updates.currentMediaIds,
             )
         ).build()
+    }
 
     override fun createMemoryMediaBucket(
         tenantName: String,
