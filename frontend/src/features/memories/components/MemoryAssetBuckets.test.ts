@@ -55,6 +55,25 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.find('.asset-camera-chip span').text()).toBe('1')
   })
 
+  it('shows only media assigned directly to the current memory in buckets', () => {
+    const wrapper = mount(MemoryAssetBuckets, {
+      props: {
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        buckets: [bucket({ id: 'bucket-kevin', displayName: 'Kevin', mediaCount: 2 })],
+        media: [
+          media({ id: 'media-parent', memoryId: 'mem-1', bucketId: 'bucket-kevin', title: 'Parent upload' }),
+          media({ id: 'media-child', memoryId: 'child-mem-1', bucketId: 'bucket-kevin', title: 'Child upload' })
+        ]
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
+    expect(wrapper.find('.asset-bucket-media-item').text()).toContain('Parent upload')
+    expect(wrapper.text()).not.toContain('Child upload')
+  })
+
   it('selects one visible media item and submits only that item with offset seconds', async () => {
     const updateMetadataBatch = vi.fn().mockResolvedValue([
       media({ id: 'media-1', capturedAt: '2026-05-03T13:00:00Z' })

@@ -128,7 +128,7 @@ const directBucketMedia = computed(() => {
   if (!activeBucket.value) return []
   const mediaById = new Map<string, MemoryMedia>()
   props.media
-    .filter((media) => media.bucketId === activeBucket.value?.id)
+    .filter((media) => media.memoryId === props.memoryId && media.bucketId === activeBucket.value?.id)
     .forEach((media) => {
       mediaById.set(media.id, media)
     })

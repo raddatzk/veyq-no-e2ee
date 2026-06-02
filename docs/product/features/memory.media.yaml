@@ -160,6 +160,9 @@ acceptanceCriteria:
           - testName: renders bucket hierarchy and filters the active bucket by camera
             kind: positive
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: shows only media assigned directly to the current memory in buckets
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
           - testName: deduplicates repeated media ids inside the active bucket
             kind: negative
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
