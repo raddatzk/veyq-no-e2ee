@@ -54,6 +54,7 @@ export function useMemoryToolbar(options: ToolbarOptions) {
 
     if (options.memory.value) {
       const memory = options.memory.value
+      if (!hasCompleteMemoryBreadcrumbs(memory, options.memoryBreadcrumbs.value)) return
       setWorkspaceToolbar(
         memoryBreadcrumbs(
           memory,
@@ -88,6 +89,16 @@ export function useMemoryToolbar(options: ToolbarOptions) {
       }
     ])
   }
+}
+
+function hasCompleteMemoryBreadcrumbs(memory: Memory, resolvedBreadcrumbs: MemoryRouteBreadcrumb[]): boolean {
+  const parts = memory.path.split('/').filter(Boolean)
+  if (parts.length === 0) return true
+  const resolvedPaths = new Set(resolvedBreadcrumbs.map((breadcrumb) => breadcrumb.path))
+  return parts.every((_, index) => {
+    const path = `/${parts.slice(0, index + 1).join('/')}`
+    return resolvedPaths.has(path)
+  })
 }
 
 export function memoryBreadcrumbs(

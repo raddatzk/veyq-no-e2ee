@@ -2,6 +2,7 @@ import { computed, effectScope, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWorkspaceToolbar, workspaceToolbar } from '../../../composables/useWorkspaceToolbar'
 import { memoryBreadcrumbs, useMemoryToolbar } from './useMemoryToolbar'
+import type { MemoryRouteBreadcrumb } from './useMemoryRouteData'
 import type { Memory, MemoryNavigationResponse } from '../api'
 
 describe('memoryBreadcrumbs', () => {
@@ -59,7 +60,7 @@ describe('memoryBreadcrumbs', () => {
     const routePath = ref('/')
     const navigation = ref<MemoryNavigationResponse | null>(navigationResponse('Friends'))
     const memoryRef = ref<Memory | null>(null)
-    const memoryBreadcrumbsRef = ref([])
+    const memoryBreadcrumbsRef = ref<MemoryRouteBreadcrumb[]>([])
     const loading = ref(false)
     const openContextSettings = vi.fn()
     const navigateToPath = vi.fn()
@@ -88,6 +89,51 @@ describe('memoryBreadcrumbs', () => {
 
     expect(workspaceToolbar.active).toBe(false)
     expect(workspaceToolbar.actions).toEqual([])
+
+    scope.stop()
+  })
+
+  it('waits for resolved memory breadcrumb labels before rendering memory toolbar breadcrumbs', async () => {
+    const tenantName = ref('friends')
+    const routePath = ref('/ostern/ostern-2026')
+    const navigation = ref<MemoryNavigationResponse | null>(null)
+    const memoryRef = ref<Memory | null>(memory({
+      displayName: 'Ostern 2026',
+      path: '/ostern/ostern-2026'
+    }))
+    const memoryBreadcrumbsRef = ref<MemoryRouteBreadcrumb[]>([])
+    const loading = ref(false)
+    const openContextSettings = vi.fn()
+    const navigateToPath = vi.fn()
+    const scope = effectScope()
+
+    scope.run(() => {
+      useMemoryToolbar({
+        navigation,
+        memory: memoryRef,
+        memoryBreadcrumbs: memoryBreadcrumbsRef,
+        loading,
+        tenantName: computed(() => tenantName.value),
+        tenantLabel: computed(() => tenantName.value),
+        routePath: computed(() => routePath.value),
+        openContextSettings,
+        navigateToPath
+      })
+    })
+
+    expect(workspaceToolbar.active).toBe(false)
+
+    memoryBreadcrumbsRef.value = [
+      { path: '/ostern', label: 'Ostern' },
+      { path: '/ostern/ostern-2026', label: 'Ostern 2026' }
+    ]
+    await nextTick()
+
+    expect(workspaceToolbar.breadcrumbs.map((breadcrumb) => breadcrumb.label)).toEqual([
+      'friends',
+      'Ostern',
+      'Ostern 2026'
+    ])
 
     scope.stop()
   })

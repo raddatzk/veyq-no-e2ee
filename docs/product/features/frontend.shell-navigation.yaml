@@ -132,6 +132,9 @@ acceptanceCriteria:
           - testName: resolves folder display names for memory breadcrumb prefixes
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: waits for resolved memory breadcrumb labels before rendering memory toolbar breadcrumbs
+            kind: negative
+            ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
           - testName: clears stale settings actions while a new tenant context is loading
             kind: negative
             ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
