@@ -122,7 +122,7 @@ services:
     depends_on:
       - veyq
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/api/collaboration/journal >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
