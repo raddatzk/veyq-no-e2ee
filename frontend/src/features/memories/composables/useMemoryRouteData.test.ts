@@ -50,7 +50,6 @@ describe('useMemoryRouteData', () => {
   let scope: EffectScope
 
   beforeEach(() => {
-    vi.useFakeTimers()
     vi.clearAllMocks()
     Object.defineProperty(document, 'visibilityState', {
       value: 'visible',
@@ -77,7 +76,6 @@ describe('useMemoryRouteData', () => {
 
   afterEach(() => {
     scope?.stop()
-    vi.useRealTimers()
   })
 
   it('merges long-polled Memory media and refreshes buckets and header counts', async () => {
@@ -184,11 +182,10 @@ function deferred<T>() {
 }
 
 async function flushUntil(done: () => boolean) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  await vi.waitFor(async () => {
     await flushPromises()
-    if (done()) return
-  }
-  expect(done()).toBe(true)
+    expect(done()).toBe(true)
+  })
 }
 
 function memory(overrides: Partial<Memory> = {}): Memory {
