@@ -340,6 +340,9 @@ acceptanceCriteria:
           - testName: removes a deleted highlighted media from the highlighted filter view
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: keeps the opened lightbox media stable when new media is inserted before it
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
           - testName: merges public share media live updates and refreshes header and buckets
             kind: positive
             ref: frontend/src/views/PublicShareView.test.ts

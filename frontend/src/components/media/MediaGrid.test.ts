@@ -73,6 +73,47 @@ describe('MediaGrid', () => {
     expect(wrapper.findComponent({ name: 'MediaLightbox' }).props('canHighlight')).toBe(false)
   })
 
+  it('keeps the opened lightbox media stable when new media is inserted before it', async () => {
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [
+          media({ id: 'media-current', title: 'Current' }),
+          media({ id: 'media-next', title: 'Next' })
+        ],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: {
+            props: ['media', 'selectedIndex'],
+            template: '<div data-testid="lightbox">{{ media.id }}:{{ selectedIndex }}</div>'
+          },
+          ProgressSpinner: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.find('.media-grid-tile').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-current:0')
+
+    await wrapper.setProps({
+      media: [
+        media({ id: 'media-before', title: 'Before' }),
+        media({ id: 'media-current', title: 'Current' }),
+        media({ id: 'media-next', title: 'Next' })
+      ]
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-current:1')
+  })
+
   it('removes a deleted highlighted media from the highlighted filter view', async () => {
     const wrapper = mount(MediaGrid, {
       props: {

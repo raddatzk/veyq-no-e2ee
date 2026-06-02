@@ -60,7 +60,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const selectedIndex = ref<number | null>(null)
+const selectedMediaId = ref<string | null>(null)
 const mediaGrid = ref<HTMLElement | null>(null)
 const containerWidth = ref(0)
 const layout = ref<MediaGridLayoutResult>({ tiles: [], height: 0 })
@@ -102,8 +102,13 @@ const galleryTiles = computed<GalleryTile[]>(() =>
 const visibleMedia = computed(() =>
   galleryTiles.value.map((tile) => tile.media)
 )
+const selectedIndex = computed(() =>
+  selectedMediaId.value
+    ? visibleMedia.value.findIndex((media) => media.id === selectedMediaId.value)
+    : -1
+)
 const selectedMedia = computed(() =>
-  selectedIndex.value === null ? null : visibleMedia.value[selectedIndex.value] || null
+  selectedIndex.value >= 0 ? visibleMedia.value[selectedIndex.value] : null
 )
 const bucketById = computed(() =>
   new Map((props.mediaBuckets ?? []).map((bucket) => [bucket.id, bucket]))
@@ -115,9 +120,9 @@ const canHighlightSelectedMedia = computed(() =>
     : true
 )
 const isLightboxOpen = computed(() => selectedMedia.value !== null)
-const canShowPrevious = computed(() => selectedIndex.value !== null && selectedIndex.value > 0)
+const canShowPrevious = computed(() => selectedIndex.value > 0)
 const canShowNext = computed(
-  () => selectedIndex.value !== null && selectedIndex.value < visibleMedia.value.length - 1
+  () => selectedIndex.value >= 0 && selectedIndex.value < visibleMedia.value.length - 1
 )
 const canRenderGallery = computed(() => galleryTiles.value.length > 0)
 const layoutSignature = computed(() =>
@@ -139,17 +144,21 @@ watch(isLightboxOpen, (isOpen) => {
 })
 
 watch(
-  () => props.media.map((item) => item.id).join('|'),
+  () => galleryItems.value.map((item) => item.id).join('|'),
   () => {
-    if (!props.media.length) {
-      selectedIndex.value = null
+    if (!galleryItems.value.length) {
+      selectedMediaId.value = null
       return
     }
 
     pruneLoadedMediaKeys()
 
-    if (selectedIndex.value !== null && selectedIndex.value >= visibleMedia.value.length)
+    if (
+      selectedMediaId.value &&
+      !galleryItems.value.some((item) => item.id === selectedMediaId.value)
+    ) {
       closeLightbox()
+    }
   }
 )
 
@@ -296,8 +305,8 @@ function pruneLoadedMediaKeys() {
   )
 }
 
-function openLightbox(index: number) {
-  selectedIndex.value = index
+function openLightbox(mediaId: string) {
+  selectedMediaId.value = mediaId
 }
 
 function canHighlightByBucket(media: MemoryMedia): boolean {
@@ -316,15 +325,17 @@ function removeMedia(media: MemoryMedia) {
 }
 
 function closeLightbox() {
-  selectedIndex.value = null
+  selectedMediaId.value = null
 }
 
 function showPrevious() {
-  if (canShowPrevious.value && selectedIndex.value !== null) selectedIndex.value -= 1
+  if (!canShowPrevious.value) return
+  selectedMediaId.value = visibleMedia.value[selectedIndex.value - 1]?.id || null
 }
 
 function showNext() {
-  if (canShowNext.value && selectedIndex.value !== null) selectedIndex.value += 1
+  if (!canShowNext.value) return
+  selectedMediaId.value = visibleMedia.value[selectedIndex.value + 1]?.id || null
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -371,7 +382,7 @@ function handleKeydown(event: KeyboardEvent) {
     >
       <template v-if="canRenderGallery">
         <button
-          v-for="(tile, index) in galleryTiles"
+          v-for="tile in galleryTiles"
           :key="tile.id"
           class="media-grid-tile"
           type="button"
@@ -381,7 +392,7 @@ function handleKeydown(event: KeyboardEvent) {
             width: `${tile.renderedWidth}px`,
             height: `${tile.renderedHeight}px`
           }"
-          @click="openLightbox(index)"
+          @click="openLightbox(tile.id)"
         >
           <template v-if="shouldRequestMedia">
             <img
@@ -429,7 +440,7 @@ function handleKeydown(event: KeyboardEvent) {
       :tenant-name="tenantName"
       :media="selectedMedia"
       :media-items="visibleMedia"
-      :selected-index="selectedIndex ?? undefined"
+      :selected-index="selectedIndex >= 0 ? selectedIndex : undefined"
       :can-show-previous="canShowPrevious"
       :can-show-next="canShowNext"
       :can-edit-metadata="canEditMetadata"
