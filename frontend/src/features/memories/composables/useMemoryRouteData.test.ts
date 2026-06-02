@@ -102,7 +102,7 @@ describe('useMemoryRouteData', () => {
       data = useMemoryRouteData(computed(() => tenantName.value), computed(() => routePath.value))
     })
 
-    await flushPromises()
+    await flushUntil(() => data?.media.value.map((item) => item.id).join(',') === 'media-existing')
 
     expect(data?.media.value.map((item) => item.id)).toEqual(['media-existing'])
     expect(data?.memoryHeader.value?.directMediaCount).toBe(0)
@@ -117,8 +117,7 @@ describe('useMemoryRouteData', () => {
         })
       ]
     })
-    await flushPromises()
-    await flushPromises()
+    await flushUntil(() => listMemoryMediaBucketsMock.mock.calls.length === 2)
 
     expect(waitForNewMemoryMediaMock).toHaveBeenCalledWith(
       'tenant',
@@ -160,14 +159,13 @@ describe('useMemoryRouteData', () => {
       data = useMemoryRouteData(computed(() => tenantName.value), computed(() => routePath.value))
     })
 
-    await flushPromises()
+    await flushUntil(() => data?.media.value.map((item) => item.id).join(',') === 'media-existing,media-deleted')
 
     update.resolve({
       media: [],
       currentMediaIds: ['media-existing']
     })
-    await flushPromises()
-    await flushPromises()
+    await flushUntil(() => listMemoryMediaBucketsMock.mock.calls.length === 2)
 
     expect(listMemoryMediaMock).toHaveBeenCalledTimes(1)
     expect(listMemoryMediaBucketsMock).toHaveBeenCalledTimes(2)
@@ -183,6 +181,14 @@ function deferred<T>() {
     resolve = innerResolve
   })
   return { promise, resolve }
+}
+
+async function flushUntil(done: () => boolean) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await flushPromises()
+    if (done()) return
+  }
+  expect(done()).toBe(true)
 }
 
 function memory(overrides: Partial<Memory> = {}): Memory {
