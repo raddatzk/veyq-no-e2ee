@@ -209,6 +209,12 @@ class MemoryServiceTest {
             "Other",
             createdAt = Instant.parse("2026-01-02T10:03:00Z"),
         )
+        val firstUpdatedAt = Instant.parse("2026-06-01T10:00:00Z")
+        inTransaction {
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt, first.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(1), second.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(2), child.publicId)
+        }
         val firstCursor = mediaService.listMemoryMedia(trip.id, true).first { it.id == first.publicId }
 
         assertThat(
