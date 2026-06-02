@@ -210,19 +210,26 @@ class MemoryServiceTest {
             "Other",
             createdAt = Instant.parse("2026-01-02T10:03:00Z"),
         )
-        val firstUpdatedAt = Instant.parse("2026-06-01T10:00:00Z")
-        inTransaction {
-            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt, first.publicId)
-            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(1), second.publicId)
-            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(2), child.publicId)
-        }
-        val firstCursor = mediaService.listMemoryMedia(trip.id, true).first { it.id == first.publicId }
+        val cursor = mediaService.listMemoryMedia(trip.id, true)
+            .maxWith(compareBy({ it.updatedAt }, { it.id }))
+
+        Thread.sleep(5)
+        mediaService.updateMemoryMediaHighlight(
+            trip.id,
+            second.publicId,
+            UpdateMemoryMediaHighlightRequest(highlight = true),
+        )
+        mediaService.updateMemoryMediaCapturedAt(
+            day.id,
+            child.publicId,
+            UpdateMemoryMediaCapturedAtRequest(capturedAt = java.time.OffsetDateTime.parse("2026-01-03T10:00:00Z")),
+        )
 
         val updates = mediaService.listMemoryMediaUpdates(
             memoryId = trip.id,
             includeChildren = true,
-            afterUpdatedAt = firstCursor.updatedAt.toInstant(),
-            afterMediaId = first.publicId,
+            afterUpdatedAt = cursor.updatedAt.toInstant(),
+            afterMediaId = cursor.id,
             knownMediaSetHash = null,
         )
 
