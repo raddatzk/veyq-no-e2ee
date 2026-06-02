@@ -144,6 +144,53 @@ paths:
         - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein.
 
         Implementierungsstatus: implemented.
+  "/api/tenant-registration-invites/{token}/logo":
+    get:
+      tags:
+      - TenantRegistrationInvites
+      operationId: getTenantRegistrationInviteLogo
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/InviteToken"
+      responses:
+        '200':
+          description: Tenant logo image for a valid registration invite.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+      summary: Tenant-Logo fuer Registrierungslink laden
+      x-implementation-status: implemented
+      x-preconditions:
+      - Der Endpunkt ist ohne Access-Token erreichbar.
+      - Das initiale Setup muss abgeschlossen sein.
+      - Der aktuelle Request-Host muss die Tenant-Domain des Links sein.
+      - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein.
+      - Der Tenant muss ein Logo haben.
+      description: |-
+        Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen
+        Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf
+        Tenant-Mitglieder begrenzt.
+
+        Vorbedingungen:
+        - Der Endpunkt ist ohne Access-Token erreichbar.
+        - Das initiale Setup muss abgeschlossen sein.
+        - Der aktuelle Request-Host muss die Tenant-Domain des Links sein.
+        - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein.
+        - Der Tenant muss ein Logo haben.
+
+        Implementierungsstatus: implemented.
   "/api/tenant-registration-invites/{token}/join":
     post:
       tags:
@@ -404,7 +451,7 @@ components:
             tenantName: friends
             tenantDisplayName: Friends
             tenantDomain: friends.example.test
-            tenantLogoUrl: /api/tenants/friends/logo?v=2026-06-01T12%3A00%3A00Z
+            tenantLogoUrl: /api/tenant-registration-invites/HrUI1ioJ6P/logo?v=2026-06-01T12%3A00%3A00Z
             expiresAt: "2026-06-15T12:00:00Z"
             requiresLogin: false
   schemas:
@@ -624,6 +671,6 @@ components:
         tenantName: friends
         tenantDisplayName: Friends
         tenantDomain: friends.example.test
-        tenantLogoUrl: /api/tenants/friends/logo?v=2026-06-01T12%3A00%3A00Z
+        tenantLogoUrl: /api/tenant-registration-invites/HrUI1ioJ6P/logo?v=2026-06-01T12%3A00%3A00Z
         expiresAt: "2026-06-15T12:00:00Z"
         requiresLogin: false

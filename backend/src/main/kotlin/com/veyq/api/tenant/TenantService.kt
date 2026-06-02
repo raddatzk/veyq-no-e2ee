@@ -171,6 +171,9 @@ class TenantService @Inject constructor(
     fun tenantLogo(): File =
         logoFile(tenant())
 
+    fun tenantLogo(tenant: Tenant): File =
+        logoFile(tenant)
+
     @Transactional
     fun updateTenantLogo(uploadPath: Path): TenantSettingsResponse {
         val tenant = tenant()

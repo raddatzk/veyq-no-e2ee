@@ -42,7 +42,7 @@ acceptanceCriteria:
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
   - id: settings.tenant-group-admin.tenant-user-management
-    statement: Tenant user invitations, activation, membership visibility and role management respect tenant boundaries.
+    statement: Tenant user invitations, activation, membership visibility, registration-link branding and role management respect tenant boundaries.
     coverage:
       backend:
         integration:

@@ -13,6 +13,7 @@ import jakarta.ws.rs.PathParam
 import jakarta.ws.rs.Produces
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
+import java.io.File
 
 @ApplicationScoped
 @Path("/api")
@@ -25,6 +26,12 @@ class TenantRegistrationInviteResource @Inject constructor(
     @Produces(MediaType.APPLICATION_JSON)
     fun getTenantRegistrationInvite(@PathParam("token") token: String): Response =
         Response.ok(tenantRegistrationInviteService.metadata(token)).build()
+
+    @GET
+    @Path("/tenant-registration-invites/{token}/logo")
+    @Produces("image/png", "image/jpeg")
+    fun getTenantRegistrationInviteLogo(@PathParam("token") token: String): File =
+        tenantRegistrationInviteService.logo(token)
 
     @POST
     @Path("/tenant-registration-invites/{token}/join")

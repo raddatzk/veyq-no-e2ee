@@ -63,6 +63,10 @@ export interface GetTenantRegistrationInviteRequest {
     token: string;
 }
 
+export interface GetTenantRegistrationInviteLogoRequest {
+    token: string;
+}
+
 export interface JoinTenantRegistrationInviteOperationRequest {
     token: string;
     joinTenantRegistrationInviteRequest: JoinTenantRegistrationInviteRequest;
@@ -164,6 +168,30 @@ export interface TenantRegistrationInvitesApiInterface {
      * Tenant-Registrierungslink pruefen
      */
     getTenantRegistrationInvite(requestParameters: GetTenantRegistrationInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantRegistrationInviteMetadataResponse>;
+
+    /**
+     * Creates request options for getTenantRegistrationInviteLogo without sending the request
+     * @param {string} token
+     * @throws {RequiredError}
+     * @memberof TenantRegistrationInvitesApiInterface
+     */
+    getTenantRegistrationInviteLogoRequestOpts(requestParameters: GetTenantRegistrationInviteLogoRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf Tenant-Mitglieder begrenzt.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Request-Host muss die Tenant-Domain des Links sein. - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein. - Der Tenant muss ein Logo haben.  Implementierungsstatus: implemented.
+     * @summary Tenant-Logo fuer Registrierungslink laden
+     * @param {string} token
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TenantRegistrationInvitesApiInterface
+     */
+    getTenantRegistrationInviteLogoRaw(requestParameters: GetTenantRegistrationInviteLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+
+    /**
+     * Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf Tenant-Mitglieder begrenzt.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Request-Host muss die Tenant-Domain des Links sein. - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein. - Der Tenant muss ein Logo haben.  Implementierungsstatus: implemented.
+     * Tenant-Logo fuer Registrierungslink laden
+     */
+    getTenantRegistrationInviteLogo(requestParameters: GetTenantRegistrationInviteLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for joinTenantRegistrationInvite without sending the request
@@ -432,6 +460,53 @@ export class TenantRegistrationInvitesApi extends runtime.BaseAPI implements Ten
      */
     async getTenantRegistrationInvite(requestParameters: GetTenantRegistrationInviteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TenantRegistrationInviteMetadataResponse> {
         const response = await this.getTenantRegistrationInviteRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for getTenantRegistrationInviteLogo without sending the request
+     */
+    async getTenantRegistrationInviteLogoRequestOpts(requestParameters: GetTenantRegistrationInviteLogoRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['token'] == null) {
+            throw new runtime.RequiredError(
+                'token',
+                'Required parameter "token" was null or undefined when calling getTenantRegistrationInviteLogo().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/tenant-registration-invites/{token}/logo`;
+        urlPath = urlPath.replace(`{${"token"}}`, encodeURIComponent(String(requestParameters['token'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf Tenant-Mitglieder begrenzt.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Request-Host muss die Tenant-Domain des Links sein. - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein. - Der Tenant muss ein Logo haben.  Implementierungsstatus: implemented.
+     * Tenant-Logo fuer Registrierungslink laden
+     */
+    async getTenantRegistrationInviteLogoRaw(requestParameters: GetTenantRegistrationInviteLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.getTenantRegistrationInviteLogoRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.BlobApiResponse(response);
+    }
+
+    /**
+     * Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf Tenant-Mitglieder begrenzt.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Request-Host muss die Tenant-Domain des Links sein. - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein. - Der Tenant muss ein Logo haben.  Implementierungsstatus: implemented.
+     * Tenant-Logo fuer Registrierungslink laden
+     */
+    async getTenantRegistrationInviteLogo(requestParameters: GetTenantRegistrationInviteLogoRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.getTenantRegistrationInviteLogoRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

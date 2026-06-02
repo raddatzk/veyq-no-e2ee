@@ -42,7 +42,9 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import io.vertx.ext.web.RoutingContext
+import java.io.File
 import java.net.URI
+import java.net.URLEncoder
 import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneOffset
@@ -54,6 +56,7 @@ class TenantRegistrationInviteService @Inject constructor(
     private val routingContext: RoutingContext,
     private val tenantRegistrationInviteRepo: TenantRegistrationInviteRepo,
     private val tenantRepo: TenantRepo,
+    private val tenantService: TenantService,
     private val tenantMemberRepo: TenantMemberRepo,
     private val userRepo: UserRepo,
     private val passkeyCredentialRepo: PasskeyCredentialRepo,
@@ -140,10 +143,28 @@ class TenantRegistrationInviteService @Inject constructor(
             tenantName = tenant.name,
             tenantDisplayName = tenant.displayName,
             tenantDomain = tenant.domain,
-            tenantLogoUrl = tenant.logoUrl(),
+            tenantLogoUrl = tenant.inviteLogoUrl(token),
             expiresAt = invite.expiresAt.atOffset(ZoneOffset.UTC),
             requiresLogin = requestContext.user != null,
         )
+    }
+
+    fun logo(token: String): File {
+        rateLimitService.checkTokenFailureAllowed("tenant-registration-invite", publicRateLimitTarget(token))
+        val invite = try {
+            requireValidInviteForCurrentDomain(token, lockForUpdate = false)
+        } catch (exception: NotFoundException) {
+            rateLimitService.recordTokenFailure("tenant-registration-invite", publicRateLimitTarget(token))
+            throw exception
+        } catch (exception: ForbiddenException) {
+            rateLimitService.recordTokenFailure("tenant-registration-invite", publicRateLimitTarget(token))
+            throw exception
+        } catch (exception: BadRequestException) {
+            rateLimitService.recordTokenFailure("tenant-registration-invite", publicRateLimitTarget(token))
+            throw exception
+        }
+        rateLimitService.recordTokenSuccess("tenant-registration-invite", publicRateLimitTarget(token))
+        return tenantService.tenantLogo(invite.tenant)
     }
 
     @Transactional
@@ -353,6 +374,11 @@ class TenantRegistrationInviteService @Inject constructor(
 
     private fun TenantRegistrationInvite.joinUrl(): String =
         "${joinUrlBase(tenant)}/join/$token"
+
+    private fun Tenant.inviteLogoUrl(token: String): String? =
+        logoUpdatedAt
+            ?.takeIf { logoStorageKey != null }
+            ?.let { "/api/tenant-registration-invites/$token/logo?v=${URLEncoder.encode(it.toString(), Charsets.UTF_8)}" }
 
     private fun joinUrlBase(tenant: Tenant): String {
         val currentDomain = passkeyHostService.currentDomain(routingContext)

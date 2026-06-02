@@ -47,6 +47,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.notNullValue
 import org.hamcrest.Matchers.nullValue
+import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.image.BufferedImage
@@ -262,6 +263,15 @@ class UserManagementResourceTest {
 
     @Test
     fun `tenant registration invite allows new and existing users to join as members`() {
+        val logo = createAvatarImage()
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerCookie)
+            .multiPart("file", logo.toFile(), "image/png")
+            .`when`().put("/api/tenants/${tenant.name}/logo")
+            .then()
+            .statusCode(200)
+            .body("logoUrl", startsWith("/api/tenants/${tenant.name}/logo?v="))
+
         val created = given()
             .contentType("application/json")
             .header("Host", tenant.domain)
@@ -302,7 +312,7 @@ class UserManagementResourceTest {
             .`as`(Map::class.java)
         assertThat(localCreated["joinUrl"] as String).startsWith("http://localhost")
 
-        given()
+        val inviteLogoUrl = given()
             .header("Host", tenant.domain)
             .`when`().get("/api/tenant-registration-invites/$token")
             .then()
@@ -310,6 +320,21 @@ class UserManagementResourceTest {
             .body("tenantName", equalTo(tenant.name))
             .body("tenantDomain", equalTo(tenant.domain))
             .body("requiresLogin", equalTo(false))
+            .body("tenantLogoUrl", startsWith("/api/tenant-registration-invites/$token/logo?v="))
+            .extract()
+            .path<String>("tenantLogoUrl")
+
+        given()
+            .header("Host", tenant.domain)
+            .`when`().get(inviteLogoUrl)
+            .then()
+            .statusCode(200)
+
+        given()
+            .header("Host", "other-${tenant.domain}")
+            .`when`().get(inviteLogoUrl)
+            .then()
+            .statusCode(403)
 
         given()
             .header("Host", "localhost:8081")
