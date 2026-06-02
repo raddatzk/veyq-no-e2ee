@@ -118,6 +118,7 @@ describe('useMemoryRouteData', () => {
       ]
     })
     await flushPromises()
+    await flushPromises()
 
     expect(waitForNewMemoryMediaMock).toHaveBeenCalledWith(
       'tenant',
@@ -165,6 +166,7 @@ describe('useMemoryRouteData', () => {
       media: [],
       currentMediaIds: ['media-existing']
     })
+    await flushPromises()
     await flushPromises()
 
     expect(listMemoryMediaMock).toHaveBeenCalledTimes(1)

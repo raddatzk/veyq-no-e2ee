@@ -160,10 +160,12 @@ paths:
               schema:
                 type: string
                 format: binary
+              example: "<binary png logo>"
             image/jpeg:
               schema:
                 type: string
                 format: binary
+              example: "<binary jpeg logo>"
         '400':
           "$ref": "./common.openapi.yaml#/components/responses/400"
         '403':

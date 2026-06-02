@@ -376,6 +376,7 @@ class OpenApiContractTest {
             "GET /api/tenants/{tenantName}/registration-invites",
             "POST /api/tenants/{tenantName}/registration-invites/{inviteId}/revoke",
             "GET /api/tenant-registration-invites/{token}",
+            "GET /api/tenant-registration-invites/{token}/logo",
             "POST /api/tenant-registration-invites/{token}/join",
             "POST /api/tenant-registration-invites/{token}/passkey-options",
             "POST /api/tenant-registration-invites/{token}/join/passkey",
