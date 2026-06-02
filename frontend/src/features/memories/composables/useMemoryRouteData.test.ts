@@ -171,6 +171,49 @@ describe('useMemoryRouteData', () => {
     expect(data?.media.value.map((item) => item.id)).toEqual(['media-existing'])
     expect(data?.media.value.some((item) => item.highlight)).toBe(false)
   })
+
+  it('resolves folder display names for memory breadcrumb prefixes', async () => {
+    getMemoryByPathMock.mockImplementation((_, path) => {
+      if (path === '/@team/ostern/ostern-2026') {
+        return Promise.resolve(memory({
+          id: 'mem-easter',
+          name: 'ostern-2026',
+          displayName: 'Ostern 2026',
+          path: '/@team/ostern/ostern-2026',
+          scope: { type: 'GROUP', groupName: 'team' }
+        }))
+      }
+      return Promise.reject({ status: 404 })
+    })
+    getMemoryNavigationMock.mockImplementation((_, path) => {
+      if (path === '/@team') {
+        return Promise.resolve(navigationResponse('@team', 'affenbande-climbing'))
+      }
+      if (path === '/@team/ostern') {
+        return Promise.resolve(navigationResponse('/@team/ostern', 'Ostern'))
+      }
+      return Promise.reject({ status: 404 })
+    })
+    getMemoryHeaderMock.mockResolvedValue(memoryHeader({ id: 'mem-easter', displayName: 'Ostern 2026' }))
+    listMemoryMediaMock.mockResolvedValue([])
+    listMemoryMediaBucketsMock.mockResolvedValue([])
+
+    const tenantName = ref('tenant')
+    const routePath = ref('/@team/ostern/ostern-2026')
+    let data: ReturnType<typeof useMemoryRouteData> | undefined
+    scope = effectScope()
+    scope.run(() => {
+      data = useMemoryRouteData(computed(() => tenantName.value), computed(() => routePath.value))
+    })
+
+    await flushUntil(() => data?.memoryBreadcrumbs.value.length === 3)
+
+    expect(data?.memoryBreadcrumbs.value).toEqual([
+      { path: '/@team', label: 'affenbande-climbing' },
+      { path: '/@team/ostern', label: 'Ostern' },
+      { path: '/@team/ostern/ostern-2026', label: 'Ostern 2026' }
+    ])
+  })
 })
 
 function deferred<T>() {
@@ -269,5 +312,15 @@ function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBuc
     createdAt: '2026-05-03T12:00:00Z',
     updatedAt: '2026-05-03T12:00:00Z',
     ...overrides
+  }
+}
+
+function navigationResponse(path: string, displayName: string) {
+  return {
+    location: { kind: 'FOLDER' as const, path, displayName },
+    breadcrumbs: [],
+    scopeRoots: [],
+    folders: [],
+    favoriteMemories: []
   }
 }

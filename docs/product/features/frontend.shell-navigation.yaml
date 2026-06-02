@@ -123,6 +123,9 @@ acceptanceCriteria:
           - testName: uses resolved display names for parent memories
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
+          - testName: resolves folder display names for memory breadcrumb prefixes
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
           - testName: clears stale settings actions while a new tenant context is loading
             kind: negative
             ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts

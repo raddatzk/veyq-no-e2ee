@@ -237,18 +237,25 @@ export function useMemoryRouteData(
   async function loadMemoryBreadcrumbs(current: Memory): Promise<MemoryRouteBreadcrumb[]> {
     const parts = current.path.split('/').filter(Boolean)
     const paths = parts.map((_, index) => `/${parts.slice(0, index + 1).join('/')}`)
-    const resolved = await Promise.all(
-      paths.map(async (path) => {
-        try {
-          const memory = await getMemoryByPath(tenantName.value, path)
-          return { path, label: memory.displayName }
-        } catch (unknownError) {
-          if (isApiStatus(unknownError, 404)) return { path, label: fallbackBreadcrumbLabel(path, current) }
-          throw unknownError
-        }
-      })
-    )
+    const resolved = await Promise.all(paths.map((path) => resolveMemoryBreadcrumb(path, current)))
     return resolved
+  }
+
+  async function resolveMemoryBreadcrumb(path: string, current: Memory): Promise<MemoryRouteBreadcrumb> {
+    try {
+      const memory = await getMemoryByPath(tenantName.value, path)
+      return { path, label: memory.displayName }
+    } catch (unknownError) {
+      if (!isApiStatus(unknownError, 404)) throw unknownError
+    }
+
+    try {
+      const folderNavigation = await getMemoryNavigation(tenantName.value, path)
+      return { path, label: folderNavigation.location.displayName }
+    } catch (unknownError) {
+      if (isApiStatus(unknownError, 404)) return { path, label: fallbackBreadcrumbLabel(path, current) }
+      throw unknownError
+    }
   }
 
   return {
