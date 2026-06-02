@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TenantSidebar from './TenantSidebar.vue'
 import type { TenantSummary } from '../../authState'
 import { notifyMemoryFavoritesChanged } from '../../features/memories/composables/useMemoryFavoritesRefresh'
@@ -25,9 +25,12 @@ function tenantSummary(
 const mocks = vi.hoisted(() => ({
   getMemoryNavigation: vi.fn(),
   routerPush: vi.fn(),
+  setActiveTenantName: vi.fn(),
+  locationAssign: vi.fn(),
   authState: {
     isAuthenticated: true,
     user: { serverRole: 'ServerMember' },
+    activeTenantName: '',
     tenants: [
       {
         id: 1,
@@ -56,7 +59,8 @@ vi.mock('../../features/memories/api', () => ({
 
 vi.mock('../../shared/state/useAuthState', () => ({
   useAuthState: () => ({
-    authState: mocks.authState
+    authState: mocks.authState,
+    setActiveTenantName: mocks.setActiveTenantName
   })
 }))
 
@@ -65,6 +69,23 @@ vi.mock('../../shared/state/useThemeState', () => ({
 }))
 
 describe('TenantSidebar', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    setTestUrl('https://tenant.test/')
+    vi.spyOn(window.location, 'assign').mockImplementation(mocks.locationAssign)
+    mocks.authState.user.serverRole = 'ServerMember'
+    mocks.authState.activeTenantName = ''
+    mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
+    mocks.getMemoryNavigation.mockResolvedValue({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [],
+      favoriteMemories: [],
+      folders: []
+    })
+  })
+
   function mountSidebar() {
     return mount(TenantSidebar, {
       global: {
@@ -94,7 +115,6 @@ describe('TenantSidebar', () => {
   }
 
   it('renders favorite memory covers without a favorites add action or star overlay', async () => {
-    mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -212,7 +232,6 @@ describe('TenantSidebar', () => {
   })
 
   it('keeps scope roots visible while refreshing favorites', async () => {
-    mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValueOnce({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -281,7 +300,6 @@ describe('TenantSidebar', () => {
   })
 
   it('renders tenant logo images when available', async () => {
-    mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [
       tenantSummary(1, 'tenant', 'Tenant', 'tenant.test', '/api/tenants/tenant/logo?v=1')
     ]
@@ -301,7 +319,6 @@ describe('TenantSidebar', () => {
   })
 
   it('keeps tenant initials as fallback without a logo', async () => {
-    mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -318,7 +335,6 @@ describe('TenantSidebar', () => {
   })
 
   it('emits create group without navigating away from the current page', async () => {
-    mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
     mocks.getMemoryNavigation.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
@@ -337,4 +353,41 @@ describe('TenantSidebar', () => {
     expect(mocks.routerPush).not.toHaveBeenCalledWith('/tenant/settings?createGroup=1')
     expect(wrapper.find('a[href="/tenant/settings?createGroup=1"]').exists()).toBe(false)
   })
+
+  it('redirects to the tenant domain when switching tenants across domains', async () => {
+    mocks.authState.tenants = [
+      tenantSummary(1, 'tenant', 'Tenant', 'tenant.test'),
+      tenantSummary(2, 'family', 'Family', 'family.test')
+    ]
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await wrapper.get('.sidebar-tenant-link[title="Family"]').trigger('click')
+
+    expect(mocks.setActiveTenantName).toHaveBeenCalledWith('family')
+    expect(mocks.locationAssign).toHaveBeenCalledWith('https://family.test/')
+    expect(mocks.routerPush).not.toHaveBeenCalled()
+  })
+
+  it('uses in-app navigation when switching tenants on the current domain', async () => {
+    mocks.authState.tenants = [
+      tenantSummary(1, 'tenant', 'Tenant', 'tenant.test'),
+      tenantSummary(2, 'family', 'Family', 'tenant.test')
+    ]
+
+    const wrapper = mountSidebar()
+    await flushPromises()
+
+    await wrapper.get('.sidebar-tenant-link[title="Family"]').trigger('click')
+
+    expect(mocks.setActiveTenantName).toHaveBeenCalledWith('family')
+    expect(mocks.routerPush).toHaveBeenCalledWith('/')
+    expect(mocks.locationAssign).not.toHaveBeenCalled()
+  })
 })
+
+function setTestUrl(url: string) {
+  const testWindow = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+  testWindow.happyDOM.setURL(url)
+}

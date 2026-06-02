@@ -178,8 +178,20 @@ function closeMobileMenu() {
 }
 
 function switchTenant(tenantName: string) {
+  const tenant = authState.tenants.find((item) => item.name === tenantName)
+  if (!tenant) return
+
   setActiveTenantName(tenantName)
-  void router.push('/')
+  if (normalizedHost(tenant.domain) === normalizedHost(window.location.host)) {
+    void router.push('/')
+    return
+  }
+
+  window.location.assign(new URL('/', `${window.location.protocol}//${tenant.domain}`).toString())
+}
+
+function normalizedHost(value: string): string {
+  return value.trim().toLowerCase().replace(/\.$/, '')
 }
 
 async function measureCompactGroupNav() {

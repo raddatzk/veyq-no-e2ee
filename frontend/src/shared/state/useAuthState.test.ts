@@ -6,6 +6,7 @@ import { useAuthState } from './useAuthState'
 describe('useAuthState', () => {
   afterEach(() => {
     localStorage.clear()
+    setTestUrl('http://localhost:3000/')
     authState.isAuthenticated = false
     authState.userLabel = ''
     authState.user = null
@@ -108,4 +109,9 @@ function tenant(name: string, domain = `${name}.example.test`): TenantSummary {
     role: 'TenantMember',
     admins: []
   }
+}
+
+function setTestUrl(url: string) {
+  const testWindow = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+  testWindow.happyDOM.setURL(url)
 }

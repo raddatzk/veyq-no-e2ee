@@ -80,11 +80,17 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/components/app/SupportNotice.test.ts
   - id: frontend.shell-navigation.sidebar-tenants-groups
-    statement: Tenant sidebar renders compact tenant, group and mobile navigation actions without losing context.
+    statement: Tenant sidebar renders compact tenant, group and mobile navigation actions without losing context, and tenant switches use the selected tenant domain.
     coverage:
       frontend:
         unit:
           - testName: renders compact tenant menu, mobile sheet content and group overflow actions with clear labels
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+          - testName: redirects to the tenant domain when switching tenants across domains
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+          - testName: uses in-app navigation when switching tenants on the current domain
             kind: positive
             ref: frontend/src/components/app/TenantSidebar.test.ts
           - testName: emits create group without navigating away from the current page

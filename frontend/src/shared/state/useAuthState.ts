@@ -44,7 +44,7 @@ export function useAuthState() {
 }
 
 function resolveActiveTenantName(tenants: TenantSummary[]): string {
-  const currentTenant = tenants.find((tenant) => tenant.domain === currentHost())
+  const currentTenant = tenants.find((tenant) => normalizedHost(tenant.domain) === currentHost())
   if (currentTenant) return currentTenant.name
   const stored = getStoredActiveTenantName()
   if (stored && tenants.some((tenant) => tenant.name === stored)) return stored
@@ -59,7 +59,11 @@ function resolveRefreshedActiveTenantName(tenants: TenantSummary[]): string {
 }
 
 function currentHost(): string {
-  return window.location.host.toLowerCase()
+  return normalizedHost(window.location.host)
+}
+
+function normalizedHost(value: string): string {
+  return value.trim().toLowerCase().replace(/\.$/, '')
 }
 
 function getStoredActiveTenantName(): string {
