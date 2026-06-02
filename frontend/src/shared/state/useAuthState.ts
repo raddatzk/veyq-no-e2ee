@@ -20,7 +20,7 @@ export function useAuthState() {
 
   function setTenants(tenants: TenantSummary[]) {
     authState.tenants = tenants
-    authState.activeTenantName = resolveActiveTenantName(tenants)
+    authState.activeTenantName = resolveRefreshedActiveTenantName(tenants)
   }
 
   function setActiveTenantName(tenantName: string) {
@@ -49,6 +49,13 @@ function resolveActiveTenantName(tenants: TenantSummary[]): string {
   const stored = getStoredActiveTenantName()
   if (stored && tenants.some((tenant) => tenant.name === stored)) return stored
   return tenants[0]?.name || ''
+}
+
+function resolveRefreshedActiveTenantName(tenants: TenantSummary[]): string {
+  if (authState.activeTenantName && tenants.some((tenant) => tenant.name === authState.activeTenantName)) {
+    return authState.activeTenantName
+  }
+  return resolveActiveTenantName(tenants)
 }
 
 function currentHost(): string {

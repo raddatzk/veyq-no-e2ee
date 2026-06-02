@@ -122,7 +122,7 @@ acceptanceCriteria:
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
   - id: platform.auth-session-security.active-tenant-session-state
-    statement: Auth state restores and stores the active tenant per server and user.
+    statement: Auth state restores, stores and preserves the active tenant per server and user.
     coverage:
       frontend:
         unit:
@@ -133,5 +133,8 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/shared/state/useAuthState.test.ts
           - testName: stores active tenant changes for the current server and user
+            kind: positive
+            ref: frontend/src/shared/state/useAuthState.test.ts
+          - testName: preserves an explicit active tenant while refreshing tenant summaries on another tenant domain
             kind: positive
             ref: frontend/src/shared/state/useAuthState.test.ts

@@ -73,6 +73,30 @@ describe('useAuthState', () => {
 
     expect(localStorage.getItem('veyq:server-1:7:last-active-tenant')).toBe('family')
   })
+
+  it('preserves an explicit active tenant while refreshing tenant summaries on another tenant domain', () => {
+    serverState.serverId = 'server-1'
+    useAuthState().setAuthenticated(
+      {
+        userId: 7,
+        email: 'kevin@example.test',
+        displayName: 'Kevin',
+        permalink: 'kevin',
+        serverRole: 'ServerMember',
+        passkeyCount: 0,
+        hasPassword: true
+      },
+      [tenant('friends', window.location.host), tenant('family')]
+    )
+
+    useAuthState().setActiveTenantName('family')
+    useAuthState().setTenants([
+      tenant('friends', window.location.host),
+      tenant('family', 'family-renamed.example.test')
+    ])
+
+    expect(authState.activeTenantName).toBe('family')
+  })
 })
 
 function tenant(name: string, domain = `${name}.example.test`): TenantSummary {
