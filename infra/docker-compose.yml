@@ -129,7 +129,8 @@ services:
       start_period: 20s
     labels:
       - traefik.enable=true
-      - traefik.http.routers.veyq-collaboration.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE} && PathPrefix(`/api/collaboration/journal`)
+      - traefik.http.routers.veyq-collaboration.rule=(${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}) && PathPrefix(`/api/collaboration/journal`)
+      - traefik.http.routers.veyq-collaboration.priority=100
       - traefik.http.routers.veyq-collaboration.entrypoints=websecure
       - traefik.http.routers.veyq-collaboration.tls.certresolver=letsencrypt
       - traefik.http.services.veyq-collaboration.loadbalancer.server.port=8082
