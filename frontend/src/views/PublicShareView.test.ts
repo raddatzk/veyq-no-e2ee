@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import PublicShareView from './PublicShareView.vue'
 import { i18n, setLocale } from '../i18n'
@@ -11,12 +11,15 @@ import {
   getPublicShareMemoryJournal,
   listPublicShareChildMemories,
   listPublicShareMemoryMedia,
+  listPublicShareMemoryMediaBuckets,
   listPublicShareMemoryPlaylists,
   listPublicShareMemoryTracks,
   loginPublicShare,
   logoutPublicShare,
+  waitForNewPublicShareMemoryMedia,
   type Memory,
   type MemoryHeader,
+  type MemoryMedia,
   type PublicShareMemorySummary,
   type PublicShareSummary
 } from '../features/memories/api'
@@ -47,14 +50,15 @@ vi.mock('../features/memories/api', () => ({
   removePublicShareMemoryCover: vi.fn(),
   setPublicShareMemoryCover: vi.fn(),
   updatePublicShareMemoryMediaBucket: vi.fn(),
-  updatePublicShareMediaMetadata: vi.fn(),
+  updatePublicShareMediaCapturedAt: vi.fn(),
   updatePublicShareMemory: vi.fn(),
   updatePublicShareMemoryJournal: vi.fn(),
   updatePublicShareMemoryPlaylist: vi.fn(),
   updatePublicShareMemoryTrack: vi.fn(),
   uploadPublicShareMedia: vi.fn(),
   uploadPublicShareMemoryMedia: vi.fn(),
-  uploadPublicShareMemoryTrack: vi.fn()
+  uploadPublicShareMemoryTrack: vi.fn(),
+  waitForNewPublicShareMemoryMedia: vi.fn()
 }))
 
 const getPublicShareMock = vi.mocked(getPublicShare)
@@ -63,12 +67,18 @@ const getPublicShareMemoryHeaderMock = vi.mocked(getPublicShareMemoryHeader)
 const getPublicShareMemoryJournalMock = vi.mocked(getPublicShareMemoryJournal)
 const listPublicShareChildMemoriesMock = vi.mocked(listPublicShareChildMemories)
 const listPublicShareMemoryMediaMock = vi.mocked(listPublicShareMemoryMedia)
+const listPublicShareMemoryMediaBucketsMock = vi.mocked(listPublicShareMemoryMediaBuckets)
 const listPublicShareMemoryPlaylistsMock = vi.mocked(listPublicShareMemoryPlaylists)
 const listPublicShareMemoryTracksMock = vi.mocked(listPublicShareMemoryTracks)
 const loginPublicShareMock = vi.mocked(loginPublicShare)
 const logoutPublicShareMock = vi.mocked(logoutPublicShare)
+const waitForNewPublicShareMemoryMediaMock = vi.mocked(waitForNewPublicShareMemoryMedia)
 
 describe('PublicShareView', () => {
+  beforeEach(() => {
+    waitForNewPublicShareMemoryMediaMock.mockImplementation(() => new Promise<never>(() => {}))
+  })
+
   afterEach(() => {
     vi.clearAllMocks()
     setLocale('de')
@@ -87,6 +97,15 @@ describe('PublicShareView', () => {
       canUpload: false,
       canEdit: false,
       canDelete: false,
+      permissions: {
+        editMemory: false,
+        editJournal: false,
+        uploadTrack: false,
+        uploadPlaylist: false,
+        addChapter: false,
+        setCover: false,
+        setHighlight: false
+      },
       notices: [],
       rootMemory: {
         id: 'mem-1',
@@ -299,6 +318,7 @@ describe('PublicShareView', () => {
     })
     listPublicShareChildMemoriesMock.mockResolvedValue([])
     listPublicShareMemoryMediaMock.mockResolvedValue([])
+    listPublicShareMemoryMediaBucketsMock.mockResolvedValue([])
     listPublicShareMemoryTracksMock.mockResolvedValue([])
     listPublicShareMemoryPlaylistsMock.mockResolvedValue([])
     const router = await publicShareRouter('/s/share-1')
@@ -340,6 +360,79 @@ describe('PublicShareView', () => {
     expect(wrapper.find('.public-share-header').exists()).toBe(false)
     expect(wrapper.find('[data-testid="memory-detail"]').exists()).toBe(true)
     expect(wrapper.find('.public-share-actions').exists()).toBe(true)
+  })
+
+  it('does not expose direct memory editing for manager shares', async () => {
+    mockProtectedMemory()
+    getPublicShareMock.mockResolvedValue(
+      publicShare({
+        role: 'MANAGER',
+        authenticated: true,
+        canViewGallery: true,
+        canUpload: true,
+        canEdit: true,
+        canDelete: true
+      })
+    )
+    const router = await publicShareRouter('/s/share-1')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+
+    const detail = wrapper.find('[data-testid="memory-detail"]')
+    expect(detail.attributes('data-can-edit')).toBe('false')
+    expect(detail.attributes('data-can-manage-cover')).toBe('true')
+  })
+
+  it('merges public share media live updates and refreshes header and buckets', async () => {
+    mockProtectedMemory()
+    const updatedMedia = memoryMedia({ id: 'media-2', updatedAt: '2026-05-28T09:00:00Z' })
+    waitForNewPublicShareMemoryMediaMock
+      .mockResolvedValueOnce({ media: [updatedMedia] })
+      .mockImplementation(() => new Promise<never>(() => {}))
+    getPublicShareMemoryHeaderMock.mockResolvedValueOnce(memoryHeader())
+    getPublicShareMemoryHeaderMock.mockResolvedValueOnce(memoryHeader({ descendantMediaCount: 1 }))
+    listPublicShareMemoryMediaBucketsMock.mockResolvedValueOnce([])
+    listPublicShareMemoryMediaBucketsMock.mockResolvedValueOnce([
+      {
+        id: 'bucket-1',
+        memoryId: 'mem-1',
+        displayName: 'Fotos',
+        primary: false,
+        uploader: { type: 'USER', displayName: 'Alex', permalink: 'alex', userId: 1 },
+        canManage: true,
+        mediaCount: 1,
+        createdAt: '2026-05-28T08:00:00Z',
+        updatedAt: '2026-05-28T09:00:00Z'
+      }
+    ])
+    const router = await publicShareRouter('/s/share-1')
+
+    const wrapper = mount(PublicShareView, {
+      global: {
+        plugins: [router],
+        stubs: viewStubs()
+      }
+    })
+    await flushPromises()
+    await flushPromises()
+
+    expect(waitForNewPublicShareMemoryMediaMock).toHaveBeenCalledWith(
+      'share-1',
+      'mem-1',
+      true,
+      undefined,
+      undefined,
+      expect.any(AbortSignal)
+    )
+    expect(wrapper.find('[data-testid="memory-detail"]').attributes('data-media-count')).toBe('1')
+    expect(wrapper.find('[data-testid="memory-detail"]').attributes('data-bucket-count')).toBe('1')
+    expect(wrapper.find('[data-testid="memory-detail"]').attributes('data-descendant-count')).toBe('1')
   })
 
   it('exposes public share language and theme controls', async () => {
@@ -443,11 +536,15 @@ function mockProtectedMemory() {
   })
   listPublicShareChildMemoriesMock.mockResolvedValue([])
   listPublicShareMemoryMediaMock.mockResolvedValue([])
+  listPublicShareMemoryMediaBucketsMock.mockResolvedValue([])
   listPublicShareMemoryTracksMock.mockResolvedValue([])
   listPublicShareMemoryPlaylistsMock.mockResolvedValue([])
 }
 
 function publicShare(overrides: Partial<PublicShareSummary> = {}): PublicShareSummary {
+  const canUpload = overrides.canUpload ?? false
+  const canEdit = overrides.canEdit ?? false
+  const canDelete = overrides.canDelete ?? false
   return {
     id: 'share-1',
     role: 'VIEWER',
@@ -455,9 +552,19 @@ function publicShare(overrides: Partial<PublicShareSummary> = {}): PublicShareSu
     passwordRequired: false,
     displayNameRequired: false,
     canViewGallery: false,
-    canUpload: false,
-    canEdit: false,
-    canDelete: false,
+    canUpload,
+    canEdit,
+    canDelete,
+    permissions: {
+      editMemory: false,
+      editJournal: canEdit,
+      uploadTrack: canEdit,
+      uploadPlaylist: canEdit,
+      addChapter: canEdit,
+      setCover: canDelete,
+      setHighlight: canUpload || canDelete,
+      ...overrides.permissions
+    },
     notices: [],
     rootMemory: publicShareMemory(),
     ...overrides
@@ -518,6 +625,35 @@ function memoryHeader(overrides: Partial<MemoryHeader> = {}): MemoryHeader {
   }
 }
 
+function memoryMedia(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
+  return {
+    id: 'media-1',
+    memoryId: 'mem-1',
+    title: 'Foto',
+    uploader: { type: 'USER', displayName: 'Alex', permalink: 'alex', userId: 1 },
+    createdAt: '2026-05-28T08:00:00Z',
+    updatedAt: '2026-05-28T08:00:00Z',
+    capturedAt: null,
+    capturedAtOverride: false,
+    mimeType: 'image/jpeg',
+    sizeBytes: 1000,
+    contentUrl: '/api/public-shares/share-1/media/media-1/content',
+    thumbnailUrl: null,
+    previewUrl: null,
+    posterUrl: null,
+    gpsLatitude: null,
+    gpsLongitude: null,
+    cameraMake: null,
+    cameraModel: null,
+    lensModel: null,
+    imageWidth: 100,
+    imageHeight: 100,
+    bucketId: undefined,
+    highlight: false,
+    ...overrides
+  }
+}
+
 function viewStubs() {
   return {
     Button: {
@@ -539,10 +675,18 @@ function viewStubs() {
         '<input :type="type || `text`" :autocomplete="autocomplete" :placeholder="placeholder" :value="modelValue" @input="$emit(`update:modelValue`, $event.target.value)" />'
     },
     MemoryDetail: {
-      props: ['activeTab'],
+      props: ['activeTab', 'media', 'mediaBuckets', 'header', 'capabilities'],
       emits: ['update:activeTab', 'openMemory'],
       template: `
-        <section data-testid="memory-detail" :data-active-tab="activeTab">
+        <section
+          data-testid="memory-detail"
+          :data-active-tab="activeTab"
+          :data-media-count="media?.length || 0"
+          :data-bucket-count="mediaBuckets?.length || 0"
+          :data-descendant-count="header?.descendantMediaCount || 0"
+          :data-can-edit="capabilities?.canEdit"
+          :data-can-manage-cover="capabilities?.canManageCover"
+        >
           <button type="button" data-testid="select-map-tab" @click="$emit('update:activeTab', 'map')" />
           <button type="button" data-testid="open-child-memory" @click="$emit('openMemory', { path: '/day-1' })" />
         </section>

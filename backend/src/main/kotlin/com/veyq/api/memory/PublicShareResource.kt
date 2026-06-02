@@ -9,9 +9,11 @@ import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
 import com.veyq.api.generated.model.MemoryTrackActivityType
 import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.PublicShareLoginRequest
+import com.veyq.api.generated.model.PublicShareMediaUpdatesResponse
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaCapturedAtRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaHighlightRequest
 import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
 import com.veyq.api.generated.model.UpdateMemoryTrackRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
@@ -89,6 +91,27 @@ class PublicShareResource @Inject constructor(
 
     override fun listPublicShareMemoryMedia(shareId: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(memoryShareService.listPublicShareMemoryMedia(shareId, memoryId, includeChildren ?: false)).build()
+
+    override fun waitForPublicShareMemoryMediaUpdates(
+        shareId: String,
+        memoryId: String,
+        includeChildren: Boolean?,
+        afterUpdatedAt: java.util.Date?,
+        afterMediaId: String?,
+        timeoutSeconds: Int?,
+    ): Response =
+        Response.ok(
+            PublicShareMediaUpdatesResponse(
+                media = memoryShareService.waitForPublicShareMemoryMediaUpdates(
+                    shareId = shareId,
+                    memoryId = memoryId,
+                    includeChildren = includeChildren ?: false,
+                    afterUpdatedAt = afterUpdatedAt?.toInstant(),
+                    afterMediaId = afterMediaId,
+                    timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
+                )
+            )
+        ).build()
 
     override fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String, includeChildren: Boolean?): Response =
         Response.ok(memoryShareService.listPublicShareMemoryMediaBuckets(shareId, memoryId, includeChildren ?: false)).build()
@@ -265,13 +288,21 @@ class PublicShareResource @Inject constructor(
     override fun publicShareMemoryCoverContent(shareId: String, memoryId: String): Response =
         memoryShareService.publicShareMemoryCoverContent(shareId, memoryId)
 
-    override fun updatePublicShareMediaMetadata(
+    override fun updatePublicShareMediaCapturedAt(
         shareId: String,
         memoryId: String,
         mediaId: String,
-        updateMemoryMediaMetadataRequest: UpdateMemoryMediaMetadataRequest,
+        updateMemoryMediaCapturedAtRequest: UpdateMemoryMediaCapturedAtRequest,
     ): Response =
-        Response.ok(memoryShareService.updatePublicShareMediaMetadata(shareId, memoryId, mediaId, updateMemoryMediaMetadataRequest)).build()
+        Response.ok(memoryShareService.updatePublicShareMediaCapturedAt(shareId, memoryId, mediaId, updateMemoryMediaCapturedAtRequest)).build()
+
+    override fun updatePublicShareMediaHighlight(
+        shareId: String,
+        memoryId: String,
+        mediaId: String,
+        updateMemoryMediaFeaturedRequest: UpdateMemoryMediaHighlightRequest,
+    ): Response =
+        Response.ok(memoryShareService.updatePublicShareMediaHighlight(shareId, memoryId, mediaId, updateMemoryMediaFeaturedRequest)).build()
 
     override fun deletePublicShareMedia(shareId: String, memoryId: String, mediaId: String): Response =
         memoryShareService.deletePublicShareMedia(shareId, memoryId, mediaId).let { Response.noContent().build() }

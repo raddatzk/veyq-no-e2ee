@@ -566,6 +566,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     title: 'First upload',
     uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
     createdAt: '2026-05-24T16:30:00Z',
+    updatedAt: '2026-05-24T16:30:00Z',
     capturedAtOverride: false,
     mimeType: 'image/jpeg',
     sizeBytes: 12,
@@ -581,6 +582,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: null,
     gpsLatitude: null,
     gpsLongitude: null,
+    highlight: false,
     ...overrides
   }
 }
@@ -592,6 +594,7 @@ function bucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBucket {
     displayName: 'Kevin',
     primary: true,
     uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
+    canManage: true,
     mediaCount: 2,
     createdAt: '2026-05-24T16:30:00Z',
     updatedAt: '2026-05-24T16:30:00Z',

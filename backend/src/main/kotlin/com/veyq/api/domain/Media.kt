@@ -212,20 +212,34 @@ class Media : PanacheEntityBase {
     @Column(name = "created_at", nullable = false)
     lateinit var createdAt: Instant
 
+    @Column(name = "updated_at", nullable = false)
+    lateinit var updatedAt: Instant
+
     @Column(name = "captured_at")
     var capturedAt: Instant? = null
 
     @Column(name = "captured_at_override", nullable = false)
     var capturedAtOverride: Boolean = false
 
+    @Column(name = "highlight", nullable = false)
+    var highlight: Boolean = false
+
     @PrePersist
-    fun assignPublicId() {
+    fun initializeMedia() {
         if (!::publicId.isInitialized) {
             publicId = NanoIdUtils.randomNanoId(16)
         }
         if (!::createdAt.isInitialized) {
             createdAt = Instant.now()
         }
+        if (!::updatedAt.isInitialized) {
+            updatedAt = createdAt
+        }
+    }
+
+    @PreUpdate
+    fun updateUpdatedAt() {
+        updatedAt = Instant.now()
     }
 }
 
@@ -296,26 +310,26 @@ class MediaRepo : PanacheRepository<Media> {
         return list("memory in ?1 order by coalesce(capturedAt, createdAt), createdAt", memories)
     }
 
-    fun listByMemoriesCreatedAfter(
+    fun listByMemoriesUpdatedAfter(
         memories: List<Memory>,
-        afterCreatedAt: Instant?,
+        afterUpdatedAt: Instant?,
         afterPublicId: String?,
         limit: Int,
     ): List<Media> {
         if (memories.isEmpty() || limit <= 0) return emptyList()
-        val query = if (afterCreatedAt == null) {
-            find("memory in ?1 order by createdAt, publicId", memories)
+        val query = if (afterUpdatedAt == null) {
+            find("memory in ?1 order by updatedAt, publicId", memories)
         } else {
             find(
                 """
                 memory in ?1 and (
-                    createdAt > ?2
-                    or (createdAt = ?2 and publicId > ?3)
+                    updatedAt > ?2
+                    or (updatedAt = ?2 and publicId > ?3)
                 )
-                order by createdAt, publicId
+                order by updatedAt, publicId
                 """.trimIndent(),
                 memories,
-                afterCreatedAt,
+                afterUpdatedAt,
                 afterPublicId ?: "",
             )
         }

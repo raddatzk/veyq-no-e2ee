@@ -25,12 +25,12 @@ acceptanceCriteria:
           - testName: rejects invalid journal live snapshot without replacing current markdown
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
-  - id: memory.journal-live-sync.public-manager
-    statement: Public Manager shares can create live journal sessions while non-manager roles cannot.
+  - id: memory.journal-live-sync.public-editors
+    statement: Public shares with journal edit permission can create live journal sessions while viewers cannot.
     coverage:
       backend:
         integration:
-          - testName: public share journal live sessions require manager access
+          - testName: public share journal live sessions require journal edit access
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
   - id: memory.journal-live-sync.ui-editor

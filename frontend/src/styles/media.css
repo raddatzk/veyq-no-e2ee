@@ -100,6 +100,32 @@
   border-radius: 8px;
 }
 
+.lightbox-star-button.p-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 8px;
+}
+
+.lightbox-star-button.p-button.p-button-secondary {
+  border-color: var(--app-line);
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.lightbox-star-button.p-button.p-button-secondary:hover {
+  border-color: var(--app-warning-line);
+  background: var(--app-warning-soft);
+  color: var(--app-warning-text);
+}
+
+.lightbox-star-button-active.p-button.p-button-secondary {
+  border-color: var(--app-warning-line);
+  background: var(--app-warning-soft);
+  color: var(--app-warning-text);
+}
+
 .lightbox-icon-button:hover,
 .lightbox-nav:not(:disabled):hover {
   background: var(--app-hover);
@@ -336,6 +362,19 @@
   margin: 0;
   color: var(--app-danger);
   font-size: 0.85rem;
+}
+
+.media-lightbox-action-error {
+  position: absolute;
+  top: 82px;
+  left: 1.25rem;
+  z-index: 3;
+  max-width: min(36rem, calc(100vw - 2.5rem));
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--app-danger) 32%, transparent);
+  border-radius: 8px;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .media-lightbox-metadata {

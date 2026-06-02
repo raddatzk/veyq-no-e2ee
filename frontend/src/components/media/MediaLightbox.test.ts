@@ -32,6 +32,7 @@ describe('MediaLightbox', () => {
     if (originalDevicePixelRatio) Object.defineProperty(window, 'devicePixelRatio', originalDevicePixelRatio)
     if (originalInnerWidth) Object.defineProperty(window, 'innerWidth', originalInnerWidth)
     if (originalInnerHeight) Object.defineProperty(window, 'innerHeight', originalInnerHeight)
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -62,6 +63,40 @@ describe('MediaLightbox', () => {
     expect(requestFullscreen).toHaveBeenCalledTimes(1)
     expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-1/preview')
     expect(wrapper.find('.media-lightbox-stage img').attributes('src')).toBe('/api/tenant/media/media-1/preview')
+  })
+
+  it('disables highlighting and shows a shortcut hint when highlighting is not allowed', async () => {
+    vi.useFakeTimers()
+    const updateHighlight = vi.fn()
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media(),
+        canShowPrevious: false,
+        canShowNext: false,
+        canHighlight: false,
+        updateHighlight
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+
+    expect(wrapper.find('.lightbox-star-button').attributes('disabled')).toBeDefined()
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await flushPromises()
+
+    expect(updateHighlight).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Du kannst nur eigene Medien hervorheben.')
+
+    vi.advanceTimersByTime(3000)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Du kannst nur eigene Medien hervorheben.')
+    vi.useRealTimers()
   })
 
   it('uses the original fullscreen when the preview is too small for DPR capped at 2', async () => {
@@ -215,6 +250,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     title: 'Photo',
     uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
     createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
     capturedAt: null,
     capturedAtOverride: false,
     mimeType: 'image/jpeg',
@@ -230,6 +266,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: 800,
     gpsLatitude: null,
     gpsLongitude: null,
+    highlight: false,
     ...overrides
   }
 }

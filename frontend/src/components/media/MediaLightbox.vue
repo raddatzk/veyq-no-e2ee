@@ -2,12 +2,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import {
-  updateMemoryMediaMetadata,
+  updateMemoryMediaCapturedAt,
+  updateMemoryMediaHighlight,
   type MemoryMedia,
-  type UpdateMemoryMediaMetadataRequest
+  type UpdateMemoryMediaCapturedAtRequest,
+  type UpdateMemoryMediaHighlightRequest
 } from '../../features/memories/api'
 import {
   mediaContentUrl,
@@ -26,11 +29,17 @@ const props = defineProps<{
   canShowNext: boolean
   canEditMetadata?: boolean
   canDelete?: boolean
-  updateMetadata?: (
+  updateCapturedAt?: (
     mediaId: string,
     memoryId: string,
-    request: UpdateMemoryMediaMetadataRequest
+    request: UpdateMemoryMediaCapturedAtRequest
   ) => Promise<MemoryMedia>
+  updateHighlight?: (
+    mediaId: string,
+    memoryId: string,
+    request: UpdateMemoryMediaHighlightRequest
+  ) => Promise<MemoryMedia>
+  canHighlight?: boolean
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
 }>()
 const emit = defineEmits<{
@@ -45,6 +54,7 @@ const { locale, t } = useI18n()
 const PRELOAD_NEXT_COUNT = 5
 const PRELOAD_PREVIOUS_COUNT = 2
 const PREVIEW_MAX_EDGE = 1600
+const ACTION_ERROR_VISIBLE_MS = 3000
 const mediaUrl = computed(() => mediaContentUrl(props.media))
 const previewUrl = computed(() => mediaPreviewOnlyUrl(props.media))
 const posterUrl = computed(() => mediaPosterUrl(props.media))
@@ -58,6 +68,7 @@ const isDetailsOpen = ref(false)
 const isEditingCapturedAt = ref(false)
 const capturedAtInput = ref('')
 const saveError = ref('')
+let actionErrorTimeout: number | null = null
 const isSaving = ref(false)
 const dragStartY = ref<number | null>(null)
 const detailActionMenu = ref<InstanceType<typeof Menu> | null>(null)
@@ -78,11 +89,14 @@ const dimensions = computed(() =>
     ? `${props.media.imageWidth} x ${props.media.imageHeight} px`
     : ''
 )
-const hasGps = computed(
-  () => props.media.gpsLatitude !== null && props.media.gpsLongitude !== null
+const highlightActionLabel = computed(() =>
+  isHighlighted.value ? t('media.highlightRemove') : t('media.highlightAdd')
 )
+const hasGps = computed(() => props.media.gpsLatitude !== null && props.media.gpsLongitude !== null)
 const gpsLabel = computed(() =>
-  hasGps.value ? `${props.media.gpsLatitude!.toFixed(6)}, ${props.media.gpsLongitude!.toFixed(6)}` : ''
+  hasGps.value
+    ? `${props.media.gpsLatitude!.toFixed(6)}, ${props.media.gpsLongitude!.toFixed(6)}`
+    : ''
 )
 const gpsUrl = computed(() =>
   hasGps.value
@@ -96,8 +110,9 @@ const uploaderLink = computed(() =>
 )
 const canEditMetadata = computed(() => props.canEditMetadata !== false)
 const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMedia))
-const canFullscreenOriginal = computed(() =>
-  canUseFullscreen.value && (isImage.value || isVideo.value)
+const canHighlightMedia = computed(() => props.canHighlight !== false)
+const canFullscreenOriginal = computed(
+  () => canUseFullscreen.value && (isImage.value || isVideo.value)
 )
 const detailActionItems = computed<MenuItem[]>(() => {
   const items: Array<MenuItem | null> = [
@@ -122,7 +137,10 @@ const detailActionItems = computed<MenuItem[]>(() => {
 })
 const metadataRows = computed(() =>
   [
-    { label: t('media.capturedAt'), value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : '' },
+    {
+      label: t('media.capturedAt'),
+      value: displayCapturedAt.value ? formatDate(displayCapturedAt.value) : ''
+    },
     { label: t('media.uploadedAt'), value: formatDate(props.media.createdAt) },
     { label: t('media.camera'), value: camera.value },
     { label: t('media.lens'), value: props.media.lensModel || '' },
@@ -131,19 +149,24 @@ const metadataRows = computed(() =>
     { label: t('media.mimeType'), value: props.media.mimeType }
   ].filter((row) => row.value)
 )
+const isHighlighted = computed(() => props.media.highlight)
 
 onMounted(() => {
   canUseFullscreen.value =
-    document.fullscreenEnabled !== false && typeof document.documentElement.requestFullscreen === 'function'
+    document.fullscreenEnabled !== false &&
+    typeof document.documentElement.requestFullscreen === 'function'
   updateViewportSize()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   window.addEventListener('resize', handleViewportResize)
+  window.addEventListener('keydown', handleKeydown)
   syncPreloads()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
   window.removeEventListener('resize', handleViewportResize)
+  window.removeEventListener('keydown', handleKeydown)
+  clearActionErrorTimeout()
   abortAllPreloads()
 })
 
@@ -152,15 +175,23 @@ watch(
   () => {
     isEditingCapturedAt.value = false
     capturedAtInput.value = isoToDatetimeLocal(props.media.capturedAt)
+    clearActionErrorTimeout()
     saveError.value = ''
     fullscreenError.value = ''
-    fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
+    fullscreenOriginalLoaded.value =
+      !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
   },
   { immediate: true }
 )
 
 watch(
-  [() => props.media.id, () => props.selectedIndex, () => props.mediaItems, viewportWidth, viewportHeight],
+  [
+    () => props.media.id,
+    () => props.selectedIndex,
+    () => props.mediaItems,
+    viewportWidth,
+    viewportHeight
+  ],
   () => syncPreloads(),
   { flush: 'post' }
 )
@@ -204,18 +235,25 @@ function datetimeLocalToIso(value: string): string | null {
 
 function startCapturedAtEdit() {
   capturedAtInput.value = isoToDatetimeLocal(props.media.capturedAt)
+  clearActionErrorTimeout()
   saveError.value = ''
   isEditingCapturedAt.value = true
 }
 
 async function saveCapturedAt() {
   isSaving.value = true
+  clearActionErrorTimeout()
   saveError.value = ''
   try {
     const request = { capturedAt: datetimeLocalToIso(capturedAtInput.value) }
-    const updated = props.updateMetadata
-      ? await props.updateMetadata(props.media.id, props.media.memoryId, request)
-      : await updateMemoryMediaMetadata(props.tenantName, props.media.memoryId, props.media.id, request)
+    const updated = props.updateCapturedAt
+      ? await props.updateCapturedAt(props.media.id, props.media.memoryId, request)
+      : await updateMemoryMediaCapturedAt(
+          props.tenantName,
+          props.media.memoryId,
+          props.media.id,
+          request
+        )
     emit('updated', updated)
     isEditingCapturedAt.value = false
   } catch (error) {
@@ -225,9 +263,36 @@ async function saveCapturedAt() {
   }
 }
 
+async function saveHighlight() {
+  if (!canHighlightMedia.value) {
+    showTemporaryActionError(t('media.highlightUnavailable'))
+    return
+  }
+  isSaving.value = true
+  clearActionErrorTimeout()
+  saveError.value = ''
+  try {
+    const request = { highlight: !isHighlighted.value }
+    const updated = props.updateHighlight
+      ? await props.updateHighlight(props.media.id, props.media.memoryId, request)
+      : await updateMemoryMediaHighlight(
+          props.tenantName,
+          props.media.memoryId,
+          props.media.id,
+          request
+        )
+    emit('updated', updated)
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : t('media.highlightSaveFailed')
+  } finally {
+    isSaving.value = false
+  }
+}
+
 async function deleteCurrentMedia() {
   if (!props.deleteMedia) return
   isSaving.value = true
+  clearActionErrorTimeout()
   saveError.value = ''
   try {
     await props.deleteMedia(props.media.id, props.media.memoryId)
@@ -247,7 +312,8 @@ async function openOriginalFullscreen() {
   if (!canFullscreenOriginal.value) return
   fullscreenError.value = ''
   fullscreenOpen.value = true
-  fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
+  fullscreenOriginalLoaded.value =
+    !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
   syncPreloads()
   await nextTick()
   try {
@@ -262,7 +328,8 @@ async function openOriginalFullscreen() {
 function handleFullscreenChange() {
   if (document.fullscreenElement !== fullscreenTarget.value) {
     fullscreenOpen.value = false
-    fullscreenOriginalLoaded.value = !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
+    fullscreenOriginalLoaded.value =
+      !isImage.value || loadedFullscreenSources.value.has(fullscreenImageUrl.value)
   }
 }
 
@@ -270,9 +337,51 @@ function handleViewportResize() {
   updateViewportSize()
 }
 
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key.toLowerCase() !== 'f') return
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  if (isTypingTarget(event.target)) return
+  if (isSaving.value) return
+
+  event.preventDefault()
+  if (!canHighlightMedia.value) {
+    showTemporaryActionError(t('media.highlightUnavailable'))
+    return
+  }
+  void saveHighlight()
+}
+
+function showTemporaryActionError(message: string) {
+  clearActionErrorTimeout()
+  saveError.value = message
+  actionErrorTimeout = window.setTimeout(() => {
+    saveError.value = ''
+    actionErrorTimeout = null
+  }, ACTION_ERROR_VISIBLE_MS)
+}
+
+function clearActionErrorTimeout() {
+  if (actionErrorTimeout === null) return
+  window.clearTimeout(actionErrorTimeout)
+  actionErrorTimeout = null
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable
+  )
+}
+
 function updateViewportSize() {
   viewportWidth.value = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1)
-  viewportHeight.value = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1)
+  viewportHeight.value = Math.max(
+    1,
+    window.innerHeight || document.documentElement.clientHeight || 1
+  )
 }
 
 function imageFullscreenUrl(media: MemoryMedia): string {
@@ -401,6 +510,20 @@ function onSheetPointerUp(event: PointerEvent) {
         >
           <span class="pi pi-download" />
         </a>
+        <Button
+          type="button"
+          class="veyq-icon-button veyq-prime-icon-button lightbox-star-button"
+          :class="{ 'lightbox-star-button-active': isHighlighted }"
+          :icon="isHighlighted ? 'pi pi-star-fill' : 'pi pi-star'"
+          :aria-label="highlightActionLabel"
+          :title="canHighlightMedia ? highlightActionLabel : t('media.highlightUnavailable')"
+          severity="secondary"
+          outlined
+          :loading="isSaving"
+          :disabled="!canHighlightMedia"
+          @click="saveHighlight"
+        />
+
         <button
           v-if="canFullscreenOriginal"
           class="veyq-icon-button lightbox-icon-button"
@@ -421,6 +544,9 @@ function onSheetPointerUp(event: PointerEvent) {
         </button>
       </div>
     </div>
+    <p v-if="saveError && !isEditingCapturedAt" class="media-lightbox-error media-lightbox-action-error">
+      {{ saveError }}
+    </p>
 
     <main class="media-lightbox-layout">
       <section class="media-lightbox-viewer">
@@ -459,11 +585,7 @@ function onSheetPointerUp(event: PointerEvent) {
         </button>
       </section>
 
-      <div
-        v-if="fullscreenOpen"
-        ref="fullscreenTarget"
-        class="media-original-fullscreen"
-      >
+      <div v-if="fullscreenOpen" ref="fullscreenTarget" class="media-original-fullscreen">
         <button
           class="lightbox-nav lightbox-nav-previous media-original-nav"
           type="button"
@@ -534,11 +656,19 @@ function onSheetPointerUp(event: PointerEvent) {
           </div>
         </div>
 
-        <form v-if="isEditingCapturedAt" class="media-lightbox-date-form" @submit.prevent="saveCapturedAt">
+        <form
+          v-if="isEditingCapturedAt"
+          class="media-lightbox-date-form"
+          @submit.prevent="saveCapturedAt"
+        >
           <label for="captured-at-input">{{ t('media.capturedAt') }}</label>
           <input id="captured-at-input" v-model="capturedAtInput" type="datetime-local" />
           <div class="media-lightbox-date-actions">
-            <button class="veyq-text-button lightbox-text-button" type="submit" :disabled="isSaving">
+            <button
+              class="veyq-text-button lightbox-text-button"
+              type="submit"
+              :disabled="isSaving"
+            >
               {{ t('common.save') }}
             </button>
             <button
@@ -567,7 +697,9 @@ function onSheetPointerUp(event: PointerEvent) {
           </template>
           <template v-if="hasGps">
             <dt>{{ t('media.location') }}</dt>
-            <dd><a :href="gpsUrl" target="_blank" rel="noreferrer">{{ gpsLabel }}</a></dd>
+            <dd>
+              <a :href="gpsUrl" target="_blank" rel="noreferrer">{{ gpsLabel }}</a>
+            </dd>
           </template>
           <template v-if="media.capturedAtOverride">
             <dt>{{ t('common.status') }}</dt>

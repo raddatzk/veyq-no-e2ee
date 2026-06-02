@@ -13,6 +13,7 @@ function media(id: string, bucketId?: string, memoryId = 'memory-1'): MemoryMedi
     title: id,
     uploader,
     createdAt: '2026-05-31T20:00:00Z',
+    updatedAt: '2026-05-31T20:00:00Z',
     capturedAt: null,
     capturedAtOverride: false,
     mimeType: 'image/jpeg',
@@ -27,7 +28,8 @@ function media(id: string, bucketId?: string, memoryId = 'memory-1'): MemoryMedi
     imageWidth: null,
     imageHeight: null,
     gpsLatitude: null,
-    gpsLongitude: null
+    gpsLongitude: null,
+    highlight: false
   }
 }
 
@@ -38,6 +40,7 @@ function bucket(id: string, mediaCount: number, options: Partial<MemoryMediaBuck
     displayName: id,
     primary: false,
     uploader,
+    canManage: true,
     mediaCount,
     createdAt: '2026-05-31T20:00:00Z',
     updatedAt: '2026-05-31T20:00:00Z',

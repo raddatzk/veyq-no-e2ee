@@ -281,7 +281,7 @@ acceptanceCriteria:
     coverage:
       backend:
         integration:
-          - testName: lists new memory media after created cursor
+          - testName: lists updated memory media after updated cursor
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: media updates endpoint accepts openapi date-time cursor
@@ -328,9 +328,12 @@ acceptanceCriteria:
           - testName: merges long-polled Memory media and refreshes buckets and header counts
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
-          - testName: long-polls for new memory media with the created cursor
+          - testName: merges public share media live updates and refreshes header and buckets
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/views/PublicShareView.test.ts
+          - testName: long-polls for new memory media with the updated cursor
+            kind: positive
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: shows the active bucket dropzone only during a file drag
             kind: positive
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts

@@ -576,6 +576,63 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/updates":
+    get:
+      tags: [PublicShares]
+      operationId: waitForPublicShareMemoryMediaUpdates
+      summary: Wait for public share Memory media updates
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share id exists and the share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Long-polls for public share media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.
+
+        Vorbedingungen:
+        - The share is enabled.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - in: query
+          name: includeChildren
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include media assigned to descendant Memories inside the shared subtree.
+        - in: query
+          name: afterUpdatedAt
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Updated timestamp of the newest media item already known to the client.
+        - in: query
+          name: afterMediaId
+          required: false
+          schema:
+            type: string
+          description: Public id of the newest media item already known to the client, used as a stable tie-breaker.
+        - in: query
+          name: timeoutSeconds
+          required: false
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 30
+          description: Maximum time to hold the request before returning an empty update set.
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMediaUpdates"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/media-buckets":
     get:
       tags: [PublicShares]
@@ -1420,11 +1477,11 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
-  "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/metadata":
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/capturedAt":
     patch:
       tags: [PublicShares]
-      operationId: updatePublicShareMediaMetadata
-      summary: Correct public share media metadata
+      operationId: updatePublicShareMediaCapturedAt
+      summary: Correct public share media capturedAt
       security: []
       x-implementation-status: implemented
       x-preconditions:
@@ -1432,7 +1489,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Corrects media metadata for one media item inside the shared subtree.
+        Corrects media capturedAt for one media item inside the shared subtree.
 
         Vorbedingungen:
         - The share role is `CONTRIBUTOR` or `MANAGER`.
@@ -1443,7 +1500,42 @@ paths:
         - "$ref": "#/components/parameters/MemoryId"
         - "$ref": "#/components/parameters/MediaId"
       requestBody:
-        "$ref": "#/components/requestBodies/UpdatePublicShareMediaMetadata"
+        "$ref": "#/components/requestBodies/UpdatePublicShareMediaCapturedAt"
+      responses:
+        "200":
+          "$ref": "#/components/responses/PublicShareMedia"
+        "400":
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        "401":
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        "404":
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/highlight":
+    patch:
+      tags: [PublicShares]
+      operationId: updatePublicShareMediaHighlight
+      summary: Highlight a media
+      security: []
+      x-implementation-status: implemented
+      x-preconditions:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The requested Memory belongs to the shared subtree.
+      description: |-
+        Highlights a media.
+
+        Vorbedingungen:
+        - The share role is `CONTRIBUTOR` or `MANAGER`.
+        - A valid share access-token cookie or normal authenticated Memory visibility is present.
+        - The media belongs to the requested Memory inside the shared subtree.
+      parameters:
+        - "$ref": "#/components/parameters/ShareId"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdatePublicShareMediaHighlight"
       responses:
         "200":
           "$ref": "#/components/responses/PublicShareMedia"
@@ -1973,14 +2065,22 @@ components:
             displayName: Day 2
             startDate: "2026-05-04"
             endDate: "2026-05-04"
-    UpdatePublicShareMediaMetadata:
+    UpdatePublicShareMediaCapturedAt:
       required: true
       content:
         application/json:
           schema:
-            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaMetadataRequest"
+            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaCapturedAtRequest"
           example:
             capturedAt: "2026-05-04T18:30:00Z"
+    UpdatePublicShareMediaHighlight:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "./memories.openapi.yaml#/components/schemas/UpdateMemoryMediaHighlightRequest"
+          example:
+            highlight: true
     UploadPublicShareMemoryTrack:
       required: true
       content:
@@ -2248,10 +2348,12 @@ components:
               type: ANONYMOUS
               displayName: Alex
             createdAt: "2026-05-24T10:00:00Z"
+            updatedAt: "2026-05-24T10:00:00Z"
             capturedAtOverride: false
             mimeType: image/jpeg
             sizeBytes: 1000
             contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+            highlight: false
     PublicShareMediaList:
       description: Public media summaries.
       content:
@@ -2268,10 +2370,33 @@ components:
                 type: ANONYMOUS
                 displayName: Alex
               createdAt: "2026-05-24T10:00:00Z"
+              updatedAt: "2026-05-24T10:00:00Z"
               capturedAtOverride: false
               mimeType: image/jpeg
               sizeBytes: 1000
               contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+              highlight: false
+    PublicShareMediaUpdates:
+      description: Public share media update batch.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/PublicShareMediaUpdatesResponse"
+          example:
+            media:
+              - id: med_abc123
+                memoryId: mem_abc123
+                title: Ceremony
+                uploader:
+                  type: ANONYMOUS
+                  displayName: Alex
+                createdAt: "2026-05-24T10:00:00Z"
+                updatedAt: "2026-05-24T10:02:00Z"
+                capturedAtOverride: false
+                mimeType: image/jpeg
+                sizeBytes: 1000
+                contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+                highlight: true
   schemas:
     MemoryShareRole:
       type: string
@@ -2395,10 +2520,31 @@ components:
             Please keep this Memory private.
         createdAt: "2026-05-24T10:00:00Z"
         updatedAt: "2026-05-24T10:00:00Z"
+    PublicSharePermissions:
+      type: object
+      additionalProperties: false
+      required: [editMemory, editJournal, uploadTrack, uploadPlaylist, addChapter, setCover, setHighlight]
+      properties:
+        editMemory:
+          description: True when the current share session may edit Memory metadata such as name, display name and date range.
+          type: boolean
+        editJournal:
+          type: boolean
+        uploadTrack:
+          type: boolean
+        uploadPlaylist:
+          type: boolean
+        addChapter:
+          type: boolean
+        setCover:
+          type: boolean
+        setHighlight:
+          description: True when the current share session may highlight at least its own uploaded media. Public bucket responses expose per-bucket `canManage` for ownership-sensitive actions.
+          type: boolean
     PublicShareSummary:
       type: object
       additionalProperties: false
-      required: [id, role, authenticated, passwordRequired, displayNameRequired, canViewGallery, canUpload, canEdit, canDelete, notices]
+      required: [id, role, authenticated, passwordRequired, displayNameRequired, canViewGallery, canUpload, canEdit, canDelete, permissions, notices]
       properties:
         id:
           type: string
@@ -2418,6 +2564,8 @@ components:
           type: boolean
         canDelete:
           type: boolean
+        permissions:
+          "$ref": "#/components/schemas/PublicSharePermissions"
         notices:
           type: array
           items:
@@ -2439,6 +2587,14 @@ components:
         canUpload: false
         canEdit: false
         canDelete: false
+        permissions:
+          editMemory: false
+          editJournal: false
+          uploadTrack: false
+          uploadPlaylist: false
+          addChapter: false
+          setCover: false
+          setHighlight: false
         notices:
           - scope: TENANT
             tenantName: friends
@@ -2697,10 +2853,19 @@ components:
         displayName: Day 2
         startDate: "2026-05-04"
         endDate: "2026-05-04"
+    PublicShareMediaUpdatesResponse:
+      type: object
+      additionalProperties: false
+      required: [media]
+      properties:
+        media:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PublicShareMediaSummary"
     PublicShareMediaSummary:
       type: object
       additionalProperties: false
-      required: [id, memoryId, title, uploader, createdAt, capturedAtOverride, mimeType, sizeBytes, contentUrl]
+      required: [id, memoryId, title, uploader, createdAt, updatedAt, capturedAtOverride, mimeType, sizeBytes, contentUrl, highlight]
       properties:
         id:
           type: string
@@ -2716,6 +2881,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
         capturedAt:
           type: string
           format: date-time
@@ -2729,6 +2897,8 @@ components:
           format: int64
         contentUrl:
           type: string
+        highlight:
+          type: boolean
         thumbnailUrl:
           type: string
           nullable: true
@@ -2755,11 +2925,13 @@ components:
           type: ANONYMOUS
           displayName: Alex
         createdAt: "2026-05-24T10:00:00Z"
+        updatedAt: "2026-05-24T10:00:00Z"
         capturedAt: "2026-05-04T18:30:00Z"
         capturedAtOverride: false
         mimeType: image/jpeg
         sizeBytes: 2048000
         contentUrl: /api/public-shares/shr_abc123/media/med_abc123/content
+        highlight: true
         thumbnailUrl: /api/public-shares/shr_abc123/media/med_abc123/thumbnail
         previewUrl: /api/public-shares/shr_abc123/media/med_abc123/preview
         posterUrl: /api/public-shares/shr_abc123/media/med_abc123/poster

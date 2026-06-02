@@ -28,8 +28,8 @@ export type MemoryRouteBreadcrumb = {
   label: string
 }
 
-type MediaCreatedCursor = {
-  createdAt: string
+type MediaUpdatedCursor = {
+  updatedAt: string
   mediaId: string
 }
 
@@ -196,13 +196,13 @@ export function useMemoryRouteData(
     controller: AbortController
   ) {
     while (!controller.signal.aborted && sequence === loadSequence && memory.value?.id === current.id) {
-      const cursor = newestCreatedCursor(media.value)
+      const cursor = newestUpdatedAtCursor(media.value)
       try {
         const updates = await waitForNewMemoryMedia(
           tenantName.value,
           current.id,
           true,
-          cursor?.createdAt,
+          cursor?.updatedAt,
           cursor?.mediaId,
           controller.signal
         )
@@ -274,15 +274,15 @@ function fallbackBreadcrumbLabel(path: string, current: Memory): string {
   return segment
 }
 
-function newestCreatedCursor(media: MemoryMedia[]): MediaCreatedCursor | null {
+function newestUpdatedAtCursor(media: MemoryMedia[]): MediaUpdatedCursor | null {
   const newest = [...media]
-    .filter((item) => item.createdAt)
+    .filter((item) => item.updatedAt)
     .sort((left, right) => {
-      const createdAtOrder = left.createdAt.localeCompare(right.createdAt)
-      return createdAtOrder || left.id.localeCompare(right.id)
+      const updatedAtOrder = left.updatedAt.localeCompare(right.updatedAt)
+      return updatedAtOrder || left.id.localeCompare(right.id)
     })
     .at(-1)
-  return newest ? { createdAt: newest.createdAt, mediaId: newest.id } : null
+  return newest ? { updatedAt: newest.updatedAt, mediaId: newest.id } : null
 }
 
 function mergeMediaById(current: MemoryMedia[], updates: MemoryMedia[]): MemoryMedia[] {

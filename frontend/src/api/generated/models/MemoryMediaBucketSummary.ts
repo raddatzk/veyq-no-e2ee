@@ -64,6 +64,12 @@ export interface MemoryMediaBucketSummary {
      */
     uploader: MediaUploader;
     /**
+     * True when the current session may manage this bucket and the media it owns.
+     * @type {boolean}
+     * @memberof MemoryMediaBucketSummary
+     */
+    canManage: boolean;
+    /**
      * 
      * @type {number}
      * @memberof MemoryMediaBucketSummary
@@ -92,6 +98,7 @@ export function instanceOfMemoryMediaBucketSummary(value: object): value is Memo
     if (!('displayName' in value) || value['displayName'] === undefined) return false;
     if (!('primary' in value) || value['primary'] === undefined) return false;
     if (!('uploader' in value) || value['uploader'] === undefined) return false;
+    if (!('canManage' in value) || value['canManage'] === undefined) return false;
     if (!('mediaCount' in value) || value['mediaCount'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
@@ -114,6 +121,7 @@ export function MemoryMediaBucketSummaryFromJSONTyped(json: any, ignoreDiscrimin
         'displayName': json['displayName'],
         'primary': json['primary'],
         'uploader': MediaUploaderFromJSON(json['uploader']),
+        'canManage': json['canManage'],
         'mediaCount': json['mediaCount'],
         'createdAt': json['createdAt'],
         'updatedAt': json['updatedAt'],
@@ -137,6 +145,7 @@ export function MemoryMediaBucketSummaryToJSONTyped(value?: MemoryMediaBucketSum
         'displayName': value['displayName'],
         'primary': value['primary'],
         'uploader': MediaUploaderToJSON(value['uploader']),
+        'canManage': value['canManage'],
         'mediaCount': value['mediaCount'],
         'createdAt': value['createdAt'],
         'updatedAt': value['updatedAt'],

@@ -858,14 +858,14 @@ paths:
       tags:
         - MemoryMedia
       operationId: waitForMemoryMediaUpdates
-      summary: Wait for newly created memory media
+      summary: Wait for memory media updates
       x-implementation-status: implemented
       x-preconditions:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
       description: |-
-        Long-polls for media created after the supplied `createdAt` plus media id cursor. The response contains only newly created media, ordered by creation time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.
+        Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -884,12 +884,12 @@ paths:
             default: false
           description: Include media assigned to visible descendant Memories.
         - in: query
-          name: afterCreatedAt
+          name: afterUpdatedAt
           required: false
           schema:
             type: string
             format: date-time
-          description: Creation timestamp of the newest media item already known to the client.
+          description: Updated timestamp of the newest media item already known to the client.
         - in: query
           name: afterMediaId
           required: false
@@ -1764,12 +1764,12 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
-  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata":
+  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata/capturedAt":
     patch:
       tags:
         - MemoryMedia
-      operationId: updateMemoryMediaMetadata
-      summary: Correct memory media metadata
+      operationId: updateMemoryMediaCapturedAt
+      summary: Correct memory media capturedAt
       x-implementation-status: implemented
       x-preconditions:
         - A valid access token cookie must be present.
@@ -1787,7 +1787,42 @@ paths:
         - "$ref": "#/components/parameters/MemoryId"
         - "$ref": "#/components/parameters/MediaId"
       requestBody:
-        "$ref": "#/components/requestBodies/UpdateMemoryMediaMetadata"
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaCapturedAt"
+      responses:
+        '200':
+          "$ref": "#/components/responses/MemoryMedia"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata/highlight":
+    patch:
+      tags:
+        - MemoryMedia
+      operationId: updateMemoryMediaHighlight
+      summary: Flag a media as a highlight
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Flag a memory as highlight
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+        - "$ref": "#/components/parameters/MediaId"
+      requestBody:
+        "$ref": "#/components/requestBodies/UpdateMemoryMediaHighlight"
       responses:
         '200':
           "$ref": "#/components/responses/MemoryMedia"
@@ -2300,14 +2335,22 @@ components:
             type: string
             format: binary
           example: "<binary media chunk>"
-    UpdateMemoryMediaMetadata:
+    UpdateMemoryMediaCapturedAt:
       required: true
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/UpdateMemoryMediaMetadataRequest"
+            "$ref": "#/components/schemas/UpdateMemoryMediaCapturedAtRequest"
           example:
             capturedAt: '2026-05-03T12:30:00Z'
+    UpdateMemoryMediaHighlight:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/UpdateMemoryMediaHighlightRequest"
+          example:
+            highlight: true
     UpdateMemoryMediaMetadataBatch:
       required: true
       content:
@@ -2545,11 +2588,13 @@ components:
               permalink: kevin
               userId: 1
             createdAt: '2026-05-03T12:00:00Z'
+            updatedAt: '2026-05-03T12:00:00Z'
             capturedAt: '2026-05-03T11:45:00Z'
             capturedAtOverride: false
             mimeType: image/jpeg
             sizeBytes: 2048000
             contentUrl: /api/friends/memory-media/med_abc123/content
+            highlight: true
             previewUrl: /api/friends/memory-media/med_abc123/preview
     MemoryMediaUploadSession:
       description: Created resumable media upload session.
@@ -3410,17 +3455,25 @@ components:
       example:
         type: GROUP
         groupName: family
-    UpdateMemoryMediaMetadataRequest:
+    UpdateMemoryMediaCapturedAtRequest:
       type: object
       additionalProperties: false
       properties:
         capturedAt:
           type: string
           format: date-time
-          nullable: true
           description: Corrected capture timestamp. Null clears the timestamp while still marking it as user-corrected.
       example:
         capturedAt: '2026-05-03T12:30:00Z'
+    UpdateMemoryMediaHighlightRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        highlight:
+          type: boolean
+          description: Flag a media as a highlight
+      example:
+        highlight: true
     UpdateMemoryMediaMetadataBatchRequest:
       type: object
       additionalProperties: false
@@ -3901,10 +3954,12 @@ components:
         - title
         - uploader
         - createdAt
+        - updatedAt
         - capturedAtOverride
         - mimeType
         - sizeBytes
         - contentUrl
+        - highlight
       properties:
         id:
           type: string
@@ -3922,6 +3977,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
         capturedAt:
           type: string
           format: date-time
@@ -3935,6 +3993,8 @@ components:
           format: int64
         contentUrl:
           type: string
+        highlight:
+          type: boolean
         thumbnailUrl:
           type: string
           nullable: true
@@ -3980,11 +4040,13 @@ components:
           permalink: kevin
           userId: 1
         createdAt: '2026-05-03T12:00:00Z'
+        updatedAt: '2026-05-03T12:00:00Z'
         capturedAt: '2026-05-03T11:45:00Z'
         capturedAtOverride: false
         mimeType: image/jpeg
         sizeBytes: 2048000
         contentUrl: /api/friends/memory-media/med_abc123/content
+        highlight: true
         thumbnailUrl: /api/friends/memory-media/med_abc123/thumbnail
         previewUrl: /api/friends/memory-media/med_abc123/preview
         posterUrl: /api/friends/memory-media/med_abc123/poster
@@ -4014,6 +4076,7 @@ components:
         - displayName
         - primary
         - uploader
+        - canManage
         - mediaCount
         - createdAt
         - updatedAt
@@ -4031,6 +4094,9 @@ components:
           type: boolean
         uploader:
           "$ref": "./common.openapi.yaml#/components/schemas/MediaUploader"
+        canManage:
+          description: True when the current session may manage this bucket and the media it owns.
+          type: boolean
         mediaCount:
           type: integer
           format: int32
@@ -4051,6 +4117,7 @@ components:
           displayName: Kevin
           permalink: kevin
           userId: 1
+        canManage: true
         mediaCount: 4
         createdAt: '2026-05-03T12:00:00Z'
         updatedAt: '2026-05-03T12:00:00Z'

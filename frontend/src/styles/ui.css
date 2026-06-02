@@ -134,6 +134,14 @@
   padding-inline: 0;
 }
 
+.veyq-prime-icon-button.p-button {
+  flex: 0 0 auto;
+  width: 2.55rem;
+  min-width: 2.55rem;
+  height: 2.55rem;
+  padding-inline: 0;
+}
+
 .veyq-icon-button:not(.p-button) {
   display: grid;
   place-items: center;

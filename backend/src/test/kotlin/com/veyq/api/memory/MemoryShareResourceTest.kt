@@ -413,17 +413,58 @@ class MemoryShareResourceTest {
     }
 
     @Test
-    fun `public share journal is readable by viewers and writable only by managers`() {
+    fun `public share cover requires manager access`() {
+        val media = createMedia("Contributor Cover")
+        val shareId = createShare("CONTRIBUTOR")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .multiPart("mediaId", media.publicId)
+            .multiPart("cropX", "0")
+            .multiPart("cropY", "0")
+            .multiPart("cropWidth", "1")
+            .multiPart("cropHeight", "1")
+            .`when`().put("/api/public-shares/$shareId/memories/${memory.publicId}/cover")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `public share memory metadata editing is not available to share roles`() {
+        val shareId = createShare("MANAGER")
+        val accessCookie = loginShare(shareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .`when`().get("/api/public-shares/$shareId")
+            .then()
+            .statusCode(200)
+            .body("canEdit", equalTo(true))
+            .body("permissions.editMemory", equalTo(false))
+            .body("permissions.setCover", equalTo(true))
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)
+            .contentType("application/json")
+            .body("""{"displayName":"Manager Rename","startDate":"2026-05-04","endDate":"2026-05-04"}""")
+            .`when`().put("/api/public-shares/$shareId/memories/${memory.publicId}")
+            .then()
+            .statusCode(403)
+    }
+
+    @Test
+    fun `public share journal is readable by viewers and writable by contributors`() {
         val media = createMedia("Journal Cover")
         val secondMedia = createMedia("Journal Carousel")
-        val managerShareId = createShare("MANAGER")
-        val managerAccessCookie = loginShare(managerShareId)
+        val contributorShareId = createShare("CONTRIBUTOR")
+        val contributorAccessCookie = loginShare(contributorShareId)
 
         given()
             .contentType("application/json")
-            .cookie("VEYQ_SHARE_ACCESS_TOKEN", managerAccessCookie)
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
             .body("""{"markdown":"# Ceremony\n\n::media:${media.publicId} Cover\n\n::media:${media.publicId},${secondMedia.publicId} Carousel"}""")
-            .`when`().put("/api/public-shares/$managerShareId/memories/${memory.publicId}/journal")
+            .`when`().put("/api/public-shares/$contributorShareId/memories/${memory.publicId}/journal")
             .then()
             .statusCode(200)
             .body("memoryId", equalTo(memory.publicId))
@@ -449,6 +490,72 @@ class MemoryShareResourceTest {
     }
 
     @Test
+    fun `public share highlights allow own contributor media and manager foreign media`() {
+        val foreignMedia = createMedia("Foreign Highlight")
+        val contributorShareId = createShare("CONTRIBUTOR")
+        val contributorAccessCookie = loginShare(contributorShareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+            .`when`().get("/api/public-shares/$contributorShareId/memories/${memory.publicId}/media-buckets")
+            .then()
+            .statusCode(200)
+            .body("find { it.uploader.type == 'USER' }.canManage", equalTo(false))
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+            .contentType("application/json")
+            .body("""{"highlight":true}""")
+            .`when`().patch("/api/public-shares/$contributorShareId/memories/${memory.publicId}/media/${foreignMedia.publicId}/highlight")
+            .then()
+            .statusCode(403)
+
+        val upload = imageFile()
+        val ownUpload = try {
+            given()
+                .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+                .multiPart("file", upload.toFile(), "image/png")
+                .multiPart("title", "Contributor Highlight")
+                .`when`().post("/api/public-shares/$contributorShareId/memories/${memory.publicId}/media")
+                .then()
+                .statusCode(200)
+                .extract()
+        } finally {
+            Files.deleteIfExists(upload)
+        }
+        val ownMediaId = ownUpload.path<String>("id")
+        val ownBucketId = ownUpload.path<String>("bucketId")
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+            .`when`().get("/api/public-shares/$contributorShareId/memories/${memory.publicId}/media-buckets")
+            .then()
+            .statusCode(200)
+            .body("find { it.id == '$ownBucketId' }.canManage", equalTo(true))
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+            .contentType("application/json")
+            .body("""{"highlight":true}""")
+            .`when`().patch("/api/public-shares/$contributorShareId/memories/${memory.publicId}/media/$ownMediaId/highlight")
+            .then()
+            .statusCode(200)
+            .body("highlight", equalTo(true))
+
+        val managerShareId = createShare("MANAGER")
+        val managerAccessCookie = loginShare(managerShareId)
+
+        given()
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", managerAccessCookie)
+            .contentType("application/json")
+            .body("""{"highlight":true}""")
+            .`when`().patch("/api/public-shares/$managerShareId/memories/${memory.publicId}/media/${foreignMedia.publicId}/highlight")
+            .then()
+            .statusCode(200)
+            .body("highlight", equalTo(true))
+    }
+
+    @Test
     fun `uploader only share cannot read journal`() {
         val shareId = createShare("UPLOADER")
         val accessCookie = loginShare(shareId)
@@ -461,17 +568,17 @@ class MemoryShareResourceTest {
     }
 
     @Test
-    fun `public share journal live sessions require manager access`() {
-        val managerShareId = createShare("MANAGER")
-        val managerAccessCookie = loginShare(managerShareId)
+    fun `public share journal live sessions require journal edit access`() {
+        val contributorShareId = createShare("CONTRIBUTOR")
+        val contributorAccessCookie = loginShare(contributorShareId)
 
         given()
-            .cookie("VEYQ_SHARE_ACCESS_TOKEN", managerAccessCookie)
-            .`when`().post("/api/public-shares/$managerShareId/memories/${memory.publicId}/journal/live-session")
+            .cookie("VEYQ_SHARE_ACCESS_TOKEN", contributorAccessCookie)
+            .`when`().post("/api/public-shares/$contributorShareId/memories/${memory.publicId}/journal/live-session")
             .then()
             .statusCode(200)
             .body("memoryId", equalTo(memory.publicId))
-            .body("documentId", equalTo("share/$managerShareId/memory/${memory.publicId}/journal"))
+            .body("documentId", equalTo("share/$contributorShareId/memory/${memory.publicId}/journal"))
             .body("token", notNullValue())
             .body("canEdit", equalTo(true))
 
@@ -1030,8 +1137,7 @@ class MemoryShareResourceTest {
             .body("""{"displayName":"Day Two"}""")
             .`when`().put("/api/public-shares/$shareId/memories/$childId")
             .then()
-            .statusCode(200)
-            .body("displayName", equalTo("Day Two"))
+            .statusCode(403)
 
         given()
             .cookie("VEYQ_SHARE_ACCESS_TOKEN", accessCookie)

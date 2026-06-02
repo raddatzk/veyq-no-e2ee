@@ -90,6 +90,7 @@ const bucketsWithLocalPrimary = computed<MemoryMediaBucket[]>(() => {
       displayName: uploader.displayName,
       primary: true,
       uploader,
+      canManage: true,
       mediaCount: 0,
       createdAt: now,
       updatedAt: now,

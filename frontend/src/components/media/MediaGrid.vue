@@ -2,12 +2,24 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ProgressSpinner from 'primevue/progressspinner'
+import SelectButton from 'primevue/selectbutton'
 import MediaLightbox from './MediaLightbox.vue'
 import { calculateJustifiedMediaLayout, galleryDisplayAspectRatio } from './mediaGridLayout'
 import type { MediaGridLayoutResult, MediaGridLayoutTile } from './mediaGridLayout'
-import type { MemoryMedia, UpdateMemoryMediaMetadataRequest } from '../../features/memories/api'
-import { mediaContentUrl, mediaPreviewOnlyUrl, mediaThumbnailUrl } from '../../shared/utils/mediaUrls'
+import type {
+  MemoryMedia,
+  MemoryMediaBucket,
+  UpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest
+} from '../../features/memories/api'
+import {
+  mediaContentUrl,
+  mediaPreviewOnlyUrl,
+  mediaThumbnailUrl
+} from '../../shared/utils/mediaUrls'
 import { createRafResizeObserver, type RafResizeObserver } from '../../shared/utils/resizeObserver'
+
+type MediaFilter = 'highlighted' | 'all'
 
 type GalleryItem = {
   id: string
@@ -24,18 +36,27 @@ type GalleryTile = MediaGridLayoutTile & GalleryItem
 const props = defineProps<{
   tenantName: string
   media: MemoryMedia[]
+  mediaBuckets?: MemoryMediaBucket[]
   streaming: boolean
   canEditMetadata?: boolean
   canDeleteMedia?: boolean
-  updateMetadata?: (
+  canHighlight?: boolean
+  updateCapturedAt?: (
     mediaId: string,
     memoryId: string,
-    request: UpdateMemoryMediaMetadataRequest
+    request: UpdateMemoryMediaCapturedAtRequest
   ) => Promise<MemoryMedia>
+  updateHighlight?: (
+    mediaId: string,
+    memoryId: string,
+    request: UpdateMemoryMediaHighlightRequest
+  ) => Promise<MemoryMedia>
+  canHighlightMedia?: (media: MemoryMedia) => boolean
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
 }>()
 const emit = defineEmits<{
   deleted: [media: MemoryMedia]
+  updated: [media: MemoryMedia]
 }>()
 
 const { t } = useI18n()
@@ -46,20 +67,27 @@ const layout = ref<MediaGridLayoutResult>({ tiles: [], height: 0 })
 const shouldRequestMedia = ref(false)
 const loadedPreviewKeys = ref<Set<string>>(new Set())
 const loadedOriginalKeys = ref<Set<string>>(new Set())
-const mediaOverrides = ref<Record<string, MemoryMedia>>({})
 let mediaGridObserver: RafResizeObserver | null = null
 let layoutSequence = 0
 
+const mediaFilter = ref<MediaFilter>('all')
+const mediaFilterOptions = computed(() => [
+  { label: t('media.filterHighlighted'), value: 'highlighted' as const },
+  { label: t('media.filterAll'), value: 'all' as const }
+])
+
 const galleryItems = computed<GalleryItem[]>(() =>
-  props.media.map((media) => ({
-    id: media.id,
-    aspectRatio: mediaAspectRatio(media),
-    mediaUrl: mediaContentUrl(media),
-    thumbnailUrl: mediaThumbnailUrl(media),
-    previewUrl: mediaPreviewOnlyUrl(media),
-    alt: media.title || media.id,
-    media
-  }))
+  props.media
+    .filter((media: MemoryMedia) => (mediaFilter.value === 'highlighted' ? media.highlight : true))
+    .map((media) => ({
+      id: media.id,
+      aspectRatio: mediaAspectRatio(media),
+      mediaUrl: mediaContentUrl(media),
+      thumbnailUrl: mediaThumbnailUrl(media),
+      previewUrl: mediaPreviewOnlyUrl(media),
+      alt: media.title || media.id,
+      media
+    }))
 )
 const galleryItemById = computed(() => new Map(galleryItems.value.map((item) => [item.id, item])))
 const targetTileHeight = computed(() => (containerWidth.value <= 720 ? 150 : 200))
@@ -72,10 +100,19 @@ const galleryTiles = computed<GalleryTile[]>(() =>
     .filter((tile): tile is GalleryTile => Boolean(tile))
 )
 const visibleMedia = computed(() =>
-  galleryTiles.value.map((tile) => mediaOverrides.value[tile.id] || tile.media)
+  galleryTiles.value.map((tile) => tile.media)
 )
 const selectedMedia = computed(() =>
   selectedIndex.value === null ? null : visibleMedia.value[selectedIndex.value] || null
+)
+const bucketById = computed(() =>
+  new Map((props.mediaBuckets ?? []).map((bucket) => [bucket.id, bucket]))
+)
+const canHighlightSelectedMedia = computed(() =>
+  selectedMedia.value
+    ? props.canHighlight !== false &&
+      (props.canHighlightMedia?.(selectedMedia.value) ?? canHighlightByBucket(selectedMedia.value))
+    : true
 )
 const isLightboxOpen = computed(() => selectedMedia.value !== null)
 const canShowPrevious = computed(() => selectedIndex.value !== null && selectedIndex.value > 0)
@@ -84,8 +121,8 @@ const canShowNext = computed(
 )
 const canRenderGallery = computed(() => galleryTiles.value.length > 0)
 const layoutSignature = computed(() =>
-  props.media
-    .map((item) => `${item.id}:${item.imageWidth ?? ''}x${item.imageHeight ?? ''}`)
+  galleryItems.value
+    .map((item) => `${item.id}:${item.media.imageWidth ?? ''}x${item.media.imageHeight ?? ''}`)
     .join('|')
 )
 
@@ -106,17 +143,13 @@ watch(
   () => {
     if (!props.media.length) {
       selectedIndex.value = null
-      mediaOverrides.value = {}
       return
     }
 
-    const currentIds = new Set(props.media.map((item) => item.id))
-    mediaOverrides.value = Object.fromEntries(
-      Object.entries(mediaOverrides.value).filter(([mediaId]) => currentIds.has(mediaId))
-    )
     pruneLoadedMediaKeys()
 
-    if (selectedIndex.value !== null && selectedIndex.value >= visibleMedia.value.length) closeLightbox()
+    if (selectedIndex.value !== null && selectedIndex.value >= visibleMedia.value.length)
+      closeLightbox()
   }
 )
 
@@ -155,7 +188,12 @@ function measureMediaGrid(element: HTMLElement) {
 }
 
 function measuredWidth(element: HTMLElement): number {
-  return element.getBoundingClientRect().width || element.clientWidth || element.parentElement?.clientWidth || 0
+  return (
+    element.getBoundingClientRect().width ||
+    element.clientWidth ||
+    element.parentElement?.clientWidth ||
+    0
+  )
 }
 
 async function recalculateLayout() {
@@ -244,24 +282,35 @@ function isTileDisplayLoaded(tile: GalleryTile): boolean {
 }
 
 function pruneLoadedMediaKeys() {
-  const previewKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.thumbnailUrl || item.previewUrl || item.mediaUrl)))
+  const previewKeys = new Set(
+    galleryItems.value.map((item) =>
+      mediaLoadKey(item, item.thumbnailUrl || item.previewUrl || item.mediaUrl)
+    )
+  )
   const originalKeys = new Set(galleryItems.value.map((item) => mediaLoadKey(item, item.mediaUrl)))
-  loadedPreviewKeys.value = new Set([...loadedPreviewKeys.value].filter((key) => previewKeys.has(key)))
-  loadedOriginalKeys.value = new Set([...loadedOriginalKeys.value].filter((key) => originalKeys.has(key)))
+  loadedPreviewKeys.value = new Set(
+    [...loadedPreviewKeys.value].filter((key) => previewKeys.has(key))
+  )
+  loadedOriginalKeys.value = new Set(
+    [...loadedOriginalKeys.value].filter((key) => originalKeys.has(key))
+  )
 }
 
 function openLightbox(index: number) {
   selectedIndex.value = index
 }
 
+function canHighlightByBucket(media: MemoryMedia): boolean {
+  if (!media.bucketId) return true
+  if (props.mediaBuckets === undefined) return true
+  return bucketById.value.get(media.bucketId)?.canManage ?? false
+}
+
 function updateMedia(media: MemoryMedia) {
-  mediaOverrides.value = { ...mediaOverrides.value, [media.id]: media }
+  emit('updated', media)
 }
 
 function removeMedia(media: MemoryMedia) {
-  mediaOverrides.value = Object.fromEntries(
-    Object.entries(mediaOverrides.value).filter(([mediaId]) => mediaId !== media.id)
-  )
   closeLightbox()
   emit('deleted', media)
 }
@@ -296,11 +345,25 @@ function handleKeydown(event: KeyboardEvent) {
     <div class="veyq-section-header memory-section-header">
       <h2>{{ t('media.title') }}</h2>
       <div class="media-grid-header-actions">
-        <span>{{ media.length }}</span>
+        <span v-if="galleryItems.length !== media.length">
+          {{ t('media.highlightCount', { highlight: galleryItems.length, all: media.length }) }}
+        </span>
+        <span v-else>
+          {{ media.length }}
+        </span>
+        <div class="media-grid-filter-toggle">
+          <SelectButton
+            v-model="mediaFilter"
+            :options="mediaFilterOptions"
+            option-label="label"
+            option-value="value"
+            :allow-empty="false"
+          />
+        </div>
       </div>
     </div>
     <div
-      v-if="media.length"
+      v-if="galleryItems.length"
       ref="mediaGrid"
       class="media-grid"
       :style="{ height: `${layout.height}px` }"
@@ -371,7 +434,9 @@ function handleKeydown(event: KeyboardEvent) {
       :can-show-next="canShowNext"
       :can-edit-metadata="canEditMetadata"
       :can-delete="canDeleteMedia"
-      :update-metadata="updateMetadata"
+      :update-captured-at="updateCapturedAt"
+      :update-highlight="updateHighlight"
+      :can-highlight="canHighlightSelectedMedia"
       :delete-media="deleteMedia"
       @close="closeLightbox"
       @previous="showPrevious"
@@ -379,6 +444,5 @@ function handleKeydown(event: KeyboardEvent) {
       @updated="updateMedia"
       @deleted="removeMedia"
     />
-
   </section>
 </template>

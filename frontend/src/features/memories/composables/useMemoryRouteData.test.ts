@@ -86,7 +86,7 @@ describe('useMemoryRouteData', () => {
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 0 }))
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 1 }))
     listMemoryMediaMock.mockResolvedValueOnce([
-      memoryMedia({ id: 'media-existing', createdAt: '2026-05-03T12:00:00Z' })
+      memoryMedia({ id: 'media-existing', updatedAt: '2026-05-03T12:00:00Z' })
     ])
     listMemoryMediaBucketsMock
       .mockResolvedValueOnce([mediaBucket({ mediaCount: 0 })])
@@ -190,6 +190,7 @@ function memoryMedia(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     title: 'Photo',
     uploader: { type: 'USER', displayName: 'Kevin', permalink: 'kevin', userId: 1 },
     createdAt: '2026-05-03T12:00:00Z',
+    updatedAt: '2026-05-03T12:00:00Z',
     capturedAt: '2026-05-03T12:00:00Z',
     capturedAtOverride: false,
     mimeType: 'image/jpeg',
@@ -206,6 +207,7 @@ function memoryMedia(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     lensModel: null,
     gpsLatitude: null,
     gpsLongitude: null,
+    highlight: false,
     ...overrides
   }
 }
@@ -218,6 +220,7 @@ function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBuc
     displayName: 'Kevin',
     primary: true,
     uploader: { type: 'USER', displayName: 'Kevin', permalink: 'kevin', userId: 1 },
+    canManage: true,
     mediaCount: 0,
     createdAt: '2026-05-03T12:00:00Z',
     updatedAt: '2026-05-03T12:00:00Z',

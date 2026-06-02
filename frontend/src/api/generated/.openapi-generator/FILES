@@ -124,10 +124,12 @@ models/PendingMemoryMediaUploadSession.ts
 models/PublicShareCoverCrop.ts
 models/PublicShareLoginRequest.ts
 models/PublicShareMediaSummary.ts
+models/PublicShareMediaUpdatesResponse.ts
 models/PublicShareMemoryHeaderSummary.ts
 models/PublicShareMemorySummary.ts
 models/PublicShareNotice.ts
 models/PublicShareNoticeScope.ts
+models/PublicSharePermissions.ts
 models/PublicShareSummary.ts
 models/PublicShareTreeResponse.ts
 models/PublicUserSummary.ts
@@ -175,8 +177,9 @@ models/UpdateGroupSettingsRequest.ts
 models/UpdateManagedUserRoleRequest.ts
 models/UpdateMemoryJournalRequest.ts
 models/UpdateMemoryMediaBucketRequest.ts
+models/UpdateMemoryMediaCapturedAtRequest.ts
+models/UpdateMemoryMediaHighlightRequest.ts
 models/UpdateMemoryMediaMetadataBatchRequest.ts
-models/UpdateMemoryMediaMetadataRequest.ts
 models/UpdateMemoryPlaylistRequest.ts
 models/UpdateMemoryRequest.ts
 models/UpdateMemoryShareRequest.ts

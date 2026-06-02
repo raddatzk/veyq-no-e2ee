@@ -21,11 +21,13 @@ class MediaResponseMapper {
             title = media.title,
             uploader = uploader(media),
             createdAt = media.createdAt.toApiOffsetDateTime(),
+            updatedAt = media.updatedAt.toApiOffsetDateTime(),
             capturedAt = media.capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = media.capturedAtOverride,
             mimeType = media.blob.mimeType,
             sizeBytes = media.blob.sizeBytes,
             contentUrl = contentUrl(media, tenantName),
+            highlight = media.highlight,
             thumbnailUrl = thumbnailUrl(media, tenantName),
             previewUrl = previewUrl(media, tenantName),
             posterUrl = posterUrl(media, tenantName),
@@ -46,11 +48,13 @@ class MediaResponseMapper {
             title = media.title,
             uploader = uploader(media),
             createdAt = media.createdAt.toApiOffsetDateTime(),
+            updatedAt = media.updatedAt.toApiOffsetDateTime(),
             capturedAt = media.capturedAt?.toApiOffsetDateTime(),
             capturedAtOverride = media.capturedAtOverride,
             mimeType = media.blob.mimeType,
             sizeBytes = media.blob.sizeBytes,
             contentUrl = publicShareMediaUrl(shareId, media.publicId, "content"),
+            highlight = media.highlight,
             thumbnailUrl = if (hasThumbnail(media.blob)) publicShareMediaUrl(shareId, media.publicId, "thumbnail") else null,
             previewUrl = if (canGeneratePreview(media.blob)) publicShareMediaUrl(shareId, media.publicId, "preview") else null,
             posterUrl = if (canGeneratePoster(media.blob)) publicShareMediaUrl(shareId, media.publicId, "poster") else null,
@@ -58,7 +62,7 @@ class MediaResponseMapper {
             gpsLongitude = media.blob.gpsLongitude,
         )
 
-    fun toBucketSummary(bucket: MemoryMediaBucket, counts: Map<Long, Int>): MemoryMediaBucketSummary =
+    fun toBucketSummary(bucket: MemoryMediaBucket, counts: Map<Long, Int>, canManage: Boolean = true): MemoryMediaBucketSummary =
         MemoryMediaBucketSummary(
             id = bucket.publicId,
             memoryId = bucket.memory.publicId,
@@ -66,6 +70,7 @@ class MediaResponseMapper {
             displayName = bucket.displayName,
             primary = bucket.primaryBucket,
             uploader = bucketUploader(bucket),
+            canManage = canManage,
             mediaCount = counts[bucket.id] ?: 0,
             createdAt = bucket.createdAt.toApiOffsetDateTime(),
             updatedAt = bucket.updatedAt.toApiOffsetDateTime(),

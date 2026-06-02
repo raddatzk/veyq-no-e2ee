@@ -3,45 +3,13 @@ package com.veyq.api.library.media
 import com.veyq.api.auth.BadRequestException
 import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.NotFoundException
-import com.veyq.api.domain.ArchiveMediaKeyset
-import com.veyq.api.domain.ArchiveMediaRow
-import com.veyq.api.domain.ArchiveTrackKeyset
-import com.veyq.api.domain.ArchiveTrackRow
 import com.veyq.api.auth.filterchain.RequestContext
-import com.veyq.api.domain.Media
-import com.veyq.api.domain.MediaBlob
-import com.veyq.api.domain.MediaBlobRepo
-import com.veyq.api.domain.MediaRepo
-import com.veyq.api.domain.Memory
-import com.veyq.api.domain.MemoryMediaBucket
-import com.veyq.api.domain.MemoryMediaBucketRepo
-import com.veyq.api.domain.MemoryShareIdentity
-import com.veyq.api.domain.MemoryShareIdentityRepo
-import com.veyq.api.domain.MemoryRepo
-import com.veyq.api.domain.MemoryTrackRepo
-import com.veyq.api.domain.TenantFolderRepo
-import com.veyq.api.domain.TenantGroupMemberRepo
-import com.veyq.api.domain.TenantGroupRepo
-import com.veyq.api.domain.User
-import com.veyq.api.domain.UserRepo
-import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
-import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
-import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
-import com.veyq.api.generated.model.MemoryMediaBucketSummary
-import com.veyq.api.generated.model.MemoryMediaUploadSession
-import com.veyq.api.generated.model.MemoryMediaBatchResponse
-import com.veyq.api.generated.model.MemoryMediaSummary
-import com.veyq.api.generated.model.MoveMemoryMediaRequest
-import com.veyq.api.generated.model.PendingMemoryMediaUploadSession
-import com.veyq.api.generated.model.PublicShareMediaSummary
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
-import com.veyq.api.common.apiPathSegment as url
 import com.veyq.api.common.toApiOffsetDateTime
+import com.veyq.api.domain.*
+import com.veyq.api.generated.model.*
 import com.veyq.api.library.LibraryScopeKey
-import com.veyq.api.library.LibraryService
 import com.veyq.api.library.LibraryScopes
+import com.veyq.api.library.LibraryService
 import com.veyq.api.library.track.MemoryTrackService
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.inject.Instance
@@ -61,9 +29,7 @@ import java.text.Normalizer
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.Comparator
-import java.util.Properties
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -140,29 +106,29 @@ class MediaService @Inject constructor(
     fun waitForNewMemoryMedia(
         memoryId: String,
         includeChildren: Boolean,
-        afterCreatedAt: Instant?,
+        afterUpdatedAt: Instant?,
         afterMediaId: String?,
         timeoutSeconds: Long,
     ): List<MemoryMediaSummary> {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
         while (true) {
-            val media = self.get().listNewMemoryMedia(memoryId, includeChildren, afterCreatedAt, afterMediaId)
+            val media = self.get().listUpdatedMemoryMedia(memoryId, includeChildren, afterUpdatedAt, afterMediaId)
             if (media.isNotEmpty() || System.nanoTime() >= deadline) return media
             TimeUnit.MILLISECONDS.sleep(750)
         }
     }
 
     @Transactional
-    fun listNewMemoryMedia(
+    fun listUpdatedMemoryMedia(
         memoryId: String,
         includeChildren: Boolean,
-        afterCreatedAt: Instant?,
+        afterUpdatedAt: Instant?,
         afterMediaId: String?,
     ): List<MemoryMediaSummary> {
         val memory = resolveVisibleMemory(memoryId)
         val memories = if (includeChildren) descendantsAndSelf(memory).filter(::isMemoryVisible) else listOf(memory)
         ensureBucketsForMemories(memories)
-        return mediaRepo.listByMemoriesCreatedAfter(memories, afterCreatedAt, afterMediaId, LIVE_MEDIA_LIMIT)
+        return mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, LIVE_MEDIA_LIMIT)
             .distinctBy { it.id }
             .map { mediaResponseMapper.toMemorySummary(it, tenant().name) }
     }
@@ -586,7 +552,7 @@ class MediaService @Inject constructor(
             it.bucket = bucket
             it.title = title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
-                ?: "Upload"
+                        ?: "Upload"
             it.blob = blob
             it.originalFilename = originalFilename
             it.uploaderUser = uploaderUser
@@ -663,7 +629,7 @@ class MediaService @Inject constructor(
             it.bucket = bucket
             it.title = prepared.title?.trim()?.takeIf { value -> value.isNotBlank() }
                 ?: prepared.originalFilename?.substringBeforeLast('.')?.takeIf { value -> value.isNotBlank() }
-                ?: "Upload"
+                        ?: "Upload"
             it.blob = blob
             it.originalFilename = prepared.originalFilename
             it.uploaderUser = uploaderUser
@@ -958,10 +924,18 @@ class MediaService @Inject constructor(
     fun resolveBucketForPublicShareUpload(memory: Memory, bucketId: String?): MemoryMediaBucket? =
         bucketId?.let { resolveBucketInMemory(memory, it) }
 
-    fun listPublicShareBuckets(memory: Memory, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> =
-        listPublicShareBuckets(listOf(memory), visibleMedia)
+    fun listPublicShareBuckets(
+        memory: Memory,
+        visibleMedia: List<Media>,
+        canManageBucket: (MemoryMediaBucket) -> Boolean = { true },
+    ): List<MemoryMediaBucketSummary> =
+        listPublicShareBuckets(listOf(memory), visibleMedia, canManageBucket)
 
-    fun listPublicShareBuckets(memories: List<Memory>, visibleMedia: List<Media>): List<MemoryMediaBucketSummary> {
+    fun listPublicShareBuckets(
+        memories: List<Memory>,
+        visibleMedia: List<Media>,
+        canManageBucket: (MemoryMediaBucket) -> Boolean = { true },
+    ): List<MemoryMediaBucketSummary> {
         memories.forEach { memory ->
             ensureBucketsForMedia(memory, visibleMedia.filter { it.memory?.id == memory.id })
         }
@@ -973,16 +947,29 @@ class MediaService @Inject constructor(
         val buckets = bucketRepo.listByMemories(memories).filter { bucket ->
             bucket.id in visibleBucketIds
         }
-        return bucketSummaries(memories, buckets)
+        return bucketSummaries(memories, buckets, canManageBucket)
     }
 
     @Transactional
-    fun updateMemoryMediaMetadata(memoryId: String, publicId: String, request: UpdateMemoryMediaMetadataRequest): MemoryMediaSummary {
+    fun updateMemoryMediaCapturedAt(memoryId: String, publicId: String, request: UpdateMemoryMediaCapturedAtRequest): MemoryMediaSummary {
         val memory = resolveVisibleMemory(memoryId)
         val media = resolveMediaInMemory(memory, publicId)
 
         media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
+
+        return mediaResponseMapper.toMemorySummary(media, tenant().name)
+    }
+
+    @Transactional
+    fun updateMemoryMediaHighlight(memoryId: String, publicId: String, request: UpdateMemoryMediaHighlightRequest): MemoryMediaSummary {
+        val memory = resolveVisibleMemory(memoryId)
+        val media = resolveMediaInMemory(memory, publicId)
+
+        request.highlight?.let {
+            media.highlight = it
+        }
+
         return mediaResponseMapper.toMemorySummary(media, tenant().name)
     }
 
@@ -1066,8 +1053,10 @@ class MediaService @Inject constructor(
             uploaderUser != null -> bucketRepo.findPrimaryByUser(memory, uploaderUser)
                 ?.also { syncPrimaryBucketDisplayName(it, uploaderUser.displayName) }
                 ?: createPrimaryBucket(memory, uploaderUser, null)
+
             shareIdentity != null -> bucketRepo.findPrimaryByShareIdentity(memory, shareIdentity)
                 ?: createPrimaryBucket(memory, null, shareIdentity)
+
             else -> throw BadRequestException("Exactly one uploader source is required")
         }
     }
@@ -1105,7 +1094,11 @@ class MediaService @Inject constructor(
         }
     }
 
-    private fun bucketSummaries(memories: Collection<Memory>, buckets: List<MemoryMediaBucket>): List<MemoryMediaBucketSummary> {
+    private fun bucketSummaries(
+        memories: Collection<Memory>,
+        buckets: List<MemoryMediaBucket>,
+        canManageBucket: (MemoryMediaBucket) -> Boolean = { true },
+    ): List<MemoryMediaBucketSummary> {
         val memoryIds = memories.map { it.id }.toSet()
         val bucketSet = buckets.toMutableSet()
         buckets.forEach { bucket ->
@@ -1115,7 +1108,7 @@ class MediaService @Inject constructor(
         }
         val counts = mediaCountsByBucket(memories)
         return bucketSet.sortedWith(compareBy<MemoryMediaBucket> { it.parentBucket?.id ?: 0L }.thenBy { it.displayName })
-            .map { mediaResponseMapper.toBucketSummary(it, counts) }
+            .map { mediaResponseMapper.toBucketSummary(it, counts, canManageBucket(it)) }
     }
 
     private fun visibleBuckets(
@@ -1129,15 +1122,15 @@ class MediaService @Inject constructor(
 
         val currentPrimary = buckets.find {
             it.memory.id == memory.id &&
-                it.primaryBucket &&
-                it.uploaderUser?.id == currentUser.id &&
-                it.shareIdentity == null
+                    it.primaryBucket &&
+                    it.uploaderUser?.id == currentUser.id &&
+                    it.shareIdentity == null
         } ?: return buckets
         val hasSameUserDescendantPrimary = buckets.any {
             it.id != currentPrimary.id &&
-                it.primaryBucket &&
-                it.uploaderUser?.id == currentUser.id &&
-                it.shareIdentity == null
+                    it.primaryBucket &&
+                    it.uploaderUser?.id == currentUser.id &&
+                    it.shareIdentity == null
         }
         if (!hasSameUserDescendantPrimary) return buckets
 
@@ -1688,9 +1681,9 @@ class MediaService @Inject constructor(
             .mapNotNull { it.message }
             .any {
                 it.contains("Failed to write", ignoreCase = true) ||
-                    it.contains("Broken pipe", ignoreCase = true) ||
-                    it.contains("Connection reset", ignoreCase = true) ||
-                    it.contains("Stream is closed", ignoreCase = true)
+                        it.contains("Broken pipe", ignoreCase = true) ||
+                        it.contains("Connection reset", ignoreCase = true) ||
+                        it.contains("Stream is closed", ignoreCase = true)
             }
 
     private fun skipFully(input: java.io.InputStream, bytes: Long) {

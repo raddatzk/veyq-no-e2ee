@@ -44,9 +44,11 @@ export const messages = {
       invalidInviteLink: 'Einladungslink ist ungültig.',
       invalidResetLink: 'Reset-Link ist ungültig.',
       inviteAcceptFailed: 'Einladung konnte nicht angenommen werden.',
-      inviteExistingAccountLogin: 'Diese Einladung gehört zu einem bestehenden Account. Melde dich mit dieser E-Mail-Adresse an, um sie anzunehmen.',
+      inviteExistingAccountLogin:
+        'Diese Einladung gehört zu einem bestehenden Account. Melde dich mit dieser E-Mail-Adresse an, um sie anzunehmen.',
       inviteTitle: 'Einladung annehmen',
-      inviteTotpCopy: 'Du hast einen Passwort-Login eingerichtet. Sichere ihn jetzt mit einem Code aus deiner Authenticator-App ab.',
+      inviteTotpCopy:
+        'Du hast einen Passwort-Login eingerichtet. Sichere ihn jetzt mit einem Code aus deiner Authenticator-App ab.',
       inviteTotpSetupFailed: 'TOTP-Einrichtung konnte nicht vorbereitet werden.',
       inviteTotpSkip: 'Später einrichten',
       inviteTotpTitle: 'Authenticator-App einrichten',
@@ -63,27 +65,34 @@ export const messages = {
       passkey: 'Passkey',
       passkeyDisplayName: 'Passkey-Name',
       passkeyDisplayNameRequired: 'Bitte gib einen Passkey-Namen ein.',
-      passkeyLinkAuthPrompt: 'Melde dich auf dieser Domain an, um den Passkey für die andere Domain vorzubereiten.',
+      passkeyLinkAuthPrompt:
+        'Melde dich auf dieser Domain an, um den Passkey für die andere Domain vorzubereiten.',
       passkeyLinkCompleteFailed: 'Passkey konnte für diese Domain nicht angelegt werden.',
       passkeyLinkCreate: 'Passkey für {domain} anlegen',
       passkeyLinkCreateFailed: 'Domain-Login konnte nicht vorbereitet werden.',
       passkeyLinkExplanation:
         'Passkeys sind aus Sicherheitsgründen an eine Webseite gebunden. Dein bestehender Passkey kann hier nicht direkt verwendet werden; mit der Anmeldung auf der anderen Domain bestätigst du deine Identität und legst danach einen eigenen Passkey für diese Domain an.',
-      passkeyLinkPrompt: 'Lege einen Passkey für {domain} an, um dich hier künftig direkt anzumelden.',
+      passkeyLinkPrompt:
+        'Lege einen Passkey für {domain} an, um dich hier künftig direkt anzumelden.',
       passkeyLinkStartFailed: 'Domain-Login konnte nicht gestartet werden.',
       passkeyLoginFailed: 'Passkey-Login fehlgeschlagen',
       passkeyResetCreate: 'Neuen Passkey anlegen',
       passkeyResetFailed: 'Passkey konnte nicht zurückgesetzt werden.',
-      passkeyResetPrompt: 'Lege einen neuen Passkey für diese Domain an. Vorhandene Passkeys dieser Domain werden ersetzt.',
+      passkeyResetPrompt:
+        'Lege einen neuen Passkey für diese Domain an. Vorhandene Passkeys dieser Domain werden ersetzt.',
       passkeyResetRequestFailed: 'Passkey-Reset konnte nicht angefordert werden.',
-      passkeyResetRequested: 'Falls ein Account mit Passkey existiert, wurde eine E-Mail zum Zurücksetzen gesendet.',
+      passkeyResetRequested:
+        'Falls ein Account mit Passkey existiert, wurde eine E-Mail zum Zurücksetzen gesendet.',
       passkeyResetTitle: 'Passkey zurücksetzen',
-      passkeyResetDialogPrompt: 'Gib die E-Mail-Adresse deines Accounts ein. Wir senden dir dann einen Link zum Zurücksetzen deines Passkeys.',
+      passkeyResetDialogPrompt:
+        'Gib die E-Mail-Adresse deines Accounts ein. Wir senden dir dann einen Link zum Zurücksetzen deines Passkeys.',
       passwordResetRequestFailed: 'Passwort-Reset konnte nicht angefordert werden.',
-      passwordResetRequested: 'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zurücksetzen gesendet.',
+      passwordResetRequested:
+        'Falls ein aktiver Account existiert, wurde eine E-Mail zum Zurücksetzen gesendet.',
       passwordResetSuccess: 'Passwort wurde zurückgesetzt.',
       passwordResetTitle: 'Passwort zurücksetzen',
-      passwordResetDialogPrompt: 'Gib die E-Mail-Adresse deines Accounts ein. Wir senden dir dann einen Link zum Zurücksetzen deines Passworts.',
+      passwordResetDialogPrompt:
+        'Gib die E-Mail-Adresse deines Accounts ein. Wir senden dir dann einen Link zum Zurücksetzen deines Passworts.',
       passwordResetFailed: 'Passwort konnte nicht zurückgesetzt werden.',
       passwordRequired: 'Bitte gib ein Passwort ein.',
       passwordRequiredEmail: 'Bitte gib deine E-Mail-Adresse ein.',
@@ -105,7 +114,8 @@ export const messages = {
       adminCreateFailed: 'Admin konnte nicht erstellt werden',
       adminCreateWithPasskey: 'Admin mit Passkey erstellen',
       method: 'Setup-Methode',
-      passkeyHint: 'Passkeys sind die empfohlene Anmeldung. Ein Passwort kann später als Fallback gesetzt werden.',
+      passkeyHint:
+        'Passkeys sind die empfohlene Anmeldung. Ein Passwort kann später als Fallback gesetzt werden.',
       skip: 'Überspringen',
       tenantCreate: 'Bereich erstellen',
       tenantCreateFailed: 'Bereich konnte nicht erstellt werden',
@@ -154,7 +164,8 @@ export const messages = {
       cover: 'Cover',
       coverChoose: 'Cover wählen',
       coverChooseFile: 'Cover auswählen',
-      coverCopy: 'Wähle ein Bild aus der Galerie oder lade ein neues Bild hoch. Der 16:9-Ausschnitt wird als Cover-Einstellung gespeichert.',
+      coverCopy:
+        'Wähle ein Bild aus der Galerie oder lade ein neues Bild hoch. Der 16:9-Ausschnitt wird als Cover-Einstellung gespeichert.',
       coverGallery: 'Bilder aus der Galerie',
       coverRemove: 'Cover entfernen',
       coverRemoveFailed: 'Cover konnte nicht entfernt werden',
@@ -167,7 +178,8 @@ export const messages = {
       createFailed: 'Memory konnte nicht erstellt werden',
       dateRange: 'Zeitraum',
       delete: 'Memory löschen',
-      deleteCopy: 'Diese Aktion löscht "{name}", alle Kapitel und alle Medien, die dieser Memory und ihren Kapiteln direkt gehören.',
+      deleteCopy:
+        'Diese Aktion löscht "{name}", alle Kapitel und alle Medien, die dieser Memory und ihren Kapiteln direkt gehören.',
       deleteFailed: 'Memory konnte nicht gelöscht werden',
       download: 'Herunterladen',
       downloadDirect: 'Nur diese Memory',
@@ -185,7 +197,8 @@ export const messages = {
       journalEmpty: 'Noch kein Journal für diese Memory.',
       journalEmptyPreview: 'Die Vorschau erscheint, sobald du Text eingibst.',
       journalHelpBasics: 'Markdown',
-      journalHelpCopy: 'Nutze normales Markdown. veyq-Funktionen werden beim Speichern geprüft und in der Vorschau speziell gerendert.',
+      journalHelpCopy:
+        'Nutze normales Markdown. veyq-Funktionen werden beim Speichern geprüft und in der Vorschau speziell gerendert.',
       journalHelpEmbeds: 'veyq-Funktionen',
       journalHelpCarousel: 'Karussell',
       journalHelpHeadingExample: 'Überschrift',
@@ -234,11 +247,13 @@ export const messages = {
       journalMediaCarouselCaption: 'Galerie',
       journalMediaElementPlural: '{count} Elemente',
       journalMediaElementSingular: '{count} Element',
-      journalMediaPickerCopy: 'Wähle ein oder mehrere Medien aus dieser Memory. Mehrere Medien werden als Karussell eingefügt.',
+      journalMediaPickerCopy:
+        'Wähle ein oder mehrere Medien aus dieser Memory. Mehrere Medien werden als Karussell eingefügt.',
       journalMediaPickerEmpty: 'Diese Memory hat noch keine Medien, die eingefügt werden können.',
       journalMediaPickerTitle: 'Medien einfügen',
       journalLiveAuthFailed: 'Live Sync konnte nicht autorisiert werden.',
-      journalLiveFallback: 'Live Sync ist nicht verfügbar. Das Journal wird über den klassischen Speichern-Flow gesichert.',
+      journalLiveFallback:
+        'Live Sync ist nicht verfügbar. Das Journal wird über den klassischen Speichern-Flow gesichert.',
       journalLiveInitFailed: 'Live Sync konnte nicht initialisiert werden.',
       journalLiveStatus: {
         connecting: 'Verbinden',
@@ -286,6 +301,7 @@ export const messages = {
       capturedAtCorrected: 'Aufnahmezeit korrigiert',
       capturedAtEdit: 'Aufnahmezeit ändern',
       capturedAtSaveFailed: 'Aufnahmezeit konnte nicht gespeichert werden',
+      highlightSaveFailed: 'Highlight konnte nicht gespeichert werden',
       allCameras: 'Alle Kameras',
       applyOffset: 'Versatz anwenden',
       batchSaveFailed: 'Aufnahmezeiten konnten nicht gespeichert werden',
@@ -304,24 +320,33 @@ export const messages = {
       currentCapturedAt: 'Aktuell',
       deleteAll: 'Alle löschen',
       deleteAllConfirm: 'Alle löschen',
-      deleteAllCopy: 'Diese Aktion löscht {count} Medien direkt aus dieser Memory. Medien in Kapiteln bleiben erhalten.',
+      deleteAllCopy:
+        'Diese Aktion löscht {count} Medien direkt aus dieser Memory. Medien in Kapiteln bleiben erhalten.',
       deleteAllFailed: 'Medien konnten nicht gelöscht werden',
       deleteAllTitle: 'Alle Medien löschen',
       bucketDeleteFailed: 'Bucket konnte nicht gelöscht werden',
       deleteBucketConfirmAction: 'Bucket löschen',
       deleteBucketConfirm: 'Bucket "{bucket}" inklusive Unterbuckets und Medien löschen?',
-      deleteBucketCopy: 'Diese Aktion löscht "{bucket}" inklusive Unterbuckets und Medien. Gib den Bucket-Namen ein, um fortzufahren.',
+      deleteBucketCopy:
+        'Diese Aktion löscht "{bucket}" inklusive Unterbuckets und Medien. Gib den Bucket-Namen ein, um fortzufahren.',
       deleteBucketNameLabel: 'Bucket-Name zur Bestätigung',
       deleteBucketTitle: 'Bucket löschen',
       deleteFailed: 'Medium konnte nicht gelöscht werden',
       deleteMedia: 'Medium löschen',
       deleteMediaConfirmAction: 'Medien löschen',
-      deleteMediaCopy: 'Diese Aktion löscht {count} ausgewählte Medien dauerhaft aus diesem Bucket.',
+      deleteMediaCopy:
+        'Diese Aktion löscht {count} ausgewählte Medien dauerhaft aus diesem Bucket.',
       deleteMediaTitle: 'Medien löschen',
       deleteSelected: 'Auswahl löschen',
       deleteSelectedConfirm: '{count} ausgewählte Medien löschen?',
       dimensions: 'Bildgröße',
       download: 'Medium herunterladen',
+      filterAll: 'Alle',
+      filterHighlighted: 'Hervorgehoben',
+      highlightAdd: 'Hervorheben',
+      highlightCount: '{highlight} von {all}',
+      highlightRemove: 'Highlight entfernen',
+      highlightUnavailable: 'Du kannst nur eigene Medien hervorheben.',
       dropzoneBucketCopy: 'Dateien hier ablegen oder den Upload-Button nutzen.',
       dropzoneBucketTitle: 'In „{bucket}“ importieren',
       dropzoneChapterTitle: 'In dieses Kapitel importieren',
@@ -389,7 +414,8 @@ export const messages = {
       empty: 'Keine Fotos oder Videos mit Standort in dieser Memory.',
       emptyAction: 'GPS-Daten aus hochgeladenen Medien erscheinen hier automatisch.',
       externalTilesAllow: 'OpenStreetMap laden',
-      externalTilesCopy: 'Für Kartenkacheln werden Daten von OpenStreetMap abgerufen. Deine Entscheidung wird in diesem Browser global für veyq gespeichert.',
+      externalTilesCopy:
+        'Für Kartenkacheln werden Daten von OpenStreetMap abgerufen. Deine Entscheidung wird in diesem Browser global für veyq gespeichert.',
       externalTilesTitle: 'Externe Kartenkacheln sind deaktiviert',
       title: 'Karte'
     },
@@ -409,7 +435,8 @@ export const messages = {
       chooseFile: 'GPX auswählen',
       count: '{count} Tracks',
       delete: 'Track löschen',
-      deleteConfirm: 'Track "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
+      deleteConfirm:
+        'Track "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
       deleteFailed: 'Track konnte nicht gelöscht werden',
       distance: 'Distanz',
       ascent: 'Aufstieg',
@@ -444,7 +471,8 @@ export const messages = {
       add: 'Playlist hinzufügen',
       count: '{count} Playlists',
       delete: 'Playlist löschen',
-      deleteConfirm: 'Playlist "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
+      deleteConfirm:
+        'Playlist "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
       deleteFailed: 'Playlist konnte nicht gelöscht werden',
       edit: 'Playlist bearbeiten',
       empty: 'Noch keine Playlists in dieser Memory.',
@@ -459,7 +487,8 @@ export const messages = {
       previous: 'Vorherige Playlist',
       saveFailed: 'Playlist konnte nicht gespeichert werden',
       setFeatured: 'Im Header anzeigen',
-      supportedProviders: 'Unterstützt werden Spotify, Apple Music, YouTube, SoundCloud und Deezer.',
+      supportedProviders:
+        'Unterstützt werden Spotify, Apple Music, YouTube, SoundCloud und Deezer.',
       title: 'Playlists',
       url: 'Playlist-Link',
       provider: {
@@ -492,7 +521,8 @@ export const messages = {
       loginTitle: 'Freigabe öffnen',
       noPassword: 'Ohne Passwort',
       noticeAccept: 'Akzeptieren',
-      noticeAcceptCopy: 'Bitte lies und akzeptiere die folgenden Hinweise, bevor du diese Freigabe öffnest.',
+      noticeAcceptCopy:
+        'Bitte lies und akzeptiere die folgenden Hinweise, bevor du diese Freigabe öffnest.',
       noticeAcceptTitle: 'Hinweise akzeptieren',
       noticeConfigured: 'Hinweis',
       noticeEdit: 'Hinweis bearbeiten',
@@ -521,8 +551,10 @@ export const messages = {
       role: 'Freigabe-Rolle',
       roleDescriptions: {
         VIEWER: 'Kann die geteilte Memory und ihre Medien ansehen.',
-        CONTRIBUTOR: 'Kann zusätzlich Metadaten bearbeiten, Medien hochladen und Kapitel anlegen, aber nicht löschen.',
-        MANAGER: 'Kann zusätzlich Medien und Unter-Memories löschen, aber nicht die geteilte Root-Memory.'
+        CONTRIBUTOR:
+          'Kann zusätzlich Metadaten bearbeiten, Medien hochladen und Kapitel anlegen, aber nicht löschen.',
+        MANAGER:
+          'Kann zusätzlich Medien und Unter-Memories löschen, aber nicht die geteilte Root-Memory.'
       },
       roles: {
         VIEWER: 'Viewer',
@@ -547,17 +579,28 @@ export const messages = {
       termsTemplateImportMode: 'Import',
       termsTemplateInsert: 'Vorlage einfügen',
       termsTemplateMarkdown: {
-        purpose: '## Zweck dieser Instanz\n\nDiese veyq-Instanz ist für private Memories, Reisen, Events und persönliche Momente gedacht. Sie ist kein allgemeiner Filesharing-Dienst und keine öffentliche Plattform.',
-        privacy: '## Datenschutz und Privatsphäre\n\nHochgeladene Inhalte können personenbezogene Daten enthalten. Lade nur Inhalte hoch, die für den jeweiligen Share bestimmt sind, und achte auf die Privatsphäre der abgebildeten oder erwähnten Personen.',
-        rights: '## Rechte an Inhalten\n\nDu darfst nur Fotos, Videos, Texte und andere Inhalte hochladen, die du verwenden und mit den vorgesehenen Personen teilen darfst.',
-        children: '## Kinder und sensible Informationen\n\nBei Kindern, Gesundheitsdaten, privaten Adressen, Schulen, Aufenthaltsorten und anderen sensiblen Informationen ist besondere Vorsicht erforderlich.',
-        illegal: '## Nicht erlaubte Inhalte\n\nNicht erlaubt sind insbesondere rechtswidrige Inhalte, CSAM, nicht-einvernehmliche intime Inhalte, Gewaltaufrufe, Doxxing, Stalking, Belästigung, Betrug, Malware, Terrorpropaganda sowie Inhalte, die Rechte Dritter verletzen.',
-        sharing: '## Share-Links\n\nShare-Links dürfen nur an die vorgesehenen Personen weitergegeben werden. Inhalte aus einem Share sollen nicht ohne Zustimmung der betroffenen Personen weiterveröffentlicht werden.',
-        uploads: '## Uploads durch Gäste\n\nWenn du über einen Share Inhalte hochlädst, bestätigst du, dass du dazu berechtigt bist. Uploads können je nach Freigabe sichtbar sein und dem angegebenen Namen zugeordnet werden.',
-        availability: '## Verfügbarkeit\n\nDer Betrieb dieser Instanz erfolgt ohne Garantie für dauerhafte Erreichbarkeit, Backups, Performance oder Datenwiederherstellung.',
-        moderation: '## Prüfung und Entfernung\n\nDer Betreiber kann Inhalte oder Freigaben prüfen, entfernen oder deaktivieren, wenn sie gegen diese Hinweise verstoßen, Rechte Dritter betreffen oder rechtliche Risiken verursachen.',
-        external: '## Externe Dienste\n\nKarten, Musiklinks oder andere externe Dienste können eigene Datenschutz- und Nutzungsbedingungen haben.',
-        contact: '## Kontakt und Löschung\n\nWenn du möchtest, dass Inhalte mit Bezug zu dir entfernt werden, oder wenn du Fragen zu Datenschutz, Freigaben oder hochgeladenen Inhalten hast, wende dich bitte an: {contact}.'
+        purpose:
+          '## Zweck dieser Instanz\n\nDiese veyq-Instanz ist für private Memories, Reisen, Events und persönliche Momente gedacht. Sie ist kein allgemeiner Filesharing-Dienst und keine öffentliche Plattform.',
+        privacy:
+          '## Datenschutz und Privatsphäre\n\nHochgeladene Inhalte können personenbezogene Daten enthalten. Lade nur Inhalte hoch, die für den jeweiligen Share bestimmt sind, und achte auf die Privatsphäre der abgebildeten oder erwähnten Personen.',
+        rights:
+          '## Rechte an Inhalten\n\nDu darfst nur Fotos, Videos, Texte und andere Inhalte hochladen, die du verwenden und mit den vorgesehenen Personen teilen darfst.',
+        children:
+          '## Kinder und sensible Informationen\n\nBei Kindern, Gesundheitsdaten, privaten Adressen, Schulen, Aufenthaltsorten und anderen sensiblen Informationen ist besondere Vorsicht erforderlich.',
+        illegal:
+          '## Nicht erlaubte Inhalte\n\nNicht erlaubt sind insbesondere rechtswidrige Inhalte, CSAM, nicht-einvernehmliche intime Inhalte, Gewaltaufrufe, Doxxing, Stalking, Belästigung, Betrug, Malware, Terrorpropaganda sowie Inhalte, die Rechte Dritter verletzen.',
+        sharing:
+          '## Share-Links\n\nShare-Links dürfen nur an die vorgesehenen Personen weitergegeben werden. Inhalte aus einem Share sollen nicht ohne Zustimmung der betroffenen Personen weiterveröffentlicht werden.',
+        uploads:
+          '## Uploads durch Gäste\n\nWenn du über einen Share Inhalte hochlädst, bestätigst du, dass du dazu berechtigt bist. Uploads können je nach Freigabe sichtbar sein und dem angegebenen Namen zugeordnet werden.',
+        availability:
+          '## Verfügbarkeit\n\nDer Betrieb dieser Instanz erfolgt ohne Garantie für dauerhafte Erreichbarkeit, Backups, Performance oder Datenwiederherstellung.',
+        moderation:
+          '## Prüfung und Entfernung\n\nDer Betreiber kann Inhalte oder Freigaben prüfen, entfernen oder deaktivieren, wenn sie gegen diese Hinweise verstoßen, Rechte Dritter betreffen oder rechtliche Risiken verursachen.',
+        external:
+          '## Externe Dienste\n\nKarten, Musiklinks oder andere externe Dienste können eigene Datenschutz- und Nutzungsbedingungen haben.',
+        contact:
+          '## Kontakt und Löschung\n\nWenn du möchtest, dass Inhalte mit Bezug zu dir entfernt werden, oder wenn du Fragen zu Datenschutz, Freigaben oder hochgeladenen Inhalten hast, wende dich bitte an: {contact}.'
       },
       termsTemplateModeration: 'Prüfung und Entfernung',
       termsTemplatePrivacy: 'Datenschutz und Privatsphäre',
@@ -576,15 +619,18 @@ export const messages = {
       toggleEnable: 'Freigabe aktivieren',
       updateFailed: 'Freigabe konnte nicht aktualisiert werden',
       uploadRequest: 'Upload anfragen',
-      uploadCopy: 'Füge Fotos oder Videos zu dieser Erinnerung hinzu. Die Auswahl wird nach dem Hochladen zurückgesetzt.',
+      uploadCopy:
+        'Füge Fotos oder Videos zu dieser Erinnerung hinzu. Die Auswahl wird nach dem Hochladen zurückgesetzt.',
       uploadComplete: '{count} Medien wurden hochgeladen.',
       uploadEmpty: 'Noch keine Medien ausgewählt.',
       uploadFailed: 'Medien konnten nicht hinzugefügt werden',
       uploadTitle: 'Zur Erinnerung beitragen',
       uploaderCreate: 'Uploader-Link erstellen',
       uploaderDefaultName: 'Uploader-Link',
-      uploaderDialogCopy: 'Erstelle einen Upload-Link für Menschen, die nur Medien zu dieser Memory beitragen sollen.',
-      uploaderOnlyNotice: 'Dieser Link zeigt keine Galerie oder andere Beiträge. Er ist nur zum Hochladen gedacht.',
+      uploaderDialogCopy:
+        'Erstelle einen Upload-Link für Menschen, die nur Medien zu dieser Memory beitragen sollen.',
+      uploaderOnlyNotice:
+        'Dieser Link zeigt keine Galerie oder andere Beiträge. Er ist nur zum Hochladen gedacht.',
       uploaderTitle: 'Upload anfragen'
     },
     capabilities: {
@@ -592,7 +638,8 @@ export const messages = {
       items: {
         server_setup: {
           title: 'Self-hosted Server-Setup',
-          description: 'veyq mit Docker Compose installieren, den ersten Admin-Account erstellen und den ersten Memory-Bereich konfigurieren.'
+          description:
+            'veyq mit Docker Compose installieren, den ersten Admin-Account erstellen und den ersten Memory-Bereich konfigurieren.'
         },
         auth_passkeys: {
           title: 'Passkey-Login',
@@ -604,71 +651,88 @@ export const messages = {
         },
         auth_mobile_handoff: {
           title: 'Mobiler Login-Handoff',
-          description: 'Native mobile Apps über den Browser-Login mit einer Server-Session verbinden.'
+          description:
+            'Native mobile Apps über den Browser-Login mit einer Server-Session verbinden.'
         },
         spaces_tenant_group_personal: {
           title: 'Mandanten-, Gruppen- und persönliche Bereiche',
-          description: 'Mandantenweite, gruppenbezogene und persönliche Memory-Bereiche mit rollenbasiertem Zugriff erstellen.'
+          description:
+            'Mandantenweite, gruppenbezogene und persönliche Memory-Bereiche mit rollenbasiertem Zugriff erstellen.'
         },
         memory_core: {
           title: 'Memory-Erstellung und Verschachtelung',
-          description: 'Memories erstellen, Zeiträume und Cover pflegen, wichtige Memories favorisieren und verwandte Memories als Kapitel verschachteln.'
+          description:
+            'Memories erstellen, Zeiträume und Cover pflegen, wichtige Memories favorisieren und verwandte Memories als Kapitel verschachteln.'
         },
         memory_media: {
           title: 'Foto- und Video-Medien',
-          description: 'Fotos und Videos hochladen, generierte Vorschauen und Poster anzeigen, Zeitstempel korrigieren und Originalvideos abspielen.'
+          description:
+            'Fotos und Videos hochladen, generierte Vorschauen und Poster anzeigen, Zeitstempel korrigieren und Originalvideos abspielen.'
         },
         memory_media_resumable_upload: {
           title: 'Fortsetzbare Medien-Uploads',
-          description: 'Größere Medien über Chunk-Sessions mit Fortschritt, Abbruch und Bereinigung unvollständiger Uploads hochladen.'
+          description:
+            'Größere Medien über Chunk-Sessions mit Fortschritt, Abbruch und Bereinigung unvollständiger Uploads hochladen.'
         },
         memory_media_upload_eta: {
           title: 'Upload-Restzeit-Prognose',
-          description: 'Aktive Medien-Uploads mit einer kompakten Schätzung der verbleibenden Dauer anzeigen.'
+          description:
+            'Aktive Medien-Uploads mit einer kompakten Schätzung der verbleibenden Dauer anzeigen.'
         },
         memory_media_live_updates: {
           title: 'Live-Medienaktualisierungen',
-          description: 'Neue Medien in offenen Memory-Ansichten automatisch nachladen, sobald andere Clients sie hochgeladen haben.'
+          description:
+            'Neue Medien in offenen Memory-Ansichten automatisch nachladen, sobald andere Clients sie hochgeladen haben.'
         },
         memory_media_zip_download: {
           title: 'Memory-Medien als ZIP herunterladen',
-          description: 'Sichtbare Medien einer Memory inklusive sichtbarer untergeordneter Memories als ZIP-Archiv herunterladen.'
+          description:
+            'Sichtbare Medien einer Memory inklusive sichtbarer untergeordneter Memories als ZIP-Archiv herunterladen.'
         },
         memory_journal_markdown: {
           title: 'Markdown-Journale',
-          description: 'Memory-Journale mit Markdown und veyq-Einbettungen für Medien, Kind-Memories, Karten, Playlists und Tracks schreiben.'
+          description:
+            'Memory-Journale mit Markdown und veyq-Einbettungen für Medien, Kind-Memories, Karten, Playlists und Tracks schreiben.'
         },
         memory_journal_live_sync: {
           title: 'Live-Journal-Sync',
-          description: 'Memory-Journale gemeinsam in Echtzeit bearbeiten, mit Presence, Auto-Save und Markdown als gespeichertem Format.'
+          description:
+            'Memory-Journale gemeinsam in Echtzeit bearbeiten, mit Presence, Auto-Save und Markdown als gespeichertem Format.'
         },
         memory_maps: {
           title: 'Medienkarten',
-          description: 'Hochgeladene Fotos und Videos mit GPS-Metadaten auf Karten anzeigen, externe Kartenkacheln nur nach Browser-Opt-in laden.'
+          description:
+            'Hochgeladene Fotos und Videos mit GPS-Metadaten auf Karten anzeigen, externe Kartenkacheln nur nach Browser-Opt-in laden.'
         },
         memory_tracks: {
           title: 'GPX-Tracks',
-          description: 'GPX-Tracks hochladen, Aktivitätstypen vergeben, Originale auflisten und herunterladen sowie Tracks in Memory-Journale einbetten.'
+          description:
+            'GPX-Tracks hochladen, Aktivitätstypen vergeben, Originale auflisten und herunterladen sowie Tracks in Memory-Journale einbetten.'
         },
         memory_playlists: {
           title: 'Memory-Playlist-Links',
-          description: 'Musikkontext mit Spotify-, Apple-Music-, YouTube-, SoundCloud- oder Deezer-Playlist-Links zu Memories hinzufügen.'
+          description:
+            'Musikkontext mit Spotify-, Apple-Music-, YouTube-, SoundCloud- oder Deezer-Playlist-Links zu Memories hinzufügen.'
         },
         memory_public_sharing: {
           title: 'Öffentliches Memory-Sharing',
-          description: 'Eine Memory-Struktur oder ausgewählte Teilbäume mit Viewer-, Contributor-, Manager- und Uploader-Rechten teilen.'
+          description:
+            'Eine Memory-Struktur oder ausgewählte Teilbäume mit Viewer-, Contributor-, Manager- und Uploader-Rechten teilen.'
         },
         memory_public_uploader_links: {
           title: 'Öffentliche Upload-Links',
-          description: 'Gäste über fokussierte Upload-Links Medien beitragen lassen, ohne Galerie oder andere Uploads offenzulegen.'
+          description:
+            'Gäste über fokussierte Upload-Links Medien beitragen lassen, ohne Galerie oder andere Uploads offenzulegen.'
         },
         server_backup_upgrade: {
           title: 'Server-Backup und Upgrade',
-          description: 'Das Server-Hilfsskript nutzen, um Konfiguration zu prüfen, Datenbank und Medienspeicher zu sichern und imagebasierte Upgrades auszuführen.'
+          description:
+            'Das Server-Hilfsskript nutzen, um Konfiguration zu prüfen, Datenbank und Medienspeicher zu sichern und imagebasierte Upgrades auszuführen.'
         },
         server_auto_updates: {
           title: 'Opt-in Auto-Updates',
-          description: 'Eine selbst gehostete Instanz den veyq-Anwendungscontainer innerhalb des konfigurierten Major-Kanals aktualisieren lassen.'
+          description:
+            'Eine selbst gehostete Instanz den veyq-Anwendungscontainer innerhalb des konfigurierten Major-Kanals aktualisieren lassen.'
         }
       }
     },
@@ -728,7 +792,8 @@ export const messages = {
         COMMUNITY: 'Community Edition'
       },
       source: 'Quellcode',
-      sourceNotice: 'Wenn du eine modifizierte Instanz öffentlich betreibst, stelle den passenden Quellcode bereit.',
+      sourceNotice:
+        'Wenn du eine modifizierte Instanz öffentlich betreibst, stelle den passenden Quellcode bereit.',
       summary: '{edition} · {license}',
       title: 'Lizenz & Edition',
       trademark: 'Trademark Policy'
@@ -738,7 +803,8 @@ export const messages = {
       dismiss: 'Nicht mehr anzeigen',
       noticeCopy: 'Wenn dir das Projekt hilft, kannst du die Entwicklung freiwillig unterstützen.',
       noticeTitle: 'veyq ist freie Software',
-      settingsCopy: 'Spenden und Support sind freiwillig und helfen bei Weiterentwicklung und Wartung.',
+      settingsCopy:
+        'Spenden und Support sind freiwillig und helfen bei Weiterentwicklung und Wartung.',
       title: 'veyq unterstützen'
     },
     privacy: {
@@ -749,16 +815,20 @@ export const messages = {
       disableOsm: 'OpenStreetMap deaktivieren',
       enableOsm: 'OpenStreetMap aktivieren',
       externalContent: 'Externe Inhalte',
-      externalContentCopy: 'Lege fest, welche externen Anbieter dieser Browser für deinen Account laden darf.',
+      externalContentCopy:
+        'Lege fest, welche externen Anbieter dieser Browser für deinen Account laden darf.',
       manageExternalContent: 'Externe Inhalte verwalten',
-      mapsGroupDescription: 'Kartenansichten können externe Kartenkacheln laden, damit Orte und Routen in Memories sichtbar werden.',
+      mapsGroupDescription:
+        'Kartenansichten können externe Kartenkacheln laden, damit Orte und Routen in Memories sichtbar werden.',
       mapsGroupTitle: 'Karten',
-      osmDescription: 'veyq lädt externe OpenStreetMap-Kartenkacheln erst nach deiner Zustimmung. Dabei können IP-Adresse, Browserdaten und die angezeigten Kartenausschnitte an OpenStreetMap-Server übertragen werden.',
+      osmDescription:
+        'veyq lädt externe OpenStreetMap-Kartenkacheln erst nach deiner Zustimmung. Dabei können IP-Adresse, Browserdaten und die angezeigten Kartenausschnitte an OpenStreetMap-Server übertragen werden.',
       osmDisabled: 'OpenStreetMap-Kacheln sind deaktiviert.',
       osmEnabled: 'OpenStreetMap-Kacheln sind aktiviert.',
       osmProviderTitle: 'OpenStreetMap',
       osmTitle: 'Externe Kartenkacheln',
-      registrationCopy: 'Du kannst externe Karten direkt für diesen Browser aktivieren. Du kannst die Auswahl später in den Einstellungen ändern.',
+      registrationCopy:
+        'Du kannst externe Karten direkt für diesen Browser aktivieren. Du kannst die Auswahl später in den Einstellungen ändern.',
       registrationTitle: 'Externe Inhalte',
       title: 'Datenschutz'
     },
@@ -787,10 +857,12 @@ export const messages = {
       passkeyAddSuccess: 'Passkey wurde hinzugefügt.',
       passkeyDeleteFailed: 'Passkey konnte nicht gelöscht werden.',
       passkeyDeleteSuccess: 'Passkey wurde gelöscht.',
-      passkeyDeleteUnavailable: 'Dieser Passkey ist deine letzte Login-Methode. Lege zuerst ein Passwort oder einen weiteren Passkey an um ihn zu löschen.',
+      passkeyDeleteUnavailable:
+        'Dieser Passkey ist deine letzte Login-Methode. Lege zuerst ein Passwort oder einen weiteren Passkey an um ihn zu löschen.',
       passkeyHint: 'Passkeys sind die empfohlene Anmeldung für veyq.',
       passkeyNameDialogTitle: 'Passkey benennen',
-      passkeyNameHelp: 'Der Name hilft dir später zu erkennen, wo dieser Passkey gespeichert ist, zum Beispiel Apple Passwords, 1Password oder ein bestimmtes Gerät.',
+      passkeyNameHelp:
+        'Der Name hilft dir später zu erkennen, wo dieser Passkey gespeichert ist, zum Beispiel Apple Passwords, 1Password oder ein bestimmtes Gerät.',
       passkeyNameSaveSuccess: 'Passkey-Name wurde gespeichert.',
       passkeyNameSkip: 'Überspringen',
       passkeyRenameFailed: 'Passkey konnte nicht umbenannt werden.',
@@ -798,7 +870,8 @@ export const messages = {
       passkeys: 'Passkeys',
       accountDelete: 'Account löschen',
       accountDeleteConfirmationMethod: 'Bestätigung',
-      accountDeleteConfirm: 'Dein Account wird gelöscht. Sichtbare Inhalte werden anonymisiert, private Inhalte entfernt und deine E-Mail kann danach wieder verwendet werden.',
+      accountDeleteConfirm:
+        'Dein Account wird gelöscht. Sichtbare Inhalte werden anonymisiert, private Inhalte entfernt und deine E-Mail kann danach wieder verwendet werden.',
       accountDeleteCopy: 'Löscht deinen Account dauerhaft aus veyq.',
       accountDeleteEmailConfirm: 'Tippe zur Bestätigung deine E-Mail-Adresse ein: {email}',
       accountDeleteFailed: 'Account konnte nicht gelöscht werden.',
@@ -809,7 +882,8 @@ export const messages = {
       passwordChangeSuccess: 'Passwort wurde geändert.',
       passwordDelete: 'Passwort löschen',
       passwordDeleteConfirm: 'Passwort löschen',
-      passwordDeleteCopy: 'Dein Passwort wird entfernt. TOTP wird dabei ebenfalls deaktiviert, weil es nur Passwort-Logins schützt.',
+      passwordDeleteCopy:
+        'Dein Passwort wird entfernt. TOTP wird dabei ebenfalls deaktiviert, weil es nur Passwort-Logins schützt.',
       passwordDeleteFailed: 'Passwort konnte nicht gelöscht werden.',
       passwordDeleteSuccess: 'Passwort wurde gelöscht.',
       passwordLogin: 'Passwort',
@@ -822,7 +896,8 @@ export const messages = {
       profileSaveSuccess: 'Profil wurde gespeichert.',
       recommended: 'Empfohlen',
       renamePasskey: 'Passkey umbenennen',
-      totpCopy: 'Sichert Passwort-Logins mit einem sechsstelligen Code aus deiner Authenticator-App ab.',
+      totpCopy:
+        'Sichert Passwort-Logins mit einem sechsstelligen Code aus deiner Authenticator-App ab.',
       totpDisabled: 'TOTP ist für Passwort-Logins noch nicht eingerichtet.',
       totpDisable: 'TOTP deaktivieren',
       totpDisableFailed: 'TOTP konnte nicht deaktiviert werden.',
@@ -836,14 +911,16 @@ export const messages = {
       totpPasswordRequired: 'Setze zuerst ein Passwort, um TOTP für Passwort-Logins zu aktivieren.',
       totpProvisioningUri: 'Provisioning-Link',
       totpQrAlt: 'QR-Code für die TOTP-Einrichtung',
-      totpQrCopy: 'Scanne den QR-Code mit deiner Authenticator-App und bestätige die Einrichtung danach mit einem aktuellen Code.',
+      totpQrCopy:
+        'Scanne den QR-Code mit deiner Authenticator-App und bestätige die Einrichtung danach mit einem aktuellen Code.',
       totpSecret: 'Secret',
       totpShowManual: 'Manuell einrichten',
       totpStart: 'TOTP einrichten',
       totpTitle: 'Authenticator-App'
     },
     tenant: {
-      alreadyMember: 'Der User ist bereits Mitglied oder hat eine offene Einladung in diesem Bereich.',
+      alreadyMember:
+        'Der User ist bereits Mitglied oder hat eine offene Einladung in diesem Bereich.',
       dangerZone: 'Gefährliche Zone',
       delete: 'Löschen',
       deleteConfirm: '{name} wirklich rekursiv löschen?',
@@ -857,7 +934,8 @@ export const messages = {
       inviteResent: 'Einladung wurde erneut gesendet.',
       inviteSent: 'Einladung wurde gesendet.',
       registrationInviteCreate: 'Registrierungslink erstellen',
-      registrationInviteCreateCopy: 'Der neue Link wird nach dem Erstellen direkt in die Zwischenablage kopiert.',
+      registrationInviteCreateCopy:
+        'Der neue Link wird nach dem Erstellen direkt in die Zwischenablage kopiert.',
       registrationInviteCopy: 'Link kopieren',
       registrationInviteCopied: 'Registrierungslink wurde kopiert.',
       registrationInviteCopyFailed: 'Registrierungslink konnte nicht kopiert werden.',
@@ -873,7 +951,8 @@ export const messages = {
       registrationInviteUnlimited: 'Unbegrenzt',
       registrationInviteUsage: '{count} / {max} Registrierungen',
       registrationInvites: 'Registrierungslinks',
-      registrationInvitesCopy: 'Über diese Links können neue und bestehende Accounts diesem Bereich als Member beitreten.',
+      registrationInvitesCopy:
+        'Über diese Links können neue und bestehende Accounts diesem Bereich als Member beitreten.',
       registrationInvitesEmpty: 'Es gibt noch keine Registrierungslinks.',
       registrationInviteStatus: {
         Active: 'Aktiv',
@@ -882,7 +961,8 @@ export const messages = {
         Exhausted: 'Ausgeschöpft'
       },
       logoChoose: 'Logo wählen',
-      logoCopy: 'Das Logo erscheint in Navigation und Einstellungen für Mitglieder dieses Bereichs.',
+      logoCopy:
+        'Das Logo erscheint in Navigation und Einstellungen für Mitglieder dieses Bereichs.',
       logoDeleteFailed: 'Logo konnte nicht gelöscht werden.',
       logoDeleteSuccess: 'Logo wurde gelöscht.',
       logoRemove: 'Logo entfernen',
@@ -953,7 +1033,8 @@ export const messages = {
       MEDIA_UPLOAD_TYPE_UNSUPPORTED: 'Dieser Dateityp wird nicht unterstützt.',
       MEMORY_COVER_CROP_INVALID: 'Der gewählte Cover-Ausschnitt ist ungültig.',
       MEMORY_COVER_CROP_REQUIRED: 'Bitte wähle einen Cover-Ausschnitt aus.',
-      MEMORY_COVER_DIMENSIONS_UNREADABLE: 'Die Abmessungen des Covers konnten nicht gelesen werden.',
+      MEMORY_COVER_DIMENSIONS_UNREADABLE:
+        'Die Abmessungen des Covers konnten nicht gelesen werden.',
       MEMORY_COVER_SOURCE_INVALID: 'Bitte wähle nur eine Cover-Quelle aus.',
       MEMORY_COVER_SOURCE_REQUIRED: 'Bitte wähle ein Cover aus.',
       MEMORY_COVER_TYPE_UNSUPPORTED: 'Nur Bilddateien können als Cover verwendet werden.',
@@ -973,7 +1054,8 @@ export const messages = {
       MEMORY_SCOPE_INVALID: 'Der Zielbereich des Memory ist ungültig.',
       NOT_FOUND: 'Die angeforderte Ressource wurde nicht gefunden.',
       PASSWORD_COMPROMISE_CHECK_UNAVAILABLE: 'Die Passwortprüfung ist momentan nicht verfügbar.',
-      PASSWORD_COMPROMISED: 'Dieses Passwort ist aus bekannten Datenlecks bekannt. Bitte wähle ein anderes.',
+      PASSWORD_COMPROMISED:
+        'Dieses Passwort ist aus bekannten Datenlecks bekannt. Bitte wähle ein anderes.',
       RATE_LIMITED: 'Zu viele Versuche. Bitte warte kurz und probiere es erneut.',
       RANGE_NOT_SATISFIABLE: 'Der angeforderte Medienbereich ist nicht verfügbar.',
       REQUEST_FAILED: 'Die Anfrage ist fehlgeschlagen.',
@@ -1028,9 +1110,11 @@ export const messages = {
       invalidInviteLink: 'Invitation link is invalid.',
       invalidResetLink: 'Reset link is invalid.',
       inviteAcceptFailed: 'Invitation could not be accepted.',
-      inviteExistingAccountLogin: 'This invitation belongs to an existing account. Log in with this email address to accept it.',
+      inviteExistingAccountLogin:
+        'This invitation belongs to an existing account. Log in with this email address to accept it.',
       inviteTitle: 'Accept invitation',
-      inviteTotpCopy: 'You created a password login. Protect it now with a code from your authenticator app.',
+      inviteTotpCopy:
+        'You created a password login. Protect it now with a code from your authenticator app.',
       inviteTotpSetupFailed: 'TOTP setup could not be prepared.',
       inviteTotpSkip: 'Set up later',
       inviteTotpTitle: 'Set up authenticator app',
@@ -1058,16 +1142,21 @@ export const messages = {
       passkeyLoginFailed: 'Passkey login failed',
       passkeyResetCreate: 'Create new passkey',
       passkeyResetFailed: 'Passkey could not be reset.',
-      passkeyResetPrompt: 'Create a new passkey for this domain. Existing passkeys for this domain will be replaced.',
+      passkeyResetPrompt:
+        'Create a new passkey for this domain. Existing passkeys for this domain will be replaced.',
       passkeyResetRequestFailed: 'Passkey reset could not be requested.',
-      passkeyResetRequested: 'If an account with passkey exists, an email to reset it has been sent.',
+      passkeyResetRequested:
+        'If an account with passkey exists, an email to reset it has been sent.',
       passkeyResetTitle: 'Reset passkey',
-      passkeyResetDialogPrompt: 'Enter the email address for your account. We will send you a link to reset your passkey.',
+      passkeyResetDialogPrompt:
+        'Enter the email address for your account. We will send you a link to reset your passkey.',
       passwordResetRequestFailed: 'Password reset could not be requested.',
-      passwordResetRequested: 'If an active account exists, an email to reset the password has been sent.',
+      passwordResetRequested:
+        'If an active account exists, an email to reset the password has been sent.',
       passwordResetSuccess: 'Password has been reset.',
       passwordResetTitle: 'Reset password',
-      passwordResetDialogPrompt: 'Enter the email address for your account. We will send you a link to reset your password.',
+      passwordResetDialogPrompt:
+        'Enter the email address for your account. We will send you a link to reset your password.',
       passwordResetFailed: 'Password could not be reset.',
       passwordRequired: 'Please enter a password.',
       passwordRequiredEmail: 'Please enter your email address.',
@@ -1089,7 +1178,8 @@ export const messages = {
       adminCreateFailed: 'Admin could not be created',
       adminCreateWithPasskey: 'Create admin with passkey',
       method: 'Setup method',
-      passkeyHint: 'Passkeys are the recommended sign-in method. A password can be set later as a fallback.',
+      passkeyHint:
+        'Passkeys are the recommended sign-in method. A password can be set later as a fallback.',
       skip: 'Skip',
       tenantCreate: 'Create space',
       tenantCreateFailed: 'Space could not be created',
@@ -1138,7 +1228,8 @@ export const messages = {
       cover: 'Cover',
       coverChoose: 'Choose cover',
       coverChooseFile: 'Choose cover',
-      coverCopy: 'Choose an image from the gallery or upload a new one. The 16:9 crop will be saved as the cover setting.',
+      coverCopy:
+        'Choose an image from the gallery or upload a new one. The 16:9 crop will be saved as the cover setting.',
       coverGallery: 'Images from the gallery',
       coverRemove: 'Remove cover',
       coverRemoveFailed: 'Cover could not be removed',
@@ -1151,7 +1242,8 @@ export const messages = {
       createFailed: 'Memory could not be created',
       dateRange: 'Date range',
       delete: 'Delete Memory',
-      deleteCopy: 'This action deletes "{name}", all chapters, and all media that belong directly to this Memory and its chapters.',
+      deleteCopy:
+        'This action deletes "{name}", all chapters, and all media that belong directly to this Memory and its chapters.',
       deleteFailed: 'Memory could not be deleted',
       download: 'Download',
       downloadDirect: 'This Memory only',
@@ -1169,7 +1261,8 @@ export const messages = {
       journalEmpty: 'No journal for this Memory yet.',
       journalEmptyPreview: 'The preview appears once you start writing.',
       journalHelpBasics: 'Markdown',
-      journalHelpCopy: 'Use normal Markdown. veyq functions are checked when saving and rendered specially in the preview.',
+      journalHelpCopy:
+        'Use normal Markdown. veyq functions are checked when saving and rendered specially in the preview.',
       journalHelpEmbeds: 'veyq functions',
       journalHelpCarousel: 'Carousel',
       journalHelpHeadingExample: 'Heading',
@@ -1218,11 +1311,13 @@ export const messages = {
       journalMediaCarouselCaption: 'Media carousel',
       journalMediaElementPlural: '{count} elements',
       journalMediaElementSingular: '{count} element',
-      journalMediaPickerCopy: 'Choose one or more media items from this Memory. Multiple items are inserted as a carousel.',
+      journalMediaPickerCopy:
+        'Choose one or more media items from this Memory. Multiple items are inserted as a carousel.',
       journalMediaPickerEmpty: 'This Memory has no media that can be inserted yet.',
       journalMediaPickerTitle: 'Insert media',
       journalLiveAuthFailed: 'Live sync could not be authorized.',
-      journalLiveFallback: 'Live sync is unavailable. The journal is saved through the classic save flow.',
+      journalLiveFallback:
+        'Live sync is unavailable. The journal is saved through the classic save flow.',
       journalLiveInitFailed: 'Live sync could not be initialized.',
       journalLiveStatus: {
         connecting: 'Connecting',
@@ -1270,6 +1365,7 @@ export const messages = {
       capturedAtCorrected: 'Captured time corrected',
       capturedAtEdit: 'Change captured time',
       capturedAtSaveFailed: 'Captured time could not be saved',
+      highlightSaveFailed: 'Highlight could not be saved',
       allCameras: 'All cameras',
       applyOffset: 'Apply offset',
       batchSaveFailed: 'Captured times could not be saved',
@@ -1288,24 +1384,33 @@ export const messages = {
       currentCapturedAt: 'Current',
       deleteAll: 'Delete all',
       deleteAllConfirm: 'Delete all',
-      deleteAllCopy: 'This action deletes {count} media items directly from this Memory. Media in chapters remains unchanged.',
+      deleteAllCopy:
+        'This action deletes {count} media items directly from this Memory. Media in chapters remains unchanged.',
       deleteAllFailed: 'Media items could not be deleted',
       deleteAllTitle: 'Delete all media',
       bucketDeleteFailed: 'Bucket could not be deleted',
       deleteBucketConfirmAction: 'Delete bucket',
       deleteBucketConfirm: 'Delete bucket "{bucket}" including subbuckets and media?',
-      deleteBucketCopy: 'This action deletes "{bucket}" including subbuckets and media. Enter the bucket name to continue.',
+      deleteBucketCopy:
+        'This action deletes "{bucket}" including subbuckets and media. Enter the bucket name to continue.',
       deleteBucketNameLabel: 'Bucket name for confirmation',
       deleteBucketTitle: 'Delete bucket',
       deleteFailed: 'Media item could not be deleted',
       deleteMedia: 'Delete media item',
       deleteMediaConfirmAction: 'Delete media',
-      deleteMediaCopy: 'This action permanently deletes {count} selected media items from this bucket.',
+      deleteMediaCopy:
+        'This action permanently deletes {count} selected media items from this bucket.',
       deleteMediaTitle: 'Delete media',
       deleteSelected: 'Delete selected',
       deleteSelectedConfirm: 'Delete {count} selected media items?',
       dimensions: 'Image size',
       download: 'Download media item',
+      filterAll: 'All',
+      filterHighlighted: 'Highlighted',
+      highlightAdd: 'Highlight',
+      highlightCount: '{highlight} of {all}',
+      highlightRemove: 'Remove highlight',
+      highlightUnavailable: 'You can only highlight your own media.',
       dropzoneBucketCopy: 'Drop files here or use the upload button.',
       dropzoneBucketTitle: 'Import into “{bucket}”',
       dropzoneChapterTitle: 'Import into this chapter',
@@ -1373,7 +1478,8 @@ export const messages = {
       empty: 'No photos or videos with location in this Memory yet.',
       emptyAction: 'GPS data from uploaded media appears here automatically.',
       externalTilesAllow: 'Load OpenStreetMap',
-      externalTilesCopy: 'Map tiles are loaded from OpenStreetMap. Your choice is saved globally for veyq in this browser.',
+      externalTilesCopy:
+        'Map tiles are loaded from OpenStreetMap. Your choice is saved globally for veyq in this browser.',
       externalTilesTitle: 'External map tiles are disabled',
       title: 'Map'
     },
@@ -1393,7 +1499,8 @@ export const messages = {
       chooseFile: 'Choose GPX',
       count: '{count} tracks',
       delete: 'Delete track',
-      deleteConfirm: 'Delete track "{name}"? Journal references stay in place and render as unavailable.',
+      deleteConfirm:
+        'Delete track "{name}"? Journal references stay in place and render as unavailable.',
       deleteFailed: 'Track could not be deleted',
       distance: 'Distance',
       ascent: 'Ascent',
@@ -1428,7 +1535,8 @@ export const messages = {
       add: 'Add playlist',
       count: '{count} playlists',
       delete: 'Delete playlist',
-      deleteConfirm: 'Delete playlist "{name}"? Journal references stay in place and render as unavailable.',
+      deleteConfirm:
+        'Delete playlist "{name}"? Journal references stay in place and render as unavailable.',
       deleteFailed: 'Playlist could not be deleted',
       edit: 'Edit playlist',
       empty: 'No playlists in this Memory yet.',
@@ -1443,7 +1551,8 @@ export const messages = {
       previous: 'Previous playlist',
       saveFailed: 'Playlist could not be saved',
       setFeatured: 'Show in header',
-      supportedProviders: 'Supported providers are Spotify, Apple Music, YouTube, SoundCloud and Deezer.',
+      supportedProviders:
+        'Supported providers are Spotify, Apple Music, YouTube, SoundCloud and Deezer.',
       title: 'Playlists',
       url: 'Playlist link',
       provider: {
@@ -1505,7 +1614,8 @@ export const messages = {
       role: 'Share role',
       roleDescriptions: {
         VIEWER: 'Can view the shared Memory and its media.',
-        CONTRIBUTOR: 'Can also edit metadata, upload media, and create chapters, but cannot delete.',
+        CONTRIBUTOR:
+          'Can also edit metadata, upload media, and create chapters, but cannot delete.',
         MANAGER: 'Can also delete media and chapters, but not the shared root Memory.'
       },
       roles: {
@@ -1531,17 +1641,28 @@ export const messages = {
       termsTemplateImportMode: 'Import',
       termsTemplateInsert: 'Insert template',
       termsTemplateMarkdown: {
-        purpose: '## Purpose of this instance\n\nThis veyq instance is intended for private Memories, trips, events, and personal moments. It is not a general filesharing service or public platform.',
-        privacy: '## Privacy and personal data\n\nUploaded content may contain personal data. Upload only content intended for the relevant share, and respect the privacy of people shown or mentioned.',
-        rights: '## Rights to content\n\nOnly upload photos, videos, text, and other content that you may use and share with the intended people.',
-        children: '## Children and sensitive information\n\nUse particular care with children, health data, private addresses, schools, locations, and other sensitive information.',
-        illegal: '## Prohibited content\n\nIllegal content is not allowed, including CSAM, non-consensual intimate content, calls for violence, doxxing, stalking, harassment, fraud, malware, terrorist propaganda, and content that violates third-party rights.',
-        sharing: '## Share links\n\nShare links may only be forwarded to the intended people. Content from a share should not be republished without consent from the affected people.',
-        uploads: '## Guest uploads\n\nWhen uploading through a share, you confirm that you are allowed to do so. Depending on the share, uploads may be visible and attributed to the name you provide.',
-        availability: '## Availability\n\nThis instance is operated without guarantees for permanent availability, backups, performance, or data recovery.',
-        moderation: '## Review and removal\n\nThe operator may review, remove, or disable content or shares if they violate these terms, affect third-party rights, or create legal risk.',
-        external: '## External services\n\nMaps, music links, and other external services may have their own privacy policies and terms.',
-        contact: '## Contact and deletion\n\nIf you want content related to you removed, or if you have questions about privacy, shares, or uploaded content, contact: {contact}.'
+        purpose:
+          '## Purpose of this instance\n\nThis veyq instance is intended for private Memories, trips, events, and personal moments. It is not a general filesharing service or public platform.',
+        privacy:
+          '## Privacy and personal data\n\nUploaded content may contain personal data. Upload only content intended for the relevant share, and respect the privacy of people shown or mentioned.',
+        rights:
+          '## Rights to content\n\nOnly upload photos, videos, text, and other content that you may use and share with the intended people.',
+        children:
+          '## Children and sensitive information\n\nUse particular care with children, health data, private addresses, schools, locations, and other sensitive information.',
+        illegal:
+          '## Prohibited content\n\nIllegal content is not allowed, including CSAM, non-consensual intimate content, calls for violence, doxxing, stalking, harassment, fraud, malware, terrorist propaganda, and content that violates third-party rights.',
+        sharing:
+          '## Share links\n\nShare links may only be forwarded to the intended people. Content from a share should not be republished without consent from the affected people.',
+        uploads:
+          '## Guest uploads\n\nWhen uploading through a share, you confirm that you are allowed to do so. Depending on the share, uploads may be visible and attributed to the name you provide.',
+        availability:
+          '## Availability\n\nThis instance is operated without guarantees for permanent availability, backups, performance, or data recovery.',
+        moderation:
+          '## Review and removal\n\nThe operator may review, remove, or disable content or shares if they violate these terms, affect third-party rights, or create legal risk.',
+        external:
+          '## External services\n\nMaps, music links, and other external services may have their own privacy policies and terms.',
+        contact:
+          '## Contact and deletion\n\nIf you want content related to you removed, or if you have questions about privacy, shares, or uploaded content, contact: {contact}.'
       },
       termsTemplateModeration: 'Review and removal',
       termsTemplatePrivacy: 'Privacy and personal data',
@@ -1560,15 +1681,18 @@ export const messages = {
       toggleEnable: 'Enable share',
       updateFailed: 'Share could not be updated',
       uploadRequest: 'Request upload',
-      uploadCopy: 'Add photos or videos to this Memory. Your selection is cleared after the upload.',
+      uploadCopy:
+        'Add photos or videos to this Memory. Your selection is cleared after the upload.',
       uploadComplete: '{count} media items uploaded.',
       uploadEmpty: 'No media selected yet.',
       uploadFailed: 'Media could not be added',
       uploadTitle: 'Contribute to this Memory',
       uploaderCreate: 'Create uploader link',
       uploaderDefaultName: 'Uploader link',
-      uploaderDialogCopy: 'Create an upload link for people who should only contribute media to this Memory.',
-      uploaderOnlyNotice: 'This link does not show the gallery or other contributions. It is only for uploading.',
+      uploaderDialogCopy:
+        'Create an upload link for people who should only contribute media to this Memory.',
+      uploaderOnlyNotice:
+        'This link does not show the gallery or other contributions. It is only for uploading.',
       uploaderTitle: 'Request upload'
     },
     capabilities: {
@@ -1576,7 +1700,8 @@ export const messages = {
       items: {
         server_setup: {
           title: 'Self-hosted server setup',
-          description: 'Install veyq with Docker Compose, create the first admin account and configure the first Memory space.'
+          description:
+            'Install veyq with Docker Compose, create the first admin account and configure the first Memory space.'
         },
         auth_passkeys: {
           title: 'Passkey login',
@@ -1592,67 +1717,83 @@ export const messages = {
         },
         spaces_tenant_group_personal: {
           title: 'Tenant, group and personal spaces',
-          description: 'Create tenant-wide, group-scoped and personal Memory spaces with role-based access.'
+          description:
+            'Create tenant-wide, group-scoped and personal Memory spaces with role-based access.'
         },
         memory_core: {
           title: 'Memory creation and nesting',
-          description: 'Create Memories, add date ranges and covers, favorite important Memories and nest related Memories as chapters.'
+          description:
+            'Create Memories, add date ranges and covers, favorite important Memories and nest related Memories as chapters.'
         },
         memory_media: {
           title: 'Photo and video media',
-          description: 'Upload photos and videos, view generated previews and posters, correct timestamps and play original videos.'
+          description:
+            'Upload photos and videos, view generated previews and posters, correct timestamps and play original videos.'
         },
         memory_media_resumable_upload: {
           title: 'Resumable media uploads',
-          description: 'Upload larger media through chunked sessions with progress, cancellation and cleanup of unfinished uploads.'
+          description:
+            'Upload larger media through chunked sessions with progress, cancellation and cleanup of unfinished uploads.'
         },
         memory_media_upload_eta: {
           title: 'Upload time remaining estimates',
-          description: 'Show active media uploads with a compact estimate of how much upload time remains.'
+          description:
+            'Show active media uploads with a compact estimate of how much upload time remains.'
         },
         memory_media_live_updates: {
           title: 'Live media updates',
-          description: 'Automatically load new media into open Memory views after other clients upload it.'
+          description:
+            'Automatically load new media into open Memory views after other clients upload it.'
         },
         memory_media_zip_download: {
           title: 'Memory media ZIP downloads',
-          description: 'Download visible Memory media, including visible descendant media, as a ZIP archive.'
+          description:
+            'Download visible Memory media, including visible descendant media, as a ZIP archive.'
         },
         memory_journal_markdown: {
           title: 'Markdown journals',
-          description: 'Write Memory journals with Markdown and veyq embeds for media, chapters, playlists and tracks.'
+          description:
+            'Write Memory journals with Markdown and veyq embeds for media, chapters, playlists and tracks.'
         },
         memory_journal_live_sync: {
           title: 'Live journal sync',
-          description: 'Collaboratively edit Memory journals in real time with presence, auto-save and Markdown as the stored format.'
+          description:
+            'Collaboratively edit Memory journals in real time with presence, auto-save and Markdown as the stored format.'
         },
         memory_maps: {
           title: 'Media maps',
-          description: 'Show uploaded photos and videos with GPS metadata on maps, with external map tiles gated by browser opt-in.'
+          description:
+            'Show uploaded photos and videos with GPS metadata on maps, with external map tiles gated by browser opt-in.'
         },
         memory_tracks: {
           title: 'GPX tracks',
-          description: 'Upload GPX tracks, label activity types, list and download originals, and embed tracks in Memory journals.'
+          description:
+            'Upload GPX tracks, label activity types, list and download originals, and embed tracks in Memory journals.'
         },
         memory_playlists: {
           title: 'Memory playlist links',
-          description: 'Add music context to Memories with Spotify, Apple Music, YouTube, SoundCloud or Deezer playlist links.'
+          description:
+            'Add music context to Memories with Spotify, Apple Music, YouTube, SoundCloud or Deezer playlist links.'
         },
         memory_public_sharing: {
           title: 'Public Memory sharing',
-          description: 'Share a Memory tree or selected subtrees with Viewer, Contributor, Manager and Uploader permissions.'
+          description:
+            'Share a Memory tree or selected subtrees with Viewer, Contributor, Manager and Uploader permissions.'
         },
         memory_public_uploader_links: {
           title: 'Upload-only public links',
-          description: 'Let guests contribute media through focused upload links without exposing the gallery or other uploads.'
+          description:
+            'Let guests contribute media through focused upload links without exposing the gallery or other uploads.'
         },
         server_backup_upgrade: {
           title: 'Server backup and upgrade workflow',
-          description: 'Use the server helper script to validate configuration, back up the database and media storage, and run image-based upgrades.'
+          description:
+            'Use the server helper script to validate configuration, back up the database and media storage, and run image-based upgrades.'
         },
         server_auto_updates: {
           title: 'Opt-in server auto-updates',
-          description: 'Let a self-hosted instance update the veyq application container within the configured major channel.'
+          description:
+            'Let a self-hosted instance update the veyq application container within the configured major channel.'
         }
       }
     },
@@ -1712,7 +1853,8 @@ export const messages = {
         COMMUNITY: 'Community Edition'
       },
       source: 'Source code',
-      sourceNotice: 'If you publicly run a modified instance, provide the corresponding source code.',
+      sourceNotice:
+        'If you publicly run a modified instance, provide the corresponding source code.',
       summary: '{edition} · {license}',
       title: 'License & edition',
       trademark: 'Trademark policy'
@@ -1722,7 +1864,8 @@ export const messages = {
       dismiss: 'Do not show again',
       noticeCopy: 'If the project helps you, you can voluntarily support its development.',
       noticeTitle: 'veyq is free software',
-      settingsCopy: 'Donations and support are voluntary and help with development and maintenance.',
+      settingsCopy:
+        'Donations and support are voluntary and help with development and maintenance.',
       title: 'Support veyq'
     },
     privacy: {
@@ -1733,16 +1876,20 @@ export const messages = {
       disableOsm: 'Disable OpenStreetMap',
       enableOsm: 'Enable OpenStreetMap',
       externalContent: 'External content',
-      externalContentCopy: 'Choose which external providers this browser may load for your account.',
+      externalContentCopy:
+        'Choose which external providers this browser may load for your account.',
       manageExternalContent: 'Manage external content',
-      mapsGroupDescription: 'Map views can load external map tiles so places and routes are visible in Memories.',
+      mapsGroupDescription:
+        'Map views can load external map tiles so places and routes are visible in Memories.',
       mapsGroupTitle: 'Maps',
-      osmDescription: 'veyq only loads external OpenStreetMap map tiles after your consent. Your IP address, browser data and visible map sections may be transferred to OpenStreetMap servers.',
+      osmDescription:
+        'veyq only loads external OpenStreetMap map tiles after your consent. Your IP address, browser data and visible map sections may be transferred to OpenStreetMap servers.',
       osmDisabled: 'OpenStreetMap tiles are disabled.',
       osmEnabled: 'OpenStreetMap tiles are enabled.',
       osmProviderTitle: 'OpenStreetMap',
       osmTitle: 'External map tiles',
-      registrationCopy: 'You can enable external maps for this browser now. You can change this later in settings.',
+      registrationCopy:
+        'You can enable external maps for this browser now. You can change this later in settings.',
       registrationTitle: 'External content',
       title: 'Privacy'
     },
@@ -1771,10 +1918,12 @@ export const messages = {
       passkeyAddSuccess: 'Passkey has been added.',
       passkeyDeleteFailed: 'Passkey could not be deleted.',
       passkeyDeleteSuccess: 'Passkey has been deleted.',
-      passkeyDeleteUnavailable: 'This passkey is your last login method. Set a password or add another passkey first before deleting it.',
+      passkeyDeleteUnavailable:
+        'This passkey is your last login method. Set a password or add another passkey first before deleting it.',
       passkeyHint: 'Passkeys are the recommended sign-in method for veyq.',
       passkeyNameDialogTitle: 'Name passkey',
-      passkeyNameHelp: 'The name helps you recognize where this passkey is saved later, for example Apple Passwords, 1Password, or a specific device.',
+      passkeyNameHelp:
+        'The name helps you recognize where this passkey is saved later, for example Apple Passwords, 1Password, or a specific device.',
       passkeyNameSaveSuccess: 'Passkey name saved.',
       passkeyNameSkip: 'Skip',
       passkeyRenameFailed: 'Passkey could not be renamed.',
@@ -1782,7 +1931,8 @@ export const messages = {
       passkeys: 'Passkeys',
       accountDelete: 'Delete account',
       accountDeleteConfirmationMethod: 'Confirmation',
-      accountDeleteConfirm: 'Your account will be deleted. Visible content will be anonymized, private content removed, and your email can be used again afterwards.',
+      accountDeleteConfirm:
+        'Your account will be deleted. Visible content will be anonymized, private content removed, and your email can be used again afterwards.',
       accountDeleteCopy: 'Permanently deletes your account from veyq.',
       accountDeleteEmailConfirm: 'Type your email address to confirm: {email}',
       accountDeleteFailed: 'Account could not be deleted.',
@@ -1793,7 +1943,8 @@ export const messages = {
       passwordChangeSuccess: 'Password has been changed.',
       passwordDelete: 'Delete password',
       passwordDeleteConfirm: 'Delete password',
-      passwordDeleteCopy: 'Your password will be removed. TOTP is disabled at the same time because it only protects password logins.',
+      passwordDeleteCopy:
+        'Your password will be removed. TOTP is disabled at the same time because it only protects password logins.',
       passwordDeleteFailed: 'Password could not be deleted.',
       passwordDeleteSuccess: 'Password has been deleted.',
       passwordLogin: 'Password',
@@ -1820,7 +1971,8 @@ export const messages = {
       totpPasswordRequired: 'Set a password first to enable TOTP for password logins.',
       totpProvisioningUri: 'Provisioning link',
       totpQrAlt: 'QR code for TOTP setup',
-      totpQrCopy: 'Scan the QR code with your authenticator app, then confirm setup with a current code.',
+      totpQrCopy:
+        'Scan the QR code with your authenticator app, then confirm setup with a current code.',
       totpSecret: 'Secret',
       totpShowManual: 'Set up manually',
       totpStart: 'Set up TOTP',
@@ -1841,7 +1993,8 @@ export const messages = {
       inviteResent: 'Invitation has been sent again.',
       inviteSent: 'Invitation has been sent.',
       registrationInviteCreate: 'Create registration link',
-      registrationInviteCreateCopy: 'The new link is copied to the clipboard immediately after creation.',
+      registrationInviteCreateCopy:
+        'The new link is copied to the clipboard immediately after creation.',
       registrationInviteCopy: 'Copy link',
       registrationInviteCopied: 'Registration link has been copied.',
       registrationInviteCopyFailed: 'Registration link could not be copied.',
@@ -1857,7 +2010,8 @@ export const messages = {
       registrationInviteUnlimited: 'Unlimited',
       registrationInviteUsage: '{count} / {max} registrations',
       registrationInvites: 'Registration links',
-      registrationInvitesCopy: 'New and existing accounts can use these links to join this space as members.',
+      registrationInvitesCopy:
+        'New and existing accounts can use these links to join this space as members.',
       registrationInvitesEmpty: 'There are no registration links yet.',
       registrationInviteStatus: {
         Active: 'Active',
@@ -1957,7 +2111,8 @@ export const messages = {
       MEMORY_SCOPE_INVALID: 'The target scope of the Memory is invalid.',
       NOT_FOUND: 'The requested resource was not found.',
       PASSWORD_COMPROMISE_CHECK_UNAVAILABLE: 'The password check is currently unavailable.',
-      PASSWORD_COMPROMISED: 'This password appears in known data breaches. Please choose another one.',
+      PASSWORD_COMPROMISED:
+        'This password appears in known data breaches. Please choose another one.',
       RATE_LIMITED: 'Too many attempts. Please wait briefly and try again.',
       RANGE_NOT_SATISFIABLE: 'The requested media range is not available.',
       REQUEST_FAILED: 'The request failed.',

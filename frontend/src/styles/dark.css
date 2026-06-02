@@ -63,6 +63,19 @@
     color: var(--p-button-primary-hover-color, var(--app-backdrop-strong));
   }
 
+  .lightbox-star-button.p-button.p-button-secondary {
+    border-color: var(--app-line);
+    background: var(--app-surface);
+    color: var(--app-text);
+  }
+
+  .lightbox-star-button.p-button.p-button-secondary:hover,
+  .lightbox-star-button-active.p-button.p-button-secondary {
+    border-color: var(--app-warning-line);
+    background: var(--app-warning-soft);
+    color: var(--app-warning-text);
+  }
+
   .asset-bucket-action-row .asset-bucket-danger-button {
     border-color: var(--app-danger-line);
     background: var(--app-surface);

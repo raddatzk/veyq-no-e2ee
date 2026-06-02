@@ -37,34 +37,34 @@ acceptanceCriteria:
         unit:
           - testName: maps folder and path based memory lookups through generatedCall
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: normalizes optional memory fields to null
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: normalizes memory header fields and forwards generated calls
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: normalizes public share memory header without scope
             kind: negative
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: maps favorite toggles through generated clients
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: maps create and update request null values to generated undefined fields
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: normalizes memory media fields and forwards includeChildren
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: uploads memory media through a resumable chunk session without an empty optional title
             kind: negative
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: updates memory media metadata in batches and normalizes returned media
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
           - testName: maps memory delete and cover operations through generated clients
             kind: positive
-            ref: frontend/src/features/memories/api/memoryApi.test.ts
+            ref: frontend/src/api/memoryApi.test.ts
   - id: platform.api-runtime.http-client-behavior
     statement: HTTP client handles stable errors, auth refresh, multipart uploads, binary chunks, progress and cancellation.
     coverage:

@@ -10,7 +10,7 @@ import {
   memoryTracksApi,
   publicSharesApi,
   searchApi
-} from '../../../api/generatedClient'
+} from './generatedClient'
 import type {
   CreateFolderRequest as GeneratedCreateFolderRequest,
   CreateMemoryMediaBucketRequest,
@@ -29,13 +29,14 @@ import type {
   MoveMemoryMediaRequest,
   UpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
-  UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
+  UpdateMemoryMediaCapturedAtRequest as GeneratedUpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest as GeneratedUpdateMemoryMediaHighlightRequest,
   UpdateMemoryPlaylistRequest as GeneratedUpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest as GeneratedUpdateMemoryTrackRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest,
   UpdatePublicShareMemoryRequest as GeneratedUpdatePublicShareMemoryRequest
-} from '../../../api/generated'
-import { callApi, uploadBlob } from '../../../shared/api/httpClient'
+} from './generated'
+import { callApi, uploadBlob } from '../shared/api/httpClient'
 import type {
   CreateFolderRequest,
   CreateMemoryPlaylistRequest,
@@ -58,7 +59,8 @@ import type {
   MoveMemoryMediaRequest as FeatureMoveMemoryMediaRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
-  UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest,
   UpdateMemoryMediaBucketRequest as FeatureUpdateMemoryMediaBucketRequest,
   UpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest,
@@ -66,7 +68,7 @@ import type {
   UploadMediaOptions,
   UploadMemoryMediaRequest,
   UploadMemoryTrackRequest
-} from './types'
+} from '../features/memories/api/types'
 import {
   normalizeMemory,
   normalizeMemoryHeader,
@@ -76,7 +78,7 @@ import {
   normalizePublicShareMedia,
   normalizePublicShareMemory,
   normalizePublicShareMemoryHeader
-} from './memoryMappers'
+} from '../features/memories/api/memoryMappers'
 
 export function getMemoryNavigation(
   tenantName: string,
@@ -271,12 +273,12 @@ export function waitForNewMemoryMedia(
   tenantName: string,
   memoryId: string,
   includeChildren: boolean,
-  afterCreatedAt?: string | null,
+  afterUpdatedAt?: string | null,
   afterMediaId?: string | null,
   signal?: AbortSignal
 ): Promise<MemoryMediaUpdatesResponse> {
   const params = new URLSearchParams({ includeChildren: String(includeChildren) })
-  if (afterCreatedAt) params.set('afterCreatedAt', afterCreatedAt)
+  if (afterUpdatedAt) params.set('afterUpdatedAt', afterUpdatedAt)
   if (afterMediaId) params.set('afterMediaId', afterMediaId)
   const path = `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
   return callApi<{ media: MemoryMediaSummary[] }>(path, { signal }).then((response) => ({
@@ -454,18 +456,34 @@ export function deleteMemoryPlaylist(tenantName: string, memoryId: string, playl
   return generatedCall(memoryPlaylistsApi.deleteMemoryPlaylist({ tenantName, memoryId, playlistId }))
 }
 
-export function updateMemoryMediaMetadata(
+export function updateMemoryMediaCapturedAt(
   tenantName: string,
   memoryId: string,
   mediaId: string,
-  request: UpdateMemoryMediaMetadataRequest
+  request: UpdateMemoryMediaCapturedAtRequest
 ): Promise<MemoryMedia> {
   return generatedCall(
-    memoryMediaApi.updateMemoryMediaMetadata({
+    memoryMediaApi.updateMemoryMediaCapturedAt({
       tenantName,
       memoryId,
       mediaId,
-      updateMemoryMediaMetadataRequest: request as GeneratedUpdateMemoryMediaMetadataRequest
+      updateMemoryMediaCapturedAtRequest: request as GeneratedUpdateMemoryMediaCapturedAtRequest
+    })
+  ).then(normalizeMemoryMedia)
+}
+
+export function updateMemoryMediaHighlight(
+  tenantName: string,
+  memoryId: string,
+  mediaId: string,
+  request: UpdateMemoryMediaHighlightRequest
+): Promise<MemoryMedia> {
+  return generatedCall(
+    memoryMediaApi.updateMemoryMediaHighlight({
+      tenantName,
+      memoryId,
+      mediaId,
+      updateMemoryMediaHighlightRequest: request as GeneratedUpdateMemoryMediaHighlightRequest
     })
   ).then(normalizeMemoryMedia)
 }
@@ -697,6 +715,23 @@ export function listPublicShareMemoryMedia(
   )
 }
 
+export function waitForNewPublicShareMemoryMedia(
+  shareId: string,
+  memoryId: string,
+  includeChildren: boolean,
+  afterUpdatedAt?: string | null,
+  afterMediaId?: string | null,
+  signal?: AbortSignal
+): Promise<MemoryMediaUpdatesResponse> {
+  const params = new URLSearchParams({ includeChildren: String(includeChildren) })
+  if (afterUpdatedAt) params.set('afterUpdatedAt', afterUpdatedAt)
+  if (afterMediaId) params.set('afterMediaId', afterMediaId)
+  const path = `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
+  return callApi<{ media: PublicShareMediaSummary[] }>(path, { signal }).then((response) => ({
+    media: response.media.map(normalizePublicShareMedia)
+  }))
+}
+
 export function listPublicShareMemoryMediaBuckets(
   shareId: string,
   memoryId: string,
@@ -878,18 +913,34 @@ export function removePublicShareMemoryCover(shareId: string, memoryId: string):
   )
 }
 
-export function updatePublicShareMediaMetadata(
+export function updatePublicShareMediaCapturedAt(
   shareId: string,
   memoryId: string,
   mediaId: string,
-  request: UpdateMemoryMediaMetadataRequest
+  request: UpdateMemoryMediaCapturedAtRequest
 ): Promise<MemoryMedia> {
   return generatedCall(
-    publicSharesApi.updatePublicShareMediaMetadata({
+    publicSharesApi.updatePublicShareMediaCapturedAt({
       shareId,
       memoryId,
       mediaId,
-      updateMemoryMediaMetadataRequest: request as GeneratedUpdateMemoryMediaMetadataRequest
+      updateMemoryMediaCapturedAtRequest: request as GeneratedUpdateMemoryMediaCapturedAtRequest
+    })
+  ).then(normalizePublicShareMedia)
+}
+
+export function updatePublicShareMediaHighlight(
+  shareId: string,
+  memoryId: string,
+  mediaId: string,
+  request: UpdateMemoryMediaHighlightRequest
+): Promise<MemoryMedia> {
+  return generatedCall(
+    publicSharesApi.updatePublicShareMediaHighlight({
+      shareId,
+      memoryId,
+      mediaId,
+      updateMemoryMediaHighlightRequest: request as GeneratedUpdateMemoryMediaHighlightRequest
     })
   ).then(normalizePublicShareMedia)
 }

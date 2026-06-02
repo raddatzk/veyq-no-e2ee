@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   getPublicShareMemoryHeader: vi.fn()
 }))
 
-vi.mock('../../../api/generatedClient', () => ({
+vi.mock('./generatedClient', () => ({
   generatedCall: mocks.generatedCall,
   memoriesApi: {
     listMemories: mocks.listMemories,
@@ -62,7 +62,7 @@ vi.mock('../../../api/generatedClient', () => ({
   }
 }))
 
-vi.mock('../../../shared/api/httpClient', () => ({
+vi.mock('../shared/api/httpClient', () => ({
   callApi: mocks.callApi,
   uploadBlob: mocks.uploadBlob
 }))
@@ -289,7 +289,7 @@ describe('memoryApi facade', () => {
     })
   })
 
-  it('long-polls for new memory media with the created cursor', async () => {
+  it('long-polls for new memory media with the updated cursor', async () => {
     mocks.callApi.mockResolvedValue({
       media: [
         {
@@ -318,7 +318,7 @@ describe('memoryApi facade', () => {
 
     expect(updates.media[0].capturedAt).toBeNull()
     expect(mocks.callApi).toHaveBeenCalledWith(
-      '/api/tenant/memories/mem-1/media/updates?includeChildren=true&afterCreatedAt=2026-01-01T00%3A00%3A00Z&afterMediaId=media-1',
+      '/api/tenant/memories/mem-1/media/updates?includeChildren=true&afterUpdatedAt=2026-01-01T00%3A00%3A00Z&afterMediaId=media-1',
       { signal: controller.signal }
     )
   })

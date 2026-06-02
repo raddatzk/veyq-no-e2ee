@@ -145,15 +145,15 @@ acceptanceCriteria:
     coverage:
       backend:
         integration:
-          - testName: public share journal is readable by viewers and writable only by managers
+          - testName: public share journal is readable by viewers and writable by contributors
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
-  - id: memory.journal-markdown.public-manager-write
+  - id: memory.journal-markdown.public-permitted-write
     statement: Public journal writes are limited to permitted share roles.
     coverage:
       backend:
         integration:
-          - testName: public share journal is readable by viewers and writable only by managers
+          - testName: public share journal is readable by viewers and writable by contributors
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
   - id: memory.journal-markdown.uploader-denied

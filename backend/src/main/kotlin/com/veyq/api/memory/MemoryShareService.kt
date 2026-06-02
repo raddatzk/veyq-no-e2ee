@@ -29,11 +29,13 @@ import com.veyq.api.generated.model.PublicShareCoverCrop
 import com.veyq.api.generated.model.PublicShareLoginRequest
 import com.veyq.api.generated.model.PublicShareMemoryHeaderSummary
 import com.veyq.api.generated.model.PublicShareMemorySummary
+import com.veyq.api.generated.model.PublicSharePermissions
 import com.veyq.api.generated.model.PublicShareSummary
 import com.veyq.api.generated.model.PublicShareTreeResponse
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaCapturedAtRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaHighlightRequest
 import com.veyq.api.generated.model.UpdateMemoryShareRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
 import com.veyq.api.library.LibraryScopeKey
@@ -58,6 +60,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Base64
 import java.util.Comparator
+import java.util.concurrent.TimeUnit
 
 @ApplicationScoped
 class MemoryShareService @Inject constructor(
@@ -295,7 +298,7 @@ class MemoryShareService @Inject constructor(
         memoryId: String,
         request: CreatePublicShareMemoryRequest,
     ): PublicShareMemorySummary {
-        val access = requireEditAccess(resolveEnabledShare(shareId))
+        val access = requireAddChapterAccess(resolveEnabledShare(shareId))
         val parent = resolveShareMemory(access, memoryId)
         val name = normalizedName(request.name)
         val dateRange = requiredDateRange(request.startDate, request.endDate)
@@ -322,7 +325,7 @@ class MemoryShareService @Inject constructor(
         memoryId: String,
         request: UpdatePublicShareMemoryRequest,
     ): PublicShareMemorySummary {
-        val access = requireEditAccess(resolveEnabledShare(shareId))
+        val access = requireEditMemoryAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         request.name?.let {
             val name = normalizedName(it)
@@ -355,13 +358,51 @@ class MemoryShareService @Inject constructor(
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
     }
 
+    fun waitForPublicShareMemoryMediaUpdates(
+        shareId: String,
+        memoryId: String,
+        includeChildren: Boolean,
+        afterUpdatedAt: Instant?,
+        afterMediaId: String?,
+        timeoutSeconds: Long,
+    ): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
+        while (true) {
+            val media = self.get().listUpdatedPublicShareMemoryMedia(
+                shareId,
+                memoryId,
+                includeChildren,
+                afterUpdatedAt,
+                afterMediaId,
+            )
+            if (media.isNotEmpty() || System.nanoTime() >= deadline) return media
+            TimeUnit.MILLISECONDS.sleep(750)
+        }
+    }
+
+    @Transactional
+    fun listUpdatedPublicShareMemoryMedia(
+        shareId: String,
+        memoryId: String,
+        includeChildren: Boolean,
+        afterUpdatedAt: Instant?,
+        afterMediaId: String?,
+    ): List<com.veyq.api.generated.model.PublicShareMediaSummary> {
+        val access = requireFullAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
+        return mediaRepo.listByMemoriesUpdatedAfter(memories, afterUpdatedAt, afterMediaId, PUBLIC_SHARE_LIVE_MEDIA_LIMIT)
+            .filter { isPublicMediaVisible(access, it) }
+            .map { mediaService.publicShareSummary(it, access.share.publicId) }
+    }
+
     @Transactional
     fun listPublicShareMemoryMediaBuckets(shareId: String, memoryId: String, includeChildren: Boolean = false): List<MemoryMediaBucketSummary> {
         val access = requireAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val memories = publicShareMemories(memory, access.share.rootMemory, includeChildren)
         val visibleMedia = mediaRepo.listByMemoriesOrdered(memories).filter { isPublicMediaVisible(access, it) }
-        return mediaService.listPublicShareBuckets(memories, visibleMedia)
+        return mediaService.listPublicShareBuckets(memories, visibleMedia) { canManageBucket(access, it) }
     }
 
     @Transactional
@@ -725,7 +766,7 @@ class MemoryShareService @Inject constructor(
         cropWidth: Double?,
         cropHeight: Double?,
     ): PublicShareMemorySummary {
-        val access = requireEditAccess(resolveEnabledShare(shareId))
+        val access = requireSetCoverAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val media = if (uploadPath != null) {
             val uploaded = uploadPublicShareMedia(access, memory, uploadPath, originalFilename, originalFilename)
@@ -755,7 +796,7 @@ class MemoryShareService @Inject constructor(
 
     @Transactional
     fun removePublicShareMemoryCover(shareId: String, memoryId: String): PublicShareMemorySummary {
-        val access = requireEditAccess(resolveEnabledShare(shareId))
+        val access = requireSetCoverAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         memory.coverStorageKey?.let { deleteRecursively(coverDirectory(it)) }
         memory.coverStorageKey = null
@@ -783,11 +824,11 @@ class MemoryShareService @Inject constructor(
     }
 
     @Transactional
-    fun updatePublicShareMediaMetadata(
+    fun updatePublicShareMediaCapturedAt(
         shareId: String,
         memoryId: String,
         mediaId: String,
-        request: UpdateMemoryMediaMetadataRequest,
+        request: UpdateMemoryMediaCapturedAtRequest,
     ): com.veyq.api.generated.model.PublicShareMediaSummary {
         val access = requireAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
@@ -796,6 +837,22 @@ class MemoryShareService @Inject constructor(
         requireMediaManageAccess(access, media)
         media.capturedAt = request.capturedAt?.toInstant()
         media.capturedAtOverride = true
+        return mediaService.publicShareSummary(media, access.share.publicId)
+    }
+
+    @Transactional
+    fun updatePublicShareMediaHighlight(
+        shareId: String,
+        memoryId: String,
+        mediaId: String,
+        request: UpdateMemoryMediaHighlightRequest,
+    ): com.veyq.api.generated.model.PublicShareMediaSummary {
+        val access = requireAccess(resolveEnabledShare(shareId))
+        val memory = resolveShareMemory(access, memoryId)
+        val media = resolvePublicMedia(access, mediaId)
+        if (media.memory?.id != memory.id) throw NotFoundException("Media not found")
+        requireMediaManageAccess(access, media)
+        media.highlight = request.highlight!!
         return mediaService.publicShareSummary(media, access.share.publicId)
     }
 
@@ -888,6 +945,11 @@ class MemoryShareService @Inject constructor(
         if (!ownShareBucket) throw ForbiddenException("Share does not allow managing this bucket")
     }
 
+    private fun canManageBucket(access: ShareAccess, bucket: MemoryMediaBucket): Boolean {
+        if (access.authenticatedUser != null || access.canDelete) return true
+        return access.shareIdentity != null && bucket.shareIdentity?.id == access.shareIdentity.id
+    }
+
     private fun com.veyq.api.generated.model.PublicShareMediaSummary.toMemoryMediaSummary(): MemoryMediaSummary =
         MemoryMediaSummary(
             id = id,
@@ -896,11 +958,13 @@ class MemoryShareService @Inject constructor(
             title = title,
             uploader = uploader,
             createdAt = createdAt,
+            updatedAt = updatedAt,
             capturedAt = capturedAt,
             capturedAtOverride = capturedAtOverride,
             mimeType = mimeType,
             sizeBytes = sizeBytes,
             contentUrl = contentUrl,
+            highlight = highlight,
             thumbnailUrl = thumbnailUrl,
             previewUrl = previewUrl,
             gpsLatitude = gpsLatitude,
@@ -940,6 +1004,21 @@ class MemoryShareService @Inject constructor(
             if (!it.canEdit) throw ForbiddenException("Share does not allow playlist editing")
         }
 
+    private fun requireAddChapterAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!canAddChapter(it)) throw ForbiddenException("Share does not allow child memory creation")
+        }
+
+    private fun requireSetCoverAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!canSetCover(it)) throw ForbiddenException("Share does not allow cover editing")
+        }
+
+    private fun requireEditMemoryAccess(share: MemoryShare): ShareAccess =
+        requireFullAccess(share).also {
+            if (!canEditMemory(it)) throw ForbiddenException("Share does not allow memory editing")
+        }
+
     private fun requireDeleteAccess(share: MemoryShare): ShareAccess =
         requireFullAccess(share).also {
             if (!it.canDelete) throw ForbiddenException("Share does not allow deleting")
@@ -947,7 +1026,7 @@ class MemoryShareService @Inject constructor(
 
     private fun requireJournalEditAccess(share: MemoryShare): ShareAccess =
         requireFullAccess(share).also {
-            if (!it.canDelete) throw ForbiddenException("Share does not allow journal editing")
+            if (!canEditJournal(it)) throw ForbiddenException("Share does not allow journal editing")
         }
 
     private fun currentAccess(share: MemoryShare): ShareAccess? {
@@ -1282,6 +1361,38 @@ class MemoryShareService @Inject constructor(
     private fun canDelete(role: MemoryShareRole): Boolean =
         role == MemoryShareRole.MANAGER
 
+    private fun publicSharePermissions(access: ShareAccess): PublicSharePermissions =
+        PublicSharePermissions(
+            editMemory = canEditMemory(access),
+            editJournal = canEditJournal(access),
+            uploadTrack = canUploadTrack(access),
+            uploadPlaylist = canUploadPlaylist(access),
+            addChapter = canAddChapter(access),
+            setCover = canSetCover(access),
+            setHighlight = canSetHighlight(access),
+        )
+
+    private fun canEditMemory(access: ShareAccess): Boolean =
+        access.authenticatedUser != null
+
+    private fun canEditJournal(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canEdit
+
+    private fun canUploadTrack(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canEdit
+
+    private fun canUploadPlaylist(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canEdit
+
+    private fun canAddChapter(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canEdit
+
+    private fun canSetCover(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canDelete
+
+    private fun canSetHighlight(access: ShareAccess): Boolean =
+        access.authenticatedUser != null || access.canUpload || access.canDelete
+
     private fun toPublicSummary(access: ShareAccess): PublicShareSummary =
         memoryShareMapper.toPublicSummary(
             PublicShareSummaryAccess(
@@ -1292,6 +1403,7 @@ class MemoryShareService @Inject constructor(
                 canUpload = access.canUpload,
                 canEdit = access.canEdit,
                 canDelete = access.canDelete,
+                permissions = publicSharePermissions(access),
                 exposeRootMemory = canExposePublicRootMemory(access),
             ),
         )
@@ -1381,5 +1493,6 @@ class MemoryShareService @Inject constructor(
     companion object {
         const val SHARE_ACCESS_COOKIE = "VEYQ_SHARE_ACCESS_TOKEN"
         const val SHARE_REFRESH_COOKIE = "VEYQ_SHARE_REFRESH_TOKEN"
+        private const val PUBLIC_SHARE_LIVE_MEDIA_LIMIT = 100
     }
 }

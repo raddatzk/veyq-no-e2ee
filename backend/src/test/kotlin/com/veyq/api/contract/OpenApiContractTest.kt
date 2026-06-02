@@ -447,7 +447,8 @@ class OpenApiContractTest {
             "PUT /api/{tenantName}/memories/{memoryId}/cover",
             "DELETE /api/{tenantName}/memories/{memoryId}/cover",
             "GET /api/{tenantName}/memories/{memoryId}/cover/content",
-            "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata",
+            "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata/capturedAt",
+            "PATCH /api/{tenantName}/memories/{memoryId}/media/{mediaId}/metadata/highlight",
             "DELETE /api/{tenantName}/memories/{memoryId}/media/{mediaId}",
             "PATCH /api/{tenantName}/memories/{memoryId}/media/metadata-batch",
             "GET /api/{tenantName}/memory-media/{mediaId}/content",
@@ -474,6 +475,7 @@ class OpenApiContractTest {
             "POST /api/public-shares/{shareId}/memories/{memoryId}/journal/live-session",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/children",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/media",
+            "GET /api/public-shares/{shareId}/memories/{memoryId}/media/updates",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/media",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/media-buckets",
             "POST /api/public-shares/{shareId}/memories/{memoryId}/media-buckets",
@@ -499,7 +501,8 @@ class OpenApiContractTest {
             "PUT /api/public-shares/{shareId}/memories/{memoryId}/cover",
             "DELETE /api/public-shares/{shareId}/memories/{memoryId}/cover",
             "GET /api/public-shares/{shareId}/memories/{memoryId}/cover/content",
-            "PATCH /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/metadata",
+            "PATCH /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/capturedAt",
+            "PATCH /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/highlight",
             "DELETE /api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}",
             "GET /api/public-shares/{shareId}/media",
             "POST /api/public-shares/{shareId}/media",
@@ -547,7 +550,7 @@ class OpenApiContractTest {
                 "memories.openapi.yaml" -> when (operationId) {
                     "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryParticipants", "listMemoryParticipantCandidates", "addMemoryParticipant", "removeMemoryParticipant" -> MemoryParticipantsApi::class.java
-                    "listMemoryMedia", "waitForMemoryMediaUpdates", "uploadMemoryMedia", "deleteAllMemoryMedia", "listMemoryMediaBuckets", "createMemoryMediaBucket", "updateMemoryMediaBucket", "deleteMemoryMediaBucket", "moveMemoryMedia", "deleteMemoryMediaBatch", "createMemoryMediaUpload", "getMemoryMediaUpload", "abortMemoryMediaUpload", "uploadMemoryMediaChunk", "completeMemoryMediaUpload", "updateMemoryMediaMetadata", "deleteMemoryMedia", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview", "memoryMediaThumbnail" -> MemoryMediaApi::class.java
+                    "listMemoryMedia", "waitForMemoryMediaUpdates", "uploadMemoryMedia", "deleteAllMemoryMedia", "listMemoryMediaBuckets", "createMemoryMediaBucket", "updateMemoryMediaBucket", "deleteMemoryMediaBucket", "moveMemoryMedia", "deleteMemoryMediaBatch", "createMemoryMediaUpload", "getMemoryMediaUpload", "abortMemoryMediaUpload", "uploadMemoryMediaChunk", "completeMemoryMediaUpload", "updateMemoryMediaCapturedAt", "updateMemoryMediaHighlight", "deleteMemoryMedia", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview", "memoryMediaThumbnail" -> MemoryMediaApi::class.java
                     "listMemoryTracks", "uploadMemoryTrack", "updateMemoryTrack", "deleteMemoryTrack", "memoryTrackContent" -> MemoryTracksApi::class.java
                     "listMemoryPlaylists", "createMemoryPlaylist", "updateMemoryPlaylist", "deleteMemoryPlaylist" -> MemoryPlaylistsApi::class.java
                     "getMemoryNavigation" -> MemoryNavigationApi::class.java
@@ -559,7 +562,7 @@ class OpenApiContractTest {
                 "settings.openapi.yaml" -> SettingsApi::class.java
                 "shares.openapi.yaml" -> when (operationId) {
                     "listMemoryShares", "createMemoryShare", "updateMemoryShare" -> MemorySharesApi::class.java
-                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "getPublicShareMemoryHeader", "getPublicShareMemoryJournal", "createPublicShareMemoryJournalLiveSession", "updatePublicShareMemoryJournal", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "uploadPublicShareMemoryMedia", "listPublicShareMemoryMediaBuckets", "createPublicShareMemoryMediaBucket", "updatePublicShareMemoryMediaBucket", "deletePublicShareMemoryMediaBucket", "movePublicShareMemoryMedia", "deletePublicShareMemoryMediaBatch", "createPublicShareMemoryMediaUpload", "getPublicShareMemoryMediaUpload", "abortPublicShareMemoryMediaUpload", "uploadPublicShareMemoryMediaChunk", "completePublicShareMemoryMediaUpload", "listPublicShareMemoryTracks", "uploadPublicShareMemoryTrack", "updatePublicShareMemoryTrack", "deletePublicShareMemoryTrack", "publicShareMemoryTrackContent", "listPublicShareMemoryPlaylists", "createPublicShareMemoryPlaylist", "updatePublicShareMemoryPlaylist", "deletePublicShareMemoryPlaylist", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaMetadata", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "createPublicShareMediaUpload", "getPublicShareMediaUpload", "abortPublicShareMediaUpload", "uploadPublicShareMediaChunk", "completePublicShareMediaUpload", "publicShareMediaContent", "publicShareMediaPreview", "publicShareMediaThumbnail" -> PublicSharesApi::class.java
+                    "getPublicShare", "loginPublicShare", "logoutPublicShare", "refreshPublicShare", "getPublicShareTree", "getPublicShareMemoryByPath", "getPublicShareMemoryHeader", "getPublicShareMemoryJournal", "createPublicShareMemoryJournalLiveSession", "updatePublicShareMemoryJournal", "updatePublicShareMemory", "deletePublicShareMemory", "listPublicShareChildMemories", "createPublicShareChildMemory", "listPublicShareMemoryMedia", "waitForPublicShareMemoryMediaUpdates", "uploadPublicShareMemoryMedia", "listPublicShareMemoryMediaBuckets", "createPublicShareMemoryMediaBucket", "updatePublicShareMemoryMediaBucket", "deletePublicShareMemoryMediaBucket", "movePublicShareMemoryMedia", "deletePublicShareMemoryMediaBatch", "createPublicShareMemoryMediaUpload", "getPublicShareMemoryMediaUpload", "abortPublicShareMemoryMediaUpload", "uploadPublicShareMemoryMediaChunk", "completePublicShareMemoryMediaUpload", "listPublicShareMemoryTracks", "uploadPublicShareMemoryTrack", "updatePublicShareMemoryTrack", "deletePublicShareMemoryTrack", "publicShareMemoryTrackContent", "listPublicShareMemoryPlaylists", "createPublicShareMemoryPlaylist", "updatePublicShareMemoryPlaylist", "deletePublicShareMemoryPlaylist", "setPublicShareMemoryCover", "removePublicShareMemoryCover", "publicShareMemoryCoverContent", "updatePublicShareMediaCapturedAt", "updatePublicShareMediaHighlight", "deletePublicShareMedia", "listPublicShareMedia", "uploadPublicShareMedia", "createPublicShareMediaUpload", "getPublicShareMediaUpload", "abortPublicShareMediaUpload", "uploadPublicShareMediaChunk", "completePublicShareMediaUpload", "publicShareMediaContent", "publicShareMediaPreview", "publicShareMediaThumbnail" -> PublicSharesApi::class.java
                     else -> error("No generated shares interface mapping for $operationId")
                 }
                 else -> error("No generated interface mapping for $specFile")

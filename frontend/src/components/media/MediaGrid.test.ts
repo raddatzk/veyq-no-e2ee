@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import MediaGrid from './MediaGrid.vue'
-import type { MemoryMedia } from '../../features/memories/api'
+import type { MemoryMedia, MemoryMediaBucket } from '../../features/memories/api'
 
 class ResizeObserverStub {
   constructor(private readonly callback: ResizeObserverCallback) {}
@@ -48,6 +48,30 @@ describe('MediaGrid', () => {
     expect(image.attributes('src')).toBe('/api/tenant/media/media-1/thumbnail')
     expect(image.attributes('src')).not.toBe('/api/tenant/media/media-1/content')
   })
+
+  it('disables lightbox highlighting when a media bucket is missing from the provided bucket list', async () => {
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [media({ bucketId: 'missing-bucket' })],
+        mediaBuckets: [bucket({ id: 'known-bucket', canManage: true })],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: true,
+          ProgressSpinner: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.find('.media-grid-tile').trigger('click')
+
+    expect(wrapper.findComponent({ name: 'MediaLightbox' }).props('canHighlight')).toBe(false)
+  })
 })
 
 function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
@@ -57,6 +81,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     title: 'Photo',
     uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
     createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
     capturedAt: null,
     capturedAtOverride: false,
     mimeType: 'image/jpeg',
@@ -72,6 +97,23 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: 800,
     gpsLatitude: null,
     gpsLongitude: null,
+    highlight: false,
+    ...overrides
+  }
+}
+
+function bucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBucket {
+  return {
+    id: 'bucket-1',
+    memoryId: 'mem-1',
+    parentBucketId: undefined,
+    displayName: 'Bucket',
+    primary: false,
+    uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
+    canManage: true,
+    mediaCount: 1,
+    createdAt: '2026-05-24T10:00:00Z',
+    updatedAt: '2026-05-24T10:00:00Z',
     ...overrides
   }
 }

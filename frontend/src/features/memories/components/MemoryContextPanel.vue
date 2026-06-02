@@ -14,12 +14,16 @@ import ConfirmationDialog from '../../../shared/components/ConfirmationDialog.vu
 import { enableOsmTiles, hasOsmTileConsent } from '../../../shared/privacy/osmTiles'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import { mediaPreviewUrl } from '../../../shared/utils/mediaUrls'
-import { createRafResizeObserver, type RafResizeObserver } from '../../../shared/utils/resizeObserver'
+import {
+  createRafResizeObserver,
+  type RafResizeObserver
+} from '../../../shared/utils/resizeObserver'
 import type {
   MemoryMedia,
   MemoryTrack,
   MemoryTrackActivityType,
-  UpdateMemoryMediaMetadataRequest,
+  UpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest,
   UpdateMemoryTrackRequest,
   UploadMemoryTrackRequest
 } from '../api'
@@ -47,10 +51,15 @@ const props = defineProps<{
   canEditMetadata?: boolean
   canDeleteMedia?: boolean
   canEditTracks?: boolean
-  updateMetadata?: (
+  updateCapturedAt?: (
     mediaId: string,
     memoryId: string,
-    request: UpdateMemoryMediaMetadataRequest
+    request: UpdateMemoryMediaCapturedAtRequest
+  ) => Promise<MemoryMedia>
+  updateHighlight?: (
+    mediaId: string,
+    memoryId: string,
+    request: UpdateMemoryMediaHighlightRequest
   ) => Promise<MemoryMedia>
   deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
   uploadTrack?: (request: UploadMemoryTrackRequest) => Promise<MemoryTrack>
@@ -96,9 +105,13 @@ const geotaggedMedia = computed(() =>
   allMedia.value.filter((media) => media.gpsLatitude !== null && media.gpsLongitude !== null)
 )
 const trackStyles = computed(() => buildTrackStyles(props.tracks))
-const visibleTracks = computed(() => props.tracks.filter((track) => visibleTrackIds.value.has(track.id)))
+const visibleTracks = computed(() =>
+  props.tracks.filter((track) => visibleTrackIds.value.has(track.id))
+)
 const hasMapContent = computed(
-  () => geotaggedMedia.value.length > 0 || props.tracks.some((track) => trackPositions(track).length >= 2)
+  () =>
+    geotaggedMedia.value.length > 0 ||
+    props.tracks.some((track) => trackPositions(track).length >= 2)
 )
 const selectedMediaList = computed(() => {
   if (!selectedMarkerGroupMediaIds.value) return geotaggedMedia.value
@@ -127,10 +140,16 @@ const mapSignature = computed(() =>
   [
     tileUrl.value,
     geotaggedMedia.value
-      .map((media) => `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.thumbnailUrl}:${media.previewUrl}`)
+      .map(
+        (media) =>
+          `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.thumbnailUrl}:${media.previewUrl}`
+      )
       .join('|'),
     props.tracks
-      .map((track) => `${track.id}:${visibleTrackIds.value.has(track.id)}:${track.geometry.coordinates.map((coordinate) => coordinate.join(',')).join(';')}`)
+      .map(
+        (track) =>
+          `${track.id}:${visibleTrackIds.value.has(track.id)}:${track.geometry.coordinates.map((coordinate) => coordinate.join(',')).join(';')}`
+      )
       .join('|')
   ].join('::')
 )
@@ -151,7 +170,9 @@ watch(
   () => props.tracks.map((track) => track.id).join('|'),
   () => {
     const currentIds = new Set(props.tracks.map((track) => track.id))
-    const nextVisibleIds = new Set([...visibleTrackIds.value].filter((trackId) => currentIds.has(trackId)))
+    const nextVisibleIds = new Set(
+      [...visibleTrackIds.value].filter((trackId) => currentIds.has(trackId))
+    )
     props.tracks.forEach((track) => {
       if (!visibleTrackIds.value.has(track.id)) nextVisibleIds.add(track.id)
     })
@@ -311,7 +332,9 @@ function renderMarkerGroups() {
 function fitContextBounds() {
   if (!map) return
   const positions = [
-    ...geotaggedMedia.value.map((media) => [media.gpsLatitude!, media.gpsLongitude!] as [number, number]),
+    ...geotaggedMedia.value.map(
+      (media) => [media.gpsLatitude!, media.gpsLongitude!] as [number, number]
+    ),
     ...visibleTracks.value.flatMap((track) => trackPositions(track))
   ]
   if (positions.length === 0) return
@@ -597,7 +620,8 @@ function nextDistinctHue(existingHues: number[], index: number): number {
   let bestHue = TRACK_COLOR_SEED_HUE
   let bestScore = -1
   for (let candidate = 0; candidate < TRACK_COLOR_CANDIDATES; candidate += 1) {
-    const hue = (TRACK_COLOR_SEED_HUE + Math.round(candidate * (360 / TRACK_COLOR_CANDIDATES))) % 360
+    const hue =
+      (TRACK_COLOR_SEED_HUE + Math.round(candidate * (360 / TRACK_COLOR_CANDIDATES))) % 360
     const distance = Math.min(...existingHues.map((existing) => hueDistance(hue, existing)))
     if (distance > bestScore) {
       bestHue = hue
@@ -614,7 +638,8 @@ function hueDistance(a: number, b: number): number {
 
 function dashArrayForActivity(activity: MemoryTrackActivityType): string | undefined {
   if (activity === 'RUNNING') return '2 8'
-  if (activity === 'CYCLING' || activity === 'ROAD_CYCLING' || activity === 'GRAVEL_CYCLING') return '10 7'
+  if (activity === 'CYCLING' || activity === 'ROAD_CYCLING' || activity === 'GRAVEL_CYCLING')
+    return '10 7'
   if (activity === 'MOUNTAIN_BIKING') return '10 5 2 5'
   if (activity === 'SKIING') return '14 6 3 6'
   if (activity === 'WATER') return '3 9'
@@ -622,7 +647,8 @@ function dashArrayForActivity(activity: MemoryTrackActivityType): string | undef
 }
 
 function formatDistance(meters: number): string {
-  if (meters >= 1000) return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`
+  if (meters >= 1000)
+    return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`
   return `${meters.toLocaleString()} m`
 }
 
@@ -710,9 +736,13 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
               <input
                 type="checkbox"
                 :checked="visibleTrackIds.has(track.id)"
-                :aria-label="visibleTrackIds.has(track.id) ? t('context.hideTrack', { title: track.title }) : t('context.showTrack', { title: track.title })"
+                :aria-label="
+                  visibleTrackIds.has(track.id)
+                    ? t('context.hideTrack', { title: track.title })
+                    : t('context.showTrack', { title: track.title })
+                "
                 @change="toggleTrack(track.id)"
-              >
+              />
               <span
                 class="memory-context-track-swatch"
                 :style="{ '--track-color': trackStyles.get(track.id)?.color }"
@@ -744,7 +774,10 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
           </dl>
 
           <div class="memory-track-actions memory-context-track-actions">
-            <a :href="track.contentUrl" class="p-button p-button-sm p-button-secondary p-button-outlined">
+            <a
+              :href="track.contentUrl"
+              class="p-button p-button-sm p-button-secondary p-button-outlined"
+            >
               <span class="pi pi-download" />
               <span>{{ t('track.gpx') }}</span>
             </a>
@@ -784,7 +817,12 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       />
     </div>
 
-    <Dialog v-model:visible="uploadOpen" modal :header="t('track.upload')" class="memory-track-dialog">
+    <Dialog
+      v-model:visible="uploadOpen"
+      modal
+      :header="t('track.upload')"
+      class="memory-track-dialog"
+    >
       <div class="veyq-form memory-dialog-form">
         <p v-if="error" class="memory-form-error">{{ error }}</p>
         <FileUpload
@@ -803,7 +841,13 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
         </label>
         <label>
           <span>{{ t('track.activityType') }}</span>
-          <Select v-model="activityType" :options="activityOptions" option-label="label" option-value="value" :disabled="saving" />
+          <Select
+            v-model="activityType"
+            :options="activityOptions"
+            option-label="label"
+            option-value="value"
+            :disabled="saving"
+          />
         </label>
         <div class="veyq-dialog-action-row">
           <Button
@@ -825,7 +869,13 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       </div>
     </Dialog>
 
-    <Dialog :visible="Boolean(editTrack)" modal :header="t('track.edit')" class="memory-track-dialog" @update:visible="editTrack = null">
+    <Dialog
+      :visible="Boolean(editTrack)"
+      modal
+      :header="t('track.edit')"
+      class="memory-track-dialog"
+      @update:visible="editTrack = null"
+    >
       <div class="veyq-form memory-dialog-form">
         <p v-if="error" class="memory-form-error">{{ error }}</p>
         <label>
@@ -834,7 +884,13 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
         </label>
         <label>
           <span>{{ t('track.activityType') }}</span>
-          <Select v-model="activityType" :options="activityOptions" option-label="label" option-value="value" :disabled="saving" />
+          <Select
+            v-model="activityType"
+            :options="activityOptions"
+            option-label="label"
+            option-value="value"
+            :disabled="saving"
+          />
         </label>
         <div class="veyq-dialog-action-row">
           <Button
@@ -865,7 +921,11 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       dialog-class="memory-track-dialog"
       form-class="memory-dialog-form"
       :loading="saving"
-      @update:visible="(nextVisible) => { if (!nextVisible) deleteCandidate = null }"
+      @update:visible="
+        (nextVisible) => {
+          if (!nextVisible) deleteCandidate = null
+        }
+      "
       @confirm="confirmDelete"
     >
       <template #default>
@@ -884,7 +944,8 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       :can-show-next="canShowNext"
       :can-edit-metadata="canEditMetadata"
       :can-delete="canDeleteMedia"
-      :update-metadata="updateMetadata"
+      :update-captured-at="updateCapturedAt"
+      :update-highlight="updateHighlight"
       :delete-media="deleteMedia"
       @close="closeLightbox"
       @previous="showPrevious"

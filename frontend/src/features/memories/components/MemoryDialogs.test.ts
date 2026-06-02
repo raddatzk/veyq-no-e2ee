@@ -1089,6 +1089,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     title: 'Beach',
     uploader: { type: 'USER', displayName: 'Owner', userId: 1 },
     createdAt: '2026-05-01T12:00:00Z',
+    updatedAt: '2026-05-01T12:00:00Z',
     mimeType: 'image/jpeg',
     sizeBytes: 12,
     contentUrl: '/api/tenant/memories/mem-1/media/media-1/content',
@@ -1104,6 +1105,7 @@ function media(overrides: Partial<MemoryMedia> = {}): MemoryMedia {
     imageHeight: 600,
     gpsLatitude: null,
     gpsLongitude: null,
+    highlight: false,
     ...overrides
   }
 }

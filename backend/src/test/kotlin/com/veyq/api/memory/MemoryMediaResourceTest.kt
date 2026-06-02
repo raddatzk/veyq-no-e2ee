@@ -60,11 +60,23 @@ class MemoryMediaResourceTest {
     fun `media updates endpoint accepts openapi date-time cursor`() {
         val first = createMedia("First", createdAt = Instant.parse("2026-05-31T19:54:48Z"))
         val second = createMedia("Second", createdAt = Instant.parse("2026-05-31T19:55:00Z"))
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
+            .queryParam("includeChildren", true)
+            .`when`().get("/api/${tenant.name}/memories/${memory.publicId}/media")
+            .then()
+            .statusCode(200)
+
+        val firstUpdatedAt = Instant.parse("2026-06-01T10:00:00Z")
+        inTransaction {
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt, first.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(12), second.publicId)
+        }
 
         given()
             .cookie("VEYQ_ACCESS_TOKEN", ownerAccessCookie)
             .queryParam("includeChildren", true)
-            .queryParam("afterCreatedAt", "2026-05-31T19:54:48Z")
+            .queryParam("afterUpdatedAt", firstUpdatedAt.toString())
             .queryParam("afterMediaId", first.publicId)
             .queryParam("timeoutSeconds", 1)
             .`when`().get("/api/${tenant.name}/memories/${memory.publicId}/media/updates")

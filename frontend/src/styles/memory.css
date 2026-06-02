@@ -46,7 +46,7 @@
   min-height: 1.55rem;
   padding: 0.12rem 0.5rem;
   border-radius: 999px;
-  background: var(--app-surface-muted);
+  background: transparent;
   color: var(--app-muted);
   font-size: 0.9rem;
   font-weight: 700;
@@ -456,6 +456,53 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.media-grid-filter-toggle {
+  margin-left: auto;
+}
+
+.media-grid-filter-toggle .p-selectbutton {
+  --p-selectbutton-border-radius: var(--app-radius-sm);
+  --p-togglebutton-background: var(--app-surface-muted);
+  --p-togglebutton-border-color: var(--app-line);
+  --p-togglebutton-color: var(--app-muted);
+  --p-togglebutton-hover-background: var(--app-hover);
+  --p-togglebutton-hover-color: var(--app-text);
+  --p-togglebutton-checked-background: var(--app-surface);
+  --p-togglebutton-checked-border-color: var(--app-line);
+  --p-togglebutton-checked-color: var(--app-text);
+  --p-togglebutton-content-checked-background: transparent;
+  --p-togglebutton-content-checked-shadow: none;
+}
+
+.media-grid-filter-toggle .p-selectbutton .p-togglebutton {
+  font-weight: 700;
+}
+
+.media-grid-filter-toggle .p-selectbutton .p-togglebutton.p-togglebutton-checked {
+  box-shadow: var(--app-shadow-sm);
+}
+
+.media-grid-filter-toggle .p-selectbutton .p-togglebutton.p-togglebutton-checked .p-togglebutton-content {
+  background: transparent;
+  box-shadow: none;
+}
+
+.veyq-dark .media-grid-filter-toggle .p-selectbutton {
+  --p-togglebutton-background: var(--app-surface);
+  --p-togglebutton-hover-background: var(--app-hover);
+  --p-togglebutton-checked-background: color-mix(in srgb, var(--app-surface-muted) 78%, white 8%);
+  --p-togglebutton-checked-border-color: color-mix(in srgb, var(--app-line) 72%, white 18%);
+  --p-togglebutton-checked-color: var(--app-text);
+}
+
+.veyq-dark .media-grid-filter-toggle .p-selectbutton .p-togglebutton.p-togglebutton-checked {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-line) 70%, white 12%),
+    var(--app-shadow-sm);
 }
 
 .memory-card-grid {
@@ -1239,14 +1286,6 @@
   align-items: flex-end;
   gap: 0.65rem;
   min-width: 0;
-}
-
-.memory-icon-action.p-button {
-  flex: 0 0 auto;
-  width: 2.55rem;
-  min-width: 2.55rem;
-  height: 2.55rem;
-  padding-inline: 0;
 }
 
 .memory-upload-action.p-button {

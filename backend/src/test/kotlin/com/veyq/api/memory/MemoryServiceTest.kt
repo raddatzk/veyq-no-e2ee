@@ -38,7 +38,7 @@ import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
+import com.veyq.api.generated.model.UpdateMemoryMediaCapturedAtRequest
 import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
 import com.veyq.api.generated.model.UpdateMemoryPlaylistRequest
 import com.veyq.api.library.playlist.MemoryPlaylistService
@@ -181,7 +181,7 @@ class MemoryServiceTest {
     }
 
     @Test
-    fun `lists new memory media after created cursor`() {
+    fun `lists updated memory media after updated cursor`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("cursor-trip", "Cursor Trip"))
         val day = memoryService.createMemory(CreateMemoryRequest("cursor-day", "Cursor Day", parentId = trip.id))
         val other = memoryService.createMemory(CreateMemoryRequest("cursor-other", "Cursor Other"))
@@ -209,12 +209,13 @@ class MemoryServiceTest {
             "Other",
             createdAt = Instant.parse("2026-01-02T10:03:00Z"),
         )
+        val firstCursor = mediaService.listMemoryMedia(trip.id, true).first { it.id == first.publicId }
 
         assertThat(
-            mediaService.listNewMemoryMedia(
+            mediaService.listUpdatedMemoryMedia(
                 memoryId = trip.id,
                 includeChildren = true,
-                afterCreatedAt = first.createdAt,
+                afterUpdatedAt = firstCursor.updatedAt.toInstant(),
                 afterMediaId = first.publicId,
             )
         ).extracting("id").containsExactly(second.publicId, child.publicId)
@@ -999,10 +1000,10 @@ class MemoryServiceTest {
             capturedAt = Instant.parse("2026-01-01T10:00:00Z"),
         )
 
-        mediaService.updateMemoryMediaMetadata(
+        mediaService.updateMemoryMediaCapturedAt(
             trip.id,
             media.publicId,
-            UpdateMemoryMediaMetadataRequest(
+            UpdateMemoryMediaCapturedAtRequest(
                 capturedAt = java.time.OffsetDateTime.parse("2026-01-02T10:00:00Z"),
             ),
         )

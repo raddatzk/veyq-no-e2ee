@@ -22,7 +22,7 @@ import {
   moveMemoryMedia as moveTenantMemoryMedia,
   unfavoriteMemory,
   updateMemoryMediaBucket as updateTenantMemoryMediaBucket,
-  updateMemoryMediaMetadata,
+  updateMemoryMediaCapturedAt,
   updateMemoryMediaMetadataBatch as updateTenantMediaMetadataBatch,
   uploadMemoryTrack as uploadTenantMemoryTrack,
   updateMemoryTrack as updateTenantMemoryTrack,
@@ -30,7 +30,10 @@ import {
   createMemoryPlaylist as createTenantMemoryPlaylist,
   updateMemoryPlaylist as updateTenantMemoryPlaylist,
   deleteMemoryPlaylist as deleteTenantMemoryPlaylist,
-  SELF_PRIMARY_BUCKET_PLACEHOLDER_ID
+  SELF_PRIMARY_BUCKET_PLACEHOLDER_ID,
+  updateMemoryMediaHighlight,
+  UpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest
 } from '../api'
 import { notifyMemoryFavoritesChanged } from '../composables/useMemoryFavoritesRefresh'
 import type {
@@ -50,7 +53,6 @@ import type {
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryMediaBucketRequest,
   UpdateMemoryJournalRequest,
-  UpdateMemoryMediaMetadataRequest,
   UpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest,
   UpdateMemoryRequest,
@@ -104,13 +106,15 @@ type MemoryDetailCapabilities = {
   canManageCover?: boolean
   canEditMediaMetadata?: boolean
   canDeleteMedia?: boolean
+  canHighlightMedia?: boolean
   canDeleteCurrentMemory?: boolean
   canEditJournal?: boolean
   canDownload?: boolean
   canEditTracks?: boolean
   canEditPlaylists?: boolean
   canFavorite?: boolean
-  canManageParticipants?: boolean
+  canManageParticipants?: boolean,
+  showInfo?: boolean
 }
 
 type JournalEmbedPickerItem = {
@@ -120,56 +124,82 @@ type JournalEmbedPickerItem = {
   icon: string
 }
 
-const props = withDefaults(defineProps<{
-  tenantName: string
-  memory: Memory
-  header?: MemoryHeader | null
-  journal?: MemoryJournal | null
-  childMemories: Memory[]
-  media: MemoryMedia[]
-  mediaBuckets?: MemoryMediaBucket[]
-  showLocalPrimaryBucket?: boolean
-  mediaLoading?: boolean
-  playlists?: MemoryPlaylist[]
-  tracks?: MemoryTrack[]
-  activeTab?: MemoryDetailTab
-  capabilities?: MemoryDetailCapabilities
-  saveMemory?: (memoryId: string, request: UpdateMemoryRequest) => Promise<Memory>
-  saveJournal?: (memoryId: string, request: UpdateMemoryJournalRequest) => Promise<MemoryJournal>
-  createJournalLiveSession?: (memoryId: string) => Promise<MemoryJournalLiveSession>
-  setCover?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
-  removeCover?: (memoryId: string) => Promise<Memory>
-  uploadMedia?: (
-    memoryId: string,
-    request: UploadMemoryMediaRequest,
-    options?: UploadMediaOptions
-  ) => Promise<MemoryMedia>
-  deleteMemory?: (memoryId: string) => Promise<void>
-  updateMediaMetadata?: (
-    mediaId: string,
-    memoryId: string,
-    request: UpdateMemoryMediaMetadataRequest
-  ) => Promise<MemoryMedia>
-  updateMediaMetadataBatch?: (
-    memoryId: string,
-    request: UpdateMemoryMediaMetadataBatchRequest
-  ) => Promise<MemoryMedia[]>
-  deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
-  createMediaBucket?: (memoryId: string, request: CreateMemoryMediaBucketRequest) => Promise<MemoryMediaBucket>
-  updateMediaBucket?: (bucketId: string, memoryId: string, request: UpdateMemoryMediaBucketRequest) => Promise<MemoryMediaBucket>
-  deleteMediaBucket?: (bucketId: string, memoryId: string) => Promise<void>
-  moveMedia?: (memoryId: string, request: MoveMemoryMediaRequest) => Promise<MemoryMedia[]>
-  deleteMediaBatch?: (memoryId: string, request: DeleteMemoryMediaBatchRequest) => Promise<void>
-  uploadTrack?: (memoryId: string, request: UploadMemoryTrackRequest) => Promise<MemoryTrack>
-  updateTrack?: (trackId: string, memoryId: string, request: UpdateMemoryTrackRequest) => Promise<MemoryTrack>
-  deleteTrack?: (trackId: string, memoryId: string) => Promise<void>
-  createPlaylist?: (memoryId: string, request: CreateMemoryPlaylistRequest) => Promise<MemoryPlaylist>
-  updatePlaylist?: (playlistId: string, memoryId: string, request: UpdateMemoryPlaylistRequest) => Promise<MemoryPlaylist>
-  deletePlaylist?: (playlistId: string, memoryId: string) => Promise<void>
-  downloadUrl?: (memoryId: string, includeChildren: boolean) => string
-}>(), {
-  showLocalPrimaryBucket: true
-})
+const props = withDefaults(
+  defineProps<{
+    tenantName: string
+    memory: Memory
+    header?: MemoryHeader | null
+    journal?: MemoryJournal | null
+    childMemories: Memory[]
+    media: MemoryMedia[]
+    mediaBuckets?: MemoryMediaBucket[]
+    showLocalPrimaryBucket?: boolean
+    mediaLoading?: boolean
+    playlists?: MemoryPlaylist[]
+    tracks?: MemoryTrack[]
+    activeTab?: MemoryDetailTab
+    capabilities?: MemoryDetailCapabilities
+    saveMemory?: (memoryId: string, request: UpdateMemoryRequest) => Promise<Memory>
+    saveJournal?: (memoryId: string, request: UpdateMemoryJournalRequest) => Promise<MemoryJournal>
+    createJournalLiveSession?: (memoryId: string) => Promise<MemoryJournalLiveSession>
+    setCover?: (memoryId: string, request: SetMemoryCoverRequest) => Promise<Memory>
+    removeCover?: (memoryId: string) => Promise<Memory>
+    uploadMedia?: (
+      memoryId: string,
+      request: UploadMemoryMediaRequest,
+      options?: UploadMediaOptions
+    ) => Promise<MemoryMedia>
+    deleteMemory?: (memoryId: string) => Promise<void>
+    updateMediaCapturedAt?: (
+      mediaId: string,
+      memoryId: string,
+      request: UpdateMemoryMediaCapturedAtRequest
+    ) => Promise<MemoryMedia>
+    updateMediaHighlight?: (
+      mediaId: string,
+      memoryId: string,
+      request: UpdateMemoryMediaHighlightRequest
+    ) => Promise<MemoryMedia>
+    updateMediaMetadataBatch?: (
+      memoryId: string,
+      request: UpdateMemoryMediaMetadataBatchRequest
+    ) => Promise<MemoryMedia[]>
+    deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+    createMediaBucket?: (
+      memoryId: string,
+      request: CreateMemoryMediaBucketRequest
+    ) => Promise<MemoryMediaBucket>
+    updateMediaBucket?: (
+      bucketId: string,
+      memoryId: string,
+      request: UpdateMemoryMediaBucketRequest
+    ) => Promise<MemoryMediaBucket>
+    deleteMediaBucket?: (bucketId: string, memoryId: string) => Promise<void>
+    moveMedia?: (memoryId: string, request: MoveMemoryMediaRequest) => Promise<MemoryMedia[]>
+    deleteMediaBatch?: (memoryId: string, request: DeleteMemoryMediaBatchRequest) => Promise<void>
+    uploadTrack?: (memoryId: string, request: UploadMemoryTrackRequest) => Promise<MemoryTrack>
+    updateTrack?: (
+      trackId: string,
+      memoryId: string,
+      request: UpdateMemoryTrackRequest
+    ) => Promise<MemoryTrack>
+    deleteTrack?: (trackId: string, memoryId: string) => Promise<void>
+    createPlaylist?: (
+      memoryId: string,
+      request: CreateMemoryPlaylistRequest
+    ) => Promise<MemoryPlaylist>
+    updatePlaylist?: (
+      playlistId: string,
+      memoryId: string,
+      request: UpdateMemoryPlaylistRequest
+    ) => Promise<MemoryPlaylist>
+    deletePlaylist?: (playlistId: string, memoryId: string) => Promise<void>
+    downloadUrl?: (memoryId: string, includeChildren: boolean) => string
+  }>(),
+  {
+    showLocalPrimaryBucket: true
+  }
+)
 const { locale, t } = useI18n()
 const { authState } = useAuthState()
 
@@ -239,13 +269,16 @@ const capabilities = computed(() => ({
   canManageCover: props.capabilities?.canManageCover ?? true,
   canEditMediaMetadata: props.capabilities?.canEditMediaMetadata ?? true,
   canDeleteMedia: props.capabilities?.canDeleteMedia ?? true,
+  canHighlightMedia: props.capabilities?.canHighlightMedia ?? true,
   canDeleteCurrentMemory: props.capabilities?.canDeleteCurrentMemory ?? true,
-  canEditJournal: props.capabilities?.canEditJournal ?? props.capabilities?.canEdit ?? true,
+  canEditJournal: props.capabilities?.canEditJournal ?? true,
   canDownload: props.capabilities?.canDownload ?? true,
   canEditTracks: props.capabilities?.canEditTracks ?? props.capabilities?.canEdit ?? true,
   canEditPlaylists: props.capabilities?.canEditPlaylists ?? props.capabilities?.canEdit ?? true,
   canFavorite: props.capabilities?.canFavorite ?? true,
-  canManageParticipants: props.capabilities?.canManageParticipants ?? props.capabilities?.canEdit ?? true
+  canManageParticipants:
+    props.capabilities?.canManageParticipants ?? props.capabilities?.canEdit ?? true,
+  showInfo: props.capabilities?.showInfo ?? true
 }))
 const localPrimaryUploader = computed(() => {
   const user = authState.user
@@ -290,7 +323,8 @@ const parentPath = computed(() => {
   return `/${segments.slice(0, -1).join('/')}`
 })
 const dateRangeLabel = computed(() => {
-  if (detailHeader.value.startDate === detailHeader.value.endDate) return formatDate(detailHeader.value.startDate)
+  if (detailHeader.value.startDate === detailHeader.value.endDate)
+    return formatDate(detailHeader.value.startDate)
   return `${formatDate(detailHeader.value.startDate)} - ${formatDate(detailHeader.value.endDate)}`
 })
 const totalMediaCount = computed(
@@ -316,25 +350,62 @@ const {
 const mediaCountLabel = computed(() => `${localTotalMediaCount.value} ${t('memory.mediaCount')}`)
 const visiblePlaylists = computed(() => props.playlists ?? [])
 const visibleTracks = computed(() => props.tracks ?? [])
-const journalEmbedPickerItems = computed<JournalEmbedPickerItem[]>(() => journalEmbedOptions(embedPickerKind.value))
-const journalEmbedTypeOptions = computed<Array<{ kind: JournalEmbedKind; label: string; icon: string; disabled: boolean }>>(() => [
-  { kind: 'media', label: t('memory.journalHelpMedia'), icon: 'pi pi-images', disabled: visibleMedia.value.length === 0 },
-  { kind: 'chapter', label: t('memory.journalHelpMemory'), icon: 'pi pi-sitemap', disabled: props.childMemories.length === 0 },
-  { kind: 'playlist', label: t('memory.journalHelpPlaylist'), icon: 'pi pi-volume-up', disabled: visiblePlaylists.value.length === 0 },
-  { kind: 'track', label: t('memory.journalHelpTrack'), icon: 'pi pi-map', disabled: visibleTracks.value.length === 0 }
+const journalEmbedPickerItems = computed<JournalEmbedPickerItem[]>(() =>
+  journalEmbedOptions(embedPickerKind.value)
+)
+const journalEmbedTypeOptions = computed<
+  Array<{ kind: JournalEmbedKind; label: string; icon: string; disabled: boolean }>
+>(() => [
+  {
+    kind: 'media',
+    label: t('memory.journalHelpMedia'),
+    icon: 'pi pi-images',
+    disabled: visibleMedia.value.length === 0
+  },
+  {
+    kind: 'chapter',
+    label: t('memory.journalHelpMemory'),
+    icon: 'pi pi-sitemap',
+    disabled: props.childMemories.length === 0
+  },
+  {
+    kind: 'playlist',
+    label: t('memory.journalHelpPlaylist'),
+    icon: 'pi pi-volume-up',
+    disabled: visiblePlaylists.value.length === 0
+  },
+  {
+    kind: 'track',
+    label: t('memory.journalHelpTrack'),
+    icon: 'pi pi-map',
+    disabled: visibleTracks.value.length === 0
+  }
 ])
-const journalEmbedPickerTitle = computed(() => t(`memory.journalEmbedPicker.${embedPickerKind.value}.title`))
-const journalEmbedPickerCopy = computed(() => t(`memory.journalEmbedPicker.${embedPickerKind.value}.copy`))
-const journalEmbedPickerEmpty = computed(() => t(`memory.journalEmbedPicker.${embedPickerKind.value}.empty`))
-const journalEmbedPickerConfirmLabel = computed(() => t(`memory.journalEmbedPicker.${embedPickerKind.value}.confirm`))
+const journalEmbedPickerTitle = computed(() =>
+  t(`memory.journalEmbedPicker.${embedPickerKind.value}.title`)
+)
+const journalEmbedPickerCopy = computed(() =>
+  t(`memory.journalEmbedPicker.${embedPickerKind.value}.copy`)
+)
+const journalEmbedPickerEmpty = computed(() =>
+  t(`memory.journalEmbedPicker.${embedPickerKind.value}.empty`)
+)
+const journalEmbedPickerConfirmLabel = computed(() =>
+  t(`memory.journalEmbedPicker.${embedPickerKind.value}.confirm`)
+)
 const canDeleteCurrentMediaEmbed = computed(() => Boolean(mediaInsertRange.value?.mediaIds?.length))
 const canDeleteCurrentJournalEmbed = computed(() => Boolean(embedInsertRange.value?.targetId))
-const canDownloadMemory = computed(() =>
-  capabilities.value.canDownload && totalMediaCount.value > 0 && Boolean(props.downloadUrl || props.tenantName)
+const canDownloadMemory = computed(
+  () =>
+    capabilities.value.canDownload &&
+    totalMediaCount.value > 0 &&
+    Boolean(props.downloadUrl || props.tenantName)
 )
 const directDownloadUrl = computed(() => memoryDownloadUrl(false))
 const subtreeDownloadUrl = computed(() => memoryDownloadUrl(true))
-const canBatchUpdateMediaMetadata = computed(() => Boolean(props.updateMediaMetadataBatch || props.tenantName))
+const canBatchUpdateMediaMetadata = computed(() =>
+  Boolean(props.updateMediaMetadataBatch || props.tenantName)
+)
 const journalMarkdown = computed(() => props.journal?.markdown ?? '')
 const journalHasContent = computed(() => journalMarkdown.value.trim().length > 0)
 const favoriteActionLabel = computed(() =>
@@ -445,7 +516,9 @@ watch(
 )
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', { dateStyle: 'medium' }).format(new Date(value))
+  return new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'de-DE', {
+    dateStyle: 'medium'
+  }).format(new Date(value))
 }
 
 function memoryDownloadUrl(includeChildren: boolean): string {
@@ -455,14 +528,26 @@ function memoryDownloadUrl(includeChildren: boolean): string {
   return `${API_BASE}/api/${tenant}/memories/${memoryId}/download?includeChildren=${includeChildren}&locale=${encodeURIComponent(locale.value)}`
 }
 
-async function updateSingleMediaMetadata(
+async function updateSingleMediaCapturedAt(
   mediaId: string,
   memoryId: string,
-  request: UpdateMemoryMediaMetadataRequest
+  request: UpdateMemoryMediaCapturedAtRequest
 ): Promise<MemoryMedia> {
-  const updated = props.updateMediaMetadata
-    ? await props.updateMediaMetadata(mediaId, memoryId, request)
-    : await updateMemoryMediaMetadata(props.tenantName, memoryId, mediaId, request)
+  const updated = props.updateMediaCapturedAt
+    ? await props.updateMediaCapturedAt(mediaId, memoryId, request)
+    : await updateMemoryMediaCapturedAt(props.tenantName, memoryId, mediaId, request)
+  mergeUpdatedMedia([updated])
+  return updated
+}
+
+async function updateSingleMediaHighlight(
+  mediaId: string,
+  memoryId: string,
+  request: UpdateMemoryMediaHighlightRequest
+): Promise<MemoryMedia> {
+  const updated = props.updateMediaHighlight
+    ? await props.updateMediaHighlight(mediaId, memoryId, request)
+    : await updateMemoryMediaHighlight(props.tenantName, memoryId, mediaId, request)
   mergeUpdatedMedia([updated])
   return updated
 }
@@ -473,7 +558,8 @@ async function submitMediaMetadataBatch(
   capturedAtOffsetSeconds: number
 ): Promise<MemoryMedia[]> {
   const request = { mediaIds, capturedAtOffsetSeconds }
-  if (!props.updateMediaMetadataBatch && !props.tenantName) throw new Error(t('media.batchSaveFailed'))
+  if (!props.updateMediaMetadataBatch && !props.tenantName)
+    throw new Error(t('media.batchSaveFailed'))
   const updated = props.updateMediaMetadataBatch
     ? await props.updateMediaMetadataBatch(memoryId, request)
     : await updateTenantMediaMetadataBatch(props.tenantName, memoryId, request)
@@ -545,7 +631,8 @@ function handleGalleryDrop(event: DragEvent) {
 
 function activateChildDrop(event: DragEvent, memoryId: string) {
   allowMediaDrop(event)
-  if (capabilities.value.canUpload && hasPotentialFileDrop(event)) childDropMemoryId.value = memoryId
+  if (capabilities.value.canUpload && hasPotentialFileDrop(event))
+    childDropMemoryId.value = memoryId
 }
 
 function deactivateChildDrop(memoryId: string) {
@@ -604,6 +691,7 @@ function materializedSelfPrimaryBucket(memoryId: string, bucketId: string): Memo
       permalink: user?.permalink,
       userId: user?.userId
     },
+    canManage: true,
     mediaCount: 0,
     createdAt: now,
     updatedAt: now
@@ -632,7 +720,11 @@ async function submitMediaBucketDelete(memoryId: string, bucketId: string): Prom
   applyDeletedBucket(bucketId)
 }
 
-async function submitMediaMove(memoryId: string, mediaIds: string[], targetBucketId: string): Promise<MemoryMedia[]> {
+async function submitMediaMove(
+  memoryId: string,
+  mediaIds: string[],
+  targetBucketId: string
+): Promise<MemoryMedia[]> {
   const request = { mediaIds, targetBucketId }
   const moved = props.moveMedia
     ? await props.moveMedia(memoryId, request)
@@ -657,7 +749,10 @@ function submitTrackUpload(request: UploadMemoryTrackRequest): Promise<MemoryTra
   return uploadTenantMemoryTrack(props.tenantName, props.memory.id, request)
 }
 
-function submitTrackUpdate(trackId: string, request: UpdateMemoryTrackRequest): Promise<MemoryTrack> {
+function submitTrackUpdate(
+  trackId: string,
+  request: UpdateMemoryTrackRequest
+): Promise<MemoryTrack> {
   if (props.updateTrack) return props.updateTrack(trackId, props.memory.id, request)
   return updateTenantMemoryTrack(props.tenantName, props.memory.id, trackId, request)
 }
@@ -672,7 +767,10 @@ function submitPlaylistCreate(request: CreateMemoryPlaylistRequest): Promise<Mem
   return createTenantMemoryPlaylist(props.tenantName, props.memory.id, request)
 }
 
-function submitPlaylistUpdate(playlistId: string, request: UpdateMemoryPlaylistRequest): Promise<MemoryPlaylist> {
+function submitPlaylistUpdate(
+  playlistId: string,
+  request: UpdateMemoryPlaylistRequest
+): Promise<MemoryPlaylist> {
   if (props.updatePlaylist) return props.updatePlaylist(playlistId, props.memory.id, request)
   return updateTenantMemoryPlaylist(props.tenantName, props.memory.id, playlistId, request)
 }
@@ -761,8 +859,11 @@ function toggleJournalMedia(mediaId: string) {
 
 function openMediaPicker(range?: MediaInsertRange) {
   const existingRange = range ?? currentEditorMediaTagRange()
-  mediaInsertRange.value = existingRange ?? (journalLiveEditor.value ? null : currentTextareaRange())
-  selectedJournalMediaIds.value = existingRange?.mediaIds?.filter((id) => visibleMedia.value.some((media) => media.id === id)) ?? []
+  mediaInsertRange.value =
+    existingRange ?? (journalLiveEditor.value ? null : currentTextareaRange())
+  selectedJournalMediaIds.value =
+    existingRange?.mediaIds?.filter((id) => visibleMedia.value.some((media) => media.id === id)) ??
+    []
   mediaPickerCaption.value = existingRange?.caption ?? ''
   mediaPickerCaptionEdited.value = Boolean(existingRange?.caption)
   embedTypePickerOpen.value = false
@@ -790,7 +891,9 @@ function journalEmbedOptions(kind: JournalEmbedKind): JournalEmbedPickerItem[] {
   return visibleTracks.value.map((track) => ({
     id: track.id,
     title: track.title,
-    meta: [formatJournalTrackDistance(track.distanceMeters), track.activityType].filter(Boolean).join(' · '),
+    meta: [formatJournalTrackDistance(track.distanceMeters), track.activityType]
+      .filter(Boolean)
+      .join(' · '),
     icon: 'pi pi-map'
   }))
 }
@@ -829,9 +932,10 @@ function handleJournalEmbedTypeOutsidePointer(event: PointerEvent) {
 }
 
 function positionJournalEmbedTypePicker() {
-  const anchor = document.querySelector<HTMLElement>('.memory-journal-codemirror .cm-cursor')
-    ?? journalTextarea.value
-    ?? document.querySelector<HTMLElement>('.memory-journal-editor')
+  const anchor =
+    document.querySelector<HTMLElement>('.memory-journal-codemirror .cm-cursor') ??
+    journalTextarea.value ??
+    document.querySelector<HTMLElement>('.memory-journal-editor')
   if (!anchor) {
     embedTypePickerStyle.value = {}
     return
@@ -928,11 +1032,13 @@ function openJournalEmbedPicker(kind: JournalEmbedKind, range?: JournalEmbedRang
   const existingRange = currentRange?.kind === kind ? currentRange : null
   const activeKind = existingRange?.kind ?? kind
   embedPickerKind.value = activeKind
-  embedInsertRange.value = existingRange ?? (journalLiveEditor.value ? null : currentTextareaRange(activeKind))
+  embedInsertRange.value =
+    existingRange ?? (journalLiveEditor.value ? null : currentTextareaRange(activeKind))
   const options = journalEmbedOptions(activeKind)
-  selectedJournalEmbedId.value = existingRange?.targetId && options.some((item) => item.id === existingRange.targetId)
-    ? existingRange.targetId
-    : ''
+  selectedJournalEmbedId.value =
+    existingRange?.targetId && options.some((item) => item.id === existingRange.targetId)
+      ? existingRange.targetId
+      : ''
   embedPickerLabel.value = existingRange?.label ?? ''
   embedPickerLabelEdited.value = Boolean(existingRange?.label)
   if (!embedPickerLabelEdited.value) syncJournalEmbedPickerLabel()
@@ -982,7 +1088,8 @@ function currentEditorJournalEmbedRange(): JournalEmbedRange | null {
 function syncMediaPickerCaption() {
   if (mediaPickerCaptionEdited.value) return
   if (selectedJournalMediaIds.value.length === 1) {
-    mediaPickerCaption.value = visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || ''
+    mediaPickerCaption.value =
+      visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || ''
   } else if (selectedJournalMediaIds.value.length > 1) {
     mediaPickerCaption.value = t('memory.journalMediaCarouselCaption')
   } else {
@@ -997,17 +1104,20 @@ function selectJournalEmbed(itemId: string) {
 
 function syncJournalEmbedPickerLabel() {
   if (embedPickerLabelEdited.value) return
-  embedPickerLabel.value = journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title || ''
+  embedPickerLabel.value =
+    journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title ||
+    ''
 }
 
 function insertSelectedJournalMedia() {
   if (selectedJournalMediaIds.value.length === 0) return
   const range = mediaInsertRange.value ?? currentTextareaRange()
-  const caption = mediaPickerCaption.value.trim() || (
-    selectedJournalMediaIds.value.length === 1
-      ? visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title || 'Caption'
-      : t('memory.journalMediaCarouselCaption')
-  )
+  const caption =
+    mediaPickerCaption.value.trim() ||
+    (selectedJournalMediaIds.value.length === 1
+      ? visibleMedia.value.find((media) => media.id === selectedJournalMediaIds.value[0])?.title ||
+        'Caption'
+      : t('memory.journalMediaCarouselCaption'))
   const markdown = journalEmbedMarkdown('media', selectedJournalMediaIds.value, caption)
   if (journalLiveEditor.value) {
     journalLiveEditor.value.insertMarkdown(markdown, range)
@@ -1043,10 +1153,15 @@ function deleteSelectedJournalMediaEmbed() {
 function insertSelectedJournalEmbed() {
   if (!selectedJournalEmbedId.value) return
   const range = embedInsertRange.value ?? currentTextareaRange(embedPickerKind.value)
-  const fallbackLabel = journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title
-    || t(`memory.journalEmbedPicker.${embedPickerKind.value}.fallbackLabel`)
+  const fallbackLabel =
+    journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title ||
+    t(`memory.journalEmbedPicker.${embedPickerKind.value}.fallbackLabel`)
   const label = embedPickerLabel.value.trim() || fallbackLabel
-  const markdown = journalEmbedMarkdown(embedPickerKind.value, [selectedJournalEmbedId.value], label)
+  const markdown = journalEmbedMarkdown(
+    embedPickerKind.value,
+    [selectedJournalEmbedId.value],
+    label
+  )
   if (journalLiveEditor.value) {
     journalLiveEditor.value.insertMarkdown(markdown, range)
     closeJournalEmbedPicker()
@@ -1079,7 +1194,8 @@ function deleteSelectedJournalEmbed() {
 }
 
 function formatJournalTrackDistance(meters: number): string {
-  if (meters >= 1000) return `${(meters / 1000).toLocaleString(locale.value === 'en' ? 'en-US' : 'de-DE', { maximumFractionDigits: 1 })} km`
+  if (meters >= 1000)
+    return `${(meters / 1000).toLocaleString(locale.value === 'en' ? 'en-US' : 'de-DE', { maximumFractionDigits: 1 })} km`
   return `${meters.toLocaleString(locale.value === 'en' ? 'en-US' : 'de-DE')} m`
 }
 
@@ -1115,13 +1231,15 @@ function handleJournalDoubleClick(event: MouseEvent) {
   const embedRange = journalEmbedRangeAtPosition(journalDraft.value, textarea.selectionStart)
   if (embedRange) openJournalEmbedPicker(embedRange.kind, embedRange)
 }
-
 </script>
 
 <template>
   <div class="memory-detail">
     <header class="memory-detail-header">
-      <div class="memory-detail-cover" :class="{ 'memory-detail-cover-has-image': Boolean(coverUrl) }">
+      <div
+        class="memory-detail-cover"
+        :class="{ 'memory-detail-cover-has-image': Boolean(coverUrl) }"
+      >
         <MemoryCoverImage
           v-if="coverUrl"
           :src="coverUrl"
@@ -1141,7 +1259,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canFavorite"
                 v-tooltip.bottom="favoriteActionLabel"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline"
                 :icon="detailHeader.favorite ? 'pi pi-star-fill' : 'pi pi-star'"
                 :aria-label="favoriteActionLabel"
                 :severity="detailHeader.favorite ? 'warn' : 'secondary'"
@@ -1167,7 +1285,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="canDownloadMemory"
                 v-tooltip.bottom="t('memory.download')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-download"
                 :aria-label="t('memory.download')"
                 severity="secondary"
@@ -1179,7 +1297,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canEdit"
                 v-tooltip.bottom="t('common.edit')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-pencil"
                 :aria-label="t('common.edit')"
                 severity="secondary"
@@ -1191,7 +1309,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canManageCover"
                 v-tooltip.bottom="t('memory.cover')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-image"
                 :aria-label="t('memory.cover')"
                 severity="secondary"
@@ -1203,7 +1321,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canManageParticipants"
                 v-tooltip.bottom="t('memory.participantsManage')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-users"
                 :aria-label="t('memory.participantsManage')"
                 severity="secondary"
@@ -1215,7 +1333,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canShare"
                 v-tooltip.bottom="t('share.uploadRequest')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-user-plus"
                 :aria-label="t('share.uploadRequest')"
                 severity="secondary"
@@ -1227,7 +1345,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canShare"
                 v-tooltip.bottom="t('share.title')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-action-inline memory-action-collapsible"
                 icon="pi pi-share-alt"
                 :aria-label="t('share.title')"
                 severity="secondary"
@@ -1239,7 +1357,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="capabilities.canDelete && capabilities.canDeleteCurrentMemory"
                 v-tooltip.bottom="t('common.delete')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-danger-action memory-action-inline memory-action-collapsible"
+                class="veyq-icon-button veyq-prime-icon-button memory-danger-action memory-action-inline memory-action-collapsible"
                 icon="pi pi-trash"
                 :aria-label="t('common.delete')"
                 severity="danger"
@@ -1251,7 +1369,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="secondaryOverflowActionItems.length"
                 v-tooltip.bottom="t('common.more')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-actions-overflow memory-actions-overflow-secondary"
+                class="veyq-icon-button veyq-prime-icon-button memory-actions-overflow memory-actions-overflow-secondary"
                 icon="pi pi-ellipsis-h"
                 :aria-label="t('common.more')"
                 severity="secondary"
@@ -1265,7 +1383,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 v-if="overflowActionItems.length"
                 v-tooltip.bottom="t('common.more')"
                 type="button"
-                class="veyq-icon-button memory-icon-action memory-actions-overflow memory-actions-overflow-mobile"
+                class="veyq-icon-button veyq-prime-icon-button memory-actions-overflow memory-actions-overflow-mobile"
                 icon="pi pi-ellipsis-h"
                 :aria-label="t('common.more')"
                 severity="secondary"
@@ -1282,7 +1400,8 @@ function handleJournalDoubleClick(event: MouseEvent) {
           <span><i class="pi pi-calendar" /> {{ dateRangeLabel }}</span>
           <span><i class="pi pi-images" /> {{ mediaCountLabel }}</span>
           <span v-if="detailHeader.childMemoryCount > 0">
-            <i class="pi pi-sitemap" /> {{ detailHeader.childMemoryCount }} {{ t('memory.children') }}
+            <i class="pi pi-sitemap" /> {{ detailHeader.childMemoryCount }}
+            {{ t('memory.children') }}
           </span>
         </div>
         <MemoryParticipantsStrip
@@ -1300,7 +1419,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
         <Tab value="journal">{{ t('memory.journal') }}</Tab>
         <Tab value="children">{{ t('memory.children') }}</Tab>
         <Tab value="contributions">{{ t('media.contributions') }}</Tab>
-        <Tab value="info">{{ t('memory.info') }}</Tab>
+        <Tab v-if="capabilities.showInfo" value="info">{{ t('memory.info') }}</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="gallery" :pt="nonFocusableTabPanelPt">
@@ -1319,7 +1438,10 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 <small>{{ t('media.dropzoneMemoryCopy') }}</small>
               </div>
             </div>
-            <div v-if="visibleMedia.length === 0 && !mediaLoading" class="veyq-empty veyq-empty-action">
+            <div
+              v-if="visibleMedia.length === 0 && !mediaLoading"
+              class="veyq-empty veyq-empty-action"
+            >
               <span class="pi pi-images" />
               <span>{{ t('memory.galleryEmptyAction') }}</span>
               <Button
@@ -1335,11 +1457,15 @@ function handleJournalDoubleClick(event: MouseEvent) {
               v-else
               :tenant-name="tenantName"
               :media="visibleMedia"
+              :media-buckets="visibleMediaBuckets"
               :streaming="Boolean(mediaLoading)"
               :can-edit-metadata="capabilities.canEditMediaMetadata"
               :can-delete-media="capabilities.canDeleteMedia"
-              :update-metadata="updateSingleMediaMetadata"
+              :can-highlight="capabilities.canHighlightMedia"
+              :update-captured-at="updateSingleMediaCapturedAt"
+              :update-highlight="updateSingleMediaHighlight"
               :delete-media="submitMediaDelete"
+              @updated="mergeUpdatedMedia([$event])"
               @deleted="markMediaDeleted"
             />
           </div>
@@ -1355,7 +1481,9 @@ function handleJournalDoubleClick(event: MouseEvent) {
             :can-upload="capabilities.canUpload"
             :can-edit-metadata="capabilities.canEditMediaMetadata"
             :can-delete-media="capabilities.canDeleteMedia"
-            :update-metadata-batch="canBatchUpdateMediaMetadata ? submitMediaMetadataBatch : undefined"
+            :update-metadata-batch="
+              canBatchUpdateMediaMetadata ? submitMediaMetadataBatch : undefined
+            "
             :create-bucket="submitMediaBucketCreate"
             :update-bucket="submitMediaBucketUpdate"
             :delete-bucket="submitMediaBucketDelete"
@@ -1363,7 +1491,9 @@ function handleJournalDoubleClick(event: MouseEvent) {
             :delete-media-batch="submitMediaBatchDelete"
             @updated="mergeUpdatedMedia"
             @upload-bucket="openBucketUpload"
-            @drop-bucket="(files, bucketId, memoryId) => startDroppedMemoryUpload(files, memoryId, bucketId)"
+            @drop-bucket="
+              (files, bucketId, memoryId) => startDroppedMemoryUpload(files, memoryId, bucketId)
+            "
           />
         </TabPanel>
         <TabPanel value="map" :pt="nonFocusableTabPanelPt">
@@ -1374,7 +1504,8 @@ function handleJournalDoubleClick(event: MouseEvent) {
             :can-edit-metadata="capabilities.canEditMediaMetadata"
             :can-delete-media="capabilities.canDeleteMedia"
             :can-edit-tracks="capabilities.canEditTracks"
-            :update-metadata="updateSingleMediaMetadata"
+            :update-captured-at="updateSingleMediaCapturedAt"
+            :update-highlight="updateSingleMediaHighlight"
             :delete-media="submitMediaDelete"
             :upload-track="capabilities.canEditTracks ? submitTrackUpload : undefined"
             :update-track="capabilities.canEditTracks ? submitTrackUpdate : undefined"
@@ -1398,7 +1529,13 @@ function handleJournalDoubleClick(event: MouseEvent) {
             <div class="memory-journal-toolbar">
               <div>
                 <h2>{{ t('memory.journal') }}</h2>
-                <p>{{ t('memory.journalUpdated', { date: props.journal ? formatDate(props.journal.updatedAt) : '-' }) }}</p>
+                <p>
+                  {{
+                    t('memory.journalUpdated', {
+                      date: props.journal ? formatDate(props.journal.updatedAt) : '-'
+                    })
+                  }}
+                </p>
               </div>
               <div class="memory-journal-actions">
                 <Button
@@ -1454,7 +1591,9 @@ function handleJournalDoubleClick(event: MouseEvent) {
               </div>
             </div>
 
-            <Message v-if="journalError" severity="error" :closable="false">{{ journalError }}</Message>
+            <Message v-if="journalError" severity="error" :closable="false">{{
+              journalError
+            }}</Message>
 
             <div v-if="journalEditing" class="memory-journal-editor">
               <div class="memory-journal-editor-grid">
@@ -1496,10 +1635,18 @@ function handleJournalDoubleClick(event: MouseEvent) {
                   <div>
                     <h4>{{ t('memory.journalHelpBasics') }}</h4>
                     <ul>
-                      <li><code># {{ t('memory.journalHelpHeadingExample') }}</code></li>
-                      <li><code>**{{ t('memory.journalHelpStrongExample') }}**</code></li>
-                      <li><code>- {{ t('memory.journalHelpListExample') }}</code></li>
-                      <li><code>[{{ t('memory.journalHelpLinkLabel') }}](https://example.com)</code></li>
+                      <li>
+                        <code># {{ t('memory.journalHelpHeadingExample') }}</code>
+                      </li>
+                      <li>
+                        <code>**{{ t('memory.journalHelpStrongExample') }}**</code>
+                      </li>
+                      <li>
+                        <code>- {{ t('memory.journalHelpListExample') }}</code>
+                      </li>
+                      <li>
+                        <code>[{{ t('memory.journalHelpLinkLabel') }}](https://example.com)</code>
+                      </li>
                     </ul>
                   </div>
                   <div>
@@ -1605,11 +1752,11 @@ function handleJournalDoubleClick(event: MouseEvent) {
               @dragleave="deactivateChildDrop(child.id)"
               @drop="handleChildDrop($event, child)"
             >
-              <MemoryCard
-                :memory="child"
-                @open="$emit('openMemory', $event)"
-              />
-              <div v-if="capabilities.canUpload && childDropMemoryId === child.id" class="memory-child-drop-hint">
+              <MemoryCard :memory="child" @open="$emit('openMemory', $event)" />
+              <div
+                v-if="capabilities.canUpload && childDropMemoryId === child.id"
+                class="memory-child-drop-hint"
+              >
                 <span class="pi pi-cloud-upload" />
                 <span>{{ t('media.dropzoneChapterTitle') }}</span>
               </div>
@@ -1624,7 +1771,10 @@ function handleJournalDoubleClick(event: MouseEvent) {
               <strong>{{ t('memory.childCreate') }}</strong>
             </button>
           </div>
-          <div v-if="childMemories.length === 0 && !capabilities.canCreateChildMemory" class="veyq-empty">
+          <div
+            v-if="childMemories.length === 0 && !capabilities.canCreateChildMemory"
+            class="veyq-empty"
+          >
             <span class="pi pi-sitemap" />
             <span>{{ t('memory.childrenEmpty') }}</span>
           </div>
@@ -1677,7 +1827,11 @@ function handleJournalDoubleClick(event: MouseEvent) {
       @deleted="$emit('deleted', parentPath)"
     />
     <MemoryShareDialog v-model:visible="shareOpen" :tenant-name="tenantName" :memory="memory" />
-    <MemoryUploaderShareDialog v-model:visible="uploaderShareOpen" :tenant-name="tenantName" :memory="memory" />
+    <MemoryUploaderShareDialog
+      v-model:visible="uploaderShareOpen"
+      :tenant-name="tenantName"
+      :memory="memory"
+    />
     <MemoryUploadDialog
       v-model:visible="uploadOpen"
       :tenant-name="tenantName"
@@ -1698,7 +1852,9 @@ function handleJournalDoubleClick(event: MouseEvent) {
           <span class="pi pi-download" />
           <span>
             <strong>{{ t('memory.downloadDirect') }}</strong>
-            <small>{{ t('memory.downloadDirectCopy', { count: detailHeader.directMediaCount }) }}</small>
+            <small>{{
+              t('memory.downloadDirectCopy', { count: detailHeader.directMediaCount })
+            }}</small>
           </span>
         </a>
         <a class="memory-download-option" :href="subtreeDownloadUrl" @click="downloadOpen = false">

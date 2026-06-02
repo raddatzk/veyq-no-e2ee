@@ -40,7 +40,8 @@ import type {
   UpdateMemoryMediaBucketRequest as GeneratedUpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest as GeneratedUpdateMemoryJournalRequest,
-  UpdateMemoryMediaMetadataRequest as GeneratedUpdateMemoryMediaMetadataRequest,
+  UpdateMemoryMediaCapturedAtRequest as GeneratedUpdateMemoryMediaCapturedAtRequest,
+  UpdateMemoryMediaHighlightRequest as GeneratedUpdateMemoryMediaHighlightRequest,
   UpdateMemoryPlaylistRequest as GeneratedUpdateMemoryPlaylistRequest,
   UpdateMemoryTrackRequest as GeneratedUpdateMemoryTrackRequest,
   UpdateMemoryRequest as GeneratedUpdateMemoryRequest
@@ -184,11 +185,18 @@ export type SetMemoryCoverRequest = {
   cropHeight: number
 }
 
-export type UpdateMemoryMediaMetadataRequest = Omit<
-  GeneratedUpdateMemoryMediaMetadataRequest,
+export type UpdateMemoryMediaCapturedAtRequest = Omit<
+  GeneratedUpdateMemoryMediaCapturedAtRequest,
   'capturedAt'
 > & {
   capturedAt?: string | null
+}
+
+export type UpdateMemoryMediaHighlightRequest = Omit<
+  GeneratedUpdateMemoryMediaHighlightRequest,
+  'featured'
+> & {
+  featured?: boolean | null
 }
 
 export type UpdateMemoryMediaMetadataBatchRequest = GeneratedUpdateMemoryMediaMetadataBatchRequest

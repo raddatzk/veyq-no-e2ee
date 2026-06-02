@@ -1,14 +1,7 @@
 package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoryMediaApi
-import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
-import com.veyq.api.generated.model.CreateMemoryMediaBucketRequest
-import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
-import com.veyq.api.generated.model.MemoryMediaUpdatesResponse
-import com.veyq.api.generated.model.MoveMemoryMediaRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaMetadataBatchRequest
-import com.veyq.api.generated.model.UpdateMemoryMediaBucketRequest
+import com.veyq.api.generated.model.*
 import com.veyq.api.library.media.MediaService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -21,7 +14,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.Date
+import java.util.*
 
 @ApplicationScoped
 class MemoryMediaResource @Inject constructor(
@@ -37,7 +30,7 @@ class MemoryMediaResource @Inject constructor(
         tenantName: String,
         memoryId: String,
         includeChildren: Boolean?,
-        afterCreatedAt: Date?,
+        afterUpdatedAt: Date?,
         afterMediaId: String?,
         timeoutSeconds: Int?,
     ): Response =
@@ -46,7 +39,7 @@ class MemoryMediaResource @Inject constructor(
                 media = mediaService.waitForNewMemoryMedia(
                     memoryId = memoryId,
                     includeChildren = includeChildren ?: false,
-                    afterCreatedAt = afterCreatedAt?.toInstant(),
+                    afterUpdatedAt = afterUpdatedAt?.toInstant(),
                     afterMediaId = afterMediaId,
                     timeoutSeconds = (timeoutSeconds ?: 25).toLong(),
                 )
@@ -91,13 +84,21 @@ class MemoryMediaResource @Inject constructor(
         }
     }
 
-    override fun updateMemoryMediaMetadata(
+    override fun updateMemoryMediaCapturedAt(
         tenantName: String,
         memoryId: String,
         mediaId: String,
-        request: UpdateMemoryMediaMetadataRequest,
+        request: UpdateMemoryMediaCapturedAtRequest,
     ): Response =
-        Response.ok(mediaService.updateMemoryMediaMetadata(memoryId, mediaId, request)).build()
+        Response.ok(mediaService.updateMemoryMediaCapturedAt(memoryId, mediaId, request)).build()
+
+    override fun updateMemoryMediaHighlight(
+        tenantName: String,
+        memoryId: String,
+        mediaId: String,
+        request: UpdateMemoryMediaHighlightRequest,
+    ): Response =
+        Response.ok(mediaService.updateMemoryMediaHighlight(memoryId, mediaId, request)).build()
 
     override fun updateMemoryMediaMetadataBatch(
         tenantName: String,

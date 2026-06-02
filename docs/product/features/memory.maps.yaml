@@ -7,7 +7,7 @@ productArea: GPS media maps with browser opt-in for external map tiles.
 entryPoints:
   - docs/api/memories.openapi.yaml
   - docs/legal/privacy.md
-  - frontend/src/features/memories/components/MemoryMediaMap.vue
+  - frontend/src/features/memories/components/MemoryContextPanel.vue
 acceptanceCriteria:
   - id: memory.maps.gps-metadata
     statement: GPS metadata extraction makes media mapable.
@@ -24,19 +24,19 @@ acceptanceCriteria:
         unit:
           - testName: clusters overlapping marker previews with a count badge
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: enables direct scroll wheel touch and control zooming
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: keeps lightbox navigation inside the clicked marker cluster
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: supports arrow key navigation inside the clicked marker cluster
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: keeps distant marker previews separate
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
   - id: memory.maps.track-route-render
     statement: Track map renders route polyline.
     coverage:
@@ -55,7 +55,7 @@ acceptanceCriteria:
         unit:
           - testName: keeps OpenStreetMap tile consent anonymous without a signed-in user
             kind: negative
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: renders route without OpenStreetMap tiles until consent is granted
             kind: negative
             ref: frontend/src/features/memories/components/TrackMap.test.ts
@@ -94,10 +94,10 @@ acceptanceCriteria:
         unit:
           - testName: keeps OpenStreetMap tile consent scoped to the signed-in user
             kind: positive
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: does not render a map-local OpenStreetMap disable button after consent
             kind: negative
-            ref: frontend/src/features/memories/components/MemoryMediaMap.test.ts
+            ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
           - testName: lists grouped external providers and keeps anonymous consent in browser storage
             kind: positive
             ref: frontend/src/features/settings/components/PrivacySettingsPanel.test.ts

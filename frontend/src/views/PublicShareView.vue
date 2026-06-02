@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import DOMPurify from 'dompurify'
@@ -45,7 +45,6 @@ import {
   removePublicShareMemoryCover,
   movePublicShareMemoryMedia,
   setPublicShareMemoryCover,
-  updatePublicShareMediaMetadata,
   updatePublicShareMemoryMediaBucket,
   updatePublicShareMemory,
   updatePublicShareMemoryJournal,
@@ -55,6 +54,9 @@ import {
   uploadPublicShareMemoryMedia,
   uploadPublicShareMemoryTrack,
   deletePublicShareMemoryTrack,
+  updatePublicShareMediaCapturedAt,
+  updatePublicShareMediaHighlight,
+  waitForNewPublicShareMemoryMedia,
   type Memory,
   type MemoryHeader,
   type MemoryJournal,
@@ -65,6 +67,11 @@ import {
   type PublicShareNotice,
   type PublicShareSummary
 } from '../features/memories/api'
+
+type MediaUpdatedCursor = {
+  updatedAt: string
+  mediaId: string
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -99,6 +106,7 @@ const { visibleBatches } = useUploadQueue()
 const { themePreference, setThemePreference } = useThemeState()
 const markdownRenderer = new MarkdownIt({ html: false, linkify: true, typographer: true })
 let memoryLoadSequence = 0
+let mediaUpdatesController: AbortController | null = null
 
 const isUploaderOnly = computed(() => share.value?.role === 'UPLOADER')
 const hasShareAccess = computed(() => Boolean(share.value?.authenticated || share.value?.canViewGallery))
@@ -150,25 +158,30 @@ const publicShareUploadBatches = computed(() =>
 const shareCoverUrl = computed(() =>
   memoryHeader.value?.coverUrl ? `${API_BASE}${memoryHeader.value.coverUrl}` : ''
 )
+const sharePermissions = computed(() => share.value?.permissions)
 const capabilities = computed(() => ({
-  canEdit: Boolean(share.value?.canEdit),
+  canEdit: Boolean(sharePermissions.value?.editMemory ?? share.value?.canEdit),
   canUpload: Boolean(share.value?.canUpload),
-  canCreateChildMemory: Boolean(share.value?.canEdit),
+  canCreateChildMemory: Boolean(sharePermissions.value?.addChapter ?? share.value?.canEdit),
   canDelete: Boolean(share.value?.canDelete),
   canShare: false,
-  canManageCover: Boolean(share.value?.canEdit),
-  canEditJournal: Boolean(share.value?.canDelete),
+  canManageCover: Boolean(sharePermissions.value?.setCover ?? share.value?.canDelete),
+  canEditJournal: Boolean(sharePermissions.value?.editJournal ?? share.value?.canEdit),
   canEditMediaMetadata: Boolean(share.value?.canUpload || share.value?.canEdit),
   canDeleteMedia: Boolean(share.value?.canUpload || share.value?.canDelete),
-  canEditTracks: Boolean(share.value?.canEdit),
-  canEditPlaylists: Boolean(share.value?.canEdit),
+  canHighlightMedia: Boolean(sharePermissions.value?.setHighlight ?? (share.value?.canUpload || share.value?.canDelete)),
+  canEditTracks: Boolean(sharePermissions.value?.uploadTrack ?? share.value?.canEdit),
+  canEditPlaylists: Boolean(sharePermissions.value?.uploadPlaylist ?? share.value?.canEdit),
   canDeleteCurrentMemory: Boolean(share.value?.canDelete && memory.value?.id !== share.value.rootMemory?.id),
   showScope: false,
   canDownload: Boolean(share.value?.canViewGallery && !isUploaderOnly.value),
-  canFavorite: false
+  canFavorite: false,
+  canManageParticipants: false,
+  showInfo: false,
 }))
 
 onMounted(loadShare)
+onBeforeUnmount(stopMemoryMediaUpdates)
 
 watch(
   () => [shareId.value, sharePath.value],
@@ -220,6 +233,7 @@ async function login() {
 
 async function closeShare() {
   memoryLoadSequence += 1
+  stopMemoryMediaUpdates()
   await logoutPublicShare(shareId.value)
   message.value = ''
   memory.value = null
@@ -248,6 +262,7 @@ async function acceptNotices() {
 
 async function loadCurrentMemory() {
   const sequence = ++memoryLoadSequence
+  stopMemoryMediaUpdates()
   error.value = ''
   message.value = ''
   loading.value = true
@@ -286,6 +301,7 @@ async function loadCurrentMemoryDetails(sequence: number, current: Memory) {
     loadCurrentMemoryDetailPart(sequence, () => listPublicShareMemoryMedia(shareId.value, current.id, true), (memoryMedia) => {
       media.value = memoryMedia
       mediaLoading.value = false
+      startMemoryMediaUpdates(sequence, current)
     }, () => {
       mediaLoading.value = false
     }),
@@ -314,6 +330,55 @@ async function loadCurrentMemoryDetailPart<T>(
     if (sequence === memoryLoadSequence) error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
   } finally {
     if (sequence === memoryLoadSequence) finalize?.()
+  }
+}
+
+function startMemoryMediaUpdates(sequence: number, current: Memory) {
+  stopMemoryMediaUpdates()
+  const controller = new AbortController()
+  mediaUpdatesController = controller
+  void watchMemoryMediaUpdates(sequence, current, controller)
+}
+
+function stopMemoryMediaUpdates() {
+  mediaUpdatesController?.abort()
+  mediaUpdatesController = null
+}
+
+async function watchMemoryMediaUpdates(
+  sequence: number,
+  current: Memory,
+  controller: AbortController
+) {
+  while (!controller.signal.aborted && sequence === memoryLoadSequence && memory.value?.id === current.id) {
+    const cursor = newestUpdatedAtCursor(media.value)
+    try {
+      const updates = await waitForNewPublicShareMemoryMedia(
+        shareId.value,
+        current.id,
+        true,
+        cursor?.updatedAt,
+        cursor?.mediaId,
+        controller.signal
+      )
+      if (controller.signal.aborted || sequence !== memoryLoadSequence || memory.value?.id !== current.id) return
+      if (updates.media.length > 0) {
+        media.value = chronologicallySortedMedia(mergeMediaById(media.value, updates.media))
+        const [header, buckets] = await Promise.all([
+          getPublicShareMemoryHeader(shareId.value, current.id),
+          listPublicShareMemoryMediaBuckets(shareId.value, current.id, true)
+        ])
+        if (controller.signal.aborted || sequence !== memoryLoadSequence || memory.value?.id !== current.id) return
+        memoryHeader.value = header
+        mediaBuckets.value = buckets
+      }
+    } catch (unknownError) {
+      if (controller.signal.aborted) return
+      if (sequence === memoryLoadSequence) {
+        error.value = getErrorMessage(unknownError, t('memory.loadFailed'))
+      }
+      await delay(5_000, controller.signal)
+    }
   }
 }
 
@@ -444,6 +509,45 @@ function noticeAcceptanceKey(notice: PublicShareNotice, renderedLocale: string):
 
 function isNoticeAccepted(notice: RenderedNotice): boolean {
   return window.localStorage.getItem(notice.storageKey) === 'true'
+}
+
+function newestUpdatedAtCursor(media: MemoryMedia[]): MediaUpdatedCursor | null {
+  const newest = [...media]
+    .filter((item) => item.updatedAt)
+    .sort((left, right) => {
+      const updatedAtOrder = left.updatedAt.localeCompare(right.updatedAt)
+      return updatedAtOrder || left.id.localeCompare(right.id)
+    })
+    .at(-1)
+  return newest ? { updatedAt: newest.updatedAt, mediaId: newest.id } : null
+}
+
+function mergeMediaById(current: MemoryMedia[], updates: MemoryMedia[]): MemoryMedia[] {
+  const byId = new Map<string, MemoryMedia>()
+  current.forEach((item) => byId.set(item.id, item))
+  updates.forEach((item) => byId.set(item.id, item))
+  return [...byId.values()]
+}
+
+function chronologicallySortedMedia(media: MemoryMedia[]): MemoryMedia[] {
+  return [...media].sort((left, right) => {
+    const leftSortTime = left.capturedAt || left.createdAt
+    const rightSortTime = right.capturedAt || right.createdAt
+    const sortTimeOrder = leftSortTime.localeCompare(rightSortTime)
+    if (sortTimeOrder !== 0) return sortTimeOrder
+    const createdAtOrder = left.createdAt.localeCompare(right.createdAt)
+    return createdAtOrder || left.id.localeCompare(right.id)
+  })
+}
+
+function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(resolve, milliseconds)
+    signal.addEventListener('abort', () => {
+      window.clearTimeout(timeout)
+      resolve()
+    }, { once: true })
+  })
 }
 </script>
 
@@ -624,7 +728,8 @@ function isNoticeAccepted(notice: RenderedNotice): boolean {
       :remove-cover="(memoryId) => removePublicShareMemoryCover(shareId, memoryId)"
       :upload-media="(memoryId, request, options) => uploadPublicShareMemoryMedia(shareId, memoryId, request, options)"
       :delete-memory="(memoryId) => deletePublicShareMemory(shareId, memoryId)"
-      :update-media-metadata="(mediaId, memoryId, request) => updatePublicShareMediaMetadata(shareId, memoryId, mediaId, request)"
+      :update-media-captured-at="(mediaId, memoryId, request) => updatePublicShareMediaCapturedAt(shareId, memoryId, mediaId, request)"
+      :update-media-highlight="(mediaId, memoryId, request) => updatePublicShareMediaHighlight(shareId, memoryId, mediaId, request)"
       :delete-media="(mediaId, memoryId) => deletePublicShareMedia(shareId, memoryId, mediaId)"
       :create-media-bucket="(memoryId, request) => createPublicShareMemoryMediaBucket(shareId, memoryId, request)"
       :update-media-bucket="(bucketId, memoryId, request) => updatePublicShareMemoryMediaBucket(shareId, memoryId, bucketId, request)"

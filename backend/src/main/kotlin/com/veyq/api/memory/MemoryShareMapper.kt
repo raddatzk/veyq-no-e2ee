@@ -9,6 +9,7 @@ import com.veyq.api.domain.MemoryShareRole
 import com.veyq.api.domain.TenantFolder
 import com.veyq.api.domain.User
 import com.veyq.api.generated.model.MemoryShareSummary
+import com.veyq.api.generated.model.PublicSharePermissions
 import com.veyq.api.generated.model.PublicShareNotice
 import com.veyq.api.generated.model.PublicShareNoticeScope
 import com.veyq.api.generated.model.PublicShareSummary
@@ -48,6 +49,7 @@ class MemoryShareMapper(
             canUpload = access.canUpload,
             canEdit = access.canEdit,
             canDelete = access.canDelete,
+            permissions = access.permissions,
             notices = publicShareNotices(access.share),
             rootMemory = if (access.exposeRootMemory) {
                 publicShareMemoryMapper.toSummary(access.share.rootMemory, access.share)
@@ -103,6 +105,7 @@ data class PublicShareSummaryAccess(
     val canUpload: Boolean,
     val canEdit: Boolean,
     val canDelete: Boolean,
+    val permissions: PublicSharePermissions,
     val exposeRootMemory: Boolean,
 )
 
