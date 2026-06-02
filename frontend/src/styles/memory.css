@@ -3351,7 +3351,8 @@
   padding: 1rem;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
-  background: var(--app-on-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
   box-shadow: var(--app-shadow-sm);
 }
 
@@ -3366,12 +3367,18 @@
 
 .public-share-notice h3 {
   margin: 0;
+  color: var(--app-text);
   font-size: 1rem;
 }
 
 .markdown-body {
   overflow-wrap: anywhere;
+  color: var(--app-text);
   line-height: 1.6;
+}
+
+.markdown-body a {
+  color: var(--app-success);
 }
 
 .markdown-body > :first-child {
