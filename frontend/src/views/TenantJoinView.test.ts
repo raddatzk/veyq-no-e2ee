@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import TenantJoinView from './TenantJoinView.vue'
 import {
@@ -230,20 +231,22 @@ function viewStubs() {
       props: ['modelValue'],
       inheritAttrs: false
     },
-    RegistrationPrivacyOptIns: {
+    RegistrationPrivacyOptIns: defineComponent({
       name: 'RegistrationPrivacyOptIns',
       template:
-        '<section>Externe Inhalte<input type="checkbox" @input="checked = $event.target.checked" /><button type="button" @click="save">Speichern</button></section>',
-      data: () => ({ checked: false }),
-      methods: {
-        save() {
-          if (this.checked) {
+        '<section>Externe Inhalte<input type="checkbox" v-model="checked" /><button type="button" @click="save">Speichern</button></section>',
+      setup(_, { emit }) {
+        const checked = ref(false)
+        function save() {
+          if (checked.value) {
             window.localStorage.setItem('veyq:user:42:osm-tiles-enabled', 'true')
           }
-          this.$emit('complete')
+          emit('complete')
         }
+
+        return { checked, save }
       }
-    },
+    }),
     TieredMenu: {
       name: 'TieredMenu',
       template: '<div />',

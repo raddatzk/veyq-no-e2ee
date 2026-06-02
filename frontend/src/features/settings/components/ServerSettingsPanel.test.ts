@@ -92,7 +92,7 @@ describe('ServerSettingsPanel', () => {
   it('renders translated mobile handoff capability', async () => {
     mockServerPanel(
       serverSettings({
-        capabilities: [{ id: 'auth.mobile-handoff', audience: 'mobile' }]
+        capabilities: [{ id: 'auth.mobile-handoff', introducedInVersion: '1.0.0', audience: 'ALL_USERS' }]
       })
     )
 
