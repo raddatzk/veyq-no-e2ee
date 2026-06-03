@@ -782,6 +782,34 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.memory-journal-editor-actions').text()).not.toContain('Speichern')
   })
 
+  it('renders the saved live journal draft after leaving edit mode', async () => {
+    const createJournalLiveSession = vi.fn().mockResolvedValue(liveSession())
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [media()],
+        createJournalLiveSession
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    await flushPromises()
+    await wrapper.find('.memory-journal-live-editor textarea').setValue('::media:media-1 Acorns')
+    wrapper.findComponent({ name: 'MemoryJournalLiveEditor' }).vm.$emit('status', 'saved')
+    await flushPromises()
+    await wrapper.find('.memory-journal-editor-actions button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.memory-journal-live-editor').exists()).toBe(false)
+    expect(wrapper.find('.memory-journal-media img').exists()).toBe(true)
+    expect(wrapper.find('.memory-journal-media figcaption').text()).toBe('Acorns')
+  })
+
   it('falls back to textarea journal editing when live session creation fails', async () => {
     const createJournalLiveSession = vi.fn().mockRejectedValue(new Error('offline'))
     const wrapper = mount(MemoryDetail, {

@@ -41,6 +41,9 @@ acceptanceCriteria:
           - testName: starts a journal live session when editing
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: renders the saved live journal draft after leaving edit mode
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
           - testName: falls back to textarea journal editing when live session creation fails
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts

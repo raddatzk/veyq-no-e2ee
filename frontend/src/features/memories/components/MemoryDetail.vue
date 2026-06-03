@@ -230,6 +230,7 @@ const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalDraft = ref('')
 const journalError = ref('')
+const journalOverride = ref<MemoryJournal | null>(null)
 const journalTextarea = ref<HTMLTextAreaElement | null>(null)
 const journalLiveEditor = ref<InstanceType<typeof MemoryJournalLiveEditor> | null>(null)
 const journalLiveSession = ref<MemoryJournalLiveSession | null>(null)
@@ -406,7 +407,8 @@ const subtreeDownloadUrl = computed(() => memoryDownloadUrl(true))
 const canBatchUpdateMediaMetadata = computed(() =>
   Boolean(props.updateMediaMetadataBatch || props.tenantName)
 )
-const journalMarkdown = computed(() => props.journal?.markdown ?? '')
+const displayedJournal = computed(() => journalOverride.value ?? props.journal ?? null)
+const journalMarkdown = computed(() => displayedJournal.value?.markdown ?? '')
 const journalHasContent = computed(() => journalMarkdown.value.trim().length > 0)
 const favoriteActionLabel = computed(() =>
   detailHeader.value.favorite ? t('memory.favoriteRemove') : t('memory.favoriteAdd')
@@ -506,8 +508,16 @@ watch(
 )
 
 watch(
+  () => props.journal?.updatedAt,
+  (value, previous) => {
+    if (previous && value !== previous) journalOverride.value = null
+  }
+)
+
+watch(
   () => props.memory.id,
   () => {
+    journalOverride.value = null
     favoriteOverride.value = null
     uploadMemoryId.value = null
     uploadBucketId.value = null
@@ -818,13 +828,24 @@ async function submitJournal() {
   journalSaving.value = true
   journalError.value = ''
   try {
-    await props.saveJournal(props.memory.id, { markdown: journalDraft.value })
+    const updatedJournal = await props.saveJournal(props.memory.id, { markdown: journalDraft.value })
+    journalOverride.value = updatedJournal
     journalEditing.value = false
     emit('changed', props.memory)
   } catch {
     journalError.value = t('memory.journalSaveFailed')
   } finally {
     journalSaving.value = false
+  }
+}
+
+function handleJournalLiveStatus(status: string) {
+  journalLiveStatus.value = status
+  if (status !== 'saved' || !journalLiveSession.value) return
+  journalOverride.value = {
+    memoryId: props.memory.id,
+    markdown: journalDraft.value,
+    updatedAt: new Date().toISOString()
   }
 }
 
@@ -1544,7 +1565,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                 <p>
                   {{
                     t('memory.journalUpdated', {
-                      date: props.journal ? formatDate(props.journal.updatedAt) : '-'
+                      date: displayedJournal ? formatDate(displayedJournal.updatedAt) : '-'
                     })
                   }}
                 </p>
@@ -1619,7 +1640,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
                   :playlists="visiblePlaylists"
                   :child-memories="childMemories"
                   :placeholder="t('memory.journalPlaceholder')"
-                  @status="journalLiveStatus = $event"
+                  @status="handleJournalLiveStatus"
                   @error="journalError = $event"
                   @fallback="fallbackToRestJournalEditor"
                   @media-trigger="openMediaPicker"
