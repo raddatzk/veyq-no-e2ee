@@ -264,16 +264,16 @@ describe('MemoryJournalLiveEditor', () => {
     const onMedia = vi.fn()
     const onEmbed = vi.fn()
     const source = createJournalEmbedTypeCompletionSource({
-      media: true,
-      chapter: true,
-      playlist: true,
-      track: true,
-      labels: {
+      media: () => true,
+      chapter: () => true,
+      playlist: () => true,
+      track: () => true,
+      labels: () => ({
         media: 'Medium',
         chapter: 'Kapitel',
         playlist: 'Playlist',
         track: 'Track'
-      },
+      }),
       onMedia,
       onEmbed
     })
@@ -299,24 +299,113 @@ describe('MemoryJournalLiveEditor', () => {
     expect(onEmbed).toHaveBeenCalledWith({ start: 0, end: 2, kind: 'track' })
   })
 
+  it('navigates the native type completion with arrow keys', async () => {
+    const wrapper = mount(MemoryJournalLiveEditor, {
+      attachTo: document.body,
+      props: {
+        modelValue: '',
+        session: liveSession(),
+        media: [{} as never],
+        childMemories: [],
+        playlists: [],
+        tracks: [
+          track({ id: 'track-1', title: 'Summit Route', distanceMeters: 1200 })
+        ]
+      }
+    })
+    await nextTick()
+
+    wrapper.vm.insertMarkdown('::')
+    await nextTick()
+    await vi.waitFor(() => {
+      expect(document.querySelector('.cm-tooltip-autocomplete')).not.toBeNull()
+    })
+
+    const options = () => Array.from(document.querySelectorAll<HTMLElement>('.cm-tooltip-autocomplete li'))
+    expect(options().map((option) => option.textContent?.trim())).toEqual(['Medium', 'Track'])
+    expect(options()[0].getAttribute('aria-selected')).toBe('true')
+
+    document.querySelector<HTMLElement>('.cm-content')?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })
+    )
+    await nextTick()
+
+    expect(options()[0].getAttribute('aria-selected')).not.toBe('true')
+    expect(options()[1].getAttribute('aria-selected')).toBe('true')
+
+    wrapper.unmount()
+  })
+
   it('keeps canonical type prefixes searchable when completion labels are localized', () => {
     const source = createJournalEmbedTypeCompletionSource({
-      media: true,
-      chapter: true,
-      playlist: true,
-      track: true,
-      labels: {
+      media: () => true,
+      chapter: () => true,
+      playlist: () => true,
+      track: () => true,
+      labels: () => ({
         media: 'Medium',
         chapter: 'Kapitel',
         playlist: 'Playlist',
         track: 'Track'
-      },
+      }),
       onMedia: vi.fn(),
       onEmbed: vi.fn()
     })
     const result = source(new CompletionContext(EditorState.create({ doc: '::c' }), 3, false))
 
     expect(result?.options.map((option) => option.label)).toEqual(['Kapitel'])
+  })
+
+  it('keeps native type completion results reusable across repeated queries', () => {
+    const source = createJournalEmbedTypeCompletionSource({
+      media: () => true,
+      chapter: () => false,
+      playlist: () => false,
+      track: () => true,
+      labels: () => ({
+        media: 'Medium',
+        chapter: 'Kapitel',
+        playlist: 'Playlist',
+        track: 'Track'
+      }),
+      onMedia: vi.fn(),
+      onEmbed: vi.fn()
+    })
+    const state = EditorState.create({ doc: '::' })
+    const first = source(new CompletionContext(state, 2, false))
+    const second = source(new CompletionContext(state, 2, false))
+
+    expect(first?.options[0]).toBe(second?.options[0])
+    expect(first?.options[1]).toBe(second?.options[1])
+    expect(first?.validFor).toEqual(/^::[A-Za-z]*$/)
+  })
+
+  it('reads native type completion availability without editor reconfiguration', () => {
+    let hasTrack = false
+    const source = createJournalEmbedTypeCompletionSource({
+      media: () => true,
+      chapter: () => false,
+      playlist: () => false,
+      track: () => hasTrack,
+      labels: () => ({
+        media: 'Medium',
+        chapter: 'Kapitel',
+        playlist: 'Playlist',
+        track: 'Track'
+      }),
+      onMedia: vi.fn(),
+      onEmbed: vi.fn()
+    })
+    const state = EditorState.create({ doc: '::' })
+
+    expect(source(new CompletionContext(state, 2, false))?.options.map((option) => option.label)).toEqual(['Medium'])
+
+    hasTrack = true
+
+    expect(source(new CompletionContext(state, 2, false))?.options.map((option) => option.label)).toEqual([
+      'Medium',
+      'Track'
+    ])
   })
 })
 

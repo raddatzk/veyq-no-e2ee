@@ -155,6 +155,11 @@
     background: color-mix(in srgb, var(--app-accent) 30%, transparent);
   }
 
+  .cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected="true"] {
+    background: color-mix(in srgb, var(--app-accent) 76%, var(--app-backdrop-strong)) !important;
+    color: var(--app-on-strong) !important;
+  }
+
   .public-share-header:not(.public-share-header-with-cover) {
     background: color-mix(in srgb, var(--app-surface) 86%, var(--app-accent) 14%);
   }
@@ -358,6 +363,10 @@
   .media-lightbox-metadata a,
   .media-lightbox-stage a {
     color: var(--app-success);
+  }
+
+  .memory-journal-rendered .media-lightbox-actions a.lightbox-icon-button {
+    color: var(--app-text);
   }
 
   .asset-batch-form button {

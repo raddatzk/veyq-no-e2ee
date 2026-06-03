@@ -50,7 +50,7 @@ acceptanceCriteria:
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
   - id: memory.journal-markdown.ui-rendering
-    statement: UI renders Markdown headings, media embeds and carousel embeds.
+    statement: UI renders Markdown headings, media embeds, carousel embeds and track map embeds.
     coverage:
       frontend:
         unit:
@@ -58,6 +58,9 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
           - testName: renders chapter playlist and track journal embeds with double colon syntax
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens journal media in a lightbox and synchronizes carousel navigation
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
         integration:
@@ -128,7 +131,16 @@ acceptanceCriteria:
           - testName: opens the native type completion for the double colon trigger
             kind: positive
             ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: navigates the native type completion with arrow keys
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
           - testName: keeps canonical type prefixes searchable when completion labels are localized
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: keeps native type completion results reusable across repeated queries
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: reads native type completion availability without editor reconfiguration
             kind: positive
             ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
           - testName: opens the media picker from an existing carousel tag with media order preserved

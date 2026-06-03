@@ -851,6 +851,27 @@
   font-size: 0.78rem;
 }
 
+.track-map-reset {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 500;
+  min-height: 1.9rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--app-surface) 94%, transparent);
+  box-shadow: var(--app-shadow-sm);
+  color: var(--app-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.track-map-reset:hover {
+  background: var(--app-hover);
+}
+
 .track-map-consent button {
   flex: 0 0 auto;
   min-height: 1.9rem;
@@ -1740,13 +1761,14 @@
   padding: 0.45rem 0.65rem;
 }
 
-.cm-tooltip-autocomplete ul li[aria-selected] {
-  background: var(--memory-active-surface);
-  color: var(--app-text);
+.cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected="true"] {
+  background: var(--app-accent) !important;
+  color: var(--app-on-strong) !important;
 }
 
-.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionIcon {
-  color: var(--app-accent);
+.cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected="true"] .cm-completionIcon,
+.cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected="true"] .cm-completionLabel {
+  color: currentColor !important;
 }
 
 .cm-tooltip-autocomplete .cm-completionIcon {
@@ -1947,8 +1969,13 @@
   font-weight: 650;
 }
 
+.memory-journal-rendered .media-lightbox-actions a.lightbox-icon-button {
+  color: var(--app-text);
+}
+
 .memory-journal-media,
-.memory-journal-carousel {
+.memory-journal-carousel,
+.memory-journal-track {
   display: grid;
   gap: 0.5rem;
   margin: 1.1rem 0;
@@ -1965,14 +1992,82 @@
   object-fit: contain;
 }
 
+.memory-journal-media-lightbox-trigger {
+  display: inline-grid;
+  justify-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.memory-journal-media-lightbox-trigger:focus-visible {
+  outline: 3px solid var(--app-focus);
+  outline-offset: 3px;
+}
+
 .memory-journal-media figcaption,
-.memory-journal-carousel figcaption {
+.memory-journal-carousel figcaption,
+.memory-journal-track figcaption {
   color: var(--app-muted);
   font-size: 0.9rem;
 }
 
-.memory-journal-carousel {
+.memory-journal-carousel,
+.memory-journal-track {
   max-width: 760px;
+}
+
+.memory-journal-track {
+  overflow: hidden;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+}
+
+.memory-journal-track .track-map {
+  min-height: 240px;
+}
+
+.memory-journal-track-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.memory-journal-track-heading {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.memory-journal-track-heading span {
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.memory-journal-track-heading small,
+.memory-journal-track-missing {
+  color: var(--app-muted);
+}
+
+.memory-journal-track-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.memory-journal-track-stats dt {
+  color: var(--app-muted);
+  font-size: 0.75rem;
+}
+
+.memory-journal-track-stats dd {
+  margin: 0;
+  color: var(--app-text);
+  font-weight: 700;
 }
 
 .memory-journal-carousel-frame {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
+import { autocompletion } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { Compartment, EditorState, RangeSetBuilder, Transaction } from '@codemirror/state'
+import { EditorState, RangeSetBuilder, Transaction } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -74,7 +74,6 @@ let fallbackTimer: number | null = null
 let savedStatusTimer: number | null = null
 let lastMediaTriggerPosition: number | null = null
 let lastJournalEmbedTriggerPosition: number | null = null
-let autocompleteCompartment: Compartment | null = null
 let pendingJournalEmbedDeleteRange: { start: number; end: number } | null = null
 
 const providerUrl = computed(() => {
@@ -98,19 +97,6 @@ watch(
   () => {
     stopEditor()
     void nextTick(startEditor)
-  }
-)
-
-watch(
-  () => [
-    locale.value,
-    props.media.length,
-    props.childMemories.length,
-    props.playlists?.length ?? 0,
-    props.tracks?.length ?? 0
-  ],
-  () => {
-    reconfigureJournalEmbedAutocomplete()
   }
 )
 
@@ -170,7 +156,6 @@ function startEditor() {
     emit('fallback')
   })
 
-  autocompleteCompartment = new Compartment()
   const state = EditorState.create({
     extensions: [
       history(),
@@ -179,13 +164,12 @@ function startEditor() {
       keymap.of([
         { key: 'Backspace', run: handleJournalEmbedBackspace },
         { key: 'Delete', run: handleJournalEmbedDelete },
-        ...completionKeymap,
         ...defaultKeymap,
         ...historyKeymap
       ]),
       EditorView.lineWrapping,
       yCollab(yText, awareness),
-      autocompleteCompartment.of(journalEmbedAutocompleteExtension()),
+      journalEmbedAutocompleteExtension(),
       mediaTagEditExtension(
         (range) => emit('media-tag-edit', range),
         (range) => emit('embed-tag-edit', range),
@@ -243,7 +227,6 @@ function stopEditor() {
   provider = null
   view?.destroy()
   view = null
-  autocompleteCompartment = null
   yDocument?.destroy()
   yDocument = null
   yText = null
@@ -253,27 +236,21 @@ function stopEditor() {
 function journalEmbedAutocompleteExtension() {
   return autocompletion({
     activateOnTyping: true,
+    interactionDelay: 0,
     override: [createJournalEmbedTypeCompletionSource({
-      media: props.media.length > 0,
-      chapter: props.childMemories.length > 0,
-      playlist: Boolean(props.playlists?.length),
-      track: Boolean(props.tracks?.length),
-      labels: {
+      media: () => props.media.length > 0,
+      chapter: () => props.childMemories.length > 0,
+      playlist: () => Boolean(props.playlists?.length),
+      track: () => Boolean(props.tracks?.length),
+      labels: () => ({
         media: t('memory.journalHelpMedia'),
         chapter: t('memory.journalHelpMemory'),
         playlist: t('memory.journalHelpPlaylist'),
         track: t('memory.journalHelpTrack')
-      },
+      }),
       onMedia: (range) => emit('media-trigger', range),
       onEmbed: (range) => emit('embed-trigger', range)
     })]
-  })
-}
-
-function reconfigureJournalEmbedAutocomplete() {
-  if (!view || !autocompleteCompartment) return
-  view.dispatch({
-    effects: autocompleteCompartment.reconfigure(journalEmbedAutocompleteExtension())
   })
 }
 
