@@ -45,6 +45,12 @@ acceptanceCriteria:
           - testName: renders a Leaflet polyline using latitude longitude positions
             kind: positive
             ref: frontend/src/features/memories/components/TrackMap.test.ts
+          - testName: renders selected tracks and memory photos on the map while reset fits the tracks
+            kind: positive
+            ref: frontend/src/features/memories/components/TrackMap.test.ts
+          - testName: groups nearby memory photos as clickable map markers
+            kind: positive
+            ref: frontend/src/features/memories/components/TrackMap.test.ts
           - testName: enables direct scroll wheel touch and control zooming
             kind: positive
             ref: frontend/src/features/memories/components/TrackMap.test.ts

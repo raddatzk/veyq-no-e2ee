@@ -249,7 +249,7 @@ const embedPickerOpen = ref(false)
 const embedPickerKind = ref<JournalEmbedKind>('chapter')
 const embedPickerLabel = ref('')
 const embedPickerLabelEdited = ref(false)
-const selectedJournalEmbedId = ref('')
+const selectedJournalEmbedIds = ref<string[]>([])
 const embedInsertRange = ref<JournalEmbedRange | null>(null)
 const lastJournalEmbedTriggerPosition = ref<number | null>(null)
 const galleryDropActive = ref(false)
@@ -1035,10 +1035,8 @@ function openJournalEmbedPicker(kind: JournalEmbedKind, range?: JournalEmbedRang
   embedInsertRange.value =
     existingRange ?? (journalLiveEditor.value ? null : currentTextareaRange(activeKind))
   const options = journalEmbedOptions(activeKind)
-  selectedJournalEmbedId.value =
-    existingRange?.targetId && options.some((item) => item.id === existingRange.targetId)
-      ? existingRange.targetId
-      : ''
+  const existingIds = existingRange?.targetIds ?? (existingRange?.targetId ? [existingRange.targetId] : [])
+  selectedJournalEmbedIds.value = existingIds.filter((id) => options.some((item) => item.id === id))
   embedPickerLabel.value = existingRange?.label ?? ''
   embedPickerLabelEdited.value = Boolean(existingRange?.label)
   if (!embedPickerLabelEdited.value) syncJournalEmbedPickerLabel()
@@ -1056,7 +1054,7 @@ function closeMediaPicker() {
 
 function closeJournalEmbedPicker() {
   embedPickerOpen.value = false
-  selectedJournalEmbedId.value = ''
+  selectedJournalEmbedIds.value = []
   embedPickerLabel.value = ''
   embedPickerLabelEdited.value = false
   embedInsertRange.value = null
@@ -1098,15 +1096,29 @@ function syncMediaPickerCaption() {
 }
 
 function selectJournalEmbed(itemId: string) {
-  selectedJournalEmbedId.value = itemId
+  if (embedPickerKind.value === 'track') {
+    selectedJournalEmbedIds.value = selectedJournalEmbedIds.value.includes(itemId)
+      ? selectedJournalEmbedIds.value.filter((id) => id !== itemId)
+      : [...selectedJournalEmbedIds.value, itemId]
+  } else {
+    selectedJournalEmbedIds.value = [itemId]
+  }
   syncJournalEmbedPickerLabel()
 }
 
 function syncJournalEmbedPickerLabel() {
   if (embedPickerLabelEdited.value) return
-  embedPickerLabel.value =
-    journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title ||
-    ''
+  if (selectedJournalEmbedIds.value.length === 1) {
+    embedPickerLabel.value =
+      journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedIds.value[0])?.title ||
+      ''
+  } else if (selectedJournalEmbedIds.value.length > 1) {
+    embedPickerLabel.value = t('memory.journalTrackSelectionTitle', {
+      count: selectedJournalEmbedIds.value.length
+    })
+  } else {
+    embedPickerLabel.value = ''
+  }
 }
 
 function insertSelectedJournalMedia() {
@@ -1151,15 +1163,15 @@ function deleteSelectedJournalMediaEmbed() {
 }
 
 function insertSelectedJournalEmbed() {
-  if (!selectedJournalEmbedId.value) return
+  if (selectedJournalEmbedIds.value.length === 0) return
   const range = embedInsertRange.value ?? currentTextareaRange(embedPickerKind.value)
   const fallbackLabel =
-    journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedId.value)?.title ||
+    journalEmbedPickerItems.value.find((item) => item.id === selectedJournalEmbedIds.value[0])?.title ||
     t(`memory.journalEmbedPicker.${embedPickerKind.value}.fallbackLabel`)
   const label = embedPickerLabel.value.trim() || fallbackLabel
   const markdown = journalEmbedMarkdown(
     embedPickerKind.value,
-    [selectedJournalEmbedId.value],
+    selectedJournalEmbedIds.value,
     label
   )
   if (journalLiveEditor.value) {
@@ -1683,6 +1695,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
               <div v-if="!journalLiveSession" class="memory-journal-preview">
                 <JournalRenderer
                   v-if="journalDraft.trim()"
+                  :tenant-name="tenantName"
                   :markdown="journalDraft"
                   :media="visibleMedia"
                   :tracks="visibleTracks"
@@ -1716,6 +1729,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
 
             <JournalRenderer
               v-else-if="journalHasContent"
+              :tenant-name="tenantName"
               :markdown="journalMarkdown"
               :media="visibleMedia"
               :tracks="visibleTracks"
@@ -1925,8 +1939,9 @@ function handleJournalDoubleClick(event: MouseEvent) {
       :field-label="t('memory.journalEmbedLabel')"
       :embed-label="embedPickerLabel"
       :label-placeholder="t('memory.journalEmbedLabelPlaceholder')"
-      :selected-id="selectedJournalEmbedId"
+      :selected-ids="selectedJournalEmbedIds"
       :items="journalEmbedPickerItems"
+      :multiple="embedPickerKind === 'track'"
       :can-delete="canDeleteCurrentJournalEmbed"
       @update:embed-label="embedPickerLabel = $event"
       @label-input="embedPickerLabelEdited = true"

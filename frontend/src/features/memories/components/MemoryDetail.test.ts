@@ -1,6 +1,6 @@
 import { config, flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia, MemoryMediaBucket } from '../api'
+import type { Memory, MemoryHeader, MemoryJournal, MemoryMedia, MemoryMediaBucket, MemoryTrack } from '../api'
 import MemoryDetail from './MemoryDetail.vue'
 
 const apiMocks = vi.hoisted(() => ({
@@ -637,6 +637,37 @@ describe('MemoryDetail', () => {
     expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('0')
   })
 
+  it('opens journal media in a lightbox and synchronizes carousel navigation', async () => {
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal({ markdown: '::media:media-1,media-2 Trip set' }),
+        childMemories: [],
+        media: [media(), media({ id: 'media-2', title: 'Second upload' })]
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.p-carousel-next-button').trigger('click')
+    expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('1')
+
+    await wrapper.find('.memory-journal-media-lightbox-trigger').trigger('click')
+
+    const lightbox = wrapper.findComponent({ name: 'MediaLightbox' })
+    expect(lightbox.props('media')).toEqual(expect.objectContaining({ id: 'media-2' }))
+    expect(lightbox.props('selectedIndex')).toBe(1)
+
+    lightbox.vm.$emit('previous')
+    await flushPromises()
+
+    expect(wrapper.find('.p-carousel').attributes('data-page')).toBe('0')
+    expect(wrapper.findComponent({ name: 'MediaLightbox' }).props('media')).toEqual(
+      expect.objectContaining({ id: 'media-1' })
+    )
+  })
+
   it('renders chapter playlist and track journal embeds with double colon syntax', async () => {
     const wrapper = mount(MemoryDetail, {
       props: {
@@ -651,7 +682,7 @@ describe('MemoryDetail', () => {
           ].join('\n\n')
         }),
         childMemories: [memory({ id: 'chapter-1', displayName: 'Day 2', path: '/trip/day-2' })],
-        media: [],
+        media: [media({ gpsLatitude: 52.515, gpsLongitude: 13.4 })],
         playlists: [
           {
             id: 'playlist-1',
@@ -666,20 +697,16 @@ describe('MemoryDetail', () => {
           }
         ],
         tracks: [
-          {
-            id: 'track-1',
-            memoryId: 'mem-1',
-            title: 'Summit Route',
-            activityType: 'HIKING',
-            originalFilename: 'summit.gpx',
-            distanceMeters: 1200,
-            pointCount: 3,
-            bounds: { minLatitude: 0, minLongitude: 0, maxLatitude: 1, maxLongitude: 1 },
-            geometry: { type: 'LineString', coordinates: [] },
-            contentUrl: '/api/tenant/memories/mem-1/tracks/track-1/content',
-            createdAt: '2026-05-24T16:30:00Z',
-            updatedAt: '2026-05-24T16:30:00Z'
-          }
+          track(),
+          track({
+            id: 'track-2',
+            title: 'Valley Route',
+            distanceMeters: 800,
+            ascentMeters: 40,
+            descentMeters: 50,
+            startedAt: '2026-05-03T10:00:00Z',
+            endedAt: '2026-05-03T10:30:00Z'
+          })
         ]
       },
       global: { stubs: detailStubs() }
@@ -697,8 +724,15 @@ describe('MemoryDetail', () => {
     expect(playlistLink.attributes('target')).toBe('_blank')
     expect(playlistLink.attributes('rel')).toBe('noreferrer')
     expect(playlistLink.attributes('aria-label')).toBe('Beim Anbieter öffnen')
-    expect(wrapper.findAll('.memory-journal-context')[1].text()).toContain('Route')
-    expect(wrapper.findAll('.memory-journal-context')[1].text()).toContain('1.2 km')
+    expect(wrapper.find('.memory-journal-track').text()).toContain('Route')
+    expect(wrapper.find('.memory-journal-track').text()).toContain('Distanz')
+    expect(wrapper.find('.memory-journal-track').text()).toContain('1.2 km')
+    expect(wrapper.findComponent({ name: 'TrackMap' }).props('tracks')).toEqual([
+      expect.objectContaining({ id: 'track-1' })
+    ])
+    expect(wrapper.findComponent({ name: 'TrackMap' }).props('media')).toEqual([
+      expect.objectContaining({ id: 'media-1' })
+    ])
   })
 
   it('emits changed after saving the journal', async () => {
@@ -866,22 +900,7 @@ describe('MemoryDetail', () => {
             updatedAt: '2026-05-24T16:30:00Z'
           }
         ],
-        tracks: [
-          {
-            id: 'track-1',
-            memoryId: 'mem-1',
-            title: 'Summit Route',
-            activityType: 'HIKING',
-            originalFilename: 'summit.gpx',
-            distanceMeters: 1200,
-            pointCount: 3,
-            bounds: { minLatitude: 0, minLongitude: 0, maxLatitude: 1, maxLongitude: 1 },
-            geometry: { type: 'LineString', coordinates: [] },
-            contentUrl: '/api/tenant/memories/mem-1/tracks/track-1/content',
-            createdAt: '2026-05-24T16:30:00Z',
-            updatedAt: '2026-05-24T16:30:00Z'
-          }
-        ]
+        tracks: [track(), track({ id: 'track-2', title: 'Valley Route' })]
       },
       global: { stubs: detailStubs() }
     })
@@ -910,10 +929,11 @@ describe('MemoryDetail', () => {
       (textarea.element as HTMLTextAreaElement).value.length
     )
     await findButton(wrapper, 'Track einfügen').trigger('click')
-    await wrapper.find('.memory-journal-embed-option').trigger('click')
+    await wrapper.findAll('.memory-journal-embed-option')[0].trigger('click')
+    await wrapper.findAll('.memory-journal-embed-option')[1].trigger('click')
     await findButton(wrapper, 'Track einfügen', 1).trigger('click')
     expect((textarea.element as HTMLTextAreaElement).value).toBe(
-      '::chapter:chapter-1 Day 2::playlist:playlist-1 Roadtrip Mix::track:track-1 Summit Route'
+      '::chapter:chapter-1 Day 2::playlist:playlist-1 Roadtrip Mix::track:track-1,track-2 2 Tracks'
     )
   })
 
@@ -1319,6 +1339,17 @@ function detailStubs() {
       props: ['media', 'tracks'],
       template: '<div />'
     },
+    TrackMap: {
+      name: 'TrackMap',
+      props: ['track', 'tracks', 'media'],
+      template: '<div class="track-map" />'
+    },
+    MediaLightbox: {
+      name: 'MediaLightbox',
+      props: ['media', 'mediaItems', 'selectedIndex'],
+      emits: ['close', 'previous', 'next'],
+      template: '<div class="media-lightbox" />'
+    },
     MemoryCard: { template: '<article />' },
     MemoryJournalLiveEditor: {
       name: 'MemoryJournalLiveEditor',
@@ -1468,6 +1499,35 @@ function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBuc
     uploader: { type: 'USER', displayName: 'Kevin', userId: 1 },
     canManage: true,
     mediaCount: 0,
+    createdAt: '2026-05-24T16:30:00Z',
+    updatedAt: '2026-05-24T16:30:00Z',
+    ...overrides
+  }
+}
+
+function track(overrides: Partial<MemoryTrack> = {}): MemoryTrack {
+  return {
+    id: 'track-1',
+    memoryId: 'mem-1',
+    title: 'Summit Route',
+    activityType: 'HIKING',
+    originalFilename: 'summit.gpx',
+    distanceMeters: 1200,
+    ascentMeters: 80,
+    descentMeters: 30,
+    pointCount: 3,
+    startedAt: '2026-05-03T08:00:00Z',
+    endedAt: '2026-05-03T09:00:00Z',
+    bounds: { minLatitude: 0, minLongitude: 0, maxLatitude: 1, maxLongitude: 1 },
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [0, 0],
+        [1, 1],
+        [2, 2]
+      ]
+    },
+    contentUrl: '/api/tenant/memories/mem-1/tracks/track-1/content',
     createdAt: '2026-05-24T16:30:00Z',
     updatedAt: '2026-05-24T16:30:00Z',
     ...overrides

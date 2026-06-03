@@ -1243,6 +1243,20 @@ class MemoryServiceTest {
                 entityManager.flush()
             }
         }
+        val secondTrack = inTransaction {
+            MemoryTrack().also {
+                it.tenant = tenant
+                it.memory = memoryRepo.findByTenantAndPublicId(tenant, trip.id)!!
+                it.scopeType = LibraryScopeType.Tenant
+                it.title = "Valley Route"
+                it.activityType = MemoryTrackActivityType.WALKING
+                it.originalFilename = "valley.gpx"
+                it.storageKey = "test/$runId/valley.gpx"
+                it.geometryJson = """{"type":"LineString","coordinates":[]}"""
+                entityManager.persist(it)
+                entityManager.flush()
+            }
+        }
 
         val empty = memoryJournalService.getJournal(memory(trip.id))
         assertThat(empty.memoryId).isEqualTo(trip.id)
@@ -1257,7 +1271,7 @@ class MemoryServiceTest {
             ::media:${media.publicId},${secondMedia.publicId} Carousel
             ::chapter:${day.id} Day One
             ::playlist:${playlist.id} Roadtrip
-            ::track:${track.publicId} Route
+            ::track:${track.publicId},${secondTrack.publicId} Route
             """.trimIndent(),
             MemoryJournalService.JournalValidationContext(memory(trip.id)),
         )
@@ -1265,6 +1279,7 @@ class MemoryServiceTest {
         assertThat(updated.memoryId).isEqualTo(trip.id)
         assertThat(updated.markdown).contains("::media:${media.publicId}")
         assertThat(updated.markdown).contains("::media:${media.publicId},${secondMedia.publicId}")
+        assertThat(updated.markdown).contains("::track:${track.publicId},${secondTrack.publicId}")
         assertThat(memoryJournalService.getJournal(memory(trip.id)).markdown).isEqualTo(updated.markdown)
     }
 

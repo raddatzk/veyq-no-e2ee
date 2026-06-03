@@ -21,8 +21,9 @@ const props = defineProps<{
   fieldLabel: string
   embedLabel: string
   labelPlaceholder: string
-  selectedId: string
+  selectedIds: string[]
   items: JournalEmbedPickerItem[]
+  multiple?: boolean
   canDelete?: boolean
 }>()
 
@@ -69,7 +70,7 @@ const dialogVisible = computed({
           :key="item.id"
           type="button"
           class="memory-journal-embed-option"
-          :class="{ 'memory-journal-embed-option-selected': selectedId === item.id }"
+          :class="{ 'memory-journal-embed-option-selected': selectedIds.includes(item.id) }"
           @click="$emit('select', item.id)"
         >
           <span class="memory-journal-embed-option-icon">
@@ -80,7 +81,7 @@ const dialogVisible = computed({
             <small v-if="item.meta">{{ item.meta }}</small>
           </span>
           <span class="memory-journal-embed-option-check">
-            <span v-if="selectedId === item.id" class="pi pi-check" />
+            <span v-if="selectedIds.includes(item.id)" class="pi pi-check" />
           </span>
         </button>
       </div>
@@ -110,7 +111,7 @@ const dialogVisible = computed({
         <Button
           icon="pi pi-check"
           :label="confirmLabel"
-          :disabled="!selectedId"
+          :disabled="selectedIds.length === 0"
           @click="$emit('confirm')"
         />
       </div>

@@ -65,7 +65,7 @@ describe('MediaLightbox', () => {
     expect(wrapper.find('.media-lightbox-stage img').attributes('src')).toBe('/api/tenant/media/media-1/preview')
   })
 
-  it('disables highlighting and shows a shortcut hint when highlighting is not allowed', async () => {
+  it('hides highlighting and shows a shortcut hint when highlighting is not allowed', async () => {
     vi.useFakeTimers()
     const updateHighlight = vi.fn()
     const wrapper = mount(MediaLightbox, {
@@ -84,7 +84,7 @@ describe('MediaLightbox', () => {
       }
     })
 
-    expect(wrapper.find('.lightbox-star-button').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.lightbox-star-button').exists()).toBe(false)
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
     await flushPromises()
@@ -148,6 +148,54 @@ describe('MediaLightbox', () => {
     expect(wrapper.emitted('next')).toHaveLength(1)
     expect(wrapper.find('.media-original-fullscreen').exists()).toBe(true)
     expect(wrapper.find('.media-original-fullscreen img').attributes('src')).toBe('/api/tenant/media/media-2/content')
+  })
+
+  it('emits navigation and close from keyboard shortcuts', async () => {
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media(),
+        canShowPrevious: true,
+        canShowNext: true
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(wrapper.emitted('next')).toHaveLength(1)
+    expect(wrapper.emitted('previous')).toHaveLength(1)
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
+  it('does not emit unavailable keyboard navigation', async () => {
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media(),
+        canShowPrevious: false,
+        canShowNext: false
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    await flushPromises()
+
+    expect(wrapper.emitted('next')).toBeUndefined()
+    expect(wrapper.emitted('previous')).toBeUndefined()
   })
 
   it('preloads current previous two and next five media with adaptive image and video poster sources', async () => {

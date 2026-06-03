@@ -13,6 +13,7 @@ export type JournalEmbedRange = {
   kind: JournalEmbedKind
   label?: string
   targetId?: string
+  targetIds?: string[]
   mediaIds?: string[]
 }
 
@@ -87,9 +88,13 @@ export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
       const end = start + match[0].length
       if (kind === 'media') {
         const mediaIds = target.split(',').map((id) => id.trim()).filter(Boolean)
-        return { start, end, kind, label, targetId: mediaIds[0], mediaIds }
+        return { start, end, kind, label, targetId: mediaIds[0], targetIds: mediaIds, mediaIds }
       }
-      return { start, end, kind, label, targetId: target }
+      if (kind === 'track') {
+        const trackIds = target.split(',').map((id) => id.trim()).filter(Boolean)
+        return { start, end, kind, label, targetId: trackIds[0], targetIds: trackIds }
+      }
+      return { start, end, kind, label, targetId: target, targetIds: [target] }
     })
     .filter((range) => range.kind !== 'media' || (range.mediaIds?.length ?? 0) > 0)
     .filter((range) => range.kind === 'media' || Boolean(range.targetId))

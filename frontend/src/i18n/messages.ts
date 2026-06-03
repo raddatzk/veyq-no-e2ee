@@ -231,7 +231,7 @@ export const messages = {
         },
         track: {
           title: 'Track einfügen',
-          copy: 'Wähle einen Track dieser Memory aus.',
+          copy: 'Wähle einen oder mehrere Tracks dieser Memory aus.',
           empty: 'Diese Memory hat noch keine Tracks.',
           confirm: 'Track einfügen',
           fallbackLabel: 'Track'
@@ -266,6 +266,8 @@ export const messages = {
       journalPlaceholder: 'Schreibe die Geschichte dieser Memory...',
       journalSaveFailed: 'Journal konnte nicht gespeichert werden',
       journalStart: 'Journal starten',
+      journalTrackMissingCount: '{count} Tracks nicht verfügbar',
+      journalTrackSelectionTitle: '{count} Tracks',
       journalUpdated: 'Zuletzt aktualisiert: {date}',
       loadFailed: 'Memory konnte nicht geladen werden',
       loading: 'Memories werden geladen...',
@@ -417,6 +419,7 @@ export const messages = {
       externalTilesCopy:
         'Für Kartenkacheln werden Daten von OpenStreetMap abgerufen. Deine Entscheidung wird in diesem Browser global für veyq gespeichert.',
       externalTilesTitle: 'Externe Kartenkacheln sind deaktiviert',
+      resetView: 'Zurücksetzen',
       title: 'Karte'
     },
     context: {
@@ -1295,7 +1298,7 @@ export const messages = {
         },
         track: {
           title: 'Insert track',
-          copy: 'Choose a track from this Memory.',
+          copy: 'Choose one or more tracks from this Memory.',
           empty: 'This Memory has no tracks yet.',
           confirm: 'Insert track',
           fallbackLabel: 'Track'
@@ -1330,6 +1333,8 @@ export const messages = {
       journalPlaceholder: 'Write the story of this Memory...',
       journalSaveFailed: 'Journal could not be saved',
       journalStart: 'Start journal',
+      journalTrackMissingCount: '{count} tracks unavailable',
+      journalTrackSelectionTitle: '{count} tracks',
       journalUpdated: 'Last updated: {date}',
       loadFailed: 'Memory could not be loaded',
       loading: 'Loading Memories...',
@@ -1481,6 +1486,7 @@ export const messages = {
       externalTilesCopy:
         'Map tiles are loaded from OpenStreetMap. Your choice is saved globally for veyq in this browser.',
       externalTilesTitle: 'External map tiles are disabled',
+      resetView: 'Reset',
       title: 'Map'
     },
     context: {

@@ -93,7 +93,7 @@ acceptanceCriteria:
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
       frontend:
         unit:
-          - testName: disables highlighting and shows a shortcut hint when highlighting is not allowed
+          - testName: hides highlighting and shows a shortcut hint when highlighting is not allowed
             kind: negative
             ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: disables lightbox highlighting when a media bucket is missing from the provided bucket list

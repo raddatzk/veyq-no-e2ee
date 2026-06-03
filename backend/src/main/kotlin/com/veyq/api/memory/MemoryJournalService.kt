@@ -193,7 +193,19 @@ class MemoryJournalService @Inject constructor(
         if (!allowed) throw NotFoundException("Media not found")
     }
 
-    private fun validateTrackEmbed(trackId: String, context: JournalValidationContext) {
+    private fun validateTrackEmbed(target: String, context: JournalValidationContext) {
+        val trackIds = target.split(',')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        if (trackIds.isEmpty()) {
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+        }
+        trackIds.forEach { trackId ->
+            validateSingleTrackEmbed(trackId, context)
+        }
+    }
+
+    private fun validateSingleTrackEmbed(trackId: String, context: JournalValidationContext) {
         val track = trackRepo.findByTenantAndPublicId(context.memory.tenant, trackId)
             ?: throw NotFoundException("Track not found")
         val allowed = if (context.allowShareSubtreeMedia) {

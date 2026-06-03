@@ -338,9 +338,30 @@ function handleViewportResize() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key.toLowerCase() !== 'f') return
   if (event.metaKey || event.ctrlKey || event.altKey) return
   if (isTypingTarget(event.target)) return
+
+  if (event.key === 'ArrowLeft') {
+    if (!props.canShowPrevious) return
+    event.preventDefault()
+    emit('previous')
+    return
+  }
+
+  if (event.key === 'ArrowRight') {
+    if (!props.canShowNext) return
+    event.preventDefault()
+    emit('next')
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+    return
+  }
+
+  if (event.key.toLowerCase() !== 'f') return
   if (isSaving.value) return
 
   event.preventDefault()
@@ -511,6 +532,7 @@ function onSheetPointerUp(event: PointerEvent) {
           <span class="pi pi-download" />
         </a>
         <Button
+          v-if="canHighlightMedia"
           type="button"
           class="veyq-icon-button veyq-prime-icon-button lightbox-star-button"
           :class="{ 'lightbox-star-button-active': isHighlighted }"

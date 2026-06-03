@@ -52,6 +52,9 @@ acceptanceCriteria:
           - testName: renders thumbnails in the grid instead of originals
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: renders media after a hidden gallery tab becomes measurable
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
   - id: memory.media.lightbox-original-download
     statement: The lightbox can open previews/originals and provide original download links.
     coverage:
@@ -65,6 +68,15 @@ acceptanceCriteria:
             ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: keeps fullscreen open and emits navigation from fullscreen controls
             kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: emits navigation and close from keyboard shortcuts
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: does not emit unavailable keyboard navigation
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: hides highlighting and shows a shortcut hint when highlighting is not allowed
+            kind: negative
             ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: preloads current previous two and next five media with adaptive image and video poster sources
             kind: positive

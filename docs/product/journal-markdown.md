@@ -44,9 +44,10 @@ Canonical forms:
 ::chapter:<memoryId> Optional label
 ::playlist:<playlistId> Optional label
 ::track:<trackId> Optional label
+::track:<trackId1>,<trackId2> Optional label
 ```
 
-The supported `type` values are `media`, `chapter`, `playlist` and `track`. Media IDs are comma-separated; whitespace starts the optional caption. For chapter, playlist and track embeds, the first whitespace starts the optional display label. Commas are reserved as media ID separators.
+The supported `type` values are `media`, `chapter`, `playlist` and `track`. Media and track IDs may be comma-separated; whitespace starts the optional caption or display label. For chapter and playlist embeds, the first whitespace starts the optional display label.
 
 Legacy Markdown links and images with `veyq:` targets are not veyq embeds. They are preserved as ordinary Markdown text/link/image content and are not migrated.
 
@@ -90,6 +91,8 @@ Playlist embeds reference Memory playlist objects. If a referenced playlist is d
 
 Track embeds reference stored GPX tracks in the current Memory context. If a referenced track is deleted later, the journal Markdown is preserved and the renderer shows an unavailable embed.
 
+Multiple comma-separated track ids render as one map with all selected GPX routes. The UI adds distance, duration, ascent and descent across the selected tracks.
+
 ## Validation Rules
 
 The backend validates `::` veyq tokens when a journal is saved:
@@ -98,7 +101,7 @@ The backend validates `::` veyq tokens when a journal is saved:
 - Media embeds must point to visible media in the allowed Memory context. Carousel embeds validate every comma-separated media id.
 - Memory embeds must point to visible Memories in the allowed Memory context.
 - Stored playlist embeds must point to a visible playlist in the allowed Memory context.
-- Track embeds must point to a visible stored track in the allowed Memory context.
+- Track embeds must point to visible stored tracks in the allowed Memory context.
 - Journal Markdown must be present and may not exceed the backend size limit.
 
 Invalid or unauthorized references fail the save request. Existing journals are not partially updated.
