@@ -60,7 +60,7 @@ const emit = defineEmits<{
   openMemory: [memory: Memory]
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const editorHost = ref<HTMLElement | null>(null)
 const status = ref<JournalLiveStatus>('connecting')
 const collaborators = ref<Array<{ clientId: number; name: string; color: string }>>([])
