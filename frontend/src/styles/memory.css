@@ -2998,6 +2998,15 @@
   display: none;
 }
 
+.memory-upload-choose-label {
+  cursor: pointer;
+}
+
+.memory-upload-choose-label.p-disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
 .memory-upload-native-fallback {
   position: absolute;
   width: 1px;

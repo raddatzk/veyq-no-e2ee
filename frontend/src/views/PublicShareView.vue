@@ -15,6 +15,11 @@ import CreateMemoryDialog from '../features/memories/components/CreateMemoryDial
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import UploadStatusMenu from '../features/memories/components/UploadStatusMenu.vue'
 import { startUploadBatch, useUploadQueue } from '../features/memories/composables/useUploadQueue'
+import {
+  mediaFileAccept,
+  mediaFilesFromFileUploadSelectEvent,
+  mediaFilesFromList
+} from '../features/memories/composables/useMemoryMediaUpload'
 import PrivacySettingsPanel from '../features/settings/components/PrivacySettingsPanel.vue'
 import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../i18n'
 import { API_BASE } from '../shared/api/httpClient'
@@ -419,12 +424,12 @@ function handleMemoryDeleted(parentPath: string) {
 
 function selectUpload(event: FileUploadSelectEvent) {
   if (loading.value) return
-  selectedFiles.value = event.files
+  selectedFiles.value = mediaFilesFromFileUploadSelectEvent(event)
 }
 
 function selectUploadFallback(event: Event) {
   if (loading.value) return
-  selectedFiles.value = Array.from((event.target as HTMLInputElement).files || [])
+  selectedFiles.value = mediaFilesFromList((event.target as HTMLInputElement).files || [])
 }
 
 async function uploadToRoot() {
@@ -684,7 +689,7 @@ function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
         <FileUpload
           ref="uploadPicker"
           mode="basic"
-          accept="image/*,video/*"
+          :accept="mediaFileAccept"
           :choose-label="t('media.chooseFiles')"
           custom-upload
           multiple
@@ -697,7 +702,7 @@ function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
           class="memory-upload-native-fallback"
           type="file"
           multiple
-          accept="image/*,video/*"
+          :accept="mediaFileAccept"
           :disabled="loading"
           @change="selectUploadFallback"
         />

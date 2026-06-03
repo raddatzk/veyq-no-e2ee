@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload'
 import Message from 'primevue/message'
 import { getErrorMessage } from '../../../shared/utils/errors'
 import { type MemoryMedia, type UploadMediaOptions, type UploadMemoryMediaRequest } from '../api'
-import { mediaFilesFromList, startMemoryMediaUpload } from '../composables/useMemoryMediaUpload'
+import { mediaFileAccept, mediaFilesFromList, startMemoryMediaUpload } from '../composables/useMemoryMediaUpload'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{
@@ -29,7 +28,17 @@ const { t } = useI18n()
 const files = ref<File[]>([])
 const error = ref('')
 const loading = ref(false)
-const picker = ref<{ clear?: () => void } | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploadInputId = `memory-upload-${Math.random().toString(36).slice(2)}`
+const isTestMode = import.meta.env.MODE === 'test' || navigator.userAgent.includes('HappyDOM')
+const fileSelectionRetryDelays = isTestMode ? [5, 15, 25] : [75, 250, 750, 1500, 3000, 6000, 10000]
+const fileSelectionMinimumPreparationMs = isTestMode ? 25 : 6000
+const fileSelectionQuietMs = isTestMode ? 5 : 1200
+let fileSelectionToken = 0
+let fileSelectionTimers: number[] = []
+let fileSelectionBest: File[] = []
+let fileSelectionStartedAt = 0
+let fileSelectionLastChangedAt = 0
 
 watch(visible, (isVisible) => {
   if (!isVisible) return
@@ -37,33 +46,42 @@ watch(visible, (isVisible) => {
   error.value = ''
 })
 
+onBeforeUnmount(() => {
+  clearFileSelectionTimers()
+})
+
 function updateFiles(event: Event) {
   if (loading.value) return
   const input = event.target as HTMLInputElement
-  files.value = mediaFilesFromList(input.files || [])
-}
-
-function selectFiles(event: FileUploadSelectEvent) {
-  if (loading.value) return
-  files.value = mediaFilesFromList(event.files)
+  readFileSelection(input)
 }
 
 function clearFiles() {
   if (loading.value) return
+  clearFileSelectionTimers()
+  fileSelectionBest = []
+  fileSelectionStartedAt = 0
+  fileSelectionLastChangedAt = 0
   files.value = []
-  picker.value?.clear?.()
+  if (fileInput.value) fileInput.value.value = ''
 }
 
 function removeFile(index: number) {
   if (loading.value) return
+  clearFileSelectionTimers()
   files.value = files.value.filter((_, fileIndex) => fileIndex !== index)
-  if (files.value.length === 0) picker.value?.clear?.()
+  fileSelectionBest = files.value
+  if (files.value.length === 0 && fileInput.value) fileInput.value.value = ''
 }
 
 async function submit() {
-  if (!props.memoryId || files.value.length === 0) return
   error.value = ''
   loading.value = true
+  if (fileInput.value) await waitForPreparedFileSelection(fileInput.value)
+  if (!props.memoryId || files.value.length === 0) {
+    loading.value = false
+    return
+  }
   try {
     startMemoryMediaUpload({
       tenantName: props.tenantName,
@@ -78,7 +96,11 @@ async function submit() {
     })
     visible.value = false
     files.value = []
-    picker.value?.clear?.()
+    clearFileSelectionTimers()
+    fileSelectionBest = []
+    fileSelectionStartedAt = 0
+    fileSelectionLastChangedAt = 0
+    if (fileInput.value) fileInput.value.value = ''
   } catch (unknownError) {
     error.value = getErrorMessage(unknownError, t('memory.uploadFailed'))
   } finally {
@@ -89,30 +111,99 @@ async function submit() {
 function emitUploadedMedia(media: MemoryMedia) {
   emit('uploaded', media)
 }
+
+function readFileSelection(input: HTMLInputElement) {
+  clearFileSelectionTimers()
+  fileSelectionBest = files.value
+  fileSelectionStartedAt = Date.now()
+  fileSelectionLastChangedAt = fileSelectionStartedAt
+  const token = ++fileSelectionToken
+  applyBestFileSelection(input)
+  const finalDelay = fileSelectionRetryDelays.at(-1)
+  fileSelectionRetryDelays.forEach((delay) => {
+    const timer = window.setTimeout(() => {
+      fileSelectionTimers = fileSelectionTimers.filter((activeTimer) => activeTimer !== timer)
+      if (token !== fileSelectionToken) return
+      applyBestFileSelection(input)
+      if (delay === finalDelay) input.value = ''
+    }, delay)
+    fileSelectionTimers.push(timer)
+  })
+}
+
+function applyBestFileSelection(input: HTMLInputElement) {
+  const nextFiles = mergeMediaFiles(fileSelectionBest, mediaFilesFromList(input.files || []))
+  if (nextFiles.length >= fileSelectionBest.length) {
+    if (nextFiles.length > fileSelectionBest.length) fileSelectionLastChangedAt = Date.now()
+    fileSelectionBest = nextFiles
+    files.value = nextFiles
+  }
+}
+
+function mergeMediaFiles(existing: File[], incoming: File[]) {
+  const merged = [...existing]
+  const known = new Set(existing.map(fileSignature))
+  incoming.forEach((file) => {
+    const signature = fileSignature(file)
+    if (known.has(signature)) return
+    known.add(signature)
+    merged.push(file)
+  })
+  return merged
+}
+
+function fileSignature(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}:${file.type}`
+}
+
+function clearFileSelectionTimers() {
+  fileSelectionTimers.forEach((timer) => window.clearTimeout(timer))
+  fileSelectionTimers = []
+}
+
+async function waitForPreparedFileSelection(input: HTMLInputElement) {
+  const token = fileSelectionToken
+  while (token === fileSelectionToken && shouldWaitForFileSelection()) {
+    applyBestFileSelection(input)
+    await delay(250)
+  }
+  applyBestFileSelection(input)
+}
+
+function shouldWaitForFileSelection() {
+  if (!fileSelectionStartedAt) return false
+  const now = Date.now()
+  const preparing = now - fileSelectionStartedAt < fileSelectionMinimumPreparationMs
+  const recentlyChanged = now - fileSelectionLastChangedAt < fileSelectionQuietMs
+  const stillScheduled = fileSelectionTimers.length > 0
+  return preparing || recentlyChanged || stillScheduled
+}
+
+async function delay(ms: number) {
+  await new Promise((resolve) => window.setTimeout(resolve, ms))
+}
 </script>
 
 <template>
   <Dialog v-model:visible="visible" :header="t('media.uploadTitle')" modal class="tenant-dialog">
     <form class="veyq-form" @submit.prevent="submit">
       <div class="memory-upload-picker">
-        <FileUpload
-          ref="picker"
-          class="memory-upload-prime-picker"
-          mode="basic"
-          accept="image/*,video/*"
-          :choose-label="t('media.chooseFiles')"
-          custom-upload
-          multiple
-          :disabled="loading"
-          @select="selectFiles"
+        <label
+          class="p-button p-component memory-upload-choose-label"
+          :class="{ 'p-disabled': loading }"
+          :for="uploadInputId"
+          :aria-disabled="loading"
         >
-          <template #filelabel />
-        </FileUpload>
+          <span class="p-button-icon pi pi-plus" />
+          <span class="p-button-label">{{ t('media.chooseFiles') }}</span>
+        </label>
         <input
+          :id="uploadInputId"
+          ref="fileInput"
           class="memory-upload-native-fallback"
           type="file"
           multiple
-          accept="image/*,video/*"
+          :accept="mediaFileAccept"
           :disabled="loading"
           @change="updateFiles"
         />

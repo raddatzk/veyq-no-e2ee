@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../shared/api/httpClient'
 import { clearUploadQueue, useUploadQueue } from '../composables/useUploadQueue'
@@ -397,7 +397,7 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await selectMemoryUploadFiles(wrapper, [first, second])
     await flushPromises()
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -409,6 +409,84 @@ describe('Memory detail dialogs', () => {
     expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
       file: second,
       title: 'clip.mov'
+    }, expect.any(Object))
+  })
+
+  it('keeps Safari Photos multi-select files when Safari populates the file input late', async () => {
+    const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
+    const second = new File(['second'], 'IMG_0002.HEIC', { type: '' })
+    const third = new File(['third'], 'clip.MOV', { type: '' })
+    const ignored = new File(['note'], 'note.txt', { type: '' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+    setInputFiles(input.element, [first])
+    await input.trigger('change')
+    setInputFiles(input.element, [first, second, third, ignored])
+    await wrapper.find('form').trigger('submit')
+    await waitForTestSubmitPreparation()
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(3)
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
+      file: first,
+      title: 'beach.jpg'
+    }, expect.any(Object))
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
+      file: second,
+      title: 'IMG_0002.HEIC'
+    }, expect.any(Object))
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(3, 'tenant', 'mem-1', {
+      file: third,
+      title: 'clip.MOV'
+    }, expect.any(Object))
+  })
+
+  it('adds files from repeated Safari Photos selections instead of replacing the existing pick', async () => {
+    const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
+    const second = new File(['second'], 'IMG_0002.HEIC', { type: '' })
+    const third = new File(['third'], 'clip.MOV', { type: '' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    await selectMemoryUploadFiles(wrapper, [first])
+    expect(wrapper.text()).toContain('1 Medien ausgewählt')
+    await selectMemoryUploadFiles(wrapper, [first, second, third])
+    expect(wrapper.text()).toContain('3 Medien ausgewählt')
+
+    await wrapper.find('form').trigger('submit')
+    await waitForTestSubmitPreparation()
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(3)
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
+      file: first,
+      title: 'beach.jpg'
+    }, expect.any(Object))
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
+      file: second,
+      title: 'IMG_0002.HEIC'
+    }, expect.any(Object))
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(3, 'tenant', 'mem-1', {
+      file: third,
+      title: 'clip.MOV'
     }, expect.any(Object))
   })
 
@@ -427,7 +505,7 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await selectMemoryUploadFiles(wrapper, [first, second])
     await flushPromises()
     await wrapper.find('button[aria-label="beach.jpg aus Auswahl entfernen"]').trigger('click')
     await flushPromises()
@@ -436,13 +514,13 @@ describe('Memory detail dialogs', () => {
     expect(wrapper.text()).toContain('clip.mov')
     expect(wrapper.text()).toContain('1 Medien ausgewählt')
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second, third] })
+    await selectMemoryUploadFiles(wrapper, [first, second, third])
     await flushPromises()
     await wrapper.find('.memory-upload-clear-button').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Keine Medien ausgewählt')
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [third] })
+    await selectMemoryUploadFiles(wrapper, [third])
     await flushPromises()
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -468,7 +546,7 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [file] })
+    await selectMemoryUploadFiles(wrapper, [file])
     await flushPromises()
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -501,7 +579,7 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first, second] })
+    await selectMemoryUploadFiles(wrapper, [first, second])
     await flushPromises()
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -547,7 +625,7 @@ describe('Memory detail dialogs', () => {
       global: { stubs: dialogStubs() }
     })
 
-    wrapper.findComponent({ name: 'FileUpload' }).vm.$emit('select', { files: [first] })
+    await selectMemoryUploadFiles(wrapper, [first])
     await flushPromises()
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -1060,6 +1138,28 @@ function dialogGlobal() {
       tooltip: {}
     }
   }
+}
+
+async function selectMemoryUploadFiles(wrapper: VueWrapper, files: File[]) {
+  const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+  setInputFiles(input.element, files)
+  await input.trigger('change')
+  await waitForTestFileSelection()
+}
+
+function setInputFiles(input: HTMLInputElement, files: File[]) {
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: files
+  })
+}
+
+async function waitForTestFileSelection() {
+  await new Promise((resolve) => window.setTimeout(resolve, 100))
+}
+
+async function waitForTestSubmitPreparation() {
+  await new Promise((resolve) => window.setTimeout(resolve, 350))
 }
 
 function memory(overrides: Partial<Memory> = {}): Memory {

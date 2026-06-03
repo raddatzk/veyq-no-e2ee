@@ -235,6 +235,17 @@ acceptanceCriteria:
           - testName: testMemoryDetailUploadIconUsesMediaImportSymbol
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media.upload-picker-multiselect
+    statement: Web Memory upload preserves multi-selected photo/video files even when the browser file provider omits MIME types.
+    coverage:
+      frontend:
+        unit:
+          - testName: keeps Safari Photos multi-select files when Safari populates the file input late
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: adds files from repeated Safari Photos selections instead of replacing the existing pick
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
   - id: memory.media.drag-drop-memory-upload
     statement: Web Memory detail accepts dropped photo/video files and starts a private Memory upload while ignoring unsupported file types.
     coverage:
