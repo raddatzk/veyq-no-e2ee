@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MediaGrid from './MediaGrid.vue'
 import type { MemoryMedia, MemoryMediaBucket } from '../../features/memories/api'
 
@@ -151,6 +151,67 @@ describe('MediaGrid', () => {
     await flushPromises()
 
     expect(wrapper.findAll('.media-grid-tile')).toHaveLength(0)
+  })
+
+  it('renders media after a hidden gallery tab becomes measurable', async () => {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+    let animationFrame: FrameRequestCallback = () => {}
+    let measuredWidth = 0
+    const boundsSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+      width: measuredWidth,
+      height: 0,
+      top: 0,
+      right: measuredWidth,
+      bottom: 0,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    }))
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        animationFrame = callback
+        return 1
+      })
+    const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [media()],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: true,
+          ProgressSpinner: true,
+          SelectButton: true
+        }
+      }
+    })
+
+    await flushPromises()
+    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(true)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(0)
+
+    measuredWidth = 640
+    animationFrame?.(performance.now())
+    await vi.waitFor(async () => {
+      await flushPromises()
+      expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
+    })
+
+    expect(wrapper.find('.media-grid-placeholder').exists()).toBe(false)
+
+    boundsSpy.mockRestore()
+    requestAnimationFrameSpy.mockRestore()
+    cancelAnimationFrameSpy.mockRestore()
   })
 })
 

@@ -69,6 +69,7 @@ const loadedPreviewKeys = ref<Set<string>>(new Set())
 const loadedOriginalKeys = ref<Set<string>>(new Set())
 let mediaGridObserver: RafResizeObserver | null = null
 let layoutSequence = 0
+let visibilityRetryFrame: number | null = null
 
 const mediaFilter = ref<MediaFilter>('all')
 const mediaFilterOptions = computed(() => [
@@ -175,6 +176,7 @@ watch(mediaGrid, attachMediaGridObserver, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
   mediaGridObserver?.disconnect()
+  cancelVisibilityRetry()
 })
 
 function attachMediaGridObserver() {
@@ -183,6 +185,7 @@ function attachMediaGridObserver() {
 
   mediaGridObserver?.disconnect()
   measureMediaGrid(element)
+  void recalculateLayout()
 
   if (typeof ResizeObserver === 'undefined') return
   mediaGridObserver = createRafResizeObserver((entry) => {
@@ -207,6 +210,15 @@ function measuredWidth(element: HTMLElement): number {
 
 async function recalculateLayout() {
   const sequence = ++layoutSequence
+  const element = mediaGrid.value
+  if (element && containerWidth.value <= 0) measureMediaGrid(element)
+
+  if (galleryItems.value.length > 0 && containerWidth.value <= 0) {
+    scheduleVisibilityRetry()
+  } else {
+    cancelVisibilityRetry()
+  }
+
   shouldRequestMedia.value = false
   layout.value = calculateJustifiedMediaLayout({
     items: galleryItems.value,
@@ -220,6 +232,29 @@ async function recalculateLayout() {
   if (sequence === layoutSequence) {
     shouldRequestMedia.value = layout.value.tiles.length > 0
   }
+}
+
+function scheduleVisibilityRetry() {
+  if (visibilityRetryFrame !== null || typeof window === 'undefined') return
+  visibilityRetryFrame = window.requestAnimationFrame(() => {
+    visibilityRetryFrame = null
+    const element = mediaGrid.value
+    if (!element) return
+
+    const nextWidth = Math.floor(measuredWidth(element))
+    if (nextWidth > 0) {
+      containerWidth.value = nextWidth
+      return
+    }
+
+    scheduleVisibilityRetry()
+  })
+}
+
+function cancelVisibilityRetry() {
+  if (visibilityRetryFrame === null || typeof window === 'undefined') return
+  window.cancelAnimationFrame(visibilityRetryFrame)
+  visibilityRetryFrame = null
 }
 
 function mediaAspectRatio(media: MemoryMedia): number {
