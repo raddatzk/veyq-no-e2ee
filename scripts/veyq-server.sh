@@ -281,7 +281,11 @@ apply_env_defaults() {
     if [ -z "$value" ]; then
       value="$(default_env_value "$key")"
       set_env "$key" "$value"
-      echo "Added default .env value: $key=$value"
+      if is_secret_env_key "$key"; then
+        echo "Added default .env value: $key=<generated>"
+      else
+        echo "Added default .env value: $key=$value"
+      fi
     fi
   done
 }
@@ -1000,6 +1004,15 @@ check_env_default_secret() {
       return 1
       ;;
   esac
+}
+
+is_secret_env_key() {
+  local wanted="$1"
+  local key
+  for key in "${SECRET_ENV_KEYS[@]}" "${RESET_PROFILE_SECRET_ENV_KEYS[@]}" "${COLLABORATION_PROFILE_SECRET_ENV_KEYS[@]}"; do
+    [ "$key" = "$wanted" ] && return 0
+  done
+  return 1
 }
 
 env_needs_setup() {
