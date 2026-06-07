@@ -8,6 +8,9 @@ entryPoints:
   - docs/api/memories.openapi.yaml
   - docs/api/shares.openapi.yaml
   - frontend/src/features/memories/composables/useUploadQueue.ts
+  - ios/Veyq/AppRootView.swift
+  - ios/Veyq/UploadSupport.swift
+  - ios/VeyqShareExtension/ShareViewController.swift
 acceptanceCriteria:
   - id: memory.media-resumable-upload.private-complete
     statement: Private Memory chunk upload resumes existing chunks and completes media.
@@ -24,6 +27,18 @@ acceptanceCriteria:
             ref: ios/VeyqTests/VeyqTests.swift
           - testName: testShareImportTargetsDoNotFetchUnknownChapters
             kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testPendingImportPlannerEnqueuesTargetedBatchWithoutSheet
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testPendingImportPlannerIgnoresOlderUntargetedBatch
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testPendingImportPlannerDoesNotPresentFreshUntargetedBatch
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testPendingImportPlannerPrioritizesTargetedBatchOverUntargetedBatch
+            kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
           - testName: testUploadQueueItemDecodesLegacyQueueWithoutProgressMetadata
             kind: negative

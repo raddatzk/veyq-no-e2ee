@@ -187,18 +187,14 @@ struct PendingImportBatch: Identifiable, Codable, Equatable {
 
 enum PendingImportPresentationAction: Equatable {
     case enqueueTargeted([PendingImportBatch])
-    case presentUntargeted(PendingImportBatch)
     case none
 }
 
 enum PendingImportPresentationPlanner {
-    static let untargetedBatchGraceInterval: TimeInterval = 10
-
     static func action(
         for batches: [PendingImportBatch],
         pendingSheetBatchId: String?,
-        activeHandoffBatchIds: Set<String>,
-        now: Date
+        activeHandoffBatchIds: Set<String>
     ) -> PendingImportPresentationAction {
         guard pendingSheetBatchId == nil else { return .none }
 
@@ -212,11 +208,7 @@ enum PendingImportPresentationPlanner {
             return .enqueueTargeted(targetedBatches)
         }
 
-        guard let untargetedBatch = importableBatches.first else { return .none }
-        guard now.timeIntervalSince(untargetedBatch.createdAt) >= untargetedBatchGraceInterval else {
-            return .none
-        }
-        return .presentUntargeted(untargetedBatch)
+        return .none
     }
 }
 
@@ -442,6 +434,12 @@ enum UploadQueuePersistence {
     static func removePendingImportBatch(id: String) {
         let directory = pendingImportDirectory.appendingPathComponent(id, isDirectory: true)
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    static func removeUntargetedPendingImportBatches(_ batches: [PendingImportBatch]) {
+        batches
+            .filter { $0.targetMemory == nil }
+            .forEach { removePendingImportBatch(id: $0.id) }
     }
 
     static func copyIntoUploadStore(sourceURL: URL, preferredFilename: String, kind: VeyqUploadFileKind) throws -> URL {

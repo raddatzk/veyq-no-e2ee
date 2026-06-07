@@ -8,7 +8,6 @@ struct AppRootView: View {
     @AppStorage(AppLanguagePreference.storageKey) private var languagePreferenceRawValue = AppLanguagePreference.system.rawValue
     @State private var pendingImportBatch: PendingImportBatch?
     @State private var activeImportHandoffBatchIDs: Set<String> = []
-    @State private var skipNextUntargetedPendingImportPresentation = false
 
     var body: some View {
         Group {
@@ -120,22 +119,21 @@ struct AppRootView: View {
             if pendingImportBatch?.id == batch.id {
                 pendingImportBatch = nil
             }
-            skipNextUntargetedPendingImportPresentation = true
             store.enqueuePendingImport(batch, target: target)
             return
         }
-        pendingImportBatch = batch
+        UploadQueuePersistence.removePendingImportBatch(id: batch.id)
     }
 
     private func presentLatestPendingImportIfAvailable() {
         guard store.isConnected, pendingImportBatch == nil else { return }
 
         let batches = UploadQueuePersistence.loadPendingImportBatches()
+        UploadQueuePersistence.removeUntargetedPendingImportBatches(batches)
         let action = PendingImportPresentationPlanner.action(
             for: batches,
             pendingSheetBatchId: pendingImportBatch?.id,
-            activeHandoffBatchIds: activeImportHandoffBatchIDs,
-            now: Date()
+            activeHandoffBatchIds: activeImportHandoffBatchIDs
         )
 
         switch action {
@@ -143,13 +141,6 @@ struct AppRootView: View {
             for batch in targetedBatches {
                 guard let target = batch.targetMemory else { continue }
                 store.enqueuePendingImport(batch, target: target)
-            }
-            skipNextUntargetedPendingImportPresentation = true
-        case .presentUntargeted(let batch):
-            if skipNextUntargetedPendingImportPresentation {
-                skipNextUntargetedPendingImportPresentation = false
-            } else {
-                pendingImportBatch = batch
             }
         case .none:
             break

@@ -271,39 +271,36 @@ final class VeyqTests: XCTestCase {
         let action = PendingImportPresentationPlanner.action(
             for: [targeted],
             pendingSheetBatchId: nil,
-            activeHandoffBatchIds: [],
-            now: now
+            activeHandoffBatchIds: []
         )
 
         XCTAssertEqual(action, .enqueueTargeted([targeted]))
     }
 
-    func testPendingImportPlannerPresentsOlderUntargetedBatch() {
+    func testPendingImportPlannerIgnoresOlderUntargetedBatch() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let untargeted = makePendingImportBatch(
             id: "untargeted",
-            createdAt: now.addingTimeInterval(-PendingImportPresentationPlanner.untargetedBatchGraceInterval - 1)
+            createdAt: now.addingTimeInterval(-60)
         )
 
         let action = PendingImportPresentationPlanner.action(
             for: [untargeted],
             pendingSheetBatchId: nil,
-            activeHandoffBatchIds: [],
-            now: now
+            activeHandoffBatchIds: []
         )
 
-        XCTAssertEqual(action, .presentUntargeted(untargeted))
+        XCTAssertEqual(action, .none)
     }
 
-    func testPendingImportPlannerDoesNotPresentFreshUntargetedBatchDuringHandoffRace() {
+    func testPendingImportPlannerDoesNotPresentFreshUntargetedBatch() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let freshUntargeted = makePendingImportBatch(id: "fresh-untargeted", createdAt: now)
 
         let action = PendingImportPresentationPlanner.action(
             for: [freshUntargeted],
             pendingSheetBatchId: nil,
-            activeHandoffBatchIds: [],
-            now: now
+            activeHandoffBatchIds: []
         )
 
         XCTAssertEqual(action, .none)
@@ -317,8 +314,7 @@ final class VeyqTests: XCTestCase {
         let action = PendingImportPresentationPlanner.action(
             for: [oldUntargeted, targeted],
             pendingSheetBatchId: nil,
-            activeHandoffBatchIds: [],
-            now: now
+            activeHandoffBatchIds: []
         )
 
         XCTAssertEqual(action, .enqueueTargeted([targeted]))
