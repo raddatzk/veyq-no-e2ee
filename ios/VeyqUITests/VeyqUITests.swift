@@ -20,25 +20,67 @@ final class VeyqUITests: XCTestCase {
 
         let homeTitle = app.staticTexts["memory-home-title"]
         XCTAssertTrue(homeTitle.waitForExistence(timeout: 5))
-        XCTAssertEqual(homeTitle.label, "Memories")
-        XCTAssertFalse(app.buttons["bottom-tab-memories"].exists)
-        XCTAssertFalse(app.buttons["bottom-tab-uploads"].exists)
+        XCTAssertEqual(homeTitle.label, "Family Memories")
+        XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
         XCTAssertTrue(app.buttons["upload-status-button"].exists)
-        XCTAssertTrue(app.buttons["bottom-search-button"].exists)
+        XCTAssertTrue(app.searchFields["Search Memories"].exists)
+
+        let rootFolder = app.buttons["folder-row-folder-travel"]
+        XCTAssertTrue(rootFolder.waitForExistence(timeout: 5))
+        rootFolder.tap()
+        let folderUpButton = app.buttons["folder-up-toolbar-button"]
+        XCTAssertTrue(folderUpButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Groups"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Personal"].exists)
+        folderUpButton.tap()
+        XCTAssertTrue(folderUpButton.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
+        XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
 
         app.buttons["settings-button"].tap()
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Appearance"].exists)
         XCTAssertTrue(app.staticTexts["Language"].exists)
+        app.buttons["settings-theme-picker"].tap()
         app.buttons["Dark"].tap()
+        app.buttons["settings-language-picker"].tap()
         app.buttons["German"].tap()
         XCTAssertTrue(app.staticTexts["Einstellungen"].waitForExistence(timeout: 5))
         app.buttons["Fertig"].tap()
 
-        app.buttons["memory-space-button"].tap()
-        XCTAssertTrue(app.staticTexts["Kontext"].waitForExistence(timeout: 5))
-        app.buttons["context-scope-row"].tap()
-        app.buttons["space-option-group-family"].tap()
+        let groupScopeButton = app.tabBars.buttons["Gruppen"]
+        XCTAssertTrue(groupScopeButton.waitForExistence(timeout: 5))
+        groupScopeButton.tap()
+        XCTAssertTrue(app.buttons["create-group-button"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["create-memory-button"].exists)
+        XCTAssertFalse(app.buttons["memory-card-summer-south-tyrol"].exists)
+        XCTAssertFalse(app.buttons["memory-card-birthday-weekend"].exists)
+        app.buttons["create-group-button"].tap()
+        let groupTitleField = app.textFields["group-title-field"]
+        XCTAssertTrue(groupTitleField.waitForExistence(timeout: 5))
+        groupTitleField.tap()
+        groupTitleField.typeText("Road Crew")
+        app.buttons["group-save-button"].tap()
+        XCTAssertTrue(groupTitleField.waitForNonExistence(timeout: 5))
+
+        let groupOption = app.buttons["group-space-card-group-family"]
+        XCTAssertTrue(groupOption.waitForExistence(timeout: 5))
+        groupOption.tap()
+        XCTAssertFalse(app.buttons["scope-up-toolbar-button"].exists)
+        XCTAssertTrue(app.buttons["memory-card-birthday-weekend"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["memory-card-summer-south-tyrol"].exists)
+
+        groupScopeButton.tap()
+        XCTAssertTrue(groupOption.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["create-memory-button"].exists)
+        XCTAssertFalse(app.buttons["memory-card-summer-south-tyrol"].exists)
+        XCTAssertFalse(app.buttons["memory-card-birthday-weekend"].exists)
+        groupOption.tap()
+        XCTAssertFalse(app.buttons["scope-up-toolbar-button"].exists)
         XCTAssertTrue(app.buttons["memory-card-birthday-weekend"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["memory-card-summer-south-tyrol"].exists)
 
@@ -75,16 +117,18 @@ final class VeyqUITests: XCTestCase {
         XCTAssertTrue(uploadQueueTitle.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["upload-state-failed"].exists)
         app.buttons["Fertig"].tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["memory-home-title"].waitForExistence(timeout: 5))
 
-        app.buttons["bottom-search-button"].tap()
-        let searchTitle = app.staticTexts["search-sheet-title"]
-        XCTAssertTrue(searchTitle.waitForExistence(timeout: 5))
-
-        let searchField = app.textFields["search-query-field"]
-        XCTAssertTrue(searchField.exists)
+        let searchField = app.searchFields["Memories suchen"]
+        XCTAssertTrue(searchField.waitForExistence(timeout: 5))
         searchField.tap()
         searchField.typeText("garden")
 
-        XCTAssertTrue(app.staticTexts["search-result-morning-garden"].waitForExistence(timeout: 5))
+        let searchResult = app.buttons["search-result-morning-garden"]
+        XCTAssertTrue(searchResult.waitForExistence(timeout: 5))
+        searchResult.tap()
+
+        XCTAssertTrue(app.staticTexts["memory-detail-title"].waitForExistence(timeout: 5))
     }
 }

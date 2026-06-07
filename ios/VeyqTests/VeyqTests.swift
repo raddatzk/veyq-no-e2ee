@@ -1,3 +1,4 @@
+import MapKit
 import XCTest
 @testable import Veyq
 
@@ -93,6 +94,23 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(store.selectedTenant?.displayName, "Family Memories")
         XCTAssertFalse(store.memories.isEmpty)
         XCTAssertFalse(store.uploadItems.isEmpty)
+    }
+
+    @MainActor
+    func testStoreUpdatesMockUserSettings() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+
+        let updated = try await store.updateMySettings(
+            displayName: "Kevin Raddatz",
+            permalink: "kevin",
+            email: "kevin@example.test"
+        )
+
+        XCTAssertEqual(updated.displayName, "Kevin Raddatz")
+        XCTAssertEqual(store.user?.displayName, "Kevin Raddatz")
+        XCTAssertEqual(store.user?.permalink, "kevin")
+        XCTAssertEqual(store.user?.email, "kevin@example.test")
     }
 
     @MainActor
@@ -351,6 +369,60 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
+    func testMockStoreShowsAndOpensOrganizationalFolders() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+
+        XCTAssertEqual(store.visibleFolders.map(\.id), ["folder-travel"])
+
+        let folder = try XCTUnwrap(store.visibleFolders.first)
+        store.openFolder(folder)
+
+        XCTAssertEqual(store.currentFolderPath, "/travel")
+        XCTAssertTrue(store.canNavigateUpFolder)
+        XCTAssertTrue(store.visibleMemories.isEmpty)
+
+        store.navigateUpFolder()
+
+        XCTAssertEqual(store.currentFolderPath, "/")
+        XCTAssertFalse(store.canNavigateUpFolder)
+    }
+
+    @MainActor
+    func testMockStoreCreatesFolderInCurrentFolder() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+
+        let created = try await store.createFolder(displayName: "Road Trips", name: "road-trips")
+
+        XCTAssertEqual(created.path, "/road-trips")
+        XCTAssertTrue(store.visibleFolders.contains { $0.id == "road-trips" })
+    }
+
+    @MainActor
+    func testGroupSpacesExposeVisibleGroupScopes() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+
+        XCTAssertEqual(store.groupSpaces.map(\.id), ["group-family"])
+        XCTAssertEqual(store.groupSpaces.first?.label, "@Family")
+    }
+
+    @MainActor
+    func testMockStoreCreatesGroupSpaceAndSelectsIt() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+
+        let created = try await store.createGroup(displayName: "Road Crew", name: "road-crew")
+
+        XCTAssertEqual(created.id, "group-road-crew")
+        XCTAssertEqual(created.label, "@Road Crew")
+        XCTAssertEqual(created.path, "/@road-crew")
+        XCTAssertTrue(store.groupSpaces.contains(created))
+        XCTAssertEqual(store.selectedSpace, created)
+    }
+
+    @MainActor
     func testSearchFindsMemoryByTitle() async throws {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
         _ = try await store.connect(to: "https://memories.example.test")
@@ -359,6 +431,20 @@ final class VeyqTests: XCTestCase {
         let results = store.searchMemories(matching: "garden")
 
         XCTAssertEqual(results.map(\.id), ["morning-garden"])
+    }
+
+    @MainActor
+    func testSearchCoversTenantGroupsAndPersonalScopes() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let personalSpace = try XCTUnwrap(store.spaces.first { $0.kind == .personal })
+        store.selectSpace(personalSpace)
+
+        await store.updateSearch(matching: "Birthday")
+
+        XCTAssertEqual(store.visibleMemories.map(\.id), ["morning-garden"])
+        XCTAssertEqual(store.searchResults.map(\.id), ["birthday-weekend"])
+        XCTAssertEqual(store.searchResults.first?.path, "/@family/birthday-weekend")
     }
 
     func testAppPreferenceResolversFallbackToSystem() {
@@ -388,6 +474,37 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(discovery.mobileCallbackScheme, "veyq")
     }
 
+    func testCreateGroupRequestUsesGroupsEndpoint() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": 99,
+          "name": "road-crew",
+          "displayName": "Road Crew",
+          "members": []
+        }
+        """.data(using: .utf8)!
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            session: URLSession(configuration: .stubbed)
+        )
+
+        let created = try await client.createGroup(
+            tenantName: "friends",
+            request: CreateGroupRequest(name: "road-crew", displayName: "Road Crew")
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = String(data: try XCTUnwrap(URLProtocolStub.lastRequestBody), encoding: .utf8) ?? ""
+        XCTAssertEqual(created.name, "road-crew")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/groups")
+        XCTAssertTrue(body.contains(#""name":"road-crew""#))
+        XCTAssertTrue(body.contains(#""displayName":"Road Crew""#))
+    }
+
     @MainActor
     func testConnectPersistsClientCapabilitySnapshotWithNativeSession() async throws {
         URLProtocolStub.reset()
@@ -397,8 +514,7 @@ final class VeyqTests: XCTestCase {
             URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "access", refreshToken: "refresh").data(using: .utf8)!),
             URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core", "memory.media"]).data(using: .utf8)!),
             URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: "[]".data(using: .utf8)!)
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
         ]
 
         let sessionStore = InMemoryNativeSessionStore()
@@ -413,6 +529,30 @@ final class VeyqTests: XCTestCase {
         let saved = try XCTUnwrap(sessionStore.loadActive())
         XCTAssertEqual(saved.capabilities.map(\.id), ["auth.mobile-handoff", "memory.core", "memory.media"])
         XCTAssertTrue(store.supportsCapability("memory.media"))
+    }
+
+    @MainActor
+    func testConnectFormatsScopedSpaceLabels() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: discoveryJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "access", refreshToken: "refresh").data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: scopedNavigationJSON().data(using: .utf8)!)
+        ]
+
+        let store = VeyqStore(
+            sessionStore: InMemoryNativeSessionStore(),
+            authenticator: StubMobileAuthenticator(),
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        try await store.connect(to: "https://memories.example.test")
+
+        XCTAssertEqual(store.spaces.first { $0.kind == .group }?.label, "@Family")
+        XCTAssertEqual(store.spaces.first { $0.kind == .personal }?.label, "~Admin")
     }
 
     @MainActor
@@ -444,8 +584,7 @@ final class VeyqTests: XCTestCase {
             URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "new-access", refreshToken: "new-refresh").data(using: .utf8)!),
             URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
             URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: "[]".data(using: .utf8)!)
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
         ]
 
         let sessionStore = InMemoryNativeSessionStore()
@@ -472,6 +611,120 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(URLProtocolStub.requestHistory.first?.value(forHTTPHeaderField: "Authorization"), nil)
         XCTAssertEqual(saved.accessToken, "new-access")
         XCTAssertTrue(store.isConnected)
+    }
+
+    @MainActor
+    func testRestoreRecoversWhenStoredNativeSessionWasAlreadyRotated() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 401, data: #"{"code":"UNAUTHORIZED","message":"Unauthorized"}"#.data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let staleSession = StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "expired-access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_700_000_000),
+            refreshToken: "old-refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
+        )
+        let rotatedSession = StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "rotated-access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "rotated-refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
+        )
+        let sessionStore = RotatedNativeSessionStore(staleSession: staleSession, rotatedSession: rotatedSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.restoreSession()
+
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(requestedURLs.first, "https://memories.example.test/api/auth/mobile/session/refresh")
+        XCTAssertEqual(requestedURLs.dropFirst().first, "https://memories.example.test/api/client-capabilities")
+        XCTAssertEqual(URLProtocolStub.requestHistory.dropFirst().first?.value(forHTTPHeaderField: "Authorization"), "Bearer rotated-access")
+        XCTAssertNil(store.errorMessage)
+        XCTAssertTrue(store.isConnected)
+    }
+
+    @MainActor
+    func testRestoreKeepsLastSelectedTenant() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: multiTenantBootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        try sessionStore.save(StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")],
+            selectedTenantName: "friends"
+        ))
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.restoreSession()
+
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(store.selectedTenant?.name, "friends")
+        XCTAssertTrue(requestedURLs.contains("https://memories.example.test/api/friends/memory-navigation-context?path=/"))
+    }
+
+    @MainActor
+    func testSelectingTenantPersistsItInActiveSession() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: multiTenantBootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        try sessionStore.save(StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
+        ))
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+        await store.restoreSession()
+
+        let friends = try XCTUnwrap(store.tenants.first { $0.name == "friends" })
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+        store.selectTenant(friends)
+
+        XCTAssertEqual(try sessionStore.loadActive()?.selectedTenantName, "friends")
     }
 
     func testMemoryCoverDecoding() throws {
@@ -537,6 +790,143 @@ final class VeyqTests: XCTestCase {
 
     func testMemoryDetailUploadIconUsesMediaImportSymbol() {
         XCTAssertEqual(MemoryDetailToolbarSymbols.upload, "photo.badge.plus")
+    }
+
+    func testMemoryNavigationContextDecodesFolders() throws {
+        let data = """
+        {
+          "location": {
+            "kind": "TENANT",
+            "path": "/",
+            "displayName": "Family Memories"
+          },
+          "breadcrumbs": [],
+          "scopeRoots": [],
+          "favoriteMemories": [],
+          "folders": [
+            {
+              "id": "fol_123",
+              "name": "travel",
+              "displayName": "Travel",
+              "path": "/travel"
+            }
+          ],
+          "memories": []
+        }
+        """.data(using: .utf8)!
+
+        let navigation = try JSONDecoder.veyq.decode(MemoryNavigationContextResponse.self, from: data)
+
+        XCTAssertEqual(navigation.folders.map(\.id), ["fol_123"])
+        XCTAssertEqual(navigation.folders.first?.path, "/travel")
+    }
+
+    func testMemoryNameFormatterCreatesStablePathSlug() {
+        XCTAssertEqual(MemoryNameFormatter.slug(from: "  Südtirol Day 1! "), "sudtirol-day-1")
+        XCTAssertEqual(MemoryNameFormatter.slug(from: "Family__Trip"), "family__trip")
+    }
+
+    @MainActor
+    func testMockStoreCreatesRootMemoryInSelectedScope() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+
+        let created = try await store.createMemory(
+            displayName: "Weekend Lake",
+            name: "weekend-lake",
+            startDate: "2026-08-01",
+            endDate: "2026-08-02"
+        )
+
+        XCTAssertEqual(created.path, "/weekend-lake")
+        XCTAssertTrue(store.visibleMemories.contains { $0.id == "weekend-lake" })
+    }
+
+    @MainActor
+    func testMockStoreCreatesChapterInsideLoadedMemory() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let parent = Memory.samples[0]
+        await store.loadDetail(for: parent)
+
+        let created = try await store.createMemory(
+            displayName: "Day 3",
+            name: "day-3",
+            startDate: "2026-07-14",
+            endDate: "2026-07-14",
+            parentMemory: parent
+        )
+
+        XCTAssertEqual(created.parentId, parent.id)
+        XCTAssertEqual(created.path, "/summer-south-tyrol/day-3")
+        XCTAssertTrue(store.memoryDetails[parent.id]?.chapters.contains { $0.id == "day-3" } == true)
+        XCTAssertEqual(store.memoryDetails[parent.id]?.header.chapterCount, 3)
+    }
+
+    @MainActor
+    func testMockStoreUpdatesLoadedMemoryDisplayMetadata() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        let updated = try await store.updateMemory(
+            memory,
+            displayName: "South Tyrol Summer",
+            name: "south-tyrol-summer",
+            startDate: "2026-07-11",
+            endDate: "2026-07-18"
+        )
+
+        XCTAssertEqual(updated.displayName, "South Tyrol Summer")
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.displayName, "South Tyrol Summer")
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.startDate, "2026-07-11")
+    }
+
+    @MainActor
+    func testMockStoreDeletesMemoryFromVisibleList() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        try await store.deleteMemory(memory)
+
+        XCTAssertFalse(store.visibleMemories.contains { $0.id == memory.id })
+        XCTAssertNil(store.memoryDetails[memory.id])
+    }
+
+    @MainActor
+    func testMockStoreSetsMemoryCoverFromMedia() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+        let media = try XCTUnwrap(store.memoryDetails[memory.id]?.media.first { $0.isImage })
+
+        let updated = try await store.setMemoryCover(for: memory, media: media)
+
+        XCTAssertEqual(updated.coverMediaId, media.id)
+        XCTAssertEqual(updated.coverUrl, media.contentUrl)
+        XCTAssertEqual(updated.coverCrop, .defaultCoverCrop)
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, media.contentUrl)
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverCrop, .defaultCoverCrop)
+    }
+
+    @MainActor
+    func testMockStoreRemovesMemoryCover() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        _ = try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        let updated = try await store.removeMemoryCover(for: memory)
+
+        XCTAssertNil(updated.coverMediaId)
+        XCTAssertNil(updated.coverUrl)
+        XCTAssertNil(updated.coverCrop)
+        XCTAssertNil(store.memoryDetails[memory.id]?.header.coverUrl)
+        XCTAssertNil(store.memoryDetails[memory.id]?.header.coverCrop)
     }
 
     func testInternalMemoryShareLinksUseSectionHashes() throws {
@@ -689,11 +1079,13 @@ final class VeyqTests: XCTestCase {
             "userId": 1
           },
           "createdAt": "2026-05-03T12:00:00.123Z",
+          "updatedAt": "2026-05-03T12:03:00Z",
           "capturedAt": null,
           "capturedAtOverride": false,
           "mimeType": "image/jpeg",
           "sizeBytes": 2048000,
           "contentUrl": "/api/friends/memory-media/med_abc123/content",
+          "highlight": true,
           "thumbnailUrl": null,
           "previewUrl": "/api/friends/memory-media/med_abc123/preview",
           "posterUrl": null,
@@ -711,14 +1103,136 @@ final class VeyqTests: XCTestCase {
 
         XCTAssertEqual(media.id, "med_abc123")
         XCTAssertEqual(media.previewUrl, "/api/friends/memory-media/med_abc123/preview")
+        XCTAssertTrue(media.highlight)
         XCTAssertEqual(media.imageWidth, 6240)
         XCTAssertEqual(media.gpsLatitude, 54.1825)
+        XCTAssertGreaterThan(media.updatedAt, media.createdAt)
+    }
+
+    func testMemoryMapPointsUseOnlyValidGpsMedia() {
+        let valid = MemoryMedia.samples[0]
+        let invalid = MemoryMedia(
+            id: "invalid-gps",
+            memoryId: valid.memoryId,
+            bucketId: nil,
+            title: "Invalid GPS",
+            uploader: valid.uploader,
+            createdAt: valid.createdAt,
+            capturedAt: valid.capturedAt,
+            capturedAtOverride: valid.capturedAtOverride,
+            mimeType: valid.mimeType,
+            sizeBytes: valid.sizeBytes,
+            contentUrl: valid.contentUrl,
+            highlight: false,
+            thumbnailUrl: nil,
+            previewUrl: nil,
+            posterUrl: nil,
+            cameraMake: nil,
+            cameraModel: nil,
+            lensModel: nil,
+            imageWidth: nil,
+            imageHeight: nil,
+            gpsLatitude: 112,
+            gpsLongitude: 11
+        )
+        let missing = MemoryMedia.samples[2]
+
+        let points = MemoryMapPoint.points(from: [valid, invalid, missing])
+
+        XCTAssertEqual(points, [
+            MemoryMapPoint(
+                mediaId: "media-summit",
+                title: "Summit view",
+                latitude: 46.4983,
+                longitude: 11.3548
+            )
+        ])
+    }
+
+    func testMemoryMapRegionFitsMappedMedia() {
+        let points = MemoryMapPoint.points(from: Array(MemoryMedia.samples.prefix(2)))
+
+        let region = MemoryMapRegion.region(for: points)
+
+        XCTAssertEqual(region.center.latitude, 46.5052, accuracy: 0.0001)
+        XCTAssertEqual(region.center.longitude, 11.37225, accuracy: 0.0001)
+        XCTAssertGreaterThanOrEqual(region.span.latitudeDelta, 0.02)
+        XCTAssertGreaterThanOrEqual(region.span.longitudeDelta, 0.02)
+    }
+
+    func testMemoryTrackDecodingProvidesRenderableCoordinatesAndDuration() throws {
+        let data = """
+        {
+          "id": "track-1",
+          "memoryId": "mem-1",
+          "title": "Summit Route",
+          "activityType": "HIKING",
+          "originalFilename": "summit.gpx",
+          "distanceMeters": 12430,
+          "ascentMeters": 820,
+          "descentMeters": 610,
+          "pointCount": 3,
+          "startedAt": "2026-05-03T08:30:00Z",
+          "endedAt": "2026-05-03T12:20:00Z",
+          "bounds": {
+            "minLatitude": 47.426,
+            "minLongitude": 10.982,
+            "maxLatitude": 47.451,
+            "maxLongitude": 11.034
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [[10.982, 47.426], [11.034, 47.451], [220, 47.5]]
+          },
+          "contentUrl": "/api/friends/memories/mem-1/tracks/track-1/content",
+          "createdAt": "2026-05-03T12:30:00Z",
+          "updatedAt": "2026-05-03T12:30:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let track = try JSONDecoder.veyq.decode(MemoryTrack.self, from: data)
+
+        XCTAssertEqual(track.id, "track-1")
+        XCTAssertEqual(track.coordinates.count, 2)
+        XCTAssertEqual(track.coordinates.first?.latitude, 47.426)
+        XCTAssertEqual(track.coordinates.first?.longitude, 10.982)
+        XCTAssertEqual(track.durationSeconds, 13_800)
+        XCTAssertTrue(track.hasRenderableGeometry)
+    }
+
+    func testMemoryMapRegionFitsTracksAndMappedMediaTogether() {
+        let points = MemoryMapPoint.points(from: [MemoryMedia.samples[0]])
+        let track = MemoryTrack.samples[0]
+
+        let region = MemoryMapRegion.region(points: points, tracks: [track])
+
+        XCTAssertEqual(region.center.latitude, 46.5092, accuracy: 0.0001)
+        XCTAssertEqual(region.center.longitude, 11.37205, accuracy: 0.0001)
+        XCTAssertGreaterThan(region.span.latitudeDelta, 0.04)
+        XCTAssertGreaterThan(region.span.longitudeDelta, 0.06)
+    }
+
+    func testMemoryTrackFormatterShowsDistanceDurationAndElevation() {
+        UserDefaults.standard.set(AppLanguagePreference.en.rawValue, forKey: AppLanguagePreference.storageKey)
+
+        XCTAssertEqual(MemoryTrackFormatter.distance(12_430), "12.4 km")
+        XCTAssertEqual(MemoryTrackFormatter.distance(860), "860 m")
+        XCTAssertEqual(MemoryTrackFormatter.duration(13_800), "3 h 50 min")
+        XCTAssertEqual(MemoryTrackFormatter.elevation(820), "820 m")
+        XCTAssertEqual(MemoryTrackFormatter.elevation(nil), "n/a")
     }
 
     func testGalleryAspectRatioBoundsExtremeValues() {
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: 16, height: 9), 4.0 / 3.0)
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: 9, height: 16), 3.0 / 4.0)
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: nil, height: 9), 4.0 / 3.0)
+    }
+
+    func testMemoryMediaSetHashMatchesServerCanonicalFormat() {
+        XCTAssertEqual(
+            MemoryMedia.mediaSetHash(["media-2", "media-1"]),
+            "7185ce8e239cc3ff81c9e76430743ac5617fbd6166ae6b3b1b41d5f0f96a5159"
+        )
     }
 
     func testJustifiedLayoutKeepsPortraitAndLandscapeShapes() {
@@ -784,6 +1298,372 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
     }
 
+    func testAPIClientSearchesTenantWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        [
+          {
+            "kind": "MEMORY",
+            "id": "mem-1",
+            "displayName": "Birthday Weekend",
+            "path": "/@family/birthday-weekend",
+            "scope": {
+              "type": "GROUP",
+              "groupName": "family"
+            },
+            "coverUrl": null,
+            "coverCrop": null,
+            "matchTypes": ["TITLE"]
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let results = try await client.searchTenant(tenantName: "friends", query: "birthday", limit: 20)
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value) })
+        XCTAssertEqual(results.map(\.id), ["mem-1"])
+        XCTAssertEqual(results.first?.scope.groupName, "family")
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "memories.example.test")
+        XCTAssertEqual(components.path, "/api/friends/search")
+        XCTAssertEqual(queryItems["q"], "birthday")
+        XCTAssertEqual(queryItems["limit"], "20")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
+    func testAPIClientCreatesFolderWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "fol_123",
+          "name": "travel",
+          "displayName": "Travel",
+          "path": "/travel"
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let created = try await client.createFolder(
+            tenantName: "friends",
+            request: CreateFolderRequest(
+                parentPath: "/",
+                name: "travel",
+                displayName: "Travel",
+                scope: MemoryScopeRequest(type: "TENANT", groupName: nil)
+            )
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(created.id, "fol_123")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/folders")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""displayName":"Travel""#))
+        XCTAssertTrue(body.contains(#""type":"TENANT""#))
+    }
+
+    func testAPIClientUpdatesMySettingsWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "userId": 1,
+          "email": "new@example.test",
+          "displayName": "New Name",
+          "permalink": "new-name",
+          "serverRole": "ServerOwner",
+          "passkeyCount": 1,
+          "hasPassword": true,
+          "totpEnabled": true,
+          "avatarUrl": null,
+          "pendingEmail": "new@example.test"
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let updated = try await client.updateMySettings(
+            displayName: "New Name",
+            permalink: "new-name",
+            email: "new@example.test"
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(updated.displayName, "New Name")
+        XCTAssertEqual(updated.pendingEmail, "new@example.test")
+        XCTAssertEqual(updated.totpEnabled, true)
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/users/me")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""displayName":"New Name""#))
+        XCTAssertTrue(body.contains(#""permalink":"new-name""#))
+        XCTAssertTrue(body.contains(#""email":"new@example.test""#))
+    }
+
+    func testAPIClientCreatesMemoryWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "mem-created",
+          "name": "summer-trip",
+          "displayName": "Summer Trip",
+          "path": "/summer-trip",
+          "parentId": null,
+          "coverMediaId": null,
+          "coverUrl": null,
+          "coverCrop": null,
+          "startDate": "2026-07-12",
+          "endDate": "2026-07-18",
+          "mediaCount": 0,
+          "childCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let created = try await client.createMemory(
+            tenantName: "friends",
+            request: CreateMemoryRequest(
+                parentId: nil,
+                folderPath: "/",
+                name: "summer-trip",
+                displayName: "Summer Trip",
+                startDate: "2026-07-12",
+                endDate: "2026-07-18",
+                scope: MemoryScopeRequest(type: "TENANT", groupName: nil)
+            )
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(created.id, "mem-created")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""displayName":"Summer Trip""#))
+        XCTAssertTrue(body.contains(#""type":"TENANT""#))
+    }
+
+    func testAPIClientUpdatesMemoryWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "mem-1",
+          "name": "summer-trip-2026",
+          "displayName": "Summer Trip 2026",
+          "path": "/summer-trip-2026",
+          "parentId": null,
+          "coverMediaId": null,
+          "coverUrl": null,
+          "coverCrop": null,
+          "startDate": "2026-07-12",
+          "endDate": "2026-07-19",
+          "mediaCount": 0,
+          "childCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let updated = try await client.updateMemory(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            request: UpdateMemoryRequest(
+                parentId: nil,
+                name: "summer-trip-2026",
+                displayName: "Summer Trip 2026",
+                startDate: "2026-07-12",
+                endDate: "2026-07-19"
+            )
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(updated.displayName, "Summer Trip 2026")
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""name":"summer-trip-2026""#))
+    }
+
+    func testAPIClientDeletesMemoryWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.statusCode = 204
+        URLProtocolStub.responseData = Data()
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        try await client.deleteMemory(tenantName: "friends", memoryId: "mem-1")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
+    func testAPIClientSetsMemoryCoverFromMediaWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "mem-1",
+          "name": "summer-trip",
+          "displayName": "Summer Trip",
+          "path": "/summer-trip",
+          "parentId": null,
+          "coverMediaId": "media-1",
+          "coverUrl": "/api/friends/memory-media/media-1/content",
+          "coverCrop": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.5625
+          },
+          "startDate": "2026-07-12",
+          "endDate": "2026-07-19",
+          "mediaCount": 1,
+          "childCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let updated = try await client.setMemoryCoverFromMedia(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            mediaId: "media-1",
+            crop: .defaultCoverCrop
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = String(data: try XCTUnwrap(URLProtocolStub.lastRequestBody), encoding: .utf8) ?? ""
+        XCTAssertEqual(updated.coverMediaId, "media-1")
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/cover")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=veyq-ios-") ?? false)
+        XCTAssertTrue(body.contains("name=\"mediaId\""))
+        XCTAssertTrue(body.contains("media-1"))
+        XCTAssertTrue(body.contains("name=\"cropWidth\""))
+        XCTAssertTrue(body.contains("1.0"))
+        XCTAssertTrue(body.contains("name=\"cropHeight\""))
+        XCTAssertTrue(body.contains("0.5625"))
+    }
+
+    func testAPIClientRemovesMemoryCoverWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "mem-1",
+          "name": "summer-trip",
+          "displayName": "Summer Trip",
+          "path": "/summer-trip",
+          "parentId": null,
+          "coverMediaId": null,
+          "coverUrl": null,
+          "coverCrop": null,
+          "startDate": "2026-07-12",
+          "endDate": "2026-07-19",
+          "mediaCount": 1,
+          "childCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let updated = try await client.removeMemoryCover(tenantName: "friends", memoryId: "mem-1")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        XCTAssertNil(updated.coverUrl)
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/cover")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
+    func testAPIClientWaitsForMemoryMediaUpdatesWithCursorAndHash() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = #"{"media":[],"currentMediaIds":["media-1"]}"#.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+        let cursorDate = Date(timeIntervalSince1970: 1_778_000_000)
+
+        let updates = try await client.waitForMemoryMediaUpdates(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            includeChildren: true,
+            afterUpdatedAt: cursorDate,
+            afterMediaId: "media-0",
+            knownMediaSetHash: "known-hash",
+            timeoutSeconds: 3
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
+            item.value.map { (item.name, $0) }
+        })
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "memories.example.test")
+        XCTAssertEqual(components.path, "/api/friends/memories/mem-1/media/updates")
+        XCTAssertEqual(query["includeChildren"], "true")
+        XCTAssertNotNil(query["afterUpdatedAt"])
+        XCTAssertEqual(query["afterMediaId"], "media-0")
+        XCTAssertEqual(query["knownMediaSetHash"], "known-hash")
+        XCTAssertEqual(query["timeoutSeconds"], "3")
+        XCTAssertEqual(updates.currentMediaIds, ["media-1"])
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
     func testAPIClientListsMemoryChaptersWithBearerHeader() async throws {
         URLProtocolStub.reset()
         URLProtocolStub.responseData = "[]".data(using: .utf8)!
@@ -802,6 +1682,120 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
     }
 
+    func testAPIClientUpdatesMemoryJournalWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = ##"{"memoryId":"mem-1","markdown":"# Updated","updatedAt":"2026-06-06T08:15:00Z"}"##.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let journal = try await client.updateMemoryJournal(tenantName: "friends", memoryId: "mem-1", markdown: "# Updated")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(request.httpMethod, "PUT")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/journal")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(body, ##"{"markdown":"# Updated"}"##)
+        XCTAssertEqual(journal.markdown, "# Updated")
+    }
+
+    func testAPIClientUploadsMemoryTrackAsMultipartGPX() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = "{}".data(using: .utf8)!
+        let fileURL = FileManager.default.temporaryDirectory.appending(path: "morning-walk.gpx")
+        try """
+        <gpx version="1.1">
+          <trk><trkseg><trkpt lat="46.1" lon="11.1"/></trkseg></trk>
+        </gpx>
+        """.data(using: .utf8)!.write(to: fileURL, options: [.atomic])
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        try await client.uploadMemoryTrack(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            fileURL: fileURL,
+            title: "Morning Walk",
+            activityType: "HIKING"
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = String(data: try XCTUnwrap(URLProtocolStub.lastRequestBody), encoding: .utf8) ?? ""
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/tracks")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=veyq-ios-") ?? false)
+        XCTAssertTrue(body.contains("name=\"title\""))
+        XCTAssertTrue(body.contains("Morning Walk"))
+        XCTAssertTrue(body.contains("name=\"activityType\""))
+        XCTAssertTrue(body.contains("HIKING"))
+        XCTAssertTrue(body.contains("name=\"file\"; filename=\"morning-walk.gpx\""))
+        XCTAssertTrue(body.contains("Content-Type: application/gpx+xml"))
+        XCTAssertTrue(body.contains("<gpx version=\"1.1\">"))
+    }
+
+    func testAPIClientListsMemoryTracksWithBearerHeader() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        [
+          {
+            "id": "track-1",
+            "memoryId": "mem-1",
+            "title": "Summit Route",
+            "activityType": "HIKING",
+            "originalFilename": "summit.gpx",
+            "distanceMeters": 12430,
+            "ascentMeters": 820,
+            "descentMeters": 610,
+            "pointCount": 3,
+            "startedAt": "2026-05-03T08:30:00Z",
+            "endedAt": "2026-05-03T12:20:00Z",
+            "bounds": {
+              "minLatitude": 47.426,
+              "minLongitude": 10.982,
+              "maxLatitude": 47.451,
+              "maxLongitude": 11.034
+            },
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [[10.982, 47.426], [11.034, 47.451]]
+            },
+            "contentUrl": "/api/friends/memories/mem-1/tracks/track-1/content",
+            "createdAt": "2026-05-03T12:30:00Z",
+            "updatedAt": "2026-05-03T12:30:00Z"
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let tracks = try await client.memoryTracks(tenantName: "friends", memoryId: "mem-1")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/tracks")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertEqual(tracks.map(\.id), ["track-1"])
+        XCTAssertEqual(tracks.first?.distanceMeters, 12_430)
+        XCTAssertEqual(tracks.first?.coordinates.count, 2)
+    }
+
     func testAPIClientLoadsMediaDataWithBearerHeader() async throws {
         URLProtocolStub.reset()
         URLProtocolStub.responseData = Data([0x01, 0x02, 0x03])
@@ -818,6 +1812,146 @@ final class VeyqTests: XCTestCase {
         let request = try XCTUnwrap(URLProtocolStub.lastRequest)
         XCTAssertEqual(data, Data([0x01, 0x02, 0x03]))
         XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memory-media/med-1/preview")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
+    func testAPIClientUpdatesMemoryMediaCapturedAt() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "media-1",
+          "memoryId": "mem-1",
+          "bucketId": null,
+          "title": "Summit",
+          "uploader": {
+            "type": "USER",
+            "displayName": "Kevin",
+            "permalink": "kevin",
+            "userId": 1
+          },
+          "createdAt": "2026-05-03T12:00:00Z",
+          "updatedAt": "2026-05-03T12:05:00Z",
+          "capturedAt": "2026-05-03T11:45:00Z",
+          "capturedAtOverride": true,
+          "mimeType": "image/jpeg",
+          "sizeBytes": 2048,
+          "contentUrl": "/api/friends/memory-media/media-1/content",
+          "highlight": false,
+          "thumbnailUrl": null,
+          "previewUrl": null,
+          "posterUrl": null,
+          "cameraMake": null,
+          "cameraModel": null,
+          "lensModel": null,
+          "imageWidth": null,
+          "imageHeight": null,
+          "gpsLatitude": null,
+          "gpsLongitude": null
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+        let capturedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-03T11:45:00Z"))
+
+        let updated = try await client.updateMemoryMediaCapturedAt(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            mediaId: "media-1",
+            capturedAt: capturedAt
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(updated.id, "media-1")
+        XCTAssertTrue(updated.capturedAtOverride)
+        XCTAssertFalse(updated.highlight)
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/media/media-1/metadata/capturedAt")
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""capturedAt":"2026-05-03T11:45:00Z""#))
+    }
+
+    func testAPIClientUpdatesMemoryMediaHighlight() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = """
+        {
+          "id": "media-1",
+          "memoryId": "mem-1",
+          "bucketId": null,
+          "title": "Summit",
+          "uploader": {
+            "type": "USER",
+            "displayName": "Kevin",
+            "permalink": "kevin",
+            "userId": 1
+          },
+          "createdAt": "2026-05-03T12:00:00Z",
+          "updatedAt": "2026-05-03T12:06:00Z",
+          "capturedAt": "2026-05-03T12:00:00Z",
+          "capturedAtOverride": false,
+          "mimeType": "image/jpeg",
+          "sizeBytes": 2048,
+          "contentUrl": "/api/friends/memory-media/media-1/content",
+          "highlight": true,
+          "thumbnailUrl": null,
+          "previewUrl": null,
+          "posterUrl": null,
+          "cameraMake": null,
+          "cameraModel": null,
+          "lensModel": null,
+          "imageWidth": null,
+          "imageHeight": null,
+          "gpsLatitude": null,
+          "gpsLongitude": null
+        }
+        """.data(using: .utf8)!
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let updated = try await client.updateMemoryMediaHighlight(
+            tenantName: "friends",
+            memoryId: "mem-1",
+            mediaId: "media-1",
+            highlight: true
+        )
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        let body = try XCTUnwrap(request.httpBodyString)
+        XCTAssertEqual(updated.id, "media-1")
+        XCTAssertTrue(updated.highlight)
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/media/media-1/metadata/highlight")
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertTrue(body.contains(#""highlight":true"#))
+    }
+
+    func testAPIClientDeletesMemoryMedia() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.statusCode = 204
+        URLProtocolStub.responseData = Data()
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        try await client.deleteMemoryMedia(tenantName: "friends", memoryId: "mem-1", mediaId: "media-1")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memories/mem-1/media/media-1")
+        XCTAssertEqual(request.httpMethod, "DELETE")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
     }
 
@@ -1161,6 +2295,18 @@ final class VeyqTests: XCTestCase {
         XCTAssertFalse(store.memoryDetails[memory.id]?.media.isEmpty ?? true)
     }
 
+    @MainActor
+    func testMockMemoryDetailIncludesTracks() async {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try? await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        let tracks = store.memoryDetails[memory.id]?.tracks ?? []
+        XCTAssertEqual(tracks.map(\.id), ["track-ridge", "track-lake"])
+        XCTAssertTrue(tracks.allSatisfy(\.hasRenderableGeometry))
+    }
+
     func testMemoryMediaChronologicalSortUsesCapturedAtThenCreatedAt() {
         let fallbackOldest = makeMedia(id: "fallback-oldest", createdAt: 100, capturedAt: nil)
         let capturedNewest = makeMedia(id: "captured-newest", createdAt: 50, capturedAt: 300)
@@ -1231,10 +2377,105 @@ final class VeyqTests: XCTestCase {
         ])
     }
 
+    @MainActor
+    func testMemoryMediaUpdatesMergeAndRemoveMissingMedia() async {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try? await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        let updatedExisting = makeMedia(
+            id: "media-summit",
+            createdAt: 1_775_000_000,
+            updatedAt: 1_775_010_000,
+            capturedAt: 1_775_000_000
+        )
+        let inserted = makeMedia(
+            id: "media-live",
+            createdAt: 1_775_001_200,
+            updatedAt: 1_775_010_100,
+            capturedAt: 1_775_001_200
+        )
+
+        let changed = store.mergeMemoryMediaUpdates(
+            for: memory.id,
+            updates: MemoryMediaUpdatesResponse(
+                media: [updatedExisting, inserted],
+                currentMediaIds: ["media-summit", "media-live"]
+            )
+        )
+
+        let media = store.memoryDetails[memory.id]?.media ?? []
+        XCTAssertTrue(changed)
+        XCTAssertEqual(media.map(\.id), ["media-summit", "media-live"])
+        XCTAssertEqual(media.first?.updatedAt, updatedExisting.updatedAt)
+    }
+
+    @MainActor
+    func testUpdateMediaCapturedAtMergesLoadedDetail() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+        let target = try XCTUnwrap(store.memoryDetails[memory.id]?.media.first)
+        let capturedAt = Date(timeIntervalSince1970: 1_775_099_000)
+
+        let updated = try await store.updateMediaCapturedAt(target, capturedAt: capturedAt)
+
+        let media = store.memoryDetails[memory.id]?.media ?? []
+        XCTAssertEqual(updated.capturedAt, capturedAt)
+        XCTAssertTrue(updated.capturedAtOverride)
+        XCTAssertEqual(media.last?.id, target.id)
+        XCTAssertEqual(media.last?.capturedAt, capturedAt)
+    }
+
+    @MainActor
+    func testDeleteMediaRemovesLoadedDetailItem() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+        let target = try XCTUnwrap(store.memoryDetails[memory.id]?.media.first)
+
+        try await store.deleteMedia(target)
+
+        let media = store.memoryDetails[memory.id]?.media ?? []
+        XCTAssertFalse(media.contains(where: { $0.id == target.id }))
+    }
+
+    @MainActor
+    func testUpdateMediaHighlightUpdatesLoadedDetailItem() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+        let target = try XCTUnwrap(store.memoryDetails[memory.id]?.media.first { $0.id == "media-trail" })
+
+        let updated = try await store.updateMediaHighlight(target, highlight: true)
+
+        XCTAssertTrue(updated.highlight)
+        XCTAssertTrue(store.memoryDetails[memory.id]?.media.first { $0.id == "media-trail" }?.highlight ?? false)
+    }
+
+    @MainActor
+    func testSaveMemoryJournalUpdatesLoadedDetail() async throws {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+        let memory = Memory.samples[0]
+        await store.loadDetail(for: memory)
+
+        let saved = try await store.saveMemoryJournal(for: memory, markdown: "# Edited\n\nLive preview text.")
+
+        XCTAssertEqual(saved.markdown, "# Edited\n\nLive preview text.")
+        XCTAssertEqual(store.memoryDetails[memory.id]?.journal.markdown, "# Edited\n\nLive preview text.")
+        XCTAssertFalse(store.memoryDetails[memory.id]?.media.isEmpty ?? false)
+    }
+
     private func makeMedia(
         id: String,
         memoryId: String = "summer-south-tyrol",
         createdAt: TimeInterval,
+        updatedAt: TimeInterval? = nil,
         capturedAt: TimeInterval?
     ) -> MemoryMedia {
         MemoryMedia(
@@ -1244,11 +2485,13 @@ final class VeyqTests: XCTestCase {
             title: id,
             uploader: MediaUploader(type: "USER", displayName: "Kevin", permalink: "kevin", userId: 1),
             createdAt: Date(timeIntervalSince1970: createdAt),
+            updatedAt: updatedAt.map { Date(timeIntervalSince1970: $0) },
             capturedAt: capturedAt.map { Date(timeIntervalSince1970: $0) },
             capturedAtOverride: false,
             mimeType: "image/jpeg",
             sizeBytes: 1_024,
             contentUrl: "/api/family/memory-media/\(id)/content",
+            highlight: false,
             thumbnailUrl: nil,
             previewUrl: nil,
             posterUrl: nil,
@@ -1372,7 +2615,73 @@ final class VeyqTests: XCTestCase {
             "path": "/",
             "displayName": "Family Memories"
           },
-          "scopeRoots": []
+          "scopeRoots": [],
+          "favoriteMemories": [],
+          "folders": [],
+          "memories": []
+        }
+        """
+    }
+
+    private func scopedNavigationJSON() -> String {
+        """
+        {
+          "location": {
+            "kind": "TENANT",
+            "path": "/",
+            "displayName": "Family Memories"
+          },
+          "scopeRoots": [
+            {
+              "kind": "GROUP",
+              "name": "family",
+              "displayName": "Family",
+              "path": "/@family"
+            },
+            {
+              "kind": "USER",
+              "name": "me",
+              "displayName": "Admin",
+              "path": "/~me"
+            }
+          ],
+          "favoriteMemories": [],
+          "folders": [],
+          "memories": []
+        }
+        """
+    }
+
+    private func multiTenantBootstrapJSON() -> String {
+        """
+        {
+          "serverId": "srv_123",
+          "user": {
+            "userId": 1,
+            "email": "admin@example.test",
+            "displayName": "Admin",
+            "permalink": "admin",
+            "serverRole": "ServerOwner",
+            "passkeyCount": 0,
+            "hasPassword": true,
+            "avatarUrl": null
+          },
+          "tenants": [
+            {
+              "id": 1,
+              "name": "family",
+              "displayName": "Family Memories",
+              "domain": "memories.example.test",
+              "role": "TenantOwner"
+            },
+            {
+              "id": 2,
+              "name": "friends",
+              "displayName": "Friends Memories",
+              "domain": "friends.example.test",
+              "role": "TenantMember"
+            }
+          ]
         }
         """
     }
@@ -1399,7 +2708,7 @@ final class VeyqTests: XCTestCase {
     }
 
     func testKeychainSessionStoreSaveLoadDeleteWithIsolatedService() throws {
-        let store = KeychainNativeSessionStore(service: "com.veyq.ios.tests.\(UUID().uuidString)", account: "active")
+        let store = KeychainNativeSessionStore(service: "app.veyq.ios.tests.\(UUID().uuidString)", account: "active")
         let session = StoredNativeSession(
             instanceURL: URL(string: "https://memories.example.test")!,
             apiBaseURL: URL(string: "https://memories.example.test/api")!,
@@ -1448,6 +2757,7 @@ final class VeyqTests: XCTestCase {
 
         XCTAssertEqual(session.instanceURL.absoluteString, "https://memories.example.test")
         XCTAssertTrue(session.capabilities.isEmpty)
+        XCTAssertNil(session.selectedTenantName)
     }
 }
 
@@ -1533,6 +2843,44 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
         }
 
         return data
+    }
+}
+
+private final class RotatedNativeSessionStore: NativeSessionStoring {
+    private let staleSession: StoredNativeSession
+    private let rotatedSession: StoredNativeSession
+    private var loadActiveCount = 0
+    private var currentSession: StoredNativeSession?
+
+    init(staleSession: StoredNativeSession, rotatedSession: StoredNativeSession) {
+        self.staleSession = staleSession
+        self.rotatedSession = rotatedSession
+    }
+
+    func loadActive() throws -> StoredNativeSession? {
+        defer { loadActiveCount += 1 }
+        if loadActiveCount == 0 {
+            return staleSession
+        }
+        return currentSession ?? rotatedSession
+    }
+
+    func loadAll() throws -> [StoredNativeSession] {
+        [currentSession ?? (loadActiveCount == 0 ? staleSession : rotatedSession)]
+    }
+
+    func save(_ session: StoredNativeSession) throws {
+        currentSession = session
+    }
+
+    func delete() throws {
+        currentSession = nil
+    }
+
+    func delete(instanceURL: URL) throws {
+        if currentSession?.instanceURL == instanceURL {
+            currentSession = nil
+        }
     }
 }
 
