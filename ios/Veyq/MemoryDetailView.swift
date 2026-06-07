@@ -102,11 +102,11 @@ struct MemoryDetailView: View {
 
                 collapsingHeader
                     .padding(.horizontal)
-                    .padding(.top, 12)
+                    .padding(.top, coverUrl == nil ? 4 : 12)
 
                 overviewContent
                     .padding(.horizontal)
-                    .padding(.top, 8)
+                    .padding(.top, coverUrl == nil ? 2 : 8)
                     .padding(.bottom, VeyqLayout.floatingDockContentPadding)
             }
         }
@@ -496,7 +496,7 @@ private struct CollapsingMemoryHeader: View {
     }
 
     private var headerHeight: CGFloat {
-        let expandedHeight: CGFloat = coverUrl == nil ? 172 : 346
+        let expandedHeight: CGFloat = coverUrl == nil ? 124 : 346
         let compactHeight: CGFloat = 82
         return expandedHeight - ((expandedHeight - compactHeight) * progress)
     }
