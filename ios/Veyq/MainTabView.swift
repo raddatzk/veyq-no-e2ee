@@ -42,7 +42,9 @@ struct MainTabView: View {
             transaction.animation = nil
         }
         .safeAreaInset(edge: .bottom) {
-            floatingDock
+            if shouldShowFloatingDock {
+                floatingDock
+            }
         }
         .sheet(isPresented: $contextPresented) {
             SpaceSwitcherSheet()
@@ -111,7 +113,6 @@ struct MainTabView: View {
                     store.selectSpace(space)
                 }
             )
-            .toolbar(shouldHideTabBar(for: tab) ? .hidden : .visible, for: .tabBar)
             .toolbar {
                 topBarToolbar
             }
@@ -127,6 +128,7 @@ struct MainTabView: View {
                 searchSuggestions
             }
         }
+        .toolbar(shouldShowRootTabBar(for: tab) ? .visible : .hidden, for: .tabBar)
     }
 
     private var navigationContextKey: MemoryNavigationContextKey {
@@ -193,6 +195,10 @@ struct MainTabView: View {
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 8)
+    }
+
+    private var shouldShowFloatingDock: Bool {
+        memoryPath.isEmpty
     }
 
     private var tenantSpace: VeyqSpace? {
@@ -275,6 +281,10 @@ struct MainTabView: View {
 
     private func shouldHideTabBar(for tab: RootScopeTab) -> Bool {
         store.canNavigateUpFolder && (tab != .groups || !groupsOverviewActive)
+    }
+
+    private func shouldShowRootTabBar(for tab: RootScopeTab) -> Bool {
+        memoryPath.isEmpty && !shouldHideTabBar(for: tab)
     }
 
     private func showsContentSections(for tab: RootScopeTab) -> Bool {

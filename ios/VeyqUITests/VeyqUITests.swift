@@ -86,6 +86,9 @@ final class VeyqUITests: XCTestCase {
 
         app.buttons["memory-card-birthday-weekend"].tap()
         XCTAssertTrue(app.staticTexts["memory-detail-title"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.tabBars.buttons["Alle Memories"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Gruppen"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Persönlich"].exists)
         XCTAssertTrue(app.buttons["memory-all-media-button"].exists)
         XCTAssertTrue(app.buttons["memory-read-journal-button"].exists)
 
@@ -112,13 +115,13 @@ final class VeyqUITests: XCTestCase {
         XCTAssertTrue(app.scrollViews["memory-journal-reader"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
 
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["memory-home-title"].waitForExistence(timeout: 5))
         app.buttons["upload-status-button"].tap()
         let uploadQueueTitle = app.staticTexts["upload-queue-title"]
         XCTAssertTrue(uploadQueueTitle.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["upload-state-failed"].exists)
         app.buttons["Fertig"].tap()
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["memory-home-title"].waitForExistence(timeout: 5))
 
         let searchField = app.searchFields["Memories suchen"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
