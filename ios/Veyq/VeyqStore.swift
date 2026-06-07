@@ -1,6 +1,12 @@
 import Foundation
 import UIKit
 
+struct NativeOpenRequest: Identifiable {
+    let id = UUID()
+    let path: String
+    let memory: Memory?
+}
+
 @MainActor
 final class VeyqStore: ObservableObject {
     @Published private(set) var connectedInstanceURL: URL?
@@ -20,11 +26,13 @@ final class VeyqStore: ObservableObject {
     @Published private(set) var recentMemoryTargets: [ShareImportMemoryTarget] = []
     @Published private(set) var memoryDetailLoadingIDs: Set<String> = []
     @Published private(set) var memoryDetailMediaErrors: [String: String] = [:]
+    @Published private(set) var memoryMediaFilters: [String: MemoryMediaFilter] = [:]
     @Published private(set) var uploadItems: [UploadQueueItem]
     @Published private(set) var loading = false
     @Published private(set) var memoryNavigationLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var hasCompletedSessionRestore = false
+    @Published private(set) var nativeOpenRequest: NativeOpenRequest?
 
     private var apiClient: VeyqAPIClient?
     private let instanceRepository: InstanceRepository
@@ -61,6 +69,14 @@ final class VeyqStore: ObservableObject {
 
     var visibleFolders: [MemoryFolder] {
         folders
+    }
+
+    func mediaFilter(for memoryId: String) -> MemoryMediaFilter {
+        memoryMediaFilters[memoryId] ?? .all
+    }
+
+    func setMediaFilter(_ filter: MemoryMediaFilter, for memoryId: String) {
+        memoryMediaFilters[memoryId] = filter
     }
 
     var currentFolderPath: String {
@@ -169,6 +185,7 @@ final class VeyqStore: ObservableObject {
         searchErrorMessage = nil
         memoryDetails = [:]
         recentMemoryTargets = []
+        memoryMediaFilters = [:]
         memoryNavigationCache = [:]
         searchSequence = 0
         memoryNavigationLoading = false
@@ -223,6 +240,7 @@ final class VeyqStore: ObservableObject {
         searchLoading = false
         searchErrorMessage = nil
         memoryDetails = [:]
+        memoryMediaFilters = [:]
         refreshRecentMemoryTargets()
         memoryNavigationCache = [:]
         memoryNavigationLoading = false
@@ -316,11 +334,84 @@ final class VeyqStore: ObservableObject {
         }
     }
 
+    func openCanonicalLink(_ url: URL) async {
+        guard url.isHTTPURL else {
+            errorMessage = L10n.string("This veyq link could not be opened.")
+            return
+        }
+
+        if mockMode {
+            let memoryPath = url.path.trimmedFolderPath
+            loadMockFolder(path: memoryPath)
+            if let memory = memories.first(where: { $0.path == memoryPath }) ?? Memory.samples.first(where: { $0.path == memoryPath }) {
+                nativeOpenRequest = NativeOpenRequest(path: memoryPath, memory: memory)
+            } else {
+                nativeOpenRequest = NativeOpenRequest(path: memoryPath, memory: nil)
+            }
+            return
+        }
+
+        if let session = instances.first(where: { storedSession in
+            url.memoryPath(relativeTo: storedSession.instanceURL) != nil
+        }), connectedInstanceURL != session.instanceURL {
+            await switchInstance(session)
+        }
+
+        guard let instanceURL = connectedInstanceURL,
+              let memoryPath = url.memoryPath(relativeTo: instanceURL)
+        else {
+            errorMessage = L10n.string("Connect this veyq instance first.")
+            return
+        }
+
+        guard !memoryPath.hasPrefix("/s/") else {
+            errorMessage = L10n.string("Shared links open in the browser for now.")
+            return
+        }
+
+        guard let tenant = selectedTenant, let apiClient else {
+            errorMessage = L10n.string("Select a tenant before opening this link.")
+            return
+        }
+
+        memoryNavigationLoadSequence += 1
+        let loadSequence = memoryNavigationLoadSequence
+        memoryNavigationLoading = true
+        defer {
+            if memoryNavigationLoadSequence == loadSequence {
+                memoryNavigationLoading = false
+            }
+        }
+
+        do {
+            let navigationContext = try await apiClient.memoryNavigationContext(tenantName: tenant.name, path: memoryPath)
+            let nextSpaces = spaces(from: tenant, navigationContext: navigationContext)
+            let snapshot = MemoryNavigationSnapshot(
+                spaces: nextSpaces,
+                selectedSpace: bestMatchingSpace(for: memoryPath, in: nextSpaces) ?? selectedSpace,
+                navigationLocation: navigationContext.location,
+                folders: navigationContext.folders,
+                memories: navigationContext.memories
+            )
+            memoryNavigationCache[MemoryNavigationCacheKey(tenantName: tenant.name, path: memoryPath)] = snapshot
+            if memoryNavigationLoadSequence == loadSequence {
+                applyMemoryNavigationSnapshot(snapshot)
+                nativeOpenRequest = NativeOpenRequest(path: memoryPath, memory: navigationContext.memory)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func spaceLabel(for path: String) -> String {
         bestMatchingSpace(for: path)?.label ?? selectedTenant?.displayName ?? L10n.string("Unknown Space")
     }
 
     private func bestMatchingSpace(for path: String) -> VeyqSpace? {
+        bestMatchingSpace(for: path, in: spaces)
+    }
+
+    private func bestMatchingSpace(for path: String, in spaces: [VeyqSpace]) -> VeyqSpace? {
         let normalizedPath = path.trimmedFolderPath
         return spaces
             .filter { space in
@@ -964,6 +1055,50 @@ final class VeyqStore: ObservableObject {
         )
     }
 
+    func uploadTrackFiles(_ fileURLs: [URL], targetMemory memory: Memory) {
+        guard supportsCapability("memory.tracks") else {
+            errorMessage = L10n.string("This instance does not support GPX tracks.")
+            return
+        }
+        guard let tenantName = selectedTenant?.name else {
+            errorMessage = L10n.string("No active tenant is selected.")
+            return
+        }
+
+        var storedURLs: [URL] = []
+        var failedCount = 0
+        for fileURL in fileURLs {
+            let didAccess = fileURL.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            do {
+                let filename = fileURL.lastPathComponent.isEmpty ? L10n.string("GPX Track") : fileURL.lastPathComponent
+                let storedURL = try UploadQueuePersistence.copyIntoUploadStore(
+                    sourceURL: fileURL,
+                    preferredFilename: filename,
+                    kind: .track
+                )
+                storedURLs.append(storedURL)
+            } catch {
+                failedCount += 1
+            }
+        }
+
+        if failedCount > 0 {
+            errorMessage = L10n.format("%d GPX tracks could not be uploaded.", failedCount)
+        }
+        guard !storedURLs.isEmpty else { return }
+
+        let target = UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
+        Task {
+            await uploadPendingImportTracks(fileURLs: storedURLs, target: target)
+        }
+    }
+
     func enqueuePendingImport(_ batch: PendingImportBatch, target: UploadTargetMemory) {
         let hasMediaFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) != .track }
         let hasTrackFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) == .track }
@@ -1079,8 +1214,9 @@ final class VeyqStore: ObservableObject {
         folders = []
         memories = []
         memoryDetails = [:]
-        refreshRecentMemoryTargets()
+        memoryMediaFilters = [:]
         try await loadBootstrap(preferredTenantName: session.selectedTenantName)
+        refreshRecentMemoryTargets()
         runNextUploadIfNeeded()
     }
 
@@ -1173,6 +1309,7 @@ final class VeyqStore: ObservableObject {
         folders = []
         memories = []
         memoryDetails = [:]
+        memoryMediaFilters = [:]
         memoryNavigationCache = [:]
         memoryNavigationLoading = false
         apiClient = nil
@@ -2119,5 +2256,50 @@ private extension String {
             normalized.removeLast()
         }
         return normalized
+    }
+}
+
+private extension URL {
+    var isHTTPURL: Bool {
+        let scheme = scheme?.lowercased()
+        return scheme == "https" || scheme == "http"
+    }
+
+    func memoryPath(relativeTo instanceURL: URL) -> String? {
+        guard isHTTPURL,
+              scheme?.lowercased() == instanceURL.scheme?.lowercased(),
+              host?.lowercased() == instanceURL.host?.lowercased(),
+              normalizedPort == instanceURL.normalizedPort
+        else {
+            return nil
+        }
+
+        let instanceBasePath = instanceURL.path.trimmedFolderPath
+        let targetPath = path.trimmedFolderPath
+        let appPath: String
+        if instanceBasePath == "/" {
+            appPath = targetPath
+        } else if targetPath == instanceBasePath {
+            appPath = "/"
+        } else if targetPath.hasPrefix("\(instanceBasePath)/") {
+            appPath = String(targetPath.dropFirst(instanceBasePath.count)).trimmedFolderPath
+        } else {
+            return nil
+        }
+        return appPath.removingPercentEncoding?.trimmedFolderPath ?? appPath
+    }
+
+    var normalizedPort: Int? {
+        if let port {
+            return port
+        }
+        switch scheme?.lowercased() {
+        case "http":
+            return 80
+        case "https":
+            return 443
+        default:
+            return nil
+        }
     }
 }

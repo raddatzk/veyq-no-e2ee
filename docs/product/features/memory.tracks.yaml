@@ -48,6 +48,9 @@ acceptanceCriteria:
           - testName: testAPIClientListsMemoryTracksWithBearerHeader
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadStoreKeepsGPXTrackFallbackExtensionAndMimeType
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.tracks.panel-update-delete
     statement: Track panel updates and deletes existing tracks.
     coverage:
@@ -78,6 +81,12 @@ acceptanceCriteria:
           - testName: testMemoryMapRegionFitsTracksAndMappedMediaTogether
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMapRectFitsMappedMediaWithoutWorldScaleFallback
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryTrackSelectionEnablesNewTracksAfterEmptyMapUpload
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.tracks.public-visible
     statement: Public shares can list visible tracks when role permits.
     coverage:
@@ -97,3 +106,5 @@ acceptanceCriteria:
 gaps:
   - reason: Public-share role denial for tracks is not separated into explicit negative acceptance criteria.
     followUp: Add role-denial ACs and backend.integration coverage for track read/write permissions.
+  - reason: iOS has no current view-test harness for asserting the empty Map placeholder link and Map toolbar GPX importer affordance.
+    followUp: Add native UI automation for empty Memory map sections once iOS view coverage is introduced.

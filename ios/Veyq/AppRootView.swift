@@ -97,10 +97,21 @@ struct AppRootView: View {
     }
 
     private func handleOpenURL(_ url: URL) {
-        guard url.scheme == "veyq", url.host == "import" else { return }
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let batchId = components.queryItems?.first(where: { $0.name == "batchId" })?.value
-        else {
+        guard let deepLink = VeyqDeepLink(url: url) else { return }
+
+        switch deepLink {
+        case .importBatch(let batchId):
+            handleImportHandoff(batchId: batchId)
+        case .open(let canonicalURL):
+            savedInstanceURL = VeyqDeepLink.instanceCandidateURL(for: canonicalURL)?.absoluteString ?? savedInstanceURL
+            Task {
+                await store.openCanonicalLink(canonicalURL)
+            }
+        }
+    }
+
+    private func handleImportHandoff(batchId: String) {
+        guard !batchId.isEmpty else {
             store.reportError(L10n.string("Shared files could not be opened."))
             return
         }
@@ -145,5 +156,57 @@ struct AppRootView: View {
         case .none:
             break
         }
+    }
+}
+
+enum VeyqDeepLink: Equatable {
+    case importBatch(String)
+    case open(URL)
+
+    init?(url: URL) {
+        guard url.scheme?.lowercased() == "veyq" else { return nil }
+        switch url.host?.lowercased() {
+        case "import":
+            guard let batchId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "batchId" })?
+                .value
+            else {
+                return nil
+            }
+            self = .importBatch(batchId)
+        case "open":
+            guard let rawURL = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "url" })?
+                .value,
+                let canonicalURL = URL(string: rawURL),
+                canonicalURL.isHTTPURL
+            else {
+                return nil
+            }
+            self = .open(canonicalURL)
+        default:
+            return nil
+        }
+    }
+
+    static func instanceCandidateURL(for canonicalURL: URL) -> URL? {
+        guard var components = URLComponents(url: canonicalURL, resolvingAgainstBaseURL: false),
+              canonicalURL.isHTTPURL
+        else {
+            return nil
+        }
+        components.path = ""
+        components.query = nil
+        components.fragment = nil
+        return components.url
+    }
+}
+
+private extension URL {
+    var isHTTPURL: Bool {
+        let scheme = scheme?.lowercased()
+        return scheme == "https" || scheme == "http"
     }
 }

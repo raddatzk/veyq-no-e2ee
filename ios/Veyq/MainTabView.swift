@@ -17,7 +17,7 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: rootTabSelection) {
-            Tab(L10n.string("All Memories"), systemImage: "person.3", value: RootScopeTab.tenant) {
+            Tab(tenantTabTitle, systemImage: "person.3", value: RootScopeTab.tenant) {
                 rootNavigationView(for: .tenant)
             }
             .customizationID("app.veyq.ios.scope.tenant")
@@ -95,6 +95,17 @@ struct MainTabView: View {
         .onChange(of: store.uploadItems.isEmpty) { _, isEmpty in
             if isEmpty && selectedRootTab == .activity {
                 selectedRootTab = RootScopeTab(space: store.selectedSpace)
+            }
+        }
+        .onChange(of: store.nativeOpenRequest?.id) { _, _ in
+            guard let request = store.nativeOpenRequest else { return }
+            groupsOverviewActive = false
+            selectedRootTab = RootScopeTab(space: store.selectedSpace)
+            if let memory = request.memory {
+                store.recordRecentMemory(memory)
+                memoryPath = [memory]
+            } else {
+                memoryPath.removeAll()
             }
         }
         .onAppear {
@@ -213,6 +224,11 @@ struct MainTabView: View {
     private var selectedGroupSpace: VeyqSpace? {
         guard store.selectedSpace?.kind == .group else { return nil }
         return store.selectedSpace
+    }
+
+    private var tenantTabTitle: String {
+        let value = store.selectedTenant?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? L10n.string("Tenant") : value
     }
 
     private var searchResults: [SearchResultSummary] {

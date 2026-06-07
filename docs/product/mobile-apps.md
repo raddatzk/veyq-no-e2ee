@@ -133,6 +133,7 @@ iOS behavior:
 - Known verified domains can use Universal Links.
 - Self-hosted pages should render Safari Smart App Banners through page metadata once the official App Store id exists.
 - The Smart App Banner `app-argument` should contain the canonical HTTPS URL for the current Memory, public share, invite target or other app-openable page.
+- When the Safari Smart App Banner is available, the web UI should not render a second in-page "Open in app" action on iOS.
 
 Android behavior:
 
@@ -142,12 +143,21 @@ Android behavior:
 Fallback behavior:
 
 - Web pages can offer a dismissable "Open in app" action.
+- That fallback affordance is deferred until a non-iOS native app exists. iOS relies on the Safari Smart App Banner instead.
 - The fallback URL form is `veyq://open?url=<encoded canonical https url>`.
 - If the app is not installed, the browser page remains usable and may show install links.
 - If the app recognizes a link but does not support the target natively yet, it opens the canonical HTTPS URL in an app-internal browser or web-auth-safe browser surface instead of attempting a partial native flow.
 - Custom scheme links are routing hints only. They never grant access.
 
 The app resolves any incoming link by checking the instance, native session, capabilities and Memory/share authorization through HTTPS APIs.
+
+Initial implementation scope:
+
+- The backend exposes white-label app metadata in frontend bootstrap. `VEYQ_MOBILE_IOS_APP_STORE_ID` maps to `veyq.mobile.ios.app-store-id` and is returned as `mobileApps.iosAppStoreId`.
+- The browser sets Safari Smart App Banner metadata from the runtime bootstrap app id and the current canonical HTTPS URL.
+- The browser does not render an in-page app-open banner while iOS is the only native app platform.
+- iOS accepts `veyq://open?url=<encoded canonical https url>` links, matches them to a stored or active instance, and opens authenticated Memory paths through the Memory navigation APIs.
+- Public share links are recognized but remain browser-first until the native public share viewer is implemented.
 
 ## Uploads
 

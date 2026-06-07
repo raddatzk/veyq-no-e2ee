@@ -316,6 +316,17 @@ acceptanceCriteria:
           - testName: renders media after a hidden gallery tab becomes measurable
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
+  - id: memory.media.ios-highlight-filter
+    statement: iOS Memory detail keeps the All Media versus Highlights selection separate per Memory and consistent across gallery and map media points.
+    coverage:
+      ios:
+        unit:
+          - testName: testMemoryMediaFilterReturnsHighlightsOrAllMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaFilterStateIsSeparatedPerMemory
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.detail-gallery-updates
     statement: Memory detail keeps media gallery and bucket counts consistent during upload, move, delete and live creation update actions.
     coverage:

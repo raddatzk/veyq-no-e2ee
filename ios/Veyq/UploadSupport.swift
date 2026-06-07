@@ -331,6 +331,7 @@ enum SharedAccountPersistence {
 enum VeyqUploadFileKind {
     case image
     case video
+    case track
 }
 
 enum VeyqPendingImportFileKind {
@@ -449,7 +450,7 @@ enum UploadQueuePersistence {
     }
 
     static func copyIntoUploadStore(sourceURL: URL, preferredFilename: String, kind: VeyqUploadFileKind) throws -> URL {
-        let safeFilename = sanitizedFilename(preferredFilename, fallbackExtension: kind == .image ? "jpg" : "mov")
+        let safeFilename = sanitizedFilename(preferredFilename, fallbackExtension: fallbackExtension(for: kind))
         let destination = uploadDirectory.appendingPathComponent("\(UUID().uuidString)-\(safeFilename)")
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
@@ -459,10 +460,18 @@ enum UploadQueuePersistence {
     }
 
     static func writeIntoUploadStore(data: Data, preferredFilename: String, kind: VeyqUploadFileKind) throws -> URL {
-        let safeFilename = sanitizedFilename(preferredFilename, fallbackExtension: kind == .image ? "jpg" : "mov")
+        let safeFilename = sanitizedFilename(preferredFilename, fallbackExtension: fallbackExtension(for: kind))
         let destination = uploadDirectory.appendingPathComponent("\(UUID().uuidString)-\(safeFilename)")
         try data.write(to: destination, options: [.atomic])
         return destination
+    }
+
+    private static func fallbackExtension(for kind: VeyqUploadFileKind) -> String {
+        return switch kind {
+        case .image: "jpg"
+        case .video: "mov"
+        case .track: "gpx"
+        }
     }
 
     static func sharedContainerURL() -> URL {
@@ -497,7 +506,11 @@ func mimeType(for filename: String, kind: VeyqUploadFileKind) -> String {
     if lower.hasSuffix(".mp4") { return "video/mp4" }
     if lower.hasSuffix(".m4v") { return "video/mp4" }
     if lower.hasSuffix(".mov") { return "video/quicktime" }
-    return kind == .image ? "image/jpeg" : "video/quicktime"
+    return switch kind {
+    case .image: "image/jpeg"
+    case .video: "video/quicktime"
+    case .track: "application/gpx+xml"
+    }
 }
 
 func isGPXFilename(_ filename: String) -> Bool {

@@ -175,6 +175,9 @@ struct MemoryHomeView: View {
                             MemoryCard(memory: memory)
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            store.recordRecentMemory(memory)
+                        })
                         .accessibilityIdentifier("memory-card-\(memory.id)")
                     }
                 }
@@ -615,10 +618,6 @@ struct GroupAuthoringSheet: View {
 struct SpaceSwitcherSheet: View {
     @EnvironmentObject private var store: VeyqStore
     @Environment(\.dismiss) private var dismiss
-    @State private var newInstanceURL = ""
-    @State private var instanceError: String?
-    @State private var addingInstance = false
-    @State private var addInstancePresented = false
 
     var body: some View {
         NavigationStack {
@@ -643,15 +642,6 @@ struct SpaceSwitcherSheet: View {
                         }
                         .accessibilityIdentifier("context-tenant-row")
                     }
-
-                    NavigationLink(value: ContextDestination.instance) {
-                        ContextSummaryRow(
-                            symbolName: "server.rack",
-                            title: "Instance",
-                            value: currentInstanceTitle
-                        )
-                    }
-                    .accessibilityIdentifier("context-instance-row")
                 }
             }
             .listStyle(.insetGrouped)
@@ -663,8 +653,6 @@ struct SpaceSwitcherSheet: View {
                     scopeList
                 case .tenant:
                     tenantList
-                case .instance:
-                    instanceList
                 }
             }
             .toolbar {
@@ -676,22 +664,6 @@ struct SpaceSwitcherSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .alert("Connect to Instance", isPresented: $addInstancePresented) {
-            TextField("Instance URL", text: $newInstanceURL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-
-            Button("Connect") {
-                Task { await connectToNewInstance() }
-            }
-            .disabled(newInstanceURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || addingInstance)
-
-            Button("Cancel", role: .cancel) {
-                newInstanceURL = ""
-            }
-        } message: {
-            Text("Enter the base URL of another veyq instance.")
-        }
     }
 
     private var scopeList: some View {
@@ -750,98 +722,11 @@ struct SpaceSwitcherSheet: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var instanceList: some View {
-        List {
-            if !store.instances.isEmpty {
-                Section("Instances") {
-                    ForEach(store.instances, id: \.instanceURL) { session in
-                        Button {
-                            Task {
-                                await store.switchInstance(session)
-                                dismiss()
-                            }
-                        } label: {
-                            SelectionOptionRow(
-                                symbolName: "server.rack",
-                                title: instanceTitle(session),
-                                subtitle: session.user.displayName,
-                                isSelected: store.connectedInstanceURL == session.instanceURL
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            Section {
-                Button {
-                    addInstancePresented = true
-                } label: {
-                    Label("Connect to Instance", systemImage: "plus")
-                }
-                .disabled(addingInstance)
-                .accessibilityIdentifier("add-instance-button")
-
-                if let activeSession {
-                    Button {
-                        Task {
-                            await store.deleteInstance(activeSession)
-                            dismiss()
-                        }
-                    } label: {
-                        Label("Remove Current Instance", systemImage: "trash")
-                    }
-                    .foregroundStyle(VeyqColor.danger)
-                }
-            }
-
-            if let instanceError {
-                Section {
-                    Text(instanceError)
-                        .font(.caption)
-                        .foregroundStyle(VeyqColor.danger)
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Instance")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var activeSession: StoredNativeSession? {
-        store.instances.first { $0.instanceURL == store.connectedInstanceURL }
-    }
-
-    private var currentInstanceTitle: String {
-        guard let activeSession else { return L10n.string("Connected") }
-        return instanceTitle(activeSession)
-    }
-
-    private func instanceTitle(_ session: StoredNativeSession) -> String {
-        session.instanceURL.host ?? session.instanceURL.absoluteString
-    }
-
-    private func connectToNewInstance() async {
-        addingInstance = true
-        instanceError = nil
-        defer { addingInstance = false }
-
-        do {
-            _ = try await store.connect(to: newInstanceURL)
-            newInstanceURL = ""
-            dismiss()
-        } catch let error as InstanceURLValidationError {
-            instanceError = error.localizedDescription
-        } catch {
-            instanceError = L10n.string("Instance could not be connected.")
-        }
-    }
 }
 
 private enum ContextDestination: Hashable {
     case scope
     case tenant
-    case instance
 }
 
 private struct ContextSummaryRow: View {

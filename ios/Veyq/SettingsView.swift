@@ -68,6 +68,23 @@ struct SettingsView: View {
                     Text(L10n.string("Account"))
                 }
 
+                if !store.instances.isEmpty {
+                    Section {
+                        ForEach(store.instances, id: \.instanceURL) { session in
+                            SettingsSummaryRow(
+                                symbolName: store.connectedInstanceURL == session.instanceURL ? "checkmark.circle.fill" : "server.rack",
+                                title: instanceTitle(session),
+                                value: session.user.displayName
+                            )
+                            .accessibilityIdentifier("signed-in-instance-\(session.instanceURL.absoluteString)")
+                        }
+                    } header: {
+                        Text(L10n.string("Signed-in Instances"))
+                    } footer: {
+                        Text(L10n.string("Tenants are selected as workspace context; instances are shown here as connected sessions."))
+                    }
+                }
+
                 Button(role: .destructive) {
                     onDisconnect()
                     dismiss()
@@ -88,6 +105,10 @@ struct SettingsView: View {
             }
             .accessibilityIdentifier("settings-view")
         }
+    }
+
+    private func instanceTitle(_ session: StoredNativeSession) -> String {
+        session.instanceURL.host ?? session.instanceURL.absoluteString
     }
 }
 

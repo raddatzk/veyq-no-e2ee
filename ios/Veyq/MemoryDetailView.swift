@@ -3,6 +3,18 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+private extension UTType {
+    static let gpxTrack = UTType(filenameExtension: "gpx") ?? .xml
+}
+
+enum MemoryTrackSelection {
+    static func synced(enabledTrackIDs: Set<String>, availableTrackIDs: Set<String>) -> Set<String> {
+        guard !enabledTrackIDs.isEmpty else { return availableTrackIDs }
+        let retained = enabledTrackIDs.intersection(availableTrackIDs)
+        return retained.isEmpty ? availableTrackIDs : retained
+    }
+}
+
 struct MemoryDetailView: View {
     @EnvironmentObject private var store: VeyqStore
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +29,7 @@ struct MemoryDetailView: View {
     @State private var deleteConfirmationPresented = false
     @State private var deletingMemory = false
     @State private var enabledTrackIDs = Set<String>()
+    @State private var importingTrackFiles = false
 
     private var detail: LoadedMemoryDetail? {
         store.memoryDetails[memory.id]
@@ -82,7 +95,8 @@ struct MemoryDetailView: View {
     }
 
     private var hasMapContent: Bool {
-        !allMapPoints.isEmpty || !tracks.isEmpty || isLoadingDetail
+        store.supportsCapability("memory.maps")
+            && (!allMapPoints.isEmpty || !tracks.isEmpty || isLoadingDetail || store.supportsCapability("memory.tracks"))
     }
 
     private var hasChapterContent: Bool {
@@ -168,41 +182,7 @@ struct MemoryDetailView: View {
                     )
                 }
 
-                Menu {
-                    if let shareURL = internalShareURL(for: .gallery) {
-                        ShareLink(item: shareURL) {
-                            Label(L10n.string("Share"), systemImage: "square.and.arrow.up")
-                        }
-                        .accessibilityIdentifier("memory-internal-share-link")
-                    }
-                    Button {
-                        infoPresented = true
-                    } label: {
-                        Label(L10n.string("Details"), systemImage: "info.circle")
-                    }
-
-                    if canManageMemory {
-                        Button {
-                            editMemoryPresented = true
-                        } label: {
-                            Label(L10n.string("Edit Memory"), systemImage: "pencil")
-                        }
-                        Button {
-                            coverPresented = true
-                        } label: {
-                            Label(L10n.string("Cover"), systemImage: "photo")
-                        }
-                        Button(role: .destructive) {
-                            deleteConfirmationPresented = true
-                        } label: {
-                            Label(L10n.string("Delete Memory"), systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel(L10n.string("More"))
-                .accessibilityIdentifier("memory-more-button")
+                memoryMoreMenu
             }
         }
         .sheet(isPresented: $infoPresented) {
@@ -242,10 +222,55 @@ struct MemoryDetailView: View {
         .onChange(of: tracks.map(\.id)) { _, trackIDs in
             syncEnabledTracks(trackIDs)
         }
+        .fileImporter(
+            isPresented: $importingTrackFiles,
+            allowedContentTypes: [.gpxTrack, .xml],
+            allowsMultipleSelection: true
+        ) { result in
+            importTrackFiles(result)
+        }
     }
 
     private var collapseProgress: CGFloat {
         min(1, max(0, -headerScrollOffset / 150))
+    }
+
+    private var memoryMoreMenu: some View {
+        Menu {
+            if let shareURL = internalShareURL(for: .gallery) {
+                ShareLink(item: shareURL) {
+                    Label(L10n.string("Share"), systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("memory-internal-share-link")
+            }
+            Button {
+                infoPresented = true
+            } label: {
+                Label(L10n.string("Details"), systemImage: "info.circle")
+            }
+
+            if canManageMemory {
+                Button {
+                    editMemoryPresented = true
+                } label: {
+                    Label(L10n.string("Edit Memory"), systemImage: "pencil")
+                }
+                Button {
+                    coverPresented = true
+                } label: {
+                    Label(L10n.string("Cover"), systemImage: "photo")
+                }
+                Button(role: .destructive) {
+                    deleteConfirmationPresented = true
+                } label: {
+                    Label(L10n.string("Delete Memory"), systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel(L10n.string("More"))
+        .accessibilityIdentifier("memory-more-button")
     }
 
     private var collapsingHeader: some View {
@@ -431,13 +456,14 @@ struct MemoryDetailView: View {
     private var mapPreviewSection: some View {
         if store.supportsCapability("memory.maps") {
             MemoryOverviewSection(title: "Map") {
-                if !mapPoints.isEmpty || !tracks.isEmpty {
+                if !mapPoints.isEmpty || !tracks.isEmpty || store.supportsCapability("memory.tracks") {
                     NavigationLink {
                         MemoryMapView(
                             points: mapPoints,
                             tracks: tracks,
                             mediaFilter: selectedMediaFilterBinding,
-                            enabledTrackIDs: $enabledTrackIDs
+                            enabledTrackIDs: $enabledTrackIDs,
+                            importingTrackFiles: $importingTrackFiles
                         )
                     } label: {
                         Text("Open Map")
@@ -451,7 +477,8 @@ struct MemoryDetailView: View {
                         points: mapPoints,
                         tracks: tracks,
                         mediaFilter: selectedMediaFilterBinding,
-                        enabledTrackIDs: $enabledTrackIDs
+                        enabledTrackIDs: $enabledTrackIDs,
+                        importingTrackFiles: $importingTrackFiles
                     )
                         .accessibilityIdentifier("memory-map-preview")
                 } else if !allMapPoints.isEmpty && selectedMediaFilter == .highlights {
@@ -465,6 +492,20 @@ struct MemoryDetailView: View {
                 } else if isLoadingDetail {
                     ProgressView("Loading map...")
                         .font(.subheadline)
+                } else if store.supportsCapability("memory.tracks") {
+                    NavigationLink {
+                        MemoryMapView(
+                            points: mapPoints,
+                            tracks: tracks,
+                            mediaFilter: selectedMediaFilterBinding,
+                            enabledTrackIDs: $enabledTrackIDs,
+                            importingTrackFiles: $importingTrackFiles
+                        )
+                    } label: {
+                        MemoryMapEmptyPreview()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("memory-map-empty-link")
                 }
             }
         }
@@ -520,11 +561,15 @@ struct MemoryDetailView: View {
     }
 
     private func syncEnabledTracks(_ trackIDs: [String]) {
-        let available = Set(trackIDs)
-        if enabledTrackIDs.isEmpty {
-            enabledTrackIDs = available
-        } else {
-            enabledTrackIDs = enabledTrackIDs.intersection(available)
+        enabledTrackIDs = MemoryTrackSelection.synced(enabledTrackIDs: enabledTrackIDs, availableTrackIDs: Set(trackIDs))
+    }
+
+    private func importTrackFiles(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            store.uploadTrackFiles(urls, targetMemory: memory)
+        case .failure(let error):
+            store.reportError(error.localizedDescription)
         }
     }
 
@@ -1159,7 +1204,29 @@ private struct MemoryMapPreview: View {
     let tracks: [MemoryTrack]
     @Binding var mediaFilter: MemoryMediaFilter
     @Binding var enabledTrackIDs: Set<String>
+    @Binding var importingTrackFiles: Bool
     @State private var position: MapCameraPosition = .automatic
+
+    init(
+        points: [MemoryMapPoint],
+        tracks: [MemoryTrack],
+        mediaFilter: Binding<MemoryMediaFilter>,
+        enabledTrackIDs: Binding<Set<String>>,
+        importingTrackFiles: Binding<Bool>
+    ) {
+        self.points = points
+        self.tracks = tracks
+        _mediaFilter = mediaFilter
+        _enabledTrackIDs = enabledTrackIDs
+        _importingTrackFiles = importingTrackFiles
+        let availableTracks = tracks.filter(\.hasRenderableGeometry)
+        let selectedTrackIDs = MemoryTrackSelection.synced(
+            enabledTrackIDs: enabledTrackIDs.wrappedValue,
+            availableTrackIDs: Set(availableTracks.map(\.id))
+        )
+        let selectedTracks = availableTracks.filter { selectedTrackIDs.contains($0.id) }
+        _position = State(initialValue: MemoryMapRegion.cameraPosition(points: points, tracks: selectedTracks))
+    }
 
     private var enabledTracks: [MemoryTrack] {
         tracks.filter { enabledTrackIDs.contains($0.id) && $0.hasRenderableGeometry }
@@ -1171,7 +1238,13 @@ private struct MemoryMapPreview: View {
 
     var body: some View {
         NavigationLink {
-            MemoryMapView(points: points, tracks: tracks, mediaFilter: $mediaFilter, enabledTrackIDs: $enabledTrackIDs)
+            MemoryMapView(
+                points: points,
+                tracks: tracks,
+                mediaFilter: $mediaFilter,
+                enabledTrackIDs: $enabledTrackIDs,
+                importingTrackFiles: $importingTrackFiles
+            )
         } label: {
             Map(position: $position) {
                 ForEach(Array(enabledTracks.enumerated()), id: \.element.id) { index, track in
@@ -1220,15 +1293,14 @@ private struct MemoryMapPreview: View {
         .buttonStyle(.plain)
         .accessibilityLabel(L10n.string("Open Map"))
         .onAppear {
-            if enabledTrackIDs.isEmpty {
-                enabledTrackIDs = Set(tracks.map(\.id))
-            }
+            syncEnabledTrackSelection()
             syncMapPosition()
         }
         .onChange(of: enabledTrackIDs) {
             syncMapPosition()
         }
         .onChange(of: tracks.map(\.id)) {
+            syncEnabledTrackSelection()
             syncMapPosition()
         }
         .onChange(of: points.map(\.id)) {
@@ -1248,8 +1320,53 @@ private struct MemoryMapPreview: View {
         }
     }
 
+    private func syncEnabledTrackSelection() {
+        let available = Set(tracks.filter(\.hasRenderableGeometry).map(\.id))
+        enabledTrackIDs = MemoryTrackSelection.synced(enabledTrackIDs: enabledTrackIDs, availableTrackIDs: available)
+    }
+
     private func syncMapPosition() {
-        position = .region(region)
+        position = MemoryMapRegion.cameraPosition(points: points, tracks: enabledTracks)
+    }
+}
+
+private struct MemoryMapEmptyPreview: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous)
+                    .fill(VeyqColor.surface)
+                Image(systemName: "map")
+                    .font(.system(size: 44, weight: .semibold))
+                    .foregroundStyle(VeyqColor.info)
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(VeyqColor.onStrong)
+                    .frame(width: 38, height: 38)
+                    .background(VeyqColor.warning, in: Circle())
+                    .offset(x: 42, y: 30)
+            }
+            .frame(height: 168)
+            .overlay {
+                RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous)
+                    .stroke(VeyqColor.hairline)
+            }
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("No map yet")
+                    .font(.headline)
+                Text("Upload photos with location data or GPX tracks to enrich this Memory.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous)
+                .stroke(VeyqColor.hairline)
+        }
     }
 }
 
@@ -1258,10 +1375,37 @@ private struct MemoryMapView: View {
     let tracks: [MemoryTrack]
     @Binding var mediaFilter: MemoryMediaFilter
     @Binding var enabledTrackIDs: Set<String>
+    @Binding var importingTrackFiles: Bool
+    @EnvironmentObject private var store: VeyqStore
     @State private var position: MapCameraPosition = .automatic
+
+    init(
+        points: [MemoryMapPoint],
+        tracks: [MemoryTrack],
+        mediaFilter: Binding<MemoryMediaFilter>,
+        enabledTrackIDs: Binding<Set<String>>,
+        importingTrackFiles: Binding<Bool>
+    ) {
+        self.points = points
+        self.tracks = tracks
+        _mediaFilter = mediaFilter
+        _enabledTrackIDs = enabledTrackIDs
+        _importingTrackFiles = importingTrackFiles
+        let availableTracks = tracks.filter(\.hasRenderableGeometry)
+        let selectedTrackIDs = MemoryTrackSelection.synced(
+            enabledTrackIDs: enabledTrackIDs.wrappedValue,
+            availableTrackIDs: Set(availableTracks.map(\.id))
+        )
+        let selectedTracks = availableTracks.filter { selectedTrackIDs.contains($0.id) }
+        _position = State(initialValue: MemoryMapRegion.cameraPosition(points: points, tracks: selectedTracks))
+    }
 
     private var enabledTracks: [MemoryTrack] {
         tracks.filter { enabledTrackIDs.contains($0.id) && $0.hasRenderableGeometry }
+    }
+
+    private var isEmpty: Bool {
+        points.isEmpty && tracks.isEmpty
     }
 
     private var region: MKCoordinateRegion {
@@ -1274,65 +1418,88 @@ private struct MemoryMapView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Map(position: $position) {
-                ForEach(Array(enabledTracks.enumerated()), id: \.element.id) { index, track in
-                    MapPolyline(coordinates: track.coordinates)
-                        .stroke(MemoryTrackPalette.color(at: index), style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
-                }
+            if isEmpty {
+                VeyqScreenBackground()
+                MemoryMapEmptyPreview()
+                    .padding()
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .accessibilityIdentifier("memory-map-fullscreen-empty")
+            } else {
+                Map(position: $position) {
+                    ForEach(Array(enabledTracks.enumerated()), id: \.element.id) { index, track in
+                        MapPolyline(coordinates: track.coordinates)
+                            .stroke(MemoryTrackPalette.color(at: index), style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
+                    }
 
-                ForEach(points) { point in
-                    Annotation(point.title, coordinate: point.coordinate) {
-                        Image(systemName: "photo.fill")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(VeyqColor.onStrong)
-                            .frame(width: 36, height: 36)
-                            .background(VeyqColor.success, in: Circle())
-                            .overlay {
-                                Circle()
-                                    .stroke(VeyqColor.onStrong.opacity(0.86), lineWidth: 2)
-                            }
-                            .shadow(color: VeyqColor.cardShadow, radius: 8, x: 0, y: 4)
+                    ForEach(points) { point in
+                        Annotation(point.title, coordinate: point.coordinate) {
+                            Image(systemName: "photo.fill")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(VeyqColor.onStrong)
+                                .frame(width: 36, height: 36)
+                                .background(VeyqColor.success, in: Circle())
+                                .overlay {
+                                    Circle()
+                                        .stroke(VeyqColor.onStrong.opacity(0.86), lineWidth: 2)
+                                }
+                                .shadow(color: VeyqColor.cardShadow, radius: 8, x: 0, y: 4)
+                        }
                     }
                 }
-            }
-            .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
-            .ignoresSafeArea(edges: .bottom)
-            .accessibilityIdentifier("memory-map-fullscreen")
+                .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
+                .ignoresSafeArea(edges: .bottom)
+                .accessibilityIdentifier("memory-map-fullscreen")
 
-            mapControls
-                .padding(.horizontal)
-                .padding(.bottom, 18)
+                mapControls
+                    .padding(.horizontal)
+                    .padding(.bottom, 18)
+            }
         }
         .navigationTitle("Map")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                MemoryMediaFilterToggle(
-                    filter: $mediaFilter,
-                    accessibilityIdentifier: "memory-map-filter-button"
-                )
+            if !isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    MemoryMediaFilterToggle(
+                        filter: $mediaFilter,
+                        accessibilityIdentifier: "memory-map-filter-button"
+                    )
+                }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    syncMapPosition()
-                } label: {
-                    Image(systemName: "location.viewfinder")
+            if store.supportsCapability("memory.tracks") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        importingTrackFiles = true
+                    } label: {
+                        Image(systemName: "doc.badge.plus")
+                    }
+                    .accessibilityLabel(L10n.string("Add GPX Track"))
+                    .accessibilityIdentifier("memory-map-toolbar-add-gpx-track-button")
                 }
-                .accessibilityLabel(L10n.string("Recenter Map"))
+            }
+
+            if !isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        syncMapPosition()
+                    } label: {
+                        Image(systemName: "location.viewfinder")
+                    }
+                    .accessibilityLabel(L10n.string("Recenter Map"))
+                }
             }
         }
         .onAppear {
-            if enabledTrackIDs.isEmpty {
-                enabledTrackIDs = Set(tracks.map(\.id))
-            }
+            syncEnabledTrackSelection()
             syncMapPosition()
         }
         .onChange(of: enabledTrackIDs) {
             syncMapPosition()
         }
         .onChange(of: tracks.map(\.id)) {
+            syncEnabledTrackSelection()
             syncMapPosition()
         }
         .onChange(of: points.map(\.id)) {
@@ -1410,14 +1577,29 @@ private struct MemoryMapView: View {
         }
     }
 
+    private func syncEnabledTrackSelection() {
+        let available = Set(tracks.filter(\.hasRenderableGeometry).map(\.id))
+        enabledTrackIDs = MemoryTrackSelection.synced(enabledTrackIDs: enabledTrackIDs, availableTrackIDs: available)
+    }
+
     private func syncMapPosition() {
-        position = .region(region)
+        position = MemoryMapRegion.cameraPosition(points: points, tracks: enabledTracks)
     }
 }
 
 enum MemoryMapRegion {
+    private static let minimumMapRectSide: Double = 4_000
+
     static func region(for points: [MemoryMapPoint]) -> MKCoordinateRegion {
         region(points: points, tracks: [])
+    }
+
+    static func cameraPosition(points: [MemoryMapPoint], tracks: [MemoryTrack]) -> MapCameraPosition {
+        let coordinates = points.map(\.coordinate) + tracks.flatMap(\.coordinates)
+        guard !coordinates.isEmpty else {
+            return .region(region(points: points, tracks: tracks))
+        }
+        return .rect(mapRect(for: coordinates))
     }
 
     static func region(points: [MemoryMapPoint], tracks: [MemoryTrack]) -> MKCoordinateRegion {
@@ -1445,6 +1627,39 @@ enum MemoryMapRegion {
             ),
             span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
         )
+    }
+
+    static func mapRect(points: [MemoryMapPoint], tracks: [MemoryTrack]) -> MKMapRect {
+        mapRect(for: points.map(\.coordinate) + tracks.flatMap(\.coordinates))
+    }
+
+    private static func mapRect(for coordinates: [CLLocationCoordinate2D]) -> MKMapRect {
+        let coordinateRects = coordinates.map { coordinate in
+            let point = MKMapPoint(coordinate)
+            return MKMapRect(x: point.x, y: point.y, width: 0, height: 0)
+        }
+        guard let first = coordinateRects.first else {
+            return MKMapRect(
+                x: MKMapPoint(CLLocationCoordinate2D(latitude: 0, longitude: 0)).x - minimumMapRectSide / 2,
+                y: MKMapPoint(CLLocationCoordinate2D(latitude: 0, longitude: 0)).y - minimumMapRectSide / 2,
+                width: minimumMapRectSide,
+                height: minimumMapRectSide
+            )
+        }
+
+        let union = coordinateRects.dropFirst().reduce(first) { partial, rect in
+            partial.union(rect)
+        }
+        let width = max(union.width, minimumMapRectSide)
+        let height = max(union.height, minimumMapRectSide)
+        let normalized = MKMapRect(
+            x: union.midX - width / 2,
+            y: union.midY - height / 2,
+            width: width,
+            height: height
+        )
+
+        return normalized.insetBy(dx: -width * 0.2, dy: -height * 0.2)
     }
 }
 

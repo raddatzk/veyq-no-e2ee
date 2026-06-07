@@ -24,6 +24,25 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(url.absoluteString, "https://memories.example.test/veyq")
     }
 
+    func testParsesImportDeepLink() throws {
+        let link = try XCTUnwrap(VeyqDeepLink(url: URL(string: "veyq://import?batchId=batch-1")!))
+        XCTAssertEqual(link, .importBatch("batch-1"))
+    }
+
+    func testParsesOpenDeepLinkWithCanonicalURL() throws {
+        let link = try XCTUnwrap(VeyqDeepLink(url: URL(string: "veyq://open?url=https%3A%2F%2Fmemories.example.test%2Fsummer%23journal")!))
+        XCTAssertEqual(link, .open(URL(string: "https://memories.example.test/summer#journal")!))
+    }
+
+    func testOpenDeepLinkRejectsNonHttpCanonicalURL() {
+        XCTAssertNil(VeyqDeepLink(url: URL(string: "veyq://open?url=file%3A%2F%2F%2Ftmp%2Fmemory")!))
+    }
+
+    func testDeepLinkInstanceCandidateDropsPathQueryAndFragment() throws {
+        let candidate = try XCTUnwrap(VeyqDeepLink.instanceCandidateURL(for: URL(string: "https://memories.example.test/summer?view=gallery#journal")!))
+        XCTAssertEqual(candidate.absoluteString, "https://memories.example.test")
+    }
+
     @MainActor
     func testConnectMovesStoreToHomeState() async throws {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
@@ -1173,6 +1192,18 @@ final class VeyqTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(region.span.longitudeDelta, 0.02)
     }
 
+    func testMemoryMapRectFitsMappedMediaWithoutWorldScaleFallback() {
+        let points = MemoryMapPoint.points(from: Array(MemoryMedia.samples.prefix(2)))
+
+        let rect = MemoryMapRegion.mapRect(points: points, tracks: [])
+
+        for point in points {
+            XCTAssertTrue(rect.contains(MKMapPoint(point.coordinate)))
+        }
+        XCTAssertLessThan(rect.width, MKMapRect.world.width / 100)
+        XCTAssertLessThan(rect.height, MKMapRect.world.height / 100)
+    }
+
     func testMemoryTrackDecodingProvidesRenderableCoordinatesAndDuration() throws {
         let data = """
         {
@@ -1225,6 +1256,17 @@ final class VeyqTests: XCTestCase {
         XCTAssertGreaterThan(region.span.longitudeDelta, 0.06)
     }
 
+    func testMemoryTrackSelectionEnablesNewTracksAfterEmptyMapUpload() {
+        XCTAssertEqual(
+            MemoryTrackSelection.synced(enabledTrackIDs: [], availableTrackIDs: ["track-ridge"]),
+            ["track-ridge"]
+        )
+        XCTAssertEqual(
+            MemoryTrackSelection.synced(enabledTrackIDs: ["track-ridge"], availableTrackIDs: ["track-lake"]),
+            ["track-lake"]
+        )
+    }
+
     func testMemoryTrackFormatterShowsDistanceDurationAndElevation() {
         UserDefaults.standard.set(AppLanguagePreference.en.rawValue, forKey: AppLanguagePreference.storageKey)
 
@@ -1235,10 +1277,47 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(MemoryTrackFormatter.elevation(nil), "n/a")
     }
 
+    func testUploadStoreKeepsGPXTrackFallbackExtensionAndMimeType() throws {
+        let source = FileManager.default.temporaryDirectory.appending(path: "selected-track")
+        try "<gpx version=\"1.1\"></gpx>".write(to: source, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let stored = try UploadQueuePersistence.copyIntoUploadStore(
+            sourceURL: source,
+            preferredFilename: "",
+            kind: .track
+        )
+        defer { try? FileManager.default.removeItem(at: stored) }
+
+        XCTAssertTrue(stored.lastPathComponent.hasSuffix("Upload.gpx"))
+        XCTAssertEqual(mimeType(for: stored.lastPathComponent, kind: .track), "application/gpx+xml")
+    }
+
     func testGalleryAspectRatioBoundsExtremeValues() {
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: 16, height: 9), 4.0 / 3.0)
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: 9, height: 16), 3.0 / 4.0)
         XCTAssertEqual(JustifiedMediaLayout.galleryDisplayAspectRatio(width: nil, height: 9), 4.0 / 3.0)
+    }
+
+    func testMemoryMediaFilterReturnsHighlightsOrAllMedia() {
+        let media = MemoryMedia.samples
+
+        XCTAssertEqual(MemoryMediaFilter.all.visibleMedia(from: media).map(\.id), media.map(\.id))
+        XCTAssertEqual(MemoryMediaFilter.highlights.visibleMedia(from: media).map(\.id), ["media-summit"])
+        XCTAssertEqual(
+            MemoryMapPoint.points(from: MemoryMediaFilter.highlights.visibleMedia(from: media)).map(\.mediaId),
+            ["media-summit"]
+        )
+    }
+
+    @MainActor
+    func testMemoryMediaFilterStateIsSeparatedPerMemory() {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+
+        store.setMediaFilter(.highlights, for: "memory-a")
+
+        XCTAssertEqual(store.mediaFilter(for: "memory-a"), .highlights)
+        XCTAssertEqual(store.mediaFilter(for: "memory-b"), .all)
     }
 
     func testMemoryMediaSetHashMatchesServerCanonicalFormat() {
