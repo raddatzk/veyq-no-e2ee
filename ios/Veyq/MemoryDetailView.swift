@@ -102,11 +102,11 @@ struct MemoryDetailView: View {
 
                 collapsingHeader
                     .padding(.horizontal)
-                    .padding(.top, coverUrl == nil ? 4 : 12)
+                    .padding(.top, 12)
 
                 overviewContent
                     .padding(.horizontal)
-                    .padding(.top, coverUrl == nil ? 2 : 8)
+                    .padding(.top, 8)
                     .padding(.bottom, VeyqLayout.floatingDockContentPadding)
             }
         }
@@ -496,7 +496,7 @@ private struct CollapsingMemoryHeader: View {
     }
 
     private var headerHeight: CGFloat {
-        let expandedHeight: CGFloat = coverUrl == nil ? 124 : 346
+        let expandedHeight: CGFloat = coverUrl == nil ? 248 : 346
         let compactHeight: CGFloat = 82
         return expandedHeight - ((expandedHeight - compactHeight) * progress)
     }
@@ -517,28 +517,45 @@ private struct CollapsingMemoryHeader: View {
 
     private var expandedHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let coverUrl {
-                AuthenticatedMediaImage(urlString: coverUrl, contentMode: .fill, crop: coverCrop)
-                    .frame(height: 190)
+            coverHero
+                .frame(height: 190)
+                .clipShape(RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+                .overlay(alignment: .bottomLeading) {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.52)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
-                    .overlay(alignment: .bottomLeading) {
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.46)],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if coverUrl == nil {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(title)
+                                .font(.title3.bold())
+                                .foregroundStyle(VeyqColor.onStrong)
+                                .lineLimit(2)
+                                .shadow(radius: 8)
+                                .accessibilityIdentifier("memory-detail-title")
+                            Text(dateRange)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(VeyqColor.onStrong.opacity(0.88))
+                                .shadow(radius: 8)
+                        }
+                        .padding(14)
                     }
-                    .accessibilityHidden(true)
-                    .padding(.bottom, 4)
-            }
+                }
+                .accessibilityHidden(coverUrl != nil)
+                .padding(.bottom, 4)
 
-            Text(title)
-                .font(.title.bold())
-                .accessibilityIdentifier("memory-detail-title")
-            Text(dateRange)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            if coverUrl != nil {
+                Text(title)
+                    .font(.title.bold())
+                    .accessibilityIdentifier("memory-detail-title")
+                Text(dateRange)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 14) {
                     headerMetadataPills
@@ -550,6 +567,16 @@ private struct CollapsingMemoryHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var coverHero: some View {
+        if let coverUrl {
+            AuthenticatedMediaImage(urlString: coverUrl, contentMode: .fill, crop: coverCrop)
+                .background(VeyqColor.accent.opacity(0.14))
+        } else {
+            MemoryPlaceholderCoverSurface()
+        }
     }
 
     @ViewBuilder
@@ -574,11 +601,10 @@ private struct CollapsingMemoryHeader: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .accessibilityHidden(true)
             } else {
-                Image(systemName: "photo")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(VeyqColor.accent)
+                MemoryPlaceholderCoverSurface()
                     .frame(width: 58, height: 58)
-                    .background(VeyqColor.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
             }
 
             VStack(alignment: .leading, spacing: 3) {

@@ -1070,6 +1070,12 @@ private struct MemoryCard: View {
     }
 
     private var placeholderCover: some View {
+        MemoryPlaceholderCoverSurface()
+    }
+}
+
+struct MemoryPlaceholderCoverSurface: View {
+    var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
                 .fill(
