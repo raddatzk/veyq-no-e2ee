@@ -26,6 +26,7 @@ struct JustifiedMemoryMediaGrid: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+        .clipped()
         .fullScreenCover(
             isPresented: Binding(
                 get: { selectedIndex != nil },
@@ -109,31 +110,7 @@ private struct MediaTile: View {
     let media: MemoryMedia
 
     var body: some View {
-        ZStack {
-            AuthenticatedMediaImage(urlString: media.preferredTileUrl, contentMode: .fill)
-
-            if media.highlight {
-                Image(systemName: "star.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(VeyqColor.warning)
-                    .frame(width: 30, height: 30)
-                    .background(VeyqColor.mediaBackdrop.opacity(0.72), in: Circle())
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .accessibilityHidden(true)
-            }
-
-            if media.isVideo {
-                Image(systemName: "play.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(VeyqColor.onStrong)
-                    .frame(width: 30, height: 30)
-                    .background(VeyqColor.mediaBackdrop.opacity(0.68), in: Circle())
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .accessibilityHidden(true)
-            }
-        }
+        AuthenticatedMediaImage(urlString: media.preferredTileUrl, contentMode: .fill)
         .background(VeyqColor.surface)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -141,6 +118,60 @@ private struct MediaTile: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(VeyqColor.hairline)
         }
+        .overlay(alignment: .topLeading) {
+            if media.highlight {
+                MediaTileHighlightBadge()
+                    .padding(9)
+                    .accessibilityHidden(true)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if media.isVideo {
+                MediaTileBadge(systemName: "play.fill", foreground: VeyqColor.onStrong)
+                    .padding(8)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+private struct MediaTileHighlightBadge: View {
+    var body: some View {
+        Image(systemName: "star.fill")
+            .font(.caption.weight(.semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(VeyqColor.warning)
+            .frame(width: 28, height: 28)
+            .background(
+                ZStack {
+                    Circle()
+                        .fill(VeyqColor.warning.opacity(0.20))
+                        .blur(radius: 7)
+                        .scaleEffect(1.35)
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                    Circle()
+                        .fill(VeyqColor.warning.opacity(0.10))
+                }
+            )
+            .overlay {
+                Circle()
+                    .stroke(VeyqColor.onStrong.opacity(0.32), lineWidth: 0.8)
+            }
+            .shadow(color: VeyqColor.mediaBackdrop.opacity(0.18), radius: 6, x: 0, y: 3)
+    }
+}
+
+private struct MediaTileBadge: View {
+    let systemName: String
+    let foreground: Color
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(foreground)
+            .frame(width: 30, height: 30)
+            .background(VeyqColor.mediaBackdrop.opacity(0.72), in: Circle())
     }
 }
 
@@ -151,6 +182,7 @@ struct AuthenticatedMediaImage: View {
     var crop: CoverCrop? = nil
 
     @State private var image: UIImage?
+    @State private var loadedURLString: String?
     @State private var loading = false
 
     var body: some View {
@@ -179,10 +211,20 @@ struct AuthenticatedMediaImage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .task(id: urlString) {
-            guard !urlString.isEmpty else { return }
+            guard !urlString.isEmpty else {
+                image = nil
+                loadedURLString = nil
+                return
+            }
+            if loadedURLString != urlString {
+                image = nil
+            }
             loading = true
             defer { loading = false }
-            image = try? await store.loadMediaImage(from: urlString)
+            let loadedImage = try? await store.loadMediaImage(from: urlString)
+            guard !Task.isCancelled else { return }
+            image = loadedImage
+            loadedURLString = loadedImage == nil ? nil : urlString
         }
     }
 
@@ -517,6 +559,7 @@ private struct ZoomableAuthenticatedMediaImage: View {
     let urlString: String
 
     @State private var image: UIImage?
+    @State private var loadedURLString: String?
     @State private var loading = false
 
     var body: some View {
@@ -534,10 +577,20 @@ private struct ZoomableAuthenticatedMediaImage: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: urlString) {
-            guard !urlString.isEmpty else { return }
+            guard !urlString.isEmpty else {
+                image = nil
+                loadedURLString = nil
+                return
+            }
+            if loadedURLString != urlString {
+                image = nil
+            }
             loading = true
             defer { loading = false }
-            image = try? await store.loadMediaImage(from: urlString)
+            let loadedImage = try? await store.loadMediaImage(from: urlString)
+            guard !Task.isCancelled else { return }
+            image = loadedImage
+            loadedURLString = loadedImage == nil ? nil : urlString
         }
     }
 }
