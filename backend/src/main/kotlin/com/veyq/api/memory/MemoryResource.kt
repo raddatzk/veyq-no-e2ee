@@ -2,6 +2,7 @@ package com.veyq.api.memory
 
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.model.CreateMemoryRequest
+import com.veyq.api.generated.model.MoveMemoryRequest
 import com.veyq.api.generated.model.UpdateMemoryJournalRequest
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import jakarta.enterprise.context.ApplicationScoped
@@ -48,6 +49,9 @@ class MemoryResource @Inject constructor(
 
     override fun updateMemory(tenantName: String, memoryId: String, request: UpdateMemoryRequest): Response =
         Response.ok(memoryService.updateMemory(memoryId, request)).build()
+
+    override fun moveMemory(tenantName: String, memoryId: String, request: MoveMemoryRequest): Response =
+        Response.ok(memoryService.moveMemory(memoryId, request)).build()
 
     override fun updateMemoryJournal(tenantName: String, memoryId: String, updateMemoryJournalRequest: UpdateMemoryJournalRequest): Response {
         val memory = memoryService.resolveVisibleMemory(memoryId)

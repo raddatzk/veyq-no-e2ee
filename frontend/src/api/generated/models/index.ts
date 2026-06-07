@@ -85,6 +85,8 @@ export * from './MobileSessionExchangeRequest';
 export * from './MobileSessionRefreshRequest';
 export * from './MoveFolderRequest';
 export * from './MoveMemoryMediaRequest';
+export * from './MoveMemoryRequest';
+export * from './MoveMemoryTarget';
 export * from './NativeMobileSessionResponse';
 export * from './PasskeyAssertionResponse';
 export * from './PasskeyAttestationResponse';

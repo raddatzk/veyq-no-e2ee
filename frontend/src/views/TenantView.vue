@@ -8,12 +8,20 @@ import CreateFolderDialog from '../features/memories/components/CreateFolderDial
 import CreateMemoryDialog from '../features/memories/components/CreateMemoryDialog.vue'
 import MemoryDetail from '../features/memories/components/MemoryDetail.vue'
 import MemoryFolderOverview from '../features/memories/components/MemoryFolderOverview.vue'
-import { createMemoryJournalLiveSession, updateMemoryJournal, type Memory } from '../features/memories/api'
+import {
+  createMemoryJournalLiveSession,
+  updateMemoryJournal,
+  type Memory
+} from '../features/memories/api'
 import { useMemoryRouteData } from '../features/memories/composables/useMemoryRouteData'
 import { useMemoryToolbar } from '../features/memories/composables/useMemoryToolbar'
 import { useAuthState } from '../shared/state/useAuthState'
 import { memoryPathToTenantRoute, routePathToMemoryPath } from '../shared/utils/paths'
-import { memoryTabFromHash, memoryTabToHash, type MemoryDetailTab } from '../features/memories/utils/memoryTabs'
+import {
+  memoryTabFromHash,
+  memoryTabToHash,
+  type MemoryDetailTab
+} from '../features/memories/utils/memoryTabs'
 
 const route = useRoute()
 const router = useRouter()
@@ -114,7 +122,9 @@ function handleMemoryCreated(createdMemory: Memory) {
       :tracks="tracks"
       :active-tab="activeMemoryTab"
       :save-journal="(memoryId, request) => updateMemoryJournal(tenantName, memoryId, request)"
-      :create-journal-live-session="(memoryId) => createMemoryJournalLiveSession(tenantName, memoryId)"
+      :create-journal-live-session="
+        (memoryId) => createMemoryJournalLiveSession(tenantName, memoryId)
+      "
       @update:active-tab="updateActiveMemoryTab"
       @open-memory="navigateToPath($event.path)"
       @create-child-memory="createMemoryOpen = true"
@@ -124,12 +134,14 @@ function handleMemoryCreated(createdMemory: Memory) {
 
     <MemoryFolderOverview
       v-else-if="navigation"
+      :tenant-name="tenantName"
       :navigation="navigation"
       :memories="memories"
       @open-folder="navigateToPath($event.path)"
       @open-memory="navigateToPath($event.path)"
       @create-folder="createFolderOpen = true"
       @create-memory="createMemoryOpen = true"
+      @deleted-folder="load"
     />
 
     <CreateFolderDialog

@@ -287,6 +287,10 @@ export const messages = {
       moveScopeTenant: 'Bereich',
       folderCreate: 'Ordner erstellen',
       folderCreateFailed: 'Ordner konnte nicht erstellt werden',
+      folderDelete: 'Ordner löschen',
+      folderDeleteCopy:
+        'Diese Aktion löscht "{name}", alle Unterordner, enthaltene Memories, deren Kapitel und die zugehörigen Medien dauerhaft.',
+      folderDeleteFailed: 'Ordner konnte nicht gelöscht werden',
       folders: 'Ordner',
       folderEmpty: 'Keine Ordner in diesem Bereich.',
       refresh: 'Aktualisieren',
@@ -1354,6 +1358,10 @@ export const messages = {
       moveScopeTenant: 'Space',
       folderCreate: 'Create folder',
       folderCreateFailed: 'Folder could not be created',
+      folderDelete: 'Delete folder',
+      folderDeleteCopy:
+        'This action permanently deletes "{name}", all subfolders, contained Memories, their chapters, and associated media.',
+      folderDeleteFailed: 'Folder could not be deleted',
       folders: 'Folders',
       folderEmpty: 'No folders in this space.',
       refresh: 'Refresh',

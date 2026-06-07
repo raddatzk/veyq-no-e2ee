@@ -13,6 +13,8 @@ import com.veyq.api.generated.model.MemoryParticipantSummary
 import com.veyq.api.generated.model.MemoryScope
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MemorySummary
+import com.veyq.api.generated.model.MoveMemoryRequest
+import com.veyq.api.generated.model.MoveMemoryTarget
 import com.veyq.api.generated.model.UpdateMemoryRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
@@ -218,6 +220,25 @@ class MemoryService @Inject constructor(
             memory.startDate = dateRange.startDate
             memory.endDate = dateRange.endDate
         }
+        return toSummary(memory)
+    }
+
+    @Transactional
+    fun moveMemory(publicId: String, request: MoveMemoryRequest): MemorySummary {
+        val memory = resolveVisibleMemory(publicId)
+        val target = resolveMoveTarget(memory, request.target)
+        val newName = request.name?.let { memoryName(it) } ?: memory.name
+        val targetChanged = target.parentMemory?.id != memory.parentMemory?.id ||
+            target.parentFolder?.id != memory.parentFolder?.id ||
+            newName != memory.name
+
+        if (targetChanged) {
+            validateNoCollision(target.parentMemory, target.parentFolder, memory.scope(), newName)
+        }
+
+        memory.parentMemory = target.parentMemory
+        memory.parentFolder = target.parentFolder
+        memory.name = newName
         return toSummary(memory)
     }
 
@@ -557,10 +578,59 @@ class MemoryService @Inject constructor(
         val scope: LibraryScopeKey,
     )
 
+    private data class MemoryMoveTarget(
+        val parentMemory: Memory?,
+        val parentFolder: TenantFolder?,
+    )
+
     private data class MemoryDateRange(
         val startDate: LocalDate,
         val endDate: LocalDate,
     )
+
+    private fun resolveMoveTarget(memory: Memory, target: MoveMemoryTarget): MemoryMoveTarget =
+        when (target.type) {
+            MoveMemoryTarget.Type.MEMORY -> {
+                val parentId = target.parentMemoryId?.trim()?.takeIf { it.isNotBlank() }
+                    ?: throw BadRequestException("parentMemoryId is required", "MEMORY_MOVE_TARGET_REQUIRED")
+                val parent = resolveVisibleMemory(parentId)
+                if (parent.id == memory.id || isDescendantOrSame(parent, memory)) {
+                    throw BadRequestException("Cannot move memory into itself", "MEMORY_MOVE_INTO_SELF")
+                }
+                if (!parent.scope().sameAs(memory.scope())) {
+                    throw BadRequestException("Cannot move memory between spaces", "MEMORY_SCOPE_INVALID")
+                }
+                MemoryMoveTarget(parent, null)
+            }
+            MoveMemoryTarget.Type.FOLDER -> {
+                val folderPath = target.folderPath?.trim()?.takeIf { it.isNotBlank() }
+                    ?: throw BadRequestException("folderPath is required", "MEMORY_MOVE_TARGET_REQUIRED")
+                val context = resolveVisibleContext(folderPath)
+                val folder = (context as? ResolvedMemoryLocation.Folder)?.folder
+                    ?: throw BadRequestException("folderPath must point to a folder", "MEMORY_MOVE_TARGET_INVALID")
+                if (!folder.scope().sameAs(memory.scope())) {
+                    throw BadRequestException("Cannot move memory between spaces", "MEMORY_SCOPE_INVALID")
+                }
+                MemoryMoveTarget(null, folder)
+            }
+            MoveMemoryTarget.Type.SCOPE_ROOT -> {
+                val scope = target.folderPath?.trim()?.takeIf { it.isNotBlank() }?.let { rootPath ->
+                    when (val context = resolveVisibleContext(rootPath)) {
+                        ResolvedMemoryLocation.Tenant -> LibraryScopeKey.Tenant
+                        is ResolvedMemoryLocation.Group -> context.scope
+                        is ResolvedMemoryLocation.User -> context.scope
+                        is ResolvedMemoryLocation.Folder -> throw BadRequestException(
+                            "folderPath must point to a scope root",
+                            "MEMORY_MOVE_TARGET_INVALID",
+                        )
+                    }
+                } ?: memory.scope()
+                if (!scope.sameAs(memory.scope())) {
+                    throw BadRequestException("Cannot move memory between spaces", "MEMORY_SCOPE_INVALID")
+                }
+                MemoryMoveTarget(null, null)
+            }
+        }
 
     private fun resolveFolderTarget(path: String?): MemoryFolderTarget =
         when (val context = resolveVisibleContext(path)) {

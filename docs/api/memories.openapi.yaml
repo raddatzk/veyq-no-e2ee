@@ -120,7 +120,7 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Deletes a visible organizational folder.
+        Deletes a visible organizational folder recursively. Descendant folders, top-level Memories inside the deleted folder subtree, descendant Memories below those Memories and media owned by the deleted Memories are removed.
 
         Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
       parameters:
@@ -128,7 +128,7 @@ paths:
         - "$ref": "#/components/parameters/FolderPathParam"
       responses:
         '204':
-          description: Folder deleted.
+          description: Folder subtree deleted.
         '401':
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
@@ -413,6 +413,42 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+  "/api/{tenantName}/memories/{memoryId}/move":
+    post:
+      tags:
+        - Memories
+      operationId: moveMemory
+      summary: Move a memory
+      x-implementation-status: implemented
+      x-preconditions:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+      description: |-
+        Moves a visible Memory within the same Space. Targets can be another Memory, a visible folder or the current Space root. Cross-space moves, cycles and sibling name collisions are rejected.
+
+        Vorbedingungen:
+        - A valid access token cookie must be present.
+        - The current user must be a member of the addressed tenant.
+
+        Implementierungsstatus: implemented.
+      parameters:
+        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
+        - "$ref": "#/components/parameters/MemoryId"
+      requestBody:
+        "$ref": "#/components/requestBodies/MoveMemory"
+      responses:
+        '200':
+          "$ref": "#/components/responses/Memory"
+        '400':
+          "$ref": "./common.openapi.yaml#/components/responses/400"
+        '401':
+          "$ref": "./common.openapi.yaml#/components/responses/401"
+        '403':
+          "$ref": "./common.openapi.yaml#/components/responses/403"
+        '404':
+          "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/favorite":
     put:
       tags:
@@ -2438,6 +2474,17 @@ components:
           example:
             path: /@family/summer
             newParentPath: /@family/archive
+    MoveMemory:
+      required: true
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/MoveMemoryRequest"
+          example:
+            target:
+              type: FOLDER
+              folderPath: /@family/archive
+            name: summer-trip
   responses:
     MemoryNavigation:
       description: Memory navigation state.
@@ -3449,6 +3496,46 @@ components:
         displayName: Summer Trip 2026
         startDate: '2026-05-03'
         endDate: '2026-05-06'
+    MoveMemoryRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - target
+      properties:
+        target:
+          "$ref": "#/components/schemas/MoveMemoryTarget"
+        name:
+          type: string
+          nullable: true
+          description: Optional URL-safe sibling name to use at the target.
+      example:
+        target:
+          type: FOLDER
+          folderPath: /travel
+        name: summer-trip
+    MoveMemoryTarget:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - MEMORY
+            - FOLDER
+            - SCOPE_ROOT
+        parentMemoryId:
+          type: string
+          nullable: true
+          description: Target parent Memory id when type is `MEMORY`.
+        folderPath:
+          type: string
+          nullable: true
+          description: Target folder path when type is `FOLDER`, or a scope root path such as `/`, `/@family` or `/~me` when type is `SCOPE_ROOT`.
+      example:
+        type: MEMORY
+        parentMemoryId: mem_parent123
     MemoryScopeRequest:
       type: object
       additionalProperties: false

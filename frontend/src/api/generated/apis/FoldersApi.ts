@@ -97,7 +97,7 @@ export interface FoldersApiInterface {
     deleteFolderRequestOpts(requestParameters: DeleteFolderRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Deletes a visible organizational folder recursively. Descendant folders, top-level Memories inside the deleted folder subtree, descendant Memories below those Memories and media owned by the deleted Memories are removed.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
      * @summary Delete an organizational folder
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} path Canonical folder path.
@@ -108,7 +108,7 @@ export interface FoldersApiInterface {
     deleteFolderRaw(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Deletes a visible organizational folder recursively. Descendant folders, top-level Memories inside the deleted folder subtree, descendant Memories below those Memories and media owned by the deleted Memories are removed.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
      * Delete an organizational folder
      */
     deleteFolder(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -268,7 +268,7 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     }
 
     /**
-     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Deletes a visible organizational folder recursively. Descendant folders, top-level Memories inside the deleted folder subtree, descendant Memories below those Memories and media owned by the deleted Memories are removed.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
      * Delete an organizational folder
      */
     async deleteFolderRaw(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -279,7 +279,7 @@ export class FoldersApi extends runtime.BaseAPI implements FoldersApiInterface {
     }
 
     /**
-     * Deletes a visible organizational folder.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
+     * Deletes a visible organizational folder recursively. Descendant folders, top-level Memories inside the deleted folder subtree, descendant Memories below those Memories and media owned by the deleted Memories are removed.  Vorbedingungen: Der Nutzer ist im Tenant authentifiziert und darf den Ordner sehen.
      * Delete an organizational folder
      */
     async deleteFolder(requestParameters: DeleteFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

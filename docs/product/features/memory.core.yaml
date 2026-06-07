@@ -27,7 +27,13 @@ acceptanceCriteria:
     coverage:
       backend:
         integration:
+          - testName: moves memories to memory folder and scope root targets inside the same space
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: prevents sibling collisions cycles and cross-scope moves
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: memory move rejects cycles cross-space targets and sibling collisions
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
   - id: memory.core.scope-inheritance
@@ -164,6 +170,28 @@ acceptanceCriteria:
           - testName: shows progress and blocks duplicate memory deletion while pending
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+  - id: memory.core.folder-delete
+    statement: Folder deletion is recursive and requires explicit frontend confirmation.
+    coverage:
+      backend:
+        integration:
+          - testName: folder delete recursively deletes nested folders contained memories descendants and media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      frontend:
+        unit:
+          - testName: opens a confirmation before deleting the current folder
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryFolderOverview.test.ts
+          - testName: deletes the current folder after confirmation and emits a refresh event
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryFolderOverview.test.ts
+          - testName: shows an error when deleting the current folder fails
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryFolderOverview.test.ts
+          - testName: maps folder delete and memory move through generated clients
+            kind: positive
+            ref: frontend/src/api/memoryApi.test.ts
   - id: memory.core.search-visible-only
     statement: Search returns only visible Memories, folders and journal snippets.
     coverage:

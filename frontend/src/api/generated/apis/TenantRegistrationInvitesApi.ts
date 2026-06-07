@@ -171,7 +171,7 @@ export interface TenantRegistrationInvitesApiInterface {
 
     /**
      * Creates request options for getTenantRegistrationInviteLogo without sending the request
-     * @param {string} token
+     * @param {string} token 
      * @throws {RequiredError}
      * @memberof TenantRegistrationInvitesApiInterface
      */
@@ -180,7 +180,7 @@ export interface TenantRegistrationInvitesApiInterface {
     /**
      * Liefert das Tenant-Logo fuer die Join-Seite ueber einen gueltigen Registrierungslink. Der bestehende Tenant-Logo-Endpunkt bleibt auf Tenant-Mitglieder begrenzt.  Vorbedingungen: - Der Endpunkt ist ohne Access-Token erreichbar. - Das initiale Setup muss abgeschlossen sein. - Der aktuelle Request-Host muss die Tenant-Domain des Links sein. - Der Link muss gueltig, nicht abgelaufen und nicht widerrufen sein. - Der Tenant muss ein Logo haben.  Implementierungsstatus: implemented.
      * @summary Tenant-Logo fuer Registrierungslink laden
-     * @param {string} token
+     * @param {string} token 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof TenantRegistrationInvitesApiInterface

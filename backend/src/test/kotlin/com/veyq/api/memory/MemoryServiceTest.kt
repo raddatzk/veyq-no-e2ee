@@ -35,6 +35,8 @@ import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
 import com.veyq.api.generated.model.MemoryScopeRequest
+import com.veyq.api.generated.model.MoveMemoryRequest
+import com.veyq.api.generated.model.MoveMemoryTarget
 import com.veyq.api.generated.model.MoveMemoryMediaRequest
 import com.veyq.api.generated.model.SearchResultSummary
 import com.veyq.api.generated.model.UpdateMemoryRequest
@@ -1186,6 +1188,81 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `moves memories to memory folder and scope root targets inside the same space`() {
+        val folder = folderService.createFolder(CreateFolderRequest("archive", "Archive"))
+        val parent = memoryService.createMemory(CreateMemoryRequest("parent", "Parent"))
+        val child = memoryService.createMemory(CreateMemoryRequest("child", "Child", parentId = parent.id))
+        val standalone = memoryService.createMemory(CreateMemoryRequest("standalone", "Standalone"))
+
+        val movedToMemory = memoryService.moveMemory(
+            standalone.id,
+            MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.MEMORY, parentMemoryId = parent.id))
+        )
+        assertThat(movedToMemory.path).isEqualTo("/parent/standalone")
+        assertThat(memory(standalone.id).parentMemory?.publicId).isEqualTo(parent.id)
+        assertThat(memory(standalone.id).parentFolder).isNull()
+
+        val movedToFolder = memoryService.moveMemory(
+            child.id,
+            MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.FOLDER, folderPath = folder.path))
+        )
+        assertThat(movedToFolder.path).isEqualTo("/archive/child")
+        assertThat(memory(child.id).parentMemory).isNull()
+        assertThat(memory(child.id).parentFolder?.publicId).isEqualTo(folder.id)
+
+        val movedToRoot = memoryService.moveMemory(
+            child.id,
+            MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.SCOPE_ROOT))
+        )
+        assertThat(movedToRoot.path).isEqualTo("/child")
+        entityManager.clear()
+        assertThat(memory(child.id).parentMemory).isNull()
+        assertThat(memory(child.id).parentFolder).isNull()
+    }
+
+    @Test
+    fun `memory move rejects cycles cross-space targets and sibling collisions`() {
+        val parent = memoryService.createMemory(CreateMemoryRequest("move-parent", "Move Parent"))
+        val child = memoryService.createMemory(CreateMemoryRequest("move-child", "Move Child", parentId = parent.id))
+        memoryService.createMemory(CreateMemoryRequest("move-sibling", "Move Sibling", parentId = parent.id))
+        val duplicateRoot = memoryService.createMemory(CreateMemoryRequest("duplicate-root", "Duplicate Root"))
+        val folder = folderService.createFolder(CreateFolderRequest("move-folder", "Move Folder"))
+        memoryService.createMemory(CreateMemoryRequest("move-child", "Move Child In Folder", folderPath = folder.path))
+        val group = createGroup("memory-move-group-$runId", owner)
+        val groupMemory = memoryService.createMemory(
+            CreateMemoryRequest("group-move-root", "Group Move Root", scope = MemoryScopeRequest("GROUP", group.name))
+        )
+
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.moveMemory(
+                parent.id,
+                MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.MEMORY, parentMemoryId = child.id))
+            )
+        }
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryService.moveMemory(
+                child.id,
+                MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.MEMORY, parentMemoryId = groupMemory.id))
+            )
+        }
+        assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
+            memoryService.moveMemory(
+                duplicateRoot.id,
+                MoveMemoryRequest(
+                    MoveMemoryTarget(MoveMemoryTarget.Type.MEMORY, parentMemoryId = parent.id),
+                    name = "move-sibling",
+                )
+            )
+        }
+        assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
+            memoryService.moveMemory(
+                child.id,
+                MoveMemoryRequest(MoveMemoryTarget(MoveMemoryTarget.Type.FOLDER, folderPath = folder.path))
+            )
+        }
+    }
+
+    @Test
     fun `updates and validates memory date range`() {
         val memory = memoryService.createMemory(CreateMemoryRequest("dated", "Dated"))
 
@@ -1414,6 +1491,32 @@ class MemoryServiceTest {
         assertThat(memoryRepo.findByTenantAndPublicId(tenant, child.id)).isNull()
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, rootMedia.publicId)).isNull()
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, childMedia.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, otherMedia.publicId)).isNotNull
+    }
+
+    @Test
+    fun `folder delete recursively deletes nested folders contained memories descendants and media`() {
+        folderService.createFolder(CreateFolderRequest("archive", "Archive"))
+        folderService.createFolder(CreateFolderRequest("nested", "Nested", parentPath = "/archive"))
+        val root = memoryService.createMemory(CreateMemoryRequest("folder-root", "Folder Root", folderPath = "/archive"))
+        val nested = memoryService.createMemory(CreateMemoryRequest("nested-root", "Nested Root", folderPath = "/archive/nested"))
+        val child = memoryService.createMemory(CreateMemoryRequest("folder-child", "Folder Child", parentId = root.id))
+        val other = memoryService.createMemory(CreateMemoryRequest("folder-other", "Folder Other"))
+        val rootMedia = createMedia(owner, memory(root.id), "Folder Root Media")
+        val nestedMedia = createMedia(owner, memory(nested.id), "Nested Media")
+        val childMedia = createMedia(owner, memory(child.id), "Folder Child Media")
+        val otherMedia = createMedia(owner, memory(other.id), "Other Folder Media")
+
+        folderService.deleteFolder("/archive")
+
+        assertThatExceptionOfType(NotFoundException::class.java).isThrownBy { folderService.deleteFolder("/archive/nested") }
+        assertThat(memoryRepo.findByTenantAndPublicId(tenant, root.id)).isNull()
+        assertThat(memoryRepo.findByTenantAndPublicId(tenant, nested.id)).isNull()
+        assertThat(memoryRepo.findByTenantAndPublicId(tenant, child.id)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, rootMedia.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, nestedMedia.publicId)).isNull()
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, childMedia.publicId)).isNull()
+        assertThat(memoryRepo.findByTenantAndPublicId(tenant, other.id)).isNotNull
         assertThat(mediaRepo.findByTenantAndPublicId(tenant, otherMedia.publicId)).isNotNull
     }
 

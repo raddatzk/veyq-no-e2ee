@@ -106,6 +106,8 @@ models/MobileSessionExchangeRequest.ts
 models/MobileSessionRefreshRequest.ts
 models/MoveFolderRequest.ts
 models/MoveMemoryMediaRequest.ts
+models/MoveMemoryRequest.ts
+models/MoveMemoryTarget.ts
 models/NativeMobileSessionResponse.ts
 models/PasskeyAssertionResponse.ts
 models/PasskeyAttestationResponse.ts

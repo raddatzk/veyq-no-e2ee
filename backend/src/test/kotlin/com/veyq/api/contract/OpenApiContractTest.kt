@@ -409,6 +409,7 @@ class OpenApiContractTest {
             "GET /api/{tenantName}/memories/{memoryId}",
             "PUT /api/{tenantName}/memories/{memoryId}",
             "DELETE /api/{tenantName}/memories/{memoryId}",
+            "POST /api/{tenantName}/memories/{memoryId}/move",
             "PUT /api/{tenantName}/memories/{memoryId}/favorite",
             "DELETE /api/{tenantName}/memories/{memoryId}/favorite",
             "GET /api/{tenantName}/memories/{memoryId}/children",
@@ -549,7 +550,7 @@ class OpenApiContractTest {
                 "tenant-registration-invites.openapi.yaml" -> TenantRegistrationInvitesApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
-                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
+                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "moveMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryParticipants", "listMemoryParticipantCandidates", "addMemoryParticipant", "removeMemoryParticipant" -> MemoryParticipantsApi::class.java
                     "listMemoryMedia", "waitForMemoryMediaUpdates", "uploadMemoryMedia", "deleteAllMemoryMedia", "listMemoryMediaBuckets", "createMemoryMediaBucket", "updateMemoryMediaBucket", "deleteMemoryMediaBucket", "moveMemoryMedia", "deleteMemoryMediaBatch", "createMemoryMediaUpload", "getMemoryMediaUpload", "abortMemoryMediaUpload", "uploadMemoryMediaChunk", "completeMemoryMediaUpload", "updateMemoryMediaCapturedAt", "updateMemoryMediaHighlight", "deleteMemoryMedia", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview", "memoryMediaThumbnail" -> MemoryMediaApi::class.java
                     "listMemoryTracks", "uploadMemoryTrack", "updateMemoryTrack", "deleteMemoryTrack", "memoryTrackContent" -> MemoryTracksApi::class.java

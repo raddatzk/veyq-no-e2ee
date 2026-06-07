@@ -60,8 +60,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Time-zone policy for Memory ZIP timestamps if locale-aware archive naming is not enough, including whether to store a user time zone in the profile or pass one per download.
 - Memory media download timestamp policy so user-corrected or overridden media timestamps are carried into downloaded originals or ZIP archive entries where the target format can represent them.
 - User account deletion/deactivation endpoints for [ADR 0017](../adr/0017-user-lifecycle-and-tenant-membership-removal.md), including permission checks, active-session invalidation, passkey/credential cleanup, tenant membership soft removal and anonymization of audit-relevant references.
-- Memory edit/delete UX follow-through, including confirmation copy and optimistic refresh behavior.
-- Organizational folder deletion behavior, including preconditions for non-empty folders, Memory reassignment or move requirements and permission/error semantics.
+- Mutation UX follow-up for [ADR 0020](../adr/0020-memory-and-folder-mutation-semantics.md), including affected-content counts, reusable same-space move target selection and error-specific copy.
 - Parent Memory aggregate summary endpoints beyond media list aggregation.
 - Live Memory event API for newly created, updated or deleted media, media buckets, tracks, playlists, journals, covers, child Memories and share-visible changes, with tenant/scope/public-share authorization filtering.
 - Uploader-only public share delete semantics so an uploader can remove media uploaded through the same share identity without gaining broader Memory delete access or visibility into other uploaders' assets.
@@ -84,7 +83,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Memory header with places, weather and richer track/participant summaries beyond the current cover, playlist and participant surfaces.
 - Video poster/title image selection that lets users choose the exact frame or an existing Memory gallery image used as the video's visible title image or preview.
 - Child Memory navigation without file-system feel.
-- Organizational folder delete UX, including confirmation copy, non-empty folder handling and clear guidance that Memories remain the primary content objects.
+- Memory and folder mutation UX polish for [ADR 0020](../adr/0020-memory-and-folder-mutation-semantics.md), including affected-content counts and clear guidance that Memories remain the primary content objects.
 - Parent Memory aggregation indicators.
 - Wrong-upload recovery flow for cross-Memory mistakes while preserving direct Memory asset ownership.
 - Richer uploader attribution and privacy modes beyond current uploader display names and media buckets.

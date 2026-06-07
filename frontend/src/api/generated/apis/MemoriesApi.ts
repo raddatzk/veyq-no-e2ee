@@ -21,6 +21,7 @@ import type {
   MemoryJournalLiveSession,
   MemoryJournalSummary,
   MemorySummary,
+  MoveMemoryRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryRequest,
 } from '../models/index';
@@ -37,6 +38,8 @@ import {
     MemoryJournalSummaryToJSON,
     MemorySummaryFromJSON,
     MemorySummaryToJSON,
+    MoveMemoryRequestFromJSON,
+    MoveMemoryRequestToJSON,
     UpdateMemoryJournalRequestFromJSON,
     UpdateMemoryJournalRequestToJSON,
     UpdateMemoryRequestFromJSON,
@@ -100,6 +103,12 @@ export interface ListMemoriesByFolderRequest {
 export interface MemoryCoverContentRequest {
     tenantName: string;
     memoryId: string;
+}
+
+export interface MoveMemoryOperationRequest {
+    tenantName: string;
+    memoryId: string;
+    moveMemoryRequest: MoveMemoryRequest;
 }
 
 export interface RemoveMemoryCoverRequest {
@@ -451,6 +460,34 @@ export interface MemoriesApiInterface {
      * Stream memory cover image
      */
     memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+
+    /**
+     * Creates request options for moveMemory without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryRequest} moveMemoryRequest 
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    moveMemoryRequestOpts(requestParameters: MoveMemoryOperationRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Moves a visible Memory within the same Space. Targets can be another Memory, a visible folder or the current Space root. Cross-space moves, cycles and sibling name collisions are rejected.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Move a memory
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} memoryId Public Memory id.
+     * @param {MoveMemoryRequest} moveMemoryRequest 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    moveMemoryRaw(requestParameters: MoveMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>>;
+
+    /**
+     * Moves a visible Memory within the same Space. Targets can be another Memory, a visible folder or the current Space root. Cross-space moves, cycles and sibling name collisions are rejected.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Move a memory
+     */
+    moveMemory(requestParameters: MoveMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary>;
 
     /**
      * Creates request options for removeMemoryCover without sending the request
@@ -1254,6 +1291,71 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
         const response = await this.memoryCoverContentRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for moveMemory without sending the request
+     */
+    async moveMemoryRequestOpts(requestParameters: MoveMemoryOperationRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling moveMemory().'
+            );
+        }
+
+        if (requestParameters['memoryId'] == null) {
+            throw new runtime.RequiredError(
+                'memoryId',
+                'Required parameter "memoryId" was null or undefined when calling moveMemory().'
+            );
+        }
+
+        if (requestParameters['moveMemoryRequest'] == null) {
+            throw new runtime.RequiredError(
+                'moveMemoryRequest',
+                'Required parameter "moveMemoryRequest" was null or undefined when calling moveMemory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/move`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+        urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
+
+        return {
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: MoveMemoryRequestToJSON(requestParameters['moveMemoryRequest']),
+        };
+    }
+
+    /**
+     * Moves a visible Memory within the same Space. Targets can be another Memory, a visible folder or the current Space root. Cross-space moves, cycles and sibling name collisions are rejected.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Move a memory
+     */
+    async moveMemoryRaw(requestParameters: MoveMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemorySummary>> {
+        const requestOptions = await this.moveMemoryRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemorySummaryFromJSON(jsonValue));
+    }
+
+    /**
+     * Moves a visible Memory within the same Space. Targets can be another Memory, a visible folder or the current Space root. Cross-space moves, cycles and sibling name collisions are rejected.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Move a memory
+     */
+    async moveMemory(requestParameters: MoveMemoryOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemorySummary> {
+        const response = await this.moveMemoryRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

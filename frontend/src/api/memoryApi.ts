@@ -26,6 +26,7 @@ import type {
   MemoryShareRole,
   PendingMemoryMediaUploadSession,
   PublicShareMediaSummary,
+  MoveMemoryRequest,
   MoveMemoryMediaRequest,
   UpdateMemoryMediaBucketRequest,
   UpdateMemoryMediaMetadataBatchRequest as GeneratedUpdateMemoryMediaMetadataBatchRequest,
@@ -57,6 +58,7 @@ import type {
   CreateMemoryMediaBucketRequest as FeatureCreateMemoryMediaBucketRequest,
   DeleteMemoryMediaBatchRequest as FeatureDeleteMemoryMediaBatchRequest,
   MoveMemoryMediaRequest as FeatureMoveMemoryMediaRequest,
+  MoveMemoryRequest as FeatureMoveMemoryRequest,
   UpdateMemoryMediaMetadataBatchRequest,
   UpdateMemoryJournalRequest,
   UpdateMemoryMediaCapturedAtRequest,
@@ -110,6 +112,10 @@ export function createFolder(
       createFolderRequest: createFolderRequest(request)
     })
   )
+}
+
+export function deleteFolder(tenantName: string, path: string): Promise<void> {
+  return generatedCall(foldersApi.deleteFolder({ tenantName, path }))
 }
 
 export function listMemories(tenantName: string): Promise<Memory[]> {
@@ -180,6 +186,20 @@ export function updateMemory(
   ).then(normalizeMemory)
 }
 
+export function moveMemory(
+  tenantName: string,
+  memoryId: string,
+  request: FeatureMoveMemoryRequest
+): Promise<Memory> {
+  return generatedCall(
+    memoriesApi.moveMemory({
+      tenantName,
+      memoryId,
+      moveMemoryRequest: request as MoveMemoryRequest
+    })
+  ).then(normalizeMemory)
+}
+
 export function deleteMemory(tenantName: string, memoryId: string): Promise<void> {
   return generatedCall(memoriesApi.deleteMemory({ tenantName, memoryId }))
 }
@@ -215,7 +235,9 @@ export function listMemoryParticipantCandidates(
   tenantName: string,
   memoryId: string
 ): Promise<MemoryParticipantSummary[]> {
-  return generatedCall(memoryParticipantsApi.listMemoryParticipantCandidates({ tenantName, memoryId }))
+  return generatedCall(
+    memoryParticipantsApi.listMemoryParticipantCandidates({ tenantName, memoryId })
+  )
 }
 
 export function addMemoryParticipant(
@@ -231,7 +253,9 @@ export function removeMemoryParticipant(
   memoryId: string,
   userId: number
 ): Promise<void> {
-  return generatedCall(memoryParticipantsApi.removeMemoryParticipant({ tenantName, memoryId, userId }))
+  return generatedCall(
+    memoryParticipantsApi.removeMemoryParticipant({ tenantName, memoryId, userId })
+  )
 }
 
 export function setMemoryCover(
@@ -283,7 +307,9 @@ export function waitForNewMemoryMedia(
   if (afterMediaId) params.set('afterMediaId', afterMediaId)
   if (knownMediaSetHash) params.set('knownMediaSetHash', knownMediaSetHash)
   const path = `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
-  return callApi<{ media: MemoryMediaSummary[]; currentMediaIds?: string[] }>(path, { signal }).then((response) => ({
+  return callApi<{ media: MemoryMediaSummary[]; currentMediaIds?: string[] }>(path, {
+    signal
+  }).then((response) => ({
     media: response.media.map(normalizeMemoryMedia),
     currentMediaIds: response.currentMediaIds
   }))
@@ -294,7 +320,9 @@ export function listMemoryMediaBuckets(
   memoryId: string,
   includeChildren = false
 ): Promise<MemoryMediaBucket[]> {
-  return generatedCall(memoryMediaApi.listMemoryMediaBuckets({ tenantName, memoryId, includeChildren }))
+  return generatedCall(
+    memoryMediaApi.listMemoryMediaBuckets({ tenantName, memoryId, includeChildren })
+  )
 }
 
 export function createMemoryMediaBucket(
@@ -342,11 +370,9 @@ export function uploadMemoryMedia(
   options: UploadMediaOptions = {}
 ): Promise<MemoryMedia> {
   const basePath = `/api/${encodeURIComponent(tenantName)}/memories/${encodeURIComponent(memoryId)}/media/uploads`
-  return uploadChunkedMedia<MemoryMediaSummary>(
-    basePath,
-    request,
-    options,
-  ).then(normalizeMemoryMedia)
+  return uploadChunkedMedia<MemoryMediaSummary>(basePath, request, options).then(
+    normalizeMemoryMedia
+  )
 }
 
 export function moveMemoryMedia(
@@ -415,11 +441,18 @@ export function updateMemoryTrack(
   ).then(normalizeMemoryTrack)
 }
 
-export function deleteMemoryTrack(tenantName: string, memoryId: string, trackId: string): Promise<void> {
+export function deleteMemoryTrack(
+  tenantName: string,
+  memoryId: string,
+  trackId: string
+): Promise<void> {
   return generatedCall(memoryTracksApi.deleteMemoryTrack({ tenantName, memoryId, trackId }))
 }
 
-export function listMemoryPlaylists(tenantName: string, memoryId: string): Promise<MemoryPlaylist[]> {
+export function listMemoryPlaylists(
+  tenantName: string,
+  memoryId: string
+): Promise<MemoryPlaylist[]> {
   return generatedCall(memoryPlaylistsApi.listMemoryPlaylists({ tenantName, memoryId })).then(
     (playlists) => playlists.map(normalizeMemoryPlaylist)
   )
@@ -455,8 +488,14 @@ export function updateMemoryPlaylist(
   ).then(normalizeMemoryPlaylist)
 }
 
-export function deleteMemoryPlaylist(tenantName: string, memoryId: string, playlistId: string): Promise<void> {
-  return generatedCall(memoryPlaylistsApi.deleteMemoryPlaylist({ tenantName, memoryId, playlistId }))
+export function deleteMemoryPlaylist(
+  tenantName: string,
+  memoryId: string,
+  playlistId: string
+): Promise<void> {
+  return generatedCall(
+    memoryPlaylistsApi.deleteMemoryPlaylist({ tenantName, memoryId, playlistId })
+  )
 }
 
 export function updateMemoryMediaCapturedAt(
@@ -578,7 +617,11 @@ export function getPublicShare(shareId: string) {
   return generatedCall(publicSharesApi.getPublicShare({ shareId }))
 }
 
-export function loginPublicShare(shareId: string, password: string | null, displayName?: string | null) {
+export function loginPublicShare(
+  shareId: string,
+  password: string | null,
+  displayName?: string | null
+) {
   const normalizedDisplayName = displayName?.trim()
   return generatedCall(
     publicSharesApi.loginPublicShare({
@@ -615,11 +658,9 @@ export function uploadPublicShareMedia(
   options: UploadMediaOptions = {}
 ) {
   const basePath = `/api/public-shares/${encodeURIComponent(shareId)}/media/uploads`
-  return uploadChunkedMedia<PublicShareMediaSummary>(
-    basePath,
-    request,
-    options,
-  ).then(normalizePublicShareMedia)
+  return uploadChunkedMedia<PublicShareMediaSummary>(basePath, request, options).then(
+    normalizePublicShareMedia
+  )
 }
 
 export function getPublicShareMemoryByPath(shareId: string, path: string): Promise<Memory> {
@@ -648,13 +689,12 @@ export function createPublicShareMemoryJournalLiveSession(
   shareId: string,
   memoryId: string
 ): Promise<MemoryJournalLiveSession> {
-  return generatedCall(publicSharesApi.createPublicShareMemoryJournalLiveSession({ shareId, memoryId }))
+  return generatedCall(
+    publicSharesApi.createPublicShareMemoryJournalLiveSession({ shareId, memoryId })
+  )
 }
 
-export function listPublicShareChildMemories(
-  shareId: string,
-  memoryId: string
-): Promise<Memory[]> {
+export function listPublicShareChildMemories(shareId: string, memoryId: string): Promise<Memory[]> {
   return generatedCall(publicSharesApi.listPublicShareChildMemories({ shareId, memoryId })).then(
     (memories) => memories.map(normalizePublicShareMemory)
   )
@@ -669,8 +709,9 @@ export function createPublicShareChildMemory(
     publicSharesApi.createPublicShareChildMemory({
       shareId,
       memoryId,
-      createPublicShareMemoryRequest:
-        createPublicShareMemoryRequest(request) as GeneratedCreatePublicShareMemoryRequest
+      createPublicShareMemoryRequest: createPublicShareMemoryRequest(
+        request
+      ) as GeneratedCreatePublicShareMemoryRequest
     })
   ).then(normalizePublicShareMemory)
 }
@@ -684,8 +725,9 @@ export function updatePublicShareMemory(
     publicSharesApi.updatePublicShareMemory({
       shareId,
       memoryId,
-      updatePublicShareMemoryRequest:
-        updatePublicShareMemoryRequest(request) as GeneratedUpdatePublicShareMemoryRequest
+      updatePublicShareMemoryRequest: updatePublicShareMemoryRequest(
+        request
+      ) as GeneratedUpdatePublicShareMemoryRequest
     })
   ).then(normalizePublicShareMemory)
 }
@@ -713,9 +755,9 @@ export function listPublicShareMemoryMedia(
   memoryId: string,
   includeChildren = false
 ): Promise<MemoryMedia[]> {
-  return generatedCall(publicSharesApi.listPublicShareMemoryMedia({ shareId, memoryId, includeChildren })).then(
-    (media) => media.map(normalizePublicShareMedia)
-  )
+  return generatedCall(
+    publicSharesApi.listPublicShareMemoryMedia({ shareId, memoryId, includeChildren })
+  ).then((media) => media.map(normalizePublicShareMedia))
 }
 
 export function waitForNewPublicShareMemoryMedia(
@@ -732,7 +774,9 @@ export function waitForNewPublicShareMemoryMedia(
   if (afterMediaId) params.set('afterMediaId', afterMediaId)
   if (knownMediaSetHash) params.set('knownMediaSetHash', knownMediaSetHash)
   const path = `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/updates?${params.toString()}`
-  return callApi<{ media: PublicShareMediaSummary[]; currentMediaIds?: string[] }>(path, { signal }).then((response) => ({
+  return callApi<{ media: PublicShareMediaSummary[]; currentMediaIds?: string[] }>(path, {
+    signal
+  }).then((response) => ({
     media: response.media.map(normalizePublicShareMedia),
     currentMediaIds: response.currentMediaIds
   }))
@@ -743,7 +787,9 @@ export function listPublicShareMemoryMediaBuckets(
   memoryId: string,
   includeChildren = false
 ): Promise<MemoryMediaBucket[]> {
-  return generatedCall(publicSharesApi.listPublicShareMemoryMediaBuckets({ shareId, memoryId, includeChildren }))
+  return generatedCall(
+    publicSharesApi.listPublicShareMemoryMediaBuckets({ shareId, memoryId, includeChildren })
+  )
 }
 
 export function createPublicShareMemoryMediaBucket(
@@ -781,7 +827,9 @@ export function deletePublicShareMemoryMediaBucket(
   memoryId: string,
   bucketId: string
 ): Promise<void> {
-  return generatedCall(publicSharesApi.deletePublicShareMemoryMediaBucket({ shareId, memoryId, bucketId }))
+  return generatedCall(
+    publicSharesApi.deletePublicShareMemoryMediaBucket({ shareId, memoryId, bucketId })
+  )
 }
 
 export function listPublicShareMemoryTracks(
@@ -837,7 +885,9 @@ export function deletePublicShareMemoryPlaylist(
   memoryId: string,
   playlistId: string
 ): Promise<void> {
-  return generatedCall(publicSharesApi.deletePublicShareMemoryPlaylist({ shareId, memoryId, playlistId }))
+  return generatedCall(
+    publicSharesApi.deletePublicShareMemoryPlaylist({ shareId, memoryId, playlistId })
+  )
 }
 
 export function uploadPublicShareMemoryTrack(
@@ -887,11 +937,9 @@ export function uploadPublicShareMemoryMedia(
   options: UploadMediaOptions = {}
 ): Promise<MemoryMedia> {
   const basePath = `/api/public-shares/${encodeURIComponent(shareId)}/memories/${encodeURIComponent(memoryId)}/media/uploads`
-  return uploadChunkedMedia<PublicShareMediaSummary>(
-    basePath,
-    request,
-    options,
-  ).then(normalizePublicShareMedia)
+  return uploadChunkedMedia<PublicShareMediaSummary>(basePath, request, options).then(
+    normalizePublicShareMedia
+  )
 }
 
 export function setPublicShareMemoryCover(
@@ -998,7 +1046,10 @@ export function abortMemoryMediaUploadSession(
   )
 }
 
-export function abortPublicShareMediaUploadSession(shareId: string, uploadId: string): Promise<void> {
+export function abortPublicShareMediaUploadSession(
+  shareId: string,
+  uploadId: string
+): Promise<void> {
   return callApi<void>(
     `/api/public-shares/${encodeURIComponent(shareId)}/media/uploads/${encodeURIComponent(uploadId)}`,
     { method: 'DELETE' }
@@ -1029,14 +1080,20 @@ async function uploadChunkedMedia<T>(
 
   const pendingSession = isPendingUploadSession(session)
     ? session
-    : await callApi<PendingMemoryMediaUploadSession>(`${basePath}/${encodeURIComponent(session.uploadId)}`)
+    : await callApi<PendingMemoryMediaUploadSession>(
+        `${basePath}/${encodeURIComponent(session.uploadId)}`
+      )
   options.onSession?.(pendingSession)
 
   const uploadedChunks = new Set(pendingSession.uploadedChunks)
   let uploadedBytes = pendingSession.uploadedBytes
   options.onProgress?.({ loaded: uploadedBytes, total: request.file.size })
 
-  for (let start = 0, index = 0; start < request.file.size; start += pendingSession.chunkSizeBytes, index += 1) {
+  for (
+    let start = 0, index = 0;
+    start < request.file.size;
+    start += pendingSession.chunkSizeBytes, index += 1
+  ) {
     const end = Math.min(start + pendingSession.chunkSizeBytes, request.file.size)
     if (uploadedChunks.has(index)) {
       uploadedBytes = Math.max(uploadedBytes, end)
@@ -1061,10 +1118,16 @@ async function uploadChunkedMedia<T>(
     options.onProgress?.({ loaded: uploadedBytes, total: request.file.size })
   }
 
-  return callApi<T>(`${basePath}/${encodeURIComponent(session.uploadId)}/complete`, { method: 'POST' })
+  return callApi<T>(`${basePath}/${encodeURIComponent(session.uploadId)}/complete`, {
+    method: 'POST'
+  })
 }
 
-function createUploadSessionRequest(request: { file: File; title?: string | null; bucketId?: string | null }): CreateMemoryMediaUploadRequest {
+function createUploadSessionRequest(request: {
+  file: File
+  title?: string | null
+  bucketId?: string | null
+}): CreateMemoryMediaUploadRequest {
   return {
     filename: request.file.name || 'Upload',
     mimeType: request.file.type || 'application/octet-stream',
@@ -1111,7 +1174,9 @@ function updateMemoryRequest(request: UpdateMemoryRequest): GeneratedUpdateMemor
   }
 }
 
-function createMemoryPlaylistRequest(request: CreateMemoryPlaylistRequest): GeneratedCreateMemoryPlaylistRequest {
+function createMemoryPlaylistRequest(
+  request: CreateMemoryPlaylistRequest
+): GeneratedCreateMemoryPlaylistRequest {
   return {
     title: request.title ?? undefined,
     note: request.note ?? undefined,

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createMemory,
+  deleteFolder,
   deleteMemory,
   favoriteMemory,
   getMemoryHeader,
@@ -9,6 +10,7 @@ import {
   listMemories,
   listMemoriesByFolder,
   listMemoryMedia,
+  moveMemory,
   removeMemoryCover,
   setMemoryCover,
   updateMemory,
@@ -28,7 +30,9 @@ const mocks = vi.hoisted(() => ({
   unfavoriteMemory: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),
+  moveMemory: vi.fn(),
   deleteMemory: vi.fn(),
+  deleteFolder: vi.fn(),
   setMemoryCover: vi.fn(),
   removeMemoryCover: vi.fn(),
   listMemoryMedia: vi.fn(),
@@ -49,9 +53,13 @@ vi.mock('./generatedClient', () => ({
     unfavoriteMemory: mocks.unfavoriteMemory,
     createMemory: mocks.createMemory,
     updateMemory: mocks.updateMemory,
+    moveMemory: mocks.moveMemory,
     deleteMemory: mocks.deleteMemory,
     setMemoryCover: mocks.setMemoryCover,
     removeMemoryCover: mocks.removeMemoryCover
+  },
+  foldersApi: {
+    deleteFolder: mocks.deleteFolder
   },
   memoryMediaApi: {
     listMemoryMedia: mocks.listMemoryMedia,
@@ -202,8 +210,14 @@ describe('memoryApi facade', () => {
 
     expect(favorited.favorite).toBe(true)
     expect(unfavorited.favorite).toBe(false)
-    expect(mocks.favoriteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-trip' })
-    expect(mocks.unfavoriteMemory).toHaveBeenCalledWith({ tenantName: 'tenant', memoryId: 'mem-trip' })
+    expect(mocks.favoriteMemory).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-trip'
+    })
+    expect(mocks.unfavoriteMemory).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-trip'
+    })
   })
 
   it('maps create and update request null values to generated undefined fields', async () => {
@@ -250,6 +264,31 @@ describe('memoryApi facade', () => {
         endDate: '2026-05-06'
       }
     })
+  })
+
+  it('maps folder delete and memory move through generated clients', async () => {
+    const request = {
+      target: { type: 'FOLDER' as const, folderPath: '/archive' },
+      name: 'renamed-trip'
+    }
+    mocks.deleteFolder.mockResolvedValue(undefined)
+    mocks.moveMemory.mockResolvedValue({
+      ...memoryResponse('renamed-trip'),
+      path: '/archive/renamed-trip'
+    })
+
+    await deleteFolder('tenant', '/archive')
+    const moved = await moveMemory('tenant', 'mem-trip', request)
+
+    expect(mocks.deleteFolder).toHaveBeenCalledWith({ tenantName: 'tenant', path: '/archive' })
+    expect(mocks.moveMemory).toHaveBeenCalledWith({
+      tenantName: 'tenant',
+      memoryId: 'mem-trip',
+      moveMemoryRequest: request
+    })
+    expect(moved.path).toBe('/archive/renamed-trip')
+    expect(moved.parentId).toBeNull()
+    expect(mocks.generatedCall).toHaveBeenCalledTimes(2)
   })
 
   it('normalizes memory media fields and forwards includeChildren', async () => {

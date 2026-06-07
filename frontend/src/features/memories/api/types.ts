@@ -35,6 +35,7 @@ import type {
   MemorySummary,
   MemoryScopeRoot,
   MoveFolderRequest as GeneratedMoveFolderRequest,
+  MoveMemoryRequest as GeneratedMoveMemoryRequest,
   MoveMemoryMediaRequest as GeneratedMoveMemoryMediaRequest,
   UpdateFolderRequest as GeneratedUpdateFolderRequest,
   UpdateMemoryMediaBucketRequest as GeneratedUpdateMemoryMediaBucketRequest,
@@ -71,7 +72,7 @@ export type {
   MemoryMediaBucketSummary,
   MemoryMediaUploadSession,
   PendingMemoryMediaUploadSession,
-  CreateMemoryMediaUploadRequest,
+  CreateMemoryMediaUploadRequest
 }
 
 export type Memory = Omit<
@@ -85,14 +86,14 @@ export type Memory = Omit<
   scope: MemoryScope | null
 }
 
-export type MemoryNavigationResponse = Omit<GeneratedMemoryNavigationResponse, 'favoriteMemories'> & {
+export type MemoryNavigationResponse = Omit<
+  GeneratedMemoryNavigationResponse,
+  'favoriteMemories'
+> & {
   favoriteMemories: Memory[]
 }
 
-export type MemoryHeader = Omit<
-  MemoryHeaderSummary,
-  'coverUrl' | 'coverCrop' | 'scope'
-> & {
+export type MemoryHeader = Omit<MemoryHeaderSummary, 'coverUrl' | 'coverCrop' | 'scope'> & {
   coverUrl: string | null
   coverCrop: CoverCrop | null
   scope: MemoryScope | null
@@ -157,11 +158,16 @@ export type MemoryMedia = Omit<
   gpsLongitude: number | null
 }
 
-export type CreateMemoryRequest = Omit<GeneratedCreateMemoryRequest, 'parentId' | 'folderPath' | 'scope'> & {
+export type CreateMemoryRequest = Omit<
+  GeneratedCreateMemoryRequest,
+  'parentId' | 'folderPath' | 'scope'
+> & {
   parentId?: string | null
   folderPath?: string | null
   scope?: MemoryScopeRequest | null
 }
+
+export type MoveMemoryRequest = GeneratedMoveMemoryRequest
 
 export type UpdateMemoryRequest = Omit<
   GeneratedUpdateMemoryRequest,
