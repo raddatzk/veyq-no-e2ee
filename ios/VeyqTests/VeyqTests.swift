@@ -35,6 +35,17 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
+    func testRestoreSessionMarksInitialSessionCheckComplete() async {
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore())
+
+        XCTAssertFalse(store.hasCompletedSessionRestore)
+        await store.restoreSession()
+
+        XCTAssertTrue(store.hasCompletedSessionRestore)
+        XCTAssertFalse(store.isConnected)
+    }
+
+    @MainActor
     func testMockMemoryDetailDataIsAvailable() async {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
         try? await store.connect(to: "https://memories.example.test")

@@ -23,6 +23,7 @@ final class VeyqStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var memoryNavigationLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var hasCompletedSessionRestore = false
 
     private var apiClient: VeyqAPIClient?
     private let instanceRepository: InstanceRepository
@@ -95,6 +96,7 @@ final class VeyqStore: ObservableObject {
     }
 
     func restoreSession() async {
+        defer { hasCompletedSessionRestore = true }
         guard !mockMode else { return }
         do {
             instances = try sessionStore.loadAll()

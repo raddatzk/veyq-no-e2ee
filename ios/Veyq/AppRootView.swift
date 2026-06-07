@@ -17,6 +17,9 @@ struct AppRootView: View {
                     store.disconnect()
                     savedInstanceURL = ""
                 }
+            } else if !store.hasCompletedSessionRestore {
+                ProgressView()
+                    .accessibilityIdentifier("session-restore-progress")
             } else {
                 NavigationStack {
                     connectView
@@ -27,7 +30,7 @@ struct AppRootView: View {
         .preferredColorScheme(AppThemePreference.resolve(themePreferenceRawValue).colorScheme)
         .environment(\.locale, AppLanguagePreference.resolve(languagePreferenceRawValue).locale)
         .task {
-            guard !store.isConnected else { return }
+            guard !store.isConnected, !store.hasCompletedSessionRestore else { return }
             await store.restoreSession()
             presentLatestPendingImportIfAvailable()
         }
