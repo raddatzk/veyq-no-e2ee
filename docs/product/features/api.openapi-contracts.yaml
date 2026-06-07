@@ -76,6 +76,23 @@ acceptanceCriteria:
           - testName: does not expose unhandled exception details
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+  - id: api.openapi-contracts.request-validation-annotations
+    statement: Shared OpenAPI request schemas attach backend validation annotations for reusable syntactic input rules.
+    coverage:
+      backend:
+        unit:
+          - testName: name accepts url safe non reserved names
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: display name requires visible text
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: positive byte values require values above zero
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: required text rejects blank values
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
 gaps:
   - reason: Generated frontend artifact freshness should be covered by a future deterministic validator.
     followUp: Add the validator before treating frontend generation freshness as proven.

@@ -62,6 +62,17 @@ acceptanceCriteria:
           - testName: deletes an avatar and clears auth state
             kind: negative
             ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+      ios:
+        unit:
+          - testName: testAPIClientUpdatesMySettingsWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testStoreUpdatesMockUserSettings
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+    gaps:
+      - reason: Native iOS now covers profile field updates, but avatar upload/delete and credential-management flows remain browser-only in Mobile V1.
+        followUp: Add native avatar handling or browser handoff affordances once the iOS account-settings scope is expanded.
   - id: user.profile-account-settings.permalink-normalization
     statement: Permalink utilities normalize profile paths and enforce length limits.
     coverage:

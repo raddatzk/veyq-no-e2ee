@@ -35,7 +35,7 @@ acceptanceCriteria:
     coverage:
       frontend:
         unit:
-          - testName: maps folder and path based memory lookups through generatedCall
+          - testName: maps navigation context and path based memory lookups through generatedCall
             kind: positive
             ref: frontend/src/api/memoryApi.test.ts
           - testName: normalizes optional memory fields to null

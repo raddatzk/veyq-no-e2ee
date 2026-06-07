@@ -52,7 +52,7 @@ acceptanceCriteria:
           - testName: renders thumbnails in the grid instead of originals
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
-          - testName: renders media after a hidden gallery tab becomes measurable
+          - testName: marks highlighted media with a star badge in the gallery
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
   - id: memory.media.lightbox-original-download
@@ -69,19 +69,19 @@ acceptanceCriteria:
           - testName: keeps fullscreen open and emits navigation from fullscreen controls
             kind: positive
             ref: frontend/src/components/media/MediaLightbox.test.ts
-          - testName: emits navigation and close from keyboard shortcuts
-            kind: positive
-            ref: frontend/src/components/media/MediaLightbox.test.ts
-          - testName: does not emit unavailable keyboard navigation
-            kind: negative
-            ref: frontend/src/components/media/MediaLightbox.test.ts
-          - testName: hides highlighting and shows a shortcut hint when highlighting is not allowed
-            kind: negative
-            ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: preloads current previous two and next five media with adaptive image and video poster sources
             kind: positive
             ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: aborts pending preloads when the lightbox unmounts
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: emits navigation and close from keyboard shortcuts
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: advances by one media item when the lightbox emits next from an arrow key
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: does not emit unavailable keyboard navigation
             kind: negative
             ref: frontend/src/components/media/MediaLightbox.test.ts
   - id: memory.media.tenant-dedup-boundary
@@ -109,6 +109,14 @@ acceptanceCriteria:
           - testName: deletes all direct memory media without deleting child memory media
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testAPIClientDeletesMemoryMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteMediaRemovesLoadedDetailItem
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.metadata-correction
     statement: Batch timestamp correction accepts valid selections and rejects empty or out-of-memory selections.
     coverage:
@@ -129,6 +137,14 @@ acceptanceCriteria:
           - testName: captured at override stays media specific and does not mutate blob metadata
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testAPIClientUpdatesMemoryMediaCapturedAt
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUpdateMediaCapturedAtMergesLoadedDetail
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.bucket-management
     statement: Bucket move/delete flows preserve primary bucket rules and reject nested subbuckets.
     coverage:
@@ -176,6 +192,9 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
           - testName: deduplicates repeated media ids inside the active bucket
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: hides highlight badges inside bucket media tiles
             kind: negative
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
           - testName: selects one visible media item and submits only that item with offset seconds
@@ -226,6 +245,9 @@ acceptanceCriteria:
           - testName: keeps batch actions disabled without a selection or without a changed reference time
             kind: negative
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: opens the bucket gallery lightbox with the camera-filtered media and selects the current media with s
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
   - id: memory.media.video-preview-delivery
     statement: Video media summaries expose poster URLs and cacheable poster responses.
     coverage:
@@ -247,17 +269,6 @@ acceptanceCriteria:
           - testName: testMemoryDetailUploadIconUsesMediaImportSymbol
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
-  - id: memory.media.upload-picker-multiselect
-    statement: Web Memory upload preserves multi-selected photo/video files even when the browser file provider omits MIME types.
-    coverage:
-      frontend:
-        unit:
-          - testName: keeps Safari Photos multi-select files when Safari populates the file input late
-            kind: positive
-            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
-          - testName: adds files from repeated Safari Photos selections instead of replacing the existing pick
-            kind: positive
-            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
   - id: memory.media.drag-drop-memory-upload
     statement: Web Memory detail accepts dropped photo/video files and starts a private Memory upload while ignoring unsupported file types.
     coverage:
@@ -302,6 +313,9 @@ acceptanceCriteria:
           - testName: keeps content, preview-only, poster and image display variants explicit
             kind: negative
             ref: frontend/src/shared/utils/mediaUrls.test.ts
+          - testName: renders media after a hidden gallery tab becomes measurable
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
   - id: memory.media.detail-gallery-updates
     statement: Memory detail keeps media gallery and bucket counts consistent during upload, move, delete and live creation update actions.
     coverage:
@@ -381,6 +395,17 @@ acceptanceCriteria:
           - testName: shows child memory drop hints only for the active drag target
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+      ios:
+        unit:
+          - testName: testAPIClientWaitsForMemoryMediaUpdatesWithCursorAndHash
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaSetHashMatchesServerCanonicalFormat
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaUpdatesMergeAndRemoveMissingMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.upload-dialog
     statement: Upload dialogs queue selected files with stable titles and bucket targets.
     coverage:
@@ -393,6 +418,12 @@ acceptanceCriteria:
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: keeps the submitted bucket for every queued file when the visible bucket changes
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: keeps Safari Photos multi-select files when Safari populates the file input late
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: adds files from repeated Safari Photos selections instead of replacing the existing pick
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: starts a background upload batch and closes the dialog

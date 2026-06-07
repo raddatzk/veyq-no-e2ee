@@ -58,7 +58,7 @@ acceptanceCriteria:
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
   - id: spaces.tenant-group-personal.scope-navigation
-    statement: Sidebar routes navigate tenant, personal and group roots without legacy areas.
+    statement: Workspace navigation surfaces route tenant, personal and group roots without legacy areas.
     coverage:
       frontend:
         unit:
@@ -72,3 +72,13 @@ acceptanceCriteria:
           - testName: sidebar scope links navigate to personal and group roots
             kind: positive
             ref: frontend/e2e/tenant-navigation.spec.ts
+      ios:
+        unit:
+          - testName: testGroupSpacesExposeVisibleGroupScopes
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+      e2e:
+        ios:
+          - testName: testConnectAndOpenMemoryDetail
+            kind: positive
+            ref: ios/VeyqUITests/VeyqUITests.swift

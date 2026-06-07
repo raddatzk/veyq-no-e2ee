@@ -8,6 +8,7 @@ entryPoints:
   - docs/api/memories.openapi.yaml
   - docs/api/shares.openapi.yaml
   - frontend/src/features/memories/components/MemoryTracksPanel.vue
+  - ios/Veyq/MemoryDetailView.swift
 acceptanceCriteria:
   - id: memory.tracks.parse-valid-gpx
     statement: Valid GPX parses route metadata.
@@ -39,6 +40,14 @@ acceptanceCriteria:
           - testName: shows an actionable empty state for editable memories
             kind: negative
             ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+      ios:
+        unit:
+          - testName: testAPIClientUploadsMemoryTrackAsMultipartGPX
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientListsMemoryTracksWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.tracks.panel-update-delete
     statement: Track panel updates and deletes existing tracks.
     coverage:
@@ -58,6 +67,17 @@ acceptanceCriteria:
           - testName: shows distance duration ascent and descent for tracks
             kind: positive
             ref: frontend/src/features/memories/components/MemoryTracksPanel.test.ts
+      ios:
+        unit:
+          - testName: testMemoryTrackFormatterShowsDistanceDurationAndElevation
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockMemoryDetailIncludesTracks
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMapRegionFitsTracksAndMappedMediaTogether
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.tracks.public-visible
     statement: Public shares can list visible tracks when role permits.
     coverage:

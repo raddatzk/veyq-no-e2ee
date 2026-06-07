@@ -8,6 +8,9 @@ entryPoints:
   - docs/api/memories.openapi.yaml
   - frontend/src/views/TenantView.vue
   - frontend/src/features/memories/components/MemoryDetail.vue
+  - ios/Veyq/MemoryHomeView.swift
+  - ios/Veyq/MemoryDetailView.swift
+  - ios/VeyqShareExtension/ShareViewController.swift
 acceptanceCriteria:
   - id: memory.core.create-tree
     statement: Users can create root and child Memories and list descendant media.
@@ -22,6 +25,17 @@ acceptanceCriteria:
           - testName: major line 1 empty states guide first setup and empty Memories
             kind: positive
             ref: frontend/e2e/major-1-smoke.spec.ts
+      ios:
+        unit:
+          - testName: testMockStoreCreatesRootMemoryInSelectedScope
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockStoreCreatesChapterInsideLoadedMemory
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientCreatesMemoryWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.core.tree-invariants
     statement: Sibling collisions, cycles and cross-scope moves are rejected.
     coverage:
@@ -119,6 +133,20 @@ acceptanceCriteria:
           - testName: removes an existing cover
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+      ios:
+        unit:
+          - testName: testMockStoreSetsMemoryCoverFromMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockStoreRemovesMemoryCover
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientSetsMemoryCoverFromMediaWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientRemovesMemoryCoverWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.core.invalid-cover-rejected
     statement: Invalid crop metadata and invalid crop-only updates are rejected.
     coverage:
@@ -170,6 +198,23 @@ acceptanceCriteria:
           - testName: shows progress and blocks duplicate memory deletion while pending
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+      ios:
+        unit:
+          - testName: testMockStoreUpdatesLoadedMemoryDisplayMetadata
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockStoreDeletesMemoryFromVisibleList
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientUpdatesMemoryWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientDeletesMemoryWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryNameFormatterCreatesStablePathSlug
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.core.folder-delete
     statement: Folder deletion is recursive and requires explicit frontend confirmation.
     coverage:
@@ -217,6 +262,14 @@ acceptanceCriteria:
           - testName: shows active uploads next to search and can cancel all
             kind: positive
             ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+      ios:
+        unit:
+          - testName: testSearchCoversTenantGroupsAndPersonalScopes
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientSearchesTenantWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.core.detail-navigation
     statement: Memory detail renders navigable context, overview sections and child navigation.
     coverage:
@@ -339,9 +392,34 @@ acceptanceCriteria:
           - testName: creates and resolves memories by folder path
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: navigation context resolves memory paths and parent memory breadcrumbs
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: folder paths preserve group and personal root scopes
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.core.folder-navigation
+    statement: Organizational folders can be listed, opened and created without treating folders as rich content objects.
+    coverage:
+      backend:
+        integration:
+          - testName: creates and resolves memories by folder path
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testMemoryNavigationContextDecodesFolders
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockStoreShowsAndOpensOrganizationalFolders
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMockStoreCreatesFolderInCurrentFolder
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientCreatesFolderWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.core.creation-entrypoints
     statement: Folder and Memory creation live in content tiles, not the topbar.
     coverage:
@@ -390,3 +468,5 @@ acceptanceCriteria:
 gaps:
   - reason: No current e2e.browser test runs Memory CRUD against frontend, Quarkus and a test database together.
     followUp: Add full-stack browser coverage for the highest-risk Memory creation and navigation flow.
+  - reason: Native iOS Share Extension can browse connected accounts, tenants, scopes, folders, Memories and Kapitel on demand, but there is no real iOS extension UI automation coverage yet.
+    followUp: Add e2e.ios coverage for Share Extension target selection once the native UI test harness can launch extension flows.

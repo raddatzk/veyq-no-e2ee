@@ -37,6 +37,17 @@ acceptanceCriteria:
           - testName: keeps distant marker previews separate
             kind: positive
             ref: frontend/src/features/memories/components/MemoryContextPanel.test.ts
+          - testName: groups nearby memory photos as clickable map markers
+            kind: positive
+            ref: frontend/src/features/memories/components/TrackMap.test.ts
+      ios:
+        unit:
+          - testName: testMemoryMapPointsUseOnlyValidGpsMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMapRegionFitsMappedMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.maps.track-route-render
     statement: Track map renders route polyline.
     coverage:
@@ -45,13 +56,10 @@ acceptanceCriteria:
           - testName: renders a Leaflet polyline using latitude longitude positions
             kind: positive
             ref: frontend/src/features/memories/components/TrackMap.test.ts
-          - testName: renders selected tracks and memory photos on the map while reset fits the tracks
-            kind: positive
-            ref: frontend/src/features/memories/components/TrackMap.test.ts
-          - testName: groups nearby memory photos as clickable map markers
-            kind: positive
-            ref: frontend/src/features/memories/components/TrackMap.test.ts
           - testName: enables direct scroll wheel touch and control zooming
+            kind: positive
+            ref: frontend/src/features/memories/components/TrackMap.test.ts
+          - testName: renders selected tracks and memory photos on the map while reset fits the tracks
             kind: positive
             ref: frontend/src/features/memories/components/TrackMap.test.ts
   - id: memory.maps.no-external-tiles-before-consent

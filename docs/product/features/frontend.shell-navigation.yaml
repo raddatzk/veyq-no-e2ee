@@ -129,7 +129,7 @@ acceptanceCriteria:
           - testName: uses resolved display names for parent memories
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
-          - testName: resolves folder display names for memory breadcrumb prefixes
+          - testName: uses navigation context breadcrumbs for memory routes
             kind: positive
             ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
           - testName: waits for resolved memory breadcrumb labels before rendering memory toolbar breadcrumbs
