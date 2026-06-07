@@ -210,7 +210,7 @@ class PasskeyService @Inject constructor(
     }
 
     private fun currentUser(): User =
-        requestContext.user ?: throw UnauthorizedException("Authentication required")
+        requestContext.requireUser()
 
     private fun currentManagedUser(): User =
         userRepo.findById(currentUser().id) ?: throw UnauthorizedException("Invalid user")

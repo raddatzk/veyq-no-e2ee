@@ -1,6 +1,5 @@
 package com.veyq.api.library
 
-import com.veyq.api.auth.BadRequestException
 import com.veyq.api.domain.LibraryScopeType
 import com.veyq.api.domain.Media
 import com.veyq.api.domain.MediaRepo
@@ -15,13 +14,10 @@ import com.veyq.api.domain.TenantGroupRepo
 import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.TenantRegistrationInviteRepo
 import com.veyq.api.domain.TenantRepo
-import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
+import com.veyq.api.library.media.MediaStorageService
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.Comparator
 
 @Singleton
 class LibraryDeletionService @Inject constructor(
@@ -34,7 +30,7 @@ class LibraryDeletionService @Inject constructor(
     private val memoryRepo: MemoryRepo,
     private val mediaRepo: MediaRepo,
     private val mediaService: MediaService,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
 ) {
     fun deleteTenant(tenant: Tenant) {
         deleteMedia(mediaRepo.list("tenant", tenant))
@@ -67,22 +63,18 @@ class LibraryDeletionService @Inject constructor(
     }
 
     fun deleteFolder(folder: TenantFolder) {
-        val folders = descendants(folder)
-        val memories = memoryRepo.list("tenant", folder.tenant)
-            .filter { memory -> memory.parentFolder != null && folders.any { it.id == memory.parentFolder!!.id } }
+        val folders = folderRepo.listDescendantsAndSelf(folder.tenant, folder)
+        val memories = memoryRepo.listByParentFolders(folder.tenant, folders)
         deleteMemories(memories)
-        folder.delete()
+        folders.sortedByDescending(::folderDepth).forEach { it.delete() }
     }
 
     private fun deleteMemories(memories: Collection<Memory>) {
         val expanded = memories
-            .flatMap { root ->
-                memoryRepo.list("tenant", root.tenant)
-                    .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } } + root
-            }
+            .flatMap { root -> memoryRepo.listDescendantsAndSelf(root.tenant, root) }
             .distinctBy { it.id }
-        deleteMedia(expanded.flatMap { mediaRepo.listByMemory(it) })
-        expanded.forEach { it.delete() }
+        deleteMedia(mediaRepo.listByMemoriesOrdered(expanded))
+        expanded.sortedByDescending(::memoryDepth).forEach { it.delete() }
     }
 
     private fun deleteMedia(media: Collection<Media>) {
@@ -96,22 +88,15 @@ class LibraryDeletionService @Inject constructor(
         blobs.forEach(mediaService::deleteBlobIfUnreferenced)
     }
 
-    private fun descendants(root: TenantFolder): List<TenantFolder> =
-        folderRepo.listByTenant(root.tenant).filter { folder ->
-            generateSequence(folder) { it.parentFolder }.any { it.id == root.id }
-        }
+    private fun folderDepth(folder: TenantFolder): Int =
+        generateSequence(folder.parentFolder) { it.parentFolder }.count()
 
-    private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key")
-        return path
-    }
+    private fun memoryDepth(memory: Memory): Int =
+        generateSequence(memory.parentMemory) { it.parentMemory }.count()
 
-    private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-        }
-    }
+    private fun storagePath(storageKey: String) =
+        mediaStorageService.path(storageKey)
+
+    private fun deleteRecursively(path: java.nio.file.Path) =
+        mediaStorageService.deleteRecursively(path)
 }

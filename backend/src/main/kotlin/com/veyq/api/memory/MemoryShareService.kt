@@ -40,8 +40,8 @@ import com.veyq.api.generated.model.UpdateMemoryShareRequest
 import com.veyq.api.generated.model.UpdatePublicShareMemoryRequest
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
-import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
+import com.veyq.api.library.media.MediaStorageService
 import com.veyq.api.library.playlist.MemoryPlaylistService
 import com.veyq.api.library.track.MemoryTrackService
 import com.veyq.api.security.RateLimitService
@@ -59,7 +59,6 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Base64
-import java.util.Comparator
 import java.util.concurrent.TimeUnit
 
 @ApplicationScoped
@@ -77,7 +76,7 @@ class MemoryShareService @Inject constructor(
     private val trackService: MemoryTrackService,
     private val playlistService: MemoryPlaylistService,
     private val memoryJournalService: MemoryJournalService,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val requestContext: RequestContext,
     private val routingContext: RoutingContext,
     private val cookieConfig: CookieConfig,
@@ -232,9 +231,10 @@ class MemoryShareService @Inject constructor(
         val access = requireAccess(resolveEnabledShare(shareId))
         if (!access.canViewGallery) throw ForbiddenException("Share does not allow full memory access")
         val memories = subtree(access.share.rootMemory)
+        val summaries = publicShareMemoryMapper.toSummaries(memories, access.share)
         return PublicShareTreeResponse(
-            root = publicShareMemoryMapper.toSummary(access.share.rootMemory, access.share),
-            memories = memories.drop(1).map { publicShareMemoryMapper.toSummary(it, access.share) },
+            root = summaries.first(),
+            memories = summaries.drop(1),
         )
     }
 
@@ -565,8 +565,7 @@ class MemoryShareService @Inject constructor(
         if (!access.canViewGallery) {
             return ownIdentityMedia(access).map { mediaService.publicShareSummary(it, access.share.publicId) }
         }
-        return subtree(access.share.rootMemory)
-            .flatMap { mediaRepo.listByMemory(it) }
+        return mediaRepo.listByMemoriesOrdered(subtree(access.share.rootMemory))
             .filter { isPublicMediaVisible(access, it) }
             .distinctBy { it.id }
             .sortedWith(compareBy<Media> { it.capturedAt ?: it.createdAt }.thenBy { it.createdAt })
@@ -1203,8 +1202,7 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun subtree(root: Memory): List<Memory> =
-        listOf(root) + memoryRepo.list("tenant", root.tenant)
-            .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+        memoryRepo.listDescendantsAndSelf(root.tenant, root)
 
     private fun publicShareMemories(memory: Memory, shareRoot: Memory, includeChildren: Boolean): List<Memory> =
         if (includeChildren) {
@@ -1330,7 +1328,7 @@ class MemoryShareService @Inject constructor(
 
     private fun deleteMemoryTree(memory: Memory) {
         val memories = subtree(memory)
-        val media = memories.flatMap { mediaRepo.listByMemory(it) }
+        val media = mediaRepo.listByMemoriesOrdered(memories)
         memories.forEach { candidate ->
             if (candidate.coverMedia?.let { cover -> media.any { it.id == cover.id } } == true) {
                 candidate.coverMedia = null
@@ -1362,17 +1360,11 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
-        return path
+        return mediaStorageService.path(storageKey)
     }
 
     private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-        }
+        mediaStorageService.deleteRecursively(path)
     }
 
     private fun canViewFull(role: MemoryShareRole): Boolean =
@@ -1462,10 +1454,10 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun tenant(): Tenant =
-        requestContext.tenant ?: throw NotFoundException("Tenant not found")
+        requestContext.requireTenant()
 
     private fun user(): User =
-        requestContext.user ?: throw UnauthorizedException("Authentication required")
+        requestContext.requireUser()
 
     private fun memoryShareShell(memory: Memory): MemoryShare =
         MemoryShare().also {

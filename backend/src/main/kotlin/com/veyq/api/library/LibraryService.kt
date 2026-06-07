@@ -27,8 +27,8 @@ abstract class LibraryService(
     private val validName = Regex("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
     private val reservedNames = setOf("settings")
 
-    fun tenant(): Tenant = requestContext.tenant!!
-    fun user(): User = requestContext.user!!
+    fun tenant(): Tenant = requestContext.requireTenant()
+    fun user(): User = requestContext.requireUser()
 
     fun breadcrumbs(folder: TenantFolder): List<MemoryNavigationBreadcrumb> {
         val folders = generateSequence(folder) { it.parentFolder }.toList().asReversed()

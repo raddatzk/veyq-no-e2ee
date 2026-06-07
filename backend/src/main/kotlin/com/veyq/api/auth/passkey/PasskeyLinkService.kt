@@ -45,7 +45,7 @@ class PasskeyLinkService(
 
     @Transactional
     fun createLink(request: CreatePasskeyLinkRequest, routingContext: RoutingContext): PasskeyLinkResponse {
-        val user = requestContext.user ?: throw UnauthorizedException("Authentication required")
+        val user = requestContext.requireUser()
         val authDomain = passkeyHostService.requireAllowedCurrentDomain(routingContext)
         val (targetOrigin, targetDomain) = passkeyHostService.normalizeOrigin(request.targetOrigin)
         passkeyHostService.requireAllowedDomain(targetDomain)

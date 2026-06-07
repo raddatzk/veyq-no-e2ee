@@ -30,12 +30,12 @@ class SettingsResource @Inject constructor(
     @GET
     @Path("/notifications/capabilities")
     fun listCapabilityNotifications(): CapabilityNotificationsResponse =
-        serverOperationsService.listCapabilityNotifications(requestContext.user!!)
+        serverOperationsService.listCapabilityNotifications(requestContext.requireUser())
 
     @DELETE
     @Path("/notifications/capabilities/{capabilityId}")
     fun dismissCapabilityNotification(@PathParam("capabilityId") capabilityId: String) =
-        serverOperationsService.dismissCapabilityNotification(requestContext.user!!, capabilityId)
+        serverOperationsService.dismissCapabilityNotification(requestContext.requireUser(), capabilityId)
 
     @POST
     @Path("/internal/updater/update-completed")

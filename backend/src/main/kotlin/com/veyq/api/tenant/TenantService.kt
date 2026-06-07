@@ -23,7 +23,7 @@ import com.veyq.api.generated.model.UpdateTenantSettingsRequest
 import com.veyq.api.generated.model.ManagedUserTenantSummary
 import com.veyq.api.generated.model.UserSummary
 import com.veyq.api.library.LibraryDeletionService
-import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaStorageService
 import com.veyq.api.settings.CapabilityAcknowledgementService
 import com.veyq.api.usermgmt.InvitationService
 import com.veyq.api.usermgmt.user.ownAvatarUrl
@@ -34,7 +34,6 @@ import jakarta.transaction.Transactional
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
 import javax.imageio.ImageIO
@@ -46,7 +45,7 @@ class TenantService @Inject constructor(
     private val libraryDeletionService: LibraryDeletionService,
     private val requestContext: RequestContext,
     private val noticeMarkdown: NoticeMarkdown,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val userRepo: UserRepo,
     private val invitationService: InvitationService,
     private val passwordService: PasswordService,
@@ -72,7 +71,7 @@ class TenantService @Inject constructor(
 
     fun listMyTenants(): TenantsSummary {
         return TenantsSummary(
-            requestContext.user!!.tenantMemberships
+            requestContext.requireUser().tenantMemberships
                 .filter { it.status == TenantMemberStatus.Active && it.tenant.activatedAt != null }
                 .sortedBy { it.tenant.name }
                 .map {
@@ -248,7 +247,7 @@ class TenantService @Inject constructor(
     }
 
     private fun tenant(): Tenant {
-        val tenantName = requestContext.tenant!!.name
+        val tenantName = requestContext.requireTenant().name
         return tenantRepo.findByName(tenantName) ?: throw NotFoundException("Tenant not found")
     }
 
@@ -314,26 +313,15 @@ class TenantService @Inject constructor(
     }
 
     private fun writeLogoFile(source: Path, storageKey: String) {
-        val target = storagePath(storageKey)
-        Files.createDirectories(target.parent)
-        val temp = target.resolveSibling("${target.fileName}.tmp")
-        try {
-            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } finally {
-            Files.deleteIfExists(temp)
-        }
+        mediaStorageService.writeAtomic(source, storageKey, "logo-")
     }
 
     private fun deleteLogoFile(storageKey: String) {
-        Files.deleteIfExists(storagePath(storageKey))
+        mediaStorageService.deleteIfExists(storageKey)
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid tenant logo storage key")
-        return path
+        return mediaStorageService.path(storageKey, "Invalid tenant logo storage key")
     }
 
     private companion object {

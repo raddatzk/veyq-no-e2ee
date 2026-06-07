@@ -310,6 +310,38 @@ class MediaRepo : PanacheRepository<Media> {
         return list("memory in ?1 order by coalesce(capturedAt, createdAt), createdAt", memories)
     }
 
+    fun countByMemoryIds(memoryIds: Collection<Long>): Map<Long, Int> {
+        if (memoryIds.isEmpty()) return emptyMap()
+        return archiveEntityManager.createQuery(
+            """
+            select m.memory.id, count(m)
+            from Media m
+            where m.memory.id in :memoryIds
+            group by m.memory.id
+            """.trimIndent(),
+            Array<Any>::class.java,
+        )
+            .setParameter("memoryIds", memoryIds)
+            .resultList
+            .associate { row -> row[0] as Long to (row[1] as Long).toInt() }
+    }
+
+    fun countByBucketIds(bucketIds: Collection<Long>): Map<Long, Int> {
+        if (bucketIds.isEmpty()) return emptyMap()
+        return archiveEntityManager.createQuery(
+            """
+            select m.bucket.id, count(m)
+            from Media m
+            where m.bucket.id in :bucketIds
+            group by m.bucket.id
+            """.trimIndent(),
+            Array<Any>::class.java,
+        )
+            .setParameter("bucketIds", bucketIds)
+            .resultList
+            .associate { row -> row[0] as Long to (row[1] as Long).toInt() }
+    }
+
     fun listPublicIdsByMemories(memories: List<Memory>): List<String> {
         if (memories.isEmpty()) return emptyList()
         return archiveEntityManager.createQuery(

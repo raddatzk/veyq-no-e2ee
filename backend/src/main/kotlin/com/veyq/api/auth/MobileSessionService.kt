@@ -31,7 +31,7 @@ class MobileSessionService(
 
     @Transactional
     fun createCode(request: MobileSessionCodeRequest): MobileSessionCodeResponse {
-        val user = requestContext.user ?: throw UnauthorizedException("Authentication required")
+        val user = requestContext.requireUser()
         val baseRedirectUri = validateRedirectUri(request.redirectUri)
         val state = validateState(request.state)
         val rawCode = newToken()

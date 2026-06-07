@@ -15,15 +15,23 @@ class PublicShareMemoryMapper(
     private val memoryRepo: MemoryRepo,
     private val mediaRepo: MediaRepo,
 ) {
+    fun toSummaries(memories: List<Memory>, share: MemoryShare): List<PublicShareMemorySummary> {
+        val stats = stats(memories)
+        return memories.map { toSummary(it, share, stats) }
+    }
+
     fun toSummary(memory: Memory, share: MemoryShare): PublicShareMemorySummary =
+        toSummary(memory, share, stats(listOf(memory)))
+
+    private fun toSummary(memory: Memory, share: MemoryShare, stats: PublicShareMemoryStats): PublicShareMemorySummary =
         PublicShareMemorySummary(
             id = memory.publicId,
             name = memory.name,
             displayName = memory.displayName,
             path = sharePath(memory, share.rootMemory),
             parentId = memory.parentMemory?.publicId ?: "",
-            childCount = memoryRepo.listChildren(memory.tenant, memory).size,
-            mediaCount = mediaRepo.listByMemory(memory).size,
+            childCount = stats.childCounts[memory.id] ?: 0,
+            mediaCount = stats.mediaCounts[memory.id] ?: 0,
             coverUrl = publicCoverUrl(memory, share.publicId),
             coverMediaId = memory.coverMedia?.publicId,
             coverCrop = coverCrop(memory),
@@ -31,7 +39,17 @@ class PublicShareMemoryMapper(
             endDate = memory.endDate,
         )
 
-    fun toHeader(memory: Memory, share: MemoryShare, descendants: List<Memory>): PublicShareMemoryHeaderSummary =
+    fun toHeader(memory: Memory, share: MemoryShare, descendants: List<Memory>): PublicShareMemoryHeaderSummary {
+        val stats = stats(listOf(memory) + descendants)
+        return toHeader(memory, share, descendants, stats)
+    }
+
+    private fun toHeader(
+        memory: Memory,
+        share: MemoryShare,
+        descendants: List<Memory>,
+        stats: PublicShareMemoryStats,
+    ): PublicShareMemoryHeaderSummary =
         PublicShareMemoryHeaderSummary(
             id = memory.publicId,
             displayName = memory.displayName,
@@ -40,10 +58,20 @@ class PublicShareMemoryMapper(
             coverCrop = coverCrop(memory),
             startDate = memory.startDate,
             endDate = memory.endDate,
-            directMediaCount = mediaRepo.listByMemory(memory).size,
-            descendantMediaCount = descendants.sumOf { mediaRepo.listByMemory(it).size },
-            childMemoryCount = memoryRepo.listChildren(memory.tenant, memory).size,
+            directMediaCount = stats.mediaCounts[memory.id] ?: 0,
+            descendantMediaCount = descendants.sumOf { stats.mediaCounts[it.id] ?: 0 },
+            childMemoryCount = stats.childCounts[memory.id] ?: 0,
         )
+
+    private fun stats(memories: List<Memory>): PublicShareMemoryStats {
+        if (memories.isEmpty()) return PublicShareMemoryStats()
+        val memoryIds = memories.map { it.id }
+        val tenant = memories.first().tenant
+        return PublicShareMemoryStats(
+            childCounts = memoryRepo.countChildrenByParentIds(tenant, memoryIds),
+            mediaCounts = mediaRepo.countByMemoryIds(memoryIds),
+        )
+    }
 
     private fun publicCoverUrl(memory: Memory, shareId: String): String? =
         memory.coverStorageKey?.let { "/api/public-shares/${url(shareId)}/memories/${url(memory.publicId)}/cover/content" }
@@ -65,4 +93,9 @@ class PublicShareMemoryMapper(
             .map { it.name }
         return if (names.isEmpty()) "/" else "/" + names.joinToString("/")
     }
+
+    private data class PublicShareMemoryStats(
+        val childCounts: Map<Long, Int> = emptyMap(),
+        val mediaCounts: Map<Long, Int> = emptyMap(),
+    )
 }

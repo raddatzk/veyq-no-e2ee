@@ -4,6 +4,7 @@ import com.soundicly.jnanoidenhanced.jnanoid.NanoIdUtils
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import jakarta.persistence.*
 import java.time.Instant
 import java.time.LocalDate
@@ -186,6 +187,8 @@ class MemoryParticipant : PanacheEntityBase {
 
 @ApplicationScoped
 class MemoryRepo : PanacheRepository<Memory> {
+    @Inject lateinit var queryEntityManager: EntityManager
+
     fun findByTenantAndPublicId(tenant: Tenant, publicId: String): Memory? =
         find("tenant = ?1 and publicId = ?2", tenant, publicId).firstResult()
 
@@ -199,8 +202,55 @@ class MemoryRepo : PanacheRepository<Memory> {
             list("tenant = ?1 and parentMemory is null and parentFolder = ?2 order by displayName", tenant, parentFolder)
         }
 
+    fun listByParentFolders(tenant: Tenant, parentFolders: Collection<TenantFolder>): List<Memory> {
+        if (parentFolders.isEmpty()) return emptyList()
+        return list("tenant = ?1 and parentMemory is null and parentFolder in ?2 order by displayName", tenant, parentFolders)
+    }
+
     fun listChildren(tenant: Tenant, parent: Memory): List<Memory> =
         list("tenant = ?1 and parentMemory = ?2 order by displayName", tenant, parent)
+
+    @Suppress("UNCHECKED_CAST")
+    fun listDescendantsAndSelf(tenant: Tenant, root: Memory): List<Memory> =
+        queryEntityManager.createNativeQuery(
+            """
+            with recursive memory_tree(id, depth) as (
+                select id, 0
+                from veyq.veyq_memory
+                where tenant_id = :tenantId and id = :rootId
+                union all
+                select child.id, memory_tree.depth + 1
+                from veyq.veyq_memory child
+                join memory_tree on child.parent_memory_id = memory_tree.id
+                where child.tenant_id = :tenantId
+            )
+            select m.*
+            from veyq.veyq_memory m
+            join memory_tree on memory_tree.id = m.id
+            order by memory_tree.depth, m.displayName, m.id
+            """.trimIndent(),
+            Memory::class.java,
+        )
+            .setParameter("tenantId", tenant.id)
+            .setParameter("rootId", root.id)
+            .resultList as List<Memory>
+
+    fun countChildrenByParentIds(tenant: Tenant, parentIds: Collection<Long>): Map<Long, Int> {
+        if (parentIds.isEmpty()) return emptyMap()
+        return queryEntityManager.createQuery(
+            """
+            select m.parentMemory.id, count(m)
+            from Memory m
+            where m.tenant = :tenant and m.parentMemory.id in :parentIds
+            group by m.parentMemory.id
+            """.trimIndent(),
+            Array<Any>::class.java,
+        )
+            .setParameter("tenant", tenant)
+            .setParameter("parentIds", parentIds)
+            .resultList
+            .associate { row -> row[0] as Long to (row[1] as Long).toInt() }
+    }
 }
 
 @ApplicationScoped
@@ -210,6 +260,13 @@ class MemoryFavoriteRepo : PanacheRepository<MemoryFavorite> {
 
     fun listByTenantAndUser(tenant: Tenant, user: User): List<MemoryFavorite> =
         list("tenant = ?1 and user = ?2 order by createdAt desc", tenant, user)
+
+    fun favoriteMemoryIds(tenant: Tenant, user: User, memories: Collection<Memory>): Set<Long> {
+        if (memories.isEmpty()) return emptySet()
+        return list("tenant = ?1 and user = ?2 and memory in ?3", tenant, user, memories)
+            .map { it.memory.id }
+            .toSet()
+    }
 }
 
 @ApplicationScoped

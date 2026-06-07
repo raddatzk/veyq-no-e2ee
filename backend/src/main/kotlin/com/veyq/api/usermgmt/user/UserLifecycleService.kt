@@ -15,13 +15,12 @@ import com.veyq.api.domain.User
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.DeleteMyAccountRequest
 import com.veyq.api.generated.model.ManagedUserSummary
-import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaStorageService
 import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
-import java.nio.file.Files
 import java.time.Instant
 
 @ApplicationScoped
@@ -32,7 +31,7 @@ class UserLifecycleService @Inject constructor(
     private val passwordService: PasswordService,
     private val passkeyService: PasskeyService,
     private val tokenService: TokenService,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val entityManager: EntityManager,
 ) {
     @Transactional
@@ -62,7 +61,7 @@ class UserLifecycleService @Inject constructor(
         requireTenantOwnerContinuity(user)
 
         user.disabledAt = Instant.now()
-        user.disabledBy = requestContext.user
+        user.disabledBy = requestContext.requireUser()
         tokenService.revokeAllForUser(user)
         return user
     }
@@ -182,7 +181,7 @@ class UserLifecycleService @Inject constructor(
         nativeUpdate("delete from veyq.veyq_user_email_change where user_id = :userId", user)
         nativeUpdate("delete from veyq.veyq_user_invitation where user_id = :userId", user)
         user.avatarStorageKey?.let { storageKey ->
-            Files.deleteIfExists(storagePath(storageKey))
+            mediaStorageService.deleteIfExists(storageKey)
         }
     }
 
@@ -213,9 +212,6 @@ class UserLifecycleService @Inject constructor(
             .setParameter("replacementId", replacement.id)
             .executeUpdate()
 
-    private fun storagePath(storageKey: String) =
-        mediaConfig.storageDir.toAbsolutePath().normalize().resolve(storageKey).normalize()
-
     private fun managedCurrentUser(): User =
-        userRepo.findById(requestContext.user!!.id) ?: throw UnauthorizedException("Invalid user")
+        userRepo.findById(requestContext.requireUser().id) ?: throw UnauthorizedException("Invalid user")
 }

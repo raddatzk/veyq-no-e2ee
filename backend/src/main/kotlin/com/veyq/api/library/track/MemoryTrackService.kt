@@ -21,22 +21,20 @@ import com.veyq.api.common.toApiOffsetDateTime
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
-import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaStorageService
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.Response
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.Comparator
 
 @Singleton
 class MemoryTrackService(
     private val trackRepo: MemoryTrackRepo,
     private val memoryRepo: MemoryRepo,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val gpxTrackParser: GpxTrackParser,
     private val objectMapper: ObjectMapper,
     folderRepo: TenantFolderRepo,
@@ -227,23 +225,15 @@ class MemoryTrackService(
     }
 
     private fun writeTrackFile(source: Path, storageKey: String) {
-        val target = storagePath(storageKey)
-        Files.createDirectories(target.parent)
-        val temp = Files.createTempFile(target.parent, "track-", ".tmp")
-        try {
-            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: Exception) {
-            Files.deleteIfExists(temp)
-            throw e
-        }
+        mediaStorageService.writeAtomic(source, storageKey, "track-")
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid track storage key", "MEMORY_TRACK_STORAGE_KEY_INVALID")
-        return path
+        return mediaStorageService.path(
+            storageKey,
+            invalidMessage = "Invalid track storage key",
+            invalidCode = "MEMORY_TRACK_STORAGE_KEY_INVALID",
+        )
     }
 
     private fun trackDirectory(track: MemoryTrack): Path {
@@ -252,10 +242,7 @@ class MemoryTrackService(
     }
 
     private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-        }
+        mediaStorageService.deleteRecursively(path)
     }
 
     private fun MemoryTrack.toSummary(publicShareId: String? = null): MemoryTrackSummary =

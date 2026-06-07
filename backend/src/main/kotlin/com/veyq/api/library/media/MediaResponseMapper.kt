@@ -55,7 +55,7 @@ class MediaResponseMapper {
             sizeBytes = media.blob.sizeBytes,
             contentUrl = publicShareMediaUrl(shareId, media.publicId, "content"),
             highlight = media.highlight,
-            thumbnailUrl = if (hasThumbnail(media.blob)) publicShareMediaUrl(shareId, media.publicId, "thumbnail") else null,
+            thumbnailUrl = if (canGeneratePreview(media.blob)) publicShareMediaUrl(shareId, media.publicId, "thumbnail") else null,
             previewUrl = if (canGeneratePreview(media.blob)) publicShareMediaUrl(shareId, media.publicId, "preview") else null,
             posterUrl = if (canGeneratePoster(media.blob)) publicShareMediaUrl(shareId, media.publicId, "poster") else null,
             gpsLatitude = media.blob.gpsLatitude,
@@ -120,7 +120,7 @@ class MediaResponseMapper {
         mediaUrl(media, tenantName, "content")
 
     private fun thumbnailUrl(media: Media, tenantName: String): String? =
-        if (hasThumbnail(media.blob)) mediaUrl(media, tenantName, "thumbnail") else null
+        if (canGeneratePreview(media.blob)) mediaUrl(media, tenantName, "thumbnail") else null
 
     private fun previewUrl(media: Media, tenantName: String): String? =
         if (canGeneratePreview(media.blob)) mediaUrl(media, tenantName, "preview") else null
@@ -133,9 +133,6 @@ class MediaResponseMapper {
 
     private fun publicShareMediaUrl(shareId: String, mediaId: String, suffix: String): String =
         "/api/public-shares/${url(shareId)}/media/${url(mediaId)}/$suffix"
-
-    private fun hasThumbnail(blob: MediaBlob): Boolean =
-        blob.thumbnailStorageKey != null
 
     private fun canGeneratePreview(blob: MediaBlob): Boolean =
         blob.mimeType.startsWith("image/") || blob.mimeType.startsWith("video/")

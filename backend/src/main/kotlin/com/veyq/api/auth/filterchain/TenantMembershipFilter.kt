@@ -21,7 +21,7 @@ class TenantMembershipFilter @Inject constructor(
             ?: return
 
         val tenant = tenantService.findTenantByName(tenantName)
-        tenantService.requireTenantMembership(tenant, requestContext.user!!)
+        tenantService.requireTenantMembership(tenant, requestContext.requireUser())
         requestContext.tenant = tenant
     }
 }

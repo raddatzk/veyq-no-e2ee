@@ -4,6 +4,7 @@ import com.soundicly.jnanoidenhanced.jnanoid.NanoIdUtils
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import jakarta.persistence.*
 import java.time.Instant
 
@@ -80,8 +81,35 @@ class TenantFolder : PanacheEntityBase {
 
 @ApplicationScoped
 class TenantFolderRepo : PanacheRepository<TenantFolder> {
+    @Inject lateinit var queryEntityManager: EntityManager
+
     fun listByTenant(tenant: Tenant): List<TenantFolder> = list("tenant", tenant)
     fun listChildren(tenant: Tenant, parent: TenantFolder?): List<TenantFolder> =
         if (parent == null) list("tenant = ?1 and parentFolder is null order by displayName", tenant)
         else list("tenant = ?1 and parentFolder = ?2 order by displayName", tenant, parent)
+
+    @Suppress("UNCHECKED_CAST")
+    fun listDescendantsAndSelf(tenant: Tenant, root: TenantFolder): List<TenantFolder> =
+        queryEntityManager.createNativeQuery(
+            """
+            with recursive folder_tree(id, depth) as (
+                select id, 0
+                from veyq.veyq_tenant_folder
+                where tenant_id = :tenantId and id = :rootId
+                union all
+                select child.id, folder_tree.depth + 1
+                from veyq.veyq_tenant_folder child
+                join folder_tree on child.parent_folder_id = folder_tree.id
+                where child.tenant_id = :tenantId
+            )
+            select f.*
+            from veyq.veyq_tenant_folder f
+            join folder_tree on folder_tree.id = f.id
+            order by folder_tree.depth, f.displayName, f.id
+            """.trimIndent(),
+            TenantFolder::class.java,
+        )
+            .setParameter("tenantId", tenant.id)
+            .setParameter("rootId", root.id)
+            .resultList as List<TenantFolder>
 }

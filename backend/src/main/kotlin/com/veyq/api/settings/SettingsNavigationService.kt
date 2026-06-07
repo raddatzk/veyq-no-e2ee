@@ -111,6 +111,7 @@ class SettingsNavigationService @Inject constructor(
             MemoryNavigationKind.GROUP -> SettingsSubjectType.GROUP
             MemoryNavigationKind.USER -> SettingsSubjectType.TENANT_USER
             MemoryNavigationKind.FOLDER -> SettingsSubjectType.FOLDER
+            MemoryNavigationKind.MEMORY -> throw BadRequestException("Unsupported settings path")
         }
 
     private fun ResolvedMemoryLocation.toSettingsSubject(): SettingsSubject =

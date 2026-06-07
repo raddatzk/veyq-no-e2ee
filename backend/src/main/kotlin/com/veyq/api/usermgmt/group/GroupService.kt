@@ -39,7 +39,7 @@ class GroupService @Inject constructor(
     }
 
     fun getGroup(groupName: String): GroupSummary {
-        val group = tenantGroupRepo.findByTenantAndName(requestContext.tenant!!, groupName)
+        val group = tenantGroupRepo.findByTenantAndName(requestContext.requireTenant(), groupName)
             ?.takeIf { canReadGroup(it) }
             ?: throw NotFoundException("Group $groupName not found")
 
@@ -48,9 +48,9 @@ class GroupService @Inject constructor(
 
     @Transactional
     fun createGroup(request: CreateGroupRequest): GroupSummary {
-        val tenant = requestContext.tenant!!
+        val tenant = requestContext.requireTenant()
         val groupName = request.name.trim().lowercase()
-        val user = requestContext.user!!
+        val user = requestContext.requireUser()
 
         if (tenantGroupRepo.findByTenantAndName(tenant, groupName) != null) {
             throw ConflictException("Group already exists")
@@ -79,7 +79,7 @@ class GroupService @Inject constructor(
 
     @Transactional
     fun updateGroup(oldName: String, request: UpdateGroupRequest): GroupSummary {
-        val tenant = requestContext.tenant!!
+        val tenant = requestContext.requireTenant()
 
         val group = tenantGroupRepo.findByTenantAndName(tenant, oldName)?.also {
             val members = request.members ?: emptySet()
@@ -124,13 +124,13 @@ class GroupService @Inject constructor(
 
     @Transactional
     fun deleteGroup(groupName: String) {
-        val group = tenantGroupRepo.findByTenantAndName(requestContext.tenant!!, groupName)
+        val group = tenantGroupRepo.findByTenantAndName(requestContext.requireTenant(), groupName)
             ?: throw NotFoundException("Group $groupName not found")
         libraryDeletionService.deleteGroup(group)
     }
 
     private fun visibleGroups(): List<TenantGroup> {
-        val tenant = requestContext.tenant!!
+        val tenant = requestContext.requireTenant()
         return if (currentTenantRole() == TenantRole.TenantOwner) {
             tenant.groups.toList()
         } else {
@@ -140,10 +140,10 @@ class GroupService @Inject constructor(
 
     private fun canReadGroup(group: TenantGroup): Boolean =
         currentTenantRole() == TenantRole.TenantOwner ||
-                groupMemberRepo.findByGroupAndUser(group, requestContext.user!!) != null
+                groupMemberRepo.findByGroupAndUser(group, requestContext.requireUser()) != null
 
     private fun currentTenantRole(): TenantRole =
-        tenantMemberRepo.findByTenantAndUser(requestContext.tenant!!, requestContext.user!!)!!.role
+        tenantMemberRepo.findByTenantAndUser(requestContext.requireTenant(), requestContext.requireUser())!!.role
 
     private fun TenantGroup.toGroupSummary(): GroupSummary =
         GroupSummary(
@@ -159,9 +159,9 @@ class GroupService @Inject constructor(
         )
 
     private fun canManageGroup(group: TenantGroup): Boolean {
-        if (requestContext.user!!.role == ServerRole.ServerOwner) return true
+        if (requestContext.requireUser().role == ServerRole.ServerOwner) return true
         if (currentTenantRole() == TenantRole.TenantOwner) return true
-        return groupMemberRepo.findByGroupAndUser(group, requestContext.user!!)?.role == GroupRole.GroupOwner
+        return groupMemberRepo.findByGroupAndUser(group, requestContext.requireUser())?.role == GroupRole.GroupOwner
     }
 }
 

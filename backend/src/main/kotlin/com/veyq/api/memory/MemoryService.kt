@@ -20,10 +20,10 @@ import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.ResolvedMemoryLocation
-import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaKind
 import com.veyq.api.library.media.MediaMetadataExtractor
 import com.veyq.api.library.media.MediaService
+import com.veyq.api.library.media.MediaStorageService
 import com.veyq.api.library.media.MediaTypeDetector
 import com.veyq.api.usermgmt.user.avatarUrlForTenant
 import jakarta.inject.Inject
@@ -34,9 +34,7 @@ import org.jboss.logging.Logger
 import java.awt.Dimension
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.LocalDate
-import java.util.Comparator
 import java.util.UUID
 import kotlin.math.abs
 
@@ -51,7 +49,7 @@ class MemoryService @Inject constructor(
     private val memoryGroupMemberRepo: TenantGroupMemberRepo,
     private val tenantMemberRepo: TenantMemberRepo,
     private val userRepo: UserRepo,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val mediaService: MediaService,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val mediaTypeDetector: MediaTypeDetector,
@@ -62,7 +60,7 @@ class MemoryService @Inject constructor(
     fun listRootMemories(): List<MemorySummary> =
         memoryRepo.listRoots(tenant())
             .filter(::isMemoryVisible)
-            .map(::toSummary)
+            .let(::toSummaries)
 
     fun listMemoriesByFolderPath(folderPath: String?): List<MemorySummary> {
         val folderTarget = resolveFolderTarget(folderPath)
@@ -70,7 +68,7 @@ class MemoryService @Inject constructor(
         return memories
             .filter(::isMemoryVisible)
             .filter { it.scope().sameAs(folderTarget.scope) }
-            .map(::toSummary)
+            .let(::toSummaries)
     }
 
     fun getMemory(publicId: String): MemorySummary =
@@ -85,7 +83,7 @@ class MemoryService @Inject constructor(
     fun listChildren(publicId: String): List<MemorySummary> =
         memoryRepo.listChildren(tenant(), resolveVisibleMemory(publicId))
             .filter(::isMemoryVisible)
-            .map(::toSummary)
+            .let(::toSummaries)
 
     fun listParticipants(publicId: String): List<MemoryParticipantSummary> =
         visibleParticipants(resolveVisibleMemory(publicId))
@@ -100,14 +98,14 @@ class MemoryService @Inject constructor(
             .filter(::isMemoryVisible)
             .distinctBy { it.id }
             .sortedWith(compareBy<Memory> { it.displayName.lowercase() }.thenBy { it.publicId })
-            .map(::toSummary)
             .toList()
+            .let(::toSummaries)
 
     fun listFavoriteMemories(): List<MemorySummary> =
         memoryFavoriteRepo.listByTenantAndUser(tenant(), user())
             .map { it.memory }
             .filter(::isMemoryVisible)
-            .map(::toSummary)
+            .let(::toSummaries)
 
     @Transactional
     fun favoriteMemory(publicId: String): MemorySummary {
@@ -247,7 +245,7 @@ class MemoryService @Inject constructor(
         val memory = resolveVisibleMemory(publicId)
         val memories = descendantsAndSelf(memory)
         val memoryIds = memories.map { it.id }
-        val media = memories.flatMap { mediaRepo.listByMemory(it) }
+        val media = mediaRepo.listByMemoriesOrdered(memories)
         val coverDirectories = memories.mapNotNull { it.coverStorageKey?.let(::coverDirectory) }.distinct()
         memories.forEach { candidate ->
             if (candidate.coverMedia?.let { cover -> media.any { it.id == cover.id } } == true) {
@@ -406,7 +404,15 @@ class MemoryService @Inject constructor(
     private fun requiredDisplayName(value: String?): String =
         value?.trim()?.takeIf { it.isNotBlank() } ?: throw BadRequestException("displayName is required", "MEMORY_DISPLAY_NAME_REQUIRED")
 
+    private fun toSummaries(memories: List<Memory>): List<MemorySummary> {
+        val stats = summaryStats(memories)
+        return memories.map { toSummary(it, stats) }
+    }
+
     private fun toSummary(memory: Memory): MemorySummary =
+        toSummary(memory, summaryStats(listOf(memory)))
+
+    private fun toSummary(memory: Memory, stats: MemorySummaryStats): MemorySummary =
         MemorySummary(
             id = memory.publicId,
             parentId = memory.parentMemory?.publicId,
@@ -418,15 +424,15 @@ class MemoryService @Inject constructor(
             coverCrop = memory.coverCrop(),
             startDate = memory.startDate,
             endDate = memory.endDate,
-            childCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
-            mediaCount = mediaRepo.listByMemory(memory).size,
-            favorite = isFavorite(memory),
+            childCount = stats.childCounts[memory.id] ?: 0,
+            mediaCount = stats.mediaCounts[memory.id] ?: 0,
+            favorite = memory.id in stats.favoriteMemoryIds,
             scope = memory.scope().toApiScope(),
         )
 
     private fun toHeader(memory: Memory): MemoryHeaderSummary {
-        val directMediaCount = mediaRepo.listByMemory(memory).size
         val visibleDescendants = descendantsAndSelf(memory).drop(1).filter(::isMemoryVisible)
+        val mediaCounts = mediaRepo.countByMemoryIds((listOf(memory) + visibleDescendants).map { it.id })
         return MemoryHeaderSummary(
             id = memory.publicId,
             displayName = memory.displayName,
@@ -435,8 +441,8 @@ class MemoryService @Inject constructor(
             coverCrop = memory.coverCrop(),
             startDate = memory.startDate,
             endDate = memory.endDate,
-            directMediaCount = directMediaCount,
-            descendantMediaCount = visibleDescendants.sumOf { mediaRepo.listByMemory(it).size },
+            directMediaCount = mediaCounts[memory.id] ?: 0,
+            descendantMediaCount = visibleDescendants.sumOf { mediaCounts[it.id] ?: 0 },
             childMemoryCount = memoryRepo.listChildren(tenant(), memory).count { isMemoryVisible(it) },
             favorite = isFavorite(memory),
             scope = memory.scope().toApiScope(),
@@ -502,6 +508,15 @@ class MemoryService @Inject constructor(
     private fun isFavorite(memory: Memory): Boolean =
         memoryFavoriteRepo.findByTenantUserAndMemory(tenant(), user(), memory) != null
 
+    private fun summaryStats(memories: List<Memory>): MemorySummaryStats {
+        if (memories.isEmpty()) return MemorySummaryStats()
+        val memoryIds = memories.map { it.id }
+        val childCounts = memoryRepo.countChildrenByParentIds(tenant(), memoryIds)
+        val mediaCounts = mediaRepo.countByMemoryIds(memoryIds)
+        val favoriteMemoryIds = memoryFavoriteRepo.favoriteMemoryIds(tenant(), user(), memories)
+        return MemorySummaryStats(childCounts, mediaCounts, favoriteMemoryIds)
+    }
+
     private fun requiredDateRange(startDate: LocalDate?, endDate: LocalDate?): MemoryDateRange {
         val start = startDate ?: throw BadRequestException("startDate is required", "MEMORY_DATE_RANGE_REQUIRED")
         val end = endDate ?: throw BadRequestException("endDate is required", "MEMORY_DATE_RANGE_REQUIRED")
@@ -564,8 +579,7 @@ class MemoryService @Inject constructor(
         }
 
     private fun descendantsAndSelf(root: Memory): List<Memory> =
-        listOf(root) + memoryRepo.list("tenant", tenant())
-            .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+        memoryRepo.listDescendantsAndSelf(tenant(), root)
 
     private fun rootMemory(memory: Memory): Memory =
         generateSequence(memory) { it.parentMemory }.last()
@@ -632,6 +646,12 @@ class MemoryService @Inject constructor(
             }
         }
 
+    private data class MemorySummaryStats(
+        val childCounts: Map<Long, Int> = emptyMap(),
+        val mediaCounts: Map<Long, Int> = emptyMap(),
+        val favoriteMemoryIds: Set<Long> = emptySet(),
+    )
+
     private fun resolveFolderTarget(path: String?): MemoryFolderTarget =
         when (val context = resolveVisibleContext(path)) {
             ResolvedMemoryLocation.Tenant -> MemoryFolderTarget(null, LibraryScopeKey.Tenant)
@@ -694,16 +714,7 @@ class MemoryService @Inject constructor(
     }
 
     private fun writeFile(source: Path, storageKey: String) {
-        val target = storagePath(storageKey)
-        Files.createDirectories(target.parent)
-        val temp = Files.createTempFile(target.parent, "cover-", ".tmp")
-        try {
-            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: Exception) {
-            Files.deleteIfExists(temp)
-            throw e
-        }
+        mediaStorageService.writeAtomic(source, storageKey, "cover-")
     }
 
     private fun deleteOldExplicitCover(oldStorageKey: String?, newStorageKey: String?) {
@@ -716,17 +727,11 @@ class MemoryService @Inject constructor(
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
-        return path
+        return mediaStorageService.path(storageKey)
     }
 
     private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-        }
+        mediaStorageService.deleteRecursively(path)
     }
 
     private data class MemoryCoverCrop(

@@ -34,7 +34,7 @@ class TotpService @Inject constructor(
     private val random = SecureRandom()
 
     fun createEnrollment(): TotpEnrollmentResponse {
-        val user = requestContext.user ?: throw UnauthorizedException("Authentication required")
+        val user = requestContext.requireUser()
         val secret = base32Encode(ByteArray(20).also(random::nextBytes))
         val accountName = user.email
         val label = "${url(TOTP_ISSUER)}:${url(accountName)}"
@@ -191,5 +191,5 @@ class TotpService @Inject constructor(
     }
 
     private fun managedCurrentUser(): User =
-        requestContext.user ?: throw UnauthorizedException("Authentication required")
+        requestContext.requireUser()
 }

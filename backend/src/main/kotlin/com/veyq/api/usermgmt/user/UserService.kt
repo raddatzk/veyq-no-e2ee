@@ -17,7 +17,7 @@ import com.veyq.api.domain.User
 import com.veyq.api.domain.UserInvitation
 import com.veyq.api.domain.UserRepo
 import com.veyq.api.generated.model.*
-import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaStorageService
 import com.veyq.api.memory.MemoryService
 import com.veyq.api.tenant.toManagedTenantSummary
 import com.veyq.api.security.RateLimitService
@@ -32,7 +32,6 @@ import jakarta.ws.rs.core.Response
 import io.vertx.ext.web.RoutingContext
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
 import javax.imageio.ImageIO
@@ -53,12 +52,13 @@ class UserService @Inject constructor(
     private val passkeyHostService: PasskeyHostService,
     private val passkeyService: PasskeyService,
     private val memoryService: MemoryService,
-    private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val capabilityAcknowledgementService: CapabilityAcknowledgementService,
     private val totpCredentialRepo: TotpCredentialRepo,
 ) {
     fun me(): UserSummary {
-        return summarize(requestContext.user!!, emailChangeService.pendingEmail(requestContext.user!!))
+        val user = requestContext.requireUser()
+        return summarize(user, emailChangeService.pendingEmail(user))
     }
 
     fun findUser(userId: Long): User {
@@ -73,7 +73,7 @@ class UserService @Inject constructor(
             permalink = profileUser.permalink,
             initials = initials(profileUser.displayName),
             memories = memoryService.listParticipantRootMemories(profileUser),
-            avatarUrl = profileUser.avatarUrlForTenant(requestContext.tenant!!.name),
+            avatarUrl = profileUser.avatarUrlForTenant(requestContext.requireTenant().name),
         )
     }
 
@@ -521,7 +521,7 @@ class UserService @Inject constructor(
             .joinToString("") { it.first().uppercaseChar().toString() }
             .ifBlank { "?" }
 
-    private fun user(): User = requestContext.user!!
+    private fun user(): User = requestContext.requireUser()
 
     private fun managedUser(): User =
         userRepo.findById(user().id) ?: throw UnauthorizedException("Invalid user")
@@ -530,7 +530,7 @@ class UserService @Inject constructor(
         val permalink = normalizePermalink(userPermalink)
         val profileUser = userRepo.findByPermalink(permalink)
             ?: throw NotFoundException("Profile not found")
-        tenantMemberRepo.findByTenantAndUser(requestContext.tenant!!, profileUser)
+        tenantMemberRepo.findByTenantAndUser(requestContext.requireTenant(), profileUser)
             ?: throw NotFoundException("Profile not found")
         return profileUser
     }
@@ -568,26 +568,15 @@ class UserService @Inject constructor(
     }
 
     private fun writeAvatarFile(source: Path, storageKey: String) {
-        val target = storagePath(storageKey)
-        Files.createDirectories(target.parent)
-        val temp = target.resolveSibling("${target.fileName}.tmp")
-        try {
-            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } finally {
-            Files.deleteIfExists(temp)
-        }
+        mediaStorageService.writeAtomic(source, storageKey, "avatar-")
     }
 
     private fun deleteAvatarFile(storageKey: String) {
-        Files.deleteIfExists(storagePath(storageKey))
+        mediaStorageService.deleteIfExists(storageKey)
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid avatar storage key")
-        return path
+        return mediaStorageService.path(storageKey, "Invalid avatar storage key")
     }
 
     private fun activeServerOwnerCount(): Int =

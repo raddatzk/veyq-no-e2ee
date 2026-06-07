@@ -24,13 +24,14 @@ class TenantRolesAllowedInterceptor @Inject constructor(
     @AroundInvoke
     fun authorize(context: InvocationContext): Any? {
 
-        val user = requestContext.user!!
+        val user = requestContext.requireUser()
+        val tenant = requestContext.requireTenant()
 
-        val membership = requestContext.tenant!!.members.firstOrNull { it.user.id == user.id }
+        val membership = tenant.members.firstOrNull { it.user.id == user.id }
             ?: throw ForbiddenException("User ${user.displayName} is not member in tenant ")
 
         if (membership.status != TenantMemberStatus.Active || membership.role != TenantRole.TenantOwner) {
-            throw ForbiddenException("User ${user.displayName} has insufficient role in tenant ${requestContext.tenant!!.name}")
+            throw ForbiddenException("User ${user.displayName} has insufficient role in tenant ${tenant.name}")
         }
 
         return context.proceed()

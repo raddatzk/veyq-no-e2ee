@@ -27,7 +27,7 @@ class ServerRolesAllowedInterceptor @Inject constructor(
     fun authorize(context: InvocationContext): Any? {
         val annotation = findServerRolesRequiredAnnotation(context)
 
-        val user = requestContext.user!!
+        val user = requestContext.requireUser()
 
         if (!annotation.value.toSet().contains(user.role)) {
             throw ForbiddenException("User ${user.displayName} has insufficient role on server")
@@ -42,4 +42,3 @@ class ServerRolesAllowedInterceptor @Inject constructor(
             ?: throw IllegalStateException("Missing ServerRolesAllowed annotation")
     }
 }
-

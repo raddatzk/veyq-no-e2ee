@@ -46,6 +46,7 @@ class MediaService @Inject constructor(
     private val userRepo: UserRepo,
     private val shareIdentityRepo: MemoryShareIdentityRepo,
     private val mediaConfig: MediaConfig,
+    private val mediaStorageService: MediaStorageService,
     private val mediaTypeDetector: MediaTypeDetector,
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val mediaResponseMapper: MediaResponseMapper,
@@ -100,12 +101,10 @@ class MediaService @Inject constructor(
     fun listMemoryMedia(memoryId: String, includeChildren: Boolean): List<MemoryMediaSummary> {
         val memory = resolveVisibleMemory(memoryId)
         val memories = if (includeChildren) descendantsAndSelf(memory) else listOf(memory)
+        val visibleMemories = memories.filter(::isMemoryVisible)
         ensureBucketsForMemories(memories)
-        return memories
-            .filter(::isMemoryVisible)
-            .flatMap { mediaRepo.listByMemory(it) }
+        return mediaRepo.listByMemoriesOrdered(visibleMemories)
             .distinctBy { it.id }
-            .sortedWith(compareBy<Media> { it.capturedAt ?: it.createdAt }.thenBy { it.createdAt })
             .map { mediaResponseMapper.toMemorySummary(it, tenant().name) }
     }
 
@@ -1050,7 +1049,9 @@ class MediaService @Inject constructor(
     }
 
     private fun ensureBucketsForMemories(memories: Collection<Memory>) {
-        memories.forEach { memory -> ensureBucketsForMedia(memory, mediaRepo.listByMemory(memory)) }
+        if (memories.isEmpty()) return
+        val mediaByMemoryId = mediaRepo.listByMemoriesOrdered(memories.toList()).groupBy { it.memory?.id }
+        memories.forEach { memory -> ensureBucketsForMedia(memory, mediaByMemoryId[memory.id] ?: emptyList()) }
     }
 
     private fun ensureBucketsForMedia(memory: Memory, media: List<Media>) {
@@ -1161,10 +1162,7 @@ class MediaService @Inject constructor(
     }
 
     private fun mediaCountsByBucket(memories: Collection<Memory>): Map<Long, Int> =
-        memories.flatMap { mediaRepo.listByMemory(it) }
-            .mapNotNull { media -> media.bucket?.id }
-            .groupingBy { it }
-            .eachCount()
+        mediaRepo.countByBucketIds(bucketRepo.listByMemories(memories).map { it.id })
 
     private fun deleteBucketTree(bucket: MemoryMediaBucket) {
         deleteBucketContents(bucket)
@@ -1267,7 +1265,6 @@ class MediaService @Inject constructor(
     }
 
     fun streamThumbnail(media: Media): Response {
-        if (media.blob.thumbnailStorageKey == null) throw NotFoundException("Media thumbnail not found")
         return streamDerivative(
             media = media,
             path = thumbnailPath(media.blob),
@@ -1376,8 +1373,7 @@ class MediaService @Inject constructor(
         }
 
     private fun descendantsAndSelf(root: Memory): List<Memory> =
-        listOf(root) + memoryRepo.list("tenant", tenant())
-            .filter { candidate -> generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id } }
+        memoryRepo.listDescendantsAndSelf(tenant(), root)
 
     fun archiveMemoryDirectories(rootMemory: Memory, memories: List<Memory>): Map<Long, String> =
         memories.associate { memory -> memory.id to memoryPath(rootMemory, memory).joinToString("/") }
@@ -1491,16 +1487,7 @@ class MediaService @Inject constructor(
             ?: fallback
 
     private fun writeMediaFile(source: Path, storageKey: String) {
-        val target = storagePath(storageKey)
-        Files.createDirectories(target.parent)
-        val temp = Files.createTempFile(target.parent, "upload-", ".tmp")
-        try {
-            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING)
-            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: Exception) {
-            Files.deleteIfExists(temp)
-            throw e
-        }
+        mediaStorageService.writeAtomic(source, storageKey, "upload-")
     }
 
     private fun sha256(path: Path): String {
@@ -1670,10 +1657,7 @@ class MediaService @Inject constructor(
     }
 
     private fun storagePath(storageKey: String): Path {
-        val root = mediaConfig.storageDir.toAbsolutePath().normalize()
-        val path = root.resolve(storageKey).normalize()
-        if (!path.startsWith(root)) throw BadRequestException("Invalid media storage key", "MEDIA_STORAGE_KEY_INVALID")
-        return path
+        return mediaStorageService.path(storageKey)
     }
 
     private fun blobDirectory(blob: MediaBlob): Path {
@@ -1682,10 +1666,7 @@ class MediaService @Inject constructor(
     }
 
     private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-        }
+        mediaStorageService.deleteRecursively(path)
     }
 
     private fun streamRange(path: Path, range: ContentRange): StreamingOutput =

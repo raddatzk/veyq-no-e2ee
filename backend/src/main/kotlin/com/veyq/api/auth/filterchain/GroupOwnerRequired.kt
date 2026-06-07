@@ -27,10 +27,10 @@ class GroupRolesRequiredInterceptor @Inject constructor(
 
         val groupName = findGroupName(context)
 
-        val group = requestContext.tenant!!.groups.firstOrNull { it.name == groupName }
+        val group = requestContext.requireTenant().groups.firstOrNull { it.name == groupName }
             ?: throw NotFoundException("Group $groupName not found")
 
-        val user = requestContext.user!!
+        val user = requestContext.requireUser()
 
         val membership = group.members.firstOrNull { it.user.id == user.id }
             ?: throw ForbiddenException("User ${user.id} is not member in group $groupName")

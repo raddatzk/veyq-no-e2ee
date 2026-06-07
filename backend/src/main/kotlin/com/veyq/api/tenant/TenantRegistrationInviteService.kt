@@ -433,11 +433,11 @@ class TenantRegistrationInviteService @Inject constructor(
         HashingService.sha256(token).take(16)
 
     private fun tenant(): Tenant {
-        val tenantName = requestContext.tenant!!.name
+        val tenantName = requestContext.requireTenant().name
         return tenantRepo.findByName(tenantName) ?: throw NotFoundException("Tenant not found")
     }
 
-    private fun user(): User = requestContext.user!!
+    private fun user(): User = requestContext.requireUser()
 
     private fun newInviteToken(): String {
         val bytes = ByteArray(32)

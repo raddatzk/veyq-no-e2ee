@@ -91,7 +91,7 @@ class AuthService @Inject constructor(
         val refreshToken = tokenService.findRefreshToken(credential.refreshToken!!)
             ?: throw UnauthorizedException("Invalid refresh token")
 
-        val user = requestContext.user!!
+        val user = requestContext.requireUser()
 
         return login(user, refreshToken)
     }

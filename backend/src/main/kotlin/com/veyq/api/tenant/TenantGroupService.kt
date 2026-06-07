@@ -40,6 +40,6 @@ class TenantGroupService @Inject constructor(
             ?: throw NotFoundException("Group $group.name not found")
     }
 
-    private fun tenant() = requestContext.tenant!!
-    private fun user() = requestContext.user!!
+    private fun tenant() = requestContext.requireTenant()
+    private fun user() = requestContext.requireUser()
 }
