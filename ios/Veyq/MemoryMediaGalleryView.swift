@@ -121,7 +121,7 @@ private struct MediaTile: View {
         .overlay(alignment: .topLeading) {
             if media.highlight {
                 MediaTileHighlightBadge()
-                    .padding(9)
+                    .padding(7)
                     .accessibilityHidden(true)
             }
         }
@@ -137,28 +137,44 @@ private struct MediaTile: View {
 
 private struct MediaTileHighlightBadge: View {
     var body: some View {
-        Image(systemName: "star.fill")
-            .font(.caption.weight(.semibold))
-            .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(VeyqColor.warning)
-            .frame(width: 28, height: 28)
-            .background(
-                ZStack {
-                    Circle()
-                        .fill(VeyqColor.warning.opacity(0.20))
-                        .blur(radius: 7)
-                        .scaleEffect(1.35)
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                    Circle()
-                        .fill(VeyqColor.warning.opacity(0.10))
-                }
-            )
+        ZStack {
+            Circle()
+                .fill(VeyqColor.warning.opacity(0.24))
+                .blur(radius: 8)
+                .scaleEffect(1.38)
+
+            Circle()
+                .fill(.regularMaterial)
+
+            Circle()
+                .fill(VeyqColor.onStrong.opacity(0.74))
+
+            Image(systemName: "star.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.orange)
+                .shadow(color: VeyqColor.mediaBackdrop.opacity(0.24), radius: 1, x: 0, y: 1)
+        }
+            .frame(width: 22, height: 22)
             .overlay {
                 Circle()
-                    .stroke(VeyqColor.onStrong.opacity(0.32), lineWidth: 0.8)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                VeyqColor.onStrong.opacity(0.82),
+                                VeyqColor.mediaBackdrop.opacity(0.20)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             }
-            .shadow(color: VeyqColor.mediaBackdrop.opacity(0.18), radius: 6, x: 0, y: 3)
+            .overlay {
+                Circle()
+                    .stroke(VeyqColor.warning.opacity(0.22), lineWidth: 4)
+                    .blur(radius: 3)
+            }
+            .shadow(color: VeyqColor.mediaBackdrop.opacity(0.28), radius: 7, x: 0, y: 3)
     }
 }
 
