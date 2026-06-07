@@ -41,6 +41,7 @@
 "Camera" = "Kamera";
 "Capture" = "Aufnahme";
 "Date" = "Datum";
+"Date Range" = "Zeitraum";
 "Create Chapter" = "Kapitel erstellen";
 "Create Folder" = "Ordner erstellen";
 "Create Group" = "Gruppe erstellen";
@@ -200,7 +201,7 @@
 "Uploads" = "Uploads";
 "Uploads continue while the app is open. Failed uploads can be retried from this queue." = "Uploads laufen weiter, solange die App geöffnet ist. Fehlgeschlagene Uploads können aus dieser Warteschlange erneut gestartet werden.";
 "Uploads continue while the app is open. Interrupted uploads resume from this queue when possible." = "Uploads laufen weiter, solange die App geöffnet ist. Unterbrochene Uploads werden aus dieser Warteschlange nach Möglichkeit fortgesetzt.";
-"Updates the Memory title, path name and date range." = "Aktualisiert Titel, Pfadname und Zeitraum der Memory.";
+"Updates the Memory title, permalink and date range." = "Ändert Titel, Permalink und Zeitraum dieser Memory.";
 "Upload appears stalled. It will keep waiting for network progress." = "Der Upload scheint zu stehen. Er wartet weiter auf Netzwerkfortschritt.";
 "Uploader" = "Uploader";
 "Use Capture Date" = "Aufnahmedatum verwenden";
@@ -301,7 +302,7 @@
 "%d mapped media" = "%d Medien mit Ort";
 "%d tracks" = "%d Tracks";
 "Advanced" = "Erweitert";
-"Changing the path affects links to this Memory." = "Eine Änderung des Pfads betrifft Links zu dieser Memory.";
+"Changing the path affects links to this Memory." = "Eine Änderung des Permalinks betrifft Links zu dieser Memory.";
 "Create a Memory, then add photos, journal notes and context." = "Erstelle eine Memory und füge danach Fotos, Journalnotizen und Kontext hinzu.";
 "Creates a chapter inside \"%@\" for a day, place or smaller moment." = "Erstellt ein Kapitel in \"%@\" für einen Tag, Ort oder kleineren Moment.";
 "Curated trips, events and moments" = "Kuratierte Reisen, Events und Momente";
@@ -318,7 +319,7 @@
 "Keep related Memories together in one place." = "Sammle zusammengehörige Memories an einem Ort.";
 "Remove Highlight" = "Highlight entfernen";
 "Start with a title and date range. Photos, journal notes and context can be added next." = "Beginne mit Titel und Zeitraum. Fotos, Journalnotizen und Kontext kommen danach dazu.";
-"The path name is generated from the title and can usually stay unchanged." = "Der Pfadname wird aus dem Titel erzeugt und kann meistens unverändert bleiben.";
+"The permalink is generated from the title and can usually stay unchanged." = "Der Permalink wird aus dem Titel erzeugt und kann meistens unverändert bleiben.";
 "Use chapters for days, places or smaller moments inside this Memory." = "Nutze Kapitel für Tage, Orte oder kleinere Momente innerhalb dieser Memory.";
 "Write a short note to give this Memory context beyond the media." = "Schreibe eine kurze Notiz, damit diese Memory mehr Kontext als nur Medien hat.";
 "Yes" = "Ja";

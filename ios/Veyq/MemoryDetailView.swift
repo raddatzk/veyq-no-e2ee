@@ -630,7 +630,7 @@ struct MemoryAuthoringSheet: View {
                     Text(mode.footer)
                 }
 
-                Section("Date") {
+                Section(L10n.string("Date Range")) {
                     DatePicker(L10n.string("Start Date"), selection: $startDate, displayedComponents: .date)
                         .accessibilityIdentifier("memory-start-date-picker")
                     DatePicker(L10n.string("End Date"), selection: $endDate, displayedComponents: .date)
@@ -647,7 +647,7 @@ struct MemoryAuthoringSheet: View {
                             Label(L10n.string("Advanced"), systemImage: "slider.horizontal.3")
                         }
                     } footer: {
-                        Text(L10n.string("The path name is generated from the title and can usually stay unchanged."))
+                        Text(L10n.string("The permalink is generated from the title and can usually stay unchanged."))
                     }
                 }
 
@@ -706,14 +706,14 @@ struct MemoryAuthoringSheet: View {
         Section {
             pathNameField
         } header: {
-            Text(L10n.string("Path Name"))
+            Text(L10n.string("Permalink"))
         } footer: {
             Text(L10n.string("Changing the path affects links to this Memory."))
         }
     }
 
     private var pathNameField: some View {
-        TextField(L10n.string("Path Name"), text: $name)
+        TextField(L10n.string("Permalink"), text: $name)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .textContentType(.URL)
@@ -765,7 +765,7 @@ enum MemoryAuthoringMode {
         case .createChapter(_, let parentTitle):
             L10n.format("Creates a chapter inside \"%@\" for a day, place or smaller moment.", parentTitle)
         case .edit:
-            L10n.string("Updates the Memory title, path name and date range.")
+            L10n.string("Updates the Memory title, permalink and date range.")
         }
     }
 

@@ -41,6 +41,7 @@
 "Camera" = "Camera";
 "Capture" = "Capture";
 "Date" = "Date";
+"Date Range" = "Date Range";
 "Create Chapter" = "Create Chapter";
 "Create Folder" = "Create Folder";
 "Create Group" = "Create Group";
@@ -200,7 +201,7 @@
 "Uploads" = "Uploads";
 "Uploads continue while the app is open. Failed uploads can be retried from this queue." = "Uploads continue while the app is open. Failed uploads can be retried from this queue.";
 "Uploads continue while the app is open. Interrupted uploads resume from this queue when possible." = "Uploads continue while the app is open. Interrupted uploads resume from this queue when possible.";
-"Updates the Memory title, path name and date range." = "Updates the Memory title, path name and date range.";
+"Updates the Memory title, permalink and date range." = "Updates the Memory title, permalink and date range.";
 "Upload appears stalled. It will keep waiting for network progress." = "Upload appears stalled. It will keep waiting for network progress.";
 "Uploader" = "Uploader";
 "Use Capture Date" = "Use Capture Date";
@@ -318,7 +319,7 @@
 "Keep related Memories together in one place." = "Keep related Memories together in one place.";
 "Remove Highlight" = "Remove Highlight";
 "Start with a title and date range. Photos, journal notes and context can be added next." = "Start with a title and date range. Photos, journal notes and context can be added next.";
-"The path name is generated from the title and can usually stay unchanged." = "The path name is generated from the title and can usually stay unchanged.";
+"The permalink is generated from the title and can usually stay unchanged." = "The permalink is generated from the title and can usually stay unchanged.";
 "Use chapters for days, places or smaller moments inside this Memory." = "Use chapters for days, places or smaller moments inside this Memory.";
 "Write a short note to give this Memory context beyond the media." = "Write a short note to give this Memory context beyond the media.";
 "Yes" = "Yes";
