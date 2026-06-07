@@ -44,6 +44,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 ## Needs Domain Modeling
 
 - Rich location model beyond major line 1 GPS metadata, including named places, map clusters and relationships between media locations and track geometry.
+- General Memory location model for an explicit place on a Memory itself, independent of media GPS metadata or uploaded GPX tracks.
 - Weather metadata model.
 - Person model beyond current tenant-user Memory participants, with optional user linkage, viewer-scoped identity resolution and no tenant-directory leakage.
 - Face occurrence, person-match confirmation and profile visibility rules for recognized people who are not just explicit Memory participants.
@@ -81,6 +82,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 
 - Memory detail next pass with combined media/track maps and richer contextual tabs.
 - Memory header with places, weather and richer track/participant summaries beyond the current cover, playlist and participant surfaces.
+- Memory map fallback for an explicit Memory location, shown as the default map position when the Memory has no geotagged media and no GPX track geometry.
 - Video poster/title image selection that lets users choose the exact frame or an existing Memory gallery image used as the video's visible title image or preview.
 - Child Memory navigation without file-system feel.
 - Memory and folder mutation UX polish for [ADR 0020](../adr/0020-memory-and-folder-mutation-semantics.md), including affected-content counts and clear guidance that Memories remain the primary content objects.
