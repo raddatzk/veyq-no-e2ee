@@ -24,7 +24,8 @@ final class VeyqUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
         XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
         XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
-        XCTAssertTrue(app.buttons["upload-status-button"].exists)
+        XCTAssertTrue(tabBarButton(in: app, startingWith: "Activity").exists)
+        XCTAssertFalse(app.buttons["upload-status-button"].exists)
         XCTAssertTrue(app.searchFields["Search Memories"].exists)
 
         let rootFolder = app.buttons["folder-row-folder-travel"]
@@ -35,11 +36,13 @@ final class VeyqUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["All Memories"].exists)
         XCTAssertFalse(app.tabBars.buttons["Groups"].exists)
         XCTAssertFalse(app.tabBars.buttons["Personal"].exists)
+        XCTAssertFalse(tabBarButton(in: app, startingWith: "Activity").exists)
         folderUpButton.tap()
         XCTAssertTrue(folderUpButton.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
         XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
         XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
+        XCTAssertTrue(tabBarButton(in: app, startingWith: "Activity").exists)
 
         app.buttons["settings-button"].tap()
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
@@ -54,6 +57,7 @@ final class VeyqUITests: XCTestCase {
 
         let groupScopeButton = app.tabBars.buttons["Gruppen"]
         XCTAssertTrue(groupScopeButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(tabBarButton(in: app, startingWith: "Aktivität").exists)
         groupScopeButton.tap()
         XCTAssertTrue(app.buttons["create-group-button"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["create-memory-button"].exists)
@@ -89,6 +93,7 @@ final class VeyqUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["Alle Memories"].exists)
         XCTAssertFalse(app.tabBars.buttons["Gruppen"].exists)
         XCTAssertFalse(app.tabBars.buttons["Persönlich"].exists)
+        XCTAssertFalse(tabBarButton(in: app, startingWith: "Aktivität").exists)
         XCTAssertTrue(app.buttons["memory-all-media-button"].exists)
         XCTAssertTrue(app.buttons["memory-read-journal-button"].exists)
 
@@ -117,11 +122,11 @@ final class VeyqUITests: XCTestCase {
 
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.staticTexts["memory-home-title"].waitForExistence(timeout: 5))
-        app.buttons["upload-status-button"].tap()
+        tabBarButton(in: app, startingWith: "Aktivität").tap()
         let uploadQueueTitle = app.staticTexts["upload-queue-title"]
         XCTAssertTrue(uploadQueueTitle.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["upload-state-failed"].exists)
-        app.buttons["Fertig"].tap()
+        app.tabBars.buttons["Alle Memories"].tap()
 
         let searchField = app.searchFields["Memories suchen"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
@@ -133,5 +138,9 @@ final class VeyqUITests: XCTestCase {
         searchResult.tap()
 
         XCTAssertTrue(app.staticTexts["memory-detail-title"].waitForExistence(timeout: 5))
+    }
+
+    private func tabBarButton(in app: XCUIApplication, startingWith labelPrefix: String) -> XCUIElement {
+        app.tabBars.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", labelPrefix)).firstMatch
     }
 }

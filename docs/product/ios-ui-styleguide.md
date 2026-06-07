@@ -24,7 +24,7 @@ The current app already has these primary surfaces:
 - Memory home with scope, tenant and instance switching.
 - Memory detail with gallery, journal, child Memory and context tabs.
 - Photos and videos import through `PhotosPicker`.
-- Floating upload/search dock and a local upload queue.
+- Search affordance, an upload activity tab while queued work exists and a local upload queue.
 - Share extension handoff into the upload target flow.
 
 Treat these surfaces as the baseline when evolving the styleguide. New guidance should reconcile with the existing SwiftUI implementation instead of describing a separate future app.
@@ -128,6 +128,8 @@ Each queue item should show:
 - Retry, cancel or remove actions for failed or paused uploads.
 
 Use the resumable Memory media upload APIs when `memory.media-resumable-upload` is advertised. Background uploads are best effort; the UI must show the final state and required user action instead of promising continuous background sync.
+
+When queued upload work exists, expose it as a top-level Activity tab with a badge rather than covering the Memory tabs with a floating status pill. The Activity tab can later absorb other app-level notifications, but it should only appear when there is actionable local status.
 
 The upload queue is an app-level surface, not just a detail-screen accessory. If queued work exists, the user should be able to reach status, failures and retry/removal actions without navigating back to the original Memory.
 

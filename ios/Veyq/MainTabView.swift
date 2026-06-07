@@ -9,7 +9,6 @@ struct MainTabView: View {
     @State private var contextPresented = false
     @State private var searchQuery = ""
     @State private var searchTask: Task<Void, Never>?
-    @State private var uploadsPresented = false
     @State private var settingsPresented = false
     @State private var createMemoryPresented = false
     @State private var createFolderPresented = false
@@ -35,16 +34,23 @@ struct MainTabView: View {
             }
             .customizationID("app.veyq.ios.scope.personal")
             .customizationBehavior(.reorderable, for: .tabBar)
+
+            if !store.uploadItems.isEmpty {
+                Tab(L10n.string("Activity"), systemImage: activityTabIcon, value: RootScopeTab.activity) {
+                    NavigationStack {
+                        UploadQueueView()
+                    }
+                    .toolbar(.visible, for: .tabBar)
+                }
+                .badge(activityBadgeCount)
+                .customizationID("app.veyq.ios.activity")
+                .customizationBehavior(.reorderable, for: .tabBar)
+            }
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($rootTabCustomization)
         .transaction { transaction in
             transaction.animation = nil
-        }
-        .safeAreaInset(edge: .bottom) {
-            if shouldShowFloatingDock {
-                floatingDock
-            }
         }
         .sheet(isPresented: $contextPresented) {
             SpaceSwitcherSheet()
@@ -53,18 +59,6 @@ struct MainTabView: View {
         .sheet(isPresented: $settingsPresented) {
             SettingsView(onDisconnect: onDisconnect)
                 .environmentObject(store)
-        }
-        .sheet(isPresented: $uploadsPresented) {
-            NavigationStack {
-                UploadQueueView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") {
-                                uploadsPresented = false
-                            }
-                        }
-                    }
-            }
         }
         .sheet(isPresented: $createMemoryPresented) {
             MemoryAuthoringSheet(mode: .createRoot)
@@ -90,6 +84,11 @@ struct MainTabView: View {
                 try? await Task.sleep(nanoseconds: 220_000_000)
                 guard !Task.isCancelled else { return }
                 await store.updateSearch(matching: query)
+            }
+        }
+        .onChange(of: store.uploadItems.isEmpty) { _, isEmpty in
+            if isEmpty && selectedRootTab == .activity {
+                selectedRootTab = RootScopeTab(space: store.selectedSpace)
             }
         }
         .onAppear {
@@ -183,24 +182,6 @@ struct MainTabView: View {
         return .settingsOnly
     }
 
-    private var floatingDock: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            Spacer(minLength: 0)
-
-            if !store.uploadItems.isEmpty {
-                uploadStatusButton
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.horizontal, 18)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-    }
-
-    private var shouldShowFloatingDock: Bool {
-        memoryPath.isEmpty
-    }
-
     private var tenantSpace: VeyqSpace? {
         store.spaces.first { $0.kind == .tenant }
     }
@@ -276,6 +257,8 @@ struct MainTabView: View {
             if let personalSpace {
                 store.selectSpace(personalSpace)
             }
+        case .activity:
+            groupsOverviewActive = false
         }
     }
 
@@ -292,31 +275,6 @@ struct MainTabView: View {
         return tab != .groups || !groupsOverviewActive
     }
 
-    private var uploadStatusButton: some View {
-        Button {
-            uploadsPresented = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: uploadStatusIcon)
-                    .font(.subheadline.weight(.semibold))
-                Text(uploadStatusLabel)
-                    .font(.subheadline.weight(.semibold))
-            }
-            .foregroundStyle(uploadStatusTint)
-            .frame(height: 52)
-            .padding(.horizontal, 16)
-            .background(.thinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(uploadStatusTint.opacity(0.28))
-            }
-            .shadow(color: uploadStatusTint.opacity(0.14), radius: 12, x: 0, y: 6)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(uploadStatusAccessibilityLabel)
-        .accessibilityIdentifier("upload-status-button")
-    }
-
     private var failedUploadCount: Int {
         store.uploadItems.filter { $0.state == .failed }.count
     }
@@ -325,30 +283,12 @@ struct MainTabView: View {
         store.uploadItems.filter { $0.state.isActive }.count
     }
 
-    private var uploadStatusLabel: String {
-        if failedUploadCount > 0 {
-            return L10n.format("%d Failed", failedUploadCount)
-        }
-
-        let count = activeUploadCount > 0 ? activeUploadCount : store.uploadItems.count
-        return L10n.format("%d Uploads", count)
+    private var activityBadgeCount: Int {
+        failedUploadCount > 0 ? failedUploadCount : max(activeUploadCount, store.uploadItems.count)
     }
 
-    private var uploadStatusAccessibilityLabel: String {
-        if failedUploadCount > 0 {
-            return L10n.format("%d failed uploads", failedUploadCount)
-        }
-
-        let count = activeUploadCount > 0 ? activeUploadCount : store.uploadItems.count
-        return L10n.format("%d active uploads", count)
-    }
-
-    private var uploadStatusIcon: String {
-        failedUploadCount > 0 ? "exclamationmark.arrow.triangle.2.circlepath" : "arrow.up.circle"
-    }
-
-    private var uploadStatusTint: Color {
-        failedUploadCount > 0 ? VeyqColor.danger : VeyqColor.accent
+    private var activityTabIcon: String {
+        failedUploadCount > 0 ? "bell.badge" : "bell"
     }
 
 }
@@ -422,6 +362,7 @@ private enum RootScopeTab: Hashable {
     case tenant
     case groups
     case personal
+    case activity
 
     init(space: VeyqSpace?) {
         switch space?.kind {
