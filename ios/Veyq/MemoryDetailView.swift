@@ -31,11 +31,30 @@ struct MemoryDetailView: View {
     }
 
     private var mapPoints: [MemoryMapPoint] {
-        MemoryMapPoint.points(from: detail?.media ?? [])
+        MemoryMapPoint.points(from: visibleMedia)
+    }
+
+    private var allMapPoints: [MemoryMapPoint] {
+        MemoryMapPoint.points(from: media)
     }
 
     private var media: [MemoryMedia] {
         detail?.media ?? []
+    }
+
+    private var visibleMedia: [MemoryMedia] {
+        selectedMediaFilter.visibleMedia(from: media)
+    }
+
+    private var selectedMediaFilter: MemoryMediaFilter {
+        store.mediaFilter(for: memory.id)
+    }
+
+    private var selectedMediaFilterBinding: Binding<MemoryMediaFilter> {
+        Binding(
+            get: { store.mediaFilter(for: memory.id) },
+            set: { store.setMediaFilter($0, for: memory.id) }
+        )
     }
 
     private var journalMarkdown: String {
@@ -54,12 +73,16 @@ struct MemoryDetailView: View {
         !media.isEmpty || isLoadingDetail || mediaError != nil || store.supportsCapability("memory.media-resumable-upload")
     }
 
+    private var hasKnownMediaContent: Bool {
+        !media.isEmpty || (detail?.header.directMediaCount ?? memory.mediaCount) > 0
+    }
+
     private var hasJournalContent: Bool {
         !journalMarkdown.isEmpty || isLoadingDetail || store.supportsCapability("memory.journal-markdown")
     }
 
     private var hasMapContent: Bool {
-        !mapPoints.isEmpty || !tracks.isEmpty || isLoadingDetail
+        !allMapPoints.isEmpty || !tracks.isEmpty || isLoadingDetail
     }
 
     private var hasChapterContent: Bool {
@@ -136,6 +159,13 @@ struct MemoryDetailView: View {
                     .disabled(importingPhotos)
                     .accessibilityLabel(L10n.string("Upload photos"))
                     .accessibilityIdentifier("memory-upload-button")
+                }
+
+                if hasKnownMediaContent {
+                    MemoryMediaFilterToggle(
+                        filter: selectedMediaFilterBinding,
+                        accessibilityIdentifier: "memory-detail-media-filter-button"
+                    )
                 }
 
                 Menu {
@@ -254,18 +284,35 @@ struct MemoryDetailView: View {
         MemoryOverviewSection(title: "Gallery") {
             if !media.isEmpty {
                 NavigationLink {
-                    MemoryGalleryView(memoryId: memory.id, title: headerTitle, media: media, shareURL: internalShareURL(for: .gallery))
+                    MemoryGalleryView(
+                        memoryId: memory.id,
+                        title: headerTitle,
+                        media: media,
+                        filter: selectedMediaFilterBinding,
+                        shareURL: internalShareURL(for: .gallery)
+                    )
                         .environmentObject(store)
                 } label: {
-                    Text("All Media")
+                    Text("Open Gallery")
                 }
                 .font(.subheadline.weight(.semibold))
                 .accessibilityIdentifier("memory-all-media-button")
             }
         } content: {
             if !media.isEmpty {
-                JustifiedMemoryMediaGrid(media: media, maxRows: 3)
-                    .accessibilityIdentifier("memory-gallery-preview")
+                Group {
+                    if visibleMedia.isEmpty {
+                        VeyqEmptyState(
+                            symbolName: "star",
+                            title: "No highlights yet",
+                            message: "Mark favorite photos or videos as Highlights from the media viewer.",
+                            tint: VeyqColor.warning
+                        )
+                    } else {
+                        JustifiedMemoryMediaGrid(media: visibleMedia, maxRows: 3)
+                    }
+                }
+                .accessibilityIdentifier("memory-gallery-preview")
             } else if isLoadingDetail {
                 ProgressView("Loading photos...")
                     .font(.subheadline)
@@ -386,7 +433,12 @@ struct MemoryDetailView: View {
             MemoryOverviewSection(title: "Map") {
                 if !mapPoints.isEmpty || !tracks.isEmpty {
                     NavigationLink {
-                        MemoryMapView(points: mapPoints, tracks: tracks, enabledTrackIDs: $enabledTrackIDs)
+                        MemoryMapView(
+                            points: mapPoints,
+                            tracks: tracks,
+                            mediaFilter: selectedMediaFilterBinding,
+                            enabledTrackIDs: $enabledTrackIDs
+                        )
                     } label: {
                         Text("Open Map")
                     }
@@ -395,8 +447,21 @@ struct MemoryDetailView: View {
                 }
             } content: {
                 if !mapPoints.isEmpty || !tracks.isEmpty {
-                    MemoryMapPreview(points: mapPoints, tracks: tracks, enabledTrackIDs: $enabledTrackIDs)
+                    MemoryMapPreview(
+                        points: mapPoints,
+                        tracks: tracks,
+                        mediaFilter: selectedMediaFilterBinding,
+                        enabledTrackIDs: $enabledTrackIDs
+                    )
                         .accessibilityIdentifier("memory-map-preview")
+                } else if !allMapPoints.isEmpty && selectedMediaFilter == .highlights {
+                    VeyqEmptyState(
+                        symbolName: "location.slash",
+                        title: "No mapped highlights",
+                        message: "Switch to All Media to see every mapped photo and video.",
+                        tint: VeyqColor.warning
+                    )
+                    .accessibilityIdentifier("memory-map-empty-filtered")
                 } else if isLoadingDetail {
                     ProgressView("Loading map...")
                         .font(.subheadline)
@@ -1092,6 +1157,7 @@ private struct MemoryChapterCard: View {
 private struct MemoryMapPreview: View {
     let points: [MemoryMapPoint]
     let tracks: [MemoryTrack]
+    @Binding var mediaFilter: MemoryMediaFilter
     @Binding var enabledTrackIDs: Set<String>
     @State private var position: MapCameraPosition = .automatic
 
@@ -1105,7 +1171,7 @@ private struct MemoryMapPreview: View {
 
     var body: some View {
         NavigationLink {
-            MemoryMapView(points: points, tracks: tracks, enabledTrackIDs: $enabledTrackIDs)
+            MemoryMapView(points: points, tracks: tracks, mediaFilter: $mediaFilter, enabledTrackIDs: $enabledTrackIDs)
         } label: {
             Map(position: $position) {
                 ForEach(Array(enabledTracks.enumerated()), id: \.element.id) { index, track in
@@ -1165,6 +1231,9 @@ private struct MemoryMapPreview: View {
         .onChange(of: tracks.map(\.id)) {
             syncMapPosition()
         }
+        .onChange(of: points.map(\.id)) {
+            syncMapPosition()
+        }
     }
 
     private var mapSummary: String {
@@ -1187,6 +1256,7 @@ private struct MemoryMapPreview: View {
 private struct MemoryMapView: View {
     let points: [MemoryMapPoint]
     let tracks: [MemoryTrack]
+    @Binding var mediaFilter: MemoryMediaFilter
     @Binding var enabledTrackIDs: Set<String>
     @State private var position: MapCameraPosition = .automatic
 
@@ -1238,6 +1308,13 @@ private struct MemoryMapView: View {
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                MemoryMediaFilterToggle(
+                    filter: $mediaFilter,
+                    accessibilityIdentifier: "memory-map-filter-button"
+                )
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     syncMapPosition()
                 } label: {
@@ -1256,6 +1333,9 @@ private struct MemoryMapView: View {
             syncMapPosition()
         }
         .onChange(of: tracks.map(\.id)) {
+            syncMapPosition()
+        }
+        .onChange(of: points.map(\.id)) {
             syncMapPosition()
         }
     }
@@ -1529,23 +1609,15 @@ private struct MemoryGalleryView: View {
     let memoryId: String
     let title: String
     let media: [MemoryMedia]
+    @Binding var filter: MemoryMediaFilter
     let shareURL: URL?
-
-    @State private var filter = MemoryGalleryFilter.all
 
     private var currentMedia: [MemoryMedia] {
         store.memoryDetails[memoryId]?.media ?? media
     }
 
-    private var highlightedMedia: [MemoryMedia] {
-        currentMedia.filter(\.highlight)
-    }
-
     private var visibleMedia: [MemoryMedia] {
-        switch filter {
-        case .all: currentMedia
-        case .highlights: highlightedMedia
-        }
+        filter.visibleMedia(from: currentMedia)
     }
 
     var body: some View {
@@ -1573,19 +1645,10 @@ private struct MemoryGalleryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    ForEach(MemoryGalleryFilter.allCases) { option in
-                        Button {
-                            filter = option
-                        } label: {
-                            Label(option.title, systemImage: filter == option ? "checkmark" : option.systemImage)
-                        }
-                    }
-                } label: {
-                    Image(systemName: filter.systemImage)
-                }
-                .accessibilityLabel(L10n.string("Media Filter"))
-                .accessibilityIdentifier("memory-gallery-filter-button")
+                MemoryMediaFilterToggle(
+                    filter: $filter,
+                    accessibilityIdentifier: "memory-gallery-filter-button"
+                )
             }
 
             if let shareURL {
@@ -1605,7 +1668,7 @@ private struct MemoryGalleryView: View {
     }
 }
 
-private enum MemoryGalleryFilter: String, CaseIterable, Identifiable {
+enum MemoryMediaFilter: String, CaseIterable, Identifiable {
     case all
     case highlights
 
@@ -1623,6 +1686,29 @@ private enum MemoryGalleryFilter: String, CaseIterable, Identifiable {
         case .all: "photo.on.rectangle"
         case .highlights: "star"
         }
+    }
+
+    func visibleMedia(from media: [MemoryMedia]) -> [MemoryMedia] {
+        switch self {
+        case .all: media
+        case .highlights: media.filter(\.highlight)
+        }
+    }
+}
+
+private struct MemoryMediaFilterToggle: View {
+    @Binding var filter: MemoryMediaFilter
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        Button {
+            filter = filter == .all ? .highlights : .all
+        } label: {
+            Image(systemName: filter == .highlights ? "star.fill" : "star")
+        }
+        .accessibilityLabel(filter == .highlights ? L10n.string("Show All Media") : L10n.string("Show Highlights"))
+        .accessibilityValue(Text(filter.title))
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 

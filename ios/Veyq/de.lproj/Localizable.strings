@@ -77,6 +77,9 @@
 "Folder" = "Ordner";
 "Folders" = "Ordner";
 "Gallery" = "Galerie";
+"Open Gallery" = "Galerie öffnen";
+"Show All Media" = "Alle Medien anzeigen";
+"Show Highlights" = "Highlights anzeigen";
 "English" = "Englisch";
 "German" = "Deutsch";
 "Groups" = "Gruppen";
@@ -316,6 +319,8 @@
 "Memories in this organizational folder" = "Memories in diesem organisatorischen Ordner";
 "No" = "Nein";
 "No highlights yet" = "Noch keine Highlights";
+"No mapped highlights" = "Keine Highlights mit Ort";
+"Switch to All Media to see every mapped photo and video." = "Wechsle zu Alle Medien, um alle Fotos und Videos mit Ort zu sehen.";
 "Organize" = "Organisieren";
 "Keep related Memories together in one place." = "Sammle zusammengehörige Memories an einem Ort.";
 "Remove Highlight" = "Highlight entfernen";

@@ -76,7 +76,7 @@ private struct JustifiedMediaGridLayout: Layout {
 
         for index in subviews.indices where !placedSubviewIndices.contains(index) {
             subviews[index].place(
-                at: CGPoint(x: bounds.minX, y: bounds.minY),
+                at: CGPoint(x: bounds.maxX + gap, y: bounds.maxY + gap),
                 anchor: .topLeading,
                 proposal: ProposedViewSize(width: 0, height: 0)
             )
