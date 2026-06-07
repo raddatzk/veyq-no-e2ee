@@ -13,9 +13,13 @@ Mobile V1 focuses on the highest-value mobile workflows:
 - Select a tenant after login.
 - Browse Memory navigation and Memory details.
 - View Memory media.
+- Create, edit and delete Memories with the existing title, path name and date range fields.
+- Create organizational folders for Memory navigation.
+- Set and remove Memory covers from existing image media.
 - Upload photos and videos to a Memory.
 - Keep a local upload queue with retry and clear failure states.
 - Use best-effort background upload support where iOS and Android allow it.
+- Manage basic user profile fields such as display name, permalink and email.
 
 Mobile V1 is under active native implementation, but app-store distribution and release support are tracked separately from the browser/server major line until the release notes explicitly promote mobile apps into a supported release scope.
 
@@ -25,7 +29,7 @@ The current browser-to-iOS parity map is tracked in [iOS Feature Parity](ios-fea
 
 Mobile V1 should not try to become the complete web app:
 
-- No full administration surface. V1 settings are limited to app preferences, connected-instance state and session actions.
+- No full administration surface. V1 settings are limited to app preferences, connected-instance state, basic user profile fields and session actions.
 - No full native public share viewer.
 - No uploader-only public share flow.
 - No white-label or instance-branded app variants.
@@ -46,7 +50,7 @@ The V1 apps use native platform UI:
 
 The iOS app lives under `ios/` as a native SwiftUI Xcode project. It should follow the iOS-specific product and interaction guidance in [veyq iOS UI Styleguide](ios-ui-styleguide.md), using the existing [Memory UI Styleguide](memory-ui-styleguide.md) as the shared product and color-role baseline.
 
-App-store versions are independent from backend `major.build` versions. A current app can support multiple maintained server major lines when capabilities and API adapters allow it.
+App-store versions are independent from backend `major.build` versions. A current app can support multiple maintained server major lines when capabilities and API adapters allow it. The app follows its own major-plus-build release line. When support for a server capability that has been removed from the server for at least one year is dropped from the app, increment the app major version.
 
 Each connected instance has separate local state:
 
@@ -94,7 +98,7 @@ The initial public client capability response should include non-sensitive `ALL_
 
 ServerOwner-only capabilities such as setup, backup/upgrade and auto-updates should remain out of public client capability discovery.
 
-If a server major changes a capability API incompatibly, the old capability is removed and a new capability id is added. The app must not call APIs for missing capabilities. If it sees a newer unsupported replacement capability, it should show an app update hint instead of offering a broken workflow.
+If a server major changes a capability API incompatibly, the old capability is removed and a new capability id is added. The app must not call APIs for missing capabilities. If it sees a newer unsupported replacement capability, it should show an app update hint instead of offering a broken workflow. App releases may keep adapters for removed capabilities during the compatibility window. Once a removed capability has been absent from maintained server releases for at least one year, a new app major may remove that adapter and no longer support servers that depend on the old capability.
 
 ## Instance Discovery
 

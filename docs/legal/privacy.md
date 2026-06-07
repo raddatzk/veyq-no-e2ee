@@ -23,3 +23,21 @@ Operators who need stricter privacy should keep OpenStreetMap tiles disabled and
 veyq stores Memory playlist links as external references. It does not proxy Spotify, Apple Music, YouTube, SoundCloud or Deezer playback and does not host music files.
 
 veyq does not embed external music players in major line 1. Opening a playlist happens through a normal external provider link, so the browser contacts the provider only when a user chooses to open that link.
+
+## Native iOS App
+
+The official iOS app connects to a user-selected veyq instance. It does not provide a separate central veyq cloud account by itself.
+
+The App Store privacy source text for the official iOS app is maintained in [veyq iOS App Privacy Policy](ios-app-privacy-policy.md).
+
+The app stores local connection and session state needed to use that selected instance:
+
+- instance URLs and discovery metadata
+- server capability snapshots
+- authenticated user and tenant bootstrap state
+- native session tokens in iOS Keychain
+- local upload queue state for selected photos and videos
+
+The app sends selected photos and videos only to the connected veyq instance. Media metadata, including dates and location metadata that may already be embedded in selected files, can become part of the Memory media record on that instance. Self-hosted operators control the retention, backup and log behavior of their own deployment.
+
+The app does not use data for third-party advertising, cross-app tracking or data broker purposes. Crash reporting, analytics and push notification infrastructure are not part of mobile V1; if they are added later, this document and the App Store privacy answers must be updated before release.

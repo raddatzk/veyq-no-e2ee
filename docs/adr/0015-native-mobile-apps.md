@@ -21,7 +21,9 @@ Build first-class native apps:
 - Mobile V1 does not use Capacitor, React Native, Flutter or a shared UI framework.
 - A shared core, such as Kotlin Multiplatform for API or upload logic, remains a later option and is not part of V1.
 
-Keep app-store versions separate from backend `major.build` versions. Backend major lines describe server compatibility. Mobile app releases describe app-store delivery. Compatibility is expressed through server capabilities and maintained server major lines.
+Keep app-store versions separate from backend `major.build` versions. Backend major lines describe server compatibility. Mobile app releases describe app-store delivery. The app uses its own major-plus-build release line. Compatibility is expressed through server capabilities and maintained server major lines.
+
+Increment the app major version when the app drops support for a server capability that has been removed from maintained server releases for at least one year. Until that window has passed, app releases can keep compatibility adapters for removed or replaced capabilities when doing so is practical.
 
 The official app supports multiple instances. Self-hosted and managed instances are equal. Mobile V1 does not include white-label apps or instance branding. Per instance, the app stores capabilities, native auth state, tenant context and upload queue state separately.
 
@@ -60,7 +62,7 @@ ServerOwner-only capabilities, such as setup, backup/upgrade and auto-updates, s
 
 Keep server capabilities separate from resource permissions. Public share fields such as `canViewGallery`, `canUpload`, `canEdit` and `canDelete` describe what a concrete share session can do. They are not server capabilities. A mobile feature is active only when the app supports it, the server advertises the required capability and the concrete Memory or share response permits the action.
 
-If a capability's API contract changes incompatibly in a new server major, remove the old capability and introduce a new capability id. Apps must not call APIs for missing capabilities. If a server exposes a newer unsupported replacement capability, the app shows an update hint instead of offering a broken workflow.
+If a capability's API contract changes incompatibly in a new server major, remove the old capability and introduce a new capability id. Apps must not call APIs for missing capabilities. If a server exposes a newer unsupported replacement capability, the app shows an update hint instead of offering a broken workflow. After the one-year removed-capability compatibility window, a new app major may remove the old adapter and stop supporting servers that still depend on that capability.
 
 Mobile login uses system browser authentication plus native session handoff:
 
