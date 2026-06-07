@@ -7,7 +7,10 @@ class ResizeObserverStub {
   constructor(private readonly callback: ResizeObserverCallback) {}
 
   observe(target: Element) {
-    this.callback([{ contentRect: { width: 640 } } as ResizeObserverEntry], this as unknown as ResizeObserver)
+    this.callback(
+      [{ contentRect: { width: 640 } } as ResizeObserverEntry],
+      this as unknown as ResizeObserver
+    )
     Object.defineProperty(target, 'clientWidth', { value: 640, configurable: true })
   }
 
@@ -47,6 +50,30 @@ describe('MediaGrid', () => {
     const image = wrapper.find('.media-grid-tile img')
     expect(image.attributes('src')).toBe('/api/tenant/media/media-1/thumbnail')
     expect(image.attributes('src')).not.toBe('/api/tenant/media/media-1/content')
+  })
+
+  it('marks highlighted media with a star badge in the gallery', async () => {
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [media({ highlight: true })],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: true,
+          ProgressSpinner: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.media-grid-highlight-badge .pi-star-fill').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-highlight-badge-subtle').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-highlight-badge').text()).toBe('')
   })
 
   it('disables lightbox highlighting when a media bucket is missing from the provided bucket list', async () => {
@@ -114,6 +141,44 @@ describe('MediaGrid', () => {
     expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-current:1')
   })
 
+  it('advances by one media item when the lightbox emits next from an arrow key', async () => {
+    const wrapper = mount(MediaGrid, {
+      props: {
+        tenantName: 'tenant',
+        media: [
+          media({ id: 'media-current', title: 'Current' }),
+          media({ id: 'media-next', title: 'Next' }),
+          media({ id: 'media-after', title: 'After' })
+        ],
+        streaming: false
+      },
+      global: {
+        stubs: {
+          Button: true,
+          Dialog: true,
+          MediaLightbox: {
+            props: ['media'],
+            emits: ['next'],
+            template:
+              '<div data-testid="lightbox" @keydown.right="$emit(\'next\')">{{ media.id }}</div>'
+          },
+          ProgressSpinner: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.find('.media-grid-tile').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-current')
+
+    await wrapper.get('[data-testid="lightbox"]').trigger('keydown', { key: 'ArrowRight' })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-next')
+  })
+
   it('removes a deleted highlighted media from the highlighted filter view', async () => {
     const wrapper = mount(MediaGrid, {
       props: {
@@ -133,7 +198,8 @@ describe('MediaGrid', () => {
           SelectButton: {
             props: ['modelValue'],
             emits: ['update:modelValue'],
-            template: '<button type="button" @click="$emit(\'update:modelValue\', \'highlighted\')">Highlights</button>'
+            template:
+              '<button type="button" @click="$emit(\'update:modelValue\', \'highlighted\')">Highlights</button>'
           }
         }
       }
@@ -160,24 +226,28 @@ describe('MediaGrid', () => {
     } as unknown as typeof ResizeObserver
     let animationFrame: FrameRequestCallback = () => {}
     let measuredWidth = 0
-    const boundsSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
-      width: measuredWidth,
-      height: 0,
-      top: 0,
-      right: measuredWidth,
-      bottom: 0,
-      left: 0,
-      x: 0,
-      y: 0,
-      toJSON: () => ({})
-    }))
+    const boundsSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(() => ({
+        width: measuredWidth,
+        height: 0,
+        top: 0,
+        right: measuredWidth,
+        bottom: 0,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }))
     const requestAnimationFrameSpy = vi
       .spyOn(window, 'requestAnimationFrame')
       .mockImplementation((callback) => {
         animationFrame = callback
         return 1
       })
-    const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, 'cancelAnimationFrame')
+      .mockImplementation(() => {})
 
     const wrapper = mount(MediaGrid, {
       props: {

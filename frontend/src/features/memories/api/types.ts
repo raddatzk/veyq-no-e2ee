@@ -16,7 +16,7 @@ import type {
   MemoryMediaBucketSummary,
   MemoryMediaUploadSession,
   MediaUploader,
-  MemoryNavigationResponse as GeneratedMemoryNavigationResponse,
+  MemoryNavigationContextResponse as GeneratedMemoryNavigationContextResponse,
   MemoryMediaSummary,
   MemoryParticipantSummary,
   MemoryScope,
@@ -86,11 +86,13 @@ export type Memory = Omit<
   scope: MemoryScope | null
 }
 
-export type MemoryNavigationResponse = Omit<
-  GeneratedMemoryNavigationResponse,
-  'favoriteMemories'
+export type MemoryNavigationContextResponse = Omit<
+  GeneratedMemoryNavigationContextResponse,
+  'favoriteMemories' | 'memory' | 'memories'
 > & {
   favoriteMemories: Memory[]
+  memory?: Memory
+  memories: Memory[]
 }
 
 export type MemoryHeader = Omit<MemoryHeaderSummary, 'coverUrl' | 'coverCrop' | 'scope'> & {

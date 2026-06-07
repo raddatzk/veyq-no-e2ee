@@ -1,9 +1,37 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
-import { SELF_PRIMARY_BUCKET_PLACEHOLDER_ID, type MemoryMedia, type MemoryMediaBucket } from '../api'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  SELF_PRIMARY_BUCKET_PLACEHOLDER_ID,
+  type MemoryMedia,
+  type MemoryMediaBucket
+} from '../api'
 import MemoryAssetBuckets from './MemoryAssetBuckets.vue'
 
+class ResizeObserverStub {
+  constructor(private readonly callback: ResizeObserverCallback) {}
+
+  observe(target: Element) {
+    this.callback(
+      [{ contentRect: { width: 640 } } as ResizeObserverEntry],
+      this as unknown as ResizeObserver
+    )
+    Object.defineProperty(target, 'clientWidth', { value: 640, configurable: true })
+  }
+
+  disconnect() {}
+}
+
 describe('MemoryAssetBuckets', () => {
+  const originalResizeObserver = globalThis.ResizeObserver
+
+  beforeEach(() => {
+    globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
+  })
+
+  afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver
+  })
+
   it('renders bucket hierarchy and filters the active bucket by camera', async () => {
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
@@ -11,10 +39,21 @@ describe('MemoryAssetBuckets', () => {
         memoryId: 'mem-1',
         buckets: [
           bucket({ id: 'bucket-kevin', displayName: 'Kevin', mediaCount: 2 }),
-          bucket({ id: 'bucket-trip', parentBucketId: 'bucket-kevin', displayName: 'Kamera', mediaCount: 1, primary: false })
+          bucket({
+            id: 'bucket-trip',
+            parentBucketId: 'bucket-kevin',
+            displayName: 'Kamera',
+            mediaCount: 1,
+            primary: false
+          })
         ],
         media: [
-          media({ id: 'media-1', bucketId: 'bucket-kevin', cameraMake: 'Canon', cameraModel: 'R6' }),
+          media({
+            id: 'media-1',
+            bucketId: 'bucket-kevin',
+            cameraMake: 'Canon',
+            cameraModel: 'R6'
+          }),
           media({ id: 'media-2', bucketId: 'bucket-kevin', cameraMake: 'Sony', cameraModel: 'A7' }),
           media({ id: 'media-3', bucketId: 'bucket-trip', cameraMake: 'Canon', cameraModel: 'R6' })
         ]
@@ -22,24 +61,33 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.findAll('.asset-bucket-button').map((button) => button.text())).toEqual([
-      'Kevin2',
-      'Kamera1'
+    await flushPromises()
+
+    expect(wrapper.findAll('.asset-bucket-select option').map((option) => option.text())).toEqual([
+      'Kevin (2)',
+      '↳ Kamera (1)'
     ])
+    expect(
+      wrapper
+        .findAll('.asset-bucket-select option')
+        .map((option) => option.attributes('data-depth'))
+    ).toEqual(['0', '1'])
 
     const expectedDate = formatDate(media().capturedAt)
-    expect(wrapper.findAll('.asset-bucket-media-item').map((item) => item.text())).toEqual([
+    expect(wrapper.findAll('.asset-bucket-media-caption').map((item) => item.text())).toEqual([
       `First upload${expectedDate}`,
       `First upload${expectedDate}`
     ])
 
-    const canonChip = wrapper.findAll('.asset-camera-chip').find((chip) => chip.text().includes('Canon R6'))
+    const canonChip = wrapper
+      .findAll('.asset-camera-chip')
+      .find((chip) => chip.text().includes('Canon R6'))
     await canonChip!.trigger('click')
 
-    expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
   })
 
-  it('deduplicates repeated media ids inside the active bucket', () => {
+  it('deduplicates repeated media ids inside the active bucket', async () => {
     const duplicated = media({ id: 'media-duplicate', bucketId: 'bucket-kevin' })
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
@@ -51,33 +99,47 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
+    await flushPromises()
+
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
     expect(wrapper.find('.asset-camera-chip span').text()).toBe('1')
   })
 
-  it('shows only media assigned directly to the current memory in buckets', () => {
+  it('shows only media assigned directly to the current memory in buckets', async () => {
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
         tenantName: 'tenant',
         memoryId: 'mem-1',
         buckets: [bucket({ id: 'bucket-kevin', displayName: 'Kevin', mediaCount: 2 })],
         media: [
-          media({ id: 'media-parent', memoryId: 'mem-1', bucketId: 'bucket-kevin', title: 'Parent upload' }),
-          media({ id: 'media-child', memoryId: 'child-mem-1', bucketId: 'bucket-kevin', title: 'Child upload' })
+          media({
+            id: 'media-parent',
+            memoryId: 'mem-1',
+            bucketId: 'bucket-kevin',
+            title: 'Parent upload'
+          }),
+          media({
+            id: 'media-child',
+            memoryId: 'child-mem-1',
+            bucketId: 'bucket-kevin',
+            title: 'Child upload'
+          })
         ]
       },
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.findAll('.asset-bucket-media-item')).toHaveLength(1)
-    expect(wrapper.find('.asset-bucket-media-item').text()).toContain('Parent upload')
+    await flushPromises()
+
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
+    expect(wrapper.find('.asset-bucket-media-caption').text()).toContain('Parent upload')
     expect(wrapper.text()).not.toContain('Child upload')
   })
 
   it('selects one visible media item and submits only that item with offset seconds', async () => {
-    const updateMetadataBatch = vi.fn().mockResolvedValue([
-      media({ id: 'media-1', capturedAt: '2026-05-03T13:00:00Z' })
-    ])
+    const updateMetadataBatch = vi
+      .fn()
+      .mockResolvedValue([media({ id: 'media-1', capturedAt: '2026-05-03T13:00:00Z' })])
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
         tenantName: 'tenant',
@@ -93,8 +155,11 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    const canonChip = wrapper.findAll('.asset-camera-chip').find((chip) => chip.text().includes('Canon R6'))
+    const canonChip = wrapper
+      .findAll('.asset-camera-chip')
+      .find((chip) => chip.text().includes('Canon R6'))
     await canonChip!.trigger('click')
+    await flushPromises()
     await wrapper.find('.asset-media-checkbox input').setValue(true)
     await wrapper.find('.asset-selection-options-button').trigger('click')
     await buttonByText(wrapper, 'Aufnahmezeit verschieben').trigger('click')
@@ -128,21 +193,28 @@ describe('MemoryAssetBuckets', () => {
     })
 
     await buttonByText(wrapper, 'Alle auswählen').trigger('click')
-    expect(wrapper.findAll<HTMLInputElement>('.asset-media-checkbox input').map((input) => input.element.checked)).toEqual([
-      true,
-      true
-    ])
+    expect(
+      wrapper
+        .findAll<HTMLInputElement>('.asset-media-checkbox input')
+        .map((input) => input.element.checked)
+    ).toEqual([true, true])
 
-    const canonChip = wrapper.findAll('.asset-camera-chip').find((chip) => chip.text().includes('Canon R6'))
+    const canonChip = wrapper
+      .findAll('.asset-camera-chip')
+      .find((chip) => chip.text().includes('Canon R6'))
     await canonChip!.trigger('click')
-    expect(wrapper.findAll<HTMLInputElement>('.asset-media-checkbox input').map((input) => input.element.checked)).toEqual([
-      true
-    ])
+    expect(
+      wrapper
+        .findAll<HTMLInputElement>('.asset-media-checkbox input')
+        .map((input) => input.element.checked)
+    ).toEqual([true])
 
     await buttonByText(wrapper, 'Auswahl aufheben').trigger('click')
-    expect(wrapper.findAll<HTMLInputElement>('.asset-media-checkbox input').map((input) => input.element.checked)).toEqual([
-      false
-    ])
+    expect(
+      wrapper
+        .findAll<HTMLInputElement>('.asset-media-checkbox input')
+        .map((input) => input.element.checked)
+    ).toEqual([false])
   })
 
   it('submits all selected media in the uploader bucket when no camera filter is active', async () => {
@@ -192,6 +264,8 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await flushPromises()
+
     await wrapper.findAll('.asset-card-options-button')[1].trigger('click')
     await buttonByText(wrapper, 'Aufnahmezeit verschieben').trigger('click')
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T12:15')
@@ -224,6 +298,8 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await flushPromises()
+
     await wrapper.find('.asset-card-options-button').trigger('click')
     await buttonByText(wrapper, 'Aufnahmezeit verschieben').trigger('click')
     await wrapper.find('#asset-corrected-time').setValue('2026-05-03T10:30')
@@ -249,15 +325,21 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await flushPromises()
+
     await wrapper.find('.asset-card-options-button').trigger('click')
     await buttonByText(wrapper, 'Aufnahmezeit verschieben').trigger('click')
     await wrapper.find('#asset-corrected-time').setValue('2026-05-12T16:30')
 
-    expect(wrapper.text()).toContain(formatOffset(offsetSeconds('2026-05-12T16:30', media().capturedAt)))
+    expect(wrapper.text()).toContain(
+      formatOffset(offsetSeconds('2026-05-12T16:30', media().capturedAt))
+    )
   })
 
   it('moves a single media item from the asset card actions', async () => {
-    const moveMedia = vi.fn().mockResolvedValue([media({ id: 'media-2', bucketId: 'bucket-target' })])
+    const moveMedia = vi
+      .fn()
+      .mockResolvedValue([media({ id: 'media-2', bucketId: 'bucket-target' })])
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
         tenantName: 'tenant',
@@ -275,6 +357,8 @@ describe('MemoryAssetBuckets', () => {
       },
       global: { stubs: dialogStubs() }
     })
+
+    await flushPromises()
 
     await wrapper.findAll('.asset-card-options-button')[1].trigger('click')
     await buttonByText(wrapper, 'Medium verschieben').trigger('click')
@@ -305,9 +389,13 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await flushPromises()
+
     await wrapper.findAll('.asset-card-options-button')[1].trigger('click')
     await buttonByText(wrapper, 'Medium löschen').trigger('click')
-    expect(wrapper.text()).toContain('Diese Aktion löscht 1 ausgewählte Medien dauerhaft aus diesem Bucket.')
+    expect(wrapper.text()).toContain(
+      'Diese Aktion löscht 1 ausgewählte Medien dauerhaft aus diesem Bucket.'
+    )
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
     expect(confirm).not.toHaveBeenCalled()
@@ -335,7 +423,9 @@ describe('MemoryAssetBuckets', () => {
     await buttonByText(wrapper, 'Alle auswählen').trigger('click')
     await wrapper.find('.asset-selection-options-button').trigger('click')
     await buttonByText(wrapper, 'Auswahl löschen').trigger('click')
-    expect(wrapper.text()).toContain('Diese Aktion löscht 2 ausgewählte Medien dauerhaft aus diesem Bucket.')
+    expect(wrapper.text()).toContain(
+      'Diese Aktion löscht 2 ausgewählte Medien dauerhaft aus diesem Bucket.'
+    )
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
     expect(deleteMediaBatch).toHaveBeenCalledWith('mem-1', ['media-1', 'media-2'])
@@ -355,6 +445,7 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await wrapper.find('.asset-bucket-options-button').trigger('click')
     await buttonByText(wrapper, 'Löschen').trigger('click')
     await wrapper.find('#asset-delete-bucket-name').setValue('Source')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
@@ -376,8 +467,11 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.find<HTMLButtonElement>('.asset-selection-options-button').element.disabled).toBe(true)
+    expect(
+      wrapper.find<HTMLButtonElement>('.asset-selection-options-button').element.disabled
+    ).toBe(true)
 
+    await flushPromises()
     await wrapper.find('.asset-media-checkbox input').setValue(true)
     await wrapper.find('.asset-selection-options-button').trigger('click')
     await buttonByText(wrapper, 'Aufnahmezeit verschieben').trigger('click')
@@ -421,7 +515,7 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.find('.asset-bucket-button').text()).toBe('Kevin0')
+    expect(wrapper.find('.asset-bucket-select option').text()).toBe('Kevin (0)')
   })
 
   it('does not render a local current user primary bucket when disabled', () => {
@@ -438,7 +532,7 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.find('.asset-bucket-button').exists()).toBe(false)
+    expect(wrapper.find('.asset-bucket-select').exists()).toBe(false)
   })
 
   it('omits the bucket id when uploading or dropping onto the local primary bucket', async () => {
@@ -455,6 +549,7 @@ describe('MemoryAssetBuckets', () => {
     })
     const image = new File(['image'], 'photo.jpg', { type: 'image/jpeg' })
 
+    await wrapper.find('.asset-bucket-options-button').trigger('click')
     await buttonByText(wrapper, 'Hochladen').trigger('click')
     await wrapper.find('.asset-bucket-drop-target').trigger('drop', {
       dataTransfer: dataTransfer([image])
@@ -486,14 +581,19 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
+    await wrapper.find('.asset-bucket-options-button').trigger('click')
     await buttonByText(wrapper, 'Unterbucket').trigger('click')
     await wrapper.find('#asset-bucket-name').setValue('Phone imports')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
-    expect(createBucket).toHaveBeenCalledWith('mem-1', SELF_PRIMARY_BUCKET_PLACEHOLDER_ID, 'Phone imports')
+    expect(createBucket).toHaveBeenCalledWith(
+      'mem-1',
+      SELF_PRIMARY_BUCKET_PLACEHOLDER_ID,
+      'Phone imports'
+    )
   })
 
-  it('does not show rename or delete actions for the local primary bucket', () => {
+  it('does not show rename or delete actions for the local primary bucket', async () => {
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
         tenantName: 'tenant',
@@ -510,8 +610,57 @@ describe('MemoryAssetBuckets', () => {
       global: { stubs: dialogStubs() }
     })
 
-    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Bearbeiten')
-    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Löschen')
+    await wrapper.find('.asset-bucket-options-button').trigger('click')
+
+    expect(buttonByText(wrapper, 'Bearbeiten').attributes('disabled')).toBeDefined()
+    expect(buttonByText(wrapper, 'Löschen').attributes('disabled')).toBeDefined()
+  })
+
+  it('opens the bucket gallery lightbox with the camera-filtered media and selects the current media with s', async () => {
+    const wrapper = mount(MemoryAssetBuckets, {
+      props: {
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        media: [
+          media({ id: 'media-1', cameraMake: 'Canon', cameraModel: 'R6' }),
+          media({ id: 'media-2', cameraMake: 'Sony', cameraModel: 'A7' })
+        ],
+        buckets: [bucket()]
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const canonChip = wrapper
+      .findAll('.asset-camera-chip')
+      .find((chip) => chip.text().includes('Canon R6'))
+    await canonChip!.trigger('click')
+    await flushPromises()
+    await wrapper.find('.media-grid-tile').trigger('click')
+    await flushPromises()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's' }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find<HTMLInputElement>('.asset-media-checkbox input').element.checked).toBe(true)
+    expect(wrapper.find('.asset-bucket-media-overlay-selected').exists()).toBe(true)
+    expect(wrapper.find('.media-grid-tile img').exists()).toBe(true)
+    expect(wrapper.findAll('.media-grid-tile')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="lightbox"]').text()).toBe('media-1')
+  })
+
+  it('hides highlight badges inside bucket media tiles', async () => {
+    const wrapper = mount(MemoryAssetBuckets, {
+      props: {
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        media: [media({ id: 'media-highlight', highlight: true })],
+        buckets: [bucket()]
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.media-grid-highlight-badge').exists()).toBe(false)
   })
 
   it('shows the active bucket dropzone only during a file drag', async () => {
@@ -573,6 +722,33 @@ function dialogStubs() {
           </button>
         </section>
       `
+    },
+    Select: {
+      props: ['modelValue', 'options', 'optionLabel', 'optionValue'],
+      emits: ['update:modelValue'],
+      methods: {
+        updateValue(this: { $emit: (event: string, value: string) => void }, event: Event) {
+          this.$emit('update:modelValue', (event.target as HTMLSelectElement).value)
+        }
+      },
+      template: `
+        <select class="asset-bucket-select" :value="modelValue" @change="updateValue">
+          <option
+            v-for="option in options"
+            :key="option[optionValue]"
+            :value="option[optionValue]"
+            :data-depth="option.depth"
+          >
+            {{ option.depth > 0 ? '↳ ' : '' }}{{ option[optionLabel] }}
+          </option>
+        </select>
+      `
+    },
+    SelectButton: true,
+    ProgressSpinner: true,
+    MediaLightbox: {
+      props: ['media', 'mediaItems'],
+      template: '<section data-testid="lightbox">{{ media.id }}</section>'
     }
   }
 }

@@ -32,31 +32,55 @@ type GalleryItem = {
 }
 
 type GalleryTile = MediaGridLayoutTile & GalleryItem
+type HighlightBadgeVariant = 'subtle' | 'prominent'
 
-const props = defineProps<{
-  tenantName: string
-  media: MemoryMedia[]
-  mediaBuckets?: MemoryMediaBucket[]
-  streaming: boolean
-  canEditMetadata?: boolean
-  canDeleteMedia?: boolean
-  canHighlight?: boolean
-  updateCapturedAt?: (
-    mediaId: string,
-    memoryId: string,
-    request: UpdateMemoryMediaCapturedAtRequest
-  ) => Promise<MemoryMedia>
-  updateHighlight?: (
-    mediaId: string,
-    memoryId: string,
-    request: UpdateMemoryMediaHighlightRequest
-  ) => Promise<MemoryMedia>
-  canHighlightMedia?: (media: MemoryMedia) => boolean
-  deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
-}>()
+const props = withDefaults(
+  defineProps<{
+    tenantName: string
+    media: MemoryMedia[]
+    mediaBuckets?: MemoryMediaBucket[]
+    streaming: boolean
+    showHeader?: boolean
+    showFilter?: boolean
+    enableLightbox?: boolean
+    showHighlightBadges?: boolean
+    highlightBadgeVariant?: HighlightBadgeVariant
+    canEditMetadata?: boolean
+    canDeleteMedia?: boolean
+    canHighlight?: boolean
+    updateCapturedAt?: (
+      mediaId: string,
+      memoryId: string,
+      request: UpdateMemoryMediaCapturedAtRequest
+    ) => Promise<MemoryMedia>
+    updateHighlight?: (
+      mediaId: string,
+      memoryId: string,
+      request: UpdateMemoryMediaHighlightRequest
+    ) => Promise<MemoryMedia>
+    canHighlightMedia?: (media: MemoryMedia) => boolean
+    deleteMedia?: (mediaId: string, memoryId: string) => Promise<void>
+  }>(),
+  {
+    showHeader: true,
+    showFilter: true,
+    enableLightbox: true,
+    showHighlightBadges: true,
+    highlightBadgeVariant: 'subtle',
+    mediaBuckets: undefined,
+    updateCapturedAt: undefined,
+    updateHighlight: undefined,
+    canHighlightMedia: undefined,
+    deleteMedia: undefined
+  }
+)
 const emit = defineEmits<{
   deleted: [media: MemoryMedia]
   updated: [media: MemoryMedia]
+  shortcutSelect: [media: MemoryMedia]
+}>()
+defineSlots<{
+  tileActions?: (props: { media: MemoryMedia }) => unknown
 }>()
 
 const { t } = useI18n()
@@ -100,9 +124,7 @@ const galleryTiles = computed<GalleryTile[]>(() =>
     })
     .filter((tile): tile is GalleryTile => Boolean(tile))
 )
-const visibleMedia = computed(() =>
-  galleryTiles.value.map((tile) => tile.media)
-)
+const visibleMedia = computed(() => galleryTiles.value.map((tile) => tile.media))
 const selectedIndex = computed(() =>
   selectedMediaId.value
     ? visibleMedia.value.findIndex((media) => media.id === selectedMediaId.value)
@@ -111,8 +133,8 @@ const selectedIndex = computed(() =>
 const selectedMedia = computed(() =>
   selectedIndex.value >= 0 ? visibleMedia.value[selectedIndex.value] : null
 )
-const bucketById = computed(() =>
-  new Map((props.mediaBuckets ?? []).map((bucket) => [bucket.id, bucket]))
+const bucketById = computed(
+  () => new Map((props.mediaBuckets ?? []).map((bucket) => [bucket.id, bucket]))
 )
 const canHighlightSelectedMedia = computed(() =>
   selectedMedia.value
@@ -341,6 +363,7 @@ function pruneLoadedMediaKeys() {
 }
 
 function openLightbox(mediaId: string) {
+  if (props.enableLightbox === false) return
   selectedMediaId.value = mediaId
 }
 
@@ -374,21 +397,17 @@ function showNext() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    closeLightbox()
-  } else if (event.key === 'ArrowLeft') {
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  if (event.key.toLowerCase() === 's' && selectedMedia.value) {
     event.preventDefault()
-    showPrevious()
-  } else if (event.key === 'ArrowRight') {
-    event.preventDefault()
-    showNext()
+    emit('shortcutSelect', selectedMedia.value)
   }
 }
 </script>
 
 <template>
   <section class="veyq-section memory-section">
-    <div class="veyq-section-header memory-section-header">
+    <div v-if="showHeader !== false" class="veyq-section-header memory-section-header">
       <h2>{{ t('media.title') }}</h2>
       <div class="media-grid-header-actions">
         <span v-if="galleryItems.length !== media.length">
@@ -397,7 +416,7 @@ function handleKeydown(event: KeyboardEvent) {
         <span v-else>
           {{ media.length }}
         </span>
-        <div class="media-grid-filter-toggle">
+        <div v-if="showFilter !== false" class="media-grid-filter-toggle">
           <SelectButton
             v-model="mediaFilter"
             :options="mediaFilterOptions"
@@ -457,6 +476,16 @@ function handleKeydown(event: KeyboardEvent) {
             />
           </template>
           <span v-else class="media-grid-tile-placeholder" />
+          <span
+            v-if="showHighlightBadges && tile.media.highlight"
+            class="media-grid-highlight-badge"
+            :class="`media-grid-highlight-badge-${highlightBadgeVariant}`"
+            :aria-label="t('media.filterHighlighted')"
+            :title="t('media.filterHighlighted')"
+          >
+            <span class="pi pi-star-fill" aria-hidden="true" />
+          </span>
+          <slot name="tileActions" :media="tile.media" />
         </button>
       </template>
       <div v-else class="media-grid-placeholder">

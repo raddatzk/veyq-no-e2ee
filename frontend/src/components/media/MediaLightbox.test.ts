@@ -90,12 +90,12 @@ describe('MediaLightbox', () => {
     await flushPromises()
 
     expect(updateHighlight).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Du kannst nur eigene Medien hervorheben.')
+    expect(wrapper.text()).toContain('Du kannst nur eigene Medien als Highlight markieren.')
 
     vi.advanceTimersByTime(3000)
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Du kannst nur eigene Medien hervorheben.')
+    expect(wrapper.text()).not.toContain('Du kannst nur eigene Medien als Highlight markieren.')
     vi.useRealTimers()
   })
 
