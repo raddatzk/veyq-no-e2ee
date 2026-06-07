@@ -1,0 +1,210 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: "Major app version for CFBundleShortVersionString."
+        required: true
+        default: "1"
+      upload:
+        description: "Upload the exported IPA to App Store Connect."
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive iOS app
+    runs-on: macos-26
+    environment: testflight
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      ASC_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY_BASE64 }}
+      APPLE_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
+      APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
+      MARKETING_VERSION: ${{ inputs.marketing_version }}
+      CURRENT_PROJECT_VERSION: ${{ github.run_number }}
+      PROJECT_PATH: ios/Veyq.xcodeproj
+      SCHEME: Veyq
+      ARCHIVE_PATH: build/ios/Veyq.xcarchive
+      EXPORT_PATH: build/ios/export
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            APPLE_TEAM_ID \
+            ASC_KEY_ID \
+            ASC_ISSUER_ID \
+            ASC_PRIVATE_KEY_BASE64 \
+            APPLE_DISTRIBUTION_CERTIFICATE_BASE64 \
+            APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD \
+            KEYCHAIN_PASSWORD
+          do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required secrets/env values:\n' >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Install signing certificate
+        env:
+          KEYCHAIN_PATH: ${{ runner.temp }}/veyq-signing.keychain-db
+          CERTIFICATE_PATH: ${{ runner.temp }}/apple-distribution.p12
+        run: |
+          set -euo pipefail
+          printf '%s' "$APPLE_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY_DIR: ${{ runner.temp }}/appstoreconnect/private_keys
+        run: |
+          set -euo pipefail
+          mkdir -p "$ASC_KEY_DIR"
+          printf '%s' "$ASC_PRIVATE_KEY_BASE64" | base64 --decode > "$ASC_KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$ASC_KEY_DIR/AuthKey_${ASC_KEY_ID}.p8"
+          echo "ASC_KEY_PATH=$ASC_KEY_DIR/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          cp "$ASC_KEY_DIR/AuthKey_${ASC_KEY_ID}.p8" "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Select iOS simulator
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/select-ios-simulator.py" <<'PY'
+          import json
+          import sys
+
+          devices_by_runtime = json.load(sys.stdin)["devices"]
+          for runtime, devices in devices_by_runtime.items():
+              if "iOS" not in runtime:
+                  continue
+              for device in devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      print("platform=iOS Simulator,id=" + device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator found.")
+          PY
+          destination="$(xcrun simctl list devices available -j | /usr/bin/python3 "$RUNNER_TEMP/select-ios-simulator.py")"
+          echo "IOS_TEST_DESTINATION=$destination" >> "$GITHUB_ENV"
+
+      - name: Run iOS unit tests
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -destination "$IOS_TEST_DESTINATION" \
+            -derivedDataPath build/DerivedData
+
+      - name: Archive release build
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION"
+
+      - name: Write export options
+        run: |
+          set -euo pipefail
+          cat > build/ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>destination</key>
+            <string>export</string>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export IPA
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist build/ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: veyq-ios-${{ inputs.marketing_version }}-${{ github.run_number }}
+          path: |
+            ${{ env.EXPORT_PATH }}/*.ipa
+            ${{ env.ARCHIVE_PATH }}/dSYMs
+          if-no-files-found: error
+
+      - name: Upload to App Store Connect
+        if: inputs.upload
+        run: |
+          set -euo pipefail
+          ipa="$(find "$EXPORT_PATH" -maxdepth 1 -name '*.ipa' -print -quit)"
+          if [[ -z "$ipa" ]]; then
+            echo "No IPA exported." >&2
+            exit 1
+          fi
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$ipa" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
