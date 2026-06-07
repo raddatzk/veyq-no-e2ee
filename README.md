@@ -81,7 +81,6 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `VEYQ_AUTO_UPDATE_ENABLED`, `VEYQ_AUTO_UPDATE_INTERVAL_HOURS`, `VEYQ_AUTO_UPDATE_JITTER_MINUTES`, `VEYQ_UPDATER_NOTIFY_TOKEN`: optional internal updater sidecar settings. For automatic compatible updates, use a major-channel image such as `ghcr.io/raddatzk/veyq:1` and enable the `updater` Compose profile.
 - `LETSENCRYPT_EMAIL`, `VEYQ_TRAEFIK_RULE`: Traefik/Let's Encrypt routing values for the public HTTPS tenant hosts.
 - `WEBAUTHN_RELYING_PARTY_NAME`: passkey display name shown by authenticators. Passkey origins and relying-party IDs are derived from the current verified tenant host.
-- `WEBAUTHN_SESSION_ENCRYPTION_KEY`: stable secret used to encrypt persistent passkey auth session data. The setup script generates it and it must remain stable across restarts.
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB application and root passwords. Replace generated or example values before keeping data.
 - `MAIL_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_LOGIN`, `MAIL_TLS`: SMTP settings for invitations, password resets and email confirmation.
 - `VEYQ_SOURCE_URL`, `VEYQ_VERSION`, `VEYQ_REVISION`: source/license and build metadata shown in server settings.
@@ -150,12 +149,14 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend, fronte
 - [`docs/product/test-feature-reverse-audit.md`](docs/product/test-feature-reverse-audit.md): Reverse-audit status for current tests and explicit delete candidates.
 - [`docs/product/documentation-and-acceptance-coverage.md`](docs/product/documentation-and-acceptance-coverage.md): Feature documentation, acceptance criteria, test coverage mapping and deterministic validation.
 - [`docs/product/mobile-apps.md`](docs/product/mobile-apps.md): Native iOS/Android app direction, V1 scope and roadmap.
+- [`docs/product/ios-testflight-submission.md`](docs/product/ios-testflight-submission.md): Source text for iOS TestFlight metadata, beta review, privacy answers and export compliance.
 - [`docs/product/hosting-and-operations-strategy.md`](docs/product/hosting-and-operations-strategy.md): Exploratory strategy for Cloud, managed hosting, operations, billing and long-term privacy architecture.
 - [`docs/product/project-consistency-audit.md`](docs/product/project-consistency-audit.md): Repository-level consistency findings, fixed gaps and refactor candidates.
 - [`docs/product/future-work.md`](docs/product/future-work.md): Deferred ADR, API, UX and spike candidates; not the implementation baseline.
 - [`docs/product/major-1-scope.md`](docs/product/major-1-scope.md): Major line 1 product scope and deferred work.
 - [`docs/releases/major-1.md`](docs/releases/major-1.md): Major line 1 notes, known limits and readiness checklist.
 - [`docs/legal/privacy.md`](docs/legal/privacy.md): Privacy notes for cookies, public shares and OpenStreetMap map tiles.
+- [`docs/legal/ios-app-privacy-policy.md`](docs/legal/ios-app-privacy-policy.md): Public privacy policy source text for the official iOS app.
 - [`docs/legal/trademark-policy.md`](docs/legal/trademark-policy.md): veyq brand and trademark usage rules.
 - [`docs/legal/commercial-boundary.md`](docs/legal/commercial-boundary.md): Boundary between the AGPL community edition and optional commercial layers.
 - [`docs/adr/README.md`](docs/adr/README.md): Architecture Decision Record process and template.

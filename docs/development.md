@@ -162,6 +162,63 @@ The Compose setup under `infra/` starts:
 
 The normal image-based Compose file keeps MariaDB available only inside the Compose network. The local source-build override below publishes MariaDB on host port `3306` so local database tools can connect during development.
 
+## iOS TestFlight Deployment
+
+The native iOS app is deployed through the `iOS TestFlight` GitHub Actions workflow. The workflow is manual (`workflow_dispatch`) so the first archives can be tested without automatically publishing every push.
+
+Before the first run, configure these Apple Developer identifiers for the `veyq.app` domain:
+
+- App ID: `app.veyq.ios`
+- Share Extension App ID: `app.veyq.ios.share`
+- App Group: `group.app.veyq.ios`, enabled for both the app and the share extension.
+- App Store Connect app record for bundle ID `app.veyq.ios`.
+
+Configure these GitHub environment or repository secrets:
+
+- `APPLE_TEAM_ID`: Apple Developer Team ID.
+- `APP_STORE_CONNECT_API_KEY_ID`: App Store Connect API key ID.
+- `APP_STORE_CONNECT_ISSUER_ID`: App Store Connect issuer ID.
+- `APP_STORE_CONNECT_API_PRIVATE_KEY_BASE64`: Base64-encoded contents of the `AuthKey_*.p8` API key.
+- `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`: Base64-encoded Apple Distribution `.p12` certificate.
+- `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`: Password for the `.p12` certificate.
+- `IOS_BUILD_KEYCHAIN_PASSWORD`: Temporary CI keychain password.
+
+To create the base64 secret values locally:
+
+```bash
+base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy
+base64 -i AppleDistribution.p12 | pbcopy
+```
+
+The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Set the `upload` input to `true` to upload the IPA to App Store Connect for TestFlight processing.
+
+iOS app versions are independent from backend `major.build` versions, but use the same major-plus-build principle. The workflow input `marketing_version` is the app major version used for `CFBundleShortVersionString`, for example `1`. `CURRENT_PROJECT_VERSION` is set from the GitHub Actions run number and becomes the app build number, for example `42`. The visible TestFlight version is therefore app-owned, such as major `1` with build `42`, without coupling it to the backend release version. Increment the app major when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
+
+The copyable App Store Connect source text is maintained in [iOS TestFlight Submission](product/ios-testflight-submission.md).
+
+TestFlight metadata for the first beta:
+
+- App name: `veyq`.
+- Primary language: English, with German added once localized App Store metadata exists.
+- Bundle ID: `app.veyq.ios`.
+- SKU: `veyq-ios`.
+- Category: Photo & Video, or Lifestyle if Apple review feedback considers Memory curation broader than media management.
+- Beta app description: official native app for connecting to a veyq instance, browsing Memories and uploading photos or videos.
+- Beta feedback email: project or operator-owned support address for `veyq.app`.
+- Beta review contact: Apple Developer account contact who can answer review questions.
+- Demo account: required only when Apple cannot use a normal self-hosted or managed test instance. The test instance should contain non-sensitive sample Memories and should not expose real private user content.
+- What to test: instance connection, browser login handoff, tenant selection, Memory navigation, Memory detail media viewing, media upload queue and logout.
+
+Compliance and privacy checklist before the first external TestFlight group:
+
+- App privacy details must be completed in App Store Connect before external testing. Current expected data categories are user account/contact identifiers used for login, user-generated Memory content, photos/videos selected for upload, approximate or precise location only when present in uploaded media metadata, and diagnostics only if crash or analytics collection is added later.
+- veyq should declare no third-party advertising, no cross-app tracking and no data broker use.
+- The native app stores instance URLs, capability snapshots, tenant/user bootstrap state, upload queue state and native sessions locally. Native sessions are stored in iOS Keychain.
+- Uploaded photos and videos are sent only to the user-selected veyq instance. Self-hosted operators, not the official app, control retention, backups and server logs for their instance.
+- External services are contacted only through the selected instance APIs, user-opened external playlist links, and optional map tile behavior documented in [`docs/legal/privacy.md`](legal/privacy.md).
+- Export compliance should be answered as standard app encryption using Apple platform HTTPS/TLS and Keychain APIs, with no custom cryptography beyond standard platform and server transport security.
+- Privacy policy URL should point to the public `veyq.app` privacy page once published. Until then, keep [`docs/legal/privacy.md`](legal/privacy.md) and [`docs/legal/ios-app-privacy-policy.md`](legal/ios-app-privacy-policy.md) as the source text for the policy.
+
 Start the normal stack:
 
 ```bash
@@ -393,7 +450,6 @@ Required reset settings in `infra/.env`:
 Optional passkey setting for Compose:
 
 - `WEBAUTHN_RELYING_PARTY_NAME`: display name shown by authenticators. Defaults to `veyq`. Passkeys are bound to the current tenant domain.
-- `WEBAUTHN_SESSION_ENCRYPTION_KEY`: stable secret used to encrypt persistent passkey auth session data. Generated by setup and required by Compose deployments.
 - `PROXY_ADDRESS_FORWARDING`, `PROXY_ALLOW_X_FORWARDED`, `PROXY_ENABLE_FORWARDED_HOST`: enabled by default in Compose so WebAuthn sees the public HTTPS host behind Traefik.
 
 Optional reset setting:
