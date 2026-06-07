@@ -1,12 +1,12 @@
 import { type ComputedRef, onBeforeUnmount, type Ref, watch } from 'vue'
 import type { MenuItem } from 'primevue/menuitem'
 import { clearWorkspaceToolbar, setWorkspaceToolbar } from '../../../composables/useWorkspaceToolbar'
-import type { Memory, MemoryNavigationResponse } from '../api'
+import type { Memory, MemoryNavigationContextResponse } from '../api'
 import { i18n } from '../../../i18n'
 import type { MemoryRouteBreadcrumb } from './useMemoryRouteData'
 
 type ToolbarOptions = {
-  navigation: Ref<MemoryNavigationResponse | null>
+  navigation: Ref<MemoryNavigationContextResponse | null>
   memory: Ref<Memory | null>
   memoryBreadcrumbs: Ref<MemoryRouteBreadcrumb[]>
   loading: Ref<boolean>

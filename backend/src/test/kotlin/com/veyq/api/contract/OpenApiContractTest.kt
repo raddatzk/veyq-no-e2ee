@@ -9,7 +9,6 @@ import com.veyq.api.generated.api.GroupsApi
 import com.veyq.api.generated.api.FoldersApi
 import com.veyq.api.generated.api.MemoriesApi
 import com.veyq.api.generated.api.MemoryMediaApi
-import com.veyq.api.generated.api.MemoryNavigationApi
 import com.veyq.api.generated.api.MemoryParticipantsApi
 import com.veyq.api.generated.api.MemoryPlaylistsApi
 import com.veyq.api.generated.api.MemorySharesApi
@@ -25,7 +24,6 @@ import com.veyq.api.generated.api.TenantRegistrationInvitesApi
 import com.veyq.api.generated.api.UsersApi
 import com.veyq.api.library.folder.FolderResource
 import com.veyq.api.memory.MemoryMediaResource
-import com.veyq.api.memory.MemoryNavigationResource
 import com.veyq.api.memory.MemoryParticipantResource
 import com.veyq.api.memory.MemoryPlaylistResource
 import com.veyq.api.memory.MemoryResource
@@ -396,14 +394,13 @@ class OpenApiContractTest {
             "DELETE /api/notifications/capabilities/{capabilityId}",
             "POST /api/internal/updater/update-completed",
             "POST /api/internal/updater/update-failed",
-            "GET /api/{tenantName}/memory-navigation",
+            "GET /api/{tenantName}/memory-navigation-context",
             "GET /api/{tenantName}/search",
             "POST /api/{tenantName}/folders",
             "POST /api/{tenantName}/folders/update",
             "POST /api/{tenantName}/folders/move",
             "DELETE /api/{tenantName}/folders",
             "GET /api/{tenantName}/memories",
-            "GET /api/{tenantName}/memories/by-folder",
             "GET /api/{tenantName}/memories/by-path",
             "POST /api/{tenantName}/memories",
             "GET /api/{tenantName}/memories/{memoryId}",
@@ -527,7 +524,6 @@ class OpenApiContractTest {
             TenantsApi::class.java to TenantResource::class.java,
             GroupsApi::class.java to GroupResource::class.java,
             FoldersApi::class.java to FolderResource::class.java,
-            MemoryNavigationApi::class.java to MemoryNavigationResource::class.java,
             MemoriesApi::class.java to MemoryResource::class.java,
             MemoryParticipantsApi::class.java to MemoryParticipantResource::class.java,
             MemoryMediaApi::class.java to MemoryMediaResource::class.java,
@@ -550,12 +546,11 @@ class OpenApiContractTest {
                 "tenant-registration-invites.openapi.yaml" -> TenantRegistrationInvitesApi::class.java
                 "groups.openapi.yaml" -> GroupsApi::class.java
                 "memories.openapi.yaml" -> when (operationId) {
-                    "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "moveMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
+                    "getMemoryNavigationContext", "listMemories", "listMemoriesByFolder", "getMemoryByPath", "createMemory", "getMemory", "getMemoryHeader", "getMemoryJournal", "createMemoryJournalLiveSession", "updateMemoryJournal", "updateMemory", "moveMemory", "deleteMemory", "favoriteMemory", "unfavoriteMemory", "listChildMemories", "setMemoryCover", "memoryCoverContent", "removeMemoryCover" -> MemoriesApi::class.java
                     "listMemoryParticipants", "listMemoryParticipantCandidates", "addMemoryParticipant", "removeMemoryParticipant" -> MemoryParticipantsApi::class.java
                     "listMemoryMedia", "waitForMemoryMediaUpdates", "uploadMemoryMedia", "deleteAllMemoryMedia", "listMemoryMediaBuckets", "createMemoryMediaBucket", "updateMemoryMediaBucket", "deleteMemoryMediaBucket", "moveMemoryMedia", "deleteMemoryMediaBatch", "createMemoryMediaUpload", "getMemoryMediaUpload", "abortMemoryMediaUpload", "uploadMemoryMediaChunk", "completeMemoryMediaUpload", "updateMemoryMediaCapturedAt", "updateMemoryMediaHighlight", "deleteMemoryMedia", "updateMemoryMediaMetadataBatch", "memoryMediaContent", "memoryMediaPreview", "memoryMediaThumbnail" -> MemoryMediaApi::class.java
                     "listMemoryTracks", "uploadMemoryTrack", "updateMemoryTrack", "deleteMemoryTrack", "memoryTrackContent" -> MemoryTracksApi::class.java
                     "listMemoryPlaylists", "createMemoryPlaylist", "updateMemoryPlaylist", "deleteMemoryPlaylist" -> MemoryPlaylistsApi::class.java
-                    "getMemoryNavigation" -> MemoryNavigationApi::class.java
                     "searchTenant" -> SearchApi::class.java
                     "createFolder", "deleteFolder", "updateFolder", "moveFolder" -> FoldersApi::class.java
                     else -> error("No generated memories interface mapping for $operationId")

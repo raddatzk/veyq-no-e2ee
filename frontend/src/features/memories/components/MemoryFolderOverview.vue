@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
-import type { Memory, MemoryFolder, MemoryNavigationResponse } from '../api'
+import type { Memory, MemoryFolder, MemoryNavigationContextResponse } from '../api'
 import { deleteFolder } from '../api'
 import ConfirmationDialog from '../../../shared/components/ConfirmationDialog.vue'
 import { getErrorMessage } from '../../../shared/utils/errors'
@@ -13,7 +13,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   tenantName: string
-  navigation: MemoryNavigationResponse
+  navigation: MemoryNavigationContextResponse
   memories: Memory[]
 }>()
 

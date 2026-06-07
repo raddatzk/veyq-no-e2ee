@@ -7,7 +7,6 @@ import {
   GroupsApi,
   MemoriesApi,
   MemoryMediaApi,
-  MemoryNavigationApi,
   MemoryParticipantsApi,
   MemoryPlaylistsApi,
   MemorySharesApi,
@@ -35,7 +34,6 @@ export const groupsApi = new GroupsApi(generatedConfiguration)
 export const foldersApi = new FoldersApi(generatedConfiguration)
 export const memoriesApi = new MemoriesApi(generatedConfiguration)
 export const memoryMediaApi = new MemoryMediaApi(generatedConfiguration)
-export const memoryNavigationApi = new MemoryNavigationApi(generatedConfiguration)
 export const memoryParticipantsApi = new MemoryParticipantsApi(generatedConfiguration)
 export const memoryPlaylistsApi = new MemoryPlaylistsApi(generatedConfiguration)
 export const memorySharesApi = new MemorySharesApi(generatedConfiguration)

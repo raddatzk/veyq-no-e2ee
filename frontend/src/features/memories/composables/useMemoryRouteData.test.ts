@@ -2,12 +2,10 @@ import { flushPromises } from '@vue/test-utils'
 import { computed, effectScope, ref, type EffectScope } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  getMemoryByPath,
+  getMemoryNavigationContext,
   getMemoryHeader,
   getMemoryJournal,
-  getMemoryNavigation,
   listChildMemories,
-  listMemoriesByFolder,
   listMemoryMedia,
   listMemoryMediaBuckets,
   listMemoryPlaylists,
@@ -16,17 +14,16 @@ import {
   type Memory,
   type MemoryHeader,
   type MemoryMedia,
-  type MemoryMediaBucket
+  type MemoryMediaBucket,
+  type MemoryNavigationContextResponse
 } from '../api'
 import { useMemoryRouteData } from './useMemoryRouteData'
 
 vi.mock('../api', () => ({
-  getMemoryByPath: vi.fn(),
+  getMemoryNavigationContext: vi.fn(),
   getMemoryHeader: vi.fn(),
   getMemoryJournal: vi.fn(),
-  getMemoryNavigation: vi.fn(),
   listChildMemories: vi.fn(),
-  listMemoriesByFolder: vi.fn(),
   listMemoryMedia: vi.fn(),
   listMemoryMediaBuckets: vi.fn(),
   listMemoryPlaylists: vi.fn(),
@@ -34,12 +31,10 @@ vi.mock('../api', () => ({
   waitForNewMemoryMedia: vi.fn()
 }))
 
-const getMemoryByPathMock = vi.mocked(getMemoryByPath)
+const getMemoryNavigationContextMock = vi.mocked(getMemoryNavigationContext)
 const getMemoryHeaderMock = vi.mocked(getMemoryHeader)
 const getMemoryJournalMock = vi.mocked(getMemoryJournal)
-const getMemoryNavigationMock = vi.mocked(getMemoryNavigation)
 const listChildMemoriesMock = vi.mocked(listChildMemories)
-const listMemoriesByFolderMock = vi.mocked(listMemoriesByFolder)
 const listMemoryMediaMock = vi.mocked(listMemoryMedia)
 const listMemoryMediaBucketsMock = vi.mocked(listMemoryMediaBuckets)
 const listMemoryPlaylistsMock = vi.mocked(listMemoryPlaylists)
@@ -55,14 +50,14 @@ describe('useMemoryRouteData', () => {
       value: 'visible',
       configurable: true
     })
-    getMemoryNavigationMock.mockResolvedValue({
+    getMemoryNavigationContextMock.mockResolvedValue({
       location: { kind: 'FOLDER', path: '/', displayName: 'Root' },
       breadcrumbs: [],
       scopeRoots: [],
       folders: [],
-      favoriteMemories: []
+      favoriteMemories: [],
+      memories: []
     })
-    listMemoriesByFolderMock.mockResolvedValue([])
     getMemoryJournalMock.mockResolvedValue({
       memoryId: 'mem-1',
       markdown: '',
@@ -79,7 +74,7 @@ describe('useMemoryRouteData', () => {
   })
 
   it('merges long-polled Memory media and refreshes buckets and header counts', async () => {
-    getMemoryByPathMock.mockResolvedValue(memory())
+    getMemoryNavigationContextMock.mockResolvedValue(memoryContext(memory()))
     getMemoryHeaderMock
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 0 }))
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 1 }))
@@ -135,7 +130,7 @@ describe('useMemoryRouteData', () => {
   })
 
   it('removes deleted media from long-polled current media ids without refetching media', async () => {
-    getMemoryByPathMock.mockResolvedValue(memory())
+    getMemoryNavigationContextMock.mockResolvedValue(memoryContext(memory()))
     getMemoryHeaderMock
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 2 }))
       .mockResolvedValueOnce(memoryHeader({ directMediaCount: 1 }))
@@ -172,28 +167,21 @@ describe('useMemoryRouteData', () => {
     expect(data?.media.value.some((item) => item.highlight)).toBe(false)
   })
 
-  it('resolves folder display names for memory breadcrumb prefixes', async () => {
-    getMemoryByPathMock.mockImplementation((_, path) => {
-      if (path === '/@team/ostern/ostern-2026') {
-        return Promise.resolve(memory({
+  it('uses navigation context breadcrumbs for memory routes', async () => {
+    getMemoryNavigationContextMock.mockResolvedValue(memoryContext(
+      memory({
           id: 'mem-easter',
           name: 'ostern-2026',
           displayName: 'Ostern 2026',
           path: '/@team/ostern/ostern-2026',
           scope: { type: 'GROUP', groupName: 'team' }
-        }))
-      }
-      return Promise.reject({ status: 404 })
-    })
-    getMemoryNavigationMock.mockImplementation((_, path) => {
-      if (path === '/@team') {
-        return Promise.resolve(navigationResponse('@team', 'affenbande-climbing'))
-      }
-      if (path === '/@team/ostern') {
-        return Promise.resolve(navigationResponse('/@team/ostern', 'Ostern'))
-      }
-      return Promise.reject({ status: 404 })
-    })
+      }),
+      [
+        { path: '/@team', label: 'affenbande-climbing' },
+        { path: '/@team/ostern', label: 'Ostern' },
+        { path: '/@team/ostern/ostern-2026', label: 'Ostern 2026' }
+      ]
+    ))
     getMemoryHeaderMock.mockResolvedValue(memoryHeader({ id: 'mem-easter', displayName: 'Ostern 2026' }))
     listMemoryMediaMock.mockResolvedValue([])
     listMemoryMediaBucketsMock.mockResolvedValue([])
@@ -213,6 +201,7 @@ describe('useMemoryRouteData', () => {
       { path: '/@team/ostern', label: 'Ostern' },
       { path: '/@team/ostern/ostern-2026', label: 'Ostern 2026' }
     ])
+    expect(getMemoryNavigationContextMock).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -315,12 +304,33 @@ function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBuc
   }
 }
 
-function navigationResponse(path: string, displayName: string) {
+function navigationResponse(path: string, displayName: string): MemoryNavigationContextResponse {
   return {
     location: { kind: 'FOLDER' as const, path, displayName },
     breadcrumbs: [],
     scopeRoots: [],
     folders: [],
-    favoriteMemories: []
+    favoriteMemories: [],
+    memories: []
+  }
+}
+
+function memoryContext(
+  resolvedMemory: Memory,
+  breadcrumbs: Array<{ path: string, label: string }> = [{ path: '/trip', label: resolvedMemory.displayName }]
+): MemoryNavigationContextResponse {
+  return {
+    location: { kind: 'MEMORY' as const, path: resolvedMemory.path, displayName: resolvedMemory.displayName },
+    breadcrumbs: breadcrumbs.map((breadcrumb) => ({
+      kind: breadcrumb.path === resolvedMemory.path ? 'MEMORY' as const : 'FOLDER' as const,
+      path: breadcrumb.path,
+      displayName: breadcrumb.label,
+      label: breadcrumb.label
+    })),
+    scopeRoots: [],
+    folders: [],
+    favoriteMemories: [],
+    memory: resolvedMemory,
+    memories: []
   }
 }

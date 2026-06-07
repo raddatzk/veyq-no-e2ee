@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWorkspaceToolbar, workspaceToolbar } from '../../../composables/useWorkspaceToolbar'
 import { memoryBreadcrumbs, useMemoryToolbar } from './useMemoryToolbar'
 import type { MemoryRouteBreadcrumb } from './useMemoryRouteData'
-import type { Memory, MemoryNavigationResponse } from '../api'
+import type { Memory, MemoryNavigationContextResponse } from '../api'
 
 describe('memoryBreadcrumbs', () => {
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('memoryBreadcrumbs', () => {
   it('clears stale settings actions while a new tenant context is loading', async () => {
     const tenantName = ref('friends')
     const routePath = ref('/')
-    const navigation = ref<MemoryNavigationResponse | null>(navigationResponse('Friends'))
+    const navigation = ref<MemoryNavigationContextResponse | null>(navigationResponse('Friends'))
     const memoryRef = ref<Memory | null>(null)
     const memoryBreadcrumbsRef = ref<MemoryRouteBreadcrumb[]>([])
     const loading = ref(false)
@@ -96,7 +96,7 @@ describe('memoryBreadcrumbs', () => {
   it('waits for resolved memory breadcrumb labels before rendering memory toolbar breadcrumbs', async () => {
     const tenantName = ref('friends')
     const routePath = ref('/ostern/ostern-2026')
-    const navigation = ref<MemoryNavigationResponse | null>(null)
+    const navigation = ref<MemoryNavigationContextResponse | null>(null)
     const memoryRef = ref<Memory | null>(memory({
       displayName: 'Ostern 2026',
       path: '/ostern/ostern-2026'
@@ -159,12 +159,13 @@ function memory(overrides: Partial<Memory>): Memory {
   }
 }
 
-function navigationResponse(label: string): MemoryNavigationResponse {
+function navigationResponse(label: string): MemoryNavigationContextResponse {
   return {
     location: { kind: 'TENANT', path: '/', displayName: label },
     breadcrumbs: [{ kind: 'TENANT', path: '/', displayName: label, label }],
     scopeRoots: [],
     favoriteMemories: [],
-    folders: []
+    folders: [],
+    memories: []
   }
 }

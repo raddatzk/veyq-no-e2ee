@@ -17,13 +17,14 @@ import java.nio.file.StandardCopyOption
 @ApplicationScoped
 class MemoryResource @Inject constructor(
     private val memoryService: MemoryService,
+    private val memoryNavigationContextService: MemoryNavigationContextService,
     private val memoryJournalService: MemoryJournalService,
 ) : MemoriesApi {
     override fun listMemories(tenantName: String): Response =
         Response.ok(memoryService.listRootMemories()).build()
 
-    override fun listMemoriesByFolder(tenantName: String, folderPath: String?): Response =
-        Response.ok(memoryService.listMemoriesByFolderPath(folderPath)).build()
+    override fun getMemoryNavigationContext(tenantName: String, path: String): Response =
+        Response.ok(memoryNavigationContextService.navigationContext(path)).build()
 
     override fun createMemory(tenantName: String, request: CreateMemoryRequest): Response =
         Response.ok(memoryService.createMemory(request)).build()

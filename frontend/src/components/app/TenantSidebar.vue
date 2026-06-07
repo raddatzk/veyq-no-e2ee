@@ -7,7 +7,7 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import logoDarkUrl from '../../assets/brand/logo-dark.svg'
 import logoLightUrl from '../../assets/brand/logo-light.svg'
-import { getMemoryNavigation, type Memory, type MemoryScopeRoot } from '../../features/memories/api'
+import { getMemoryNavigationContext, type Memory, type MemoryScopeRoot } from '../../features/memories/api'
 import { memoryFavoritesRefreshToken } from '../../features/memories/composables/useMemoryFavoritesRefresh'
 import MemoryCoverImage from '../../features/memories/components/MemoryCoverImage.vue'
 import { API_BASE } from '../../shared/api/httpClient'
@@ -140,7 +140,7 @@ async function loadNavigationData(options: { preserveExisting?: boolean } = {}) 
   if (!tenantName) return
 
   try {
-    const navigation = await getMemoryNavigation(tenantName, '/')
+    const navigation = await getMemoryNavigationContext(tenantName, '/')
     if (sequence !== loadSequence) return
     scopeRoots.value = navigation.scopeRoots
     favoriteMemories.value = navigation.favoriteMemories

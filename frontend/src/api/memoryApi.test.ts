@@ -6,9 +6,9 @@ import {
   favoriteMemory,
   getMemoryHeader,
   getMemoryByPath,
+  getMemoryNavigationContext,
   getPublicShareMemoryHeader,
   listMemories,
-  listMemoriesByFolder,
   listMemoryMedia,
   moveMemory,
   removeMemoryCover,
@@ -23,7 +23,7 @@ import {
 const mocks = vi.hoisted(() => ({
   generatedCall: vi.fn((request: Promise<unknown>) => request),
   listMemories: vi.fn(),
-  listMemoriesByFolder: vi.fn(),
+  getMemoryNavigationContext: vi.fn(),
   getMemoryByPath: vi.fn(),
   getMemoryHeader: vi.fn(),
   favoriteMemory: vi.fn(),
@@ -46,7 +46,7 @@ vi.mock('./generatedClient', () => ({
   generatedCall: mocks.generatedCall,
   memoriesApi: {
     listMemories: mocks.listMemories,
-    listMemoriesByFolder: mocks.listMemoriesByFolder,
+    getMemoryNavigationContext: mocks.getMemoryNavigationContext,
     getMemoryByPath: mocks.getMemoryByPath,
     getMemoryHeader: mocks.getMemoryHeader,
     favoriteMemory: mocks.favoriteMemory,
@@ -80,18 +80,28 @@ describe('memoryApi facade', () => {
     vi.clearAllMocks()
   })
 
-  it('maps folder and path based memory lookups through generatedCall', async () => {
-    mocks.listMemoriesByFolder.mockResolvedValue([memoryResponse('trip')])
+  it('maps navigation context and path based memory lookups through generatedCall', async () => {
+    mocks.getMemoryNavigationContext.mockResolvedValue({
+      location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
+      breadcrumbs: [],
+      scopeRoots: [],
+      favoriteMemories: [memoryResponse('favorite')],
+      memory: memoryResponse('current'),
+      folders: [],
+      memories: [memoryResponse('trip')]
+    })
     mocks.getMemoryByPath.mockResolvedValue(memoryResponse('trip'))
 
-    const memories = await listMemoriesByFolder('tenant', '/travel')
+    const navigationContext = await getMemoryNavigationContext('tenant', '/travel')
     const memory = await getMemoryByPath('tenant', '/travel/trip')
 
-    expect(memories[0].path).toBe('/trip')
+    expect(navigationContext.memories[0].path).toBe('/trip')
+    expect(navigationContext.memory?.id).toBe('mem-current')
+    expect(navigationContext.favoriteMemories[0].id).toBe('mem-favorite')
     expect(memory.id).toBe('mem-trip')
-    expect(mocks.listMemoriesByFolder).toHaveBeenCalledWith({
+    expect(mocks.getMemoryNavigationContext).toHaveBeenCalledWith({
       tenantName: 'tenant',
-      folderPath: '/travel'
+      path: '/travel'
     })
     expect(mocks.getMemoryByPath).toHaveBeenCalledWith({
       tenantName: 'tenant',

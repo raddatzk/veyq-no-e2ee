@@ -52,58 +52,71 @@ import {
 /**
  * 
  * @export
- * @interface MemoryNavigationResponse
+ * @interface MemoryNavigationContextResponse
  */
-export interface MemoryNavigationResponse {
+export interface MemoryNavigationContextResponse {
     /**
      * 
      * @type {MemoryNavigationLocation}
-     * @memberof MemoryNavigationResponse
+     * @memberof MemoryNavigationContextResponse
      */
     location: MemoryNavigationLocation;
     /**
      * 
      * @type {Array<MemoryNavigationBreadcrumb>}
-     * @memberof MemoryNavigationResponse
+     * @memberof MemoryNavigationContextResponse
      */
     breadcrumbs: Array<MemoryNavigationBreadcrumb>;
     /**
      * 
      * @type {Array<MemoryScopeRoot>}
-     * @memberof MemoryNavigationResponse
+     * @memberof MemoryNavigationContextResponse
      */
     scopeRoots: Array<MemoryScopeRoot>;
     /**
      * Memories favorited by the current user and visible in the current tenant.
      * @type {Array<MemorySummary>}
-     * @memberof MemoryNavigationResponse
+     * @memberof MemoryNavigationContextResponse
      */
     favoriteMemories: Array<MemorySummary>;
     /**
+     * Present when the addressed path resolves to a Memory.
+     * @type {MemorySummary}
+     * @memberof MemoryNavigationContextResponse
+     */
+    memory?: MemorySummary;
+    /**
      * 
      * @type {Array<MemoryFolder>}
-     * @memberof MemoryNavigationResponse
+     * @memberof MemoryNavigationContextResponse
      */
     folders: Array<MemoryFolder>;
+    /**
+     * 
+     * @type {Array<MemorySummary>}
+     * @memberof MemoryNavigationContextResponse
+     */
+    memories: Array<MemorySummary>;
 }
 
 /**
- * Check if a given object implements the MemoryNavigationResponse interface.
+ * Check if a given object implements the MemoryNavigationContextResponse interface.
  */
-export function instanceOfMemoryNavigationResponse(value: object): value is MemoryNavigationResponse {
+export function instanceOfMemoryNavigationContextResponse(value: object): value is MemoryNavigationContextResponse {
     if (!('location' in value) || value['location'] === undefined) return false;
     if (!('breadcrumbs' in value) || value['breadcrumbs'] === undefined) return false;
     if (!('scopeRoots' in value) || value['scopeRoots'] === undefined) return false;
     if (!('favoriteMemories' in value) || value['favoriteMemories'] === undefined) return false;
     if (!('folders' in value) || value['folders'] === undefined) return false;
+    if (!('memories' in value) || value['memories'] === undefined) return false;
     return true;
 }
 
-export function MemoryNavigationResponseFromJSON(json: any): MemoryNavigationResponse {
-    return MemoryNavigationResponseFromJSONTyped(json, false);
+export function MemoryNavigationContextResponseFromJSON(json: any): MemoryNavigationContextResponse {
+    return MemoryNavigationContextResponseFromJSONTyped(json, false);
 }
 
-export function MemoryNavigationResponseFromJSONTyped(json: any, ignoreDiscriminator: boolean): MemoryNavigationResponse {
+export function MemoryNavigationContextResponseFromJSONTyped(json: any, ignoreDiscriminator: boolean): MemoryNavigationContextResponse {
     if (json == null) {
         return json;
     }
@@ -113,15 +126,17 @@ export function MemoryNavigationResponseFromJSONTyped(json: any, ignoreDiscrimin
         'breadcrumbs': ((json['breadcrumbs'] as Array<any>).map(MemoryNavigationBreadcrumbFromJSON)),
         'scopeRoots': ((json['scopeRoots'] as Array<any>).map(MemoryScopeRootFromJSON)),
         'favoriteMemories': ((json['favoriteMemories'] as Array<any>).map(MemorySummaryFromJSON)),
+        'memory': json['memory'] == null ? undefined : MemorySummaryFromJSON(json['memory']),
         'folders': ((json['folders'] as Array<any>).map(MemoryFolderFromJSON)),
+        'memories': ((json['memories'] as Array<any>).map(MemorySummaryFromJSON)),
     };
 }
 
-export function MemoryNavigationResponseToJSON(json: any): MemoryNavigationResponse {
-    return MemoryNavigationResponseToJSONTyped(json, false);
+export function MemoryNavigationContextResponseToJSON(json: any): MemoryNavigationContextResponse {
+    return MemoryNavigationContextResponseToJSONTyped(json, false);
 }
 
-export function MemoryNavigationResponseToJSONTyped(value?: MemoryNavigationResponse | null, ignoreDiscriminator: boolean = false): any {
+export function MemoryNavigationContextResponseToJSONTyped(value?: MemoryNavigationContextResponse | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }
@@ -132,7 +147,9 @@ export function MemoryNavigationResponseToJSONTyped(value?: MemoryNavigationResp
         'breadcrumbs': ((value['breadcrumbs'] as Array<any>).map(MemoryNavigationBreadcrumbToJSON)),
         'scopeRoots': ((value['scopeRoots'] as Array<any>).map(MemoryScopeRootToJSON)),
         'favoriteMemories': ((value['favoriteMemories'] as Array<any>).map(MemorySummaryToJSON)),
+        'memory': MemorySummaryToJSON(value['memory']),
         'folders': ((value['folders'] as Array<any>).map(MemoryFolderToJSON)),
+        'memories': ((value['memories'] as Array<any>).map(MemorySummaryToJSON)),
     };
 }
 

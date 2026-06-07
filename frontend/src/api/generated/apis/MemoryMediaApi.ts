@@ -764,8 +764,8 @@ export interface MemoryMediaApiInterface {
     updateMemoryMediaHighlightRequestOpts(requestParameters: UpdateMemoryMediaHighlightOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Flag a memory as highlight  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * @summary Flag a media as a highlight
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Set media highlight status
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
      * @param {string} mediaId Public media id.
@@ -777,8 +777,8 @@ export interface MemoryMediaApiInterface {
     updateMemoryMediaHighlightRaw(requestParameters: UpdateMemoryMediaHighlightOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>>;
 
     /**
-     * Flag a memory as highlight  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Flag a media as a highlight
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Set media highlight status
      */
     updateMemoryMediaHighlight(requestParameters: UpdateMemoryMediaHighlightOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary>;
 
@@ -2145,8 +2145,8 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Flag a memory as highlight  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Flag a media as a highlight
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Set media highlight status
      */
     async updateMemoryMediaHighlightRaw(requestParameters: UpdateMemoryMediaHighlightOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryMediaSummary>> {
         const requestOptions = await this.updateMemoryMediaHighlightRequestOpts(requestParameters);
@@ -2156,8 +2156,8 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Flag a memory as highlight  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Flag a media as a highlight
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Set media highlight status
      */
     async updateMemoryMediaHighlight(requestParameters: UpdateMemoryMediaHighlightOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryMediaSummary> {
         const response = await this.updateMemoryMediaHighlightRaw(requestParameters, initOverrides);

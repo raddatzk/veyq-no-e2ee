@@ -60,43 +60,47 @@ export const overflowGroupScopeRoots = [
 
 export const rootNavigation = {
   location: { kind: 'TENANT', path: '/', displayName: 'Friends' },
-  breadcrumbs: [{ label: 'Friends', path: '/' }],
+  breadcrumbs: [{ kind: 'TENANT', label: 'Friends', displayName: 'Friends', path: '/' }],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
   favoriteMemories: [],
-  folders: []
+  folders: [],
+  memories: []
 }
 
 export const personalNavigation = {
   location: { kind: 'USER', path: '/~administrator', displayName: 'Administrator' },
   breadcrumbs: [
-    { label: 'Friends', path: '/' },
-    { label: 'Persönlich', path: '/~administrator' }
+    { kind: 'TENANT', label: 'Friends', displayName: 'Friends', path: '/' },
+    { kind: 'USER', label: 'Persönlich', displayName: 'Administrator', path: '/~administrator' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
   favoriteMemories: [],
-  folders: []
+  folders: [],
+  memories: []
 }
 
 export const groupNavigation = {
   location: { kind: 'GROUP', path: '/@travel', displayName: 'Travel' },
   breadcrumbs: [
-    { label: 'Friends', path: '/' },
-    { label: '@Travel', path: '/@travel' }
+    { kind: 'TENANT', label: 'Friends', displayName: 'Friends', path: '/' },
+    { kind: 'GROUP', label: '@Travel', displayName: 'Travel', path: '/@travel' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
   favoriteMemories: [],
-  folders: []
+  folders: [],
+  memories: []
 }
 
 export const folderNavigation = {
   location: { kind: 'FOLDER', path: '/reisen', displayName: 'Reisen' },
   breadcrumbs: [
-    { label: 'Friends', path: '/' },
-    { label: 'Reisen', path: '/reisen' }
+    { kind: 'TENANT', label: 'Friends', displayName: 'Friends', path: '/' },
+    { kind: 'FOLDER', label: 'Reisen', displayName: 'Reisen', path: '/reisen' }
   ],
   scopeRoots: [personalScopeRoot, groupScopeRoot],
   favoriteMemories: [],
-  folders: []
+  folders: [],
+  memories: []
 }
 
 export const weddingMemory = {
@@ -294,13 +298,8 @@ export async function mockInitialSetupApi(page: Page) {
       return
     }
 
-    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation') {
+    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation-context') {
       await fulfillJson(route, rootNavigation)
-      return
-    }
-
-    if (method === 'GET' && url.pathname === '/api/friends/memories/by-folder') {
-      await fulfillJson(route, [])
       return
     }
 
@@ -331,19 +330,15 @@ export async function mockAuthenticatedOwnerApi(
       return
     }
 
-    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation') {
+    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation-context') {
       const path = url.searchParams.get('path') || '/'
       const navigation = navigationForPath(path)
       await fulfillJson(route, {
         ...navigation,
         favoriteMemories: options.favoriteMemories ?? navigation.favoriteMemories,
-        scopeRoots: options.scopeRoots ?? navigation.scopeRoots
+        scopeRoots: options.scopeRoots ?? navigation.scopeRoots,
+        memories: options.folderMemories ?? navigation.memories
       })
-      return
-    }
-
-    if (method === 'GET' && url.pathname === '/api/friends/memories/by-folder') {
-      await fulfillJson(route, options.folderMemories ?? [])
       return
     }
 
@@ -440,9 +435,13 @@ export async function mockMemoryDetailApi(page: Page, options: MemoryDetailApiOp
       return
     }
 
-    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation') {
+    if (method === 'GET' && url.pathname === '/api/friends/memory-navigation-context') {
       const path = url.searchParams.get('path') || '/'
-      await fulfillJson(route, navigationForPath(path))
+      const navigation = navigationForPath(path)
+      await fulfillJson(route, {
+        ...navigation,
+        memories: options.folderMemories ?? navigation.memories
+      })
       return
     }
 

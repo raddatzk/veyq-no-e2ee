@@ -9,7 +9,6 @@ servers:
 security:
   - accessTokenCookie: []
 tags:
-  - name: MemoryNavigation
   - name: Folders
   - name: Memories
   - name: MemoryParticipants
@@ -49,18 +48,18 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
           "$ref": "./common.openapi.yaml#/components/responses/403"
-  "/api/{tenantName}/memory-navigation":
+  "/api/{tenantName}/memory-navigation-context":
     get:
       tags:
-        - MemoryNavigation
-      operationId: getMemoryNavigation
-      summary: Load memory navigation for a tenant path
+        - Memories
+      operationId: getMemoryNavigationContext
+      summary: Load Memory navigation context for a tenant path
       x-implementation-status: implemented
       x-preconditions: &memoryPreconditions
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Returns the current memory navigation location, its breadcrumb chain, visible scope roots and child folders.
+        Resolves the addressed path to either a navigation container or a Memory and returns the context needed to render that route. Container contexts include child folders and top-level Memories. Memory contexts include the resolved Memory and breadcrumb chain. Scope roots and favorite Memories are populated for the tenant root and otherwise returned as empty arrays.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -69,10 +68,10 @@ paths:
         Implementierungsstatus: implemented.
       parameters:
         - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
-        - "$ref": "#/components/parameters/NavigationPath"
+        - "$ref": "#/components/parameters/MemoryNavigationContextPath"
       responses:
         '200':
-          "$ref": "#/components/responses/MemoryNavigation"
+          "$ref": "#/components/responses/MemoryNavigationContext"
         '401':
           "$ref": "./common.openapi.yaml#/components/responses/401"
         '403':
@@ -258,36 +257,6 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/404"
         '409':
           "$ref": "./common.openapi.yaml#/components/responses/409"
-  "/api/{tenantName}/memories/by-folder":
-    get:
-      tags:
-        - Memories
-      operationId: listMemoriesByFolder
-      summary: List memories in a folder path
-      x-implementation-status: implemented
-      x-preconditions:
-        - A valid access token cookie must be present.
-        - The current user must be a member of the addressed tenant.
-      description: |-
-        Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.
-
-        Vorbedingungen:
-        - A valid access token cookie must be present.
-        - The current user must be a member of the addressed tenant.
-
-        Implementierungsstatus: implemented.
-      parameters:
-        - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
-        - "$ref": "#/components/parameters/FolderPath"
-      responses:
-        '200':
-          "$ref": "#/components/responses/MemorySummaries"
-        '401':
-          "$ref": "./common.openapi.yaml#/components/responses/401"
-        '403':
-          "$ref": "./common.openapi.yaml#/components/responses/403"
-        '404':
-          "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/{tenantName}/memories/by-path":
     get:
       tags:
@@ -1846,13 +1815,13 @@ paths:
       tags:
         - MemoryMedia
       operationId: updateMemoryMediaHighlight
-      summary: Flag a media as a highlight
+      summary: Set media highlight status
       x-implementation-status: implemented
       x-preconditions:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Flag a memory as highlight
+        Sets whether a media item is marked as a Highlight.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -2138,16 +2107,7 @@ components:
         format: int64
       description: Registered user id.
       example: 7
-    FolderPath:
-      in: query
-      required: false
-      name: folderPath
-      schema:
-        type: string
-        default: "/"
-      description: Organizational folder path. Empty or omitted addresses the tenant root.
-      example: /summer
-    NavigationPath:
+    MemoryNavigationContextPath:
       in: query
       required: false
       name: path
@@ -2486,12 +2446,12 @@ components:
               folderPath: /@family/archive
             name: summer-trip
   responses:
-    MemoryNavigation:
-      description: Memory navigation state.
+    MemoryNavigationContext:
+      description: Memory navigation context state.
       content:
         application/json:
           schema:
-            "$ref": "#/components/schemas/MemoryNavigationResponse"
+            "$ref": "#/components/schemas/MemoryNavigationContextResponse"
           example:
             location:
               kind: TENANT
@@ -2509,6 +2469,20 @@ components:
                 path: /~me
             favoriteMemories: []
             folders: []
+            memories:
+              - id: mem_abc123
+                parentId: null
+                name: summer-trip
+                displayName: Summer Trip
+                path: /summer-trip
+                coverMediaId: med_abc123
+                startDate: '2026-05-03'
+                endDate: '2026-05-05'
+                childCount: 1
+                mediaCount: 12
+                favorite: true
+                scope:
+                  type: TENANT
     Folder:
       description: Organizational folder.
       content:
@@ -2832,7 +2806,7 @@ components:
               matchTypes:
                 - TITLE
   schemas:
-    MemoryNavigationResponse:
+    MemoryNavigationContextResponse:
       type: object
       additionalProperties: false
       required:
@@ -2841,6 +2815,7 @@ components:
         - scopeRoots
         - favoriteMemories
         - folders
+        - memories
       properties:
         location:
           "$ref": "#/components/schemas/MemoryNavigationLocation"
@@ -2857,10 +2832,17 @@ components:
           description: Memories favorited by the current user and visible in the current tenant.
           items:
             "$ref": "#/components/schemas/MemorySummary"
+        memory:
+          "$ref": "#/components/schemas/MemorySummary"
+          description: Present when the addressed path resolves to a Memory.
         folders:
           type: array
           items:
             "$ref": "#/components/schemas/MemoryFolder"
+        memories:
+          type: array
+          items:
+            "$ref": "#/components/schemas/MemorySummary"
       example:
         location:
           kind: TENANT
@@ -2882,6 +2864,8 @@ components:
             name: summer
             displayName: Summer
             path: /summer
+        memories:
+          - *memoryExample
     MemoryNavigationLocation:
       type: object
       additionalProperties: false
@@ -2929,6 +2913,7 @@ components:
         - GROUP
         - USER
         - FOLDER
+        - MEMORY
     MemoryScopeRoot:
       type: object
       additionalProperties: false
@@ -2944,7 +2929,7 @@ components:
             - GROUP
             - USER
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
         path:
@@ -3009,7 +2994,7 @@ components:
         path:
           type: string
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
           nullable: true
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
@@ -3031,7 +3016,7 @@ components:
           type: string
           nullable: true
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
           nullable: true
       example:
         path: /@family/summer
@@ -3442,7 +3427,7 @@ components:
           nullable: true
           description: Organizational folder path for new top-level Memories. Ignored when `parentId` is present.
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
           description: URL-safe sibling name.
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
@@ -3475,7 +3460,7 @@ components:
           nullable: true
           description: New parent Memory id. Cross-scope moves and cycles are rejected.
         name:
-          type: string
+          "$ref": "./common.openapi.yaml#/components/schemas/Name"
           nullable: true
         displayName:
           "$ref": "./common.openapi.yaml#/components/schemas/DisplayName"
@@ -3564,7 +3549,7 @@ components:
       properties:
         highlight:
           type: boolean
-          description: Flag a media as a highlight
+          description: Whether the media item is marked as a Highlight.
       example:
         highlight: true
     UpdateMemoryMediaMetadataBatchRequest:
@@ -3599,14 +3584,26 @@ components:
       properties:
         filename:
           type: string
+          minLength: 1
+          maxLength: 255
+          x-field-extra-annotation:
+            - '@field:com.veyq.api.common.validation.RequiredText'
         mimeType:
           type: string
+          minLength: 1
+          maxLength: 255
+          x-field-extra-annotation:
+            - '@field:com.veyq.api.common.validation.RequiredText'
         sizeBytes:
           type: integer
           format: int64
+          minimum: 1
+          x-field-extra-annotation:
+            - '@field:com.veyq.api.common.validation.PositiveBytes'
         title:
           type: string
           nullable: true
+          maxLength: 120
         bucketId:
           type: string
           nullable: true

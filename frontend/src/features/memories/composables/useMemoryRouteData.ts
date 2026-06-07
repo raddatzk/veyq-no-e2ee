@@ -1,11 +1,9 @@
 import { computed, onScopeDispose, ref, watch, type ComputedRef } from 'vue'
 import {
-  getMemoryByPath,
+  getMemoryNavigationContext,
   getMemoryHeader,
   getMemoryJournal,
-  getMemoryNavigation,
   listChildMemories,
-  listMemoriesByFolder,
   listMemoryMedia,
   listMemoryMediaBuckets,
   listMemoryPlaylists,
@@ -16,11 +14,11 @@ import {
   type MemoryJournal,
   type MemoryMedia,
   type MemoryMediaBucket,
-  type MemoryNavigationResponse,
+  type MemoryNavigationContextResponse,
   type MemoryPlaylist,
   type MemoryTrack
 } from '../api'
-import { getErrorMessage, isApiStatus } from '../../../shared/utils/errors'
+import { getErrorMessage } from '../../../shared/utils/errors'
 import { mediaSetHash } from '../utils/mediaSetHash'
 
 export type MemoryRouteKind = 'folder' | 'memory'
@@ -39,7 +37,7 @@ export function useMemoryRouteData(
   routePath: ComputedRef<string>
 ) {
   const kind = ref<MemoryRouteKind>('folder')
-  const navigation = ref<MemoryNavigationResponse | null>(null)
+  const navigation = ref<MemoryNavigationContextResponse | null>(null)
   const memories = ref<Memory[]>([])
   const memory = ref<Memory | null>(null)
   const memoryHeader = ref<MemoryHeader | null>(null)
@@ -89,11 +87,7 @@ export function useMemoryRouteData(
     tracks.value = []
 
     try {
-      if (routePath.value !== '/') {
-        const loadedMemory = await tryLoadMemoryRoute(sequence)
-        if (loadedMemory) return
-      }
-      await loadFolderRoute(sequence)
+      await loadRouteContext(sequence)
     } catch (unknownError) {
       if (sequence !== loadSequence) return
       error.value = getErrorMessage(unknownError, 'Ansicht konnte nicht geladen werden')
@@ -102,19 +96,24 @@ export function useMemoryRouteData(
     }
   }
 
-  async function tryLoadMemoryRoute(sequence: number): Promise<boolean> {
-    try {
-      const loadedMemory = await getMemoryByPath(tenantName.value, routePath.value)
-      if (sequence !== loadSequence) return true
+  async function loadRouteContext(sequence: number) {
+    const loadedNavigationContext = await getMemoryNavigationContext(tenantName.value, routePath.value)
+    if (sequence !== loadSequence) return
+    if (loadedNavigationContext.location.kind === 'MEMORY' && loadedNavigationContext.memory) {
+      const loadedMemory = loadedNavigationContext.memory
       kind.value = 'memory'
       memory.value = loadedMemory
+      memoryBreadcrumbs.value = loadedNavigationContext.breadcrumbs.map((breadcrumb) => ({
+        path: breadcrumb.path,
+        label: breadcrumb.label
+      }))
       mediaLoading.value = true
       void loadMemoryRouteDetails(sequence, loadedMemory)
-      return true
-    } catch (unknownError) {
-      if (isApiStatus(unknownError, 404)) return false
-      throw unknownError
+      return
     }
+    kind.value = 'folder'
+    navigation.value = loadedNavigationContext
+    memories.value = loadedNavigationContext.memories
   }
 
   async function loadMemoryRouteDetails(sequence: number, loadedMemory: Memory) {
@@ -124,9 +123,6 @@ export function useMemoryRouteData(
       }),
       loadMemoryDetailPart(sequence, () => getMemoryJournal(tenantName.value, loadedMemory.id), (journal) => {
         memoryJournal.value = journal
-      }),
-      loadMemoryDetailPart(sequence, () => loadMemoryBreadcrumbs(loadedMemory), (breadcrumbs) => {
-        memoryBreadcrumbs.value = breadcrumbs
       }),
       loadMemoryDetailPart(sequence, () => listChildMemories(tenantName.value, loadedMemory.id), (children) => {
         childMemories.value = children
@@ -166,17 +162,6 @@ export function useMemoryRouteData(
     } finally {
       if (sequence === loadSequence) finalize?.()
     }
-  }
-
-  async function loadFolderRoute(sequence: number) {
-    const [loadedNavigation, loadedMemories] = await Promise.all([
-      getMemoryNavigation(tenantName.value, routePath.value),
-      listMemoriesByFolder(tenantName.value, routePath.value)
-    ])
-    if (sequence !== loadSequence) return
-    kind.value = 'folder'
-    navigation.value = loadedNavigation
-    memories.value = loadedMemories
   }
 
   function startMemoryMediaUpdates(sequence: number, current: Memory) {
@@ -234,30 +219,6 @@ export function useMemoryRouteData(
     }
   }
 
-  async function loadMemoryBreadcrumbs(current: Memory): Promise<MemoryRouteBreadcrumb[]> {
-    const parts = current.path.split('/').filter(Boolean)
-    const paths = parts.map((_, index) => `/${parts.slice(0, index + 1).join('/')}`)
-    const resolved = await Promise.all(paths.map((path) => resolveMemoryBreadcrumb(path, current)))
-    return resolved
-  }
-
-  async function resolveMemoryBreadcrumb(path: string, current: Memory): Promise<MemoryRouteBreadcrumb> {
-    try {
-      const memory = await getMemoryByPath(tenantName.value, path)
-      return { path, label: memory.displayName }
-    } catch (unknownError) {
-      if (!isApiStatus(unknownError, 404)) throw unknownError
-    }
-
-    try {
-      const folderNavigation = await getMemoryNavigation(tenantName.value, path)
-      return { path, label: folderNavigation.location.displayName }
-    } catch (unknownError) {
-      if (isApiStatus(unknownError, 404)) return { path, label: fallbackBreadcrumbLabel(path, current) }
-      throw unknownError
-    }
-  }
-
   return {
     childMemories,
     currentFolderPath,
@@ -278,14 +239,6 @@ export function useMemoryRouteData(
     memoryJournal,
     memoryHeader
   }
-}
-
-function fallbackBreadcrumbLabel(path: string, current: Memory): string {
-  if (path === current.path) return current.displayName
-  const segment = path.split('/').filter(Boolean).at(-1) || path
-  if (segment.startsWith('@')) return segment
-  if (segment.startsWith('~') && current.scope?.type === 'USER') return 'Persönlich'
-  return segment
 }
 
 function newestUpdatedAtCursor(media: MemoryMedia[]): MediaUpdatedCursor | null {

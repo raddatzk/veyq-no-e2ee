@@ -23,7 +23,7 @@ function tenantSummary(
 }
 
 const mocks = vi.hoisted(() => ({
-  getMemoryNavigation: vi.fn(),
+  getMemoryNavigationContext: vi.fn(),
   routerPush: vi.fn(),
   setActiveTenantName: vi.fn(),
   locationAssign: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('../../features/memories/api', () => ({
-  getMemoryNavigation: mocks.getMemoryNavigation
+  getMemoryNavigationContext: mocks.getMemoryNavigationContext
 }))
 
 vi.mock('../../shared/state/useAuthState', () => ({
@@ -77,12 +77,13 @@ describe('TenantSidebar', () => {
     mocks.authState.user.serverRole = 'ServerMember'
     mocks.authState.activeTenantName = ''
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [],
       favoriteMemories: [],
-      folders: []
+      folders: [],
+      memories: []
     })
   })
 
@@ -116,7 +117,7 @@ describe('TenantSidebar', () => {
 
   it('renders favorite memory covers without a favorites add action or star overlay', async () => {
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [],
@@ -154,7 +155,8 @@ describe('TenantSidebar', () => {
           scope: null
         }
       ],
-      folders: []
+      folders: [],
+      memories: []
     })
 
     const wrapper = mountSidebar()
@@ -175,7 +177,7 @@ describe('TenantSidebar', () => {
       tenantSummary(1, 'tenant', 'Tenant', 'tenant.test'),
       tenantSummary(2, 'family', 'Family', 'family.test')
     ]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [
@@ -210,7 +212,8 @@ describe('TenantSidebar', () => {
           scope: null
         }
       ],
-      folders: []
+      folders: [],
+      memories: []
     })
 
     const wrapper = mountSidebar()
@@ -233,7 +236,7 @@ describe('TenantSidebar', () => {
 
   it('keeps scope roots visible while refreshing favorites', async () => {
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
-    mocks.getMemoryNavigation.mockResolvedValueOnce({
+    mocks.getMemoryNavigationContext.mockResolvedValueOnce({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [
@@ -262,7 +265,8 @@ describe('TenantSidebar', () => {
           scope: null
         }
       ],
-      folders: []
+      folders: [],
+      memories: []
     })
     const wrapper = mountSidebar()
     await flushPromises()
@@ -271,7 +275,7 @@ describe('TenantSidebar', () => {
     const refreshPromise = new Promise((resolve) => {
       resolveRefresh = resolve
     })
-    mocks.getMemoryNavigation.mockImplementation(() => refreshPromise)
+    mocks.getMemoryNavigationContext.mockImplementation(() => refreshPromise)
 
     notifyMemoryFavoritesChanged()
     await flushPromises()
@@ -291,7 +295,8 @@ describe('TenantSidebar', () => {
         }
       ],
       favoriteMemories: [],
-      folders: []
+      folders: [],
+      memories: []
     })
     await flushPromises()
 
@@ -303,12 +308,13 @@ describe('TenantSidebar', () => {
     mocks.authState.tenants = [
       tenantSummary(1, 'tenant', 'Tenant', 'tenant.test', '/api/tenants/tenant/logo?v=1')
     ]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [],
       favoriteMemories: [],
-      folders: []
+      folders: [],
+      memories: []
     })
 
     const wrapper = mountSidebar()
@@ -320,12 +326,13 @@ describe('TenantSidebar', () => {
 
   it('keeps tenant initials as fallback without a logo', async () => {
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [],
       favoriteMemories: [],
-      folders: []
+      folders: [],
+      memories: []
     })
 
     const wrapper = mountSidebar()
@@ -336,12 +343,13 @@ describe('TenantSidebar', () => {
 
   it('emits create group without navigating away from the current page', async () => {
     mocks.authState.tenants = [tenantSummary(1, 'tenant', 'Tenant', 'tenant.test')]
-    mocks.getMemoryNavigation.mockResolvedValue({
+    mocks.getMemoryNavigationContext.mockResolvedValue({
       location: { kind: 'TENANT', path: '/', displayName: 'Tenant' },
       breadcrumbs: [],
       scopeRoots: [],
       favoriteMemories: [],
-      folders: []
+      folders: [],
+      memories: []
     })
 
     const wrapper = mountSidebar()

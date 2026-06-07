@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MemoryFolderOverview from './MemoryFolderOverview.vue'
 import { deleteFolder } from '../api'
-import type { MemoryNavigationResponse } from '../api'
+import type { MemoryNavigationContextResponse } from '../api'
 
 vi.mock('../api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api')>()
@@ -69,7 +69,7 @@ function mountOverview() {
   })
 }
 
-function navigation(): MemoryNavigationResponse {
+function navigation(): MemoryNavigationContextResponse {
   return {
     location: {
       kind: 'FOLDER',
@@ -81,7 +81,7 @@ function navigation(): MemoryNavigationResponse {
     folders: [],
     memories: [],
     favoriteMemories: []
-  } as MemoryNavigationResponse
+  } as MemoryNavigationContextResponse
 }
 
 function primeStubs() {

@@ -20,7 +20,7 @@ describe('path utilities', () => {
   })
 
   it('encodes api paths and path queries', () => {
-    expect(tenantApiPath('my tenant', 'memory-navigation', '?path=%2F')).toBe('/api/my%20tenant/memory-navigation?path=%2F')
+    expect(tenantApiPath('my tenant', 'memory-navigation-context', '?path=%2F')).toBe('/api/my%20tenant/memory-navigation-context?path=%2F')
     expect(pathQuery('/@family/trip')).toBe('path=%2F%40family%2Ftrip')
   })
 

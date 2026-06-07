@@ -5,7 +5,6 @@ apis/FrontendApi.ts
 apis/GroupsApi.ts
 apis/MemoriesApi.ts
 apis/MemoryMediaApi.ts
-apis/MemoryNavigationApi.ts
 apis/MemoryParticipantsApi.ts
 apis/MemoryPlaylistsApi.ts
 apis/MemorySharesApi.ts
@@ -84,9 +83,9 @@ models/MemoryMediaSummary.ts
 models/MemoryMediaUpdatesResponse.ts
 models/MemoryMediaUploadSession.ts
 models/MemoryNavigationBreadcrumb.ts
+models/MemoryNavigationContextResponse.ts
 models/MemoryNavigationKind.ts
 models/MemoryNavigationLocation.ts
-models/MemoryNavigationResponse.ts
 models/MemoryParticipantSummary.ts
 models/MemoryPlaylistProvider.ts
 models/MemoryPlaylistSummary.ts

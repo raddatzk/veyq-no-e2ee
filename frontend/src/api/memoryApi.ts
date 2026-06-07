@@ -3,7 +3,6 @@ import {
   generatedCall,
   memoriesApi,
   memoryMediaApi,
-  memoryNavigationApi,
   memoryParticipantsApi,
   memoryPlaylistsApi,
   memorySharesApi,
@@ -50,7 +49,7 @@ import type {
   MemoryMedia,
   MemoryMediaBucket,
   MemoryMediaUpdatesResponse,
-  MemoryNavigationResponse,
+  MemoryNavigationContextResponse,
   MemoryPlaylist,
   MemoryTrack,
   SearchResultSummary,
@@ -82,16 +81,16 @@ import {
   normalizePublicShareMemoryHeader
 } from '../features/memories/api/memoryMappers'
 
-export function getMemoryNavigation(
+export function getMemoryNavigationContext(
   tenantName: string,
   path: string
-): Promise<MemoryNavigationResponse> {
-  return generatedCall(memoryNavigationApi.getMemoryNavigation({ tenantName, path })).then(
-    (navigation) => ({
-      ...navigation,
-      favoriteMemories: navigation.favoriteMemories.map(normalizeMemory)
-    })
-  )
+): Promise<MemoryNavigationContextResponse> {
+  return generatedCall(memoriesApi.getMemoryNavigationContext({ tenantName, path })).then((navigationContext) => ({
+    ...navigationContext,
+    favoriteMemories: navigationContext.favoriteMemories.map(normalizeMemory),
+    memory: navigationContext.memory ? normalizeMemory(navigationContext.memory) : undefined,
+    memories: navigationContext.memories.map(normalizeMemory)
+  }))
 }
 
 export function searchTenant(
@@ -121,12 +120,6 @@ export function deleteFolder(tenantName: string, path: string): Promise<void> {
 export function listMemories(tenantName: string): Promise<Memory[]> {
   return generatedCall(memoriesApi.listMemories({ tenantName })).then((memories) =>
     memories.map(normalizeMemory)
-  )
-}
-
-export function listMemoriesByFolder(tenantName: string, folderPath: string): Promise<Memory[]> {
-  return generatedCall(memoriesApi.listMemoriesByFolder({ tenantName, folderPath })).then(
-    (memories) => memories.map(normalizeMemory)
   )
 }
 

@@ -34,6 +34,7 @@ import com.veyq.api.generated.model.CreateMemoryMediaUploadRequest
 import com.veyq.api.generated.model.CreateMemoryPlaylistRequest
 import com.veyq.api.generated.model.CreateMemoryRequest as ApiCreateMemoryRequest
 import com.veyq.api.generated.model.DeleteMemoryMediaBatchRequest
+import com.veyq.api.generated.model.MemoryNavigationKind
 import com.veyq.api.generated.model.MemoryScopeRequest
 import com.veyq.api.generated.model.MoveMemoryRequest
 import com.veyq.api.generated.model.MoveMemoryTarget
@@ -89,7 +90,7 @@ class MemoryServiceTest {
     @Inject lateinit var transaction: UserTransaction
     @Inject lateinit var entityManager: EntityManager
     @Inject lateinit var memoryService: MemoryService
-    @Inject lateinit var memoryNavigationService: MemoryNavigationService
+    @Inject lateinit var memoryNavigationContextService: MemoryNavigationContextService
     @Inject lateinit var memoryJournalService: MemoryJournalService
     @Inject lateinit var searchService: SearchService
     @Inject lateinit var memoryPlaylistService: MemoryPlaylistService
@@ -294,25 +295,25 @@ class MemoryServiceTest {
         Thread.sleep(5)
         assertThat(memoryService.favoriteMemory(day.id).favorite).isTrue()
 
-        val navigation = memoryNavigationService.navigation("/")
+        val navigation = memoryNavigationContextService.navigationContext("/")
         assertThat(navigation.favoriteMemories).extracting("id").containsExactly(day.id, trip.id)
         assertThat(memoryService.getMemory(trip.id).favorite).isTrue()
         assertThat(memoryService.getMemoryHeader(trip.id).favorite).isTrue()
 
         useContext(otherUser, tenant)
         assertThat(memoryService.getMemory(trip.id).favorite).isFalse()
-        assertThat(memoryNavigationService.navigation("/").favoriteMemories).isEmpty()
+        assertThat(memoryNavigationContextService.navigationContext("/").favoriteMemories).isEmpty()
 
         assertThat(memoryService.favoriteMemory(trip.id).favorite).isTrue()
-        assertThat(memoryNavigationService.navigation("/").favoriteMemories).extracting("id").containsExactly(trip.id)
+        assertThat(memoryNavigationContextService.navigationContext("/").favoriteMemories).extracting("id").containsExactly(trip.id)
 
         assertThat(memoryService.unfavoriteMemory(trip.id).favorite).isFalse()
         assertThat(memoryService.unfavoriteMemory(trip.id).favorite).isFalse()
-        assertThat(memoryNavigationService.navigation("/").favoriteMemories).isEmpty()
+        assertThat(memoryNavigationContextService.navigationContext("/").favoriteMemories).isEmpty()
 
         useContext(owner, tenant)
         assertThat(memoryService.getMemory(trip.id).favorite).isTrue()
-        assertThat(memoryNavigationService.navigation("/").favoriteMemories).extracting("id").containsExactly(day.id, trip.id)
+        assertThat(memoryNavigationContextService.navigationContext("/").favoriteMemories).extracting("id").containsExactly(day.id, trip.id)
     }
 
     @Test
@@ -1105,6 +1106,25 @@ class MemoryServiceTest {
             .containsExactly("/travel/italy/dolomites")
         assertThat(memoryService.getMemoryByPath("/travel/italy/dolomites").id).isEqualTo(trip.id)
         assertThat(memoryService.getMemoryByPath("/travel/italy/dolomites/day-one").id).isEqualTo(day.id)
+    }
+
+    @Test
+    fun `navigation context resolves memory paths and parent memory breadcrumbs`() {
+        folderService.createFolder(CreateFolderRequest("travel", "Travel"))
+        val trip = memoryService.createMemory(CreateMemoryRequest("dolomites", "Dolomites", folderPath = "/travel"))
+        val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
+
+        val navigation = memoryNavigationContextService.navigationContext("/travel/dolomites/day-one")
+
+        assertThat(navigation.location.kind).isEqualTo(MemoryNavigationKind.MEMORY)
+        assertThat(navigation.location.path).isEqualTo("/travel/dolomites/day-one")
+        assertThat(navigation.memory?.id).isEqualTo(day.id)
+        assertThat(navigation.folders).isEmpty()
+        assertThat(navigation.memories).isEmpty()
+        assertThat(navigation.breadcrumbs).extracting("kind")
+            .containsExactly(MemoryNavigationKind.FOLDER, MemoryNavigationKind.MEMORY, MemoryNavigationKind.MEMORY)
+        assertThat(navigation.breadcrumbs).extracting("path")
+            .containsExactly("/travel", "/travel/dolomites", "/travel/dolomites/day-one")
     }
 
     @Test

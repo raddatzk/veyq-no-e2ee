@@ -20,6 +20,7 @@ import type {
   MemoryHeaderSummary,
   MemoryJournalLiveSession,
   MemoryJournalSummary,
+  MemoryNavigationContextResponse,
   MemorySummary,
   MoveMemoryRequest,
   UpdateMemoryJournalRequest,
@@ -36,6 +37,8 @@ import {
     MemoryJournalLiveSessionToJSON,
     MemoryJournalSummaryFromJSON,
     MemoryJournalSummaryToJSON,
+    MemoryNavigationContextResponseFromJSON,
+    MemoryNavigationContextResponseToJSON,
     MemorySummaryFromJSON,
     MemorySummaryToJSON,
     MoveMemoryRequestFromJSON,
@@ -86,6 +89,11 @@ export interface GetMemoryJournalRequest {
     memoryId: string;
 }
 
+export interface GetMemoryNavigationContextRequest {
+    tenantName: string;
+    path?: string;
+}
+
 export interface ListChildMemoriesRequest {
     tenantName: string;
     memoryId: string;
@@ -93,11 +101,6 @@ export interface ListChildMemoriesRequest {
 
 export interface ListMemoriesRequest {
     tenantName: string;
-}
-
-export interface ListMemoriesByFolderRequest {
-    tenantName: string;
-    folderPath?: string;
 }
 
 export interface MemoryCoverContentRequest {
@@ -360,6 +363,32 @@ export interface MemoriesApiInterface {
     getMemoryJournal(requestParameters: GetMemoryJournalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryJournalSummary>;
 
     /**
+     * Creates request options for getMemoryNavigationContext without sending the request
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [path] Organizational navigation path. Empty or omitted loads the tenant root.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryNavigationContextRequestOpts(requestParameters: GetMemoryNavigationContextRequest): Promise<runtime.RequestOpts>;
+
+    /**
+     * Resolves the addressed path to either a navigation container or a Memory and returns the context needed to render that route. Container contexts include child folders and top-level Memories. Memory contexts include the resolved Memory and breadcrumb chain. Scope roots and favorite Memories are populated for the tenant root and otherwise returned as empty arrays.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Load Memory navigation context for a tenant path
+     * @param {string} tenantName Permalink tenant name from the URL.
+     * @param {string} [path] Organizational navigation path. Empty or omitted loads the tenant root.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof MemoriesApiInterface
+     */
+    getMemoryNavigationContextRaw(requestParameters: GetMemoryNavigationContextRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryNavigationContextResponse>>;
+
+    /**
+     * Resolves the addressed path to either a navigation container or a Memory and returns the context needed to render that route. Container contexts include child folders and top-level Memories. Memory contexts include the resolved Memory and breadcrumb chain. Scope roots and favorite Memories are populated for the tenant root and otherwise returned as empty arrays.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Load Memory navigation context for a tenant path
+     */
+    getMemoryNavigationContext(requestParameters: GetMemoryNavigationContextRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryNavigationContextResponse>;
+
+    /**
      * Creates request options for listChildMemories without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -408,32 +437,6 @@ export interface MemoriesApiInterface {
      * List root memories
      */
     listMemories(requestParameters: ListMemoriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
-
-    /**
-     * Creates request options for listMemoriesByFolder without sending the request
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} [folderPath] Organizational folder path. Empty or omitted addresses the tenant root.
-     * @throws {RequiredError}
-     * @memberof MemoriesApiInterface
-     */
-    listMemoriesByFolderRequestOpts(requestParameters: ListMemoriesByFolderRequest): Promise<runtime.RequestOpts>;
-
-    /**
-     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * @summary List memories in a folder path
-     * @param {string} tenantName Permalink tenant name from the URL.
-     * @param {string} [folderPath] Organizational folder path. Empty or omitted addresses the tenant root.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof MemoriesApiInterface
-     */
-    listMemoriesByFolderRaw(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemorySummary>>>;
-
-    /**
-     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * List memories in a folder path
-     */
-    listMemoriesByFolder(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
 
     /**
      * Creates request options for memoryCoverContent without sending the request
@@ -1087,6 +1090,57 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
+     * Creates request options for getMemoryNavigationContext without sending the request
+     */
+    async getMemoryNavigationContextRequestOpts(requestParameters: GetMemoryNavigationContextRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['tenantName'] == null) {
+            throw new runtime.RequiredError(
+                'tenantName',
+                'Required parameter "tenantName" was null or undefined when calling getMemoryNavigationContext().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['path'] != null) {
+            queryParameters['path'] = requestParameters['path'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/{tenantName}/memory-navigation-context`;
+        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Resolves the addressed path to either a navigation container or a Memory and returns the context needed to render that route. Container contexts include child folders and top-level Memories. Memory contexts include the resolved Memory and breadcrumb chain. Scope roots and favorite Memories are populated for the tenant root and otherwise returned as empty arrays.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Load Memory navigation context for a tenant path
+     */
+    async getMemoryNavigationContextRaw(requestParameters: GetMemoryNavigationContextRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MemoryNavigationContextResponse>> {
+        const requestOptions = await this.getMemoryNavigationContextRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MemoryNavigationContextResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Resolves the addressed path to either a navigation container or a Memory and returns the context needed to render that route. Container contexts include child folders and top-level Memories. Memory contexts include the resolved Memory and breadcrumb chain. Scope roots and favorite Memories are populated for the tenant root and otherwise returned as empty arrays.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Load Memory navigation context for a tenant path
+     */
+    async getMemoryNavigationContext(requestParameters: GetMemoryNavigationContextRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MemoryNavigationContextResponse> {
+        const response = await this.getMemoryNavigationContextRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Creates request options for listChildMemories without sending the request
      */
     async listChildMemoriesRequestOpts(requestParameters: ListChildMemoriesRequest): Promise<runtime.RequestOpts> {
@@ -1185,57 +1239,6 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
      */
     async listMemories(requestParameters: ListMemoriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>> {
         const response = await this.listMemoriesRaw(requestParameters, initOverrides);
-        return await response.value();
-    }
-
-    /**
-     * Creates request options for listMemoriesByFolder without sending the request
-     */
-    async listMemoriesByFolderRequestOpts(requestParameters: ListMemoriesByFolderRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['tenantName'] == null) {
-            throw new runtime.RequiredError(
-                'tenantName',
-                'Required parameter "tenantName" was null or undefined when calling listMemoriesByFolder().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        if (requestParameters['folderPath'] != null) {
-            queryParameters['folderPath'] = requestParameters['folderPath'];
-        }
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/{tenantName}/memories/by-folder`;
-        urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
-     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * List memories in a folder path
-     */
-    async listMemoriesByFolderRaw(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<MemorySummary>>> {
-        const requestOptions = await this.listMemoriesByFolderRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(MemorySummaryFromJSON));
-    }
-
-    /**
-     * Lists top-level Memories that live in the addressed organizational folder path. This is the path-based UI listing used alongside folders.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * List memories in a folder path
-     */
-    async listMemoriesByFolder(requestParameters: ListMemoriesByFolderRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>> {
-        const response = await this.listMemoriesByFolderRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

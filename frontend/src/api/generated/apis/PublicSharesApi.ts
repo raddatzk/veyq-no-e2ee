@@ -1613,8 +1613,8 @@ export interface PublicSharesApiInterface {
     updatePublicShareMediaHighlightRequestOpts(requestParameters: UpdatePublicShareMediaHighlightRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Highlights a media.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
-     * @summary Highlight a media
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * @summary Set public share media highlight status
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
      * @param {string} mediaId Public media id.
@@ -1626,8 +1626,8 @@ export interface PublicSharesApiInterface {
     updatePublicShareMediaHighlightRaw(requestParameters: UpdatePublicShareMediaHighlightRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>>;
 
     /**
-     * Highlights a media.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
-     * Highlight a media
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Set public share media highlight status
      */
     updatePublicShareMediaHighlight(requestParameters: UpdatePublicShareMediaHighlightRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary>;
 
@@ -4548,8 +4548,8 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Highlights a media.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
-     * Highlight a media
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Set public share media highlight status
      */
     async updatePublicShareMediaHighlightRaw(requestParameters: UpdatePublicShareMediaHighlightRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PublicShareMediaSummary>> {
         const requestOptions = await this.updatePublicShareMediaHighlightRequestOpts(requestParameters);
@@ -4559,8 +4559,8 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Highlights a media.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
-     * Highlight a media
+     * Sets whether a media item is marked as a Highlight.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Set public share media highlight status
      */
     async updatePublicShareMediaHighlight(requestParameters: UpdatePublicShareMediaHighlightRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PublicShareMediaSummary> {
         const response = await this.updatePublicShareMediaHighlightRaw(requestParameters, initOverrides);

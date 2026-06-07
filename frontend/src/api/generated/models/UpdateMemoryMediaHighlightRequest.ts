@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface UpdateMemoryMediaHighlightRequest {
     /**
-     * Flag a media as a highlight
+     * Whether the media item is marked as a Highlight.
      * @type {boolean}
      * @memberof UpdateMemoryMediaHighlightRequest
      */

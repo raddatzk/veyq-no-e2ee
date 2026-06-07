@@ -1522,7 +1522,7 @@ paths:
     patch:
       tags: [PublicShares]
       operationId: updatePublicShareMediaHighlight
-      summary: Highlight a media
+      summary: Set public share media highlight status
       security: []
       x-implementation-status: implemented
       x-preconditions:
@@ -1530,7 +1530,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Highlights a media.
+        Sets whether a media item is marked as a Highlight.
 
         Vorbedingungen:
         - The share role is `CONTRIBUTOR` or `MANAGER`.

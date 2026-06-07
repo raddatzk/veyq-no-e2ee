@@ -6,7 +6,6 @@ export * from './FrontendApi';
 export * from './GroupsApi';
 export * from './MemoriesApi';
 export * from './MemoryMediaApi';
-export * from './MemoryNavigationApi';
 export * from './MemoryParticipantsApi';
 export * from './MemoryPlaylistsApi';
 export * from './MemorySharesApi';

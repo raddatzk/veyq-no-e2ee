@@ -21,7 +21,8 @@ export const MemoryNavigationKind = {
     Tenant: 'TENANT',
     Group: 'GROUP',
     User: 'USER',
-    Folder: 'FOLDER'
+    Folder: 'FOLDER',
+    Memory: 'MEMORY'
 } as const;
 export type MemoryNavigationKind = typeof MemoryNavigationKind[keyof typeof MemoryNavigationKind];
 
