@@ -11,6 +11,7 @@ const leafletMock = vi.hoisted(() => ({
   markerOn: vi.fn(),
   divIcon: vi.fn(),
   polyline: vi.fn(),
+  setView: vi.fn(),
   tileLayer: vi.fn()
 }))
 
@@ -32,7 +33,8 @@ vi.mock('leaflet', () => ({
         }),
         off: vi.fn(),
         on: vi.fn(),
-        remove: vi.fn()
+        remove: vi.fn(),
+        setView: leafletMock.setView
       }
     }),
     divIcon: vi.fn((options: object) => {
@@ -82,6 +84,7 @@ describe('TrackMap', () => {
     leafletMock.markerOn.mockClear()
     leafletMock.divIcon.mockClear()
     leafletMock.polyline.mockClear()
+    leafletMock.setView.mockClear()
     leafletMock.tileLayer.mockClear()
   })
 
@@ -168,6 +171,23 @@ describe('TrackMap', () => {
       }),
       expect.objectContaining({ maxZoom: 15 })
     )
+  })
+
+  it('renders geotagged memory photos without GPX tracks', async () => {
+    mountTrackMap({
+      track: undefined,
+      tracks: [],
+      media: [media()]
+    })
+    await flushPromises()
+
+    expect(leafletMock.map).toHaveBeenCalled()
+    expect(leafletMock.polyline).not.toHaveBeenCalled()
+    expect(leafletMock.marker).toHaveBeenCalledWith(
+      [52.515, 13.4],
+      expect.objectContaining({ title: 'Checkpoint' })
+    )
+    expect(leafletMock.setView).toHaveBeenCalledWith([52.515, 13.4], 13)
   })
 
   it('groups nearby memory photos as clickable map markers', async () => {

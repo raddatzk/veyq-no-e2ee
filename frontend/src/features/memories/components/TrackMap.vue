@@ -43,11 +43,21 @@ const trackPositions = computed(() =>
     positions: track.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number])
   }))
 )
-const allPositions = computed<[number, number][]>(() =>
-  trackPositions.value.flatMap((track) => track.positions)
-)
 const geotaggedMedia = computed(() =>
   (props.media ?? []).filter((media) => media.gpsLatitude !== null && media.gpsLongitude !== null)
+)
+const mediaPositions = computed<[number, number][]>(() =>
+  geotaggedMedia.value.map((media) => [media.gpsLatitude!, media.gpsLongitude!])
+)
+const allPositions = computed<[number, number][]>(() =>
+  [...trackPositions.value.flatMap((track) => track.positions), ...mediaPositions.value]
+)
+const hasMapContent = computed(() => allPositions.value.length > 0)
+const mapAriaLabel = computed(() =>
+  [
+    ...activeTracks.value.map((track) => track.title),
+    ...geotaggedMedia.value.map((media) => media.title || media.id)
+  ].join(', ')
 )
 const mapSignature = computed(
   () =>
@@ -83,7 +93,7 @@ onBeforeUnmount(() => {
 async function renderMap() {
   await nextTick()
 
-  if (!mapElement.value || allPositions.value.length < 2) {
+  if (!mapElement.value || !hasMapContent.value) {
     destroyMap()
     return
   }
@@ -103,7 +113,7 @@ async function renderMap() {
   syncTileLayer()
   syncRouteLayer()
   syncMediaMarkers()
-  fitTrackBounds()
+  fitMapBounds()
   map.invalidateSize()
 }
 
@@ -189,8 +199,12 @@ function buildMarkerGroups(): MapMarkerGroup[] {
   }))
 }
 
-function fitTrackBounds() {
-  if (!map || allPositions.value.length < 2) return
+function fitMapBounds() {
+  if (!map || allPositions.value.length === 0) return
+  if (allPositions.value.length === 1) {
+    map.setView(allPositions.value[0], 13)
+    return
+  }
   const bounds = L.latLngBounds(allPositions.value)
   map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 })
 }
@@ -246,7 +260,7 @@ function attachResizeObserver(element: HTMLElement) {
 
   resizeObserver = createRafResizeObserver(() => {
     map?.invalidateSize()
-    fitTrackBounds()
+    fitMapBounds()
   })
   resizeObserver?.observe(element)
 }
@@ -257,7 +271,7 @@ function allowOsmTiles() {
 }
 
 function resetMapView() {
-  fitTrackBounds()
+  fitMapBounds()
 }
 </script>
 
@@ -267,7 +281,7 @@ function resetMapView() {
     class="track-map"
     :class="{ 'track-map-without-tiles': !tileUrl }"
     role="img"
-    :aria-label="activeTracks.map((track) => track.title).join(', ')"
+    :aria-label="mapAriaLabel"
   >
     <button type="button" class="track-map-reset" @click="resetMapView">
       {{ $t('map.resetView') }}
