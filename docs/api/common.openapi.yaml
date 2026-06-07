@@ -247,6 +247,8 @@ components:
       x-normalization:
         - trim
         - lowercase
+      x-field-extra-annotation:
+        - '@field:com.veyq.api.common.validation.Name'
 
     EmailAddress:
       type: string
@@ -273,7 +275,7 @@ components:
     Name:
       type: string
       x-field-extra-annotation:
-        - '@field:com.veyq.api.common.validation.Normalize'
+        - '@field:com.veyq.api.common.validation.Name'
 
     ErrorResponse:
       type: object
