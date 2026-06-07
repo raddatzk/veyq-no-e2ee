@@ -87,19 +87,27 @@ private struct UploadQueueRow: View {
             ProgressView(value: item.progress)
                 .tint(progressTint)
 
-            HStack {
-                Button("Retry") {
-                    store.retryUpload(item)
+            if item.state == .failed || item.state.isActive {
+                HStack {
+                    if item.state == .failed {
+                        Button("Retry") {
+                            store.retryUpload(item)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!item.retryable)
+                        .accessibilityIdentifier("upload-retry-\(item.id)")
+                    }
+
+                    if item.state.isActive {
+                        Button("Cancel") {
+                            store.cancelUpload(item)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("upload-cancel-\(item.id)")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .disabled(item.state != .failed || !item.retryable)
-                Button("Cancel") {
-                    store.cancelUpload(item)
-                }
-                .buttonStyle(.bordered)
-                .disabled(!(item.state == .queued || item.state == .uploading))
+                .font(.caption)
             }
-            .font(.caption)
         }
         .padding(.vertical, 6)
         .listRowBackground(

@@ -162,12 +162,58 @@ struct VeyqAPIClient {
         try await get(path: "frontend/bootstrap")
     }
 
-    func navigation(tenantName: String, path: String = "/") async throws -> MemoryNavigationResponse {
-        try await get(path: "\(tenantName)/memory-navigation", query: ["path": path])
+    func mySettings() async throws -> VeyqUser {
+        try await get(path: "users/me")
     }
 
-    func memoriesByFolder(tenantName: String, folderPath: String = "/") async throws -> [Memory] {
-        try await get(path: "\(tenantName)/memories/by-folder", query: ["folderPath": folderPath])
+    func updateMySettings(displayName: String, permalink: String, email: String) async throws -> VeyqUser {
+        try await put(
+            path: "users/me",
+            body: UpdateUserSettingsRequest(displayName: displayName, permalink: permalink, email: email)
+        )
+    }
+
+    func memoryNavigationContext(tenantName: String, path: String = "/") async throws -> MemoryNavigationContextResponse {
+        try await get(path: "\(tenantName)/memory-navigation-context", query: ["path": path])
+    }
+
+    func searchTenant(tenantName: String, query: String, limit: Int = 20) async throws -> [SearchResultSummary] {
+        try await get(path: "\(tenantName)/search", query: ["q": query, "limit": String(limit)])
+    }
+
+    func createFolder(tenantName: String, request: CreateFolderRequest) async throws -> MemoryFolder {
+        try await post(path: "\(tenantName)/folders", body: request)
+    }
+
+    func createGroup(tenantName: String, request: CreateGroupRequest) async throws -> GroupSummary {
+        try await post(path: "\(tenantName)/groups", body: request)
+    }
+
+    func createMemory(tenantName: String, request: CreateMemoryRequest) async throws -> Memory {
+        try await post(path: "\(tenantName)/memories", body: request)
+    }
+
+    func updateMemory(tenantName: String, memoryId: String, request: UpdateMemoryRequest) async throws -> Memory {
+        try await put(path: "\(tenantName)/memories/\(memoryId)", body: request)
+    }
+
+    func deleteMemory(tenantName: String, memoryId: String) async throws {
+        try await delete(path: "\(tenantName)/memories/\(memoryId)")
+    }
+
+    func setMemoryCoverFromMedia(tenantName: String, memoryId: String, mediaId: String, crop: CoverCrop) async throws -> Memory {
+        let boundary = "veyq-ios-\(UUID().uuidString)"
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath("\(tenantName)/memories/\(memoryId)/cover"))
+        request.httpMethod = "PUT"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = multipartCoverBody(boundary: boundary, mediaId: mediaId, crop: crop)
+        return try await send(request)
+    }
+
+    func removeMemoryCover(tenantName: String, memoryId: String) async throws -> Memory {
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath("\(tenantName)/memories/\(memoryId)/cover"))
+        request.httpMethod = "DELETE"
+        return try await send(request)
     }
 
     func memoryHeader(tenantName: String, memoryId: String) async throws -> MemoryHeader {
@@ -178,12 +224,76 @@ struct VeyqAPIClient {
         try await get(path: "\(tenantName)/memories/\(memoryId)/journal")
     }
 
+    func updateMemoryJournal(tenantName: String, memoryId: String, markdown: String) async throws -> MemoryJournal {
+        try await put(
+            path: "\(tenantName)/memories/\(memoryId)/journal",
+            body: UpdateMemoryJournalRequest(markdown: markdown)
+        )
+    }
+
     func listMemoryChapters(tenantName: String, memoryId: String) async throws -> [Memory] {
         try await get(path: "\(tenantName)/memories/\(memoryId)/children")
     }
 
     func memoryMedia(tenantName: String, memoryId: String, includeChildren: Bool = true) async throws -> [MemoryMedia] {
         try await get(path: "\(tenantName)/memories/\(memoryId)/media", query: ["includeChildren": includeChildren ? "true" : "false"])
+    }
+
+    func memoryTracks(tenantName: String, memoryId: String) async throws -> [MemoryTrack] {
+        try await get(path: "\(tenantName)/memories/\(memoryId)/tracks")
+    }
+
+    func waitForMemoryMediaUpdates(
+        tenantName: String,
+        memoryId: String,
+        includeChildren: Bool = true,
+        afterUpdatedAt: Date? = nil,
+        afterMediaId: String? = nil,
+        knownMediaSetHash: String? = nil,
+        timeoutSeconds: Int = 25
+    ) async throws -> MemoryMediaUpdatesResponse {
+        var query = [
+            "includeChildren": includeChildren ? "true" : "false",
+            "timeoutSeconds": String(timeoutSeconds)
+        ]
+        if let afterUpdatedAt {
+            query["afterUpdatedAt"] = afterUpdatedAt.veyqQueryDate
+        }
+        if let afterMediaId {
+            query["afterMediaId"] = afterMediaId
+        }
+        if let knownMediaSetHash, !knownMediaSetHash.isEmpty {
+            query["knownMediaSetHash"] = knownMediaSetHash
+        }
+        return try await get(path: "\(tenantName)/memories/\(memoryId)/media/updates", query: query)
+    }
+
+    func updateMemoryMediaCapturedAt(
+        tenantName: String,
+        memoryId: String,
+        mediaId: String,
+        capturedAt: Date?
+    ) async throws -> MemoryMedia {
+        try await patch(
+            path: "\(tenantName)/memories/\(memoryId)/media/\(mediaId)/metadata/capturedAt",
+            body: UpdateMemoryMediaCapturedAtRequest(capturedAt: capturedAt)
+        )
+    }
+
+    func updateMemoryMediaHighlight(
+        tenantName: String,
+        memoryId: String,
+        mediaId: String,
+        highlight: Bool
+    ) async throws -> MemoryMedia {
+        try await patch(
+            path: "\(tenantName)/memories/\(memoryId)/media/\(mediaId)/metadata/highlight",
+            body: UpdateMemoryMediaHighlightRequest(highlight: highlight)
+        )
+    }
+
+    func deleteMemoryMedia(tenantName: String, memoryId: String, mediaId: String) async throws {
+        try await delete(path: "\(tenantName)/memories/\(memoryId)/media/\(mediaId)")
     }
 
     func mediaData(from urlString: String) async throws -> Data {
@@ -248,6 +358,26 @@ struct VeyqAPIClient {
     ) async throws {
         var request = URLRequest(url: apiBaseURL.appendingEncodedPath("\(tenantName)/memories/\(memoryId)/media/uploads/\(uploadId)"))
         request.httpMethod = "DELETE"
+        let _: EmptyResponse = try await send(request)
+    }
+
+    func uploadMemoryTrack(
+        tenantName: String,
+        memoryId: String,
+        fileURL: URL,
+        title: String,
+        activityType: String = "HIKING"
+    ) async throws {
+        let boundary = "veyq-ios-\(UUID().uuidString)"
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath("\(tenantName)/memories/\(memoryId)/tracks"))
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try multipartTrackUploadBody(
+            boundary: boundary,
+            fileURL: fileURL,
+            title: title,
+            activityType: activityType
+        )
         let _: EmptyResponse = try await send(request)
     }
 
@@ -435,6 +565,56 @@ struct VeyqAPIClient {
         return try await send(request)
     }
 
+    private func put<T: Decodable, Body: Encodable>(path: String, body: Body) async throws -> T {
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath(path))
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder.veyq.encode(body)
+        return try await send(request)
+    }
+
+    private func patch<T: Decodable, Body: Encodable>(path: String, body: Body) async throws -> T {
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath(path))
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder.veyq.encode(body)
+        return try await send(request)
+    }
+
+    private func delete(path: String) async throws {
+        var request = URLRequest(url: apiBaseURL.appendingEncodedPath(path))
+        request.httpMethod = "DELETE"
+        let _: EmptyResponse = try await send(request)
+    }
+
+    private func multipartTrackUploadBody(
+        boundary: String,
+        fileURL: URL,
+        title: String,
+        activityType: String
+    ) throws -> Data {
+        var body = Data()
+        body.appendMultipartField(name: "title", value: title, boundary: boundary)
+        body.appendMultipartField(name: "activityType", value: activityType, boundary: boundary)
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n")
+        body.appendString("Content-Type: application/gpx+xml\r\n\r\n")
+        body.append(try Data(contentsOf: fileURL))
+        body.appendString("\r\n--\(boundary)--\r\n")
+        return body
+    }
+
+    private func multipartCoverBody(boundary: String, mediaId: String, crop: CoverCrop) -> Data {
+        var body = Data()
+        body.appendMultipartField(name: "mediaId", value: mediaId, boundary: boundary)
+        body.appendMultipartField(name: "cropX", value: String(crop.x), boundary: boundary)
+        body.appendMultipartField(name: "cropY", value: String(crop.y), boundary: boundary)
+        body.appendMultipartField(name: "cropWidth", value: String(crop.width), boundary: boundary)
+        body.appendMultipartField(name: "cropHeight", value: String(crop.height), boundary: boundary)
+        body.appendString("--\(boundary)--\r\n")
+        return body
+    }
+
     private func send<T: Decodable>(_ request: URLRequest) async throws -> T {
         let data = try await sendData(request)
         if T.self == EmptyResponse.self {
@@ -486,6 +666,18 @@ struct VeyqAPIClient {
 struct EmptyRequest: Encodable {}
 struct EmptyResponse: Decodable {}
 
+private extension Data {
+    mutating func appendMultipartField(name: String, value: String, boundary: String) {
+        appendString("--\(boundary)\r\n")
+        appendString("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+        appendString("\(value)\r\n")
+    }
+
+    mutating func appendString(_ value: String) {
+        append(Data(value.utf8))
+    }
+}
+
 protocol NativeSessionStoring {
     func loadActive() throws -> StoredNativeSession?
     func loadAll() throws -> [StoredNativeSession]
@@ -498,7 +690,7 @@ final class KeychainNativeSessionStore: NativeSessionStoring {
     private let service: String
     private let account: String
 
-    init(service: String = "com.veyq.ios.native-session", account: String = "active") {
+    init(service: String = "app.veyq.ios.native-session", account: String = "active") {
         self.service = service
         self.account = account
     }
@@ -699,5 +891,13 @@ extension JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         return encoder
+    }
+}
+
+private extension Date {
+    var veyqQueryDate: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: self)
     }
 }

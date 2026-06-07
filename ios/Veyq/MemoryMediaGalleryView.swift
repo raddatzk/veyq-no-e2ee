@@ -62,12 +62,22 @@ private struct JustifiedMediaGridLayout: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let width = max(0, floor(bounds.width))
         let layout = calculateLayout(width: width, subviews: subviews)
+        var placedSubviewIndices = Set<Int>()
 
         for (index, tile) in layout.tiles.enumerated() where subviews.indices.contains(index) {
+            placedSubviewIndices.insert(index)
             subviews[index].place(
                 at: CGPoint(x: bounds.minX + tile.left, y: bounds.minY + tile.top),
                 anchor: .topLeading,
                 proposal: ProposedViewSize(width: tile.renderedWidth, height: tile.renderedHeight)
+            )
+        }
+
+        for index in subviews.indices where !placedSubviewIndices.contains(index) {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: 0, height: 0)
             )
         }
     }
@@ -99,8 +109,19 @@ private struct MediaTile: View {
     let media: MemoryMedia
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             AuthenticatedMediaImage(urlString: media.preferredTileUrl, contentMode: .fill)
+
+            if media.highlight {
+                Image(systemName: "star.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(VeyqColor.warning)
+                    .frame(width: 30, height: 30)
+                    .background(VeyqColor.mediaBackdrop.opacity(0.72), in: Circle())
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .accessibilityHidden(true)
+            }
 
             if media.isVideo {
                 Image(systemName: "play.fill")
@@ -109,6 +130,8 @@ private struct MediaTile: View {
                     .frame(width: 30, height: 30)
                     .background(VeyqColor.mediaBackdrop.opacity(0.68), in: Circle())
                     .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .accessibilityHidden(true)
             }
         }
         .background(VeyqColor.surface)
@@ -218,25 +241,33 @@ struct AuthenticatedMediaImage: View {
 private struct MemoryMediaViewer: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var store: VeyqStore
-    let media: [MemoryMedia]
     @Binding var selectedIndex: Int
+    @State private var viewerMedia: [MemoryMedia]
     @State private var metadataPresented = false
+    @State private var capturedAtEditorPresented = false
+    @State private var deleteConfirmationPresented = false
     @State private var shareItem: ShareItem?
     @State private var loadingShare = false
+    @State private var savingAction = false
     @State private var errorMessage: String?
     @State private var dismissDragOffset: CGFloat = 0
 
     private let dismissDragThreshold: CGFloat = 120
     private let predictedDismissDragThreshold: CGFloat = 220
 
+    init(media: [MemoryMedia], selectedIndex: Binding<Int>) {
+        _viewerMedia = State(initialValue: media)
+        _selectedIndex = selectedIndex
+    }
+
     private var selectedMedia: MemoryMedia? {
-        media.indices.contains(selectedIndex) ? media[selectedIndex] : nil
+        viewerMedia.indices.contains(selectedIndex) ? viewerMedia[selectedIndex] : nil
     }
 
     var body: some View {
         NavigationStack {
             TabView(selection: $selectedIndex) {
-                ForEach(Array(media.enumerated()), id: \.element.id) { index, item in
+                ForEach(Array(viewerMedia.enumerated()), id: \.element.id) { index, item in
                     MemoryMediaViewerPage(media: item)
                     .tag(index)
                     .accessibilityIdentifier("memory-gallery-viewer-page-\(item.id)")
@@ -252,6 +283,17 @@ private struct MemoryMediaViewer: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        Task { await toggleSelectedHighlight() }
+                    } label: {
+                        Image(systemName: selectedMedia?.highlight == true ? "star.fill" : "star")
+                    }
+                    .foregroundStyle(selectedMedia?.highlight == true ? VeyqColor.warning : VeyqColor.onStrong)
+                    .disabled(selectedMedia == nil || savingAction)
+                    .accessibilityLabel(selectedMedia?.highlight == true ? L10n.string("Remove Highlight") : L10n.string("Mark as Highlight"))
+                    .accessibilityIdentifier("memory-gallery-highlight-button")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         metadataPresented = true
                     } label: {
                         Image(systemName: "info.circle")
@@ -260,6 +302,34 @@ private struct MemoryMediaViewer: View {
                     .disabled(selectedMedia == nil)
                     .accessibilityLabel("Media info")
                     .accessibilityIdentifier("memory-gallery-info-button")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            capturedAtEditorPresented = true
+                        } label: {
+                            Label("Edit Capture Date", systemImage: "calendar.badge.clock")
+                        }
+                        .disabled(selectedMedia == nil || savingAction)
+
+                        Button(role: .destructive) {
+                            deleteConfirmationPresented = true
+                        } label: {
+                            Label("Delete Media", systemImage: "trash")
+                        }
+                        .disabled(selectedMedia == nil || savingAction)
+                    } label: {
+                        if savingAction {
+                            ProgressView()
+                                .tint(VeyqColor.onStrong)
+                        } else {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
+                    .foregroundStyle(VeyqColor.onStrong)
+                    .disabled(selectedMedia == nil || savingAction)
+                    .accessibilityLabel("Media actions")
+                    .accessibilityIdentifier("memory-gallery-actions-button")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -299,8 +369,27 @@ private struct MemoryMediaViewer: View {
                 MemoryMediaMetadataSheet(media: selectedMedia)
             }
         }
+        .sheet(isPresented: $capturedAtEditorPresented) {
+            if let selectedMedia {
+                MemoryMediaCapturedAtEditor(media: selectedMedia) { capturedAt in
+                    try await updateSelectedCapturedAt(capturedAt)
+                }
+            }
+        }
         .sheet(item: $shareItem) { item in
             ActivityView(activityItems: [item.url])
+        }
+        .confirmationDialog(
+            "Delete Media?",
+            isPresented: $deleteConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Media", role: .destructive) {
+                Task { await deleteSelectedMedia() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the selected media item from its Memory.")
         }
         .alert("Media action failed", isPresented: Binding(
             get: { errorMessage != nil },
@@ -339,8 +428,8 @@ private struct MemoryMediaViewer: View {
     }
 
     private var viewerTitle: String {
-        guard media.indices.contains(selectedIndex) else { return L10n.string("Media") }
-        return media[selectedIndex].displayTitle
+        guard viewerMedia.indices.contains(selectedIndex) else { return L10n.string("Media") }
+        return viewerMedia[selectedIndex].displayTitle
     }
 
     @MainActor
@@ -356,6 +445,53 @@ private struct MemoryMediaViewer: View {
             shareItem = ShareItem(url: url)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func updateSelectedCapturedAt(_ capturedAt: Date?) async throws {
+        guard let selectedMedia else { return }
+        savingAction = true
+        defer { savingAction = false }
+        let updated = try await store.updateMediaCapturedAt(selectedMedia, capturedAt: capturedAt)
+        replaceVisibleMedia(updated)
+    }
+
+    @MainActor
+    private func toggleSelectedHighlight() async {
+        guard let selectedMedia else { return }
+        savingAction = true
+        defer { savingAction = false }
+        do {
+            let updated = try await store.updateMediaHighlight(selectedMedia, highlight: !selectedMedia.highlight)
+            replaceVisibleMedia(updated)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func deleteSelectedMedia() async {
+        guard let selectedMedia else { return }
+        savingAction = true
+        defer { savingAction = false }
+        do {
+            try await store.deleteMedia(selectedMedia)
+            viewerMedia.removeAll { $0.id == selectedMedia.id }
+            if viewerMedia.isEmpty {
+                dismiss()
+            } else {
+                selectedIndex = min(selectedIndex, viewerMedia.count - 1)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func replaceVisibleMedia(_ updated: MemoryMedia) {
+        viewerMedia = MemoryMedia.chronologicallySorted(viewerMedia.map { $0.id == updated.id ? updated : $0 })
+        if let nextIndex = viewerMedia.firstIndex(where: { $0.id == updated.id }) {
+            selectedIndex = nextIndex
         }
     }
 }
@@ -600,6 +736,7 @@ private struct MemoryMediaMetadataSheet: View {
             List {
                 Section("Media") {
                     MetadataRow(title: "Title", value: media.displayTitle)
+                    MetadataRow(title: "Highlight", value: media.highlight ? L10n.string("Yes") : L10n.string("No"))
                     MetadataRow(title: "Type", value: media.mimeType)
                     MetadataRow(title: "Size", value: media.formattedSize)
                     if let dimensions = media.formattedDimensions {
@@ -635,6 +772,78 @@ private struct MemoryMediaMetadataSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+private struct MemoryMediaCapturedAtEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let media: MemoryMedia
+    let save: (Date?) async throws -> Void
+
+    @State private var capturedAt: Date
+    @State private var hasCapturedAt: Bool
+    @State private var saving = false
+    @State private var errorMessage: String?
+
+    init(media: MemoryMedia, save: @escaping (Date?) async throws -> Void) {
+        self.media = media
+        self.save = save
+        _capturedAt = State(initialValue: media.capturedAt ?? media.createdAt)
+        _hasCapturedAt = State(initialValue: media.capturedAt != nil)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Capture") {
+                    Toggle("Use Capture Date", isOn: $hasCapturedAt)
+                    DatePicker(
+                        "Date",
+                        selection: $capturedAt,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .disabled(!hasCapturedAt)
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(VeyqColor.danger)
+                    }
+                }
+            }
+            .navigationTitle("Edit Capture Date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(saving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Saving..." : "Save") {
+                        Task { await saveCapturedAt() }
+                    }
+                    .disabled(saving)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    @MainActor
+    private func saveCapturedAt() async {
+        saving = true
+        errorMessage = nil
+        defer { saving = false }
+        do {
+            try await save(hasCapturedAt ? capturedAt : nil)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

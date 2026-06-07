@@ -270,13 +270,79 @@ struct ShareImportTargetSnapshot: Codable, Equatable {
     }
 }
 
+struct SharedVeyqAccount: Identifiable, Codable, Equatable {
+    let id: String
+    let instanceURL: URL
+    let apiBaseURL: URL
+    let userId: Int
+    let displayName: String
+    let email: String
+    let active: Bool
+
+    init(session: StoredNativeSession, active: Bool) {
+        self.id = session.instanceURL.absoluteString
+        self.instanceURL = session.instanceURL
+        self.apiBaseURL = session.apiBaseURL
+        self.userId = session.user.userId
+        self.displayName = session.user.displayName
+        self.email = session.user.email
+        self.active = active
+    }
+}
+
+struct SharedVeyqAccountSnapshot: Codable, Equatable {
+    let accounts: [SharedVeyqAccount]
+    let activeAccountId: String?
+    let updatedAt: Date
+}
+
+enum SharedAccountPersistence {
+    static func save(sessions: [StoredNativeSession], activeInstanceURL: URL?) {
+        let activeId = activeInstanceURL?.absoluteString
+        let accounts = sessions.map { session in
+            SharedVeyqAccount(session: session, active: session.instanceURL.absoluteString == activeId)
+        }
+        save(
+            SharedVeyqAccountSnapshot(
+                accounts: accounts,
+                activeAccountId: activeId,
+                updatedAt: Date()
+            )
+        )
+    }
+
+    static func save(_ snapshot: SharedVeyqAccountSnapshot) {
+        guard let data = try? JSONEncoder.veyq.encode(snapshot) else { return }
+        try? data.write(to: fileURL, options: [.atomic])
+    }
+
+    static func load() -> SharedVeyqAccountSnapshot? {
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return try? JSONDecoder.veyq.decode(SharedVeyqAccountSnapshot.self, from: data)
+    }
+
+    static func clear() {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    private static var fileURL: URL {
+        UploadQueuePersistence.sharedContainerURL().appendingPathComponent("shared-accounts.json")
+    }
+}
+
 enum VeyqUploadFileKind {
     case image
     case video
 }
 
+enum VeyqPendingImportFileKind {
+    case image
+    case video
+    case track
+}
+
 enum UploadQueuePersistence {
-    static let appGroupIdentifier = "group.com.veyq.ios"
+    static let appGroupIdentifier = "group.app.veyq.ios"
 
     static var uploadDirectory: URL {
         let root = sharedContainerURL()
@@ -428,6 +494,10 @@ func mimeType(for filename: String, kind: VeyqUploadFileKind) -> String {
     if lower.hasSuffix(".m4v") { return "video/mp4" }
     if lower.hasSuffix(".mov") { return "video/quicktime" }
     return kind == .image ? "image/jpeg" : "video/quicktime"
+}
+
+func isGPXFilename(_ filename: String) -> Bool {
+    filename.lowercased().hasSuffix(".gpx")
 }
 
 struct CreateMemoryMediaUploadBody: Encodable {

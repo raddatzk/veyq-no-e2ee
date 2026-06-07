@@ -99,7 +99,7 @@ struct AppRootView: View {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let batchId = components.queryItems?.first(where: { $0.name == "batchId" })?.value
         else {
-            store.reportError(L10n.string("Shared media could not be opened."))
+            store.reportError(L10n.string("Shared files could not be opened."))
             return
         }
 
@@ -109,7 +109,7 @@ struct AppRootView: View {
         }
 
         guard let batch = UploadQueuePersistence.loadPendingImportBatch(id: batchId) else {
-            store.reportError(L10n.string("Shared media could not be opened."))
+            store.reportError(L10n.string("Shared files could not be opened."))
             return
         }
 

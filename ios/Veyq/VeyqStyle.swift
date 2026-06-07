@@ -48,10 +48,15 @@ struct VeyqMetadataPill: View {
     var tint: Color = VeyqColor.accent
 
     var body: some View {
-        Label(text, systemImage: symbolName)
+        HStack(spacing: 7) {
+            Image(systemName: symbolName)
+                .imageScale(.medium)
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+        }
             .font(.caption.weight(.semibold))
             .foregroundStyle(tint)
-            .lineLimit(1)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(tint.opacity(0.11), in: Capsule())
