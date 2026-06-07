@@ -323,4 +323,9 @@
 "The permalink is generated from the title and can usually stay unchanged." = "Der Permalink wird aus dem Titel erzeugt und kann meistens unverändert bleiben.";
 "Use chapters for days, places or smaller moments inside this Memory." = "Nutze Kapitel für Tage, Orte oder kleinere Momente innerhalb dieser Memory.";
 "Write a short note to give this Memory context beyond the media." = "Schreibe eine kurze Notiz, damit diese Memory mehr Kontext als nur Medien hat.";
+"No recent Memories yet." = "Noch keine zuletzt verwendeten Memories.";
+"Open a Memory or choose an import target to see it here." = "Öffne eine Memory oder wähle ein Importziel, damit es hier erscheint.";
+"Recent" = "Zuletzt";
+"Recently opened and imported Memories for %@." = "Zuletzt geöffnete und importierte Memories für %@.";
+"Tenant" = "Tenant";
 "Yes" = "Ja";

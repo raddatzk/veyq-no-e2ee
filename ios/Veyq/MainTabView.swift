@@ -23,6 +23,12 @@ struct MainTabView: View {
             .customizationID("app.veyq.ios.scope.tenant")
             .customizationBehavior(.reorderable, for: .tabBar)
 
+            Tab(L10n.string("Recent"), systemImage: "clock", value: RootScopeTab.recent) {
+                recentNavigationView
+            }
+            .customizationID("app.veyq.ios.scope.recent")
+            .customizationBehavior(.reorderable, for: .tabBar)
+
             Tab(L10n.string("Groups"), systemImage: selectedGroupSpace?.symbolName ?? "at", value: RootScopeTab.groups) {
                 rootNavigationView(for: .groups)
             }
@@ -128,6 +134,20 @@ struct MainTabView: View {
             }
         }
         .toolbar(shouldShowRootTabBar(for: tab) ? .visible : .hidden, for: .tabBar)
+    }
+
+    private var recentNavigationView: some View {
+        NavigationStack(path: $memoryPath) {
+            RecentMemoriesView()
+                .toolbar {
+                    topBarToolbar
+                }
+                .navigationDestination(for: Memory.self) { memory in
+                    MemoryDetailView(memory: memory)
+                        .toolbar(.hidden, for: .tabBar)
+                }
+        }
+        .toolbar(memoryPath.isEmpty ? .visible : .hidden, for: .tabBar)
     }
 
     private var navigationContextKey: MemoryNavigationContextKey {
@@ -250,6 +270,9 @@ struct MainTabView: View {
             if let tenantSpace {
                 store.selectSpace(tenantSpace)
             }
+        case .recent:
+            groupsOverviewActive = false
+            store.refreshRecentMemoryTargets()
         case .groups:
             groupsOverviewActive = true
         case .personal:
@@ -360,6 +383,7 @@ private struct RootActionBar: View {
 
 private enum RootScopeTab: Hashable {
     case tenant
+    case recent
     case groups
     case personal
     case activity
@@ -373,6 +397,142 @@ private enum RootScopeTab: Hashable {
         case .tenant, .none:
             self = .tenant
         }
+    }
+}
+
+private struct RecentMemoriesView: View {
+    @EnvironmentObject private var store: VeyqStore
+
+    var body: some View {
+        ZStack {
+            VeyqScreenBackground()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L10n.string("Recent"))
+                            .font(.largeTitle.bold())
+                        Text(L10n.format("Recently opened and imported Memories for %@.", tenantDisplayName))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if store.recentMemoryTargets.isEmpty {
+                        VeyqEmptyState(
+                            symbolName: "clock.badge.questionmark",
+                            title: "No recent Memories yet.",
+                            message: "Open a Memory or choose an import target to see it here.",
+                            tint: VeyqColor.accent
+                        )
+                    } else {
+                        LazyVStack(spacing: 14) {
+                            ForEach(store.recentMemoryTargets) { target in
+                                NavigationLink(value: target.memoryValue) {
+                                    RecentMemoryRow(target: target)
+                                }
+                                .buttonStyle(.plain)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    store.recordRecentTarget(target)
+                                })
+                                .accessibilityIdentifier("recent-memory-\(target.id)")
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .padding(.bottom, VeyqLayout.floatingDockContentPadding)
+            }
+        }
+        .task {
+            store.refreshRecentMemoryTargets()
+        }
+    }
+
+    private var tenantDisplayName: String {
+        let value = store.selectedTenant?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? L10n.string("Tenant") : value
+    }
+}
+
+private struct RecentMemoryRow: View {
+    let target: ShareImportMemoryTarget
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cover
+                .frame(height: 168)
+                .clipShape(RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+                .overlay(alignment: .bottomLeading) {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.52)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+                }
+                .overlay(alignment: .bottomLeading) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(target.title)
+                            .font(.title3.bold())
+                            .foregroundStyle(VeyqColor.onStrong)
+                            .lineLimit(2)
+                            .shadow(radius: 8)
+                        Text(target.dateRange)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(VeyqColor.onStrong.opacity(0.88))
+                            .lineLimit(1)
+                            .shadow(radius: 8)
+                    }
+                    .padding(14)
+                }
+
+            HStack(spacing: 8) {
+                VeyqMetadataPill(symbolName: "photo.on.rectangle", text: L10n.format("%d photos", target.mediaCount ?? 0), tint: VeyqColor.success)
+                VeyqMetadataPill(symbolName: "square.stack.3d.up", text: L10n.format("%d chapters", target.childCount ?? 0), tint: VeyqColor.info)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+        }
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous)
+                .stroke(VeyqColor.hairline)
+        }
+        .shadow(color: VeyqColor.cardShadow, radius: 14, x: 0, y: 8)
+    }
+
+    @ViewBuilder
+    private var cover: some View {
+        if let coverUrl = target.coverUrl, !coverUrl.isEmpty {
+            AuthenticatedMediaImage(urlString: coverUrl, contentMode: .fill)
+                .background(VeyqColor.accent.opacity(0.14))
+        } else {
+            MemoryPlaceholderCoverSurface()
+        }
+    }
+}
+
+private extension ShareImportMemoryTarget {
+    var memoryValue: Memory {
+        Memory(
+            id: id,
+            name: id,
+            displayName: title,
+            path: "",
+            parentId: nil,
+            coverMediaId: nil,
+            coverUrl: coverUrl,
+            coverCrop: nil,
+            startDate: dateRange,
+            endDate: dateRange,
+            mediaCount: mediaCount ?? 0,
+            childCount: childCount ?? 0
+        )
     }
 }
 

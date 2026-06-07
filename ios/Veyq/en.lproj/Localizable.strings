@@ -323,4 +323,9 @@
 "The permalink is generated from the title and can usually stay unchanged." = "The permalink is generated from the title and can usually stay unchanged.";
 "Use chapters for days, places or smaller moments inside this Memory." = "Use chapters for days, places or smaller moments inside this Memory.";
 "Write a short note to give this Memory context beyond the media." = "Write a short note to give this Memory context beyond the media.";
+"No recent Memories yet." = "No recent Memories yet.";
+"Open a Memory or choose an import target to see it here." = "Open a Memory or choose an import target to see it here.";
+"Recent" = "Recent";
+"Recently opened and imported Memories for %@." = "Recently opened and imported Memories for %@.";
+"Tenant" = "Tenant";
 "Yes" = "Yes";

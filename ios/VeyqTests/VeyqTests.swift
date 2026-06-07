@@ -1010,6 +1010,8 @@ final class VeyqTests: XCTestCase {
         XCTAssertNil(target.coverThumbnailFilename)
         XCTAssertNil(target.parentMemoryTitle)
         XCTAssertNil(target.depth)
+        XCTAssertNil(target.mediaCount)
+        XCTAssertNil(target.childCount)
     }
 
     func testShareImportMemoryTargetDecodesChapterMetadata() throws {
@@ -1022,7 +1024,9 @@ final class VeyqTests: XCTestCase {
           "coverUrl": null,
           "coverThumbnailFilename": null,
           "parentMemoryTitle": "Albania 2024",
-          "depth": 1
+          "depth": 1,
+          "mediaCount": 19,
+          "childCount": 0
         }
         """.data(using: .utf8)!
 
@@ -1030,6 +1034,8 @@ final class VeyqTests: XCTestCase {
 
         XCTAssertEqual(target.parentMemoryTitle, "Albania 2024")
         XCTAssertEqual(target.depth, 1)
+        XCTAssertEqual(target.mediaCount, 19)
+        XCTAssertEqual(target.childCount, 0)
     }
 
     func testShareImportTargetsPersistCoverThumbnailFilename() throws {

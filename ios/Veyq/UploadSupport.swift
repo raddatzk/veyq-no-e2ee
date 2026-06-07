@@ -221,6 +221,8 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
     let coverThumbnailFilename: String?
     let parentMemoryTitle: String?
     let depth: Int?
+    let mediaCount: Int?
+    let childCount: Int?
 
     init(
         id: String,
@@ -230,7 +232,9 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         coverUrl: String?,
         coverThumbnailFilename: String?,
         parentMemoryTitle: String? = nil,
-        depth: Int = 0
+        depth: Int = 0,
+        mediaCount: Int? = nil,
+        childCount: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -240,6 +244,8 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         self.coverThumbnailFilename = coverThumbnailFilename
         self.parentMemoryTitle = parentMemoryTitle
         self.depth = depth
+        self.mediaCount = mediaCount
+        self.childCount = childCount
     }
 }
 

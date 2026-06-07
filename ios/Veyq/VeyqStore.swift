@@ -17,6 +17,7 @@ final class VeyqStore: ObservableObject {
     @Published private(set) var searchLoading = false
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var memoryDetails: [String: LoadedMemoryDetail] = [:]
+    @Published private(set) var recentMemoryTargets: [ShareImportMemoryTarget] = []
     @Published private(set) var memoryDetailLoadingIDs: Set<String> = []
     @Published private(set) var memoryDetailMediaErrors: [String: String] = [:]
     @Published private(set) var uploadItems: [UploadQueueItem]
@@ -167,6 +168,7 @@ final class VeyqStore: ObservableObject {
         searchLoading = false
         searchErrorMessage = nil
         memoryDetails = [:]
+        recentMemoryTargets = []
         memoryNavigationCache = [:]
         searchSequence = 0
         memoryNavigationLoading = false
@@ -221,6 +223,7 @@ final class VeyqStore: ObservableObject {
         searchLoading = false
         searchErrorMessage = nil
         memoryDetails = [:]
+        refreshRecentMemoryTargets()
         memoryNavigationCache = [:]
         memoryNavigationLoading = false
         searchSequence = 0
@@ -293,7 +296,9 @@ final class VeyqStore: ObservableObject {
     func openSearchResult(_ result: SearchResultSummary) async -> Memory? {
         switch result.kind {
         case .memory:
-            return result.memory
+            let memory = result.memory
+            recordRecentMemory(memory)
+            return memory
         case .folder:
             await navigateToSearchResultPath(result.path)
             return nil
@@ -952,6 +957,7 @@ final class VeyqStore: ObservableObject {
             errorMessage = L10n.string("No active tenant is selected.")
             return
         }
+        recordRecentMemory(memory)
         enqueuePendingImport(
             batch,
             target: UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
@@ -1073,6 +1079,7 @@ final class VeyqStore: ObservableObject {
         folders = []
         memories = []
         memoryDetails = [:]
+        refreshRecentMemoryTargets()
         try await loadBootstrap(preferredTenantName: session.selectedTenantName)
         runNextUploadIfNeeded()
     }
@@ -1517,17 +1524,63 @@ final class VeyqStore: ObservableObject {
 
     private func persistShareImportTargets(tenantName: String) async {
         let targets = await shareImportTargets(tenantName: tenantName)
+        let previousSnapshot = UploadQueuePersistence.loadShareImportTargets()
+        let previousTargets = previousSnapshot?.targets ?? []
+        let mergedTargets = targets + previousTargets.filter { previous in
+            !targets.contains { $0.id == previous.id }
+        }
         UploadQueuePersistence.removeUnreferencedShareImportCovers(
-            keeping: Set(targets.compactMap(\.coverThumbnailFilename))
+            keeping: Set(mergedTargets.compactMap(\.coverThumbnailFilename))
         )
         UploadQueuePersistence.saveShareImportTargets(
             ShareImportTargetSnapshot(
-                targets: targets,
-                lastUsedMemoryId: nil,
+                targets: mergedTargets,
+                lastUsedMemoryId: previousSnapshot?.lastUsedMemoryId,
                 updatedAt: Date(),
                 includesOnlyKnownChapters: true
             )
         )
+        refreshRecentMemoryTargets()
+    }
+
+    func refreshRecentMemoryTargets() {
+        guard let tenantName = selectedTenant?.name,
+              let snapshot = UploadQueuePersistence.loadShareImportTargets()
+        else {
+            recentMemoryTargets = []
+            return
+        }
+        recentMemoryTargets = snapshot.targets.filter { $0.tenantName == tenantName }
+    }
+
+    func recordRecentMemory(_ memory: Memory) {
+        guard let tenantName = selectedTenant?.name else { return }
+        recordRecentTarget(
+            ShareImportMemoryTarget(
+                id: memory.id,
+                title: memory.title,
+                dateRange: memory.dateRange,
+                tenantName: tenantName,
+                coverUrl: memory.coverUrl,
+                coverThumbnailFilename: nil,
+                mediaCount: memory.mediaCount,
+                childCount: memory.childCount
+            )
+        )
+    }
+
+    func recordRecentTarget(_ target: ShareImportMemoryTarget) {
+        let snapshot = UploadQueuePersistence.loadShareImportTargets()
+        let nextTargets = [target] + (snapshot?.targets ?? []).filter { $0.id != target.id }
+        UploadQueuePersistence.saveShareImportTargets(
+            ShareImportTargetSnapshot(
+                targets: Array(nextTargets.prefix(40)),
+                lastUsedMemoryId: target.id,
+                updatedAt: Date(),
+                includesOnlyKnownChapters: snapshot?.includesOnlyKnownChapters
+            )
+        )
+        refreshRecentMemoryTargets()
     }
 
     func shareImportTargets(tenantName: String) async -> [ShareImportMemoryTarget] {
@@ -1573,7 +1626,9 @@ final class VeyqStore: ObservableObject {
             coverUrl: memory.coverUrl,
             coverThumbnailFilename: thumbnailFilename,
             parentMemoryTitle: parentMemoryTitle,
-            depth: depth
+            depth: depth,
+            mediaCount: memory.mediaCount,
+            childCount: memory.childCount
         )
     }
 
