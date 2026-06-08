@@ -39,11 +39,10 @@ const deleteConfirmation = ref('')
 
 const playlistCountLabel = computed(() => t('playlist.count', { count: props.playlists.length }))
 const supportedProvidersLabel = computed(() => t('playlist.supportedProviders'))
-const canConfirmDelete = computed(
-  () => Boolean(deleteCandidate.value) &&
-    deleteConfirmation.value.trim() === deleteCandidate.value.title.trim() &&
-    !saving.value
-)
+const canConfirmDelete = computed(() => {
+  const candidate = deleteCandidate.value
+  return candidate !== null && deleteConfirmation.value.trim() === candidate.title.trim() && !saving.value
+})
 
 function providerLabel(provider: MemoryPlaylistProvider): string {
   return t(`playlist.provider.${provider}`)

@@ -41,11 +41,10 @@ const deleteConfirmation = ref('')
 const activityOptions = computed(() =>
   ACTIVITY_TYPES.map((value) => ({ label: t(`track.activity.${value}`), value }))
 )
-const canConfirmDelete = computed(
-  () => Boolean(deleteCandidate.value) &&
-    deleteConfirmation.value.trim() === deleteCandidate.value.title.trim() &&
-    !saving.value
-)
+const canConfirmDelete = computed(() => {
+  const candidate = deleteCandidate.value
+  return candidate !== null && deleteConfirmation.value.trim() === candidate.title.trim() && !saving.value
+})
 
 watch(uploadOpen, (open) => {
   if (!open) resetForm()
