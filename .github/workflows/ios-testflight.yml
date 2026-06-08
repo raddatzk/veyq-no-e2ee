@@ -1,12 +1,18 @@
 name: iOS TestFlight
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-testflight.yml"
   workflow_dispatch:
     inputs:
       marketing_version:
-        description: "Major app version for CFBundleShortVersionString."
-        required: true
-        default: "1"
+        description: "Optional full CFBundleShortVersionString override. Defaults to ios/VERSION.<run number>."
+        required: false
+        default: ""
       upload:
         description: "Upload the exported IPA to App Store Connect."
         required: true
@@ -35,7 +41,7 @@ jobs:
       APPLE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_APP_STORE_PROFILE_BASE64 }}
       APPLE_SHARE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_SHARE_APP_STORE_PROFILE_BASE64 }}
       KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
-      MARKETING_VERSION: ${{ inputs.marketing_version }}
+      MARKETING_VERSION_OVERRIDE: ${{ inputs.marketing_version || '' }}
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
       PROJECT_PATH: ios/Veyq.xcodeproj
       SCHEME: Veyq
@@ -44,6 +50,23 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Resolve app version
+        run: |
+          set -euo pipefail
+          app_major="$(tr -d '[:space:]' < ios/VERSION)"
+          if [[ ! "$app_major" =~ ^[0-9]+$ ]]; then
+            echo "ios/VERSION must contain a numeric app major version, got: $app_major" >&2
+            exit 1
+          fi
+          if [[ -n "$MARKETING_VERSION_OVERRIDE" ]]; then
+            marketing_version="$MARKETING_VERSION_OVERRIDE"
+          else
+            marketing_version="${app_major}.${CURRENT_PROJECT_VERSION}"
+          fi
+          echo "MARKETING_VERSION=$marketing_version" >> "$GITHUB_ENV"
+          echo "IOS_ARTIFACT_NAME=veyq-ios-${marketing_version}-${CURRENT_PROJECT_VERSION}" >> "$GITHUB_ENV"
+          printf 'Resolved CFBundleShortVersionString=%s and CFBundleVersion=%s\n' "$marketing_version" "$CURRENT_PROJECT_VERSION"
 
       - name: Select Xcode
         run: |
@@ -215,14 +238,14 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: veyq-ios-${{ inputs.marketing_version }}-${{ github.run_number }}
+          name: ${{ env.IOS_ARTIFACT_NAME }}
           path: |
             ${{ env.EXPORT_PATH }}/*.ipa
             ${{ env.ARCHIVE_PATH }}/dSYMs
           if-no-files-found: error
 
       - name: Upload to App Store Connect
-        if: inputs.upload
+        if: github.event_name != 'workflow_dispatch' || inputs.upload
         run: |
           set -euo pipefail
           ipa="$(find "$EXPORT_PATH" -maxdepth 1 -name '*.ipa' -print -quit)"

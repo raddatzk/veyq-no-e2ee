@@ -164,7 +164,7 @@ The normal image-based Compose file keeps MariaDB available only inside the Comp
 
 ## iOS TestFlight Deployment
 
-The native iOS app is deployed through the `iOS TestFlight` GitHub Actions workflow. The workflow is manual (`workflow_dispatch`) so the first archives can be tested without automatically publishing every push.
+The native iOS app is deployed through the `iOS TestFlight` GitHub Actions workflow. The workflow runs automatically on pushes to `main` that change `ios/**` or the workflow itself, and can also be started manually with `workflow_dispatch`.
 
 Before the first run, configure these Apple Developer identifiers for the `veyq.app` domain:
 
@@ -194,9 +194,9 @@ base64 -i "veyq iOS App Store app.veyq.ios.mobileprovision" | pbcopy
 base64 -i "veyq Share App Store app.veyq.ios.share.mobileprovision" | pbcopy
 ```
 
-The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Set the `upload` input to `true` to upload the IPA to App Store Connect for TestFlight processing.
+The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Automatic runs upload the IPA to App Store Connect for TestFlight processing. Manual runs can set the `upload` input to `false` when an archive should be built without publishing to App Store Connect.
 
-iOS app versions are independent from backend `major.build` versions, but use the same major-plus-build principle. The workflow input `marketing_version` is the app major version used for `CFBundleShortVersionString`, for example `1`. `CURRENT_PROJECT_VERSION` is set from the GitHub Actions run number and becomes the app build number, for example `42`. The visible TestFlight version is therefore app-owned, such as major `1` with build `42`, without coupling it to the backend release version. Increment the app major when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
+iOS app versions are independent from backend `major.build` versions, but use the same major-plus-build principle. The repository root `VERSION` file is only the backend and frontend major source. The iOS app major is stored separately in `ios/VERSION`. Automatic TestFlight runs set `CFBundleShortVersionString` to `ios/VERSION.github_run_number`, for example `1.42`, and set `CFBundleVersion` to the GitHub Actions run number, for example `42`. Manual runs can set `marketing_version` to a full `CFBundleShortVersionString` override. Increment the iOS app major in `ios/VERSION` when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
 
 The copyable App Store Connect source text is maintained in [iOS TestFlight Submission](product/ios-testflight-submission.md).
 
