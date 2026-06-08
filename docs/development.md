@@ -181,6 +181,8 @@ Configure these GitHub environment or repository secrets:
 - `APP_STORE_CONNECT_API_PRIVATE_KEY_BASE64`: Base64-encoded contents of the `AuthKey_*.p8` API key.
 - `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`: Base64-encoded Apple Distribution `.p12` certificate.
 - `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`: Password for the `.p12` certificate.
+- `APPLE_APP_STORE_PROFILE_BASE64`: Base64-encoded App Store provisioning profile for `app.veyq.ios`, named `veyq iOS App Store app.veyq.ios`.
+- `APPLE_SHARE_APP_STORE_PROFILE_BASE64`: Base64-encoded App Store provisioning profile for `app.veyq.ios.share`, named `veyq Share App Store app.veyq.ios.share`.
 - `IOS_BUILD_KEYCHAIN_PASSWORD`: Temporary CI keychain password.
 
 To create the base64 secret values locally:
@@ -188,6 +190,8 @@ To create the base64 secret values locally:
 ```bash
 base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy
 base64 -i AppleDistribution.p12 | pbcopy
+base64 -i "veyq iOS App Store app.veyq.ios.mobileprovision" | pbcopy
+base64 -i "veyq Share App Store app.veyq.ios.share.mobileprovision" | pbcopy
 ```
 
 The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Set the `upload` input to `true` to upload the IPA to App Store Connect for TestFlight processing.

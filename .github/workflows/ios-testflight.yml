@@ -32,6 +32,8 @@ jobs:
       ASC_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY_BASE64 }}
       APPLE_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_BASE64 }}
       APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      APPLE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_APP_STORE_PROFILE_BASE64 }}
+      APPLE_SHARE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_SHARE_APP_STORE_PROFILE_BASE64 }}
       KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
       MARKETING_VERSION: ${{ inputs.marketing_version }}
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
@@ -60,6 +62,8 @@ jobs:
             ASC_PRIVATE_KEY_BASE64 \
             APPLE_DISTRIBUTION_CERTIFICATE_BASE64 \
             APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD \
+            APPLE_APP_STORE_PROFILE_BASE64 \
+            APPLE_SHARE_APP_STORE_PROFILE_BASE64 \
             KEYCHAIN_PASSWORD
           do
             if [[ -z "${!name:-}" ]]; then
@@ -90,6 +94,26 @@ jobs:
             -k "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install App Store provisioning profiles
+        env:
+          APP_PROFILE_PATH: ${{ runner.temp }}/veyq-ios-appstore.mobileprovision
+          SHARE_PROFILE_PATH: ${{ runner.temp }}/veyq-ios-share-appstore.mobileprovision
+        run: |
+          set -euo pipefail
+          profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$profile_dir"
+          printf '%s' "$APPLE_APP_STORE_PROFILE_BASE64" | base64 --decode > "$APP_PROFILE_PATH"
+          printf '%s' "$APPLE_SHARE_APP_STORE_PROFILE_BASE64" | base64 --decode > "$SHARE_PROFILE_PATH"
+
+          for profile in "$APP_PROFILE_PATH" "$SHARE_PROFILE_PATH"; do
+            decoded_plist="${profile}.plist"
+            security cms -D -i "$profile" > "$decoded_plist"
+            uuid="$(/usr/libexec/PlistBuddy -c 'Print UUID' "$decoded_plist")"
+            name="$(/usr/libexec/PlistBuddy -c 'Print Name' "$decoded_plist")"
+            cp "$profile" "$profile_dir/$uuid.mobileprovision"
+            printf 'Installed provisioning profile: %s (%s)\n' "$name" "$uuid"
+          done
 
       - name: Install App Store Connect API key
         env:
@@ -162,9 +186,16 @@ jobs:
             <key>method</key>
             <string>app-store-connect</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
             <key>teamID</key>
             <string>${APPLE_TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>app.veyq.ios</key>
+              <string>veyq iOS App Store app.veyq.ios</string>
+              <key>app.veyq.ios.share</key>
+              <string>veyq Share App Store app.veyq.ios.share</string>
+            </dict>
             <key>stripSwiftSymbols</key>
             <true/>
             <key>uploadSymbols</key>
@@ -179,11 +210,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_PATH" \
-            -exportOptionsPlist build/ios/ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -exportOptionsPlist build/ios/ExportOptions.plist
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
