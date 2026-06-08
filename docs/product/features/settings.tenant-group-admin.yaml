@@ -170,7 +170,13 @@ acceptanceCriteria:
           - testName: allows anonymous tenant registration links
             kind: positive
             ref: frontend/src/router.test.ts
+          - testName: keeps legacy tenant registration paths anonymous
+            kind: positive
+            ref: frontend/src/router.test.ts
           - testName: renders the translated email label on tenant registration links
+            kind: positive
+            ref: frontend/src/views/TenantJoinView.test.ts
+          - testName: still reads tokens from legacy tenant registration paths
             kind: positive
             ref: frontend/src/views/TenantJoinView.test.ts
           - testName: lets new users join with a passkey by default

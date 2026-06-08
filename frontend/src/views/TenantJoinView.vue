@@ -28,7 +28,7 @@ const { locale, t } = useI18n()
 const { authState, setAuthenticated } = useAuthState()
 const { themePreference, setThemePreference } = useThemeState()
 
-const token = computed(() => String(route.params.token || ''))
+const token = computed(() => String(route.hash || route.params.token || '').replace(/^#/, ''))
 const tenantDisplayName = ref('')
 const tenantLogoUrl = ref('')
 const email = ref('')

@@ -289,8 +289,8 @@ class UserManagementResourceTest {
         @Suppress("UNCHECKED_CAST")
         val invite = created["invite"] as Map<String, Any?>
         val token = created["token"] as String
-        assertThat(created["joinUrl"]).isEqualTo("https://${tenant.domain}/join/$token")
-        assertThat(invite["joinUrl"]).isEqualTo("https://${tenant.domain}/join/$token")
+        assertThat(created["joinUrl"]).isEqualTo("https://${tenant.domain}/join#$token")
+        assertThat(invite["joinUrl"]).isEqualTo("https://${tenant.domain}/join#$token")
 
         given()
             .header("Host", tenant.domain)
@@ -298,7 +298,7 @@ class UserManagementResourceTest {
             .`when`().get("/api/tenants/${tenant.name}/registration-invites")
             .then()
             .statusCode(200)
-            .body("invites[0].joinUrl", equalTo("https://${tenant.domain}/join/$token"))
+            .body("invites[0].joinUrl", equalTo("https://${tenant.domain}/join#$token"))
 
         val localCreated = given()
             .contentType("application/json")

@@ -397,14 +397,14 @@ components:
               tenantId: 42
               tenantName: friends
               createdByUserId: 1
-              joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+              joinUrl: https://friends.example.test/join#HrUI1ioJ6P
               expiresAt: "2026-06-15T12:00:00Z"
               revokedAt: null
               maxRegistrations: 100
               registrationCount: 0
               createdAt: "2026-06-01T12:00:00Z"
               status: Active
-            joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+            joinUrl: https://friends.example.test/join#HrUI1ioJ6P
             token: HrUI1ioJ6P
     TenantRegistrationInvites:
       description: Tenant registration invites.
@@ -435,7 +435,7 @@ components:
             tenantId: 42
             tenantName: friends
             createdByUserId: 1
-            joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+            joinUrl: https://friends.example.test/join#HrUI1ioJ6P
             expiresAt: "2026-06-15T12:00:00Z"
             revokedAt: "2026-06-02T12:00:00Z"
             maxRegistrations: 100
@@ -565,6 +565,7 @@ components:
           format: int64
         joinUrl:
           type: string
+          description: Browser join URL with the invite token in the URL fragment.
         expiresAt:
           type: string
           format: date-time
@@ -587,7 +588,7 @@ components:
         tenantId: 42
         tenantName: friends
         createdByUserId: 1
-        joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+        joinUrl: https://friends.example.test/join#HrUI1ioJ6P
         expiresAt: "2026-06-15T12:00:00Z"
         revokedAt: null
         maxRegistrations: 100
@@ -606,6 +607,7 @@ components:
           "$ref": "#/components/schemas/TenantRegistrationInviteSummary"
         joinUrl:
           type: string
+          description: Browser join URL with the invite token in the URL fragment.
         token:
           type: string
       example:
@@ -614,12 +616,12 @@ components:
           tenantId: 42
           tenantName: friends
           createdByUserId: 1
-          joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+          joinUrl: https://friends.example.test/join#HrUI1ioJ6P
           expiresAt: "2026-06-15T12:00:00Z"
           registrationCount: 0
           createdAt: "2026-06-01T12:00:00Z"
           status: Active
-        joinUrl: https://friends.example.test/join/HrUI1ioJ6P
+        joinUrl: https://friends.example.test/join#HrUI1ioJ6P
         token: HrUI1ioJ6P
     TenantRegistrationInvitesResponse:
       type: object

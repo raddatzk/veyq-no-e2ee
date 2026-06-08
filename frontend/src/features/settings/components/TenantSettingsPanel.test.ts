@@ -240,7 +240,7 @@ describe('TenantSettingsPanel', () => {
   it('creates and copies a tenant registration link', async () => {
     createTenantRegistrationInviteMock.mockResolvedValue({
       invite: registrationInvite(12),
-      joinUrl: 'https://friends.test/join/token-123',
+      joinUrl: 'https://friends.test/join#token-123',
       token: 'token-123'
     })
 
@@ -255,7 +255,7 @@ describe('TenantSettingsPanel', () => {
     await flushPromises()
 
     expect(createTenantRegistrationInviteMock).toHaveBeenCalledWith('friends', 30, 100)
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join/token-123')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join#token-123')
     expect(wrapper.text()).toContain('Registrierungslink wurde erstellt und kopiert.')
     expect(wrapper.text()).toContain('Registrierungslink #12')
   })
@@ -271,7 +271,7 @@ describe('TenantSettingsPanel', () => {
     await wrapper.find('button[aria-label="Link kopieren"]').trigger('click')
     await flushPromises()
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join/invite-12')
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://friends.test/join#invite-12')
     expect(wrapper.text()).toContain('Registrierungslink wurde kopiert.')
     await wrapper.find('button[aria-label="Link widerrufen"]').trigger('click')
     await flushPromises()
@@ -515,7 +515,7 @@ function registrationInvite(
     tenantId: 10,
     tenantName: 'friends',
     createdByUserId: 1,
-    joinUrl: `https://friends.test/join/invite-${id}`,
+    joinUrl: `https://friends.test/join#invite-${id}`,
     expiresAt: '2026-06-15T12:00:00Z',
     revokedAt: status === 'Revoked' ? '2026-06-03T12:00:00Z' : undefined,
     maxRegistrations: 100,

@@ -20,9 +20,20 @@ describe('router', () => {
     authState.isAuthenticated = false
     serverState.setupCompleted = true
 
-    await router.push('/join/token-123')
+    await router.push('/join#token-123')
     await router.isReady()
 
     expect(router.currentRoute.value.name).toBe('tenant-join')
+  })
+
+  it('keeps legacy tenant registration paths anonymous', async () => {
+    authState.loading = false
+    authState.isAuthenticated = false
+    serverState.setupCompleted = true
+
+    await router.push('/join/token-123')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('tenant-join-legacy')
   })
 })

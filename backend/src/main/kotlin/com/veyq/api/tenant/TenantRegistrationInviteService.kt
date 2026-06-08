@@ -373,7 +373,7 @@ class TenantRegistrationInviteService @Inject constructor(
         )
 
     private fun TenantRegistrationInvite.joinUrl(): String =
-        "${joinUrlBase(tenant)}/join/$token"
+        "${joinUrlBase(tenant)}/join#$token"
 
     private fun Tenant.inviteLogoUrl(token: String): String? =
         logoUpdatedAt

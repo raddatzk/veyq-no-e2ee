@@ -64,11 +64,12 @@ describe('TenantJoinView', () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
+        { path: '/join', component: TenantJoinView },
         { path: '/join/:token', component: TenantJoinView },
         { path: '/', component: { template: '<div />' } }
       ]
     })
-    await router.push('/join/token-123')
+    await router.push('/join#token-123')
     await router.isReady()
 
     const wrapper = mount(TenantJoinView, { global: { plugins: [router], stubs: viewStubs() } })
@@ -116,11 +117,12 @@ describe('TenantJoinView', () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
+        { path: '/join', component: TenantJoinView },
         { path: '/join/:token', component: TenantJoinView },
         { path: '/', component: { template: '<div />' } }
       ]
     })
-    await router.push('/join/token-123')
+    await router.push('/join#token-123')
     await router.isReady()
 
     const wrapper = mount(TenantJoinView, { global: { plugins: [router], stubs: viewStubs() } })
@@ -146,7 +148,7 @@ describe('TenantJoinView', () => {
     expect(joinTenantRegistrationInviteWithPasskeyMock).toHaveBeenCalledWith('token-123', 'join@example.test', 'Join')
     expect(joinTenantRegistrationInviteMock).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Passkey benennen')
-    expect(router.currentRoute.value.path).toBe('/join/token-123')
+    expect(router.currentRoute.value.fullPath).toBe('/join#token-123')
 
     await wrapper.findAll('input').at(-1)!.setValue('  Private 1Password  ')
     await wrapper.findAll('button').filter((button) => button.text() === 'Speichern').at(-1)!.trigger('click')
@@ -176,11 +178,12 @@ describe('TenantJoinView', () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
+        { path: '/join', component: TenantJoinView },
         { path: '/join/:token', component: TenantJoinView },
         { path: '/', component: { template: '<div />' } }
       ]
     })
-    await router.push('/join/token-123')
+    await router.push('/join#token-123')
     await router.isReady()
 
     const wrapper = mount(TenantJoinView, { global: { plugins: [router], stubs: viewStubs() } })
@@ -202,6 +205,32 @@ describe('TenantJoinView', () => {
     expect(useThemeState().themePreference.value).toBe('dark')
     expect(window.localStorage.getItem('veyq:locale')).toBe('en')
     expect(window.localStorage.getItem('veyq:theme')).toBe('dark')
+  })
+
+  it('still reads tokens from legacy tenant registration paths', async () => {
+    getTenantRegistrationInviteMock.mockResolvedValue({
+      tenantId: 10,
+      tenantName: 'friends',
+      tenantDisplayName: 'Friends',
+      tenantDomain: 'friends.example.test',
+      expiresAt: '2026-06-15T12:00:00Z',
+      requiresLogin: false
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/join', component: TenantJoinView },
+        { path: '/join/:token', component: TenantJoinView },
+        { path: '/', component: { template: '<div />' } }
+      ]
+    })
+    await router.push('/join/token-123')
+    await router.isReady()
+
+    mount(TenantJoinView, { global: { plugins: [router], stubs: viewStubs() } })
+    await flushPromises()
+
+    expect(getTenantRegistrationInviteMock).toHaveBeenCalledWith('token-123')
   })
 })
 

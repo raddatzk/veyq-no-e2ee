@@ -18,7 +18,8 @@ const router = createRouter({
     { path: '/setup', name: 'setup', component: SetupView },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/invite/:userId', name: 'invite', component: InviteView },
-    { path: '/join/:token', name: 'tenant-join', component: TenantJoinView },
+    { path: '/join', name: 'tenant-join', component: TenantJoinView },
+    { path: '/join/:token', name: 'tenant-join-legacy', component: TenantJoinView },
     { path: '/s/:shareId/:pathMatch(.*)*', name: 'public-share', component: PublicShareView },
     { path: '/password/reset/:userId', name: 'password-reset', component: ResetPasswordView },
     { path: '/passkey/reset/:userId', name: 'passkey-reset', component: ResetPasskeyView },
@@ -57,6 +58,7 @@ function visitingAnyPageWithSetupWithoutLogin(to: RouteLocationNormalized) {
     to.name !== 'setup' &&
     to.name !== 'invite' &&
     to.name !== 'tenant-join' &&
+    to.name !== 'tenant-join-legacy' &&
     to.name !== 'public-share' &&
     to.name !== 'password-reset' &&
     to.name !== 'passkey-reset' &&
