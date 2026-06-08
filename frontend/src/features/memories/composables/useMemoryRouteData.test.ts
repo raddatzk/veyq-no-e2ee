@@ -304,16 +304,6 @@ function mediaBucket(overrides: Partial<MemoryMediaBucket> = {}): MemoryMediaBuc
   }
 }
 
-function navigationResponse(path: string, displayName: string): MemoryNavigationContextResponse {
-  return {
-    location: { kind: 'FOLDER' as const, path, displayName },
-    breadcrumbs: [],
-    scopeRoots: [],
-    folders: [],
-    favoriteMemories: [],
-    memories: []
-  }
-}
 
 function memoryContext(
   resolvedMemory: Memory,
