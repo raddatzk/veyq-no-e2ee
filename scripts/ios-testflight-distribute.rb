@@ -102,7 +102,8 @@ end
 def find_processed_build(client, app_id, build_number)
   60.times do |attempt|
     response = client.get(
-      "/apps/#{app_id}/builds",
+      "/builds",
+      "filter[app]" => app_id,
       "filter[version]" => build_number,
       "sort" => "-uploadedDate",
       "limit" => 10
