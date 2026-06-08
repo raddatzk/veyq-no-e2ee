@@ -600,7 +600,7 @@
   transform: none;
 }
 
-.memory-folder-card .pi,
+.memory-folder-card > .pi,
 .memory-scope-card-icon,
 .memory-create-card .pi {
   display: grid;
@@ -701,14 +701,14 @@
   color: var(--app-muted);
 }
 
-.memory-folder-card .pi,
+.memory-folder-card > .pi,
 .memory-scope-card-icon,
 .memory-create-card .pi {
   width: 42px;
   height: 42px;
 }
 
-.memory-folder-card .pi {
+.memory-folder-card > .pi {
   background: var(--app-info-soft);
   color: var(--app-info-text);
 }
@@ -742,22 +742,23 @@
   flex: 0 0 auto;
 }
 
-.memory-folder-overview-action.p-button {
-  border-color: var(--app-danger-line);
-  background: transparent;
-  color: var(--app-danger-line);
+.memory-danger-action.p-button,
+.memory-danger-action.p-button.p-button-outlined {
+  border-color: var(--app-danger);
+  background: transparent !important;
+  color: var(--app-danger);
 }
 
-.memory-folder-overview-action.p-button .p-button-icon {
-  background: transparent;
+.memory-danger-action.p-button .p-button-icon {
+  background: transparent !important;
   color: inherit;
 }
 
-.memory-folder-overview-action.p-button:hover:not(:disabled),
-.memory-folder-overview-action.p-button:focus-visible {
-  border-color: var(--app-danger);
-  background: transparent;
-  color: var(--app-danger);
+.memory-danger-action.p-button:hover:not(:disabled),
+.memory-danger-action.p-button:focus-visible {
+  border-color: var(--app-danger-strong);
+  background: transparent !important;
+  color: var(--app-danger-strong);
 }
 
 .memory-create-card {

@@ -88,21 +88,23 @@
     color: var(--app-danger-strong);
   }
 
-  .memory-folder-overview-action.p-button.p-button-danger {
-    border-color: var(--app-danger-line);
-    background: transparent;
-    color: var(--app-danger-line);
+  .memory-danger-action.p-button.p-button-danger,
+  .memory-danger-action.p-button.p-button-danger.p-button-outlined {
+    border-color: var(--app-danger);
+    background: transparent !important;
+    color: var(--app-danger);
   }
 
-  .memory-folder-overview-action.p-button.p-button-danger .p-button-icon {
+  .memory-danger-action.p-button.p-button-danger .p-button-icon {
+    background: transparent !important;
     color: inherit;
   }
 
-  .memory-folder-overview-action.p-button.p-button-danger:hover:not(:disabled),
-  .memory-folder-overview-action.p-button.p-button-danger:focus-visible {
-    border-color: var(--app-danger);
-    background: transparent;
-    color: var(--app-danger);
+  .memory-danger-action.p-button.p-button-danger:hover:not(:disabled),
+  .memory-danger-action.p-button.p-button-danger:focus-visible {
+    border-color: var(--app-danger-strong);
+    background: transparent !important;
+    color: var(--app-danger-strong);
   }
 
   .asset-bucket-button:hover,
@@ -286,7 +288,7 @@
   .memory-scope-root-icon,
   .memory-card-cover,
   .memory-card-icon,
-  .memory-folder-card .pi,
+  .memory-folder-card > .pi,
   .memory-scope-card-icon,
   .memory-create-card .pi,
   .memory-detail-cover,
@@ -319,7 +321,7 @@
   }
 
   .sidebar-memory-thumb,
-  .memory-folder-card .pi {
+  .memory-folder-card > .pi {
     background: var(--app-info-soft);
     color: var(--app-info-text);
   }
