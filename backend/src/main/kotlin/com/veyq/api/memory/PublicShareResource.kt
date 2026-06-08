@@ -153,6 +153,7 @@ class PublicShareResource @Inject constructor(
         fileInputStream: InputStream,
         title: String?,
         activityType: MemoryTrackActivityType?,
+        filename: String?,
     ): Response {
         val temp = Files.createTempFile("veyq-public-share-track-", ".gpx")
         return try {
@@ -162,7 +163,7 @@ class PublicShareResource @Inject constructor(
                     shareId = shareId,
                     memoryId = memoryId,
                     uploadPath = temp,
-                    originalFilename = null,
+                    originalFilename = filename,
                     title = title,
                     activityType = activityType,
                 )

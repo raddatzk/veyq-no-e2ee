@@ -412,6 +412,7 @@ export function uploadMemoryTrack(
       tenantName,
       memoryId,
       file: request.file,
+      filename: request.file.name || undefined,
       title: request.title,
       activityType: request.activityType
     })
@@ -893,6 +894,7 @@ export function uploadPublicShareMemoryTrack(
       shareId,
       memoryId,
       file: request.file,
+      filename: request.file.name || undefined,
       title: request.title,
       activityType: request.activityType
     })

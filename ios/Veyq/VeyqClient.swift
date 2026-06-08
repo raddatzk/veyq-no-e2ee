@@ -596,6 +596,7 @@ struct VeyqAPIClient {
         var body = Data()
         body.appendMultipartField(name: "title", value: title, boundary: boundary)
         body.appendMultipartField(name: "activityType", value: activityType, boundary: boundary)
+        body.appendMultipartField(name: "filename", value: fileURL.lastPathComponent, boundary: boundary)
         body.appendString("--\(boundary)\r\n")
         body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n")
         body.appendString("Content-Type: application/gpx+xml\r\n\r\n")

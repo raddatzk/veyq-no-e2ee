@@ -2272,6 +2272,10 @@ components:
                 type: string
                 format: binary
                 description: GPX file.
+              filename:
+                type: string
+                nullable: true
+                description: Original client-side filename to preserve for track listings and downloads.
               title:
                 type: string
                 minLength: 1
@@ -2279,6 +2283,7 @@ components:
               activityType:
                 "$ref": "#/components/schemas/MemoryTrackActivityType"
           example:
+            filename: ridge-day-2.gpx
             title: Alpine ridge day 2
             activityType: HIKING
     CreateMemoryMediaUpload:

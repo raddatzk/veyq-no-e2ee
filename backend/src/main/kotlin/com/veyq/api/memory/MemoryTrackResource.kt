@@ -24,11 +24,12 @@ class MemoryTrackResource @Inject constructor(
         fileInputStream: InputStream,
         title: String?,
         activityType: MemoryTrackActivityType?,
+        filename: String?,
     ): Response {
         val temp = Files.createTempFile("veyq-memory-track-", ".gpx")
         return try {
             fileInputStream.use { input -> Files.copy(input, temp, StandardCopyOption.REPLACE_EXISTING) }
-            Response.ok(trackService.uploadMemoryTrack(memoryId, temp, null, title, activityType)).build()
+            Response.ok(trackService.uploadMemoryTrack(memoryId, temp, filename, title, activityType)).build()
         } finally {
             Files.deleteIfExists(temp)
         }

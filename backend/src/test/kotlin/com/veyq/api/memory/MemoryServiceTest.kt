@@ -51,6 +51,7 @@ import com.veyq.api.library.folder.FolderService
 import com.veyq.api.library.media.MediaConfig
 import com.veyq.api.library.media.MediaService
 import com.veyq.api.library.media.MediaService.Companion.SELF_PRIMARY_BUCKET_PLACEHOLDER_ID
+import com.veyq.api.library.track.MemoryTrackService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -95,6 +96,7 @@ class MemoryServiceTest {
     @Inject lateinit var searchService: SearchService
     @Inject lateinit var memoryPlaylistService: MemoryPlaylistService
     @Inject lateinit var mediaService: MediaService
+    @Inject lateinit var memoryTrackService: MemoryTrackService
     @Inject lateinit var mediaConfig: MediaConfig
     @Inject lateinit var folderService: FolderService
     @Inject lateinit var libraryDeletionService: LibraryDeletionService
@@ -1314,6 +1316,31 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `uploads memory track with original filename`() {
+        val memory = memoryService.createMemory(CreateMemoryRequest("track-upload", "Track Upload"))
+        val gpx = gpxFile("veyq-memory-track-upload-")
+
+        try {
+            val uploaded = memoryTrackService.uploadMemoryTrack(
+                memory.id,
+                gpx,
+                "ridge-day-2.gpx",
+                title = null,
+                activityType = com.veyq.api.generated.model.MemoryTrackActivityType.HIKING,
+            )
+
+            assertThat(uploaded.originalFilename).isEqualTo("ridge-day-2.gpx")
+            assertThat(uploaded.title).isEqualTo("ridge-day-2")
+
+            val content = memoryTrackService.memoryTrackContent(memory.id, uploaded.id)
+            assertThat(content.getHeaderString("Content-Disposition"))
+                .isEqualTo("inline; filename=\"ridge-day-2.gpx\"")
+        } finally {
+            Files.deleteIfExists(gpx)
+        }
+    }
+
+    @Test
     fun `reads empty journal and updates markdown with visible embeds`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("journal-trip", "Journal Trip"))
         val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
@@ -1919,6 +1946,24 @@ class MemoryServiceTest {
     private fun textFile(prefix: String): Path {
         val path = Files.createTempFile(prefix, ".txt")
         Files.writeString(path, "not an image")
+        return path
+    }
+
+    private fun gpxFile(prefix: String): Path {
+        val path = Files.createTempFile(prefix, ".gpx")
+        Files.writeString(
+            path,
+            """
+            <gpx version="1.1" creator="veyq-test">
+              <trk>
+                <trkseg>
+                  <trkpt lat="47.0000" lon="11.0000"><time>2026-06-01T08:00:00Z</time></trkpt>
+                  <trkpt lat="47.0010" lon="11.0010"><time>2026-06-01T08:05:00Z</time></trkpt>
+                </trkseg>
+              </trk>
+            </gpx>
+            """.trimIndent(),
+        )
         return path
     }
 

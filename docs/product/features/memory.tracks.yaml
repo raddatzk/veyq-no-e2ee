@@ -32,6 +32,11 @@ acceptanceCriteria:
   - id: memory.tracks.panel-upload
     statement: Track panel uploads a selected GPX file with inferred title/default activity type.
     coverage:
+      backend:
+        integration:
+          - testName: uploads memory track with original filename
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
       frontend:
         unit:
           - testName: uploads a selected GPX file with inferred title and default activity type

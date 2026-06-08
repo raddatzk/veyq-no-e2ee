@@ -61,6 +61,7 @@ export interface UploadMemoryTrackRequest {
     file: Blob;
     title: string;
     activityType: MemoryTrackActivityType;
+    filename?: string;
 }
 
 /**
@@ -189,6 +190,7 @@ export interface MemoryTracksApiInterface {
      * @param {Blob} file GPX file.
      * @param {string} title 
      * @param {MemoryTrackActivityType} activityType 
+     * @param {string} [filename] Original client-side filename to preserve for track listings and downloads.
      * @throws {RequiredError}
      * @memberof MemoryTracksApiInterface
      */
@@ -202,6 +204,7 @@ export interface MemoryTracksApiInterface {
      * @param {Blob} file GPX file.
      * @param {string} title 
      * @param {MemoryTrackActivityType} activityType 
+     * @param {string} [filename] Original client-side filename to preserve for track listings and downloads.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MemoryTracksApiInterface
@@ -535,6 +538,10 @@ export class MemoryTracksApi extends runtime.BaseAPI implements MemoryTracksApiI
 
         if (requestParameters['file'] != null) {
             formParams.append('file', requestParameters['file'] as any);
+        }
+
+        if (requestParameters['filename'] != null) {
+            formParams.append('filename', requestParameters['filename'] as any);
         }
 
         if (requestParameters['title'] != null) {

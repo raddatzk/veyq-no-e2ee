@@ -1833,6 +1833,8 @@ final class VeyqTests: XCTestCase {
         XCTAssertTrue(body.contains("Morning Walk"))
         XCTAssertTrue(body.contains("name=\"activityType\""))
         XCTAssertTrue(body.contains("HIKING"))
+        XCTAssertTrue(body.contains("name=\"filename\""))
+        XCTAssertTrue(body.contains("morning-walk.gpx"))
         XCTAssertTrue(body.contains("name=\"file\"; filename=\"morning-walk.gpx\""))
         XCTAssertTrue(body.contains("Content-Type: application/gpx+xml"))
         XCTAssertTrue(body.contains("<gpx version=\"1.1\">"))
