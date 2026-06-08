@@ -7,7 +7,7 @@ VEYQ_REF="${VEYQ_REF:-main}"
 RAW_BASE="${RAW_BASE:-https://raw.githubusercontent.com/${VEYQ_REPO}/${VEYQ_REF}}"
 
 COMPOSE_FILES=(-f docker-compose.yml)
-VEYQ_ENV_SCHEMA_VERSION="3"
+VEYQ_ENV_SCHEMA_VERSION="4"
 REQUIRED_ENV_KEYS=(VEYQ_IMAGE LETSENCRYPT_EMAIL VEYQ_TRAEFIK_RULE DB_PASSWORD DB_ROOT_PASSWORD MAIL_FROM MAIL_HOST MAIL_PORT MAIL_USERNAME MAIL_PASSWORD)
 SECRET_ENV_KEYS=(DB_PASSWORD DB_ROOT_PASSWORD MAIL_PASSWORD WEBAUTHN_SESSION_ENCRYPTION_KEY)
 DEFAULTABLE_ENV_KEYS=(VEYQ_ENV_SCHEMA_VERSION VEYQ_AUTO_UPDATE_ENABLED VEYQ_AUTO_UPDATE_INTERVAL_HOURS VEYQ_AUTO_UPDATE_JITTER_MINUTES WEBAUTHN_SESSION_ENCRYPTION_KEY)
@@ -273,6 +273,7 @@ reconcile_env() {
 
 apply_env_defaults() {
   local key value
+  sync_env_with_template
   migrate_legacy_env_names
   set_env VEYQ_ENV_SCHEMA_VERSION "$VEYQ_ENV_SCHEMA_VERSION"
   for key in "${DEFAULTABLE_ENV_KEYS[@]}"; do
@@ -288,6 +289,76 @@ apply_env_defaults() {
       fi
     fi
   done
+}
+
+sync_env_with_template() {
+  local tmp
+  if [ ! -f .env.template ]; then
+    return
+  fi
+  require_env_readable
+  require_env_writable
+  tmp="$(mktemp)"
+  awk '
+    function active_key(line, raw) {
+      if (line ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+        raw = line
+        sub(/=.*/, "", raw)
+        return raw
+      }
+      return ""
+    }
+    function template_key(line, raw) {
+      if (line ~ /^#?[A-Za-z_][A-Za-z0-9_]*=/) {
+        raw = line
+        sub(/^#/, "", raw)
+        sub(/=.*/, "", raw)
+        return raw
+      }
+      return ""
+    }
+    FNR == NR {
+      key = active_key($0)
+      if (key != "") {
+        if (!(key in values)) {
+          order[++count] = key
+        }
+        values[key] = substr($0, length(key) + 2)
+      }
+      next
+    }
+    {
+      key = template_key($0)
+      if (key != "" && key in values) {
+        print key "=" values[key]
+        used[key] = 1
+        next
+      }
+      print
+    }
+    END {
+      customHeaderPrinted = 0
+      for (i = 1; i <= count; i++) {
+        key = order[i]
+        if (!(key in used)) {
+          if (!customHeaderPrinted) {
+            print ""
+            print "#### CUSTOM VALUES PRESERVED FROM PREVIOUS .env ####"
+            customHeaderPrinted = 1
+          }
+          print key "=" values[key]
+        }
+      }
+      if (customHeaderPrinted) {
+        print "#### CUSTOM VALUES PRESERVED FROM PREVIOUS .env ####"
+      }
+    }
+  ' .env .env.template > "$tmp"
+  if ! cmp -s "$tmp" .env; then
+    cat "$tmp" > .env
+    echo "Synchronized .env with .env.template"
+  fi
+  rm -f "$tmp"
 }
 
 migrate_legacy_env_names() {

@@ -386,7 +386,7 @@ ls -lah backups | tail
 
 Safe recovery: keep the failed instance stopped if it may be writing bad state. Restore the pre-upgrade `.env`, database and media backup together, and set `VEYQ_IMAGE` back to the previous working tag before `sudo docker compose up -d`.
 
-Prevention: run `doctor`, then `backup`, then `upgrade`. Prefer exact build tags over moving tags for real instances. The helper script automatically adds safe defaults for new optional `.env` values during upgrade, but any new required secret or operator decision without a safe default must be handled manually and belongs in a new major channel.
+Prevention: run `doctor`, then `backup`, then `upgrade`. Prefer exact build tags over moving tags for real instances. The helper script regenerates `.env` from the current `.env.template`, restores existing values and adds safe defaults for new optional values during upgrade, but any new required secret or operator decision without a safe default must be handled manually and belongs in a new major channel.
 
 ### Auto-update fails
 

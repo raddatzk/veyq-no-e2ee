@@ -337,7 +337,7 @@ sudo ./veyq-server.sh backup
 sudo ./veyq-server.sh upgrade
 ```
 
-The helper script keeps `.env` compatible across additive builds in the same major line. During `upgrade` and `auto-upgrade`, it adds safe default values for newly introduced optional environment variables and records `VEYQ_ENV_SCHEMA_VERSION`. If a new build needs a secret or operator decision that has no safe default, `upgrade` stops before pulling or restarting containers and offers interactive setup when a terminal is available. `auto-upgrade` never prompts; it stops before pull/restart and reports the failure to ServerOwner users when updater notifications are configured.
+The helper script keeps `.env` compatible across additive builds in the same major line. During `upgrade` and `auto-upgrade`, it regenerates `.env` from the current `.env.template`, restores previously configured values, preserves custom keys at the end of the file, adds safe defaults where available and records `VEYQ_ENV_SCHEMA_VERSION`. If a new build needs a secret or operator decision that has no safe default, `upgrade` stops before pulling or restarting containers and offers interactive setup when a terminal is available. `auto-upgrade` never prompts; it stops before pull/restart and reports the failure to ServerOwner users when updater notifications are configured.
 
 Within a major image channel, new environment variables must either be optional with a safe default or be handled by a migration that needs no operator decision. A new required variable without a safe default is a breaking operational change and must ship in a new major channel.
 

@@ -25,6 +25,11 @@ acceptanceCriteria:
     gaps:
       - reason: No automated Feature Trust test currently proves doctor validation around upgrades.
         followUp: Add operator integration coverage for doctor checks before and after env changes.
+  - id: server.backup-upgrade.env-template-reconcile
+    statement: Upgrade workflows should regenerate `.env` from the current `.env.template`, restore existing values, preserve unknown custom keys and validate required values before pulling or restarting containers.
+    gaps:
+      - reason: No automated Feature Trust test currently proves `.env` template reconciliation during upgrades.
+        followUp: Add fixture-based script tests for template reconciliation, preserved values and missing required values.
 gaps:
   - reason: >-
       No automated tests currently prove backup/upgrade ACs; script and workflow references are intentionally not
