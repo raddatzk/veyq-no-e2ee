@@ -106,6 +106,14 @@ describe('MemoryPlaylistsPanel', () => {
     })
 
     await buttonByText(wrapper, 'Löschen').trigger('click')
+    expect(wrapper.text()).toContain('Playlist-Name zur Bestätigung')
+    expect(deleteDialogButton(wrapper).attributes('disabled')).toBeDefined()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(deletePlaylist).not.toHaveBeenCalled()
+
+    await wrapper.find('input').setValue('Roadtrip Soundtrack')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -121,6 +129,12 @@ describe('MemoryPlaylistsPanel', () => {
     expect(wrapper.emitted('changed')).toHaveLength(1)
   })
 })
+
+function deleteDialogButton(wrapper: VueWrapper) {
+  const button = wrapper.findAll('button').reverse().find((candidate) => candidate.text().includes('Löschen'))
+  if (!button) throw new Error('Delete dialog button not found')
+  return button
+}
 
 function playlist(overrides: Partial<MemoryPlaylist> = {}): MemoryPlaylist {
   return {

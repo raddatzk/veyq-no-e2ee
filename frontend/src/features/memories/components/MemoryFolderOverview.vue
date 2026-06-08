@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import type { Memory, MemoryFolder, MemoryNavigationContextResponse } from '../api'
 import { deleteFolder } from '../api'
@@ -28,9 +29,18 @@ const emit = defineEmits<{
 const deleteDialogOpen = ref(false)
 const deleteLoading = ref(false)
 const deleteError = ref('')
+const deleteConfirmation = ref('')
+const canConfirmDelete = computed(
+  () => deleteConfirmation.value.trim() === props.navigation.location.displayName.trim() && !deleteLoading.value
+)
 
 watch(deleteDialogOpen, (isOpen) => {
-  if (!isOpen) deleteError.value = ''
+  if (isOpen) {
+    deleteError.value = ''
+    deleteConfirmation.value = ''
+  } else {
+    deleteError.value = ''
+  }
 })
 
 function openDeleteDialog() {
@@ -39,6 +49,7 @@ function openDeleteDialog() {
 }
 
 async function confirmDeleteFolder() {
+  if (!canConfirmDelete.value) return
   deleteError.value = ''
   deleteLoading.value = true
   try {
@@ -138,13 +149,25 @@ async function confirmDeleteFolder() {
       :confirm-label="t('memory.folderDelete')"
       confirm-icon="pi pi-trash"
       confirm-severity="danger"
+      :confirm-disabled="!canConfirmDelete"
       :loading="deleteLoading"
       @confirm="confirmDeleteFolder"
     >
-      <p class="memory-dialog-copy">
-        {{ t('memory.folderDeleteCopy', { name: navigation.location.displayName }) }}
-      </p>
-      <Message v-if="deleteError" severity="error" :closable="false">{{ deleteError }}</Message>
+      <template #default="{ disabled }">
+        <p class="memory-dialog-copy">
+          {{ t('memory.folderDeleteCopy', { name: navigation.location.displayName }) }}
+        </p>
+        <label>
+          {{ t('memory.folderDeleteNameLabel') }}
+          <InputText
+            v-model="deleteConfirmation"
+            autocomplete="off"
+            :placeholder="navigation.location.displayName"
+            :disabled="disabled"
+          />
+        </label>
+        <Message v-if="deleteError" severity="error" :closable="false">{{ deleteError }}</Message>
+      </template>
     </ConfirmationDialog>
   </div>
 </template>

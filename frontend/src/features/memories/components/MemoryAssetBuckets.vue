@@ -108,6 +108,7 @@ const isSaving = ref(false)
 const saveError = ref('')
 const moveTargetBucketId = ref('')
 const deleteMediaIds = ref<string[]>([])
+const deleteMediaConfirmation = ref('')
 const bucketDropActive = ref(false)
 
 const bucketsWithLocalPrimary = computed<MemoryMediaBucket[]>(() => {
@@ -263,6 +264,12 @@ const canSubmitBucketDelete = computed(
     !isSaving.value
 )
 const deleteMediaCount = computed(() => deleteMediaIds.value.length)
+const canSubmitMediaDelete = computed(
+  () =>
+    deleteMediaCount.value > 0 &&
+    deleteMediaConfirmation.value.trim() === String(deleteMediaCount.value) &&
+    !isSaving.value
+)
 const selectionActionItems = computed<MenuItem[]>(() => [
   {
     label: t('media.shiftCapturedAt'),
@@ -641,6 +648,7 @@ async function submitMove() {
 function openDeleteSelectedMediaDialog() {
   if (!props.canDeleteMedia || !props.deleteMediaBatch || !selectedMediaIds.value.size) return
   deleteMediaIds.value = [...selectedMediaIds.value]
+  deleteMediaConfirmation.value = ''
   saveError.value = ''
   isDeleteMediaDialogOpen.value = true
 }
@@ -650,7 +658,7 @@ async function deleteSelectedMedia() {
     isSaving.value ||
     !props.canDeleteMedia ||
     !props.deleteMediaBatch ||
-    !deleteMediaIds.value.length
+    !canSubmitMediaDelete.value
   )
     return
   isSaving.value = true
@@ -663,6 +671,7 @@ async function deleteSelectedMedia() {
       [...selectedMediaIds.value].filter((mediaId) => !deletedIds.has(mediaId))
     )
     deleteMediaIds.value = []
+    deleteMediaConfirmation.value = ''
     isDeleteMediaDialogOpen.value = false
   } catch (error) {
     saveError.value = error instanceof Error ? error.message : t('media.deleteFailed')
@@ -1013,14 +1022,24 @@ function handleBucketDrop(event: DragEvent) {
       confirm-severity="danger"
       dialog-class="tenant-dialog asset-action-dialog"
       form-class="asset-dialog-form"
-      :confirm-disabled="!deleteMediaCount"
+      :confirm-disabled="!canSubmitMediaDelete"
       :loading="isSaving"
       @confirm="deleteSelectedMedia"
     >
-      <template #default>
+      <template #default="{ disabled }">
         <p class="asset-dialog-copy">
           {{ t('media.deleteMediaCopy', { count: deleteMediaCount }) }}
         </p>
+        <label for="asset-delete-media-count">{{ t('media.deleteMediaCountLabel', { count: deleteMediaCount }) }}</label>
+        <input
+          id="asset-delete-media-count"
+          v-model="deleteMediaConfirmation"
+          type="text"
+          :placeholder="String(deleteMediaCount)"
+          autocomplete="off"
+          inputmode="numeric"
+          :disabled="disabled"
+        />
         <p v-if="saveError" class="asset-batch-error">{{ saveError }}</p>
       </template>
     </ConfirmationDialog>

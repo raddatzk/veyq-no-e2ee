@@ -396,9 +396,15 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.text()).toContain(
       'Diese Aktion löscht 1 ausgewählte Medien dauerhaft aus diesem Bucket.'
     )
+    expect(wrapper.text()).toContain('Anzahl zur Bestätigung eingeben: 1')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
     expect(confirm).not.toHaveBeenCalled()
+    expect(deleteMediaBatch).not.toHaveBeenCalled()
+
+    await wrapper.find('#asset-delete-media-count').setValue('1')
+    await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
+
     expect(deleteMediaBatch).toHaveBeenCalledWith('mem-1', ['media-2'])
     confirm.mockRestore()
   })
@@ -426,6 +432,12 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.text()).toContain(
       'Diese Aktion löscht 2 ausgewählte Medien dauerhaft aus diesem Bucket.'
     )
+    expect(wrapper.text()).toContain('Anzahl zur Bestätigung eingeben: 2')
+    await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
+
+    expect(deleteMediaBatch).not.toHaveBeenCalled()
+
+    await wrapper.find('#asset-delete-media-count').setValue('2')
     await wrapper.find('.asset-dialog-form').trigger('submit.prevent')
 
     expect(deleteMediaBatch).toHaveBeenCalledWith('mem-1', ['media-1', 'media-2'])

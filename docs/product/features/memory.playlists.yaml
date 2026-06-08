@@ -88,7 +88,7 @@ acceptanceCriteria:
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
   - id: memory.playlists.panel-ui
-    statement: Playlist panel renders empty states, compact cards, metadata editing and featured playlist selection.
+    statement: Playlist panel renders empty states, compact cards, metadata editing, featured playlist selection and title-confirmed deletion.
     coverage:
       frontend:
         unit:

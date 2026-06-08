@@ -228,7 +228,7 @@ acceptanceCriteria:
           - testName: opens a confirmation before deleting the current folder
             kind: negative
             ref: frontend/src/features/memories/components/MemoryFolderOverview.test.ts
-          - testName: deletes the current folder after confirmation and emits a refresh event
+          - testName: requires the current folder name before deleting the current folder
             kind: positive
             ref: frontend/src/features/memories/components/MemoryFolderOverview.test.ts
           - testName: shows an error when deleting the current folder fails

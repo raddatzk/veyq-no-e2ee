@@ -57,7 +57,7 @@ acceptanceCriteria:
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.tracks.panel-update-delete
-    statement: Track panel updates and deletes existing tracks.
+    statement: Track panel updates and deletes existing tracks, with title confirmation before deletion.
     coverage:
       frontend:
         unit:

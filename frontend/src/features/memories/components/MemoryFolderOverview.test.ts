@@ -26,13 +26,30 @@ describe('MemoryFolderOverview', () => {
     expect(deleteFolder).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Ordner löschen')
     expect(wrapper.text()).toContain('alle Unterordner')
+    expect(wrapper.text()).toContain('Ordnername zur Bestätigung')
   })
 
-  it('deletes the current folder after confirmation and emits a refresh event', async () => {
+  it('requires the current folder name before deleting the current folder', async () => {
     vi.mocked(deleteFolder).mockResolvedValue(undefined)
     const wrapper = mountOverview()
 
     await wrapper.find('.memory-folder-overview-action').trigger('click')
+    const deleteButton = () =>
+      wrapper.findAll('button').find((button) => button.text().includes('Ordner löschen'))!
+    expect(deleteButton().attributes('disabled')).toBeDefined()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(deleteFolder).not.toHaveBeenCalled()
+
+    await wrapper.find('input').setValue('Wrong folder')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(deleteFolder).not.toHaveBeenCalled()
+
+    await wrapper.find('input').setValue('Archive')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -45,6 +62,7 @@ describe('MemoryFolderOverview', () => {
     const wrapper = mountOverview()
 
     await wrapper.find('.memory-folder-overview-action').trigger('click')
+    await wrapper.find('input').setValue('Archive')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -99,6 +117,12 @@ function primeStubs() {
     },
     Message: {
       template: '<div><slot /></div>'
+    },
+    InputText: {
+      props: ['modelValue'],
+      emits: ['update:modelValue'],
+      template:
+        '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
     }
   }
 }

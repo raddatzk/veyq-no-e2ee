@@ -146,7 +146,7 @@ acceptanceCriteria:
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.bucket-management
-    statement: Bucket move/delete flows preserve primary bucket rules and reject nested subbuckets.
+    statement: Bucket move/delete flows preserve primary bucket rules, require typed deletion confirmation and reject nested subbuckets.
     coverage:
       backend:
         integration:

@@ -35,9 +35,15 @@ const note = ref('')
 const url = ref('')
 const saving = ref(false)
 const error = ref('')
+const deleteConfirmation = ref('')
 
 const playlistCountLabel = computed(() => t('playlist.count', { count: props.playlists.length }))
 const supportedProvidersLabel = computed(() => t('playlist.supportedProviders'))
+const canConfirmDelete = computed(
+  () => Boolean(deleteCandidate.value) &&
+    deleteConfirmation.value.trim() === deleteCandidate.value.title.trim() &&
+    !saving.value
+)
 
 function providerLabel(provider: MemoryPlaylistProvider): string {
   return t(`playlist.provider.${provider}`)
@@ -56,6 +62,12 @@ function openEdit(playlist: MemoryPlaylist) {
   title.value = playlist.title
   note.value = playlist.note ?? ''
   url.value = playlist.url
+  error.value = ''
+}
+
+function openDelete(playlist: MemoryPlaylist) {
+  deleteCandidate.value = playlist
+  deleteConfirmation.value = ''
   error.value = ''
 }
 
@@ -112,7 +124,7 @@ async function markFeatured(playlist: MemoryPlaylist) {
 }
 
 async function confirmDelete() {
-  if (saving.value || !props.deletePlaylist || !deleteCandidate.value) return
+  if (!props.deletePlaylist || !deleteCandidate.value || !canConfirmDelete.value) return
   saving.value = true
   error.value = ''
   try {
@@ -204,7 +216,7 @@ async function confirmDelete() {
             size="small"
             severity="danger"
             outlined
-            @click="deleteCandidate = playlist"
+            @click="openDelete(playlist)"
           />
         </div>
       </article>
@@ -262,12 +274,22 @@ async function confirmDelete() {
       confirm-severity="danger"
       dialog-class="memory-track-dialog"
       form-class="memory-dialog-form"
+      :confirm-disabled="!canConfirmDelete"
       :loading="saving"
       @update:visible="(nextVisible) => { if (!nextVisible) deleteCandidate = null }"
       @confirm="confirmDelete"
     >
-      <template #default>
+      <template #default="{ disabled }">
         <p>{{ t('playlist.deleteConfirm', { name: deleteCandidate?.title }) }}</p>
+        <label>
+          <span>{{ t('playlist.deleteNameLabel') }}</span>
+          <InputText
+            v-model="deleteConfirmation"
+            autocomplete="off"
+            :placeholder="deleteCandidate?.title"
+            :disabled="disabled"
+          />
+        </label>
       </template>
     </ConfirmationDialog>
   </section>

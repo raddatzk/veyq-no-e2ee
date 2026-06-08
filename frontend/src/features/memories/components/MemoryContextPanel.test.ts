@@ -348,6 +348,13 @@ describe('MemoryContextPanel', () => {
     })
 
     await wrapper.find('button[aria-label="Löschen"]').trigger('click')
+    expect(wrapper.text()).toContain('Track-Name zur Bestätigung')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(deleteTrack).not.toHaveBeenCalled()
+
+    await wrapper.findAll('input').at(-1)!.setValue('Morning Walk')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

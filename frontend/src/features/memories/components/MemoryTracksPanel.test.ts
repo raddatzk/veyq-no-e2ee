@@ -71,6 +71,14 @@ describe('MemoryTracksPanel', () => {
 
     await wrapper.find('button[aria-label="Löschen"]').trigger('click')
     expect(wrapper.text()).toContain('Track "Weekend Hike" löschen?')
+    expect(wrapper.text()).toContain('Track-Name zur Bestätigung')
+    expect(buttonByText(wrapper, 'Löschen').attributes('disabled')).toBeDefined()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(deleteTrack).not.toHaveBeenCalled()
+
+    await wrapper.find('input').setValue('Weekend Hike')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -93,6 +101,7 @@ describe('MemoryTracksPanel', () => {
     })
 
     await wrapper.find('button[aria-label="Löschen"]').trigger('click')
+    await wrapper.find('input').setValue('Weekend Hike')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

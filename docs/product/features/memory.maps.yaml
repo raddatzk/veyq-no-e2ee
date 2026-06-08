@@ -105,7 +105,7 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/e2e/responsive.spec.ts
   - id: memory.maps.context-panel
-    statement: Memory context panel combines media locations, track metrics and permitted track actions.
+    statement: Memory context panel combines media locations, track metrics and permitted track actions, with title confirmation before track deletion.
     coverage:
       frontend:
         unit:

@@ -291,6 +291,7 @@ export const messages = {
       folderDeleteCopy:
         'Diese Aktion löscht "{name}", alle Unterordner, enthaltene Memories, deren Kapitel und die zugehörigen Medien dauerhaft.',
       folderDeleteFailed: 'Ordner konnte nicht gelöscht werden',
+      folderDeleteNameLabel: 'Ordnername zur Bestätigung',
       folders: 'Ordner',
       folderEmpty: 'Keine Ordner in diesem Bereich.',
       refresh: 'Aktualisieren',
@@ -342,6 +343,7 @@ export const messages = {
       deleteMediaConfirmAction: 'Medien löschen',
       deleteMediaCopy:
         'Diese Aktion löscht {count} ausgewählte Medien dauerhaft aus diesem Bucket.',
+      deleteMediaCountLabel: 'Anzahl zur Bestätigung eingeben: {count}',
       deleteMediaTitle: 'Medien löschen',
       deleteSelected: 'Auswahl löschen',
       deleteSelectedConfirm: '{count} ausgewählte Medien löschen?',
@@ -445,6 +447,7 @@ export const messages = {
       deleteConfirm:
         'Track "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
       deleteFailed: 'Track konnte nicht gelöscht werden',
+      deleteNameLabel: 'Track-Name zur Bestätigung',
       distance: 'Distanz',
       ascent: 'Aufstieg',
       descent: 'Abstieg',
@@ -481,6 +484,7 @@ export const messages = {
       deleteConfirm:
         'Playlist "{name}" löschen? Journal-Referenzen bleiben erhalten und werden als nicht verfügbar angezeigt.',
       deleteFailed: 'Playlist konnte nicht gelöscht werden',
+      deleteNameLabel: 'Playlist-Name zur Bestätigung',
       edit: 'Playlist bearbeiten',
       empty: 'Noch keine Playlists in dieser Memory.',
       featured: 'Im Header',
@@ -1362,6 +1366,7 @@ export const messages = {
       folderDeleteCopy:
         'This action permanently deletes "{name}", all subfolders, contained Memories, their chapters, and associated media.',
       folderDeleteFailed: 'Folder could not be deleted',
+      folderDeleteNameLabel: 'Folder name for confirmation',
       folders: 'Folders',
       folderEmpty: 'No folders in this space.',
       refresh: 'Refresh',
@@ -1413,6 +1418,7 @@ export const messages = {
       deleteMediaConfirmAction: 'Delete media',
       deleteMediaCopy:
         'This action permanently deletes {count} selected media items from this bucket.',
+      deleteMediaCountLabel: 'Enter the count to confirm: {count}',
       deleteMediaTitle: 'Delete media',
       deleteSelected: 'Delete selected',
       deleteSelectedConfirm: 'Delete {count} selected media items?',
@@ -1516,6 +1522,7 @@ export const messages = {
       deleteConfirm:
         'Delete track "{name}"? Journal references stay in place and render as unavailable.',
       deleteFailed: 'Track could not be deleted',
+      deleteNameLabel: 'Track name for confirmation',
       distance: 'Distance',
       ascent: 'Ascent',
       descent: 'Descent',
@@ -1552,6 +1559,7 @@ export const messages = {
       deleteConfirm:
         'Delete playlist "{name}"? Journal references stay in place and render as unavailable.',
       deleteFailed: 'Playlist could not be deleted',
+      deleteNameLabel: 'Playlist name for confirmation',
       edit: 'Edit playlist',
       empty: 'No playlists in this Memory yet.',
       featured: 'In header',

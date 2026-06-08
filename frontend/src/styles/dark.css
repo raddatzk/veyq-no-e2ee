@@ -88,6 +88,23 @@
     color: var(--app-danger-strong);
   }
 
+  .memory-folder-overview-action.p-button.p-button-danger {
+    border-color: var(--app-danger-line);
+    background: transparent;
+    color: var(--app-danger-line);
+  }
+
+  .memory-folder-overview-action.p-button.p-button-danger .p-button-icon {
+    color: inherit;
+  }
+
+  .memory-folder-overview-action.p-button.p-button-danger:hover:not(:disabled),
+  .memory-folder-overview-action.p-button.p-button-danger:focus-visible {
+    border-color: var(--app-danger);
+    background: transparent;
+    color: var(--app-danger);
+  }
+
   .asset-bucket-button:hover,
   .asset-camera-chip:hover {
     border-color: var(--memory-active-border);

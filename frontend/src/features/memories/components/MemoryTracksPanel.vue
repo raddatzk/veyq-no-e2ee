@@ -36,9 +36,15 @@ const title = ref('')
 const activityType = ref<MemoryTrackActivityType>('HIKING')
 const saving = ref(false)
 const error = ref('')
+const deleteConfirmation = ref('')
 
 const activityOptions = computed(() =>
   ACTIVITY_TYPES.map((value) => ({ label: t(`track.activity.${value}`), value }))
+)
+const canConfirmDelete = computed(
+  () => Boolean(deleteCandidate.value) &&
+    deleteConfirmation.value.trim() === deleteCandidate.value.title.trim() &&
+    !saving.value
 )
 
 watch(uploadOpen, (open) => {
@@ -49,6 +55,11 @@ watch(editTrack, (track) => {
   error.value = ''
   title.value = track?.title ?? ''
   activityType.value = track?.activityType ?? 'HIKING'
+})
+
+watch(deleteCandidate, () => {
+  error.value = ''
+  deleteConfirmation.value = ''
 })
 
 function selectTrackFile(event: FileUploadSelectEvent) {
@@ -96,7 +107,7 @@ async function submitEdit() {
 }
 
 async function confirmDelete() {
-  if (saving.value || !props.deleteTrack || !deleteCandidate.value) return
+  if (!props.deleteTrack || !deleteCandidate.value || !canConfirmDelete.value) return
   saving.value = true
   error.value = ''
   try {
@@ -320,12 +331,22 @@ const ACTIVITY_TYPES: MemoryTrackActivityType[] = [
       confirm-severity="danger"
       dialog-class="memory-track-dialog"
       form-class="memory-dialog-form"
+      :confirm-disabled="!canConfirmDelete"
       :loading="saving"
       @update:visible="(nextVisible) => { if (!nextVisible) deleteCandidate = null }"
       @confirm="confirmDelete"
     >
-      <template #default>
+      <template #default="{ disabled }">
         <p>{{ t('track.deleteConfirm', { name: deleteCandidate?.title }) }}</p>
+        <label>
+          <span>{{ t('track.deleteNameLabel') }}</span>
+          <InputText
+            v-model="deleteConfirmation"
+            autocomplete="off"
+            :placeholder="deleteCandidate?.title"
+            :disabled="disabled"
+          />
+        </label>
         <p v-if="error" class="memory-form-error">{{ error }}</p>
       </template>
     </ConfirmationDialog>
