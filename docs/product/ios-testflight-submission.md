@@ -41,7 +41,7 @@ Use only non-sensitive test Memories and sample photos or videos for this beta.
 Feedback email:
 
 ```text
-support@veyq.app
+info@veyq.app
 ```
 
 External testing notes:
@@ -60,7 +60,7 @@ If a demo account is needed, use the provided test instance and account credenti
 
 Open fields before external TestFlight review:
 
-- Confirm `support@veyq.app` exists and is monitored.
+- Confirm `info@veyq.app` exists and is monitored.
 - Add the App Store Connect beta review contact name, phone number and email.
 - Provide a demo instance URL and demo account only if Apple cannot use a normal reviewer login flow.
 

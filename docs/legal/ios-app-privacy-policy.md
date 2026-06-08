@@ -47,5 +47,5 @@ If a user opens an external playlist link, the device may contact the external p
 Privacy and TestFlight feedback for the official iOS app should be sent to:
 
 ```text
-support@veyq.app
+info@veyq.app
 ```
