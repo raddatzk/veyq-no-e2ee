@@ -490,13 +490,15 @@ final class ShareViewController: UIViewController {
         }
         availableGroupSpaces = scopedSpaces.filter { $0.kind == .group }
         let personalSpace = scopedSpaces.first { $0.kind == .personal }
-        let contentRoot = ([tenantSpace] + scopedSpaces)
-            .filter { space in
-                navigationContext.location.path == space.path
-                    || (space.path != "/" && navigationContext.location.path.hasPrefix("\(space.path)/"))
-            }
-            .max { lhs, rhs in lhs.path.count < rhs.path.count }
-            ?? tenantSpace
+        let locationPath = navigationContext.location.path
+        var contentRootCandidates: [ShareSpace] = [tenantSpace]
+        contentRootCandidates.append(contentsOf: scopedSpaces)
+        let matchingContentRoots = contentRootCandidates.filter { space in
+            locationPath == space.path || (space.path != "/" && locationPath.hasPrefix("\(space.path)/"))
+        }
+        let contentRoot = matchingContentRoots.max { lhs, rhs in
+            lhs.path.count < rhs.path.count
+        } ?? tenantSpace
 
         activeContentRootPath = contentRoot.path
 
@@ -519,7 +521,7 @@ final class ShareViewController: UIViewController {
         availableSpaces = [tenantSpace]
             + (availableGroupSpaces.isEmpty ? [] : [groupTab])
             + (personalTab.map { [$0] } ?? [])
-        activeSpace = contentRoot.kind == .group
+        activeSpace = contentRoot.kind == ShareSpaceKind.group
             ? groupTab
             : availableSpaces.first { $0.kind == contentRoot.kind } ?? tenantSpace
         rebuildSpaceBar()
