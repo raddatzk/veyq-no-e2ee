@@ -314,7 +314,8 @@ function stripHtml(value: string): string {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: []
   })
-  return sanitized.replace(/[<>]/g, '')
+  const parsed = new DOMParser().parseFromString(sanitized, 'text/html')
+  return (parsed.documentElement.textContent ?? '').replace(/[<>]/g, '')
 }
 
 function escapeHtml(value: string): string {
