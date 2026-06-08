@@ -184,6 +184,8 @@ Configure these GitHub environment or repository secrets:
 - `APPLE_APP_STORE_PROFILE_BASE64`: Base64-encoded App Store provisioning profile for `app.veyq.ios`, named `veyq iOS App Store app.veyq.ios`.
 - `APPLE_SHARE_APP_STORE_PROFILE_BASE64`: Base64-encoded App Store provisioning profile for `app.veyq.ios.share`, named `veyq Share App Store app.veyq.ios.share`.
 - `IOS_BUILD_KEYCHAIN_PASSWORD`: Temporary CI keychain password.
+- `APP_STORE_CONNECT_APP_ID`: Numeric App Store Connect app id for `app.veyq.ios`.
+- `TESTFLIGHT_PUBLIC_GROUP_NAME`: External TestFlight group name that should receive new builds.
 
 To create the base64 secret values locally:
 
@@ -194,9 +196,11 @@ base64 -i "veyq iOS App Store app.veyq.ios.mobileprovision" | pbcopy
 base64 -i "veyq Share App Store app.veyq.ios.share.mobileprovision" | pbcopy
 ```
 
-The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Automatic runs upload the IPA to App Store Connect for TestFlight processing. Manual runs can set the `upload` input to `false` when an archive should be built without publishing to App Store Connect.
+The workflow runs unit tests, archives the app, exports an IPA and uploads it as a GitHub artifact. Automatic runs upload the IPA to App Store Connect, wait for build processing, set the beta "What to Test" text, add the build to the configured external TestFlight group and submit it for Beta App Review. Manual runs can set the `upload` input to `false` when an archive should be built without publishing to App Store Connect.
 
-iOS app versions are independent from backend `major.build` versions, but use the same major-plus-build principle. The repository root `VERSION` file is only the backend and frontend major source. The iOS app major is stored separately in `ios/VERSION`. Automatic TestFlight runs set `CFBundleShortVersionString` to `ios/VERSION.github_run_number`, for example `1.42`, and set `CFBundleVersion` to the GitHub Actions run number, for example `42`. Manual runs can set `marketing_version` to a full `CFBundleShortVersionString` override. Increment the iOS app major in `ios/VERSION` when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
+iOS app versions are independent from backend `major.build` versions. The repository root `VERSION` file is only the backend and frontend major source. The iOS app major is stored separately in `ios/VERSION`. Automatic TestFlight runs set `CFBundleShortVersionString` to `ios/VERSION`, for example `1`, and set `CFBundleVersion` to the GitHub Actions run number, for example `42`. Manual runs can set `marketing_version` to a full `CFBundleShortVersionString` override. Increment the iOS app major in `ios/VERSION` when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
+
+New TestFlight builds use a latest-build-wins policy. If App Store Connect rejects the automatic Beta App Review submission because another build of the same version is already in review, remove or resolve that older review in App Store Connect and rerun the workflow. The uploaded IPA remains available in App Store Connect even when the final distribution step fails.
 
 The copyable App Store Connect source text is maintained in [iOS TestFlight Submission](product/ios-testflight-submission.md).
 

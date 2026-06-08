@@ -6,11 +6,12 @@ on:
       - main
     paths:
       - "ios/**"
+      - "scripts/ios-testflight-distribute.rb"
       - ".github/workflows/ios-testflight.yml"
   workflow_dispatch:
     inputs:
       marketing_version:
-        description: "Optional full CFBundleShortVersionString override. Defaults to ios/VERSION.<run number>."
+        description: "Optional full CFBundleShortVersionString override. Defaults to ios/VERSION."
         required: false
         default: ""
       upload:
@@ -41,6 +42,8 @@ jobs:
       APPLE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_APP_STORE_PROFILE_BASE64 }}
       APPLE_SHARE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_SHARE_APP_STORE_PROFILE_BASE64 }}
       KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
+      APP_STORE_CONNECT_APP_ID: ${{ secrets.APP_STORE_CONNECT_APP_ID }}
+      TESTFLIGHT_PUBLIC_GROUP_NAME: ${{ secrets.TESTFLIGHT_PUBLIC_GROUP_NAME }}
       MARKETING_VERSION_OVERRIDE: ${{ inputs.marketing_version || '' }}
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
       PROJECT_PATH: ios/Veyq.xcodeproj
@@ -62,7 +65,7 @@ jobs:
           if [[ -n "$MARKETING_VERSION_OVERRIDE" ]]; then
             marketing_version="$MARKETING_VERSION_OVERRIDE"
           else
-            marketing_version="${app_major}.${CURRENT_PROJECT_VERSION}"
+            marketing_version="$app_major"
           fi
           echo "MARKETING_VERSION=$marketing_version" >> "$GITHUB_ENV"
           echo "IOS_ARTIFACT_NAME=veyq-ios-${marketing_version}-${CURRENT_PROJECT_VERSION}" >> "$GITHUB_ENV"
@@ -258,3 +261,20 @@ jobs:
             --file "$ipa" \
             --apiKey "$ASC_KEY_ID" \
             --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Distribute to TestFlight public group
+        if: github.event_name != 'workflow_dispatch' || inputs.upload
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in APP_STORE_CONNECT_APP_ID TESTFLIGHT_PUBLIC_GROUP_NAME; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing TestFlight distribution secrets/env values:\n' >&2
+            printf '  - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+          ruby scripts/ios-testflight-distribute.rb

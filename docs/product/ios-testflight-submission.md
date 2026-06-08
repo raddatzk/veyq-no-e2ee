@@ -18,7 +18,7 @@ This document is the source text for the first official veyq iOS TestFlight subm
 iOS uses its own major-plus-build line, separate from backend `major.build` versions:
 
 - iOS app major source: `ios/VERSION`
-- `CFBundleShortVersionString`: app major plus GitHub Actions run number, for example `1.42`
+- `CFBundleShortVersionString`: app major, for example `1`
 - `CFBundleVersion`: GitHub Actions run number, for example `42`
 
 Increment `ios/VERSION` when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
