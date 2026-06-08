@@ -1204,6 +1204,86 @@ final class VeyqTests: XCTestCase {
         XCTAssertLessThan(rect.height, MKMapRect.world.height / 100)
     }
 
+    func testMemoryMapRectAccountsForBottomOverlay() {
+        let rect = MKMapRect(x: 1_000, y: 2_000, width: 400, height: 600)
+
+        let adjusted = MemoryMapRegion.mapRect(
+            rect,
+            fittingViewportSize: CGSize(width: 390, height: 800),
+            bottomObscuredHeight: 240
+        )
+
+        XCTAssertEqual(adjusted.minX, rect.minX, accuracy: 0.000001)
+        XCTAssertEqual(adjusted.minY, rect.minY, accuracy: 0.000001)
+        XCTAssertEqual(adjusted.width, rect.width, accuracy: 0.000001)
+        XCTAssertEqual(adjusted.height, rect.height * (800.0 / 560.0), accuracy: 0.000001)
+        XCTAssertGreaterThan(adjusted.midY, rect.midY)
+    }
+
+    func testMemoryTrackEndpointSymbols() throws {
+        let track = try XCTUnwrap(MemoryTrack.samples.first)
+        let endpoints = MemoryTrackEndpoint.endpoints(from: [track])
+        let start = try XCTUnwrap(endpoints.first { $0.kind == .start })
+        let end = try XCTUnwrap(endpoints.first { $0.kind == .end })
+
+        XCTAssertEqual(endpoints.count, 2)
+        XCTAssertEqual(start.id, "\(track.id)-start")
+        XCTAssertEqual(start.symbolName, "circle.fill")
+        XCTAssertEqual(start.coordinate.latitude, track.coordinates.first?.latitude)
+        XCTAssertEqual(start.coordinate.longitude, track.coordinates.first?.longitude)
+        XCTAssertEqual(end.id, "\(track.id)-end")
+        XCTAssertEqual(end.symbolName, "flag")
+        XCTAssertEqual(end.coordinate.latitude, track.coordinates.last?.latitude)
+        XCTAssertEqual(end.coordinate.longitude, track.coordinates.last?.longitude)
+    }
+
+    func testMemoryMapClustersGroupNearbyMediaPoints() throws {
+        let points = [
+            MemoryMapPoint(mediaId: "media-a", title: "North coast", latitude: 65.10000, longitude: -18.50000),
+            MemoryMapPoint(mediaId: "media-b", title: "East falls", latitude: 64.80000, longitude: -14.50000),
+            MemoryMapPoint(mediaId: "media-c", title: "South trail", latitude: 63.40000, longitude: -22.00000)
+        ]
+        let center = CLLocationCoordinate2D(latitude: 64.3, longitude: -18.25)
+        let centerPoint = MKMapPoint(center)
+        let tightRectSide = 700_000 / MKMetersPerMapPointAtLatitude(center.latitude)
+        let wideRectSide = 1_600_000 / MKMetersPerMapPointAtLatitude(center.latitude)
+        let tightVisibleRect = MKMapRect(
+            x: centerPoint.x - tightRectSide / 2,
+            y: centerPoint.y - tightRectSide / 2,
+            width: tightRectSide,
+            height: tightRectSide
+        )
+        let wideVisibleRect = MKMapRect(
+            x: centerPoint.x - wideRectSide / 2,
+            y: centerPoint.y - wideRectSide / 2,
+            width: wideRectSide,
+            height: wideRectSide
+        )
+        let viewportSize = CGSize(width: 700, height: 700)
+
+        let separateClusters = MemoryMapCluster.clusters(
+            from: points,
+            in: tightVisibleRect,
+            viewportSize: viewportSize,
+            markerDimension: 44
+        )
+        let clusters = MemoryMapCluster.clusters(
+            from: points,
+            in: wideVisibleRect,
+            viewportSize: viewportSize,
+            markerDimension: 44
+        )
+        let groupedCluster = try XCTUnwrap(clusters.first { $0.mediaIDs == ["media-a", "media-b"] })
+        let singleCluster = try XCTUnwrap(clusters.first { $0.mediaIDs == ["media-c"] })
+
+        XCTAssertEqual(separateClusters.count, 3)
+        XCTAssertEqual(clusters.count, 2)
+        XCTAssertEqual(groupedCluster.count, 2)
+        XCTAssertEqual(groupedCluster.coordinate.latitude, 64.95, accuracy: 0.000001)
+        XCTAssertEqual(groupedCluster.coordinate.longitude, -16.5, accuracy: 0.000001)
+        XCTAssertEqual(singleCluster.count, 1)
+    }
+
     func testMemoryTrackDecodingProvidesRenderableCoordinatesAndDuration() throws {
         let data = """
         {
@@ -1241,7 +1321,36 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(track.coordinates.first?.latitude, 47.426)
         XCTAssertEqual(track.coordinates.first?.longitude, 10.982)
         XCTAssertEqual(track.durationSeconds, 13_800)
+        XCTAssertEqual(track.descentMeters, 610)
         XCTAssertTrue(track.hasRenderableGeometry)
+    }
+
+    func testMemoryTrackDownloadFilenameUsesGPXExtension() throws {
+        let track = try XCTUnwrap(MemoryTrack.samples.first)
+        let renamed = MemoryTrack(
+            id: track.id,
+            memoryId: track.memoryId,
+            title: "Morning Route",
+            activityType: track.activityType,
+            originalFilename: "Morning Route",
+            distanceMeters: track.distanceMeters,
+            ascentMeters: track.ascentMeters,
+            descentMeters: track.descentMeters,
+            pointCount: track.pointCount,
+            startedAt: track.startedAt,
+            endedAt: track.endedAt,
+            bounds: track.bounds,
+            geometry: track.geometry,
+            contentUrl: track.contentUrl,
+            createdAt: track.createdAt,
+            updatedAt: track.updatedAt
+        )
+
+        let sampleFilename = track.downloadFilename
+        let renamedFilename = renamed.downloadFilename
+
+        XCTAssertEqual(sampleFilename, "ridge-walk.gpx")
+        XCTAssertEqual(renamedFilename, "Morning Route.gpx")
     }
 
     func testMemoryMapRegionFitsTracksAndMappedMediaTogether() {
@@ -1274,6 +1383,7 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(MemoryTrackFormatter.distance(860), "860 m")
         XCTAssertEqual(MemoryTrackFormatter.duration(13_800), "3 h 50 min")
         XCTAssertEqual(MemoryTrackFormatter.elevation(820), "820 m")
+        XCTAssertEqual(MemoryTrackFormatter.elevation(610), "610 m")
         XCTAssertEqual(MemoryTrackFormatter.elevation(nil), "n/a")
     }
 

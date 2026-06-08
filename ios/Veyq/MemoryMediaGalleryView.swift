@@ -296,7 +296,7 @@ struct AuthenticatedMediaImage: View {
     }
 }
 
-private struct MemoryMediaViewer: View {
+struct MemoryMediaViewer: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var store: VeyqStore
     @Binding var selectedIndex: Int
