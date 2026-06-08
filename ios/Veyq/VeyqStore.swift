@@ -59,6 +59,16 @@ final class VeyqStore: ObservableObject {
         let memories: [Memory]
     }
 
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+        return false
+    }
+
     var isConnected: Bool {
         connectedInstanceURL != nil
     }
@@ -782,6 +792,7 @@ final class VeyqStore: ObservableObject {
                 do {
                     loadedMedia = try await apiClient.memoryMedia(tenantName: tenantName, memoryId: memory.id, includeChildren: true)
                 } catch {
+                    guard !Self.isCancellation(error) else { return }
                     loadedMedia = []
                     memoryDetailMediaErrors[memory.id] = error.localizedDescription
                 }
@@ -800,6 +811,7 @@ final class VeyqStore: ObservableObject {
             )
             await persistShareImportTargets(tenantName: tenantName)
         } catch {
+            guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -1558,6 +1570,7 @@ final class VeyqStore: ObservableObject {
             }
             await persistShareImportTargets(tenantName: tenant.name)
         } catch {
+            guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
         }
     }

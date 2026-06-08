@@ -386,6 +386,42 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshingCurrentMemoriesIgnoresCancelledRequests() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        try sessionStore.save(StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
+        ))
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+        await store.restoreSession()
+
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(error: URLError(.cancelled))
+        ]
+
+        await store.refreshCurrentMemories()
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertFalse(store.memoryNavigationLoading)
+    }
+
+    @MainActor
     func testMockSpacesIncludeTenantGroupAndPersonalKinds() async throws {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
         _ = try await store.connect(to: "https://memories.example.test")
@@ -866,6 +902,45 @@ final class VeyqTests: XCTestCase {
 
         XCTAssertEqual(created.path, "/weekend-lake")
         XCTAssertTrue(store.visibleMemories.contains { $0.id == "weekend-lake" })
+    }
+
+    @MainActor
+    func testLoadingMemoryDetailIgnoresCancelledRequests() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        try sessionStore.save(StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
+        ))
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+        await store.restoreSession()
+
+        let memory = Memory.samples[0]
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(error: URLError(.cancelled)),
+            URLProtocolStub.Response(error: URLError(.cancelled))
+        ]
+
+        await store.loadDetail(for: memory, force: true)
+
+        XCTAssertNil(store.errorMessage)
+        XCTAssertNil(store.memoryDetailMediaErrors[memory.id])
+        XCTAssertFalse(store.memoryDetailLoadingIDs.contains(memory.id))
     }
 
     @MainActor
@@ -2980,6 +3055,19 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     struct Response {
         let statusCode: Int
         let data: Data
+        let error: Error?
+
+        init(statusCode: Int, data: Data) {
+            self.statusCode = statusCode
+            self.data = data
+            self.error = nil
+        }
+
+        init(error: Error) {
+            self.statusCode = 0
+            self.data = Data()
+            self.error = error
+        }
     }
 
     nonisolated(unsafe) static var responseData = Data()
@@ -3013,6 +3101,10 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
         let stubbedResponse = Self.queuedResponses.isEmpty
             ? Response(statusCode: Self.statusCode, data: Self.responseData)
             : Self.queuedResponses.removeFirst()
+        if let error = stubbedResponse.error {
+            client?.urlProtocol(self, didFailWithError: error)
+            return
+        }
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: stubbedResponse.statusCode,
