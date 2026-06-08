@@ -94,6 +94,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Optional demo Memory, seed-data strategy and homepage-linked demo instance with a mock backend so visitors can explore the Memory UI without real accounts, uploads or tenant data.
 - Native mobile "Open in App" banner and verified-link behavior from [Native Mobile Apps](mobile-apps.md), including Safari Smart App Banners after App Store/developer registration and an app-internal browser fallback when a recognized link is not supported natively yet.
 - Local client capability notifications for app-only features such as the iOS Share Extension. These should use the same product language as server capability notices, but be emitted and dismissed locally by the app instead of being delivered or acknowledged through the backend.
+- iOS primary navigation should default to the "Zuletzt" tab, while still offering first-class Memory search and a compact tenant-selection dropdown for users connected to multiple tenants.
 - Browser tab title should include the active tenant name where available, with privacy-conscious fallbacks for setup, login, personal scope and public-share pages.
 - Live search fields where useful.
 - Remote/shared Memory navigation that clearly shows source tenant/domain, current share access state and target-side visibility without making the source Memory look copied.
