@@ -8,6 +8,7 @@ final class VeyqUITests: XCTestCase {
     @MainActor
     func testConnectAndOpenMemoryDetail() throws {
         let app = XCUIApplication()
+        let tenantTabTitle = "Family Memories"
         app.launchArguments = ["--ui-testing"]
         app.launch()
 
@@ -20,8 +21,8 @@ final class VeyqUITests: XCTestCase {
 
         let homeTitle = app.staticTexts["memory-home-title"]
         XCTAssertTrue(homeTitle.waitForExistence(timeout: 5))
-        XCTAssertEqual(homeTitle.label, "Family Memories")
-        XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertEqual(homeTitle.label, tenantTabTitle)
+        XCTAssertTrue(app.tabBars.buttons[tenantTabTitle].exists)
         XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
         XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
         XCTAssertTrue(tabBarButton(in: app, startingWith: "Activity").exists)
@@ -33,13 +34,13 @@ final class VeyqUITests: XCTestCase {
         rootFolder.tap()
         let folderUpButton = app.buttons["folder-up-toolbar-button"]
         XCTAssertTrue(folderUpButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertFalse(app.tabBars.buttons[tenantTabTitle].exists)
         XCTAssertFalse(app.tabBars.buttons["Groups"].exists)
         XCTAssertFalse(app.tabBars.buttons["Personal"].exists)
         XCTAssertFalse(tabBarButton(in: app, startingWith: "Activity").exists)
         folderUpButton.tap()
         XCTAssertTrue(folderUpButton.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["All Memories"].exists)
+        XCTAssertTrue(app.tabBars.buttons[tenantTabTitle].exists)
         XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
         XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
         XCTAssertTrue(tabBarButton(in: app, startingWith: "Activity").exists)
@@ -90,7 +91,7 @@ final class VeyqUITests: XCTestCase {
 
         app.buttons["memory-card-birthday-weekend"].tap()
         XCTAssertTrue(app.staticTexts["memory-detail-title"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.tabBars.buttons["Alle Memories"].exists)
+        XCTAssertFalse(app.tabBars.buttons[tenantTabTitle].exists)
         XCTAssertFalse(app.tabBars.buttons["Gruppen"].exists)
         XCTAssertFalse(app.tabBars.buttons["Persönlich"].exists)
         XCTAssertFalse(tabBarButton(in: app, startingWith: "Aktivität").exists)
@@ -126,7 +127,7 @@ final class VeyqUITests: XCTestCase {
         let uploadQueueTitle = app.staticTexts["upload-queue-title"]
         XCTAssertTrue(uploadQueueTitle.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["upload-state-failed"].exists)
-        app.tabBars.buttons["Alle Memories"].tap()
+        app.tabBars.buttons[tenantTabTitle].tap()
 
         let searchField = app.searchFields["Memories suchen"]
         XCTAssertTrue(searchField.waitForExistence(timeout: 5))
