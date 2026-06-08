@@ -310,7 +310,11 @@ function unavailableEmbed(label: string): string {
 }
 
 function stripHtml(value: string): string {
-  return value.replace(/<[^>]+>/g, '')
+  const sanitized = DOMPurify.sanitize(value, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: []
+  })
+  return sanitized.replace(/[<>]/g, '')
 }
 
 function escapeHtml(value: string): string {
