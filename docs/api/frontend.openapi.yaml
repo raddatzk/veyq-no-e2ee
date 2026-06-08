@@ -44,6 +44,8 @@ components:
             "$ref": "#/components/schemas/BootstrapResponse"
           example:
             serverId: srv_123
+            mobileApps:
+              iosAppStoreId: '1234567890'
             user:
               userId: 1
               email: kevin@example.test
@@ -73,11 +75,14 @@ components:
       additionalProperties: false
       required:
         - serverId
+        - mobileApps
         - user
         - tenants
       properties:
         serverId:
           type: string
+        mobileApps:
+          "$ref": "#/components/schemas/MobileAppsMetadata"
         user:
           "$ref": "./common.openapi.yaml#/components/schemas/UserSummary"
         tenants:
@@ -86,6 +91,8 @@ components:
             "$ref": "./tenants.openapi.yaml#/components/schemas/TenantSummary"
       example:
         serverId: srv_123
+        mobileApps:
+          iosAppStoreId: '1234567890'
         user:
           userId: 1
           email: kevin@example.test
@@ -108,3 +115,15 @@ components:
             serverRole: ServerOwner
             passkeyCount: 1
             hasPassword: true
+
+    MobileAppsMetadata:
+      type: object
+      additionalProperties: false
+      required: []
+      properties:
+        iosAppStoreId:
+          type: string
+          description: Optional App Store numeric app id used by Safari Smart App Banners for this white-label instance.
+          pattern: '^[0-9]+$'
+      example:
+        iosAppStoreId: '1234567890'

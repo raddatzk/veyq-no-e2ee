@@ -79,6 +79,7 @@ export * from './MemoryTrackActivityType';
 export * from './MemoryTrackBounds';
 export * from './MemoryTrackGeometry';
 export * from './MemoryTrackSummary';
+export * from './MobileAppsMetadata';
 export * from './MobileSessionCodeRequest';
 export * from './MobileSessionCodeResponse';
 export * from './MobileSessionExchangeRequest';

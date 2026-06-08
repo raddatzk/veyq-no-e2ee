@@ -20,6 +20,13 @@ import {
     TenantSummaryToJSON,
     TenantSummaryToJSONTyped,
 } from './TenantSummary';
+import type { MobileAppsMetadata } from './MobileAppsMetadata';
+import {
+    MobileAppsMetadataFromJSON,
+    MobileAppsMetadataFromJSONTyped,
+    MobileAppsMetadataToJSON,
+    MobileAppsMetadataToJSONTyped,
+} from './MobileAppsMetadata';
 import type { UserSummary } from './UserSummary';
 import {
     UserSummaryFromJSON,
@@ -42,6 +49,12 @@ export interface BootstrapResponse {
     serverId: string;
     /**
      * 
+     * @type {MobileAppsMetadata}
+     * @memberof BootstrapResponse
+     */
+    mobileApps: MobileAppsMetadata;
+    /**
+     * 
      * @type {UserSummary}
      * @memberof BootstrapResponse
      */
@@ -59,6 +72,7 @@ export interface BootstrapResponse {
  */
 export function instanceOfBootstrapResponse(value: object): value is BootstrapResponse {
     if (!('serverId' in value) || value['serverId'] === undefined) return false;
+    if (!('mobileApps' in value) || value['mobileApps'] === undefined) return false;
     if (!('user' in value) || value['user'] === undefined) return false;
     if (!('tenants' in value) || value['tenants'] === undefined) return false;
     return true;
@@ -75,6 +89,7 @@ export function BootstrapResponseFromJSONTyped(json: any, ignoreDiscriminator: b
     return {
         
         'serverId': json['serverId'],
+        'mobileApps': MobileAppsMetadataFromJSON(json['mobileApps']),
         'user': UserSummaryFromJSON(json['user']),
         'tenants': ((json['tenants'] as Array<any>).map(TenantSummaryFromJSON)),
     };
@@ -92,6 +107,7 @@ export function BootstrapResponseToJSONTyped(value?: BootstrapResponse | null, i
     return {
         
         'serverId': value['serverId'],
+        'mobileApps': MobileAppsMetadataToJSON(value['mobileApps']),
         'user': UserSummaryToJSON(value['user']),
         'tenants': ((value['tenants'] as Array<any>).map(TenantSummaryToJSON)),
     };

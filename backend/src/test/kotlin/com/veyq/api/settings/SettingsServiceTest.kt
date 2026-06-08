@@ -55,5 +55,10 @@ class SettingsServiceTest {
             override val updater: VeyqConfig.Updater = object : VeyqConfig.Updater {
                 override val notifyToken: Optional<String> = Optional.empty()
             }
+            override val mobile: VeyqConfig.Mobile = object : VeyqConfig.Mobile {
+                override val ios: VeyqConfig.Ios = object : VeyqConfig.Ios {
+                    override val appStoreId: Optional<String> = Optional.empty()
+                }
+            }
         }
 }

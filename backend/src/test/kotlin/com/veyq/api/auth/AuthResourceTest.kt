@@ -468,6 +468,7 @@ class AuthResourceTest {
             .`when`().get("/api/frontend/bootstrap")
             .then()
             .statusCode(200)
+            .body("mobileApps.iosAppStoreId", equalTo("1234567890"))
             .body("user.email", equalTo("kevin@raddatz.me"))
 
         given()

@@ -99,6 +99,7 @@ describe('TenantJoinView', () => {
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
+      mobileApps: {},
       user: {
         userId: 42,
         email: 'join@example.test',
@@ -233,8 +234,6 @@ function viewStubs() {
     },
     RegistrationPrivacyOptIns: defineComponent({
       name: 'RegistrationPrivacyOptIns',
-      template:
-        '<section>Externe Inhalte<input type="checkbox" v-model="checked" /><button type="button" @click="save">Speichern</button></section>',
       setup(_, { emit }) {
         const checked = ref(false)
         function save() {
@@ -245,7 +244,9 @@ function viewStubs() {
         }
 
         return { checked, save }
-      }
+      },
+      template:
+        '<section>Externe Inhalte<input type="checkbox" v-model="checked" /><button type="button" @click="save">Speichern</button></section>'
     }),
     TieredMenu: {
       name: 'TieredMenu',

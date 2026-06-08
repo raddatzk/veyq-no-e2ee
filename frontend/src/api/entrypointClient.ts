@@ -3,6 +3,9 @@ import { frontendApi, generatedCall } from './generatedClient'
 
 export type EntrypointSummary = {
   serverId: string
+  mobileApps: {
+    iosAppStoreId?: string
+  }
   user: UserSummary | null
   tenants: TenantSummary[]
 }

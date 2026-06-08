@@ -58,6 +58,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Tenant domain change flow, including ownership/permission rules, validation, invite-link impact and reverse-proxy assumptions.
 - Tenant-scoped email delivery settings so invitation, account and share emails can use sender identity, reply-to/contact details and branding that match the tenant domain while falling back to instance SMTP defaults.
 - Localized email template model for invites, password resets, email changes and account/security notifications, including locale selection, tenant branding variables, safe fallbacks and template versioning.
+- Optional TenantOwner approval mode for tenant registration links, including pending join requests, approve/reject semantics, expiration/revocation behavior, notifications, and privacy-preserving responses that do not expose tenant membership or account existence.
 - Time-zone policy for Memory ZIP timestamps if locale-aware archive naming is not enough, including whether to store a user time zone in the profile or pass one per download.
 - Memory media download timestamp policy so user-corrected or overridden media timestamps are carried into downloaded originals or ZIP archive entries where the target format can represent them.
 - User account deletion/deactivation endpoints for [ADR 0017](../adr/0017-user-lifecycle-and-tenant-membership-removal.md), including permission checks, active-session invalidation, passkey/credential cleanup, tenant membership soft removal and anonymization of audit-relevant references.
@@ -99,6 +100,7 @@ Current implemented behavior is documented in the feature catalog, OpenAPI contr
 - Email-domain masking in user search or invite flows where privacy requires it.
 - Tenant email settings UI for tenant owners, including domain-aligned sender preview, reply-to/contact fields, test email, validation status and clear fallback behavior when tenant-specific settings are incomplete.
 - Email template management and review workflow, including correct German/English translations, preview/test-send support and copy QA for transactional mail across setup, invitation, password and account flows.
+- Tenant registration-link approval UX where TenantOwners can choose whether a public join link activates users immediately or places them into a review queue, and registrants get a clear pending/approved/rejected state without gaining tenant access before approval.
 - Dedicated public tenant contact fields and optional server-side audit logging for tenant terms/share notice acceptance, beyond the browser-local acceptance model in [ADR 0012](../adr/0012-share-notices-and-tenant-terms.md).
 - Password setup and change forms should ask users to enter the new password twice, provide a visibility toggle for password fields, and show inline mismatch feedback before submitting setup, invitation acceptance, password reset or password change requests.
 - TOTP recovery-code display, ServerOwner reset/disable authority and tenant/server enforcement controls beyond the current account-level enrollment and removal UI.

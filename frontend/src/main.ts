@@ -17,12 +17,13 @@ import 'primeicons/primeicons.css'
 async function bootstrap() {
   initializeTheme()
   const { finishLoading, setAnonymous, setAuthenticated } = useAuthState()
-  const { setSetupCompleted, setServerId } = useServerState()
+  const { setMobileApps, setSetupCompleted, setServerId } = useServerState()
 
   try {
     const entrypoint = await bootstrapClient()
 
     setServerId(entrypoint.serverId)
+    setMobileApps(entrypoint.mobileApps)
     if (entrypoint.user) {
       setAuthenticated(entrypoint.user, entrypoint.tenants)
     } else {

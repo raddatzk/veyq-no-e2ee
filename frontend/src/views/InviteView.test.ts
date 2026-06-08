@@ -67,6 +67,7 @@ describe('InviteView', () => {
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
+      mobileApps: {},
       user: {
         userId: 42,
         email: 'invitee@example.test',
@@ -136,6 +137,7 @@ describe('InviteView', () => {
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
+      mobileApps: {},
       user: {
         userId: 42,
         email: 'invitee@example.test',
@@ -199,6 +201,7 @@ describe('InviteView', () => {
     })
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
+      mobileApps: {},
       user: {
         userId: 42,
         email: 'invitee@example.test',
@@ -267,6 +270,7 @@ describe('InviteView', () => {
     acceptInvitationMock.mockResolvedValue(authState.user)
     bootstrapMock.mockResolvedValue({
       serverId: 'server',
+      mobileApps: {},
       user: authState.user,
       tenants: [tenant('friends')]
     })

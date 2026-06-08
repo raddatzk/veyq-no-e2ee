@@ -9,9 +9,14 @@ export function useServerState() {
     serverState.serverId = id
   }
 
+  function setMobileApps(value: { iosAppStoreId?: string }) {
+    serverState.mobileApps.iosAppStoreId = value.iosAppStoreId
+  }
+
   return {
     serverState,
     setSetupCompleted,
     setServerId,
+    setMobileApps,
   }
 }

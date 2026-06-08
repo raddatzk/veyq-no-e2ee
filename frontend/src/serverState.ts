@@ -2,5 +2,8 @@ import { reactive } from 'vue'
 
 export const serverState = reactive({
   serverId: '',
-  setupCompleted: false
+  setupCompleted: false,
+  mobileApps: {
+    iosAppStoreId: undefined as string | undefined
+  }
 })

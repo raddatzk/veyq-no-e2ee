@@ -21,8 +21,21 @@ interface VeyqConfig {
     @get:WithName("updater")
     val updater: Updater
 
+    @get:WithName("mobile")
+    val mobile: Mobile
+
     interface Updater {
         @get:WithName("notify-token")
         val notifyToken: Optional<String>
+    }
+
+    interface Mobile {
+        @get:WithName("ios")
+        val ios: Ios
+    }
+
+    interface Ios {
+        @get:WithName("app-store-id")
+        val appStoreId: Optional<String>
     }
 }

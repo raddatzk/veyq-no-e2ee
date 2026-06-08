@@ -21,6 +21,7 @@ The catalog is for humans first and agents second: names should stay readable, w
 - [`memory.public-sharing.yaml`](memory.public-sharing.yaml)
 - [`memory.public-uploader-links.yaml`](memory.public-uploader-links.yaml)
 - [`memory.tracks.yaml`](memory.tracks.yaml)
+- [`mobile.app-links.yaml`](mobile.app-links.yaml)
 - [`platform.api-runtime.yaml`](platform.api-runtime.yaml)
 - [`platform.auth-session-security.yaml`](platform.auth-session-security.yaml)
 - [`platform.security-pipeline.yaml`](platform.security-pipeline.yaml)

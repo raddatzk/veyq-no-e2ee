@@ -99,6 +99,7 @@ models/MemoryTrackActivityType.ts
 models/MemoryTrackBounds.ts
 models/MemoryTrackGeometry.ts
 models/MemoryTrackSummary.ts
+models/MobileAppsMetadata.ts
 models/MobileSessionCodeRequest.ts
 models/MobileSessionCodeResponse.ts
 models/MobileSessionExchangeRequest.ts
