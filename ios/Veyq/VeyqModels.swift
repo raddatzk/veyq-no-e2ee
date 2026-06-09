@@ -154,6 +154,8 @@ struct StoredNativeSession: Codable, Equatable {
     let user: VeyqUser
     let capabilities: [VeyqCapability]
     let selectedTenantName: String?
+    let tenants: [VeyqTenant]
+    let disabledTenantNames: Set<String>
 
     init(
         instanceURL: URL,
@@ -164,7 +166,9 @@ struct StoredNativeSession: Codable, Equatable {
         refreshTokenExpiresAt: Date,
         user: VeyqUser,
         capabilities: [VeyqCapability] = [],
-        selectedTenantName: String? = nil
+        selectedTenantName: String? = nil,
+        tenants: [VeyqTenant] = [],
+        disabledTenantNames: Set<String> = []
     ) {
         self.instanceURL = instanceURL
         self.apiBaseURL = apiBaseURL
@@ -175,6 +179,8 @@ struct StoredNativeSession: Codable, Equatable {
         self.user = user
         self.capabilities = capabilities
         self.selectedTenantName = selectedTenantName
+        self.tenants = tenants
+        self.disabledTenantNames = disabledTenantNames
     }
 
     enum CodingKeys: String, CodingKey {
@@ -187,6 +193,8 @@ struct StoredNativeSession: Codable, Equatable {
         case user
         case capabilities
         case selectedTenantName
+        case tenants
+        case disabledTenantNames
     }
 
     init(from decoder: Decoder) throws {
@@ -200,6 +208,8 @@ struct StoredNativeSession: Codable, Equatable {
         user = try container.decode(VeyqUser.self, forKey: .user)
         capabilities = try container.decodeIfPresent([VeyqCapability].self, forKey: .capabilities) ?? []
         selectedTenantName = try container.decodeIfPresent(String.self, forKey: .selectedTenantName)
+        tenants = try container.decodeIfPresent([VeyqTenant].self, forKey: .tenants) ?? []
+        disabledTenantNames = try container.decodeIfPresent(Set<String>.self, forKey: .disabledTenantNames) ?? []
     }
 
     func withCapabilities(_ capabilities: [VeyqCapability]) -> StoredNativeSession {
@@ -212,7 +222,9 @@ struct StoredNativeSession: Codable, Equatable {
             refreshTokenExpiresAt: refreshTokenExpiresAt,
             user: user,
             capabilities: capabilities,
-            selectedTenantName: selectedTenantName
+            selectedTenantName: selectedTenantName,
+            tenants: tenants,
+            disabledTenantNames: disabledTenantNames
         )
     }
 
@@ -226,7 +238,9 @@ struct StoredNativeSession: Codable, Equatable {
             refreshTokenExpiresAt: refreshTokenExpiresAt,
             user: user,
             capabilities: capabilities,
-            selectedTenantName: selectedTenantName
+            selectedTenantName: selectedTenantName,
+            tenants: tenants,
+            disabledTenantNames: disabledTenantNames
         )
     }
 
@@ -240,7 +254,48 @@ struct StoredNativeSession: Codable, Equatable {
             refreshTokenExpiresAt: refreshTokenExpiresAt,
             user: user,
             capabilities: capabilities,
-            selectedTenantName: selectedTenantName
+            selectedTenantName: selectedTenantName,
+            tenants: tenants,
+            disabledTenantNames: disabledTenantNames
+        )
+    }
+
+    func withTenants(_ tenants: [VeyqTenant]) -> StoredNativeSession {
+        let tenantNames = Set(tenants.map(\.name))
+        return StoredNativeSession(
+            instanceURL: instanceURL,
+            apiBaseURL: apiBaseURL,
+            accessToken: accessToken,
+            accessTokenExpiresAt: accessTokenExpiresAt,
+            refreshToken: refreshToken,
+            refreshTokenExpiresAt: refreshTokenExpiresAt,
+            user: user,
+            capabilities: capabilities,
+            selectedTenantName: selectedTenantName,
+            tenants: tenants,
+            disabledTenantNames: disabledTenantNames.intersection(tenantNames)
+        )
+    }
+
+    func withTenantEnabled(_ tenantName: String, isEnabled: Bool) -> StoredNativeSession {
+        var disabledTenantNames = disabledTenantNames
+        if isEnabled {
+            disabledTenantNames.remove(tenantName)
+        } else {
+            disabledTenantNames.insert(tenantName)
+        }
+        return StoredNativeSession(
+            instanceURL: instanceURL,
+            apiBaseURL: apiBaseURL,
+            accessToken: accessToken,
+            accessTokenExpiresAt: accessTokenExpiresAt,
+            refreshToken: refreshToken,
+            refreshTokenExpiresAt: refreshTokenExpiresAt,
+            user: user,
+            capabilities: capabilities,
+            selectedTenantName: selectedTenantName,
+            tenants: tenants,
+            disabledTenantNames: disabledTenantNames
         )
     }
 

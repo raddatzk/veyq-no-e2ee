@@ -683,6 +683,7 @@ protocol NativeSessionStoring {
     func loadActive() throws -> StoredNativeSession?
     func loadAll() throws -> [StoredNativeSession]
     func save(_ session: StoredNativeSession) throws
+    func update(_ session: StoredNativeSession) throws
     func delete() throws
     func delete(instanceURL: URL) throws
 }
@@ -733,6 +734,18 @@ final class KeychainNativeSessionStore: NativeSessionStoring {
         try writeCollection(StoredNativeSessionCollection(activeInstanceURL: session.instanceURL, sessions: [session] + existing))
     }
 
+    func update(_ session: StoredNativeSession) throws {
+        let collection = try loadCollection()
+        var sessions = collection.sessions
+        if let index = sessions.firstIndex(where: { $0.instanceURL == session.instanceURL }) {
+            sessions[index] = session
+        } else {
+            sessions.insert(session, at: 0)
+        }
+        let activeInstanceURL = collection.activeInstanceURL ?? collection.sessions.first?.instanceURL ?? session.instanceURL
+        try writeCollection(StoredNativeSessionCollection(activeInstanceURL: activeInstanceURL, sessions: sessions))
+    }
+
     private func writeCollection(_ collection: StoredNativeSessionCollection) throws {
         try delete()
         let data = try JSONEncoder.veyq.encode(collection)
@@ -779,6 +792,17 @@ final class InMemoryNativeSessionStore: NativeSessionStoring {
         sessions.removeAll { $0.instanceURL == session.instanceURL }
         sessions.insert(session, at: 0)
         activeInstanceURL = session.instanceURL
+    }
+
+    func update(_ session: StoredNativeSession) throws {
+        if let index = sessions.firstIndex(where: { $0.instanceURL == session.instanceURL }) {
+            sessions[index] = session
+        } else {
+            sessions.insert(session, at: 0)
+        }
+        if activeInstanceURL == nil {
+            activeInstanceURL = sessions.first?.instanceURL
+        }
     }
 
     func delete() throws {

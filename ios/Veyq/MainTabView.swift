@@ -3,8 +3,8 @@ import SwiftUI
 struct MainTabView: View {
     let onDisconnect: () -> Void
     @EnvironmentObject private var store: VeyqStore
-    @AppStorage("veyq.root.tab.customization") private var rootTabCustomization = TabViewCustomization()
-    @State private var selectedRootTab = RootScopeTab.tenant
+    @AppStorage("veyq.root.tab.customization.v2") private var rootTabCustomization = TabViewCustomization()
+    @State private var selectedRootTab = RootScopeTab.recent
     @State private var memoryPath: [Memory] = []
     @State private var contextPresented = false
     @State private var searchQuery = ""
@@ -17,16 +17,16 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: rootTabSelection) {
-            Tab(tenantTabTitle, systemImage: "person.3", value: RootScopeTab.tenant) {
-                rootNavigationView(for: .tenant)
-            }
-            .customizationID("app.veyq.ios.scope.tenant")
-            .customizationBehavior(.reorderable, for: .tabBar)
-
             Tab(L10n.string("Recent"), systemImage: "clock", value: RootScopeTab.recent) {
                 recentNavigationView
             }
             .customizationID("app.veyq.ios.scope.recent")
+            .customizationBehavior(.reorderable, for: .tabBar)
+
+            Tab(tenantTabTitle, systemImage: "person.3", value: RootScopeTab.tenant) {
+                rootNavigationView(for: .tenant)
+            }
+            .customizationID("app.veyq.ios.scope.tenant")
             .customizationBehavior(.reorderable, for: .tabBar)
 
             Tab(L10n.string("Groups"), systemImage: selectedGroupSpace?.symbolName ?? "at", value: RootScopeTab.groups) {
@@ -78,10 +78,14 @@ struct MainTabView: View {
             GroupAuthoringSheet()
                 .environmentObject(store)
         }
-        .onChange(of: navigationContextKey) { _, _ in
+        .onChange(of: navigationContextKey) { oldContext, newContext in
             memoryPath.removeAll()
             searchQuery = ""
-            selectedRootTab = RootScopeTab(space: store.selectedSpace)
+            if selectedRootTab == .recent && shouldKeepRecentSelected(from: oldContext, to: newContext) {
+                store.refreshRecentMemoryTargets()
+            } else {
+                selectedRootTab = RootScopeTab(space: store.selectedSpace)
+            }
             groupsOverviewActive = false
         }
         .onChange(of: searchQuery) { _, query in
@@ -107,9 +111,6 @@ struct MainTabView: View {
             } else {
                 memoryPath.removeAll()
             }
-        }
-        .onAppear {
-            selectedRootTab = RootScopeTab(space: store.selectedSpace)
         }
     }
 
@@ -149,13 +150,22 @@ struct MainTabView: View {
 
     private var recentNavigationView: some View {
         NavigationStack(path: $memoryPath) {
-            RecentMemoriesView()
+            RecentMemoriesView {
+                contextPresented = true
+            }
                 .toolbar {
                     topBarToolbar
                 }
                 .navigationDestination(for: Memory.self) { memory in
                     MemoryDetailView(memory: memory)
                         .toolbar(.hidden, for: .tabBar)
+                }
+                .searchable(
+                    text: $searchQuery,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: Text(L10n.string("Search Memories"))
+                ) {
+                    searchSuggestions
                 }
         }
         .toolbar(memoryPath.isEmpty ? .visible : .hidden, for: .tabBar)
@@ -258,6 +268,7 @@ struct MainTabView: View {
                             memoryPath = [memory]
                         } else {
                             memoryPath.removeAll()
+                            selectedRootTab = RootScopeTab(space: store.selectedSpace)
                         }
                     }
                 } label: {
@@ -307,6 +318,10 @@ struct MainTabView: View {
 
     private func shouldShowRootTabBar(for tab: RootScopeTab) -> Bool {
         memoryPath.isEmpty && !shouldHideTabBar(for: tab)
+    }
+
+    private func shouldKeepRecentSelected(from oldContext: MemoryNavigationContextKey, to newContext: MemoryNavigationContextKey) -> Bool {
+        oldContext.tenantID != newContext.tenantID || oldContext.spaceID == nil
     }
 
     private func showsContentSections(for tab: RootScopeTab) -> Bool {
@@ -417,6 +432,7 @@ private enum RootScopeTab: Hashable {
 }
 
 private struct RecentMemoriesView: View {
+    let onContextTap: () -> Void
     @EnvironmentObject private var store: VeyqStore
 
     var body: some View {
@@ -425,32 +441,66 @@ private struct RecentMemoriesView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L10n.string("Recent"))
-                            .font(.largeTitle.bold())
-                        Text(L10n.format("Recently opened and imported Memories for %@.", tenantDisplayName))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(tenantDisplayName)
+                                .font(.largeTitle.bold())
+                                .accessibilityIdentifier("recent-home-title")
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Button {
+                            onContextTap()
+                        } label: {
+                            Image(systemName: "chevron.down.circle.fill")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(VeyqColor.accent)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.string("Context"))
+                        .accessibilityIdentifier("recent-context-button")
                     }
 
-                    if store.recentMemoryTargets.isEmpty {
-                        VeyqEmptyState(
-                            symbolName: "clock.badge.questionmark",
-                            title: "No recent Memories yet.",
-                            message: "Open a Memory or choose an import target to see it here.",
-                            tint: VeyqColor.accent
-                        )
-                    } else {
-                        LazyVStack(spacing: 14) {
-                            ForEach(store.recentMemoryTargets) { target in
-                                NavigationLink(value: target.memoryValue) {
-                                    RecentMemoryRow(target: target)
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .lastTextBaseline) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(L10n.string("Recent"))
+                                    .font(.title2.bold())
+                                Text(L10n.format("Recently opened and imported Memories for %@.", tenantDisplayName))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer()
+
+                            Text("\(store.recentMemoryTargets.count)")
+                                .font(.callout.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if store.recentMemoryTargets.isEmpty {
+                            VeyqEmptyState(
+                                symbolName: "clock.badge.questionmark",
+                                title: "No recent Memories yet.",
+                                message: "Open a Memory or choose an import target to see it here.",
+                                tint: VeyqColor.accent
+                            )
+                        } else {
+                            LazyVStack(spacing: 14) {
+                                ForEach(store.recentMemoryTargets) { target in
+                                    NavigationLink(value: target.memoryValue) {
+                                        RecentMemoryRow(target: target)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .simultaneousGesture(TapGesture().onEnded {
+                                        store.recordRecentTarget(target)
+                                    })
+                                    .accessibilityIdentifier("recent-memory-\(target.id)")
                                 }
-                                .buttonStyle(.plain)
-                                .simultaneousGesture(TapGesture().onEnded {
-                                    store.recordRecentTarget(target)
-                                })
-                                .accessibilityIdentifier("recent-memory-\(target.id)")
                             }
                         }
                     }

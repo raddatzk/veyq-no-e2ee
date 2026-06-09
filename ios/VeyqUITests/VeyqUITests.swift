@@ -19,15 +19,41 @@ final class VeyqUITests: XCTestCase {
 
         app.buttons["connect-button"].tap()
 
+        let recentTabTitle = "Recent"
+        let recentHomeTitle = app.staticTexts["recent-home-title"]
+        XCTAssertTrue(recentHomeTitle.waitForExistence(timeout: 5))
+        XCTAssertEqual(recentHomeTitle.label, tenantTabTitle)
+        XCTAssertTrue(app.staticTexts[recentTabTitle].exists)
+        XCTAssertTrue(app.searchFields["Search Memories"].exists)
+        XCTAssertTrue(app.buttons["recent-context-button"].exists)
+        XCTAssertTrue(app.tabBars.buttons[recentTabTitle].exists)
+        XCTAssertLessThan(app.tabBars.buttons[recentTabTitle].frame.midX, app.tabBars.buttons[tenantTabTitle].frame.midX)
+        XCTAssertLessThan(app.tabBars.buttons[recentTabTitle].frame.midX, app.tabBars.buttons["Groups"].frame.midX)
+
+        app.tabBars.buttons[tenantTabTitle].tap()
         let homeTitle = app.staticTexts["memory-home-title"]
         XCTAssertTrue(homeTitle.waitForExistence(timeout: 5))
         XCTAssertEqual(homeTitle.label, tenantTabTitle)
         XCTAssertTrue(app.tabBars.buttons[tenantTabTitle].exists)
         XCTAssertTrue(app.tabBars.buttons["Groups"].exists)
         XCTAssertTrue(app.tabBars.buttons["Personal"].exists)
+        XCTAssertTrue(app.tabBars.buttons[recentTabTitle].exists)
         XCTAssertTrue(tabBarButton(in: app, startingWith: "Activity").exists)
         XCTAssertFalse(app.buttons["upload-status-button"].exists)
         XCTAssertTrue(app.searchFields["Search Memories"].exists)
+
+        app.buttons["memory-context-button"].tap()
+        XCTAssertTrue(app.staticTexts["Context"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Memory Scope"].exists)
+        XCTAssertTrue(app.buttons["tenant-option-family"].exists)
+        XCTAssertTrue(app.buttons["context-edit-accounts-button"].exists)
+        app.buttons["context-edit-accounts-button"].tap()
+        XCTAssertTrue(app.staticTexts["Accounts"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["accounts-add-account-button"].exists)
+        XCTAssertTrue(app.staticTexts["Administrator"].exists)
+        XCTAssertTrue(app.staticTexts[tenantTabTitle].exists)
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["Accounts"].waitForNonExistence(timeout: 5))
 
         let rootFolder = app.buttons["folder-row-folder-travel"]
         XCTAssertTrue(rootFolder.waitForExistence(timeout: 5))

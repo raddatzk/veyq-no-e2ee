@@ -618,44 +618,29 @@ struct GroupAuthoringSheet: View {
 struct SpaceSwitcherSheet: View {
     @EnvironmentObject private var store: VeyqStore
     @Environment(\.dismiss) private var dismiss
+    @State private var path: [ContextDestination] = []
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    NavigationLink(value: ContextDestination.scope) {
-                        ContextSummaryRow(
-                            symbolName: store.selectedSpace?.symbolName ?? "person.3",
-                            title: "Memory Scope",
-                            value: store.selectedSpace?.label ?? L10n.string("Memories")
-                        )
-                    }
-                    .accessibilityIdentifier("context-scope-row")
-
-                    if store.tenants.count > 1 {
-                        NavigationLink(value: ContextDestination.tenant) {
-                            ContextSummaryRow(
-                                symbolName: "building.2",
-                                title: "Tenant",
-                                value: store.selectedTenant?.displayName ?? L10n.string("Select Tenant")
-                            )
-                        }
-                        .accessibilityIdentifier("context-tenant-row")
-                    }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Context")
+        NavigationStack(path: $path) {
+            tenantList
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: ContextDestination.self) { destination in
                 switch destination {
-                case .scope:
-                    scopeList
-                case .tenant:
-                    tenantList
+                case .accounts:
+                    AccountManagementView(
+                        onConnect: connectAccount,
+                        onDone: { dismiss() }
+                    )
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Edit") {
+                        path.append(.accounts)
+                    }
+                    .accessibilityIdentifier("context-edit-accounts-button")
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -666,40 +651,9 @@ struct SpaceSwitcherSheet: View {
         .presentationDetents([.medium, .large])
     }
 
-    private var scopeList: some View {
-        List {
-            ForEach(VeyqSpaceKind.allCases, id: \.self) { kind in
-                let spaces = store.spaces.filter { $0.kind == kind }
-
-                if !spaces.isEmpty {
-                    Section(kind.sectionTitle) {
-                        ForEach(spaces) { space in
-                            Button {
-                                store.selectSpace(space)
-                                dismiss()
-                            } label: {
-                                SelectionOptionRow(
-                                    symbolName: space.symbolName,
-                                    title: space.label,
-                                    subtitle: space.path,
-                                    isSelected: store.selectedSpace == space
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier(space.spaceOptionAccessibilityIdentifier)
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Memory Scope")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
     private var tenantList: some View {
         List {
-            Section {
+            Section("Tenant") {
                 ForEach(store.tenants) { tenant in
                     Button {
                         store.selectTenant(tenant)
@@ -718,15 +672,181 @@ struct SpaceSwitcherSheet: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Tenant")
+        .navigationTitle("Context")
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private func connectAccount(_ rawValue: String) async -> String? {
+        do {
+            _ = try await store.connect(to: rawValue)
+            path.removeAll()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
 }
 
 private enum ContextDestination: Hashable {
-    case scope
-    case tenant
+    case accounts
+}
+
+private struct AccountManagementView: View {
+    @EnvironmentObject private var store: VeyqStore
+    let onConnect: (String) async -> String?
+    let onDone: () -> Void
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    InstanceConnectView(initialURL: "") { rawValue in
+                        await onConnect(rawValue)
+                    }
+                } label: {
+                    Label("Add Account", systemImage: "plus.circle.fill")
+                        .foregroundStyle(VeyqColor.accent)
+                }
+                .accessibilityIdentifier("accounts-add-account-button")
+            }
+
+            Section {
+                ForEach(store.instances, id: \.instanceURL) { session in
+                    AccountCard(
+                        session: session,
+                        tenants: tenants(for: session),
+                        isActive: store.connectedInstanceURL == session.instanceURL,
+                        onTenantEnabledChange: { tenant, isEnabled in
+                            Task {
+                                await store.setTenantEnabled(tenant, isEnabled: isEnabled, for: session)
+                            }
+                        }
+                    )
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            Task {
+                                await store.deleteInstance(session)
+                            }
+                        } label: {
+                            Label("Log Out", systemImage: "trash")
+                        }
+                        .tint(VeyqColor.danger)
+                    }
+                    .accessibilityIdentifier("account-card-\(session.instanceURL.absoluteString)")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Accounts")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    onDone()
+                }
+            }
+        }
+    }
+
+    private func tenants(for session: StoredNativeSession) -> [VeyqTenant] {
+        if store.connectedInstanceURL == session.instanceURL, session.tenants.isEmpty {
+            return store.tenants
+        }
+        return session.tenants
+    }
+}
+
+private struct AccountCard: View {
+    let session: StoredNativeSession
+    let tenants: [VeyqTenant]
+    let isActive: Bool
+    let onTenantEnabledChange: (VeyqTenant, Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(accountTitle)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(accountSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isActive {
+                    Text("Connected")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(VeyqColor.success)
+                }
+            }
+
+            if tenants.isEmpty {
+                Text("No tenants loaded yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(tenants) { tenant in
+                        HStack(spacing: 10) {
+                            let tenantEnabled = !session.disabledTenantNames.contains(tenant.name)
+
+                            Image(systemName: "building.2")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(tenantEnabled ? VeyqColor.accent : .secondary)
+                                .frame(width: 24, height: 24)
+                                .background((tenantEnabled ? VeyqColor.accent : Color.secondary).opacity(0.12), in: Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tenant.displayName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(tenantEnabled ? .primary : .secondary)
+                                Text(tenant.domain)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle(
+                                L10n.string("Tenant Enabled"),
+                                isOn: Binding(
+                                    get: { !session.disabledTenantNames.contains(tenant.name) },
+                                    set: { onTenantEnabledChange(tenant, $0) }
+                                )
+                            )
+                            .labelsHidden()
+                            .tint(VeyqColor.accent)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(VeyqColor.surface, in: RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: VeyqLayout.cardRadius, style: .continuous)
+                .stroke(VeyqColor.hairline)
+        }
+    }
+
+    private var accountTitle: String {
+        if session.user.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return session.user.email
+        }
+        return session.user.displayName
+    }
+
+    private var accountSubtitle: String {
+        if let host = session.instanceURL.host {
+            return "\(session.user.email) · \(host)"
+        }
+        return session.user.email
+    }
 }
 
 private struct ContextSummaryRow: View {

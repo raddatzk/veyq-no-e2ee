@@ -65,6 +65,9 @@ acceptanceCriteria:
           - testName: opens journal media in a lightbox and synchronizes carousel navigation
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: uses decoded plain text for media alt labels
+            kind: positive
+            ref: frontend/src/features/memories/components/JournalRenderer.test.ts
         integration:
           - testName: memory detail renders breadcrumb context and memory tabs
             kind: positive

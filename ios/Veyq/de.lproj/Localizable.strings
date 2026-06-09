@@ -23,7 +23,9 @@
 "%d%% uploaded. Retry will resume where possible." = "%d%% hochgeladen. Ein erneuter Versuch setzt nach Möglichkeit fort.";
 "%d%% uploaded. Will resume when next in queue." = "%d%% hochgeladen. Wird fortgesetzt, wenn der Upload an der Reihe ist.";
 "Account" = "Account";
+"Accounts" = "Accounts";
 "Activity" = "Aktivität";
+"Add Account" = "Account hinzufügen";
 "Add GPX Track" = "GPX-Track hinzufügen";
 "Add image media before choosing a cover." = "Füge Bildmedien hinzu, bevor du ein Cover auswählst.";
 "Add photos or videos to start shaping this Memory." = "Füge Fotos oder Videos hinzu, um diese Memory zu gestalten.";
@@ -200,6 +202,7 @@
 "Loading journal..." = "Journal wird geladen...";
 "Loading photos..." = "Bilder werden geladen...";
 "Location" = "Ort";
+"Log Out" = "Abmelden";
 "Mapped media" = "Medien mit Ort";
 "Mark as Highlight" = "Als Highlight markieren";
 "Mark favorite photos or videos as Highlights from the media viewer." = "Markiere Lieblingsfotos oder -videos in der Medienansicht als Highlights.";
@@ -234,6 +237,7 @@
 "No native session is stored." = "Es ist keine native Sitzung gespeichert.";
 "No photos yet" = "Noch keine Bilder";
 "No recent Memories yet." = "Noch keine zuletzt verwendeten Memories.";
+"No tenants loaded yet." = "Noch keine Tenants geladen.";
 "Not set" = "Nicht gesetzt";
 "OK" = "OK";
 "Open a Memory or choose an import target to see it here." = "Öffne eine Memory oder wähle ein Importziel, damit es hier erscheint.";
@@ -306,6 +310,7 @@
 "Switch to All Media to see every mapped photo and video." = "Wechsle zu Alle Medien, um alle Fotos und Videos mit Ort zu sehen.";
 "System" = "System";
 "Tenant" = "Tenant";
+"Tenant Enabled" = "Tenant aktiviert";
 "Tenants are selected as workspace context; instances are shown here as connected sessions." = "Tenants werden als Arbeitskontext ausgewählt; Instanzen werden hier als verbundene Sitzungen angezeigt.";
 "The local file is no longer available. Add it again to upload." = "Die lokale Datei ist nicht mehr verfügbar. Füge sie erneut hinzu, um sie hochzuladen.";
 "The login callback was invalid." = "Der Login-Callback war ungültig.";

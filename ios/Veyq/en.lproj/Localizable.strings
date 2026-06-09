@@ -23,7 +23,9 @@
 "%d%% uploaded. Retry will resume where possible." = "%d%% uploaded. Retry will resume where possible.";
 "%d%% uploaded. Will resume when next in queue." = "%d%% uploaded. Will resume when next in queue.";
 "Account" = "Account";
+"Accounts" = "Accounts";
 "Activity" = "Activity";
+"Add Account" = "Add Account";
 "Add GPX Track" = "Add GPX Track";
 "Add image media before choosing a cover." = "Add image media before choosing a cover.";
 "Add photos or videos to start shaping this Memory." = "Add photos or videos to start shaping this Memory.";
@@ -200,6 +202,7 @@
 "Loading journal..." = "Loading journal...";
 "Loading photos..." = "Loading photos...";
 "Location" = "Location";
+"Log Out" = "Log Out";
 "Mapped media" = "Mapped media";
 "Mark as Highlight" = "Mark as Highlight";
 "Mark favorite photos or videos as Highlights from the media viewer." = "Mark favorite photos or videos as Highlights from the media viewer.";
@@ -234,6 +237,7 @@
 "No native session is stored." = "No native session is stored.";
 "No photos yet" = "No photos yet";
 "No recent Memories yet." = "No recent Memories yet.";
+"No tenants loaded yet." = "No tenants loaded yet.";
 "Not set" = "Not set";
 "OK" = "OK";
 "Open a Memory or choose an import target to see it here." = "Open a Memory or choose an import target to see it here.";
@@ -306,6 +310,7 @@
 "Switch to All Media to see every mapped photo and video." = "Switch to All Media to see every mapped photo and video.";
 "System" = "System";
 "Tenant" = "Tenant";
+"Tenant Enabled" = "Tenant Enabled";
 "Tenants are selected as workspace context; instances are shown here as connected sessions." = "Tenants are selected as workspace context; instances are shown here as connected sessions.";
 "The local file is no longer available. Add it again to upload." = "The local file is no longer available. Add it again to upload.";
 "The login callback was invalid." = "The login callback was invalid.";

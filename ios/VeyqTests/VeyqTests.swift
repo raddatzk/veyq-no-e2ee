@@ -789,6 +789,47 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(try sessionStore.loadActive()?.selectedTenantName, "friends")
     }
 
+    @MainActor
+    func testDisablingSelectedTenantPersistsAndSelectsNextEnabledTenant() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: multiTenantBootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        try sessionStore.save(StoredNativeSession(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            accessToken: "access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000),
+            refreshToken: "refresh",
+            refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_900_003_600),
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")],
+            selectedTenantName: "friends"
+        ))
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+        await store.restoreSession()
+
+        let friends = try XCTUnwrap(store.selectedTenant)
+        XCTAssertEqual(friends.name, "friends")
+
+        await store.setTenantEnabled(friends, isEnabled: false, for: try XCTUnwrap(sessionStore.loadActive()))
+
+        XCTAssertFalse(store.tenants.contains { $0.name == "friends" })
+        XCTAssertEqual(store.selectedTenant?.name, "family")
+        let storedSession = try XCTUnwrap(sessionStore.loadActive())
+        XCTAssertTrue(storedSession.disabledTenantNames.contains("friends"))
+        XCTAssertEqual(storedSession.selectedTenantName, "family")
+        XCTAssertEqual(storedSession.tenants.map(\.name), ["family", "friends"])
+    }
+
     func testMemoryCoverDecoding() throws {
         let data = """
         {
@@ -3166,6 +3207,10 @@ private final class RotatedNativeSessionStore: NativeSessionStoring {
     }
 
     func save(_ session: StoredNativeSession) throws {
+        currentSession = session
+    }
+
+    func update(_ session: StoredNativeSession) throws {
         currentSession = session
     }
 

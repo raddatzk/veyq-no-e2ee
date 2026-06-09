@@ -262,6 +262,31 @@ final class VeyqStore: ObservableObject {
         }
     }
 
+    func setTenantEnabled(_ tenant: VeyqTenant, isEnabled: Bool, for session: StoredNativeSession) async {
+        do {
+            let currentSession = try sessionStore.loadAll().first { $0.instanceURL == session.instanceURL } ?? session
+            let updatedSession = currentSession.withTenantEnabled(tenant.name, isEnabled: isEnabled)
+
+            if connectedInstanceURL == currentSession.instanceURL {
+                let previousTenantID = selectedTenant?.id
+                try sessionStore.update(updatedSession)
+                instances = try sessionStore.loadAll()
+                applyEnabledTenants(from: updatedSession)
+                persistSelectedTenantName(selectedTenant?.name)
+                if previousTenantID != selectedTenant?.id {
+                    clearMemoryNavigationState()
+                    await reloadMemories()
+                }
+            } else {
+                try sessionStore.update(updatedSession)
+                instances = try sessionStore.loadAll()
+                persistSharedAccounts()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func selectSpace(_ space: VeyqSpace) {
         guard spaces.contains(space) else { return }
         if mockMode {
@@ -1186,13 +1211,21 @@ final class VeyqStore: ObservableObject {
         guard let apiClient else { throw VeyqAPIError.missingSession }
         let bootstrap = try await apiClient.bootstrap()
         user = bootstrap.user
-        tenants = bootstrap.tenants
-        if let currentTenant = selectedTenant, bootstrap.tenants.contains(where: { $0.id == currentTenant.id }) {
+        var disabledTenantNames: Set<String> = []
+        if !mockMode, let activeSession = try sessionStore.loadActive() {
+            let updatedSession = activeSession.withTenants(bootstrap.tenants)
+            disabledTenantNames = updatedSession.disabledTenantNames
+            try sessionStore.save(updatedSession)
+            instances = try sessionStore.loadAll()
+            persistSharedAccounts()
+        }
+        tenants = bootstrap.tenants.filter { !disabledTenantNames.contains($0.name) }
+        if let currentTenant = selectedTenant, tenants.contains(where: { $0.id == currentTenant.id }) {
             selectedTenant = currentTenant
-        } else if let preferredTenant = bootstrap.tenants.first(where: { $0.name == preferredTenantName }) {
+        } else if let preferredTenant = tenants.first(where: { $0.name == preferredTenantName }) {
             selectedTenant = preferredTenant
         } else {
-            selectedTenant = bootstrap.tenants.first
+            selectedTenant = tenants.first
         }
         selectedSpace = nil
         await reloadMemories()
@@ -1269,8 +1302,36 @@ final class VeyqStore: ObservableObject {
             refreshTokenExpiresAt: nativeSession.refreshTokenExpiresAt,
             user: nativeSession.user,
             capabilities: session.capabilities,
-            selectedTenantName: session.selectedTenantName
+            selectedTenantName: session.selectedTenantName,
+            tenants: session.tenants,
+            disabledTenantNames: session.disabledTenantNames
         )
+    }
+
+    private func applyEnabledTenants(from session: StoredNativeSession) {
+        let allTenants = session.tenants.isEmpty ? tenants : session.tenants
+        tenants = allTenants.filter { !session.disabledTenantNames.contains($0.name) }
+        if let selectedTenant, tenants.contains(where: { $0.id == selectedTenant.id }) {
+            return
+        }
+        selectedTenant = tenants.first
+    }
+
+    private func clearMemoryNavigationState() {
+        selectedSpace = nil
+        navigationLocation = nil
+        folders = []
+        spaces = []
+        memories = []
+        searchResults = []
+        searchLoading = false
+        searchErrorMessage = nil
+        memoryDetails = [:]
+        memoryMediaFilters = [:]
+        recentMemoryTargets = []
+        memoryNavigationCache = [:]
+        memoryNavigationLoading = false
+        searchSequence = 0
     }
 
     private func persistSelectedTenantName(_ tenantName: String?) {
@@ -2006,7 +2067,8 @@ final class VeyqStore: ObservableObject {
                 accessTokenExpiresAt: Date(timeIntervalSince1970: 1_800_000_000),
                 refreshToken: "mock-refresh",
                 refreshTokenExpiresAt: Date(timeIntervalSince1970: 1_800_003_600),
-                user: VeyqUser(userId: 1, email: "admin@example.test", displayName: "Administrator", permalink: "administrator", serverRole: "ServerOwner", passkeyCount: 0, hasPassword: true, avatarUrl: nil)
+                user: VeyqUser(userId: 1, email: "admin@example.test", displayName: "Administrator", permalink: "administrator", serverRole: "ServerOwner", passkeyCount: 0, hasPassword: true, avatarUrl: nil),
+                tenants: [.sample]
             )
         ]
         tenants = [.sample]
