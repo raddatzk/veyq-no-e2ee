@@ -1096,11 +1096,12 @@ final class VeyqTests: XCTestCase {
         let media = try XCTUnwrap(store.memoryDetails[memory.id]?.media.first { $0.isImage })
 
         let updated = try await store.setMemoryCover(for: memory, media: media)
+        let expectedCoverUrl = media.previewUrl ?? media.thumbnailUrl ?? media.contentUrl
 
         XCTAssertEqual(updated.coverMediaId, media.id)
-        XCTAssertEqual(updated.coverUrl, media.previewUrl)
+        XCTAssertEqual(updated.coverUrl, expectedCoverUrl)
         XCTAssertEqual(updated.coverCrop, .defaultCoverCrop)
-        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, media.previewUrl)
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, expectedCoverUrl)
         XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverCrop, .defaultCoverCrop)
     }
 
