@@ -51,6 +51,20 @@ acceptanceCriteria:
           - testName: does not validate legacy veyq markdown link embeds
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-markdown.delete-reference-protection
+    statement: Media, track and playlist deletes are rejected while the target is referenced by the Memory journal.
+    coverage:
+      backend:
+        integration:
+          - testName: deleting media referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting track referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting playlist referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
   - id: memory.journal-markdown.ui-rendering
     statement: UI renders Markdown headings, media embeds, carousel embeds and track embeds.
     coverage:

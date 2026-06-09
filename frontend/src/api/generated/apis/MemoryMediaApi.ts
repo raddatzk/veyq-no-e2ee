@@ -344,7 +344,7 @@ export interface MemoryMediaApiInterface {
     deleteAllMemoryMediaRequestOpts(requestParameters: DeleteAllMemoryMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted. The request is rejected with `409 Conflict` when any direct media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - No direct media item in the addressed Memory is referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete all direct media from a memory
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -355,7 +355,7 @@ export interface MemoryMediaApiInterface {
     deleteAllMemoryMediaRaw(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted. The request is rejected with `409 Conflict` when any direct media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - No direct media item in the addressed Memory is referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete all direct media from a memory
      */
     deleteAllMemoryMedia(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -371,7 +371,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaRequestOpts(requestParameters: DeleteMemoryMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes one media item directly assigned to the addressed Memory. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory. - The media is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete one memory media item
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -383,7 +383,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaRaw(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes one media item directly assigned to the addressed Memory. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory. - The media is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete one memory media item
      */
     deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -399,7 +399,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaBatchRequestOpts(requestParameters: DeleteMemoryMediaBatchOperationRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes selected media directly assigned to one Memory. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - None of the selected media is referenced by the Memory journal.
      * @summary Delete selected memory media
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -411,7 +411,7 @@ export interface MemoryMediaApiInterface {
     deleteMemoryMediaBatchRaw(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes selected media directly assigned to one Memory. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - None of the selected media is referenced by the Memory journal.
      * Delete selected memory media
      */
     deleteMemoryMediaBatch(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -1206,7 +1206,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted. The request is rejected with `409 Conflict` when any direct media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - No direct media item in the addressed Memory is referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete all direct media from a memory
      */
     async deleteAllMemoryMediaRaw(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1217,7 +1217,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted. The request is rejected with `409 Conflict` when any direct media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - No direct media item in the addressed Memory is referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete all direct media from a memory
      */
     async deleteAllMemoryMedia(requestParameters: DeleteAllMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -1268,7 +1268,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes one media item directly assigned to the addressed Memory. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory. - The media is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete one memory media item
      */
     async deleteMemoryMediaRaw(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1279,7 +1279,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes one media item directly assigned to the addressed Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes one media item directly assigned to the addressed Memory. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The media belongs directly to the addressed Memory. - The media is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete one memory media item
      */
     async deleteMemoryMedia(requestParameters: DeleteMemoryMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -1332,7 +1332,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes selected media directly assigned to one Memory. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - None of the selected media is referenced by the Memory journal.
      * Delete selected memory media
      */
     async deleteMemoryMediaBatchRaw(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -1343,7 +1343,7 @@ export class MemoryMediaApi extends runtime.BaseAPI implements MemoryMediaApiInt
     }
 
     /**
-     * Deletes selected media directly assigned to one Memory.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.
+     * Deletes selected media directly assigned to one Memory. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - None of the selected media is referenced by the Memory journal.
      * Delete selected memory media
      */
     async deleteMemoryMediaBatch(requestParameters: DeleteMemoryMediaBatchOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

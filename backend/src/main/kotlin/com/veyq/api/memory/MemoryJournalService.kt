@@ -1,6 +1,7 @@
 package com.veyq.api.memory
 
 import com.veyq.api.auth.BadRequestException
+import com.veyq.api.auth.ConflictException
 import com.veyq.api.auth.ForbiddenException
 import com.veyq.api.auth.NotFoundException
 import com.veyq.api.auth.UnauthorizedException
@@ -44,6 +45,20 @@ class MemoryJournalService @Inject constructor(
 ) {
     fun getJournal(memory: Memory): MemoryJournalSummary =
         journalRepo.findByMemory(memory)?.let(::toSummary) ?: emptySummary(memory)
+
+    fun requireNoJournalReference(memory: Memory, kind: JournalReferenceKind, targetId: String) {
+        val managedMemory = memoryRepo.findByTenantAndPublicId(memory.tenant, memory.publicId)
+            ?: throw NotFoundException("Memory not found")
+        val markdown = journalRepo.findByMemory(managedMemory)?.markdown ?: return
+        val referenced = journalReferences(markdown)
+            .any { reference -> reference.kind == kind && targetId in reference.targetIds }
+        if (referenced) {
+            throw ConflictException(
+                "Cannot delete ${kind.displayName} while it is referenced by the memory journal",
+                "MEMORY_JOURNAL_REFERENCE_CONFLICT",
+            )
+        }
+    }
 
     fun createLiveSession(memory: Memory): MemoryJournalLiveSession {
         val user = requestContext.user ?: throw UnauthorizedException("Invalid session")
@@ -155,27 +170,21 @@ class MemoryJournalService @Inject constructor(
     private fun validateEmbeds(markdown: String, context: JournalValidationContext) {
         VEYQ_EMBED.findAll(markdown).forEach { match ->
             val kind = match.groupValues[1]
-            val target = match.groupValues[2].trim()
-            if (target.isBlank()) {
+            val targetIds = targetIds(match.groupValues[2])
+            if (targetIds.isEmpty()) {
                 throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
             }
             when (kind) {
-                "media" -> validateMediaEmbed(target, context)
-                "chapter" -> validateMemoryEmbed(target, context)
-                "playlist" -> validatePlaylistEmbed(target, context)
-                "track" -> validateTrackEmbed(target, context)
+                "media" -> validateMediaEmbed(targetIds, context)
+                "chapter" -> validateMemoryEmbed(singleTarget(targetIds), context)
+                "playlist" -> validatePlaylistEmbed(singleTarget(targetIds), context)
+                "track" -> validateTrackEmbed(targetIds, context)
                 else -> throw BadRequestException("Unsupported veyq journal embed", "MEMORY_JOURNAL_EMBED_UNSUPPORTED")
             }
         }
     }
 
-    private fun validateMediaEmbed(target: String, context: JournalValidationContext) {
-        val mediaIds = target.split(',')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        if (mediaIds.isEmpty()) {
-            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
-        }
+    private fun validateMediaEmbed(mediaIds: List<String>, context: JournalValidationContext) {
         mediaIds.forEach { mediaId ->
             validateSingleMediaEmbed(mediaId, context)
         }
@@ -193,13 +202,7 @@ class MemoryJournalService @Inject constructor(
         if (!allowed) throw NotFoundException("Media not found")
     }
 
-    private fun validateTrackEmbed(target: String, context: JournalValidationContext) {
-        val trackIds = target.split(',')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        if (trackIds.isEmpty()) {
-            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
-        }
+    private fun validateTrackEmbed(trackIds: List<String>, context: JournalValidationContext) {
         trackIds.forEach { trackId ->
             validateSingleTrackEmbed(trackId, context)
         }
@@ -242,6 +245,28 @@ class MemoryJournalService @Inject constructor(
 
     private fun isDescendantOrSelf(candidate: Memory, root: Memory): Boolean =
         candidate.id == root.id || generateSequence(candidate.parentMemory) { it.parentMemory }.any { it.id == root.id }
+
+    private fun journalReferences(markdown: String): List<JournalReference> =
+        VEYQ_EMBED.findAll(markdown)
+            .mapNotNull { match ->
+                val kind = JournalReferenceKind.fromToken(match.groupValues[1]) ?: return@mapNotNull null
+                val targetIds = targetIds(match.groupValues[2])
+                if (targetIds.isEmpty()) null else JournalReference(kind, targetIds)
+            }
+            .toList()
+
+    private fun targetIds(target: String): List<String> =
+        target.trim()
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+    private fun singleTarget(targetIds: List<String>): String {
+        if (targetIds.size != 1) {
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+        }
+        return targetIds.single()
+    }
 
     private fun emptySummary(memory: Memory): MemoryJournalSummary =
         MemoryJournalSummary(memory.publicId, "", OffsetDateTime.ofInstant(memory.updatedAt, ZoneOffset.UTC))
@@ -379,6 +404,22 @@ class MemoryJournalService @Inject constructor(
         val color: String = "#5b6ee1",
         val canEdit: Boolean = false,
         val expiresAt: Long = 0,
+    )
+
+    enum class JournalReferenceKind(val token: String, val displayName: String) {
+        Media("media", "media"),
+        Track("track", "track"),
+        Playlist("playlist", "playlist");
+
+        companion object {
+            fun fromToken(token: String): JournalReferenceKind? =
+                entries.firstOrNull { it.token == token }
+        }
+    }
+
+    private data class JournalReference(
+        val kind: JournalReferenceKind,
+        val targetIds: List<String>,
     )
 
     companion object {

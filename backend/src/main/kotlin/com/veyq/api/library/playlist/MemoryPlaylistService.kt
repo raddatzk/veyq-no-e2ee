@@ -21,6 +21,8 @@ import com.veyq.api.common.toApiOffsetDateTime
 import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
+import com.veyq.api.memory.MemoryJournalService
+import com.veyq.api.memory.MemoryJournalService.JournalReferenceKind
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import java.net.URI
@@ -31,6 +33,7 @@ import java.nio.charset.StandardCharsets
 class MemoryPlaylistService(
     private val playlistRepo: MemoryPlaylistRepo,
     private val memoryRepo: MemoryRepo,
+    private val memoryJournalService: MemoryJournalService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val playlistGroupMemberRepo: TenantGroupMemberRepo,
@@ -83,12 +86,16 @@ class MemoryPlaylistService(
     @Transactional
     fun deleteMemoryPlaylist(memoryId: String, playlistId: String) {
         val memory = resolveVisibleMemory(memoryId)
-        deletePlaylist(resolvePlaylist(memory, playlistId))
+        val playlist = resolvePlaylist(memory, playlistId)
+        requireNotReferencedByJournal(playlist)
+        deletePlaylist(playlist)
     }
 
     @Transactional
     fun deletePublicShareMemoryPlaylist(memory: Memory, playlistId: String) {
-        deletePlaylist(resolvePlaylist(memory, playlistId))
+        val playlist = resolvePlaylist(memory, playlistId)
+        requireNotReferencedByJournal(playlist)
+        deletePlaylist(playlist)
     }
 
     private fun createPlaylist(
@@ -124,6 +131,10 @@ class MemoryPlaylistService(
     private fun deletePlaylist(playlist: MemoryPlaylist) {
         playlist.delete()
         playlistRepo.flush()
+    }
+
+    private fun requireNotReferencedByJournal(playlist: MemoryPlaylist) {
+        memoryJournalService.requireNoJournalReference(playlist.memory, JournalReferenceKind.Playlist, playlist.publicId)
     }
 
     private fun applyFeatured(playlist: MemoryPlaylist, featured: Boolean?) {

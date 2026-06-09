@@ -82,7 +82,7 @@ export interface MemoryTracksApiInterface {
     deleteMemoryTrackRequestOpts(requestParameters: DeleteMemoryTrackRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory track and its stored original GPX file. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete a Memory track
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -94,7 +94,7 @@ export interface MemoryTracksApiInterface {
     deleteMemoryTrackRaw(requestParameters: DeleteMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory track and its stored original GPX file. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a Memory track
      */
     deleteMemoryTrack(requestParameters: DeleteMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -268,7 +268,7 @@ export class MemoryTracksApi extends runtime.BaseAPI implements MemoryTracksApiI
     }
 
     /**
-     * Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory track and its stored original GPX file. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a Memory track
      */
     async deleteMemoryTrackRaw(requestParameters: DeleteMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -279,7 +279,7 @@ export class MemoryTracksApi extends runtime.BaseAPI implements MemoryTracksApiI
     }
 
     /**
-     * Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory track and its stored original GPX file. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a Memory track
      */
     async deleteMemoryTrack(requestParameters: DeleteMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

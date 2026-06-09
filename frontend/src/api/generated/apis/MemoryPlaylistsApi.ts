@@ -101,7 +101,7 @@ export interface MemoryPlaylistsApiInterface {
     deleteMemoryPlaylistRequestOpts(requestParameters: DeleteMemoryPlaylistRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory playlist. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete Memory playlist
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
@@ -113,7 +113,7 @@ export interface MemoryPlaylistsApiInterface {
     deleteMemoryPlaylistRaw(requestParameters: DeleteMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory playlist. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete Memory playlist
      */
     deleteMemoryPlaylist(requestParameters: DeleteMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -290,7 +290,7 @@ export class MemoryPlaylistsApi extends runtime.BaseAPI implements MemoryPlaylis
     }
 
     /**
-     * Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory playlist. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete Memory playlist
      */
     async deleteMemoryPlaylistRaw(requestParameters: DeleteMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -301,7 +301,7 @@ export class MemoryPlaylistsApi extends runtime.BaseAPI implements MemoryPlaylis
     }
 
     /**
-     * Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory.  Implementierungsstatus: implemented.
+     * Deletes a Memory playlist. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant. - The current user can see the addressed Memory. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete Memory playlist
      */
     async deleteMemoryPlaylist(requestParameters: DeleteMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {

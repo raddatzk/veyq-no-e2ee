@@ -22,6 +22,8 @@ import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.media.MediaStorageService
+import com.veyq.api.memory.MemoryJournalService
+import com.veyq.api.memory.MemoryJournalService.JournalReferenceKind
 import jakarta.inject.Singleton
 import jakarta.transaction.Transactional
 import jakarta.ws.rs.core.Response
@@ -37,6 +39,7 @@ class MemoryTrackService(
     private val mediaStorageService: MediaStorageService,
     private val gpxTrackParser: GpxTrackParser,
     private val objectMapper: ObjectMapper,
+    private val memoryJournalService: MemoryJournalService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val trackGroupMemberRepo: TenantGroupMemberRepo,
@@ -95,12 +98,16 @@ class MemoryTrackService(
     @Transactional
     fun deleteMemoryTrack(memoryId: String, trackId: String) {
         val memory = resolveVisibleMemory(memoryId)
-        deleteTrack(resolveTrack(memory, trackId))
+        val track = resolveTrack(memory, trackId)
+        requireNotReferencedByJournal(track)
+        deleteTrack(track)
     }
 
     @Transactional
     fun deletePublicShareMemoryTrack(memory: Memory, trackId: String) {
-        deleteTrack(resolveTrack(memory, trackId))
+        val track = resolveTrack(memory, trackId)
+        requireNotReferencedByJournal(track)
+        deleteTrack(track)
     }
 
     fun memoryTrackContent(memoryId: String, trackId: String): Response {
@@ -185,6 +192,10 @@ class MemoryTrackService(
         track.delete()
         trackRepo.flush()
         deleteRecursively(directory)
+    }
+
+    private fun requireNotReferencedByJournal(track: MemoryTrack) {
+        memoryJournalService.requireNoJournalReference(track.memory, JournalReferenceKind.Track, track.publicId)
     }
 
     private fun trackContent(track: MemoryTrack): Response {

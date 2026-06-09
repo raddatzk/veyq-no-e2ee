@@ -81,7 +81,7 @@ Chapter embeds render an inline Chapter link/card affordance. Private Memory jou
 ::playlist:{playlistId} Playlist
 ```
 
-Playlist embeds reference Memory playlist objects. If a referenced playlist is deleted later, the journal Markdown is preserved and the renderer shows an unavailable embed. A veyq playlist holds one provider link in major line 1, such as Spotify, Apple Music, YouTube, SoundCloud or Deezer.
+Playlist embeds reference Memory playlist objects. A playlist cannot be deleted while it is referenced by the Memory journal. A veyq playlist holds one provider link in major line 1, such as Spotify, Apple Music, YouTube, SoundCloud or Deezer.
 
 ### Track
 
@@ -89,7 +89,7 @@ Playlist embeds reference Memory playlist objects. If a referenced playlist is d
 ::track:{trackId} Track
 ```
 
-Track embeds reference stored GPX tracks in the current Memory context. If a referenced track is deleted later, the journal Markdown is preserved and the renderer shows an unavailable embed.
+Track embeds reference stored GPX tracks in the current Memory context. A track cannot be deleted while it is referenced by the Memory journal.
 
 Multiple comma-separated track ids render as one map with all selected GPX routes. The UI adds distance, duration, ascent and descent across the selected tracks.
 
@@ -105,6 +105,8 @@ The backend validates `::` veyq tokens when a journal is saved:
 - Journal Markdown must be present and may not exceed the backend size limit.
 
 Invalid or unauthorized references fail the save request. Existing journals are not partially updated.
+
+Media, track and playlist delete requests fail with `409 Conflict` while the target is referenced by the Memory journal. Users must first edit the journal and remove the embed reference before deleting the referenced asset.
 
 ## Public Shares
 

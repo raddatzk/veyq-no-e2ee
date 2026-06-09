@@ -11,6 +11,8 @@ import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.track.MemoryTrackService
+import com.veyq.api.memory.MemoryJournalService
+import com.veyq.api.memory.MemoryJournalService.JournalReferenceKind
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
@@ -51,6 +53,7 @@ class MediaService @Inject constructor(
     private val mediaMetadataExtractor: MediaMetadataExtractor,
     private val mediaResponseMapper: MediaResponseMapper,
     private val trackService: MemoryTrackService,
+    private val memoryJournalService: MemoryJournalService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val mediaGroupMemberRepo: TenantGroupMemberRepo,
@@ -240,9 +243,10 @@ class MediaService @Inject constructor(
     @Transactional
     fun deleteMemoryMediaBatch(memoryId: String, request: DeleteMemoryMediaBatchRequest) {
         val memory = resolveVisibleMemory(memoryId)
-        normalizedMediaIds(request.mediaIds)
+        val media = normalizedMediaIds(request.mediaIds)
             .map { resolveMediaInMemory(memory, it) }
-            .forEach(::deleteMedia)
+        media.forEach { requireNotReferencedByJournal(it) }
+        media.forEach(::deleteMedia)
     }
 
     fun downloadMemoryMedia(memoryId: String, includeChildren: Boolean, locale: String?): Response {
@@ -1015,16 +1019,20 @@ class MediaService @Inject constructor(
     fun deleteMemoryMedia(memoryId: String, mediaId: String) {
         val memory = resolveVisibleMemory(memoryId)
         val media = resolveMediaInMemory(memory, mediaId)
+        requireNotReferencedByJournal(media)
         deleteMedia(media)
     }
 
     @Transactional
     fun deleteAllMemoryMedia(memoryId: String) {
         val memory = resolveVisibleMemory(memoryId)
-        mediaRepo.listByMemory(memory).forEach(::deleteMedia)
+        val media = mediaRepo.listByMemory(memory)
+        media.forEach { requireNotReferencedByJournal(it) }
+        media.forEach(::deleteMedia)
     }
 
     fun deletePublicMedia(media: Media) {
+        requireNotReferencedByJournal(media)
         deleteMedia(media)
     }
 
@@ -1332,6 +1340,11 @@ class MediaService @Inject constructor(
         media.delete()
         mediaRepo.flush()
         deleteBlobIfUnreferenced(blob)
+    }
+
+    private fun requireNotReferencedByJournal(media: Media) {
+        val memory = media.memory ?: return
+        memoryJournalService.requireNoJournalReference(memory, JournalReferenceKind.Media, media.publicId)
     }
 
     fun mediaSetHash(mediaIds: List<String>): String {
