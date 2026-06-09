@@ -370,6 +370,7 @@ struct MemoryDetailView: View {
                         title: headerTitle,
                         markdown: journalMarkdown,
                         media: media,
+                        tracks: tracks,
                         shareURL: internalShareURL(for: .journal)
                     )
                         .environmentObject(store)
@@ -385,6 +386,7 @@ struct MemoryDetailView: View {
                         title: headerTitle,
                         markdown: "",
                         media: media,
+                        tracks: tracks,
                         shareURL: internalShareURL(for: .journal),
                         editingInitially: true
                     )
@@ -397,7 +399,7 @@ struct MemoryDetailView: View {
             }
         } content: {
             if !journalMarkdown.isEmpty {
-                MemoryJournalRenderer(markdown: journalMarkdown, media: media)
+                MemoryJournalRenderer(markdown: journalMarkdown, media: media, tracks: tracks)
             } else if isLoadingDetail {
                 ProgressView("Loading journal...")
                     .font(.subheadline)
@@ -1518,7 +1520,7 @@ struct MemoryMapCluster: Identifiable, Equatable {
     }
 }
 
-private struct MemoryMapClusterMarker: View {
+struct MemoryMapClusterMarker: View {
     enum Size {
         case compact
         case regular
@@ -1652,7 +1654,7 @@ struct MemoryTrackEndpoint: Identifiable, Equatable {
     }
 }
 
-private struct MemoryTrackEndpointMarker: View {
+struct MemoryTrackEndpointMarker: View {
     let endpoint: MemoryTrackEndpoint
 
     var body: some View {
@@ -1669,10 +1671,11 @@ private struct MemoryTrackEndpointMarker: View {
     }
 }
 
-private struct MemoryMapView: View {
+struct MemoryMapView: View {
     let points: [MemoryMapPoint]
     let media: [MemoryMedia]
     let tracks: [MemoryTrack]
+    let recenterTracks: [MemoryTrack]?
     @Binding var mediaFilter: MemoryMediaFilter
     @Binding var enabledTrackIDs: Set<String>
     @Binding var importingTrackFiles: Bool
@@ -1691,6 +1694,7 @@ private struct MemoryMapView: View {
         points: [MemoryMapPoint],
         media: [MemoryMedia],
         tracks: [MemoryTrack],
+        recenterTracks: [MemoryTrack]? = nil,
         mediaFilter: Binding<MemoryMediaFilter>,
         enabledTrackIDs: Binding<Set<String>>,
         importingTrackFiles: Binding<Bool>
@@ -1698,6 +1702,7 @@ private struct MemoryMapView: View {
         self.points = points
         self.media = media
         self.tracks = tracks
+        self.recenterTracks = recenterTracks
         _mediaFilter = mediaFilter
         _enabledTrackIDs = enabledTrackIDs
         _importingTrackFiles = importingTrackFiles
@@ -1707,11 +1712,23 @@ private struct MemoryMapView: View {
             availableTrackIDs: Set(availableTracks.map(\.id))
         )
         let selectedTracks = availableTracks.filter { selectedTrackIDs.contains($0.id) }
-        _position = State(initialValue: MemoryMapRegion.cameraPosition(points: points, tracks: selectedTracks))
+        let focusedTracks = recenterTracks ?? selectedTracks
+        let focusedPoints = recenterTracks == nil ? points : []
+        _position = State(initialValue: MemoryMapRegion.cameraPosition(points: focusedPoints, tracks: focusedTracks))
     }
 
     private var enabledTracks: [MemoryTrack] {
         tracks.filter { enabledTrackIDs.contains($0.id) && $0.hasRenderableGeometry }
+    }
+
+    private var recenterFocusTracks: [MemoryTrack] {
+        guard let recenterTracks else { return enabledTracks }
+        let focusedTracks = recenterTracks.filter { enabledTrackIDs.contains($0.id) && $0.hasRenderableGeometry }
+        if !focusedTracks.isEmpty {
+            return focusedTracks
+        }
+        let renderableRecenterTracks = recenterTracks.filter(\.hasRenderableGeometry)
+        return renderableRecenterTracks.isEmpty ? enabledTracks : renderableRecenterTracks
     }
 
     private var clusters: [MemoryMapCluster] {
@@ -1959,19 +1976,24 @@ private struct MemoryMapView: View {
     }
 
     private func syncMapPosition() {
-        let nextRect = overlayAdjustedMapRect(MemoryMapRegion.mapRect(points: points, tracks: enabledTracks))
+        let nextRect = focusedMapRect()
         position = .rect(nextRect)
         visibleMapRect = nextRect
     }
 
     private func recenterMap() {
-        let nextRect = overlayAdjustedMapRect(MemoryMapRegion.mapRect(points: points, tracks: enabledTracks))
+        let nextRect = focusedMapRect()
         position = .automatic
         Task { @MainActor in
             await Task.yield()
             visibleMapRect = nextRect
             position = .rect(nextRect)
         }
+    }
+
+    private func focusedMapRect() -> MKMapRect {
+        let focusedPoints = recenterTracks == nil ? points : []
+        return overlayAdjustedMapRect(MemoryMapRegion.mapRect(points: focusedPoints, tracks: recenterFocusTracks))
     }
 
     private func focusTrack(_ track: MemoryTrack) {
@@ -2274,7 +2296,7 @@ private struct MemoryTrackSummaryRow: View {
     }
 }
 
-private struct MemoryTrackMetric: View {
+struct MemoryTrackMetric: View {
     let title: LocalizedStringKey
     let value: String
     let symbolName: String
@@ -2341,7 +2363,7 @@ enum MemoryTrackFormatter {
     }
 }
 
-private enum MemoryTrackPalette {
+enum MemoryTrackPalette {
     static func color(at index: Int) -> Color {
         let colors: [Color] = [
             VeyqColor.accent,
@@ -2468,6 +2490,7 @@ private struct MemoryJournalView: View {
     let title: String
     let markdown: String
     let media: [MemoryMedia]
+    let tracks: [MemoryTrack]
     let shareURL: URL?
     var editingInitially = false
 
@@ -2487,6 +2510,10 @@ private struct MemoryJournalView: View {
 
     private var currentMedia: [MemoryMedia] {
         store.memoryDetails[memory.id]?.media ?? media
+    }
+
+    private var currentTracks: [MemoryTrack] {
+        store.memoryDetails[memory.id]?.tracks ?? tracks
     }
 
     private var canEdit: Bool {
@@ -2513,7 +2540,7 @@ private struct MemoryJournalView: View {
                         )
                         .padding(.horizontal)
                     } else {
-                        MemoryJournalRenderer(markdown: currentMarkdown, media: currentMedia)
+                        MemoryJournalRenderer(markdown: currentMarkdown, media: currentMedia, tracks: currentTracks)
                             .padding(.horizontal)
                     }
                 }
@@ -2624,7 +2651,7 @@ private struct MemoryJournalView: View {
                             )
                             .padding(.horizontal)
                         } else {
-                            MemoryJournalRenderer(markdown: draft, media: currentMedia)
+                            MemoryJournalRenderer(markdown: draft, media: currentMedia, tracks: currentTracks)
                                 .padding(.horizontal)
                         }
                     }

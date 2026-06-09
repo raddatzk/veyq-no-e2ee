@@ -2674,6 +2674,30 @@ final class VeyqTests: XCTestCase {
         ])
     }
 
+    func testJournalParserTurnsCommaSeparatedTracksIntoTrackEmbed() {
+        let blocks = MemoryJournalParser.blocks(from: "# Route\n\n::track:track-ridge,track-lake Combined route\n\nDone.")
+
+        XCTAssertEqual(blocks, [
+            .markdown("# Route\n\n"),
+            .tracks(caption: "Combined route", ids: ["track-ridge", "track-lake"]),
+            .markdown("\n\nDone.")
+        ])
+    }
+
+    func testMemoryTrackAggregateCombinesTrackMetadata() throws {
+        UserDefaults.standard.set(AppLanguagePreference.en.rawValue, forKey: AppLanguagePreference.storageKey)
+        let first = try XCTUnwrap(MemoryTrack.samples.first { $0.id == "track-ridge" })
+        let second = try XCTUnwrap(MemoryTrack.samples.first { $0.id == "track-lake" })
+
+        let aggregate = MemoryTrackAggregate(tracks: [first, second])
+
+        XCTAssertEqual(aggregate.distanceMeters, 17_290)
+        XCTAssertEqual(aggregate.durationSeconds, 19_200)
+        XCTAssertEqual(aggregate.ascentMeters, 940)
+        XCTAssertEqual(aggregate.descentMeters, 730)
+        XCTAssertEqual(aggregate.title, "2 tracks")
+    }
+
     @MainActor
     func testMergeUploadedMediaKeepsDetailMediaChronological() async {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)

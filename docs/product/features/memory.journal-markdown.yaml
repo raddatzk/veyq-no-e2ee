@@ -52,7 +52,7 @@ acceptanceCriteria:
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
   - id: memory.journal-markdown.ui-rendering
-    statement: UI renders Markdown headings, media embeds and carousel embeds.
+    statement: UI renders Markdown headings, media embeds, carousel embeds and track embeds.
     coverage:
       frontend:
         unit:
@@ -65,9 +65,6 @@ acceptanceCriteria:
           - testName: opens journal media in a lightbox and synchronizes carousel navigation
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDetail.test.ts
-          - testName: uses decoded plain text for media alt labels
-            kind: positive
-            ref: frontend/src/features/memories/components/JournalRenderer.test.ts
         integration:
           - testName: memory detail renders breadcrumb context and memory tabs
             kind: positive
@@ -83,6 +80,15 @@ acceptanceCriteria:
           - testName: testJournalParserDecodesPercentEncodedMediaIDs
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testJournalParserTurnsCommaSeparatedTracksIntoTrackEmbed
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryTrackAggregateCombinesTrackMetadata
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+    gaps:
+      - reason: Browser decoded plain-text alt-label coverage was previously mapped to a removed JournalRenderer test file.
+        followUp: Restore focused browser unit coverage for decoded media alt labels in the current MemoryDetail or JournalRenderer test location.
   - id: memory.journal-markdown.ui-editing
     statement: UI supports journal editing and preview; the browser editor also supports help text and picker insertion for media, chapter, playlist and track embeds.
     coverage:
