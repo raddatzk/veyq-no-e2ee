@@ -183,22 +183,16 @@ end
 def active_review_builds(client, app_id, current_build_id)
   response = client.get(
     "/apps/#{app_id}/builds",
-    "fields[builds]" => "version,uploadedDate,expired,betaAppReviewSubmission",
-    "fields[betaAppReviewSubmissions]" => "betaReviewState,submittedDate,build",
-    "include" => "betaAppReviewSubmission",
+    "fields[builds]" => "version,uploadedDate,expired",
     "sort" => "-uploadedDate",
     "limit" => 200
   )
-  submissions = response.fetch("included", [])
-    .select { |item| item.fetch("type") == "betaAppReviewSubmissions" }
-    .to_h { |item| [item.fetch("id"), item] }
 
   response.fetch("data").filter_map do |build|
     next if build.fetch("id") == current_build_id
     next if build.dig("attributes", "expired")
 
-    submission_id = build.dig("relationships", "betaAppReviewSubmission", "data", "id")
-    submission = submissions[submission_id]
+    submission = beta_review_submission(client, build.fetch("id"))
     state = submission&.dig("attributes", "betaReviewState")
     next unless ACTIVE_BETA_REVIEW_STATES.include?(state)
 
