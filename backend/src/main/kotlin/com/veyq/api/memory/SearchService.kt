@@ -132,8 +132,13 @@ class SearchService @Inject constructor(
             ?: LibraryScopes.pathPrefix(scope()).trimEnd('/')) + "/" + name
 
     private fun Memory.coverUrl(): String? =
-        coverStorageKey?.let { "/api/${url(tenant().name)}/memories/${url(publicId)}/cover/content" }
-            ?: coverMedia?.let { media -> "/api/${url(tenant().name)}/memory-media/${url(media.publicId)}/content" }
+        coverStorageKey?.let { storageKey ->
+            "/api/${url(tenant().name)}/memories/${url(publicId)}/cover/preview?fp=${coverFingerprint(storageKey)}"
+        }
+            ?: coverMedia?.let { media -> "/api/${url(tenant().name)}/memory-media/${url(media.publicId)}/preview" }
+
+    private fun coverFingerprint(storageKey: String): String =
+        Integer.toUnsignedString(storageKey.hashCode(), 36)
 
     private fun Memory.coverCrop(): CoverCrop? {
         val x = coverCropX ?: return null

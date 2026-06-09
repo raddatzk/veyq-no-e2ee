@@ -308,7 +308,7 @@ export interface PublicShareMediaThumbnailRequest {
     mediaId: string;
 }
 
-export interface PublicShareMemoryCoverContentRequest {
+export interface PublicShareMemoryCoverPreviewRequest {
     shareId: string;
     memoryId: string;
 }
@@ -723,7 +723,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMediaRequestOpts(requestParameters: DeletePublicShareMediaRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes one media item inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Deletes one media item inside the shared subtree. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree. - The media is not referenced by the Memory journal.
      * @summary Delete media through a public share
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -735,7 +735,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMediaRaw(requestParameters: DeletePublicShareMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes one media item inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Deletes one media item inside the shared subtree. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree. - The media is not referenced by the Memory journal.
      * Delete media through a public share
      */
     deletePublicShareMedia(requestParameters: DeletePublicShareMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -777,7 +777,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryMediaBatchRequestOpts(requestParameters: DeletePublicShareMemoryMediaBatchRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes selected media when the current identity can manage each selected item. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree. - None of the selected media is referenced by the Memory journal.
      * @summary Delete selected public share Memory media
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -789,7 +789,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryMediaBatchRaw(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes selected media when the current identity can manage each selected item. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree. - None of the selected media is referenced by the Memory journal.
      * Delete selected public share Memory media
      */
     deletePublicShareMemoryMediaBatch(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -833,7 +833,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryPlaylistRequestOpts(requestParameters: DeletePublicShareMemoryPlaylistRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes playlist context visible through a public share. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete public share Memory playlist
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -845,7 +845,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryPlaylistRaw(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes playlist context visible through a public share. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete public share Memory playlist
      */
     deletePublicShareMemoryPlaylist(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -861,7 +861,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryTrackRequestOpts(requestParameters: DeletePublicShareMemoryTrackRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes a GPX track visible through a public share. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * @summary Delete a public share Memory track
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
@@ -873,7 +873,7 @@ export interface PublicSharesApiInterface {
     deletePublicShareMemoryTrackRaw(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes a GPX track visible through a public share. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a public share Memory track
      */
     deletePublicShareMemoryTrack(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
@@ -1431,30 +1431,30 @@ export interface PublicSharesApiInterface {
     publicShareMediaThumbnail(requestParameters: PublicShareMediaThumbnailRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
-     * Creates request options for publicShareMemoryCoverContent without sending the request
+     * Creates request options for publicShareMemoryCoverPreview without sending the request
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
      */
-    publicShareMemoryCoverContentRequestOpts(requestParameters: PublicShareMemoryCoverContentRequest): Promise<runtime.RequestOpts>;
+    publicShareMemoryCoverPreviewRequestOpts(requestParameters: PublicShareMemoryCoverPreviewRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Streams an explicit cover upload for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
-     * @summary Stream explicit public share Memory cover
+     * Streams the bounded cover preview for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * @summary Stream explicit public share Memory cover preview
      * @param {string} shareId Public share id.
      * @param {string} memoryId Public Memory id.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof PublicSharesApiInterface
      */
-    publicShareMemoryCoverContentRaw(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+    publicShareMemoryCoverPreviewRaw(requestParameters: PublicShareMemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
 
     /**
-     * Streams an explicit cover upload for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
-     * Stream explicit public share Memory cover
+     * Streams the bounded cover preview for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Stream explicit public share Memory cover preview
      */
-    publicShareMemoryCoverContent(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+    publicShareMemoryCoverPreview(requestParameters: PublicShareMemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
 
     /**
      * Creates request options for publicShareMemoryTrackContent without sending the request
@@ -2625,7 +2625,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes one media item inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Deletes one media item inside the shared subtree. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree. - The media is not referenced by the Memory journal.
      * Delete media through a public share
      */
     async deletePublicShareMediaRaw(requestParameters: DeletePublicShareMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -2636,7 +2636,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes one media item inside the shared subtree.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree.
+     * Deletes one media item inside the shared subtree. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.  Vorbedingungen: - The share role is `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The media belongs to the requested Memory inside the shared subtree. - The media is not referenced by the Memory journal.
      * Delete media through a public share
      */
     async deletePublicShareMedia(requestParameters: DeletePublicShareMediaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -2743,7 +2743,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes selected media when the current identity can manage each selected item. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree. - None of the selected media is referenced by the Memory journal.
      * Delete selected public share Memory media
      */
     async deletePublicShareMemoryMediaBatchRaw(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -2754,7 +2754,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes selected media when the current identity can manage each selected item.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Deletes selected media when the current identity can manage each selected item. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.  Vorbedingungen: - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree. - None of the selected media is referenced by the Memory journal.
      * Delete selected public share Memory media
      */
     async deletePublicShareMemoryMediaBatch(requestParameters: DeletePublicShareMemoryMediaBatchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -2867,7 +2867,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes playlist context visible through a public share. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete public share Memory playlist
      */
     async deletePublicShareMemoryPlaylistRaw(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -2878,7 +2878,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes playlist context visible through a public share. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and playlist belong to the shared subtree. - The playlist is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete public share Memory playlist
      */
     async deletePublicShareMemoryPlaylist(requestParameters: DeletePublicShareMemoryPlaylistRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -2929,7 +2929,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes a GPX track visible through a public share. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a public share Memory track
      */
     async deletePublicShareMemoryTrackRaw(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -2940,7 +2940,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree.  Implementierungsstatus: implemented.
+     * Deletes a GPX track visible through a public share. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.  Vorbedingungen: - The share role is `CONTRIBUTOR` or `MANAGER`. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory and track belong to the shared subtree. - The track is not referenced by the Memory journal.  Implementierungsstatus: implemented.
      * Delete a public share Memory track
      */
     async deletePublicShareMemoryTrack(requestParameters: DeletePublicShareMemoryTrackRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
@@ -4110,20 +4110,20 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Creates request options for publicShareMemoryCoverContent without sending the request
+     * Creates request options for publicShareMemoryCoverPreview without sending the request
      */
-    async publicShareMemoryCoverContentRequestOpts(requestParameters: PublicShareMemoryCoverContentRequest): Promise<runtime.RequestOpts> {
+    async publicShareMemoryCoverPreviewRequestOpts(requestParameters: PublicShareMemoryCoverPreviewRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['shareId'] == null) {
             throw new runtime.RequiredError(
                 'shareId',
-                'Required parameter "shareId" was null or undefined when calling publicShareMemoryCoverContent().'
+                'Required parameter "shareId" was null or undefined when calling publicShareMemoryCoverPreview().'
             );
         }
 
         if (requestParameters['memoryId'] == null) {
             throw new runtime.RequiredError(
                 'memoryId',
-                'Required parameter "memoryId" was null or undefined when calling publicShareMemoryCoverContent().'
+                'Required parameter "memoryId" was null or undefined when calling publicShareMemoryCoverPreview().'
             );
         }
 
@@ -4132,7 +4132,7 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/cover/content`;
+        let urlPath = `/api/public-shares/{shareId}/memories/{memoryId}/cover/preview`;
         urlPath = urlPath.replace(`{${"shareId"}}`, encodeURIComponent(String(requestParameters['shareId'])));
         urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
 
@@ -4145,22 +4145,22 @@ export class PublicSharesApi extends runtime.BaseAPI implements PublicSharesApiI
     }
 
     /**
-     * Streams an explicit cover upload for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
-     * Stream explicit public share Memory cover
+     * Streams the bounded cover preview for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Stream explicit public share Memory cover preview
      */
-    async publicShareMemoryCoverContentRaw(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        const requestOptions = await this.publicShareMemoryCoverContentRequestOpts(requestParameters);
+    async publicShareMemoryCoverPreviewRaw(requestParameters: PublicShareMemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.publicShareMemoryCoverPreviewRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.VoidApiResponse(response);
     }
 
     /**
-     * Streams an explicit cover upload for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
-     * Stream explicit public share Memory cover
+     * Streams the bounded cover preview for one Memory inside the shared subtree.  Vorbedingungen: - The share is enabled. - A valid share access-token cookie or normal authenticated Memory visibility is present. - The requested Memory belongs to the shared subtree.
+     * Stream explicit public share Memory cover preview
      */
-    async publicShareMemoryCoverContent(requestParameters: PublicShareMemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.publicShareMemoryCoverContentRaw(requestParameters, initOverrides);
+    async publicShareMemoryCoverPreview(requestParameters: PublicShareMemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.publicShareMemoryCoverPreviewRaw(requestParameters, initOverrides);
     }
 
     /**

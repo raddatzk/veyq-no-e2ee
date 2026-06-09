@@ -822,12 +822,14 @@ paths:
       x-preconditions:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
+        - None of the selected media is referenced by the Memory journal.
       description: |-
-        Deletes selected media when the current identity can manage each selected item.
+        Deletes selected media when the current identity can manage each selected item. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
+        - None of the selected media is referenced by the Memory journal.
       parameters:
         - "$ref": "#/components/parameters/ShareId"
         - "$ref": "#/components/parameters/MemoryId"
@@ -844,6 +846,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/public-shares/{shareId}/memories/{memoryId}/media/uploads":
     post:
       tags: [PublicShares]
@@ -1191,13 +1195,15 @@ paths:
         - The share role is `CONTRIBUTOR` or `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory and track belong to the shared subtree.
+        - The track is not referenced by the Memory journal.
       description: |-
-        Deletes a GPX track visible through a public share. Journal references are preserved and render as unavailable embeds.
+        Deletes a GPX track visible through a public share. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.
 
         Vorbedingungen:
         - The share role is `CONTRIBUTOR` or `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory and track belong to the shared subtree.
+        - The track is not referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -1213,6 +1219,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/public-shares/{shareId}/memories/{memoryId}/tracks/{trackId}/content":
     get:
       tags: [PublicShares]
@@ -1370,13 +1378,15 @@ paths:
         - The share role is `CONTRIBUTOR` or `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory and playlist belong to the shared subtree.
+        - The playlist is not referenced by the Memory journal.
       description: |-
-        Deletes playlist context visible through a public share. Journal references are preserved and render as unavailable embeds.
+        Deletes playlist context visible through a public share. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.
 
         Vorbedingungen:
         - The share role is `CONTRIBUTOR` or `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory and playlist belong to the shared subtree.
+        - The playlist is not referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -1392,6 +1402,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/public-shares/{shareId}/memories/{memoryId}/cover":
     put:
       tags: [PublicShares]
@@ -1455,11 +1467,11 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
-  "/api/public-shares/{shareId}/memories/{memoryId}/cover/content":
+  "/api/public-shares/{shareId}/memories/{memoryId}/cover/preview":
     get:
       tags: [PublicShares]
-      operationId: publicShareMemoryCoverContent
-      summary: Stream explicit public share Memory cover
+      operationId: publicShareMemoryCoverPreview
+      summary: Stream explicit public share Memory cover preview
       security: []
       x-implementation-status: implemented
       x-preconditions:
@@ -1467,7 +1479,7 @@ paths:
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The requested Memory belongs to the shared subtree.
       description: |-
-        Streams an explicit cover upload for one Memory inside the shared subtree.
+        Streams the bounded cover preview for one Memory inside the shared subtree.
 
         Vorbedingungen:
         - The share is enabled.
@@ -1478,9 +1490,11 @@ paths:
         - "$ref": "#/components/parameters/MemoryId"
       responses:
         "200":
-          description: Cover bytes.
+          description: Cover preview bytes.
         "401":
           "$ref": "./common.openapi.yaml#/components/responses/401"
+        "403":
+          "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
   "/api/public-shares/{shareId}/memories/{memoryId}/media/{mediaId}/capturedAt":
@@ -1564,13 +1578,15 @@ paths:
         - The share role is `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The media belongs to the requested Memory inside the shared subtree.
+        - The media is not referenced by the Memory journal.
       description: |-
-        Deletes one media item inside the shared subtree.
+        Deletes one media item inside the shared subtree. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.
 
         Vorbedingungen:
         - The share role is `MANAGER`.
         - A valid share access-token cookie or normal authenticated Memory visibility is present.
         - The media belongs to the requested Memory inside the shared subtree.
+        - The media is not referenced by the Memory journal.
       parameters:
         - "$ref": "#/components/parameters/ShareId"
         - "$ref": "#/components/parameters/MemoryId"
@@ -1584,6 +1600,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "409":
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/public-shares/{shareId}/media":
     get:
       tags: [PublicShares]
@@ -2291,7 +2309,7 @@ components:
             id: mem_abc123
             displayName: Summer Trip
             path: /
-            coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/content
+            coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/preview?fp=cover-preview-fp
             coverCrop:
               x: 0
               y: 0
@@ -2747,7 +2765,7 @@ components:
         parentId: null
         childCount: 1
         mediaCount: 3
-        coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/content
+        coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/preview?fp=cover-preview-fp
         coverMediaId: med_abc123
         coverCrop:
           x: 0
@@ -2792,7 +2810,7 @@ components:
         id: mem_abc123
         displayName: Summer Trip
         path: /
-        coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/content
+        coverUrl: /api/public-shares/shr_abc123/memories/mem_abc123/cover/preview?fp=cover-preview-fp
         coverCrop:
           x: 0
           y: 0.125

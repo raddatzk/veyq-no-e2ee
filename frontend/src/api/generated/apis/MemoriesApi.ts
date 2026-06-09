@@ -103,7 +103,7 @@ export interface ListMemoriesRequest {
     tenantName: string;
 }
 
-export interface MemoryCoverContentRequest {
+export interface MemoryCoverPreviewRequest {
     tenantName: string;
     memoryId: string;
 }
@@ -439,30 +439,30 @@ export interface MemoriesApiInterface {
     listMemories(requestParameters: ListMemoriesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<MemorySummary>>;
 
     /**
-     * Creates request options for memoryCoverContent without sending the request
+     * Creates request options for memoryCoverPreview without sending the request
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
      */
-    memoryCoverContentRequestOpts(requestParameters: MemoryCoverContentRequest): Promise<runtime.RequestOpts>;
+    memoryCoverPreviewRequestOpts(requestParameters: MemoryCoverPreviewRequest): Promise<runtime.RequestOpts>;
 
     /**
-     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * @summary Stream memory cover image
+     * Streams the bounded preview variant used for rendering Memory covers.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * @summary Stream memory cover preview image
      * @param {string} tenantName Permalink tenant name from the URL.
      * @param {string} memoryId Public Memory id.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof MemoriesApiInterface
      */
-    memoryCoverContentRaw(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
+    memoryCoverPreviewRaw(requestParameters: MemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>>;
 
     /**
-     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Stream memory cover image
+     * Streams the bounded preview variant used for rendering Memory covers.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover preview image
      */
-    memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
+    memoryCoverPreview(requestParameters: MemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob>;
 
     /**
      * Creates request options for moveMemory without sending the request
@@ -1243,20 +1243,20 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Creates request options for memoryCoverContent without sending the request
+     * Creates request options for memoryCoverPreview without sending the request
      */
-    async memoryCoverContentRequestOpts(requestParameters: MemoryCoverContentRequest): Promise<runtime.RequestOpts> {
+    async memoryCoverPreviewRequestOpts(requestParameters: MemoryCoverPreviewRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['tenantName'] == null) {
             throw new runtime.RequiredError(
                 'tenantName',
-                'Required parameter "tenantName" was null or undefined when calling memoryCoverContent().'
+                'Required parameter "tenantName" was null or undefined when calling memoryCoverPreview().'
             );
         }
 
         if (requestParameters['memoryId'] == null) {
             throw new runtime.RequiredError(
                 'memoryId',
-                'Required parameter "memoryId" was null or undefined when calling memoryCoverContent().'
+                'Required parameter "memoryId" was null or undefined when calling memoryCoverPreview().'
             );
         }
 
@@ -1265,7 +1265,7 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/api/{tenantName}/memories/{memoryId}/cover/content`;
+        let urlPath = `/api/{tenantName}/memories/{memoryId}/cover/preview`;
         urlPath = urlPath.replace(`{${"tenantName"}}`, encodeURIComponent(String(requestParameters['tenantName'])));
         urlPath = urlPath.replace(`{${"memoryId"}}`, encodeURIComponent(String(requestParameters['memoryId'])));
 
@@ -1278,22 +1278,22 @@ export class MemoriesApi extends runtime.BaseAPI implements MemoriesApiInterface
     }
 
     /**
-     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Stream memory cover image
+     * Streams the bounded preview variant used for rendering Memory covers.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover preview image
      */
-    async memoryCoverContentRaw(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
-        const requestOptions = await this.memoryCoverContentRequestOpts(requestParameters);
+    async memoryCoverPreviewRaw(requestParameters: MemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Blob>> {
+        const requestOptions = await this.memoryCoverPreviewRequestOpts(requestParameters);
         const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.BlobApiResponse(response);
     }
 
     /**
-     * Streams the explicit Memory cover image when one is set.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
-     * Stream memory cover image
+     * Streams the bounded preview variant used for rendering Memory covers.  Vorbedingungen: - A valid access token cookie must be present. - The current user must be a member of the addressed tenant.  Implementierungsstatus: implemented.
+     * Stream memory cover preview image
      */
-    async memoryCoverContent(requestParameters: MemoryCoverContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
-        const response = await this.memoryCoverContentRaw(requestParameters, initOverrides);
+    async memoryCoverPreview(requestParameters: MemoryCoverPreviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Blob> {
+        const response = await this.memoryCoverPreviewRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

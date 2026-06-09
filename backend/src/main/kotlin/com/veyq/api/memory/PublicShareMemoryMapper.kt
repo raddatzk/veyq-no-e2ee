@@ -74,8 +74,13 @@ class PublicShareMemoryMapper(
     }
 
     private fun publicCoverUrl(memory: Memory, shareId: String): String? =
-        memory.coverStorageKey?.let { "/api/public-shares/${url(shareId)}/memories/${url(memory.publicId)}/cover/content" }
-            ?: memory.coverMedia?.publicId?.let { "/api/public-shares/${url(shareId)}/media/${url(it)}/content" }
+        memory.coverStorageKey?.let { storageKey ->
+            "/api/public-shares/${url(shareId)}/memories/${url(memory.publicId)}/cover/preview?fp=${coverFingerprint(storageKey)}"
+        }
+            ?: memory.coverMedia?.publicId?.let { "/api/public-shares/${url(shareId)}/media/${url(it)}/preview" }
+
+    private fun coverFingerprint(storageKey: String): String =
+        Integer.toUnsignedString(storageKey.hashCode(), 36)
 
     private fun coverCrop(memory: Memory): PublicShareCoverCrop? {
         val x = memory.coverCropX ?: return null

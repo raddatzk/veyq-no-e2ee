@@ -1,4 +1,5 @@
 import MapKit
+import UIKit
 import XCTest
 @testable import Veyq
 
@@ -17,6 +18,54 @@ final class VeyqTests: XCTestCase {
     func testAllowsHttpInstanceURL() throws {
         let url = try InstanceURLValidator.normalize("http://memories.example.test")
         XCTAssertEqual(url.absoluteString, "http://memories.example.test")
+    }
+
+    func testMediaImageCacheStoresThumbnailInMemoryAndOnDisk() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "veyq-media-cache-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let imageData = try XCTUnwrap(Self.testPNGData())
+        let image = try XCTUnwrap(UIImage(data: imageData))
+        var currentDate = Date(timeIntervalSince1970: 1_000)
+        let cache = MediaImageCache(rootDirectory: directory, timeToLive: 60, now: { currentDate })
+        let scope = MediaImageCache.Scope(instanceURL: URL(string: "https://memories.example.test")!, tenantName: "family", userId: 1)
+        let url = "/api/family/memory-media/med-1/thumbnail"
+
+        cache.store(image, data: imageData, for: url, scope: scope)
+
+        XCTAssertNotNil(cache.image(for: url, scope: scope))
+
+        cache.clearMemory()
+        currentDate = Date(timeIntervalSince1970: 1_030)
+
+        let diskImage = try XCTUnwrap(cache.image(for: url, scope: scope))
+        XCTAssertEqual(diskImage.size.width, image.size.width)
+    }
+
+    func testMediaImageCacheExpiresDiskEntriesAfterTTL() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "veyq-media-cache-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let imageData = try XCTUnwrap(Self.testPNGData())
+        let image = try XCTUnwrap(UIImage(data: imageData))
+        var currentDate = Date(timeIntervalSince1970: 1_000)
+        let cache = MediaImageCache(rootDirectory: directory, timeToLive: 60, now: { currentDate })
+        let scope = MediaImageCache.Scope(instanceURL: URL(string: "https://memories.example.test")!, tenantName: "family", userId: 1)
+        let url = "/api/family/memory-media/med-1/preview"
+
+        cache.store(image, data: imageData, for: url, scope: scope)
+        cache.clearMemory()
+        currentDate = Date(timeIntervalSince1970: 1_061)
+
+        XCTAssertNil(cache.image(for: url, scope: scope))
+    }
+
+    func testMediaImageCacheOnlyCachesDerivedMediaVariants() throws {
+        XCTAssertTrue(MediaImageCache.isCacheableVariant("/api/family/memory-media/med-1/thumbnail"))
+        XCTAssertTrue(MediaImageCache.isCacheableVariant("/api/family/memory-media/med-1/preview"))
+        XCTAssertTrue(MediaImageCache.isCacheableVariant("/api/family/memory-media/med-1/poster"))
+        XCTAssertTrue(MediaImageCache.isCacheableVariant("/api/family/memories/mem-1/cover/preview?fp=cover-preview-fp"))
+        XCTAssertFalse(MediaImageCache.isCacheableVariant("/api/family/memory-media/med-1/content"))
     }
 
     func testKeepsInstancePathPrefix() throws {
@@ -72,7 +121,7 @@ final class VeyqTests: XCTestCase {
         await store.loadDetail(for: memory)
 
         XCTAssertEqual(store.memoryDetails[memory.id]?.header.displayName, "Summer in South Tyrol")
-        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, "/api/family/memories/summer-south-tyrol/cover/content")
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, "/api/family/memories/summer-south-tyrol/cover/preview?fp=cover-preview-fp")
         XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverCrop?.width, 0.8)
         XCTAssertEqual(store.memoryDetails[memory.id]?.journal.memoryId, "summer-south-tyrol")
     }
@@ -839,7 +888,7 @@ final class VeyqTests: XCTestCase {
           "path": "/albania-2024",
           "parentId": null,
           "coverMediaId": "med_abc123",
-          "coverUrl": "/api/friends/memory-media/med_abc123/content",
+          "coverUrl": "/api/friends/memory-media/med_abc123/preview",
           "coverCrop": {
             "x": 0.1,
             "y": 0.2,
@@ -856,7 +905,7 @@ final class VeyqTests: XCTestCase {
 
         let memory = try JSONDecoder.veyq.decode(Memory.self, from: data)
 
-        XCTAssertEqual(memory.coverUrl, "/api/friends/memory-media/med_abc123/content")
+        XCTAssertEqual(memory.coverUrl, "/api/friends/memory-media/med_abc123/preview")
         XCTAssertEqual(memory.coverCrop?.x, 0.1)
         XCTAssertEqual(memory.coverCrop?.height, 0.45)
     }
@@ -867,7 +916,7 @@ final class VeyqTests: XCTestCase {
           "id": "mem_abc123",
           "displayName": "Albania 2024",
           "path": "/albania-2024",
-          "coverUrl": "/api/friends/memories/mem_abc123/cover/content",
+          "coverUrl": "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp",
           "coverCrop": {
             "x": 0,
             "y": 0,
@@ -885,7 +934,7 @@ final class VeyqTests: XCTestCase {
 
         let header = try JSONDecoder.veyq.decode(MemoryHeader.self, from: data)
 
-        XCTAssertEqual(header.coverUrl, "/api/friends/memories/mem_abc123/cover/content")
+        XCTAssertEqual(header.coverUrl, "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp")
         XCTAssertEqual(header.coverCrop?.width, 1)
         XCTAssertEqual(header.coverCrop?.height, 0.5625)
         XCTAssertEqual(header.chapterCount, 3)
@@ -1049,9 +1098,9 @@ final class VeyqTests: XCTestCase {
         let updated = try await store.setMemoryCover(for: memory, media: media)
 
         XCTAssertEqual(updated.coverMediaId, media.id)
-        XCTAssertEqual(updated.coverUrl, media.contentUrl)
+        XCTAssertEqual(updated.coverUrl, media.previewUrl)
         XCTAssertEqual(updated.coverCrop, .defaultCoverCrop)
-        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, media.contentUrl)
+        XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverUrl, media.previewUrl)
         XCTAssertEqual(store.memoryDetails[memory.id]?.header.coverCrop, .defaultCoverCrop)
     }
 
@@ -1117,14 +1166,14 @@ final class VeyqTests: XCTestCase {
           "title": "Albania 2024",
           "dateRange": "2026-06-01 - 2026-06-07",
           "tenantName": "friends",
-          "coverUrl": "/api/friends/memories/mem_abc123/cover/content",
+          "coverUrl": "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp",
           "coverThumbnailFilename": "mem_abc123-cover.jpg"
         }
         """.data(using: .utf8)!
 
         let target = try JSONDecoder().decode(ShareImportMemoryTarget.self, from: data)
 
-        XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/content")
+        XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp")
         XCTAssertEqual(target.coverThumbnailFilename, "mem_abc123-cover.jpg")
     }
 
@@ -1135,13 +1184,13 @@ final class VeyqTests: XCTestCase {
           "title": "Albania 2024",
           "dateRange": "2026-06-01 - 2026-06-07",
           "tenantName": "friends",
-          "coverUrl": "/api/friends/memories/mem_abc123/cover/content"
+          "coverUrl": "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp"
         }
         """.data(using: .utf8)!
 
         let target = try JSONDecoder().decode(ShareImportMemoryTarget.self, from: data)
 
-        XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/content")
+        XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp")
         XCTAssertNil(target.coverThumbnailFilename)
         XCTAssertNil(target.parentMemoryTitle)
         XCTAssertNil(target.depth)
@@ -1181,7 +1230,7 @@ final class VeyqTests: XCTestCase {
                     title: "Albania 2024",
                     dateRange: "2026-06-01 - 2026-06-07",
                     tenantName: "friends",
-                    coverUrl: "/api/friends/memories/mem_abc123/cover/content",
+                    coverUrl: "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp",
                     coverThumbnailFilename: "mem_abc123-cover.jpg"
                 )
             ],
@@ -1865,7 +1914,7 @@ final class VeyqTests: XCTestCase {
           "path": "/summer-trip",
           "parentId": null,
           "coverMediaId": "media-1",
-          "coverUrl": "/api/friends/memory-media/media-1/content",
+          "coverUrl": "/api/friends/memory-media/media-1/preview",
           "coverCrop": {
             "x": 0,
             "y": 0,
@@ -3102,6 +3151,15 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(session.instanceURL.absoluteString, "https://memories.example.test")
         XCTAssertTrue(session.capabilities.isEmpty)
         XCTAssertNil(session.selectedTenantName)
+    }
+
+    private static func testPNGData() -> Data? {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2))
+        let image = renderer.image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+        }
+        return image.pngData()
     }
 }
 

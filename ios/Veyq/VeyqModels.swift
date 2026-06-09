@@ -845,7 +845,7 @@ struct MemoryTrack: Codable, Identifiable, Equatable {
 
 extension Memory {
     static let samples: [Memory] = [
-        Memory(id: "summer-south-tyrol", name: "summer-south-tyrol", displayName: "Summer in South Tyrol", path: "/summer-south-tyrol", parentId: nil, coverMediaId: nil, coverUrl: "/api/family/memories/summer-south-tyrol/cover/content", coverCrop: CoverCrop(x: 0.1, y: 0.0, width: 0.8, height: 0.45), startDate: "2026-07-12", endDate: "2026-07-18", mediaCount: 128, childCount: 4),
+        Memory(id: "summer-south-tyrol", name: "summer-south-tyrol", displayName: "Summer in South Tyrol", path: "/summer-south-tyrol", parentId: nil, coverMediaId: nil, coverUrl: "/api/family/memories/summer-south-tyrol/cover/preview?fp=cover-preview-fp", coverCrop: CoverCrop(x: 0.1, y: 0.0, width: 0.8, height: 0.45), startDate: "2026-07-12", endDate: "2026-07-18", mediaCount: 128, childCount: 4),
         Memory(id: "birthday-weekend", name: "birthday-weekend", displayName: "Birthday Weekend", path: "/@family/birthday-weekend", parentId: nil, coverMediaId: nil, coverUrl: nil, coverCrop: nil, startDate: "2026-03-07", endDate: "2026-03-09", mediaCount: 56, childCount: 2),
         Memory(id: "morning-garden", name: "morning-garden", displayName: "Morning Garden", path: "/~me/morning-garden", parentId: nil, coverMediaId: nil, coverUrl: nil, coverCrop: nil, startDate: "2026-05-04", endDate: "2026-05-04", mediaCount: 18, childCount: 0)
     ]

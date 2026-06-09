@@ -161,6 +161,28 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `deleting playlist referenced by journal is rejected`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("playlist-journal-trip", "Playlist Journal Trip"))
+        val playlist = memoryPlaylistService.createMemoryPlaylist(
+            trip.id,
+            CreateMemoryPlaylistRequest(
+                title = "Roadtrip Soundtrack",
+                url = "https://www.youtube.com/playlist?list=PL1234567890abcdef",
+            ),
+        )
+        memoryJournalService.updateJournal(
+            memory(trip.id),
+            "::playlist:${playlist.id} Roadtrip",
+            MemoryJournalService.JournalValidationContext(memory(trip.id)),
+        )
+
+        assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
+            memoryPlaylistService.deleteMemoryPlaylist(trip.id, playlist.id)
+        }
+        assertThat(memoryPlaylistService.listMemoryPlaylists(trip.id).map { it.id }).contains(playlist.id)
+    }
+
+    @Test
     fun `creates root and child memories and lists descendant media by taken time`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("trip", "Trip"))
         val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
@@ -873,6 +895,23 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `deleting media referenced by journal is rejected`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("delete-journal-media-trip", "Delete Journal Media Trip"))
+        val first = createMedia(owner, memory(trip.id), "First Journal Photo")
+        val second = createMedia(owner, memory(trip.id), "Second Journal Photo")
+        memoryJournalService.updateJournal(
+            memory(trip.id),
+            "::media:${first.publicId},${second.publicId} Carousel",
+            MemoryJournalService.JournalValidationContext(memory(trip.id)),
+        )
+
+        assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
+            mediaService.deleteMemoryMedia(trip.id, second.publicId)
+        }
+        assertThat(mediaRepo.findByTenantAndPublicId(tenant, second.publicId)).isNotNull
+    }
+
+    @Test
     fun `deletes all direct memory media without deleting child memory media`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("delete-all-media-trip", "Delete All Media Trip"))
         val child = memoryService.createMemory(CreateMemoryRequest("delete-all-media-child", "Delete All Media Child", parentId = trip.id))
@@ -1341,6 +1380,23 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `deleting track referenced by journal is rejected`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("delete-journal-track-trip", "Delete Journal Track Trip"))
+        val first = createTrack(memory(trip.id), "Summit Route")
+        val second = createTrack(memory(trip.id), "Valley Route")
+        memoryJournalService.updateJournal(
+            memory(trip.id),
+            "::track:${first.publicId},${second.publicId} Route",
+            MemoryJournalService.JournalValidationContext(memory(trip.id)),
+        )
+
+        assertThatExceptionOfType(ConflictException::class.java).isThrownBy {
+            memoryTrackService.deleteMemoryTrack(trip.id, second.publicId)
+        }
+        assertThat(memoryTrackService.listMemoryTracks(trip.id).map { it.id }).contains(second.publicId)
+    }
+
+    @Test
     fun `reads empty journal and updates markdown with visible embeds`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("journal-trip", "Journal Trip"))
         val day = memoryService.createMemory(CreateMemoryRequest("day-one", "Day One", parentId = trip.id))
@@ -1524,9 +1580,9 @@ class MemoryServiceTest {
 
         val covered = setCover(root.id, coverFile("root-cover"), "root-cover.png")
         assertThat(covered.coverMediaId).isNull()
-        assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
+        assertThat(covered.coverUrl).startsWith("/api/${tenant.name}/memories/${root.id}/cover/preview?fp=")
         entityManager.clear()
-        val coverResponse = memoryService.coverContent(root.id)
+        val coverResponse = memoryService.coverPreview(root.id)
         assertThat(coverResponse.getHeaderString("X-Content-Type-Options")).isEqualTo("nosniff")
         assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
             setCover(root.id, textFile("not-an-image"), "cover.txt")
@@ -1579,8 +1635,19 @@ class MemoryServiceTest {
         val covered = setCover(root.id, coverFile("standalone-cover"), "cover.png")
 
         assertThat(covered.coverMediaId).isNull()
-        assertThat(covered.coverUrl).isEqualTo("/api/${tenant.name}/memories/${root.id}/cover/content")
+        assertThat(covered.coverUrl).startsWith("/api/${tenant.name}/memories/${root.id}/cover/preview?fp=")
         assertThat(memory(root.id).coverMedia).isNull()
+    }
+
+    @Test
+    fun `standalone cover replacement changes preview fingerprint URL`() {
+        val root = memoryService.createMemory(CreateMemoryRequest("cover-fingerprint-root", "Cover Fingerprint Root"))
+        val first = setCover(root.id, coverFile("first-cover"), "cover.png")
+        val second = setCover(root.id, coverFile("second-cover"), "cover.png")
+
+        assertThat(first.coverUrl).startsWith("/api/${tenant.name}/memories/${root.id}/cover/preview?fp=")
+        assertThat(second.coverUrl).startsWith("/api/${tenant.name}/memories/${root.id}/cover/preview?fp=")
+        assertThat(second.coverUrl).isNotEqualTo(first.coverUrl)
     }
 
     @Test
@@ -1600,7 +1667,7 @@ class MemoryServiceTest {
         )
 
         assertThat(covered.coverMediaId).isEqualTo(media.publicId)
-        assertThat(covered.coverUrl).contains("/memory-media/${media.publicId}/content")
+        assertThat(covered.coverUrl).contains("/memory-media/${media.publicId}/preview")
         assertThat(covered.coverCrop?.x).isEqualTo(0.0)
         assertThat(covered.coverCrop?.width).isEqualTo(1.0)
     }
@@ -1643,7 +1710,7 @@ class MemoryServiceTest {
         }
 
         assertThat(memory(root.id).coverStorageKey).isEqualTo(existingKey)
-        assertThat(memoryService.coverContent(root.id).status).isEqualTo(200)
+        assertThat(memoryService.coverPreview(root.id).status).isEqualTo(200)
     }
 
     @Test
@@ -1916,6 +1983,24 @@ class MemoryServiceTest {
                 it.createdAt = createdAt
                 it.capturedAt = capturedAt
                 mediaRepo.persist(it)
+            }
+        }
+
+    private fun createTrack(memory: Memory, title: String): MemoryTrack =
+        inTransaction {
+            MemoryTrack().also {
+                it.tenant = tenant
+                it.memory = memory
+                it.scopeType = memory.scopeType
+                it.scopeGroup = memory.scopeGroup
+                it.scopeUser = memory.scopeUser
+                it.title = title
+                it.activityType = MemoryTrackActivityType.HIKING
+                it.originalFilename = "${title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')}.gpx"
+                it.storageKey = "test/$runId/${UUID.randomUUID()}.gpx"
+                it.geometryJson = """{"type":"LineString","coordinates":[]}"""
+                entityManager.persist(it)
+                entityManager.flush()
             }
         }
 

@@ -20,6 +20,7 @@ import com.veyq.api.library.LibraryScopeKey
 import com.veyq.api.library.LibraryScopes
 import com.veyq.api.library.LibraryService
 import com.veyq.api.library.ResolvedMemoryLocation
+import com.veyq.api.library.media.MediaImageOrientation
 import com.veyq.api.library.media.MediaKind
 import com.veyq.api.library.media.MediaMetadataExtractor
 import com.veyq.api.library.media.MediaService
@@ -34,8 +35,10 @@ import org.jboss.logging.Logger
 import java.awt.Dimension
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.time.LocalDate
 import java.util.UUID
+import javax.imageio.ImageIO
 import kotlin.math.abs
 
 @Singleton
@@ -295,10 +298,10 @@ class MemoryService @Inject constructor(
                 ?: throw BadRequestException("Only JPEG, PNG and GIF covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
             if (mediaType.kind != MediaKind.Image) throw BadRequestException("Only JPEG, PNG and GIF covers are supported", "MEMORY_COVER_TYPE_UNSUPPORTED")
             val crop = requiredCoverCrop(cropX, cropY, cropWidth, cropHeight, imageDimensions(uploadPath, mediaType.mimeType))
-            val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}-${UUID.randomUUID()}/cover-original"
-            writeFile(uploadPath, storageKey)
+            val storageKey = "tenant-${tenant().id}/memory-covers/${memory.publicId}-${UUID.randomUUID()}/cover-preview.jpg"
+            writeCoverPreview(uploadPath, storageKey)
             memory.coverStorageKey = storageKey
-            memory.coverMimeType = mediaType.mimeType
+            memory.coverMimeType = "image/jpeg"
             memory.coverOriginalFilename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "cover"
             memory.coverMedia = null
             memory.coverCropX = crop.x
@@ -335,7 +338,7 @@ class MemoryService @Inject constructor(
         return toSummary(memory)
     }
 
-    fun coverContent(publicId: String): Response {
+    fun coverPreview(publicId: String): Response {
         val memory = resolveVisibleMemory(publicId)
         val storageKey = memory.coverStorageKey ?: throw NotFoundException("Cover not found")
         val path = storagePath(storageKey)
@@ -555,8 +558,10 @@ class MemoryService @Inject constructor(
     }
 
     private fun Memory.coverUrl(): String? =
-        coverStorageKey?.let { "/api/${url(tenant().name)}/memories/${url(publicId)}/cover/content" }
-            ?: coverMedia?.let { media -> media.contentUrl() }
+        coverStorageKey?.let { coverStorageKey ->
+            "/api/${url(tenant().name)}/memories/${url(publicId)}/cover/preview?fp=${coverFingerprint(coverStorageKey)}"
+        }
+            ?: coverMedia?.let { media -> media.previewUrl() }
 
     private fun Memory.coverCrop(): CoverCrop? {
         val x = coverCropX ?: return null
@@ -690,8 +695,11 @@ class MemoryService @Inject constructor(
     private fun List<String>.toPathOrNull(): String? =
         if (isEmpty()) null else "/" + joinToString("/")
 
-    private fun Media.contentUrl(): String =
-        "/api/${url(tenant().name)}/memory-media/${url(publicId)}/content"
+    private fun Media.previewUrl(): String =
+        "/api/${url(tenant().name)}/memory-media/${url(publicId)}/preview"
+
+    private fun coverFingerprint(storageKey: String): String =
+        Integer.toUnsignedString(storageKey.hashCode(), 36)
 
     private fun Media.imageDimensions(): Dimension =
         blob.imageWidth?.let { width ->
@@ -713,8 +721,25 @@ class MemoryService @Inject constructor(
         return coverPath.parent ?: coverPath
     }
 
-    private fun writeFile(source: Path, storageKey: String) {
-        mediaStorageService.writeAtomic(source, storageKey, "cover-")
+    private fun writeCoverPreview(source: Path, storageKey: String) {
+        val targetPath = storagePath(storageKey)
+        Files.createDirectories(targetPath.parent)
+        val temp = Files.createTempFile(targetPath.parent, "cover-preview-", ".jpg")
+        try {
+            val image = ImageIO.read(source.toFile())
+                ?: throw BadRequestException("Cover source dimensions could not be read", "MEMORY_COVER_DIMENSIONS_UNREADABLE")
+            val oriented = MediaImageOrientation.apply(image, mediaMetadataExtractor.extractOrientation(source))
+            val scale = minOf(1.0, COVER_PREVIEW_MAX_EDGE.toDouble() / maxOf(oriented.width, oriented.height).toDouble())
+            val targetWidth = maxOf(1, (oriented.width * scale).toInt())
+            val targetHeight = maxOf(1, (oriented.height * scale).toInt())
+            val preview = MediaImageOrientation.resize(oriented, targetWidth, targetHeight)
+            if (!ImageIO.write(preview, "jpg", temp.toFile())) {
+                throw BadRequestException("Cover preview could not be generated", "MEMORY_COVER_PREVIEW_UNSUPPORTED")
+            }
+            Files.move(temp, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
     }
 
     private fun deleteOldExplicitCover(oldStorageKey: String?, newStorageKey: String?) {
@@ -744,5 +769,6 @@ class MemoryService @Inject constructor(
     private companion object {
         private const val COVER_ASPECT_RATIO = 16.0 / 9.0
         private const val COVER_ASPECT_TOLERANCE = 0.01
+        private const val COVER_PREVIEW_MAX_EDGE = 1600
     }
 }

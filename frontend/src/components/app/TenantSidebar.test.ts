@@ -129,7 +129,7 @@ describe('TenantSidebar', () => {
           displayName: 'Favorite Trip',
           path: '/trip',
           coverMediaId: null,
-          coverUrl: '/api/tenant/memories/mem-1/cover/content',
+          coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp',
           coverCrop: { x: 0.1, y: 0.2, width: 0.8, height: 0.45 },
           startDate: '2026-05-03',
           endDate: '2026-05-05',
@@ -164,7 +164,7 @@ describe('TenantSidebar', () => {
 
     expect(wrapper.text()).toContain('Favorite Trip')
     expect(wrapper.find('a[href="/trip"]').exists()).toBe(true)
-    expect(wrapper.find('img.memory-cover-image').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/content')
+    expect(wrapper.find('img.memory-cover-image').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp')
     expect(wrapper.find('img.memory-cover-image').attributes('data-crop')).toBe('{"x":0.1,"y":0.2,"width":0.8,"height":0.45}')
     expect(wrapper.find('a[href="/without-cover"] .pi-images').exists()).toBe(true)
     expect(wrapper.find('.pi-star-fill').exists()).toBe(false)

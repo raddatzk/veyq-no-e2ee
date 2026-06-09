@@ -194,7 +194,7 @@ describe('MemoryDetail', () => {
       props: {
         tenantName: 'tenant',
         memory: memory(),
-        header: header({ coverUrl: '/api/tenant/memories/mem-1/cover/content' }),
+        header: header({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' }),
         childMemories: [],
         media: []
       },

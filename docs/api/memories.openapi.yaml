@@ -837,13 +837,15 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - No direct media item in the addressed Memory is referenced by the Memory journal.
       description: |-
-        Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted.
+        Deletes all media directly assigned to the addressed Memory. Media assigned to descendant Memories is not deleted. The request is rejected with `409 Conflict` when any direct media item is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - No direct media item in the addressed Memory is referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -858,6 +860,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/media/updates":
     get:
       tags:
@@ -1113,13 +1117,15 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - None of the selected media is referenced by the Memory journal.
       description: |-
-        Deletes selected media directly assigned to one Memory.
+        Deletes selected media directly assigned to one Memory. The request is rejected with `409 Conflict` when any selected media item is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - None of the selected media is referenced by the Memory journal.
       parameters:
         - "$ref": "./common.openapi.yaml#/components/parameters/TenantName"
         - "$ref": "#/components/parameters/MemoryId"
@@ -1136,6 +1142,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/media/uploads":
     post:
       tags:
@@ -1479,13 +1487,15 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - The track is not referenced by the Memory journal.
       description: |-
-        Deletes a Memory track and its stored original GPX file. Journal references are preserved and render as unavailable embeds.
+        Deletes a Memory track and its stored original GPX file. The request is rejected with `409 Conflict` when the track is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - The track is not referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -1501,6 +1511,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/tracks/{trackId}/content":
     get:
       tags:
@@ -1654,13 +1666,15 @@ paths:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - The playlist is not referenced by the Memory journal.
       description: |-
-        Deletes a Memory playlist. Journal references are preserved and render as unavailable embeds.
+        Deletes a Memory playlist. The request is rejected with `409 Conflict` when the playlist is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
+        - The playlist is not referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -1676,6 +1690,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/cover":
     put:
       tags:
@@ -1739,18 +1755,18 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
-  "/api/{tenantName}/memories/{memoryId}/cover/content":
+  "/api/{tenantName}/memories/{memoryId}/cover/preview":
     get:
       tags:
         - Memories
-      operationId: memoryCoverContent
-      summary: Stream memory cover image
+      operationId: memoryCoverPreview
+      summary: Stream memory cover preview image
       x-implementation-status: implemented
       x-preconditions:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
       description: |-
-        Streams the explicit Memory cover image when one is set.
+        Streams the bounded preview variant used for rendering Memory covers.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
@@ -1762,7 +1778,7 @@ paths:
         - "$ref": "#/components/parameters/MemoryId"
       responses:
         '200':
-          description: Memory cover image bytes.
+          description: Memory cover preview image bytes.
           content:
             image/*:
               schema:
@@ -1857,14 +1873,16 @@ paths:
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
         - The media belongs directly to the addressed Memory.
+        - The media is not referenced by the Memory journal.
       description: |-
-        Deletes one media item directly assigned to the addressed Memory.
+        Deletes one media item directly assigned to the addressed Memory. The request is rejected with `409 Conflict` when the media item is referenced by the Memory journal.
 
         Vorbedingungen:
         - A valid access token cookie must be present.
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
         - The media belongs directly to the addressed Memory.
+        - The media is not referenced by the Memory journal.
 
         Implementierungsstatus: implemented.
       parameters:
@@ -1880,6 +1898,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '409':
+          "$ref": "./common.openapi.yaml#/components/responses/409"
   "/api/{tenantName}/memories/{memoryId}/media/metadata-batch":
     patch:
       tags:
@@ -2529,7 +2549,7 @@ components:
             id: mem_abc123
             displayName: Summer Trip
             path: /summer-trip
-            coverUrl: /api/friends/memories/mem_abc123/cover/content
+            coverUrl: /api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp
             coverCrop:
               x: 0
               y: 0
@@ -2797,7 +2817,7 @@ components:
               path: /summer-trip/beach-day
               scope:
                 type: TENANT
-              coverUrl: /api/friends/memories/mem_abc123/cover/content
+              coverUrl: /api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp
               matchTypes:
                 - TITLE
                 - JOURNAL
@@ -3080,7 +3100,7 @@ components:
         path: /summer-trip/beach-day
         scope:
           type: TENANT
-        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        coverUrl: /api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp
         matchTypes:
           - TITLE
           - JOURNAL
@@ -3150,7 +3170,7 @@ components:
         displayName: Summer Trip
         path: /summer-trip
         coverMediaId: med_abc123
-        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        coverUrl: /api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp
         coverCrop:
           x: 0
           y: 0.125
@@ -3222,7 +3242,7 @@ components:
         id: mem_abc123
         displayName: Summer Trip
         path: /summer-trip
-        coverUrl: /api/friends/memories/mem_abc123/cover/content
+        coverUrl: /api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp
         coverCrop:
           x: 0
           y: 0.125

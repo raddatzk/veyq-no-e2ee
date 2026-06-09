@@ -291,8 +291,8 @@ class PublicShareResource @Inject constructor(
     override fun removePublicShareMemoryCover(shareId: String, memoryId: String): Response =
         Response.ok(memoryShareService.removePublicShareMemoryCover(shareId, memoryId)).build()
 
-    override fun publicShareMemoryCoverContent(shareId: String, memoryId: String): Response =
-        memoryShareService.publicShareMemoryCoverContent(shareId, memoryId)
+    override fun publicShareMemoryCoverPreview(shareId: String, memoryId: String): Response =
+        memoryShareService.publicShareMemoryCoverPreview(shareId, memoryId)
 
     override fun updatePublicShareMediaCapturedAt(
         shareId: String,

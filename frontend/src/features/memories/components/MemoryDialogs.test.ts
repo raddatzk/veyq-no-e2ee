@@ -350,7 +350,7 @@ describe('Memory detail dialogs', () => {
 
   it('uploads a standalone cover image', async () => {
     const file = new File(['cover'], 'cover.jpg', { type: 'image/jpeg' })
-    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/content' })
+    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' })
     setMemoryCoverMock.mockResolvedValue(updated)
     const saved = vi.fn()
 
@@ -667,7 +667,7 @@ describe('Memory detail dialogs', () => {
   })
 
   it('creates a standalone cover from existing memory media', async () => {
-    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/content' })
+    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' })
     setMemoryCoverMock.mockResolvedValue(updated)
     const saved = vi.fn()
 
@@ -701,7 +701,7 @@ describe('Memory detail dialogs', () => {
   })
 
   it('preloads an existing media cover with saved crop metadata', async () => {
-    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/content' })
+    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' })
     setMemoryCoverMock.mockResolvedValue(updated)
 
     const wrapper = mount(MemoryCoverDialog, {
@@ -733,7 +733,7 @@ describe('Memory detail dialogs', () => {
   it('updates crop only for an existing standalone cover without reuploading it', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
-    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/content' })
+    const updated = memory({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' })
     setMemoryCoverMock.mockResolvedValue(updated)
 
     const wrapper = mount(MemoryCoverDialog, {
@@ -741,7 +741,7 @@ describe('Memory detail dialogs', () => {
         visible: true,
         tenantName: 'tenant',
         memory: memory({
-          coverUrl: '/api/tenant/memories/mem-1/cover/content',
+          coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp',
           coverCrop: { x: 0, y: 0, width: 1, height: 0.75 }
         }),
         media: []
@@ -790,7 +790,7 @@ describe('Memory detail dialogs', () => {
       props: {
         visible: true,
         tenantName: 'tenant',
-        memory: memory({ coverUrl: '/api/tenant/memories/mem-1/cover/content' }),
+        memory: memory({ coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp' }),
         media: [],
         onSaved: saved
       },
@@ -826,7 +826,7 @@ describe('Memory detail dialogs', () => {
         visible: true,
         tenantName: 'tenant',
         memory: memory({
-          coverUrl: '/api/tenant/memories/mem-1/cover/content',
+          coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp',
           coverCrop: { x: 0, y: 0, width: 1, height: 0.75 }
         })
       },
@@ -834,7 +834,7 @@ describe('Memory detail dialogs', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('.share-memory-cover img').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/content')
+    expect(wrapper.find('.share-memory-cover img').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp')
     expect(wrapper.find('.share-memory-copy').text()).toContain('Trip')
     expect(wrapper.text()).toContain('Family')
     expect(wrapper.text()).not.toContain('Drop Zone')
@@ -984,7 +984,7 @@ describe('Memory detail dialogs', () => {
         visible: true,
         tenantName: 'tenant',
         memory: memory({
-          coverUrl: '/api/tenant/memories/mem-1/cover/content',
+          coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp',
           coverCrop: { x: 0, y: 0, width: 1, height: 0.75 }
         })
       },
@@ -992,7 +992,7 @@ describe('Memory detail dialogs', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('.share-memory-cover img').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/content')
+    expect(wrapper.find('.share-memory-cover img').attributes('src')).toBe('/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp')
     expect(wrapper.find('.share-memory-copy').text()).toContain('Trip')
     expect(wrapper.text()).toContain('Drop Zone')
     expect(wrapper.text()).not.toContain('Family')

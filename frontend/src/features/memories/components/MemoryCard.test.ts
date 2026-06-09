@@ -36,7 +36,7 @@ describe('MemoryCard', () => {
     const wrapper = mount(MemoryCard, {
       props: {
         memory: memory({
-          coverUrl: '/api/tenant/memories/mem-1/cover/content'
+          coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp'
         })
       },
       global: { stubs: cardStubs() }

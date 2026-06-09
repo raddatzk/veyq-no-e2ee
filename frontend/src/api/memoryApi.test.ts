@@ -491,7 +491,7 @@ describe('memoryApi facade', () => {
     mocks.deleteMemory.mockResolvedValue(undefined)
     mocks.setMemoryCover.mockResolvedValue({
       ...memoryResponse('updated'),
-      coverUrl: '/api/tenant/memories/mem-1/cover/content'
+      coverUrl: '/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp'
     })
     mocks.removeMemoryCover.mockResolvedValue(memoryResponse('updated'))
 
@@ -520,7 +520,7 @@ describe('memoryApi facade', () => {
       tenantName: 'tenant',
       memoryId: 'mem-1'
     })
-    expect(covered.coverUrl).toBe('/api/tenant/memories/mem-1/cover/content')
+    expect(covered.coverUrl).toBe('/api/tenant/memories/mem-1/cover/preview?fp=cover-preview-fp')
     expect(uncovered.coverMediaId).toBeNull()
     expect(uncovered.coverUrl).toBeNull()
   })

@@ -60,6 +60,7 @@ Each connected instance has separate local state:
 - authenticated user and tenant bootstrap state
 - upload queue
 - cached Memory navigation/media metadata
+- scoped in-memory and on-disk caches for derived thumbnails, previews and posters
 
 Kotlin Multiplatform or another shared core can be considered later for API adapters, upload state machines or compatibility logic, but V1 should not depend on shared UI or a shared runtime.
 

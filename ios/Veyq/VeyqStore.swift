@@ -39,6 +39,7 @@ final class VeyqStore: ObservableObject {
     private let sessionStore: NativeSessionStoring
     private let authenticator: MobileAuthenticating
     private let apiSession: URLSession
+    private let mediaImageCache: MediaImageCache
     private let mockMode: Bool
     private var uploadTasks: [String: Task<Void, Never>] = [:]
     private var activeCapabilities = Set<String>()
@@ -112,12 +113,14 @@ final class VeyqStore: ObservableObject {
         sessionStore: NativeSessionStoring = KeychainNativeSessionStore(),
         authenticator: MobileAuthenticating? = nil,
         apiSession: URLSession = .shared,
+        mediaImageCache: MediaImageCache = .shared,
         mockMode: Bool = false
     ) {
         self.instanceRepository = instanceRepository
         self.sessionStore = sessionStore
         self.authenticator = authenticator ?? SystemMobileAuthenticator()
         self.apiSession = apiSession
+        self.mediaImageCache = mediaImageCache
         self.mockMode = mockMode
         self.uploadItems = mockMode ? UploadQueueItem.samples : UploadQueuePersistence.loadQueue()
     }
@@ -177,6 +180,9 @@ final class VeyqStore: ObservableObject {
     }
 
     func disconnect() {
+        if !mockMode {
+            mediaImageCache.removeAllDiskCache()
+        }
         if !mockMode, let client = apiClient {
             Task { try? await client.logoutMobileSession() }
             try? sessionStore.delete()
@@ -222,6 +228,9 @@ final class VeyqStore: ObservableObject {
                 try? await VeyqAPIClient(instanceURL: session.instanceURL, apiBaseURL: session.apiBaseURL, accessToken: session.accessToken, session: apiSession).logoutMobileSession()
             }
             try sessionStore.delete(instanceURL: session.instanceURL)
+            if !mockMode {
+                mediaImageCache.removeDiskCache(forInstanceURL: session.instanceURL)
+            }
             instances = try sessionStore.loadAll()
             if connectedInstanceURL == session.instanceURL {
                 if let next = try sessionStore.loadActive() {
@@ -735,7 +744,7 @@ final class VeyqStore: ObservableObject {
         let crop = CoverCrop.defaultCoverCrop
         let updated: Memory
         if mockMode {
-            updated = memory.withCover(mediaId: media.id, coverUrl: media.contentUrl, coverCrop: crop)
+            updated = memory.withCover(mediaId: media.id, coverUrl: media.previewUrl ?? media.thumbnailUrl ?? media.contentUrl, coverCrop: crop)
         } else {
             guard let tenantName = selectedTenant?.name, let apiClient else {
                 throw VeyqAPIError.missingSession
@@ -1018,8 +1027,15 @@ final class VeyqStore: ObservableObject {
             throw VeyqAPIError.invalidDiscovery
         }
         guard let apiClient else { throw VeyqAPIError.missingSession }
+        let cacheScope = mediaImageCacheScope()
+        if let cacheScope, let image = mediaImageCache.image(for: urlString, scope: cacheScope) {
+            return image
+        }
         let data = try await apiClient.mediaData(from: urlString)
         guard let image = UIImage(data: data) else { throw VeyqAPIError.invalidDiscovery }
+        if let cacheScope {
+            mediaImageCache.store(image, data: data, for: urlString, scope: cacheScope)
+        }
         return image
     }
 
@@ -1372,6 +1388,7 @@ final class VeyqStore: ObservableObject {
 
     private func clearActiveState() {
         cancelRunningUploadTasks()
+        mediaImageCache.clearMemory()
         connectedInstanceURL = nil
         user = nil
         tenants = []
@@ -1388,6 +1405,11 @@ final class VeyqStore: ObservableObject {
         apiClient = nil
         activeCapabilities = []
         errorMessage = nil
+    }
+
+    private func mediaImageCacheScope() -> MediaImageCache.Scope? {
+        guard let connectedInstanceURL, let tenantName = selectedTenant?.name, let userId = user?.userId else { return nil }
+        return MediaImageCache.Scope(instanceURL: connectedInstanceURL, tenantName: tenantName, userId: userId)
     }
 
     private func runNextUploadIfNeeded() {

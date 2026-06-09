@@ -114,8 +114,8 @@ class MemoryResource @Inject constructor(
         }
     }
 
-    override fun memoryCoverContent(tenantName: String, memoryId: String): Response =
-        memoryService.coverContent(memoryId)
+    override fun memoryCoverPreview(tenantName: String, memoryId: String): Response =
+        memoryService.coverPreview(memoryId)
 
     override fun removeMemoryCover(tenantName: String, memoryId: String): Response =
         Response.ok(memoryService.clearCover(memoryId)).build()

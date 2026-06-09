@@ -32,6 +32,7 @@
 		10A000000000000000000023 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B000000000000000000031 /* AppPreferences.swift */; };
 		10A000000000000000000024 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B000000000000000000032 /* SettingsView.swift */; };
 		10A000000000000000000025 /* MemoryJournalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B000000000000000000033 /* MemoryJournalRenderer.swift */; };
+		10A000000000000000000026 /* MediaImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B000000000000000000034 /* MediaImageCache.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -106,6 +107,7 @@
 		10B000000000000000000031 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
 		10B000000000000000000032 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		10B000000000000000000033 /* MemoryJournalRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryJournalRenderer.swift; sourceTree = "<group>"; };
+		10B000000000000000000034 /* MediaImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImageCache.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +168,7 @@
 				10B000000000000000000018 /* MemoryMediaGalleryView.swift */,
 				10B000000000000000000016 /* UploadQueueView.swift */,
 				10B000000000000000000020 /* UploadSupport.swift */,
+				10B000000000000000000034 /* MediaImageCache.swift */,
 				10B000000000000000000031 /* AppPreferences.swift */,
 				10B000000000000000000026 /* L10n.swift */,
 				10B000000000000000000006 /* VeyqStore.swift */,
@@ -395,6 +398,7 @@
 				10A000000000000000000014 /* JustifiedMediaLayout.swift in Sources */,
 				10A000000000000000000015 /* MemoryMediaGalleryView.swift in Sources */,
 				10A000000000000000000017 /* UploadSupport.swift in Sources */,
+				10A000000000000000000026 /* MediaImageCache.swift in Sources */,
 				10A000000000000000000020 /* L10n.swift in Sources */,
 				10A000000000000000000023 /* AppPreferences.swift in Sources */,
 				10A000000000000000000024 /* SettingsView.swift in Sources */,

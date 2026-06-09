@@ -55,6 +55,45 @@ acceptanceCriteria:
           - testName: marks highlighted media with a star badge in the gallery
             kind: positive
             ref: frontend/src/components/media/MediaGrid.test.ts
+  - id: memory.media.ios-derived-image-cache
+    statement: iOS caches thumbnail, preview, poster and cover preview image variants in memory and on disk with scoped expiry while leaving originals uncached.
+    coverage:
+      ios:
+        unit:
+          - testName: testMediaImageCacheStoresThumbnailInMemoryAndOnDisk
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMediaImageCacheExpiresDiskEntriesAfterTTL
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMediaImageCacheOnlyCachesDerivedMediaVariants
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media.cover-preview-use
+    statement: Memory cover URLs use bounded preview variants instead of original media or upload bytes.
+    coverage:
+      backend:
+        integration:
+          - testName: uploads standalone covers and deletes descendant memories and media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: standalone cover upload clears existing cover media reference
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: standalone cover replacement changes preview fingerprint URL
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: sets cover from existing memory media with crop metadata
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testMemoryCoverDecoding
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientSetsMemoryCoverFromMediaWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: memory.media.lightbox-original-download
     statement: The lightbox can open previews/originals and provide original download links.
     coverage:

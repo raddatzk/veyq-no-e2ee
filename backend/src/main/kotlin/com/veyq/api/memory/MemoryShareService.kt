@@ -821,7 +821,7 @@ class MemoryShareService @Inject constructor(
         return publicShareMemoryMapper.toSummary(memory, access.share)
     }
 
-    fun publicShareMemoryCoverContent(shareId: String, memoryId: String): Response {
+    fun publicShareMemoryCoverPreview(shareId: String, memoryId: String): Response {
         val access = requireFullAccess(resolveEnabledShare(shareId))
         val memory = resolveShareMemory(access, memoryId)
         val storageKey = memory.coverStorageKey ?: throw NotFoundException("Cover not found")
