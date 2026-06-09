@@ -93,6 +93,8 @@ class AppStoreConnect
   end
 end
 
+ACTIVE_BETA_REVIEW_STATES = %w[WAITING_FOR_REVIEW IN_REVIEW].freeze
+
 def find_group(client, app_id, group_name)
   response = client.get("/apps/#{app_id}/betaGroups", limit: 200)
   response.fetch("data").find { |group| group.dig("attributes", "name") == group_name } ||
@@ -178,7 +180,76 @@ rescue RuntimeError => e
   puts "Build #{build_id} is already associated with beta group #{group_id}."
 end
 
-def submit_beta_review(client, build_id)
+def active_review_builds(client, app_id, current_build_id)
+  response = client.get(
+    "/apps/#{app_id}/builds",
+    "fields[builds]" => "version,uploadedDate,expired,betaAppReviewSubmission",
+    "fields[betaAppReviewSubmissions]" => "betaReviewState,submittedDate,build",
+    "include" => "betaAppReviewSubmission",
+    "sort" => "-uploadedDate",
+    "limit" => 200
+  )
+  submissions = response.fetch("included", [])
+    .select { |item| item.fetch("type") == "betaAppReviewSubmissions" }
+    .to_h { |item| [item.fetch("id"), item] }
+
+  response.fetch("data").filter_map do |build|
+    next if build.fetch("id") == current_build_id
+    next if build.dig("attributes", "expired")
+
+    submission_id = build.dig("relationships", "betaAppReviewSubmission", "data", "id")
+    submission = submissions[submission_id]
+    state = submission&.dig("attributes", "betaReviewState")
+    next unless ACTIVE_BETA_REVIEW_STATES.include?(state)
+
+    { build: build, submission: submission, state: state }
+  end
+end
+
+def expire_build(client, build)
+  build_id = build.fetch("id")
+  client.patch(
+    "/builds/#{build_id}",
+    data: {
+      type: "builds",
+      id: build_id,
+      attributes: {
+        expired: true
+      }
+    }
+  )
+end
+
+def expire_active_review_builds(client, app_id, current_build_id)
+  builds = active_review_builds(client, app_id, current_build_id)
+  abort("Could not find an older active Beta App Review build to expire.") if builds.empty?
+
+  builds.each do |entry|
+    build = entry.fetch(:build)
+    puts "Expiring older TestFlight build #{build.dig("attributes", "version")} (#{build.fetch("id")}) with Beta App Review state #{entry.fetch(:state)}."
+    expire_build(client, build)
+  end
+end
+
+def beta_review_submission(client, build_id)
+  client.get(
+    "/builds/#{build_id}/betaAppReviewSubmission",
+    "fields[betaAppReviewSubmissions]" => "betaReviewState,submittedDate,build"
+  ).fetch("data")
+rescue RuntimeError => e
+  raise e unless e.message.include?("HTTP 404")
+
+  nil
+end
+
+def beta_review_conflict?(error)
+  message = error.message
+  message.include?("HTTP 409") ||
+    message.match?(/another build.*review/i) ||
+    message.match?(/already.*review/i)
+end
+
+def create_beta_review_submission(client, build_id)
   client.post(
     "/betaAppReviewSubmissions",
     data: {
@@ -193,10 +264,23 @@ def submit_beta_review(client, build_id)
       }
     }
   )
+end
+
+def submit_beta_review(client, app_id, build_id)
+  create_beta_review_submission(client, build_id)
 rescue RuntimeError => e
-  warn "Could not submit build #{build_id} for Beta App Review."
-  warn "If another build of this version is already in review, remove or resolve it in App Store Connect, then rerun the workflow."
-  raise e
+  raise e unless beta_review_conflict?(e)
+
+  existing_submission = beta_review_submission(client, build_id)
+  if existing_submission
+    puts "Build #{build_id} already has Beta App Review submission #{existing_submission.fetch("id")} with state #{existing_submission.dig("attributes", "betaReviewState")}."
+    return
+  end
+
+  warn "Could not submit build #{build_id} for Beta App Review because another build is already in review."
+  warn "Expiring older active TestFlight review builds and retrying once."
+  expire_active_review_builds(client, app_id, build_id)
+  create_beta_review_submission(client, build_id)
 end
 
 app_id = required_env("APP_STORE_CONNECT_APP_ID")
@@ -218,5 +302,5 @@ group_source = group_id.empty? ? "name" : "id"
 puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_label.inspect} using #{group_source} configuration."
 upsert_what_to_test(client, build_id, what_to_test)
 add_build_to_group(client, group.fetch("id"), build_id)
-submit_beta_review(client, build_id)
+submit_beta_review(client, app_id, build_id)
 puts "Submitted build #{build_number} for TestFlight Beta App Review."
