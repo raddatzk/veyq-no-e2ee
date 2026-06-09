@@ -100,7 +100,7 @@ def find_group(client, app_id, group_name)
 end
 
 def beta_group(client, app_id, group_id, group_name)
-  return client.get("/betaGroups/#{group_id}").fetch("data") unless group_id.empty?
+  return { "id" => group_id, "attributes" => { "name" => group_name } } unless group_id.empty?
 
   abort("Missing required environment variable: TESTFLIGHT_PUBLIC_GROUP_NAME") if group_name.empty?
 
@@ -213,8 +213,9 @@ group = beta_group(client, app_id, group_id, group_name)
 build = find_processed_build(client, app_id, build_number)
 build_id = build.fetch("id")
 group_label = group.dig("attributes", "name") || (group_id.empty? ? group_name : group_id)
+group_source = group_id.empty? ? "name" : "id"
 
-puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_label.inspect}."
+puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_label.inspect} using #{group_source} configuration."
 upsert_what_to_test(client, build_id, what_to_test)
 add_build_to_group(client, group.fetch("id"), build_id)
 submit_beta_review(client, build_id)
