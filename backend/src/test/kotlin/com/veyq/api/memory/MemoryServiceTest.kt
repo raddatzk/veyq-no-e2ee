@@ -71,6 +71,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import javax.imageio.ImageIO
 import jakarta.ws.rs.core.StreamingOutput
@@ -303,6 +304,33 @@ class MemoryServiceTest {
         assertThat(updates.media.map { it.id }).containsExactly(first.publicId)
         assertThat(updates.media.single().highlight).isTrue()
         assertThat(updates.currentMediaIds).containsExactly(first.publicId)
+    }
+
+    @Test
+    fun `memory media updates do not repeat the cursor media when database timestamp is more precise than the api cursor`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-precise-cursor-trip", "Live Precise Cursor Trip"))
+        val preciseUpdatedAt = Instant.parse("2026-01-02T10:00:00.123456Z")
+        val media = createMedia(
+            owner,
+            memory(trip.id),
+            "Precise Cursor",
+            createdAt = preciseUpdatedAt,
+        )
+        mediaService.listMemoryMedia(trip.id, false)
+        inTransaction {
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", preciseUpdatedAt, media.publicId)
+        }
+
+        val updates = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = preciseUpdatedAt.truncatedTo(ChronoUnit.MILLIS),
+            afterMediaId = media.publicId,
+            knownMediaSetHash = mediaService.mediaSetHash(listOf(media.publicId)),
+        )
+
+        assertThat(updates.media).isEmpty()
+        assertThat(updates.currentMediaIds).isNull()
     }
 
     @Test
