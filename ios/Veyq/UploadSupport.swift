@@ -218,6 +218,7 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
     let dateRange: String
     let tenantName: String
     let coverUrl: String?
+    let coverCrop: CoverCrop?
     let coverThumbnailFilename: String?
     let parentMemoryTitle: String?
     let depth: Int?
@@ -230,6 +231,7 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         dateRange: String,
         tenantName: String,
         coverUrl: String?,
+        coverCrop: CoverCrop? = nil,
         coverThumbnailFilename: String?,
         parentMemoryTitle: String? = nil,
         depth: Int = 0,
@@ -241,6 +243,7 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         self.dateRange = dateRange
         self.tenantName = tenantName
         self.coverUrl = coverUrl
+        self.coverCrop = coverCrop
         self.coverThumbnailFilename = coverThumbnailFilename
         self.parentMemoryTitle = parentMemoryTitle
         self.depth = depth

@@ -2491,6 +2491,7 @@ private struct ShareImportMemoryTarget: Codable {
     let dateRange: String
     let tenantName: String
     let coverUrl: String?
+    let coverCrop: ShareCoverCrop?
     let coverThumbnailFilename: String?
     let parentMemoryTitle: String?
     let depth: Int?
@@ -2652,6 +2653,7 @@ private struct ShareMemoryHeader: Codable, Equatable {
     let displayName: String
     let path: String
     let coverUrl: String?
+    let coverCrop: ShareCoverCrop?
     let startDate: String
     let endDate: String
     let directMediaCount: Int
@@ -2663,12 +2665,20 @@ private struct ShareMemoryHeader: Codable, Equatable {
         case displayName
         case path
         case coverUrl
+        case coverCrop
         case startDate
         case endDate
         case directMediaCount
         case descendantMediaCount
         case chapterCount = "childMemoryCount"
     }
+}
+
+private struct ShareCoverCrop: Codable, Equatable, Hashable {
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
 }
 
 private struct ShareMediaUploader: Codable, Equatable {
@@ -2764,6 +2774,7 @@ private struct ShareMemory: Codable, Identifiable, Hashable {
     let parentId: String?
     let coverMediaId: String?
     let coverUrl: String?
+    let coverCrop: ShareCoverCrop?
     let startDate: String
     let endDate: String
     let mediaCount: Int
@@ -2786,6 +2797,7 @@ private struct ShareMemory: Codable, Identifiable, Hashable {
             dateRange: dateRange,
             tenantName: tenantName,
             coverUrl: coverUrl,
+            coverCrop: coverCrop,
             coverThumbnailFilename: nil,
             parentMemoryTitle: parentMemoryTitle,
             depth: depth,

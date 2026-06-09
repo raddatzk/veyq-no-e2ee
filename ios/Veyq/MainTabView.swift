@@ -521,6 +521,7 @@ private struct RecentMemoriesView: View {
 }
 
 private struct RecentMemoryRow: View {
+    @EnvironmentObject private var store: VeyqStore
     let target: ShareImportMemoryTarget
 
     var body: some View {
@@ -575,11 +576,15 @@ private struct RecentMemoryRow: View {
     @ViewBuilder
     private var cover: some View {
         if let coverUrl = target.coverUrl, !coverUrl.isEmpty {
-            AuthenticatedMediaImage(urlString: coverUrl, contentMode: .fill)
+            AuthenticatedMediaImage(urlString: coverUrl, contentMode: .fill, crop: coverCrop)
                 .background(VeyqColor.accent.opacity(0.14))
         } else {
             MemoryPlaceholderCoverSurface()
         }
+    }
+
+    private var coverCrop: CoverCrop? {
+        target.coverCrop ?? store.memoryDetails[target.id]?.header.coverCrop
     }
 }
 
@@ -593,7 +598,7 @@ private extension ShareImportMemoryTarget {
             parentId: nil,
             coverMediaId: nil,
             coverUrl: coverUrl,
-            coverCrop: nil,
+            coverCrop: coverCrop,
             startDate: dateRange,
             endDate: dateRange,
             mediaCount: mediaCount ?? 0,

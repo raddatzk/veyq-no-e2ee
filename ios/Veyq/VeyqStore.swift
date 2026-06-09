@@ -1773,6 +1773,7 @@ final class VeyqStore: ObservableObject {
                 dateRange: memory.dateRange,
                 tenantName: tenantName,
                 coverUrl: memory.coverUrl,
+                coverCrop: memory.coverCrop,
                 coverThumbnailFilename: nil,
                 mediaCount: memory.mediaCount,
                 childCount: memory.childCount
@@ -1835,6 +1836,7 @@ final class VeyqStore: ObservableObject {
             dateRange: memory.dateRange,
             tenantName: tenantName,
             coverUrl: memory.coverUrl,
+            coverCrop: memory.coverCrop,
             coverThumbnailFilename: thumbnailFilename,
             parentMemoryTitle: parentMemoryTitle,
             depth: depth,
