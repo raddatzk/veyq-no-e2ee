@@ -392,8 +392,9 @@ describe('PublicShareView', () => {
   it('merges public share media live updates and refreshes header and buckets', async () => {
     mockProtectedMemory()
     const updatedMedia = memoryMedia({ id: 'media-2', updatedAt: '2026-05-28T09:00:00Z' })
+    const update = deferred<Awaited<ReturnType<typeof waitForNewPublicShareMemoryMedia>>>()
     waitForNewPublicShareMemoryMediaMock
-      .mockResolvedValueOnce({ media: [updatedMedia] })
+      .mockReturnValueOnce(update.promise)
       .mockImplementation(() => new Promise<never>(() => {}))
     getPublicShareMemoryHeaderMock.mockResolvedValueOnce(memoryHeader())
     getPublicShareMemoryHeaderMock.mockResolvedValueOnce(memoryHeader({ descendantMediaCount: 1 }))
@@ -419,8 +420,9 @@ describe('PublicShareView', () => {
         stubs: viewStubs()
       }
     })
-    await flushPromises()
-    await flushPromises()
+    await flushUntil(() => waitForNewPublicShareMemoryMediaMock.mock.calls.length === 1)
+    update.resolve({ media: [updatedMedia] })
+    await flushUntil(() => listPublicShareMemoryMediaBucketsMock.mock.calls.length === 2)
 
     expect(waitForNewPublicShareMemoryMediaMock).toHaveBeenCalledWith(
       'share-1',
@@ -585,6 +587,21 @@ function publicShareMemory(overrides: Partial<PublicShareMemorySummary> = {}): P
     mediaCount: 0,
     ...overrides
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve
+  })
+  return { promise, resolve }
+}
+
+async function flushUntil(done: () => boolean) {
+  await vi.waitFor(async () => {
+    await flushPromises()
+    expect(done()).toBe(true)
+  })
 }
 
 function memory(overrides: Partial<Memory> = {}): Memory {
