@@ -183,8 +183,7 @@ end
 def active_review_builds(client, app_id, current_build_id)
   response = client.get(
     "/apps/#{app_id}/builds",
-    "fields[builds]" => "version,uploadedDate,expired",
-    "sort" => "-uploadedDate",
+    "fields[builds]" => "version,expired",
     "limit" => 200
   )
 
