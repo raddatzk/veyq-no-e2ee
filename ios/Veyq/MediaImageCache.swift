@@ -8,7 +8,7 @@ final class MediaImageCache {
         let userId: Int
     }
 
-    static let shared = MediaImageCache()
+    @MainActor static let shared = MediaImageCache()
     static let defaultTimeToLive: TimeInterval = 14 * 24 * 60 * 60
 
     private final class CachedImage {
