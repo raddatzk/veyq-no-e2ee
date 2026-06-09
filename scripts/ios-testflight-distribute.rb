@@ -99,6 +99,14 @@ def find_group(client, app_id, group_name)
     abort("Could not find TestFlight beta group named #{group_name.inspect}.")
 end
 
+def beta_group(client, app_id, group_id, group_name)
+  return client.get("/betaGroups/#{group_id}").fetch("data") unless group_id.empty?
+
+  abort("Missing required environment variable: TESTFLIGHT_PUBLIC_GROUP_NAME") if group_name.empty?
+
+  find_group(client, app_id, group_name)
+end
+
 def find_processed_build(client, app_id, build_number)
   60.times do |attempt|
     response = client.get(
@@ -192,7 +200,8 @@ rescue RuntimeError => e
 end
 
 app_id = required_env("APP_STORE_CONNECT_APP_ID")
-group_name = required_env("TESTFLIGHT_PUBLIC_GROUP_NAME")
+group_id = ENV.fetch("TESTFLIGHT_PUBLIC_GROUP_ID", "").strip
+group_name = ENV.fetch("TESTFLIGHT_PUBLIC_GROUP_NAME", "").strip
 build_number = required_env("CURRENT_PROJECT_VERSION")
 what_to_test = ENV.fetch(
   "TESTFLIGHT_WHAT_TO_TEST",
@@ -200,11 +209,12 @@ what_to_test = ENV.fetch(
 )
 
 client = AppStoreConnect.new(jwt)
-group = find_group(client, app_id, group_name)
+group = beta_group(client, app_id, group_id, group_name)
 build = find_processed_build(client, app_id, build_number)
 build_id = build.fetch("id")
+group_label = group.dig("attributes", "name") || (group_id.empty? ? group_name : group_id)
 
-puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_name.inspect}."
+puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_label.inspect}."
 upsert_what_to_test(client, build_id, what_to_test)
 add_build_to_group(client, group.fetch("id"), build_id)
 submit_beta_review(client, build_id)

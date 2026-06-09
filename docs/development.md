@@ -185,7 +185,8 @@ Configure these GitHub environment or repository secrets:
 - `APPLE_SHARE_APP_STORE_PROFILE_BASE64`: Base64-encoded App Store provisioning profile for `app.veyq.ios.share`, named `veyq Share App Store app.veyq.ios.share`.
 - `IOS_BUILD_KEYCHAIN_PASSWORD`: Temporary CI keychain password.
 - `APP_STORE_CONNECT_APP_ID`: Numeric App Store Connect app id for `app.veyq.ios`.
-- `TESTFLIGHT_PUBLIC_GROUP_NAME`: External TestFlight group name that should receive new builds.
+- `TESTFLIGHT_PUBLIC_GROUP_ID`: Optional App Store Connect beta group ID that should receive new builds. Prefer this when available because it avoids name matching.
+- `TESTFLIGHT_PUBLIC_GROUP_NAME`: External TestFlight group name that should receive new builds when `TESTFLIGHT_PUBLIC_GROUP_ID` is not configured.
 
 To create the base64 secret values locally:
 

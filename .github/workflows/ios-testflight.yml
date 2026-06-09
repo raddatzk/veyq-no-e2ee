@@ -43,6 +43,7 @@ jobs:
       APPLE_SHARE_APP_STORE_PROFILE_BASE64: ${{ secrets.APPLE_SHARE_APP_STORE_PROFILE_BASE64 }}
       KEYCHAIN_PASSWORD: ${{ secrets.IOS_BUILD_KEYCHAIN_PASSWORD }}
       APP_STORE_CONNECT_APP_ID: ${{ secrets.APP_STORE_CONNECT_APP_ID }}
+      TESTFLIGHT_PUBLIC_GROUP_ID: ${{ secrets.TESTFLIGHT_PUBLIC_GROUP_ID }}
       TESTFLIGHT_PUBLIC_GROUP_NAME: ${{ secrets.TESTFLIGHT_PUBLIC_GROUP_NAME }}
       MARKETING_VERSION_OVERRIDE: ${{ inputs.marketing_version || '' }}
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
@@ -267,11 +268,14 @@ jobs:
         run: |
           set -euo pipefail
           missing=()
-          for name in APP_STORE_CONNECT_APP_ID TESTFLIGHT_PUBLIC_GROUP_NAME; do
+          for name in APP_STORE_CONNECT_APP_ID; do
             if [[ -z "${!name:-}" ]]; then
               missing+=("$name")
             fi
           done
+          if [[ -z "${TESTFLIGHT_PUBLIC_GROUP_ID:-}" && -z "${TESTFLIGHT_PUBLIC_GROUP_NAME:-}" ]]; then
+            missing+=("TESTFLIGHT_PUBLIC_GROUP_ID or TESTFLIGHT_PUBLIC_GROUP_NAME")
+          fi
           if (( ${#missing[@]} > 0 )); then
             printf 'Missing TestFlight distribution secrets/env values:\n' >&2
             printf '  - %s\n' "${missing[@]}" >&2
