@@ -201,7 +201,7 @@ The workflow runs unit tests, archives the app with the preinstalled signing cer
 
 iOS app versions are independent from backend `major.build` versions. The repository root `VERSION` file is only the backend and frontend major source. The iOS app major is stored separately in `ios/VERSION`. Automatic TestFlight runs set `CFBundleShortVersionString` to `ios/VERSION`, for example `1`, and set `CFBundleVersion` to the GitHub Actions run number, for example `42`. Manual runs can set `marketing_version` to a full `CFBundleShortVersionString` override. Increment the iOS app major in `ios/VERSION` when the app drops support for a server capability that has been removed from maintained server releases for at least one year.
 
-New TestFlight builds use a latest-build-wins policy. If App Store Connect rejects the automatic Beta App Review submission because another build is already in review, the workflow cancels older active Beta App Review submissions and retries the new submission. The uploaded IPA remains available in App Store Connect even when the final distribution step fails.
+New TestFlight builds are uploaded and associated with the configured external group even when App Store Connect rejects automatic Beta App Review submission because another build in the same train is already in review. App Store Connect no longer exposes an API operation for canceling Beta App Review submissions, so the workflow reports the active older review and leaves the new build available for a later or manual Beta App Review submission after the older review completes or is handled in App Store Connect.
 
 The copyable App Store Connect source text is maintained in [iOS TestFlight Submission](product/ios-testflight-submission.md).
 

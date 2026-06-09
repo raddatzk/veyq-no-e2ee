@@ -65,10 +65,6 @@ class AppStoreConnect
     request(:patch, path, body: payload)
   end
 
-  def delete(path)
-    request(:delete, path)
-  end
-
   private
 
   def request(method, path, params: {}, body: nil)
@@ -92,8 +88,7 @@ class AppStoreConnect
     {
       get: Net::HTTP::Get,
       post: Net::HTTP::Post,
-      patch: Net::HTTP::Patch,
-      delete: Net::HTTP::Delete
+      patch: Net::HTTP::Patch
     }.fetch(method)
   end
 end
@@ -203,20 +198,16 @@ def active_review_builds(client, app_id, current_build_id)
   end
 end
 
-def cancel_beta_review_submission(client, submission)
-  client.delete("/betaAppReviewSubmissions/#{submission.fetch("id")}")
-end
-
-def cancel_active_review_submissions(client, app_id, current_build_id)
+def report_active_review_submissions(client, app_id, current_build_id)
   builds = active_review_builds(client, app_id, current_build_id)
-  abort("Could not find an older active Beta App Review submission to cancel.") if builds.empty?
+  return false if builds.empty?
 
   builds.each do |entry|
     build = entry.fetch(:build)
     submission = entry.fetch(:submission)
-    puts "Canceling Beta App Review submission #{submission.fetch("id")} for older TestFlight build #{build.dig("attributes", "version")} (#{build.fetch("id")}) with state #{entry.fetch(:state)}."
-    cancel_beta_review_submission(client, submission)
+    warn "Older TestFlight build #{build.dig("attributes", "version")} (#{build.fetch("id")}) already has Beta App Review submission #{submission.fetch("id")} with state #{entry.fetch(:state)}."
   end
+  true
 end
 
 def beta_review_submission(client, build_id)
@@ -254,33 +245,23 @@ def create_beta_review_submission(client, build_id)
   )
 end
 
-def retry_beta_review_submission(client, build_id)
-  12.times do |attempt|
-    return create_beta_review_submission(client, build_id)
-  rescue RuntimeError => e
-    raise e unless beta_review_conflict?(e)
-    raise e if attempt == 11
-
-    puts "Waiting for canceled Beta App Review submission to clear before retry #{attempt + 2}/12."
-    sleep 10
-  end
-end
-
 def submit_beta_review(client, app_id, build_id)
   create_beta_review_submission(client, build_id)
+  true
 rescue RuntimeError => e
   raise e unless beta_review_conflict?(e)
 
   existing_submission = beta_review_submission(client, build_id)
   if existing_submission
     puts "Build #{build_id} already has Beta App Review submission #{existing_submission.fetch("id")} with state #{existing_submission.dig("attributes", "betaReviewState")}."
-    return
+    return true
   end
 
-  warn "Could not submit build #{build_id} for Beta App Review because another build is already in review."
-  warn "Canceling older active Beta App Review submissions and retrying."
-  cancel_active_review_submissions(client, app_id, build_id)
-  retry_beta_review_submission(client, build_id)
+  warn "Could not submit build #{build_id} for Beta App Review because another build in the same train is already in review."
+  found_active_submission = report_active_review_submissions(client, app_id, build_id)
+  warn "App Store Connect no longer exposes an API operation to cancel Beta App Review submissions; leaving the uploaded build associated with the TestFlight group." if found_active_submission
+  warn "No active older Beta App Review submission was found through the API, but App Store Connect still reported a review conflict." unless found_active_submission
+  false
 end
 
 app_id = required_env("APP_STORE_CONNECT_APP_ID")
@@ -302,5 +283,8 @@ group_source = group_id.empty? ? "name" : "id"
 puts "Distributing build #{build_number} (#{build_id}) to TestFlight group #{group_label.inspect} using #{group_source} configuration."
 upsert_what_to_test(client, build_id, what_to_test)
 add_build_to_group(client, group.fetch("id"), build_id)
-submit_beta_review(client, app_id, build_id)
-puts "Submitted build #{build_number} for TestFlight Beta App Review."
+if submit_beta_review(client, app_id, build_id)
+  puts "Submitted build #{build_number} for TestFlight Beta App Review."
+else
+  puts "Uploaded build #{build_number} and associated it with the TestFlight group, but Beta App Review submission is blocked by an older active review and must be submitted later."
+end
