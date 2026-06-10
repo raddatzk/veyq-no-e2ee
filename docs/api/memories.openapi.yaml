@@ -2295,6 +2295,7 @@ components:
               filename:
                 type: string
                 nullable: true
+                maxLength: 255
                 description: Original client-side filename to preserve for track listings and downloads.
               title:
                 type: string

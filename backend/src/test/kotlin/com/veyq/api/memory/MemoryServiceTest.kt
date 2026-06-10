@@ -1442,6 +1442,51 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `uploads memory track normalizes filename to basename`() {
+        val memory = memoryService.createMemory(CreateMemoryRequest("track-basename", "Track Basename"))
+        val gpx = gpxFile("veyq-memory-track-basename-")
+
+        try {
+            val uploaded = memoryTrackService.uploadMemoryTrack(
+                memory.id,
+                gpx,
+                "C:\\Users\\someone\\Downloads/ridge day.gpx",
+                title = "Ridge",
+                activityType = com.veyq.api.generated.model.MemoryTrackActivityType.HIKING,
+            )
+
+            assertThat(uploaded.originalFilename).isEqualTo("ridge day.gpx")
+        } finally {
+            Files.deleteIfExists(gpx)
+        }
+    }
+
+    @Test
+    fun `rejects memory track filename longer than column limit`() {
+        val memory = memoryService.createMemory(CreateMemoryRequest("track-long-name", "Track Long Name"))
+        val gpx = gpxFile("veyq-memory-track-long-name-")
+        val longName = "a".repeat(260) + ".gpx"
+
+        try {
+            assertThatExceptionOfType(BadRequestException::class.java)
+                .isThrownBy {
+                    memoryTrackService.uploadMemoryTrack(
+                        memory.id,
+                        gpx,
+                        longName,
+                        title = "ok",
+                        activityType = com.veyq.api.generated.model.MemoryTrackActivityType.HIKING,
+                    )
+                }
+                .matches { it.code == "MEMORY_TRACK_FILENAME_TOO_LONG" }
+
+            assertThat(memoryTrackService.listMemoryTracks(memory.id)).isEmpty()
+        } finally {
+            Files.deleteIfExists(gpx)
+        }
+    }
+
+    @Test
     fun `deleting track referenced by journal is rejected`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("delete-journal-track-trip", "Delete Journal Track Trip"))
         val first = createTrack(memory(trip.id), "Summit Route")
