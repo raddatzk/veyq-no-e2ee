@@ -43,6 +43,58 @@ class TenantRegistrationInvite : PanacheEntityBase {
     lateinit var createdAt: Instant
 }
 
+@Entity
+@Table(
+    name = "veyq_tenant_registration_passkey_stage",
+    indexes = [
+        Index(name = "idx_veyq_tenant_registration_passkey_stage_invite_user", columnList = "invite_id,user_id"),
+        Index(name = "idx_veyq_tenant_registration_passkey_stage_expires_at", columnList = "expires_at"),
+    ],
+)
+class TenantRegistrationPasskeyStage : PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long = 0
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "invite_id", nullable = false)
+    lateinit var invite: TenantRegistrationInvite
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    lateinit var user: User
+
+    @Column(name = "email", nullable = false)
+    lateinit var email: String
+
+    @Column(name = "created_at", nullable = false)
+    lateinit var createdAt: Instant
+
+    @Column(name = "expires_at", nullable = false)
+    lateinit var expiresAt: Instant
+
+    @Column(name = "consumed_at")
+    var consumedAt: Instant? = null
+}
+
+@ApplicationScoped
+class TenantRegistrationPasskeyStageRepo : PanacheRepository<TenantRegistrationPasskeyStage> {
+    fun findOpenByInviteAndUser(
+        invite: TenantRegistrationInvite,
+        user: User,
+        now: Instant,
+    ): TenantRegistrationPasskeyStage? =
+        find(
+            "invite = ?1 and user = ?2 and consumedAt is null and expiresAt > ?3 order by createdAt desc",
+            invite,
+            user,
+            now,
+        ).firstResult()
+
+    fun findLatestByInviteAndUser(invite: TenantRegistrationInvite, user: User): TenantRegistrationPasskeyStage? =
+        find("invite = ?1 and user = ?2 order by createdAt desc", invite, user).firstResult()
+}
+
 @ApplicationScoped
 class TenantRegistrationInviteRepo : PanacheRepository<TenantRegistrationInvite> {
     fun findByTokenHash(tokenHash: String): TenantRegistrationInvite? =

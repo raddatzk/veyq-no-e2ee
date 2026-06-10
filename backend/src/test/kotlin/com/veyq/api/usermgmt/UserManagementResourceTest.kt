@@ -344,7 +344,9 @@ class UserManagementResourceTest {
             .body("tenantName", equalTo(tenant.name))
             .body("tenantDomain", equalTo(tenant.domain))
 
+        val passkeyCookieFilter = CookieFilter()
         given()
+            .filter(passkeyCookieFilter)
             .contentType("application/json")
             .header("Host", tenant.domain)
             .body("""{"email":"join-passkey-$runId@example.com","displayName":"Join Passkey"}""")
@@ -358,6 +360,24 @@ class UserManagementResourceTest {
         assertThat(stagedPasskeyUser).isNotNull
         assertThat(stagedPasskeyUser?.passwordSetAt).isNull()
         assertThat(tenantMemberRepo.findByTenantAndUser(tenant, stagedPasskeyUser!!)).isNull()
+
+        given()
+            .filter(passkeyCookieFilter)
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body(
+                """
+                {
+                  "email": "join-passkey-$runId@example.com",
+                  "displayName": "Join Passkey",
+                  "passkeyDisplayName": "Laptop",
+                  "credential": ${passkeyRegistrationJson()}
+                }
+                """.trimIndent()
+            )
+            .`when`().post("/api/tenant-registration-invites/$token/join/passkey")
+            .then()
+            .statusCode(400)
 
         val newUserCookie = given()
             .contentType("application/json")
