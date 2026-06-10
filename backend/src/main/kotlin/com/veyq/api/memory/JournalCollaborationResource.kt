@@ -59,7 +59,9 @@ class JournalCollaborationResource @Inject constructor(
 
     private fun requireSidecarSecret(collaborationSecret: String?) {
         val configuredSecret = configuredSidecarSecret()
-        if (configuredSecret.isBlank()) return
+        if (configuredSecret.isBlank()) {
+            throw ForbiddenException("Journal live sync is not configured", "MEMORY_JOURNAL_LIVE_NOT_CONFIGURED")
+        }
         if (collaborationSecret != configuredSecret) {
             throw ForbiddenException("Invalid collaboration service secret", "JOURNAL_COLLABORATION_SECRET_INVALID")
         }

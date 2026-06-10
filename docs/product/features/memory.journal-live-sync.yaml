@@ -68,6 +68,17 @@ acceptanceCriteria:
           - testName: highlights a pill on first delete and deletes it on the second delete
             kind: positive
             ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+  - id: memory.journal-live-sync.secure-runtime-configuration
+    statement: Journal live session validation and snapshot endpoints reject forged or unauthenticated requests when live sync secrets are unset or left at development defaults.
+    coverage:
+      backend:
+        integration:
+          - testName: rejects forged journal live tokens when live sync uses insecure defaults
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/JournalLiveSecurityTest.kt
+          - testName: rejects collaboration session endpoints when sidecar secret is not configured
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/JournalLiveSecurityTest.kt
   - id: memory.journal-live-sync.sidecar-runtime
     statement: The collaboration sidecar starts with the supported Hocuspocus server API and keeps journal documents in memory only while active.
     coverage:
