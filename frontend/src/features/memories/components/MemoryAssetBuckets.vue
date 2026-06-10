@@ -839,6 +839,7 @@ function handleBucketDrop(event: DragEvent) {
             :show-header="false"
             :show-filter="false"
             :enable-lightbox="true"
+            :can-highlight="false"
             :show-highlight-badges="false"
             @shortcut-select="toggleMediaSelection"
           >
@@ -1030,7 +1031,9 @@ function handleBucketDrop(event: DragEvent) {
         <p class="asset-dialog-copy">
           {{ t('media.deleteMediaCopy', { count: deleteMediaCount }) }}
         </p>
-        <label for="asset-delete-media-count">{{ t('media.deleteMediaCountLabel', { count: deleteMediaCount }) }}</label>
+        <label for="asset-delete-media-count">{{
+          t('media.deleteMediaCountLabel', { count: deleteMediaCount })
+        }}</label>
         <input
           id="asset-delete-media-count"
           v-model="deleteMediaConfirmation"

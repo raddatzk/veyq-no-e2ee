@@ -236,6 +236,9 @@ acceptanceCriteria:
           - testName: hides highlight badges inside bucket media tiles
             kind: negative
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: disables highlight actions in the bucket gallery lightbox
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
           - testName: selects one visible media item and submits only that item with offset seconds
             kind: negative
             ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts

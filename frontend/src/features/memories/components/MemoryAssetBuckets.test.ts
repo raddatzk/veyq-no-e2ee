@@ -675,6 +675,24 @@ describe('MemoryAssetBuckets', () => {
     expect(wrapper.find('.media-grid-highlight-badge').exists()).toBe(false)
   })
 
+  it('disables highlight actions in the bucket gallery lightbox', async () => {
+    const wrapper = mount(MemoryAssetBuckets, {
+      props: {
+        tenantName: 'tenant',
+        memoryId: 'mem-1',
+        media: [media({ id: 'media-highlight', highlight: true })],
+        buckets: [bucket()]
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    await flushPromises()
+    await wrapper.find('.media-grid-tile').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="lightbox"]').attributes('data-can-highlight')).toBe('false')
+  })
+
   it('shows the active bucket dropzone only during a file drag', async () => {
     const wrapper = mount(MemoryAssetBuckets, {
       props: {
@@ -759,8 +777,9 @@ function dialogStubs() {
     SelectButton: true,
     ProgressSpinner: true,
     MediaLightbox: {
-      props: ['media', 'mediaItems'],
-      template: '<section data-testid="lightbox">{{ media.id }}</section>'
+      props: ['media', 'mediaItems', 'canHighlight'],
+      template:
+        '<section data-testid="lightbox" :data-can-highlight="String(canHighlight)">{{ media.id }}</section>'
     }
   }
 }
