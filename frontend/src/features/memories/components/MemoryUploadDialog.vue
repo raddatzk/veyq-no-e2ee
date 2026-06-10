@@ -37,6 +37,7 @@ const fileSelectionQuietMs = isTestMode ? 5 : 1200
 let fileSelectionToken = 0
 let fileSelectionTimers: number[] = []
 let fileSelectionBest: File[] = []
+let fileSelectionRemovedSignatures = new Set<string>()
 let fileSelectionStartedAt = 0
 let fileSelectionLastChangedAt = 0
 
@@ -60,6 +61,7 @@ function clearFiles() {
   if (loading.value) return
   clearFileSelectionTimers()
   fileSelectionBest = []
+  fileSelectionRemovedSignatures = new Set()
   fileSelectionStartedAt = 0
   fileSelectionLastChangedAt = 0
   files.value = []
@@ -69,6 +71,8 @@ function clearFiles() {
 function removeFile(index: number) {
   if (loading.value) return
   clearFileSelectionTimers()
+  const removedFile = files.value[index]
+  if (removedFile) fileSelectionRemovedSignatures.add(fileSignature(removedFile))
   files.value = files.value.filter((_, fileIndex) => fileIndex !== index)
   fileSelectionBest = files.value
   if (files.value.length === 0 && fileInput.value) fileInput.value.value = ''
@@ -98,6 +102,7 @@ async function submit() {
     files.value = []
     clearFileSelectionTimers()
     fileSelectionBest = []
+    fileSelectionRemovedSignatures = new Set()
     fileSelectionStartedAt = 0
     fileSelectionLastChangedAt = 0
     if (fileInput.value) fileInput.value.value = ''
@@ -115,6 +120,7 @@ function emitUploadedMedia(media: MemoryMedia) {
 function readFileSelection(input: HTMLInputElement) {
   clearFileSelectionTimers()
   fileSelectionBest = files.value
+  fileSelectionRemovedSignatures = new Set()
   fileSelectionStartedAt = Date.now()
   fileSelectionLastChangedAt = fileSelectionStartedAt
   const token = ++fileSelectionToken
@@ -132,7 +138,10 @@ function readFileSelection(input: HTMLInputElement) {
 }
 
 function applyBestFileSelection(input: HTMLInputElement) {
-  const nextFiles = mergeMediaFiles(fileSelectionBest, mediaFilesFromList(input.files || []))
+  const nextFiles = mergeMediaFiles(
+    fileSelectionBest,
+    mediaFilesFromList(input.files || []).filter((file) => !fileSelectionRemovedSignatures.has(fileSignature(file)))
+  )
   if (nextFiles.length >= fileSelectionBest.length) {
     if (nextFiles.length > fileSelectionBest.length) fileSelectionLastChangedAt = Date.now()
     fileSelectionBest = nextFiles
