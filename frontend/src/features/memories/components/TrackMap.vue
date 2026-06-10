@@ -6,8 +6,12 @@ import 'leaflet/dist/leaflet.css'
 import { enableOsmTiles, hasOsmTileConsent } from '../../../shared/privacy/osmTiles'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import { mediaPreviewUrl } from '../../../shared/utils/mediaUrls'
-import { createRafResizeObserver, type RafResizeObserver } from '../../../shared/utils/resizeObserver'
+import {
+  createRafResizeObserver,
+  type RafResizeObserver
+} from '../../../shared/utils/resizeObserver'
 import type { MemoryMedia, MemoryTrack } from '../api'
+import { JOURNAL_TRACK_EMBED_MAX_IDS } from '../utils/journalMediaMarkdown'
 
 const DEFAULT_OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const MARKER_CLUSTER_DISTANCE_PX = 34
@@ -35,12 +39,20 @@ const osmTilesEnabled = ref(hasOsmTileConsent(userId))
 const tileUrl = computed(() => (osmTilesEnabled.value ? DEFAULT_OSM_TILE_URL : ''))
 const activeTracks = computed(() => {
   const tracks = props.tracks ?? (props.track ? [props.track] : [])
-  return tracks.filter((track) => track.geometry.coordinates.length >= 2)
+  const uniqueTracks = new Map<string, MemoryTrack>()
+  tracks.forEach((track) => {
+    if (track.geometry.coordinates.length >= 2 && !uniqueTracks.has(track.id)) {
+      uniqueTracks.set(track.id, track)
+    }
+  })
+  return Array.from(uniqueTracks.values()).slice(0, JOURNAL_TRACK_EMBED_MAX_IDS)
 })
 const trackPositions = computed(() =>
   activeTracks.value.map((track) => ({
     track,
-    positions: track.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number])
+    positions: track.geometry.coordinates.map(
+      ([longitude, latitude]) => [latitude, longitude] as [number, number]
+    )
   }))
 )
 const geotaggedMedia = computed(() =>
@@ -49,9 +61,10 @@ const geotaggedMedia = computed(() =>
 const mediaPositions = computed<[number, number][]>(() =>
   geotaggedMedia.value.map((media) => [media.gpsLatitude!, media.gpsLongitude!])
 )
-const allPositions = computed<[number, number][]>(() =>
-  [...trackPositions.value.flatMap((track) => track.positions), ...mediaPositions.value]
-)
+const allPositions = computed<[number, number][]>(() => [
+  ...trackPositions.value.flatMap((track) => track.positions),
+  ...mediaPositions.value
+])
 const hasMapContent = computed(() => allPositions.value.length > 0)
 const mapAriaLabel = computed(() =>
   [
@@ -62,9 +75,15 @@ const mapAriaLabel = computed(() =>
 const mapSignature = computed(
   () =>
     `${tileUrl.value}:${trackPositions.value
-      .map(({ track, positions }) => `${track.id}:${positions.map((position) => position.join(',')).join('|')}`)
+      .map(
+        ({ track, positions }) =>
+          `${track.id}:${positions.map((position) => position.join(',')).join('|')}`
+      )
       .join(';')}:${geotaggedMedia.value
-      .map((media) => `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.thumbnailUrl}:${media.previewUrl}`)
+      .map(
+        (media) =>
+          `${media.id}:${media.gpsLatitude}:${media.gpsLongitude}:${media.thumbnailUrl}:${media.previewUrl}`
+      )
       .join('|')}`
 )
 

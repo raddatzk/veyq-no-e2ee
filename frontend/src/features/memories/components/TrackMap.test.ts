@@ -134,7 +134,9 @@ describe('TrackMap', () => {
     expect(leafletMock.tileLayer).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('External map tiles are disabled')
 
-    const osmButton = wrapper.findAll('button').find((button) => button.text() === 'Load OpenStreetMap')
+    const osmButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Load OpenStreetMap')
     if (!osmButton) throw new Error('OpenStreetMap consent button not found')
     await osmButton.trigger('click')
     await flushPromises()
@@ -144,6 +146,17 @@ describe('TrackMap', () => {
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       expect.objectContaining({ maxZoom: 19 })
     )
+  })
+
+  it('deduplicates repeated track entries before rendering route layers', async () => {
+    mountTrackMap({
+      track: undefined,
+      tracks: [track(), track()]
+    })
+    await flushPromises()
+
+    expect(leafletMock.polyline.mock.calls.length).toBeGreaterThan(0)
+    expect(leafletMock.polyline.mock.calls.length).toBeLessThanOrEqual(2)
   })
 
   it('renders selected tracks and memory photos on the map while reset fits the tracks', async () => {
@@ -205,7 +218,9 @@ describe('TrackMap', () => {
     )
     const markerOptions = leafletMock.divIcon.mock.calls.at(-1)?.[0] as { html: HTMLElement }
     expect(markerOptions.html.classList.contains('memory-media-map-marker-cluster')).toBe(true)
-    expect(markerOptions.html.querySelector('.memory-media-map-marker-badge')?.textContent).toBe('2')
+    expect(markerOptions.html.querySelector('.memory-media-map-marker-badge')?.textContent).toBe(
+      '2'
+    )
     expect(leafletMock.markerOn).toHaveBeenCalledWith('click', expect.any(Function))
   })
 })

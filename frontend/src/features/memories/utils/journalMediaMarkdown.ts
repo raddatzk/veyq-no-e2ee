@@ -1,3 +1,5 @@
+export const JOURNAL_TRACK_EMBED_MAX_IDS = 20
+
 export type MediaInsertRange = {
   start: number
   end: number
@@ -32,7 +34,10 @@ export function mediaTriggerRange(markdown: string, position: number): MediaInse
   }
 }
 
-export function mediaTagRangeAtPosition(markdown: string, position: number): MediaInsertRange | null {
+export function mediaTagRangeAtPosition(
+  markdown: string,
+  position: number
+): MediaInsertRange | null {
   for (const embed of journalEmbedRanges(markdown)) {
     if (embed.kind !== 'media') continue
     if (position < embed.start || position > embed.end) continue
@@ -48,7 +53,10 @@ export function mediaTagRangeAtPosition(markdown: string, position: number): Med
   return null
 }
 
-export function journalEmbedTriggerRange(markdown: string, position: number): JournalEmbedRange | null {
+export function journalEmbedTriggerRange(
+  markdown: string,
+  position: number
+): JournalEmbedRange | null {
   const beforeCursor = markdown.slice(0, position)
   const match = beforeCursor.match(/::(chapter|playlist|track):$/)
   if (!match) return null
@@ -59,7 +67,10 @@ export function journalEmbedTriggerRange(markdown: string, position: number): Jo
   }
 }
 
-export function journalEmbedRangeAtPosition(markdown: string, position: number): JournalEmbedRange | null {
+export function journalEmbedRangeAtPosition(
+  markdown: string,
+  position: number
+): JournalEmbedRange | null {
   for (const embed of journalEmbedRanges(markdown)) {
     if (embed.kind === 'media') continue
     if (position >= embed.start && position <= embed.end) return embed
@@ -67,7 +78,10 @@ export function journalEmbedRangeAtPosition(markdown: string, position: number):
   return null
 }
 
-export function journalEmbedTypeTriggerRange(markdown: string, position: number): JournalEmbedTypeRange | null {
+export function journalEmbedTypeTriggerRange(
+  markdown: string,
+  position: number
+): JournalEmbedTypeRange | null {
   const beforeCursor = markdown.slice(0, position)
   const match = beforeCursor.match(/::$/)
   if (!match) return null
@@ -78,7 +92,8 @@ export function journalEmbedTypeTriggerRange(markdown: string, position: number)
 }
 
 export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
-  const embed = /::(media|chapter|playlist|track):([^\s\n]+)(?:[ \t]+([^\n]*?))?(?=\n|$|::(?:media|chapter|playlist|track):)/g
+  const embed =
+    /::(media|chapter|playlist|track):([^\s\n]+)(?:[ \t]+([^\n]*?))?(?=\n|$|::(?:media|chapter|playlist|track):)/g
   return Array.from(markdown.matchAll(embed))
     .map((match) => {
       const kind = match[1] as JournalEmbedKind
@@ -87,11 +102,14 @@ export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
       const start = match.index ?? 0
       const end = start + match[0].length
       if (kind === 'media') {
-        const mediaIds = target.split(',').map((id) => id.trim()).filter(Boolean)
+        const mediaIds = target
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
         return { start, end, kind, label, targetId: mediaIds[0], targetIds: mediaIds, mediaIds }
       }
       if (kind === 'track') {
-        const trackIds = target.split(',').map((id) => id.trim()).filter(Boolean)
+        const trackIds = normalizeJournalTrackIds(target.split(','))
         return { start, end, kind, label, targetId: trackIds[0], targetIds: trackIds }
       }
       return { start, end, kind, label, targetId: target, targetIds: [target] }
@@ -100,8 +118,19 @@ export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
     .filter((range) => range.kind === 'media' || Boolean(range.targetId))
 }
 
-export function journalEmbedMarkdown(kind: JournalEmbedKind, ids: string[], label?: string): string {
-  const target = ids.join(',')
+export function journalEmbedMarkdown(
+  kind: JournalEmbedKind,
+  ids: string[],
+  label?: string
+): string {
+  const target = (kind === 'track' ? normalizeJournalTrackIds(ids) : ids).join(',')
   const suffix = label?.trim() ? ` ${label.trim()}` : ''
   return `::${kind}:${target}${suffix}`
+}
+
+export function normalizeJournalTrackIds(ids: string[]): string[] {
+  return Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).slice(
+    0,
+    JOURNAL_TRACK_EMBED_MAX_IDS
+  )
 }

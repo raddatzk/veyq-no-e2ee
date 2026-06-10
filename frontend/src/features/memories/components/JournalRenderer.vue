@@ -5,9 +5,17 @@ import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import Carousel from 'primevue/carousel'
 import MediaLightbox from '../../../components/media/MediaLightbox.vue'
-import { mediaContentUrl, mediaImageDisplayUrl, mediaPosterUrl } from '../../../shared/utils/mediaUrls'
+import {
+  mediaContentUrl,
+  mediaImageDisplayUrl,
+  mediaPosterUrl
+} from '../../../shared/utils/mediaUrls'
 import type { Memory, MemoryMedia, MemoryPlaylist, MemoryTrack } from '../api'
-import { journalEmbedRanges, type JournalEmbedRange } from '../utils/journalMediaMarkdown'
+import {
+  journalEmbedRanges,
+  normalizeJournalTrackIds,
+  type JournalEmbedRange
+} from '../utils/journalMediaMarkdown'
 import TrackMap from './TrackMap.vue'
 
 type JournalHtmlBlock = {
@@ -56,9 +64,7 @@ const journalCarouselPages = ref<Record<number, number>>({})
 const lightboxItems = ref<MemoryMedia[]>([])
 const lightboxMediaId = ref<string | null>(null)
 const lightboxCarouselIndex = ref<number | null>(null)
-const carouselResponsiveOptions = [
-  { breakpoint: '900px', numVisible: 1, numScroll: 1 }
-]
+const carouselResponsiveOptions = [{ breakpoint: '900px', numVisible: 1, numScroll: 1 }]
 
 const markdownRenderer = new MarkdownIt({
   breaks: true,
@@ -77,7 +83,8 @@ const selectedLightboxMedia = computed(() =>
 )
 const canShowPreviousLightbox = computed(() => lightboxSelectedIndex.value > 0)
 const canShowNextLightbox = computed(
-  () => lightboxSelectedIndex.value >= 0 && lightboxSelectedIndex.value < lightboxItems.value.length - 1
+  () =>
+    lightboxSelectedIndex.value >= 0 && lightboxSelectedIndex.value < lightboxItems.value.length - 1
 )
 
 function renderJournalBlocks(markdown: string): JournalBlock[] {
@@ -109,27 +116,32 @@ function appendHtmlBlock(blocks: JournalBlock[], html: string) {
   if (sanitized.trim()) blocks.push({ type: 'html', html: sanitized })
 }
 
-function renderMediaBlock(ids: string[], caption: string): JournalMediaBlock | JournalCarouselBlock {
+function renderMediaBlock(
+  ids: string[],
+  caption: string
+): JournalMediaBlock | JournalCarouselBlock {
   const items = ids.map((id) => ({
     type: 'media' as const,
     id,
     caption,
     media: props.media.find((item) => item.id === id) ?? null
   }))
-  if (items.length <= 1) return items[0] ?? { type: 'media', id: ids.join(','), caption, media: null }
+  if (items.length <= 1)
+    return items[0] ?? { type: 'media', id: ids.join(','), caption, media: null }
   return { type: 'carousel', caption, items }
 }
 
 function renderTrackBlock(trackIds: string[], caption: string): JournalTrackBlock {
-  const tracks = trackIds
+  const uniqueTrackIds = normalizeJournalTrackIds(trackIds)
+  const tracks = uniqueTrackIds
     .map((trackId) => props.tracks?.find((item) => item.id === trackId) ?? null)
     .filter((track): track is MemoryTrack => Boolean(track))
   return {
     type: 'track',
-    ids: trackIds,
+    ids: uniqueTrackIds,
     caption,
     tracks,
-    missingIds: trackIds.filter((trackId) => !tracks.some((track) => track.id === trackId))
+    missingIds: uniqueTrackIds.filter((trackId) => !tracks.some((track) => track.id === trackId))
   }
 }
 
@@ -170,9 +182,18 @@ function trackStats(block: JournalTrackBlock) {
   const durationMinutes = sumDurationMinutes(block.tracks)
   return [
     { label: t('track.distance'), value: formatDistance(distanceMeters) },
-    { label: t('track.duration'), value: durationMinutes === null ? t('common.notAvailable') : formatDuration(durationMinutes) },
-    { label: t('track.ascent'), value: ascentMeters === null ? t('common.notAvailable') : formatDistance(ascentMeters) },
-    { label: t('track.descent'), value: descentMeters === null ? t('common.notAvailable') : formatDistance(descentMeters) }
+    {
+      label: t('track.duration'),
+      value: durationMinutes === null ? t('common.notAvailable') : formatDuration(durationMinutes)
+    },
+    {
+      label: t('track.ascent'),
+      value: ascentMeters === null ? t('common.notAvailable') : formatDistance(ascentMeters)
+    },
+    {
+      label: t('track.descent'),
+      value: descentMeters === null ? t('common.notAvailable') : formatDistance(descentMeters)
+    }
   ]
 }
 
@@ -218,7 +239,11 @@ function updateJournalCarouselPage(index: number, page: number) {
   journalCarouselPages.value = { ...journalCarouselPages.value, [index]: page }
 }
 
-function openMediaLightbox(items: MemoryMedia[], mediaId: string, carouselIndex: number | null = null) {
+function openMediaLightbox(
+  items: MemoryMedia[],
+  mediaId: string,
+  carouselIndex: number | null = null
+) {
   lightboxItems.value = items
   lightboxMediaId.value = mediaId
   lightboxCarouselIndex.value = carouselIndex
@@ -230,7 +255,9 @@ function openSingleMediaLightbox(media: MemoryMedia) {
 }
 
 function openCarouselLightbox(block: JournalCarouselBlock, blockIndex: number) {
-  const items = block.items.map((item) => item.media).filter((media): media is MemoryMedia => Boolean(media))
+  const items = block.items
+    .map((item) => item.media)
+    .filter((media): media is MemoryMedia => Boolean(media))
   if (items.length === 0) return
   const page = Math.min(journalCarouselPage(blockIndex), block.items.length - 1)
   const currentMedia = block.items[page]?.media ?? items[0]
@@ -301,7 +328,8 @@ function providerLabel(provider: string): string {
 }
 
 function formatDistance(meters: number): string {
-  if (meters >= 1000) return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`
+  if (meters >= 1000)
+    return `${(meters / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`
   return `${meters.toLocaleString()} m`
 }
 
@@ -417,7 +445,11 @@ function handleClick(event: MouseEvent) {
       </figure>
       <figure v-else class="memory-journal-track">
         <template v-if="block.tracks.length">
-          <TrackMap :tracks="block.tracks" :media="media" @open-media-group="openTrackMediaLightbox" />
+          <TrackMap
+            :tracks="block.tracks"
+            :media="media"
+            @open-media-group="openTrackMediaLightbox"
+          />
           <figcaption class="memory-journal-track-body">
             <div class="memory-journal-track-heading">
               <span>{{ trackCaption(block) }}</span>
@@ -436,7 +468,9 @@ function handleClick(event: MouseEvent) {
         </template>
         <span v-else class="memory-journal-unavailable">
           <span class="pi pi-ban" />
-          <span>{{ block.caption || block.ids.join(',') || t('memory.journalEmbedUnavailable') }}</span>
+          <span>{{
+            block.caption || block.ids.join(',') || t('memory.journalEmbedUnavailable')
+          }}</span>
         </span>
       </figure>
     </template>

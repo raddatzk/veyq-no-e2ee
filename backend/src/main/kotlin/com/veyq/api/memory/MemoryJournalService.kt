@@ -203,7 +203,11 @@ class MemoryJournalService @Inject constructor(
     }
 
     private fun validateTrackEmbed(trackIds: List<String>, context: JournalValidationContext) {
-        trackIds.forEach { trackId ->
+        val uniqueTrackIds = trackIds.distinct()
+        if (uniqueTrackIds.size > MAX_TRACK_EMBED_IDS) {
+            throw BadRequestException("Invalid veyq journal embed", "MEMORY_JOURNAL_EMBED_INVALID")
+        }
+        uniqueTrackIds.forEach { trackId ->
             validateSingleTrackEmbed(trackId, context)
         }
     }
@@ -425,6 +429,7 @@ class MemoryJournalService @Inject constructor(
 
     companion object {
         private const val MAX_MARKDOWN_LENGTH = 200_000
+        private const val MAX_TRACK_EMBED_IDS = 20
         private const val DEFAULT_LIVE_TOKEN_SECRET = "dev-only-change-me"
         private val VEYQ_EMBED = Regex("""(?<!:)::([A-Za-z][A-Za-z0-9-]*):([^\s\n]+)(?:[ \t]+[^\n]*?)?(?=\n|$|::(?:media|chapter|playlist|track):)""")
     }
