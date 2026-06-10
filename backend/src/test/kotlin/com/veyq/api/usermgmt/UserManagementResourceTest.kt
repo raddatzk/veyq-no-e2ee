@@ -398,6 +398,45 @@ class UserManagementResourceTest {
     }
 
     @Test
+    fun `tenant registration passkey invite cannot claim pending existing user`() {
+        val token = createTenantRegistrationInviteToken(maxRegistrations = null)
+        val pendingOwner = createPendingNoLoginUser("pending-passkey-owner-$runId", ServerRole.ServerOwner)
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body("""{"email":"${pendingOwner.email}","displayName":"Claimed Owner"}""")
+            .`when`().post("/api/tenant-registration-invites/$token/passkey-options")
+            .then()
+            .statusCode(409)
+
+        given()
+            .contentType("application/json")
+            .header("Host", tenant.domain)
+            .body(
+                """
+                {
+                  "email": "${pendingOwner.email}",
+                  "displayName": "Claimed Owner",
+                  "passkeyDisplayName": "Attacker Device",
+                  "credential": ${passkeyRegistrationJson()}
+                }
+                """.trimIndent()
+            )
+            .`when`().post("/api/tenant-registration-invites/$token/join/passkey")
+            .then()
+            .statusCode(409)
+
+        entityManager.clear()
+        val unchangedUser = userRepo.findByEmail(pendingOwner.email)!!
+        assertThat(unchangedUser.displayName).isEqualTo(pendingOwner.displayName)
+        assertThat(unchangedUser.role).isEqualTo(ServerRole.ServerOwner)
+        assertThat(unchangedUser.passwordSetAt).isNull()
+        assertThat(passkeyCredentialRepo.countByUser(unchangedUser)).isZero()
+        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, unchangedUser)).isNull()
+    }
+
+    @Test
     fun `tenant registration invite rejects wrong domain revoked expired and exhausted links`() {
         val token = createTenantRegistrationInviteToken(maxRegistrations = 1)
 
@@ -2424,6 +2463,19 @@ class UserManagementResourceTest {
             }
         }.also {
             serverState.markSetupCompleted()
+        }
+
+    private fun createPendingNoLoginUser(name: String, role: ServerRole): User =
+        inTransaction {
+            User().also {
+                it.passwordHash = passwordService.hash("pending-password")
+                it.displayName = name
+                it.permalink = name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+                it.email = "$name@example.com"
+                it.role = role
+                it.passwordSetAt = null
+                userRepo.persist(it)
+            }
         }
 
     private fun createPendingOwner(name: String, tenant: Tenant): User =

@@ -13,7 +13,6 @@ import com.veyq.api.auth.passkey.PasskeyHostService
 import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.common.HashingService
 import com.veyq.api.common.Permalinks
-import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
@@ -59,7 +58,6 @@ class TenantRegistrationInviteService @Inject constructor(
     private val tenantService: TenantService,
     private val tenantMemberRepo: TenantMemberRepo,
     private val userRepo: UserRepo,
-    private val passkeyCredentialRepo: PasskeyCredentialRepo,
     private val passwordService: PasswordService,
     private val authService: AuthService,
     private val passkeyHostService: PasskeyHostService,
@@ -289,14 +287,7 @@ class TenantRegistrationInviteService @Inject constructor(
             if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
                 throw UnauthorizedException("User cannot join this tenant")
             }
-            if (userHasLogin(existingUser)) {
-                throw ConflictException("Existing users must be logged in to join this tenant")
-            }
-            existingUser.displayName = displayName
-            if (existingUser.permalink.startsWith("user-")) {
-                existingUser.permalink = uniquePermalink(displayName)
-            }
-            return existingUser
+            throw ConflictException("Existing users must be logged in to join this tenant")
         }
         return createStagedPasskeyUser(email, displayName)
     }
@@ -312,9 +303,6 @@ class TenantRegistrationInviteService @Inject constructor(
             userRepo.persist(it)
             userRepo.flush()
         }
-
-    private fun userHasLogin(user: User): Boolean =
-        user.passwordSetAt != null || passkeyCredentialRepo.countByUser(user) > 0
 
     private fun requireLoggedInExistingUser(existingUser: User, email: String): User {
         if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
