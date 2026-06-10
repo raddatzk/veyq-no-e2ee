@@ -151,6 +151,7 @@ final class VeyqTests: XCTestCase {
             "summer-south-tyrol-day-1",
             "summer-south-tyrol-day-2"
         ])
+        XCTAssertEqual(targets[0].instanceURL, "https://memories.example.test")
         XCTAssertEqual(targets[1].parentMemoryTitle, "Summer in South Tyrol")
         XCTAssertEqual(targets[1].depth, 1)
     }
@@ -1174,6 +1175,7 @@ final class VeyqTests: XCTestCase {
 
         let target = try JSONDecoder().decode(ShareImportMemoryTarget.self, from: data)
 
+        XCTAssertNil(target.instanceURL)
         XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp")
         XCTAssertEqual(target.coverThumbnailFilename, "mem_abc123-cover.jpg")
     }
@@ -1191,6 +1193,7 @@ final class VeyqTests: XCTestCase {
 
         let target = try JSONDecoder().decode(ShareImportMemoryTarget.self, from: data)
 
+        XCTAssertNil(target.instanceURL)
         XCTAssertEqual(target.coverUrl, "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp")
         XCTAssertNil(target.coverThumbnailFilename)
         XCTAssertNil(target.parentMemoryTitle)
@@ -1231,6 +1234,7 @@ final class VeyqTests: XCTestCase {
                     title: "Albania 2024",
                     dateRange: "2026-06-01 - 2026-06-07",
                     tenantName: "friends",
+                    instanceURL: "https://memories.example.test",
                     coverUrl: "/api/friends/memories/mem_abc123/cover/preview?fp=cover-preview-fp",
                     coverThumbnailFilename: "mem_abc123-cover.jpg"
                 )
@@ -1242,8 +1246,48 @@ final class VeyqTests: XCTestCase {
         UploadQueuePersistence.saveShareImportTargets(snapshot)
         let loaded = try XCTUnwrap(UploadQueuePersistence.loadShareImportTargets())
 
+        XCTAssertEqual(loaded.targets.first?.instanceURL, "https://memories.example.test")
         XCTAssertEqual(loaded.targets.first?.coverThumbnailFilename, "mem_abc123-cover.jpg")
         XCTAssertNil(loaded.includesOnlyKnownChapters)
+    }
+
+    @MainActor
+    func testRecentTargetsAreScopedToConnectedInstance() async throws {
+        let staleTarget = ShareImportMemoryTarget(
+            id: "evil-memory",
+            title: "Stale Memory",
+            dateRange: "2026-06-01",
+            tenantName: "family",
+            instanceURL: "https://attacker.example.test",
+            coverUrl: "https://attacker.example.test/cover.jpg",
+            coverThumbnailFilename: nil
+        )
+        let legacyTarget = ShareImportMemoryTarget(
+            id: "legacy-memory",
+            title: "Legacy Memory",
+            dateRange: "2026-06-02",
+            tenantName: "family",
+            coverUrl: "https://attacker.example.test/legacy.jpg",
+            coverThumbnailFilename: nil
+        )
+        UploadQueuePersistence.saveShareImportTargets(
+            ShareImportTargetSnapshot(
+                targets: [staleTarget, legacyTarget],
+                lastUsedMemoryId: nil,
+                updatedAt: Date(timeIntervalSince1970: 1_775_000_000)
+            )
+        )
+
+        let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
+        try await store.connect(to: "https://memories.example.test")
+        store.refreshRecentMemoryTargets()
+
+        XCTAssertTrue(store.recentMemoryTargets.isEmpty)
+
+        store.recordRecentTarget(staleTarget)
+
+        XCTAssertEqual(store.recentMemoryTargets.map(\.id), ["evil-memory"])
+        XCTAssertEqual(store.recentMemoryTargets.first?.instanceURL, "https://memories.example.test")
     }
 
     func testShareImportCoverCleanupRemovesStaleThumbnails() throws {
@@ -2183,6 +2227,25 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(data, Data([0x01, 0x02, 0x03]))
         XCTAssertEqual(request.url?.absoluteString, "https://memories.example.test/api/friends/memory-media/med-1/preview")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+    }
+
+    func testAPIClientDoesNotSendBearerHeaderToExternalMediaURL() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.responseData = Data([0x01, 0x02, 0x03])
+
+        let session = URLSession(configuration: .stubbed)
+        let client = VeyqAPIClient(
+            instanceURL: URL(string: "https://memories.example.test")!,
+            accessToken: "access",
+            session: session
+        )
+
+        let data = try await client.mediaData(from: "https://attacker.example.test/cover.jpg")
+
+        let request = try XCTUnwrap(URLProtocolStub.lastRequest)
+        XCTAssertEqual(data, Data([0x01, 0x02, 0x03]))
+        XCTAssertEqual(request.url?.absoluteString, "https://attacker.example.test/cover.jpg")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
     }
 
     func testAPIClientUpdatesMemoryMediaCapturedAt() async throws {

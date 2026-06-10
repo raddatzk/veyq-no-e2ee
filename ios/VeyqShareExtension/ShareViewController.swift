@@ -354,8 +354,9 @@ final class ShareViewController: UIViewController {
     }
 
     private func addRecentTargets(tenantName: String) {
+        guard let activeInstanceURL = activeAccount?.instanceURL.absoluteString else { return }
         let targets = (loadShareImportTargets()?.targets ?? [])
-            .filter { $0.tenantName == tenantName }
+            .filter { $0.tenantName == tenantName && $0.instanceURL == activeInstanceURL }
             .prefix(8)
         guard !targets.isEmpty else { return }
 
@@ -1108,7 +1109,7 @@ final class ShareViewController: UIViewController {
     private func addMemoryTarget(_ target: ShareImportMemoryTarget) {
         let card = MemoryTargetCardControl(
             target: target,
-            isSelected: loadShareImportTargets()?.lastUsedMemoryId == target.id,
+            isSelected: isLastUsedTarget(target),
             placeholder: Self.placeholderCoverImage()
         )
         loadCachedCover(for: target, into: card)
@@ -1116,6 +1117,20 @@ final class ShareViewController: UIViewController {
             self?.showMemoryPreview(target)
         }, for: .touchUpInside)
         targetStack.addArrangedSubview(card)
+    }
+
+    private func isLastUsedTarget(_ target: ShareImportMemoryTarget) -> Bool {
+        guard let activeInstanceURL = activeAccount?.instanceURL.absoluteString,
+              let snapshot = loadShareImportTargets(),
+              snapshot.lastUsedMemoryId == target.id
+        else {
+            return false
+        }
+        return snapshot.targets.contains { cached in
+            cached.id == target.id
+                && cached.tenantName == target.tenantName
+                && cached.instanceURL == activeInstanceURL
+        }
     }
 
     private func showMemoryTargets(
@@ -2490,6 +2505,7 @@ private struct ShareImportMemoryTarget: Codable {
     let title: String
     let dateRange: String
     let tenantName: String
+    let instanceURL: String?
     let coverUrl: String?
     let coverCrop: ShareCoverCrop?
     let coverThumbnailFilename: String?
@@ -2796,6 +2812,7 @@ private struct ShareMemory: Codable, Identifiable, Hashable {
             title: displayName,
             dateRange: dateRange,
             tenantName: tenantName,
+            instanceURL: nil,
             coverUrl: coverUrl,
             coverCrop: coverCrop,
             coverThumbnailFilename: nil,
@@ -2959,9 +2976,10 @@ private struct ShareExtensionAPIClient {
     }
 
     private func mediaData(from urlString: String) async throws -> Data {
-        var request = URLRequest(url: try mediaURL(from: urlString))
+        let url = try mediaURL(from: urlString)
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        return try await sendData(request)
+        return try await sendData(request, authenticated: shouldAuthenticateRequest(to: url))
     }
 
     private func get<T: Decodable>(path: String, query: [String: String] = [:]) async throws -> T {
@@ -2999,6 +3017,16 @@ private struct ShareExtensionAPIClient {
             throw ShareExtensionError.serverStatus(http.statusCode)
         }
         return data
+    }
+
+    private func shouldAuthenticateRequest(to url: URL) -> Bool {
+        isSameOrigin(url, session.instanceURL) || isSameOrigin(url, session.apiBaseURL)
+    }
+
+    private func isSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
+            && lhs.host?.lowercased() == rhs.host?.lowercased()
+            && lhs.effectivePort == rhs.effectivePort
     }
 
     private func mediaURL(from urlString: String) throws -> URL {
@@ -3043,6 +3071,13 @@ private enum ShareExtensionError: LocalizedError {
 }
 
 private extension URL {
+    var effectivePort: Int? {
+        if let port { return port }
+        if scheme?.lowercased() == "https" { return 443 }
+        if scheme?.lowercased() == "http" { return 80 }
+        return nil
+    }
+
     func appendingVeyqShareEncodedPath(_ path: String, query: [String: String] = [:]) -> URL {
         var url = self
         path.split(separator: "/").forEach { segment in

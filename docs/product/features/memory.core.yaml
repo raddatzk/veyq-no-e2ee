@@ -317,6 +317,9 @@ acceptanceCriteria:
           - testName: testShareImportMemoryTargetDecodesChapterMetadata
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testRecentTargetsAreScopedToConnectedInstance
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
           - testName: testInternalMemoryShareLinksUseSectionHashes
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift

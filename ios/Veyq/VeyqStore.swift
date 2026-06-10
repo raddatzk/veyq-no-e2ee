@@ -1756,18 +1756,19 @@ final class VeyqStore: ObservableObject {
     }
 
     private func persistShareImportTargets(tenantName: String) async {
+        guard let activeInstanceURL = connectedInstanceURL?.absoluteString else { return }
         let targets = await shareImportTargets(tenantName: tenantName)
         let previousSnapshot = UploadQueuePersistence.loadShareImportTargets()
-        let previousTargets = previousSnapshot?.targets ?? []
-        let mergedTargets = targets + previousTargets.filter { previous in
-            !targets.contains { $0.id == previous.id }
+        let retainedTargets = (previousSnapshot?.targets ?? []).filter { previous in
+            previous.instanceURL != nil && previous.instanceURL != activeInstanceURL
         }
+        let cachedTargets = targets + retainedTargets
         UploadQueuePersistence.removeUnreferencedShareImportCovers(
-            keeping: Set(mergedTargets.compactMap(\.coverThumbnailFilename))
+            keeping: Set(cachedTargets.compactMap(\.coverThumbnailFilename))
         )
         UploadQueuePersistence.saveShareImportTargets(
             ShareImportTargetSnapshot(
-                targets: mergedTargets,
+                targets: cachedTargets,
                 lastUsedMemoryId: previousSnapshot?.lastUsedMemoryId,
                 updatedAt: Date(),
                 includesOnlyKnownChapters: true
@@ -1778,12 +1779,15 @@ final class VeyqStore: ObservableObject {
 
     func refreshRecentMemoryTargets() {
         guard let tenantName = selectedTenant?.name,
+              let activeInstanceURL = connectedInstanceURL?.absoluteString,
               let snapshot = UploadQueuePersistence.loadShareImportTargets()
         else {
             recentMemoryTargets = []
             return
         }
-        recentMemoryTargets = snapshot.targets.filter { $0.tenantName == tenantName }
+        recentMemoryTargets = snapshot.targets.filter {
+            $0.tenantName == tenantName && $0.instanceURL == activeInstanceURL
+        }
     }
 
     func recordRecentMemory(_ memory: Memory) {
@@ -1794,6 +1798,7 @@ final class VeyqStore: ObservableObject {
                 title: memory.title,
                 dateRange: memory.dateRange,
                 tenantName: tenantName,
+                instanceURL: connectedInstanceURL?.absoluteString,
                 coverUrl: memory.coverUrl,
                 coverCrop: memory.coverCrop,
                 coverThumbnailFilename: nil,
@@ -1804,12 +1809,17 @@ final class VeyqStore: ObservableObject {
     }
 
     func recordRecentTarget(_ target: ShareImportMemoryTarget) {
+        guard let activeInstanceURL = connectedInstanceURL?.absoluteString else { return }
+        let scopedTarget = target.scoped(toInstanceURL: activeInstanceURL)
         let snapshot = UploadQueuePersistence.loadShareImportTargets()
-        let nextTargets = [target] + (snapshot?.targets ?? []).filter { $0.id != target.id }
+        let retainedTargets = (snapshot?.targets ?? []).filter { previous in
+            previous.instanceURL != nil && !(previous.instanceURL == activeInstanceURL && previous.id == scopedTarget.id)
+        }
+        let nextTargets = [scopedTarget] + retainedTargets
         UploadQueuePersistence.saveShareImportTargets(
             ShareImportTargetSnapshot(
                 targets: Array(nextTargets.prefix(40)),
-                lastUsedMemoryId: target.id,
+                lastUsedMemoryId: scopedTarget.id,
                 updatedAt: Date(),
                 includesOnlyKnownChapters: snapshot?.includesOnlyKnownChapters
             )
@@ -1857,6 +1867,7 @@ final class VeyqStore: ObservableObject {
             title: memory.title,
             dateRange: memory.dateRange,
             tenantName: tenantName,
+            instanceURL: connectedInstanceURL?.absoluteString,
             coverUrl: memory.coverUrl,
             coverCrop: memory.coverCrop,
             coverThumbnailFilename: thumbnailFilename,

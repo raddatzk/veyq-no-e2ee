@@ -297,9 +297,10 @@ struct VeyqAPIClient {
     }
 
     func mediaData(from urlString: String) async throws -> Data {
-        var request = URLRequest(url: try mediaURL(from: urlString))
+        let url = try mediaURL(from: urlString)
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        return try await sendData(request)
+        return try await sendData(request, authenticated: shouldAuthenticateRequest(to: url))
     }
 
     func createMemoryMediaUpload(
@@ -624,9 +625,9 @@ struct VeyqAPIClient {
         return try JSONDecoder.veyq.decode(T.self, from: data)
     }
 
-    private func sendData(_ request: URLRequest) async throws -> Data {
+    private func sendData(_ request: URLRequest, authenticated: Bool = true) async throws -> Data {
         var request = request
-        if let accessToken {
+        if authenticated, let accessToken {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         let (data, response) = try await session.data(for: request)
@@ -639,6 +640,16 @@ struct VeyqAPIClient {
             throw VeyqAPIError.serverStatus(http.statusCode)
         }
         return data
+    }
+
+    private func shouldAuthenticateRequest(to url: URL) -> Bool {
+        isSameOrigin(url, instanceURL) || isSameOrigin(url, apiBaseURL)
+    }
+
+    private func isSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
+            && lhs.host?.lowercased() == rhs.host?.lowercased()
+            && lhs.effectivePort == rhs.effectivePort
     }
 
     private func mediaURL(from urlString: String) throws -> URL {
@@ -869,6 +880,13 @@ final class SystemMobileAuthenticator: NSObject, MobileAuthenticating, ASWebAuth
 }
 
 private extension URL {
+    var effectivePort: Int? {
+        if let port { return port }
+        if scheme?.lowercased() == "https" { return 443 }
+        if scheme?.lowercased() == "http" { return 80 }
+        return nil
+    }
+
     func appendingEncodedPath(_ path: String, query: [String: String] = [:]) -> URL {
         var url = self
         path.split(separator: "/").forEach { segment in
