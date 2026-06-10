@@ -138,10 +138,11 @@ class MemoryTrackService(
     ): MemoryTrack {
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty", "MEMORY_TRACK_UPLOAD_EMPTY")
-        val filename = normalizedTrackFilename(originalFilename)
-        if (!filename.endsWith(".gpx", ignoreCase = true)) {
+        val basename = normalizedTrackFilename(originalFilename)
+        if (!basename.endsWith(".gpx", ignoreCase = true)) {
             throw BadRequestException("Only GPX tracks are supported", "MEMORY_TRACK_UPLOAD_TYPE_UNSUPPORTED")
         }
+        val filename = truncateFilename(basename, MAX_ORIGINAL_FILENAME_LENGTH)
 
         val parsed = gpxTrackParser.parse(uploadPath)
         val publicId = NanoIdUtils.randomNanoId(16)
@@ -239,15 +240,12 @@ class MemoryTrackService(
         mediaStorageService.writeAtomic(source, storageKey, "track-")
     }
 
-    private fun normalizedTrackFilename(originalFilename: String?): String {
-        val filename = originalFilename
-            ?.trim()
-            ?.substringAfterLast('/')
-            ?.substringAfterLast('\\')
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_TRACK_FILENAME
-        return truncateFilename(filename, MAX_ORIGINAL_FILENAME_LENGTH)
-    }
+    private fun normalizedTrackFilename(originalFilename: String?): String = originalFilename
+        ?.trim()
+        ?.substringAfterLast('/')
+        ?.substringAfterLast('\\')
+        ?.takeIf { it.isNotBlank() }
+        ?: DEFAULT_TRACK_FILENAME
 
     private fun truncateFilename(filename: String, maxLength: Int): String {
         if (filename.length <= maxLength) return filename

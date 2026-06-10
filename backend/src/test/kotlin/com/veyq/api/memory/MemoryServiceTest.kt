@@ -1422,6 +1422,28 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `rejects track filename whose GPX extension appears only after truncation`() {
+        val memory = memoryService.createMemory(CreateMemoryRequest("track-upload-extension", "Track Upload Extension"))
+        val gpx = gpxFile("veyq-memory-track-upload-extension-")
+
+        try {
+            assertThatExceptionOfType(BadRequestException::class.java)
+                .isThrownBy {
+                    memoryTrackService.uploadMemoryTrack(
+                        memory.id,
+                        gpx,
+                        "a".repeat(251) + ".gpx" + "x".repeat(255),
+                        title = "Invalid Long Ridge",
+                        activityType = com.veyq.api.generated.model.MemoryTrackActivityType.HIKING,
+                    )
+                }
+                .matches { it.code == "MEMORY_TRACK_UPLOAD_TYPE_UNSUPPORTED" }
+        } finally {
+            Files.deleteIfExists(gpx)
+        }
+    }
+
+    @Test
     fun `deleting track referenced by journal is rejected`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("delete-journal-track-trip", "Delete Journal Track Trip"))
         val first = createTrack(memory(trip.id), "Summit Route")

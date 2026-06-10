@@ -2123,7 +2123,7 @@ components:
               filename:
                 type: string
                 nullable: true
-                description: Original client-side filename to preserve for track listings and downloads. The server stores the basename and truncates it to 255 characters while preserving the extension.
+                description: Original client-side filename to preserve for track listings and downloads. The server validates the basename GPX extension before truncating the stored basename to 255 characters while preserving the extension.
               title:
                 type: string
                 minLength: 1

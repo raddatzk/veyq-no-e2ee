@@ -30,12 +30,15 @@ acceptanceCriteria:
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
   - id: memory.tracks.panel-upload
-    statement: Track panel uploads a selected GPX file with inferred title/default activity type and bounds preserved filenames to the storage limit.
+    statement: Track panel uploads a selected GPX file with inferred title/default activity type, rejects basenames without a GPX extension, and bounds preserved filenames to the storage limit.
     coverage:
       backend:
         integration:
           - testName: uploads memory track with original filename
             kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: rejects track filename whose GPX extension appears only after truncation
+            kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
       frontend:
         unit:
