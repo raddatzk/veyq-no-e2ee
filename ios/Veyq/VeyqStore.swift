@@ -1152,6 +1152,51 @@ final class VeyqStore: ObservableObject {
         }
     }
 
+    /// Ensures the host app is active on the account the share extension browsed
+    /// with before uploading. Unbound targets (created inside the host app) keep
+    /// using the currently active session.
+    private func activateUploadTargetAccountIfNeeded(_ target: UploadTargetMemory) async -> Bool {
+        guard !mockMode, target.isAccountBound else { return true }
+
+        do {
+            guard let targetSession = try sessionStore.loadAll().first(where: { target.matches(session: $0) }) else {
+                errorMessage = L10n.string("The account selected in the share sheet is no longer available.")
+                return false
+            }
+
+            let activeSession = try sessionStore.loadActive()
+            let activeSessionMismatch = activeSession.map { !target.matches(session: $0) } ?? true
+            if connectedInstanceURL != targetSession.instanceURL || activeSessionMismatch {
+                try sessionStore.save(targetSession)
+                instances = try sessionStore.loadAll()
+                try await activate(targetSession)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Entry point for targeted batches handed off from the share extension. Unlike
+    /// `enqueuePendingImport`, it requires the target to carry the selected-account
+    /// binding and switches the host app to that account before uploading, so shared
+    /// files cannot be sent to an unrelated currently-active account/instance.
+    func enqueuePendingImportHandoff(_ batch: PendingImportBatch, target: UploadTargetMemory) async {
+        guard target.isAccountBound else {
+            UploadQueuePersistence.removePendingImportBatch(id: batch.id)
+            errorMessage = L10n.string("Shared files could not be opened securely. Please choose the Memory again.")
+            return
+        }
+
+        guard await activateUploadTargetAccountIfNeeded(target) else {
+            UploadQueuePersistence.removePendingImportBatch(id: batch.id)
+            return
+        }
+
+        enqueuePendingImport(batch, target: target)
+    }
+
     func enqueuePendingImport(_ batch: PendingImportBatch, target: UploadTargetMemory) {
         let hasMediaFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) != .track }
         let hasTrackFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) == .track }
@@ -1425,8 +1470,33 @@ final class VeyqStore: ObservableObject {
     }
 
     private func performUpload(itemId: String) async {
-        guard let index = uploadItems.firstIndex(where: { $0.id == itemId }), let apiClient else {
+        guard let preflightIndex = uploadItems.firstIndex(where: { $0.id == itemId }) else {
             uploadTasks[itemId] = nil
+            return
+        }
+        let target = uploadItems[preflightIndex].target
+        guard await activateUploadTargetAccountIfNeeded(target) else {
+            if let failIndex = uploadItems.firstIndex(where: { $0.id == itemId }) {
+                uploadItems[failIndex].state = .failed
+                uploadItems[failIndex].errorMessage = errorMessage ?? L10n.string("The account selected in the share sheet is no longer available.")
+                uploadItems[failIndex].retryable = false
+                uploadItems[failIndex].progressUpdatedAt = Date()
+                persistUploads()
+            }
+            uploadTasks[itemId] = nil
+            runNextUploadIfNeeded()
+            return
+        }
+        guard let index = uploadItems.firstIndex(where: { $0.id == itemId }), let apiClient else {
+            if let failIndex = uploadItems.firstIndex(where: { $0.id == itemId }) {
+                uploadItems[failIndex].state = .failed
+                uploadItems[failIndex].errorMessage = L10n.string("No native session is stored.")
+                uploadItems[failIndex].retryable = true
+                uploadItems[failIndex].progressUpdatedAt = Date()
+                persistUploads()
+            }
+            uploadTasks[itemId] = nil
+            runNextUploadIfNeeded()
             return
         }
         guard FileManager.default.isReadableFile(atPath: uploadItems[index].localFileURL.path) else {
@@ -1719,6 +1789,7 @@ final class VeyqStore: ObservableObject {
         if mockMode {
             return
         }
+        guard await activateUploadTargetAccountIfNeeded(target) else { return }
         guard supportsCapability("memory.tracks") else {
             errorMessage = L10n.string("This instance does not support GPX tracks.")
             return

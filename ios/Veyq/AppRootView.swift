@@ -130,7 +130,9 @@ struct AppRootView: View {
             if pendingImportBatch?.id == batch.id {
                 pendingImportBatch = nil
             }
-            store.enqueuePendingImport(batch, target: target)
+            Task {
+                await store.enqueuePendingImportHandoff(batch, target: target)
+            }
             return
         }
         UploadQueuePersistence.removePendingImportBatch(id: batch.id)
@@ -151,7 +153,9 @@ struct AppRootView: View {
         case .enqueueTargeted(let targetedBatches):
             for batch in targetedBatches {
                 guard let target = batch.targetMemory else { continue }
-                store.enqueuePendingImport(batch, target: target)
+                Task {
+                    await store.enqueuePendingImportHandoff(batch, target: target)
+                }
             }
         case .none:
             break
