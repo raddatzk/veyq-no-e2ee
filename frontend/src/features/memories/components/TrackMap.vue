@@ -8,6 +8,7 @@ import { useAuthState } from '../../../shared/state/useAuthState'
 import { mediaPreviewUrl } from '../../../shared/utils/mediaUrls'
 import { createRafResizeObserver, type RafResizeObserver } from '../../../shared/utils/resizeObserver'
 import type { MemoryMedia, MemoryTrack } from '../api'
+import { JOURNAL_TRACK_EMBED_MAX_IDS } from '../utils/journalMediaMarkdown'
 
 const DEFAULT_OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const MARKER_CLUSTER_DISTANCE_PX = 34
@@ -35,7 +36,13 @@ const osmTilesEnabled = ref(hasOsmTileConsent(userId))
 const tileUrl = computed(() => (osmTilesEnabled.value ? DEFAULT_OSM_TILE_URL : ''))
 const activeTracks = computed(() => {
   const tracks = props.tracks ?? (props.track ? [props.track] : [])
-  return tracks.filter((track) => track.geometry.coordinates.length >= 2)
+  const uniqueTracks = new Map<string, MemoryTrack>()
+  tracks.forEach((track) => {
+    if (track.geometry.coordinates.length >= 2 && !uniqueTracks.has(track.id)) {
+      uniqueTracks.set(track.id, track)
+    }
+  })
+  return Array.from(uniqueTracks.values()).slice(0, JOURNAL_TRACK_EMBED_MAX_IDS)
 })
 const trackPositions = computed(() =>
   activeTracks.value.map((track) => ({

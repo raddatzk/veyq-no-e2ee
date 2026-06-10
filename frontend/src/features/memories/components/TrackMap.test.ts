@@ -146,6 +146,17 @@ describe('TrackMap', () => {
     )
   })
 
+  it('deduplicates repeated track entries before rendering route layers', async () => {
+    mountTrackMap({
+      track: undefined,
+      tracks: [track(), track()]
+    })
+    await flushPromises()
+
+    expect(leafletMock.polyline.mock.calls.length).toBeGreaterThan(0)
+    expect(leafletMock.polyline.mock.calls.length).toBeLessThanOrEqual(2)
+  })
+
   it('renders selected tracks and memory photos on the map while reset fits the tracks', async () => {
     const wrapper = mountTrackMap({
       tracks: [track(), track({ id: 'track-2', title: 'Evening Walk' })],

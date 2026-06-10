@@ -7,7 +7,11 @@ import Carousel from 'primevue/carousel'
 import MediaLightbox from '../../../components/media/MediaLightbox.vue'
 import { mediaContentUrl, mediaImageDisplayUrl, mediaPosterUrl } from '../../../shared/utils/mediaUrls'
 import type { Memory, MemoryMedia, MemoryPlaylist, MemoryTrack } from '../api'
-import { journalEmbedRanges, type JournalEmbedRange } from '../utils/journalMediaMarkdown'
+import {
+  journalEmbedRanges,
+  normalizeJournalTrackIds,
+  type JournalEmbedRange
+} from '../utils/journalMediaMarkdown'
 import TrackMap from './TrackMap.vue'
 
 type JournalHtmlBlock = {
@@ -121,15 +125,16 @@ function renderMediaBlock(ids: string[], caption: string): JournalMediaBlock | J
 }
 
 function renderTrackBlock(trackIds: string[], caption: string): JournalTrackBlock {
-  const tracks = trackIds
+  const uniqueTrackIds = normalizeJournalTrackIds(trackIds)
+  const tracks = uniqueTrackIds
     .map((trackId) => props.tracks?.find((item) => item.id === trackId) ?? null)
     .filter((track): track is MemoryTrack => Boolean(track))
   return {
     type: 'track',
-    ids: trackIds,
+    ids: uniqueTrackIds,
     caption,
     tracks,
-    missingIds: trackIds.filter((trackId) => !tracks.some((track) => track.id === trackId))
+    missingIds: uniqueTrackIds.filter((trackId) => !tracks.some((track) => track.id === trackId))
   }
 }
 

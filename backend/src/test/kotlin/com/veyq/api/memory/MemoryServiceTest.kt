@@ -1571,6 +1571,20 @@ class MemoryServiceTest {
     }
 
     @Test
+    fun `rejects journal track embeds with too many unique tracks`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("journal-track-limit-trip", "Journal Track Limit Trip"))
+        val trackIds = (1..21).joinToString(",") { index -> "track-$index" }
+
+        assertThatExceptionOfType(BadRequestException::class.java).isThrownBy {
+            memoryJournalService.updateJournal(
+                memory(trip.id),
+                "::track:$trackIds Route",
+                MemoryJournalService.JournalValidationContext(memory(trip.id)),
+            )
+        }
+    }
+
+    @Test
     fun `rejects journal media embeds outside the current memory`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("journal-private-trip", "Journal Private Trip"))
         val other = memoryService.createMemory(CreateMemoryRequest("journal-other-trip", "Journal Other Trip"))
