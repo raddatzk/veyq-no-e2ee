@@ -13,7 +13,6 @@ import com.veyq.api.auth.passkey.PasskeyHostService
 import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.common.HashingService
 import com.veyq.api.common.Permalinks
-import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
@@ -59,7 +58,6 @@ class TenantRegistrationInviteService @Inject constructor(
     private val tenantService: TenantService,
     private val tenantMemberRepo: TenantMemberRepo,
     private val userRepo: UserRepo,
-    private val passkeyCredentialRepo: PasskeyCredentialRepo,
     private val passwordService: PasswordService,
     private val authService: AuthService,
     private val passkeyHostService: PasskeyHostService,
@@ -205,11 +203,11 @@ class TenantRegistrationInviteService @Inject constructor(
 
     @Transactional
     fun passkeyOptions(token: String, request: TenantRegistrationInvitePasskeyOptionsRequest): String {
-        requireValidInviteForCurrentDomain(token, lockForUpdate = false)
+        val invite = requireValidInviteForCurrentDomain(token, lockForUpdate = false)
         val email = normalizeEmail(request.email)
         val displayName = normalizeDisplayName(request.displayName)
-        val user = stagedPasskeyUser(email, displayName)
-        return passkeyService.registrationOptionsForUser(user, routingContext)
+        requireNewPasskeyInviteUser(email)
+        return passkeyService.registrationOptionsForIdentity(email, displayName, routingContext)
     }
 
     @Transactional
@@ -231,7 +229,8 @@ class TenantRegistrationInviteService @Inject constructor(
 
         val email = normalizeEmail(request.email)
         val displayName = normalizeDisplayName(request.displayName)
-        val user = stagedPasskeyUser(email, displayName)
+        requireNewPasskeyInviteUser(email)
+        val user = createStagedPasskeyUser(email, displayName)
         passkeyService.createPasskeyForUser(user, request.passkeyDisplayName, request.credential, routingContext)
         capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(user)
         val joined = activateTenantMember(invite.tenant, user)
@@ -283,22 +282,14 @@ class TenantRegistrationInviteService @Inject constructor(
         return user
     }
 
-    private fun stagedPasskeyUser(email: String, displayName: String): User {
+    private fun requireNewPasskeyInviteUser(email: String) {
         val existingUser = userRepo.findByEmail(email)
         if (existingUser != null) {
             if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
                 throw UnauthorizedException("User cannot join this tenant")
             }
-            if (userHasLogin(existingUser)) {
-                throw ConflictException("Existing users must be logged in to join this tenant")
-            }
-            existingUser.displayName = displayName
-            if (existingUser.permalink.startsWith("user-")) {
-                existingUser.permalink = uniquePermalink(displayName)
-            }
-            return existingUser
+            throw ConflictException("Existing users must be logged in to join this tenant")
         }
-        return createStagedPasskeyUser(email, displayName)
     }
 
     private fun createStagedPasskeyUser(email: String, displayName: String): User =
@@ -312,9 +303,6 @@ class TenantRegistrationInviteService @Inject constructor(
             userRepo.persist(it)
             userRepo.flush()
         }
-
-    private fun userHasLogin(user: User): Boolean =
-        user.passwordSetAt != null || passkeyCredentialRepo.countByUser(user) > 0
 
     private fun requireLoggedInExistingUser(existingUser: User, email: String): User {
         if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
