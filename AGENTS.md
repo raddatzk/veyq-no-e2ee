@@ -45,6 +45,7 @@ Memory UI and the Memory APIs are the active product baseline. Folders still exi
 - API contracts live in `docs/api` and are generated into backend and frontend code.
 - For backend configuration, model all project-owned `veyq.*` properties with complete `@ConfigMapping` classes instead of injecting individual values with `@ConfigProperty`. Internal Quarkus properties such as `quarkus.*` may still use direct `@ConfigProperty` injection.
 - Use domain-scoped Conventional Commit messages as documented in [docs/development.md](docs/development.md). Database and migration changes use the `backend` scope; commits affecting multiple client or server domains list each affected domain.
+- Write all repository documentation in English (README, AGENTS, `docs/**`, ADRs, feature YAML and OpenAPI descriptions). Keep code identifiers, table names, annotations and config keys unchanged.
 
 ## Current Product North Star
 
