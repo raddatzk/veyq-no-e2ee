@@ -71,7 +71,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import java.util.UUID
 import javax.imageio.ImageIO
 import jakarta.ws.rs.core.StreamingOutput
@@ -307,7 +306,7 @@ class MemoryServiceTest {
     }
 
     @Test
-    fun `memory media updates do not repeat the cursor media when database timestamp is more precise than the api cursor`() {
+    fun `memory media updates do not repeat the cursor media when database timestamp is precise`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("live-precise-cursor-trip", "Live Precise Cursor Trip"))
         val preciseUpdatedAt = Instant.parse("2026-01-02T10:00:00.123456Z")
         val media = createMedia(
@@ -324,12 +323,56 @@ class MemoryServiceTest {
         val updates = mediaService.listMemoryMediaUpdates(
             memoryId = trip.id,
             includeChildren = false,
-            afterUpdatedAt = preciseUpdatedAt.truncatedTo(ChronoUnit.MILLIS),
+            afterUpdatedAt = preciseUpdatedAt,
             afterMediaId = media.publicId,
             knownMediaSetHash = mediaService.mediaSetHash(listOf(media.publicId)),
         )
 
         assertThat(updates.media).isEmpty()
+        assertThat(updates.currentMediaIds).isNull()
+    }
+
+    @Test
+    fun `memory media updates include same millisecond lower id rows after precise cursor`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-same-millis-trip", "Live Same Millis Trip"))
+        val cursorUpdatedAt = Instant.parse("2026-01-02T10:00:00.123100Z")
+        val laterUpdatedAt = Instant.parse("2026-01-02T10:00:00.123900Z")
+        val cursor = createMedia(
+            owner,
+            memory(trip.id),
+            "Same Millis Cursor",
+            createdAt = cursorUpdatedAt,
+        )
+        val later = createMedia(
+            owner,
+            memory(trip.id),
+            "Same Millis Later",
+            createdAt = laterUpdatedAt,
+        )
+        inTransaction {
+            mediaRepo.update(
+                "publicId = ?1, updatedAt = ?2 where publicId = ?3",
+                "zzzzzzzzzzzzzzzz",
+                cursorUpdatedAt,
+                cursor.publicId,
+            )
+            mediaRepo.update(
+                "publicId = ?1, updatedAt = ?2 where publicId = ?3",
+                "aaaaaaaaaaaaaaaa",
+                laterUpdatedAt,
+                later.publicId,
+            )
+        }
+
+        val updates = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = cursorUpdatedAt,
+            afterMediaId = "zzzzzzzzzzzzzzzz",
+            knownMediaSetHash = null,
+        )
+
+        assertThat(updates.media.map { it.id }).containsExactly("aaaaaaaaaaaaaaaa")
         assertThat(updates.currentMediaIds).isNull()
     }
 

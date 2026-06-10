@@ -7,7 +7,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.persistence.*
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 @Entity
 @Table(
@@ -361,20 +360,17 @@ class MediaRepo : PanacheRepository<Media> {
         val query = if (afterUpdatedAt == null) {
             find("memory in ?1 order by updatedAt, publicId", memories)
         } else {
-            val afterUpdatedAtMillis = afterUpdatedAt.truncatedTo(ChronoUnit.MILLIS)
-            val nextUpdatedAtMillis = afterUpdatedAtMillis.plus(1, ChronoUnit.MILLIS)
             find(
                 """
                 memory in ?1 and (
-                    updatedAt >= ?4
-                    or (updatedAt >= ?2 and updatedAt < ?4 and publicId > ?3)
+                    updatedAt > ?2
+                    or (updatedAt = ?2 and publicId > ?3)
                 )
                 order by updatedAt, publicId
                 """.trimIndent(),
                 memories,
-                afterUpdatedAtMillis,
+                afterUpdatedAt,
                 afterPublicId ?: "",
-                nextUpdatedAtMillis,
             )
         }
         return query.page(0, limit).list()

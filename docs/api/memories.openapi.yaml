@@ -898,7 +898,7 @@ paths:
           schema:
             type: string
             format: date-time
-          description: Updated timestamp of the newest media item already known to the client.
+          description: Exact updated timestamp of the newest media item already known to the client; clients must preserve the response precision for the cursor.
         - in: query
           name: afterMediaId
           required: false
