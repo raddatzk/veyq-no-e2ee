@@ -179,12 +179,13 @@ final class VeyqStore: ObservableObject {
         return normalized
     }
 
-    func disconnect() {
+    func disconnect() async {
+        let sessionsToRevoke = (try? sessionStore.loadAll()) ?? []
         if !mockMode {
             mediaImageCache.removeAllDiskCache()
-        }
-        if !mockMode, let client = apiClient {
-            Task { try? await client.logoutMobileSession() }
+            for session in sessionsToRevoke {
+                await revokeMobileSession(session)
+            }
             try? sessionStore.delete()
         }
         cancelRunningUploadTasks()
@@ -224,8 +225,8 @@ final class VeyqStore: ObservableObject {
 
     func deleteInstance(_ session: StoredNativeSession) async {
         do {
-            if !mockMode, connectedInstanceURL == session.instanceURL {
-                try? await VeyqAPIClient(instanceURL: session.instanceURL, apiBaseURL: session.apiBaseURL, accessToken: session.accessToken, session: apiSession).logoutMobileSession()
+            if !mockMode {
+                await revokeMobileSession(session)
             }
             try sessionStore.delete(instanceURL: session.instanceURL)
             if !mockMode {
@@ -1322,6 +1323,42 @@ final class VeyqStore: ObservableObject {
             tenants: session.tenants,
             disabledTenantNames: session.disabledTenantNames
         )
+    }
+
+    private func revokeMobileSession(_ session: StoredNativeSession) async {
+        var sessionForLogout = session
+        var refreshedBeforeLogout = false
+        if shouldRefreshAccessToken(session) {
+            do {
+                sessionForLogout = try await refresh(session)
+                refreshedBeforeLogout = true
+            } catch {
+                sessionForLogout = session
+            }
+        }
+
+        do {
+            try await VeyqAPIClient(
+                instanceURL: sessionForLogout.instanceURL,
+                apiBaseURL: sessionForLogout.apiBaseURL,
+                accessToken: sessionForLogout.accessToken,
+                session: apiSession
+            ).logoutMobileSession()
+        } catch VeyqAPIError.unauthorized where !refreshedBeforeLogout {
+            do {
+                let refreshedSession = try await refresh(session)
+                try await VeyqAPIClient(
+                    instanceURL: refreshedSession.instanceURL,
+                    apiBaseURL: refreshedSession.apiBaseURL,
+                    accessToken: refreshedSession.accessToken,
+                    session: apiSession
+                ).logoutMobileSession()
+            } catch {
+                // Logout is best-effort so users can still remove inaccessible local credentials.
+            }
+        } catch {
+            // Logout is best-effort so users can still remove inaccessible local credentials.
+        }
     }
 
     private func applyEnabledTenants(from session: StoredNativeSession) {
