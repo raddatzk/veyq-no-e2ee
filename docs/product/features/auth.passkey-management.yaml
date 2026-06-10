@@ -1,0 +1,132 @@
+id: auth.passkey-management
+title: Passkey Management And Recovery
+status: implemented
+capabilities:
+  - auth.passkeys
+productArea: Passkey registration, reset, cross-domain linking and own-passkey account management.
+entryPoints:
+  - docs/api/users.openapi.yaml
+  - frontend/src/views/LoginView.vue
+  - frontend/src/views/ResetPasskeyView.vue
+  - frontend/src/features/settings/components/UserSettingsForm.vue
+acceptanceCriteria:
+  - id: auth.passkey-management.own-management
+    statement: Users can list, rename and delete their own passkeys but cannot manage another user's passkeys.
+    coverage:
+      backend:
+        integration:
+          - testName: user can list own passkeys
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey delete requires valid own passkey assertion
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: last passkey without password cannot be deleted
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: foreign passkey cannot be deleted
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: user can rename own passkey
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: user cannot rename another users passkey
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: renaming passkey requires display name
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+      frontend:
+        unit:
+          - testName: renders password TOTP and passkeys as two login method panels
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: adds a passkey and asks to confirm the suggested name
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: renders existing passkey names as editable fields
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: requires a passkey name before renaming a passkey
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: renames a passkey with trimmed input and updates the list
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: deletes a passkey after passkey confirmation
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: does not allow deleting the last passkey without a password
+            kind: negative
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+    gaps:
+      - reason: Backend covers the confirmed passkey delete negative paths, but no integration test currently drives a browser-grade WebAuthn assertion to prove the successful server-side delete path end to end.
+        followUp: Add a WebAuthn integration harness for successful authenticated passkey-management assertions.
+
+  - id: auth.passkey-management.registration-linking-reset
+    statement: Passkey registration, reset and cross-domain linking enforce domain, token and account boundaries.
+    coverage:
+      backend:
+        integration:
+          - testName: passkey link options reject consumed and expired tokens
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey reset sends domain-bound reset link and options reject wrong domain
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: creating passkey does not require display name
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey domains list other tenant domains
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey registration options reject unknown hosts
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link code is exchanged into target-domain grant
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link creation rejects unauthenticated same unknown and malformed targets
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token requires target tenant membership
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link creation rejects existing passkey for target domain
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link grant is rejected if target passkey appears after exchange
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token cannot be used as a normal session
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey registration options use email as username
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey reset uses the request domain for multi-tenant users
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey reset is not sent for password-only users
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: accepting invitation with passkey does not require passkey display name
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+      frontend:
+        unit:
+          - testName: shows passkey creation CTA when returning with a fragment link code and cleans the URL
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+          - testName: completes passkey linking and follows the sanitized redirect
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+          - testName: requests passkey reset for the entered email
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+          - testName: keeps accepting query link codes as a compatibility fallback
+            kind: negative
+            ref: frontend/src/views/LoginView.test.ts
+          - testName: resets the passkey with the reset token and authenticates the user
+            kind: positive
+            ref: frontend/src/views/ResetPasskeyView.test.ts

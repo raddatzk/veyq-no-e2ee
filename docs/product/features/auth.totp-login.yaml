@@ -1,0 +1,26 @@
+id: auth.totp-login
+title: TOTP Password-Login Challenge
+status: implemented
+capabilities:
+  - auth.totp-mfa
+productArea: TOTP challenge handling for password login and its interaction with passkey login.
+entryPoints:
+  - docs/api/auth.openapi.yaml
+  - frontend/src/views/LoginView.vue
+acceptanceCriteria:
+  - id: auth.totp-login.password-login-challenge
+    statement: Password login requires a valid TOTP code when TOTP is enabled, and passkey login is not stacked with TOTP.
+    coverage:
+      backend:
+        integration:
+          - testName: password login requires totp code when enabled
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+      frontend:
+        unit:
+          - testName: asks for a TOTP code only after password login requires it
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+    gaps:
+      - reason: Passkey login interaction is covered by design and unchanged passkey login tests, but no automated test currently proves a TOTP-enabled passkey user can still log in without TOTP.
+        followUp: Add a WebAuthn test path for a TOTP-enabled user once passkey login tests cover real assertions end to end.

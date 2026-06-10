@@ -1,0 +1,175 @@
+id: web.workspace-shell
+title: Web Workspace Shell And Navigation
+status: implemented
+capabilities: []
+
+productArea: Browser workspace shell, navigation, profile menu, support notice, route helpers and breadcrumbs.
+entryPoints:
+  - frontend/src/components/app
+  - frontend/src/shared/components
+  - frontend/src/router.ts
+  - frontend/src/views/TenantRouteView.vue
+acceptanceCriteria:
+  - id: web.workspace-shell.responsive-workspace
+    statement: Workspace shell and tenant home remain usable with long Memory names.
+    coverage:
+      frontend:
+        integration:
+          - testName: workspace shell and tenant home remain usable with long memory names
+            kind: positive
+            ref: frontend/e2e/responsive.spec.ts
+  - id: web.workspace-shell.app-shell-routing
+    statement: The app shell keeps setup outside the workspace shell and shows authenticated workspace routes correctly.
+    coverage:
+      frontend:
+        unit:
+          - testName: keeps setup outside the workspace shell after admin authentication
+            kind: negative
+            ref: frontend/src/components/app/AppShell.test.ts
+          - testName: shows the workspace shell for authenticated app routes
+            kind: positive
+            ref: frontend/src/components/app/AppShell.test.ts
+          - testName: shows support notice only for server owners
+            kind: negative
+            ref: frontend/src/components/app/AppShell.test.ts
+  - id: web.workspace-shell.profile-menu-access
+    statement: Profile menu exposes user and server settings according to the current user role.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows user settings for authenticated users
+            kind: positive
+            ref: frontend/src/components/app/ProfileMenu.test.ts
+          - testName: shows server settings only for server owners
+            kind: negative
+            ref: frontend/src/components/app/ProfileMenu.test.ts
+  - id: web.workspace-shell.confirmation-dialog-state
+    statement: Shared browser confirmation dialogs show progress and block duplicate confirm, cancel and close actions while a mutation is running.
+    coverage:
+      frontend:
+        unit:
+          - testName: emits confirm from the submit action
+            kind: positive
+            ref: frontend/src/shared/components/ConfirmationDialog.test.ts
+          - testName: blocks duplicate confirm and cancel while loading
+            kind: negative
+            ref: frontend/src/shared/components/ConfirmationDialog.test.ts
+          - testName: keeps the dialog open when the shell tries to close during loading
+            kind: negative
+            ref: frontend/src/shared/components/ConfirmationDialog.test.ts
+          - testName: allows cancel after loading ends
+            kind: positive
+            ref: frontend/src/shared/components/ConfirmationDialog.test.ts
+          - testName: disables confirm when confirmation requirements are not met
+            kind: negative
+            ref: frontend/src/shared/components/ConfirmationDialog.test.ts
+  - id: web.workspace-shell.support-notice
+    statement: Server-owner support notices respect server metadata, version changes and local dismissal state.
+    coverage:
+      frontend:
+        unit:
+          - testName: stays hidden when the server omits the support link
+            kind: negative
+            ref: frontend/src/components/app/SupportNotice.test.ts
+          - testName: shows support notice and stores dismiss state locally
+            kind: positive
+            ref: frontend/src/components/app/SupportNotice.test.ts
+          - testName: shows support notice again for a new version
+            kind: positive
+            ref: frontend/src/components/app/SupportNotice.test.ts
+          - testName: shows support notice again after ninety days
+            kind: positive
+            ref: frontend/src/components/app/SupportNotice.test.ts
+  - id: web.workspace-shell.sidebar-tenants-groups
+    statement: Tenant sidebar renders compact tenant, group and mobile navigation actions without losing context, and tenant switches use the selected tenant domain.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders compact tenant menu, mobile sheet content and group overflow actions with clear labels
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+          - testName: redirects to the tenant domain when switching tenants across domains
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+          - testName: uses in-app navigation when switching tenants on the current domain
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+          - testName: emits create group without navigating away from the current page
+            kind: negative
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+  - id: web.workspace-shell.topbar-keyboard-behavior
+    statement: Topbar overlays support keyboard and outside-click dismissal behavior.
+    coverage:
+      frontend:
+        unit:
+          - testName: opens with the keyboard shortcut and closes with escape
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+          - testName: supports keyboard selection with enter
+            kind: positive
+            ref: frontend/src/components/app/WorkspaceTopbar.test.ts
+  - id: web.workspace-shell.breadcrumb-fallbacks
+    statement: Breadcrumbs fall back to tenant or product labels when route context is incomplete.
+    coverage:
+      frontend:
+        unit:
+          - testName: uses only the tenant fallback breadcrumb for deep tenant routes
+            kind: negative
+            ref: frontend/src/composables/useBreadcrumbs.test.ts
+          - testName: falls back to veyq when no active tenant is known
+            kind: negative
+            ref: frontend/src/composables/useBreadcrumbs.test.ts
+  - id: web.workspace-shell.memory-toolbar-breadcrumbs
+    statement: Memory toolbar breadcrumb labels include tenant and parent path context, and stale toolbar actions are cleared during context switches.
+    coverage:
+      frontend:
+        unit:
+          - testName: includes the tenant and parent path segments before the memory label
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
+          - testName: uses resolved display names for parent memories
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
+          - testName: uses navigation context breadcrumbs for memory routes
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: waits for resolved memory breadcrumb labels before rendering memory toolbar breadcrumbs
+            kind: negative
+            ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
+          - testName: clears stale settings actions while a new tenant context is loading
+            kind: negative
+            ref: frontend/src/features/memories/composables/useMemoryToolbar.test.ts
+  - id: web.workspace-shell.path-utilities
+    statement: Path utilities convert Memory routes, API paths and settings paths safely.
+    coverage:
+      frontend:
+        unit:
+          - testName: converts route path params to memory paths
+            kind: positive
+            ref: frontend/src/shared/utils/paths.test.ts
+          - testName: converts memory paths to frontend routes
+            kind: positive
+            ref: frontend/src/shared/utils/paths.test.ts
+          - testName: encodes api paths and path queries
+            kind: positive
+            ref: frontend/src/shared/utils/paths.test.ts
+          - testName: detects settings paths by the final segment
+            kind: positive
+            ref: frontend/src/shared/utils/paths.test.ts
+  - id: web.workspace-shell.tenant-route-resolution
+    statement: Tenant route resolution preserves personal routes, profile routes and settings route precedence.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders a user profile route for another user permalink
+            kind: positive
+            ref: frontend/src/views/TenantRouteView.test.ts
+          - testName: redirects the current user permalink to the personal memory route
+            kind: positive
+            ref: frontend/src/views/TenantRouteView.test.ts
+          - testName: keeps the reserved personal memory route on tenant view
+            kind: positive
+            ref: frontend/src/views/TenantRouteView.test.ts
+          - testName: renders settings routes before profile routes
+            kind: positive
+            ref: frontend/src/views/TenantRouteView.test.ts

@@ -1,0 +1,77 @@
+id: mobile.deep-links
+title: Mobile Deep Links
+status: implemented
+capabilities: []
+
+productArea: Browser-to-native app open affordances, self-hosted deep-link fallbacks and native link parsing.
+entryPoints:
+  - docs/product/mobile-apps.md
+  - frontend/src/components/app/AppLinkBanner.vue
+  - frontend/src/shared/utils/appLinks.ts
+  - ios/Veyq/AppRootView.swift
+  - ios/Veyq/VeyqStore.swift
+  - backend/src/main/kotlin/com/veyq/api/frontend/EntrypointResource.kt
+  - backend/src/main/kotlin/com/veyq/api/frontend/SpaFallbackResource.kt
+acceptanceCriteria:
+  - id: mobile.deep-links.browser-affordance
+    statement: Browser pages derive canonical HTTPS app URLs, publish Safari Smart App Banner metadata from runtime instance metadata when configured and keep in-page app-open actions disabled while iOS is the only native app platform.
+    coverage:
+      backend:
+        integration:
+          - testName: mobile handoff code exchanges once for bearer session
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: spa fallback injects Safari Smart App Banner metadata for app-openable routes
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/frontend/SpaFallbackResourceTest.kt
+          - testName: spa fallback does not shadow backend api paths
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/frontend/SpaFallbackResourceTest.kt
+      frontend:
+        unit:
+          - testName: uses runtime bootstrap metadata for the Safari Smart App Banner
+            kind: positive
+            ref: frontend/src/components/app/AppLinkBanner.test.ts
+          - testName: does not leave Smart App Banner metadata when the instance has no app id
+            kind: negative
+            ref: frontend/src/components/app/AppLinkBanner.test.ts
+          - testName: detects iOS browser user agents
+            kind: negative
+            ref: frontend/src/shared/utils/appLinks.test.ts
+          - testName: builds canonical http app urls from the current location
+            kind: positive
+            ref: frontend/src/shared/utils/appLinks.test.ts
+          - testName: rejects non-http locations
+            kind: negative
+            ref: frontend/src/shared/utils/appLinks.test.ts
+          - testName: encodes canonical links as veyq open urls
+            kind: positive
+            ref: frontend/src/shared/utils/appLinks.test.ts
+          - testName: creates Safari Smart App Banner content only when configured
+            kind: positive
+            ref: frontend/src/shared/utils/appLinks.test.ts
+          - testName: upserts and removes Safari Smart App Banner metadata
+            kind: positive
+            ref: frontend/src/shared/utils/appLinks.test.ts
+  - id: mobile.deep-links.ios-deep-link-parser
+    statement: iOS accepts `veyq://open` links with canonical HTTP(S) targets while preserving existing share-import handoff links and rejecting unsupported targets.
+    coverage:
+      ios:
+        unit:
+          - testName: testParsesImportDeepLink
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testParsesOpenDeepLinkWithCanonicalURL
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testOpenDeepLinkRejectsNonHttpCanonicalURL
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeepLinkInstanceCandidateDropsPathQueryAndFragment
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+gaps:
+  - reason: Android App Links and custom-scheme routing are documented but no Android client exists in the repository yet.
+    followUp: Add Android manifest and routing tests when the Android app implementation starts.
+  - reason: Native public share routing is intentionally browser-first until the native public share viewer is implemented.
+    followUp: Add native public share link handling coverage with the native public share viewer.

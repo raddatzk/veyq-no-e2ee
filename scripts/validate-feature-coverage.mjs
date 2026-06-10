@@ -95,6 +95,7 @@ const knownCapabilities = new Set(
 )
 
 const featureFiles = walk(featureDir, (file) => file.endsWith('.yaml')).sort()
+const catalogPath = path.join(featureDir, 'catalog.yml')
 
 for (const file of featureFiles) {
   const featurePath = rel(file)
@@ -170,6 +171,61 @@ for (const file of featureFiles) {
 
           featureCoverageRefs.add(`${item.ref}::${item.testName}`)
         }
+      }
+    }
+
+    if (criterion.attackPaths !== undefined) {
+      errors.push(`${featurePath}: ${criterion.id} contains retired attackPaths field; derive pentest paths during run discovery instead`)
+    }
+
+    if (criterion.dynamicAttackPathSignals !== undefined) {
+      errors.push(`${featurePath}: ${criterion.id} contains retired dynamicAttackPathSignals field; derive technical attack paths from run discovery instead`)
+    }
+  }
+
+  if (doc.pentestScenarios !== undefined) {
+    errors.push(`${featurePath}: contains retired top-level pentestScenarios field; derive pentest paths during run discovery instead`)
+  }
+}
+
+if (fs.existsSync(catalogPath)) {
+  let catalog
+  try {
+    catalog = yaml.load(read(catalogPath))
+  } catch (error) {
+    errors.push(`docs/product/features/catalog.yml: YAML parse failed: ${error.message}`)
+  }
+
+  if (catalog) {
+    const knownFeatureIds = new Set()
+    const listedFeatureIds = new Set()
+    for (const file of featureFiles) {
+      const doc = yaml.load(read(file))
+      if (doc?.id) knownFeatureIds.add(doc.id)
+    }
+
+    for (const group of catalog.groups || []) {
+      if (!group.id || !group.title || !group.intent) {
+        errors.push(`docs/product/features/catalog.yml: group missing id title or intent`)
+      }
+      if (!Array.isArray(group.features) || group.features.length === 0) {
+        errors.push(`docs/product/features/catalog.yml: group ${group.id || '<missing>'} missing features`)
+        continue
+      }
+      for (const featureId of group.features) {
+        if (!knownFeatureIds.has(featureId)) {
+          errors.push(`docs/product/features/catalog.yml: unknown feature ${featureId}`)
+        }
+        if (listedFeatureIds.has(featureId)) {
+          errors.push(`docs/product/features/catalog.yml: duplicate feature ${featureId}`)
+        }
+        listedFeatureIds.add(featureId)
+      }
+    }
+
+    for (const featureId of knownFeatureIds) {
+      if (!listedFeatureIds.has(featureId)) {
+        errors.push(`docs/product/features/catalog.yml: missing feature ${featureId}`)
       }
     }
   }

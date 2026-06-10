@@ -81,6 +81,10 @@ class SetupFilter @Inject constructor(
     }
 
     private fun isSetupAllowed(path: String): Boolean {
-        return path == "api/setup" || path == "api/setup/admin" || path == "api/setup/admin/passkey" || path == "api/setup/admin/passkey/options"
+        return path == "api/setup" ||
+            path == "api/setup/admin" ||
+            path == "api/setup/admin/passkey" ||
+            path == "api/setup/admin/passkey/options" ||
+            path == "api/pentest/reset"
     }
 }

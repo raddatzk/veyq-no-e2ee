@@ -1,0 +1,53 @@
+id: auth.passkey-login
+title: Passkey Login
+status: implemented
+capabilities:
+  - auth.passkeys
+productArea: Passkey login options, challenge rotation, domain-aware login entry points and client relying-party display.
+entryPoints:
+  - docs/api/auth.openapi.yaml
+  - frontend/src/views/LoginView.vue
+  - frontend/src/shared/utils/passkeys.ts
+acceptanceCriteria:
+  - id: auth.passkey-login.challenge-options
+    statement: Passkey login options rotate challenges in the same cookie context.
+    coverage:
+      backend:
+        integration:
+          - testName: passkey login options rotate challenge in the same cookie context
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+      frontend:
+        unit:
+          - testName: uses passkey as the initial login method
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+          - testName: renders login options for other tenant domains across auth methods
+            kind: positive
+            ref: frontend/src/views/LoginView.test.ts
+
+  - id: auth.passkey-login.domain-boundaries
+    statement: Passkey login entry points reject unknown hosts and unsafe redirect targets.
+    coverage:
+      backend:
+        integration:
+          - testName: passkey domains reject unknown hosts
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+      frontend:
+        unit:
+          - testName: ignores external-looking redirect paths after passkey login
+            kind: negative
+            ref: frontend/src/views/LoginView.test.ts
+
+  - id: auth.passkey-login.client-rp-display
+    statement: Passkey client utilities present stable relying-party display names.
+    coverage:
+      frontend:
+        unit:
+          - testName: uses veyq as the relying party name when the API returns localhost
+            kind: positive
+            ref: frontend/src/shared/utils/passkeys.test.ts
+          - testName: keeps a configured relying party display name
+            kind: positive
+            ref: frontend/src/shared/utils/passkeys.test.ts

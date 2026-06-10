@@ -1,0 +1,213 @@
+id: memory.journal-content
+title: Memory Journal Content
+status: implemented
+capabilities:
+  - memory.journal-markdown
+productArea: Markdown journals, veyq embeds, editing permissions and rendering behavior.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - docs/api/shares.openapi.yaml
+  - frontend/src/features/memories/components/JournalRenderer.vue
+  - ios/Veyq/MemoryDetailView.swift
+  - ios/Veyq/MemoryJournalRenderer.swift
+acceptanceCriteria:
+  - id: memory.journal-content.empty-journal
+    statement: Memories without saved journal text return an empty Markdown journal.
+    coverage:
+      backend:
+        integration:
+          - testName: reads empty journal and updates markdown with visible embeds
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.visible-embeds-update
+    statement: Journal updates with visible media embeds succeed.
+    coverage:
+      backend:
+        integration:
+          - testName: reads empty journal and updates markdown with visible embeds
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.media-embed-boundary
+    statement: Media embeds outside the current Memory context are rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: rejects journal media embeds outside the current memory
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.carousel-boundary
+    statement: Carousel embeds are rejected if any media is outside context.
+    coverage:
+      backend:
+        integration:
+          - testName: rejects journal carousel embeds when any media is outside the current memory
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.legacy-veyq-links
+    statement: Legacy `veyq:` Markdown link and image targets are no longer treated as veyq journal embeds.
+    coverage:
+      backend:
+        integration:
+          - testName: does not validate legacy veyq markdown link embeds
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.delete-reference-protection
+    statement: Media, track and playlist deletes are rejected while the target is referenced by the Memory journal.
+    coverage:
+      backend:
+        integration:
+          - testName: deleting media referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting track referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting playlist referenced by journal is rejected
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-content.ui-rendering
+    statement: UI renders Markdown headings, media embeds, carousel embeds and track embeds.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders journal markdown and media embeds
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: renders chapter playlist and track journal embeds with double colon syntax
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens journal media in a lightbox and synchronizes carousel navigation
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+        integration:
+          - testName: memory detail renders breadcrumb context and memory tabs
+            kind: positive
+            ref: frontend/e2e/memory-detail.spec.ts
+      ios:
+        unit:
+          - testName: testJournalParserKeepsMarkdownAroundMediaEmbed
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testJournalParserTurnsCommaSeparatedMediaIntoCarousel
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testJournalParserDecodesPercentEncodedMediaIDs
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testJournalParserTurnsCommaSeparatedTracksIntoTrackEmbed
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryTrackAggregateCombinesTrackMetadata
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+    gaps:
+      - reason: Browser decoded plain-text alt-label coverage was previously mapped to a removed JournalRenderer test file.
+        followUp: Restore focused browser unit coverage for decoded media alt labels in the current MemoryDetail or JournalRenderer test location.
+  - id: memory.journal-content.ui-editing
+    statement: UI supports journal editing and preview; the browser editor also supports help text and picker insertion for media, chapter, playlist and track embeds.
+    coverage:
+      frontend:
+        unit:
+          - testName: opens the media picker from the editor button and inserts selected media markdown
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens embed pickers from editor buttons and inserts chapter playlist and track markdown
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: renders comma-separated media embeds as a carousel with unavailable placeholders
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: changes journal carousel pages with native navigators
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: emits changed after saving the journal
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: shows markdown and veyq embed help while editing the journal
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the media picker when typing media target and replaces the trigger
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the type picker when typing double colon and then inserts media
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: navigates and dismisses the type picker with keyboard and outside clicks
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: preserves an existing media caption when replacing a media target
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the media picker from an existing media tag double-click and replaces that tag
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: deletes an existing media pill from the edit dialog
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: deletes an existing chapter pill from the edit dialog
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the media picker from the editor button when the cursor is inside an existing media tag
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the media picker from a live editor autocomplete trigger and replaces the trigger
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: opens the native type completion for the double colon trigger
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: navigates the native type completion with arrow keys
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: keeps native type completion results reusable across repeated queries
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: reads native type completion availability without editor reconfiguration
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: keeps canonical type prefixes searchable when completion labels are localized
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryJournalLiveEditor.test.ts
+          - testName: opens the media picker from an existing carousel tag with media order preserved
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: does not open the media picker when double-clicking outside a media tag
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+      ios:
+        unit:
+          - testName: testAPIClientUpdatesMemoryJournalWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testSaveMemoryJournalUpdatesLoadedDetail
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+    gaps:
+      - reason: Live journal media autocomplete and re-opening existing media embeds are covered by unit tests but not by a real browser E2E flow yet.
+        followUp: Add Playwright coverage when E2E execution is available again.
+      - reason: Native iOS supports Markdown editing with live preview and REST saving, but does not yet provide browser-style embed picker insertion.
+        followUp: Add native media/chapter/playlist/track insertion controls after read embed parity is complete.
+  - id: memory.journal-content.public-viewer-read
+    statement: Public viewers can read journals.
+    coverage:
+      backend:
+        integration:
+          - testName: public share journal is readable by viewers and writable by contributors
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.journal-content.public-permitted-write
+    statement: Public journal writes are limited to permitted share roles.
+    coverage:
+      backend:
+        integration:
+          - testName: public share journal is readable by viewers and writable by contributors
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.journal-content.uploader-denied
+    statement: Uploader-only shares cannot read journals.
+    coverage:
+      backend:
+        integration:
+          - testName: uploader only share cannot read journal
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt

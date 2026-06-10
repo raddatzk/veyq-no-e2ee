@@ -1,0 +1,53 @@
+id: auth.invitations
+title: Tenant Invitation Acceptance
+status: implemented
+capabilities: []
+
+productArea: Tenant invitation acceptance for new users, existing users, password accounts and passkey accounts.
+entryPoints:
+  - docs/api/users.openapi.yaml
+  - frontend/src/views/InviteView.vue
+acceptanceCriteria:
+  - id: auth.invitations.acceptance
+    statement: Tenant invitation emails include the link expiration time, can create a new password or passkey account, and require login before acceptance for existing accounts.
+    coverage:
+      backend:
+        integration:
+          - testName: server admin creates invited tenant user and invitation can be accepted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey only user can accept tenant invitation without display name
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant owner invites and activates existing tenant user by email
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant creation invites existing owner account through login flow
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token allows pending target tenant membership
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: passkey link token rejects removed target tenant membership
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+      frontend:
+        unit:
+          - testName: asks for TOTP setup before privacy opt-ins after password invitation acceptance
+            kind: positive
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: enables TOTP before privacy opt-ins after password invitation acceptance
+            kind: positive
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: asks for privacy opt-ins after passkey invitation acceptance and passkey naming
+            kind: positive
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: requires a display name before starting passkey invitation acceptance
+            kind: negative
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: accepts an invitation for an already signed-in user without privacy opt-ins
+            kind: negative
+            ref: frontend/src/views/InviteView.test.ts
+          - testName: sends existing invited accounts to login instead of account creation
+            kind: positive
+            ref: frontend/src/views/InviteView.test.ts

@@ -13,10 +13,11 @@ COPY backend/gradle ./gradle
 RUN ./gradlew --no-daemon help
 
 FROM backend-build-base AS backend-build-jvm
+ARG VEYQ_QUARKUS_BUILD_PROFILE=prod
 COPY docs/api ../docs/api
 COPY backend/src ./src
 COPY --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
-RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.package.type=fast-jar -x test
+RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.profile=${VEYQ_QUARKUS_BUILD_PROFILE} -Dquarkus.package.type=fast-jar -x test
 
 FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21 AS backend-build-native-base
 WORKDIR /code/backend
@@ -26,10 +27,11 @@ USER quarkus
 RUN ./gradlew --no-daemon help
 
 FROM backend-build-native-base AS backend-build-native
+ARG VEYQ_QUARKUS_BUILD_PROFILE=prod
 COPY --chown=quarkus:quarkus docs/api ../docs/api
 COPY --chown=quarkus:quarkus backend/src ./src
 COPY --chown=quarkus:quarkus --from=frontend-build /frontend/dist ./src/main/resources/META-INF/resources
-RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -x test
+RUN ./gradlew --no-daemon quarkusBuild -Dquarkus.profile=${VEYQ_QUARKUS_BUILD_PROFILE} -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -x test
 
 FROM eclipse-temurin:21-jre-jammy AS runtime-jvm
 ARG VEYQ_VERSION=""

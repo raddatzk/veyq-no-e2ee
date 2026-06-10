@@ -1,0 +1,141 @@
+id: auth.session-security
+title: Authentication Session Security
+status: implemented
+capabilities: []
+
+productArea: Cookie sessions, bearer sessions, token refresh, password hashing and rate-limit trust boundaries.
+entryPoints:
+  - docs/api/auth.openapi.yaml
+  - backend/src/main/kotlin/com/veyq/api/auth
+  - frontend/src/shared/state/useAuthState.ts
+acceptanceCriteria:
+  - id: auth.session-security.session-token-cookie-boundaries
+    statement: Auth sessions, cookies, tokens, password hashes and client IP boundaries stay secure and clean up stale state.
+    coverage:
+      backend:
+        unit:
+          - testName: argon2 parameters are initialized and persisted in config
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/Argon2ParameterServiceTest.kt
+          - testName: createAccessCookie sets expected flags and values
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/CookieServiceTest.kt
+          - testName: createRefreshCookie sets expected flags and values
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/CookieServiceTest.kt
+          - testName: delete cookies set max age zero and preserve names
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/CookieServiceTest.kt
+          - testName: hash and matches are consistent
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/PasswordServiceTest.kt
+          - testName: unknown hash is rejected and needs rehash
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/PasswordServiceTest.kt
+          - testName: cleanup deletes old revoked tokens and keeps active ones
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/TokenCleanupTest.kt
+          - testName: createToken rotates refresh token by linking successor
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/TokenServiceTest.kt
+          - testName: invalidateRefreshToken revokes given refresh token and its related access token
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/TokenServiceTest.kt
+          - testName: findUserByAccessToken returns null after access token is revoked
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/TokenServiceTest.kt
+          - testName: ignores forwarded for when it is not trusted
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/filterchain/ClientIpResolverTest.kt
+          - testName: uses first forwarded for value when trusted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/filterchain/ClientIpResolverTest.kt
+          - testName: falls back to remote host when trusted forwarded for is blank
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/filterchain/ClientIpResolverTest.kt
+          - testName: cleanup deletes old invalid user workflow tokens and keeps active or recent invalid ones
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserTokenCleanupTest.kt
+  - id: auth.session-security.browser-session-lifecycle
+    statement: Browser sessions expose current user state, rotate refresh cookies and revoke sessions on logout.
+    coverage:
+      backend:
+        unit:
+          - testName: me requires authentication
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: me returns current user with access cookie
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: refresh rotates refresh token and returns new cookies
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: logout invalidates current access token
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+      frontend:
+        unit:
+          - testName: routes directly to login after logout
+            kind: positive
+            ref: frontend/src/components/app/ProfileMenu.test.ts
+  - id: auth.session-security.mobile-bearer-sessions
+    statement: Native mobile handoff, refresh and logout flows issue single-use bearer sessions and reject expired credentials.
+    coverage:
+      backend:
+        unit:
+          - testName: mobile handoff code exchanges once for bearer session
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: mobile refresh rotates native bearer session
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: mobile handoff code rejects expired code
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: mobile logout revokes native bearer session
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+      ios:
+        unit:
+          - testName: testRestoreRefreshesExpiredNativeSessionBeforeBootstrap
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testStoredNativeSessionDecodesLegacyPayloadWithoutCapabilities
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testKeychainSessionStoreSaveLoadDeleteWithIsolatedService
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: auth.session-security.public-share-token-reuse
+    statement: Public share refresh token reuse revokes rotated token chains.
+    coverage:
+      backend:
+        unit:
+          - testName: share refresh token reuse revokes rotated token chain
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: auth.session-security.server-owner-safety
+    statement: Server owner management keeps at least one valid server owner.
+    coverage:
+      backend:
+        integration:
+          - testName: server admin cannot demote the only server owner in a single-admin instance
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+  - id: auth.session-security.active-tenant-session-state
+    statement: Auth state restores, stores and preserves the active tenant per server and user.
+    coverage:
+      frontend:
+        unit:
+          - testName: restores the stored active tenant for the current server and user
+            kind: positive
+            ref: frontend/src/shared/state/useAuthState.test.ts
+          - testName: prefers the tenant for the current domain over the stored active tenant
+            kind: positive
+            ref: frontend/src/shared/state/useAuthState.test.ts
+          - testName: stores active tenant changes for the current server and user
+            kind: positive
+            ref: frontend/src/shared/state/useAuthState.test.ts
+          - testName: preserves an explicit active tenant while refreshing tenant summaries on another tenant domain
+            kind: positive
+            ref: frontend/src/shared/state/useAuthState.test.ts

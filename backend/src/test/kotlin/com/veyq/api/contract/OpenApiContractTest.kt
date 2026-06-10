@@ -135,7 +135,7 @@ class OpenApiContractTest {
     }
 
     @Test
-    fun `generated interfaces use generated payload models for json contracts`() {
+    fun `generated interfaces use generated request and response models for json contracts`() {
         generatedApiSources().forEach { source ->
             val handwrittenApiImport = Regex("""import\s+com\.veyq\.api\.(?!generated)[\w.]+;""")
                 .find(Files.readString(source))

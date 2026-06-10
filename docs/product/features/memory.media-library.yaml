@@ -1,0 +1,484 @@
+id: memory.media-library
+title: Memory Media Library
+status: implemented
+capabilities:
+  - memory.media
+  - memory.media-live-updates
+productArea: Photo and video upload, previews, posters, lightbox, metadata, buckets and delete flows.
+entryPoints:
+  - docs/api/memories.openapi.yaml
+  - frontend/src/components/media
+  - frontend/src/features/memories/components/MemoryDetail.vue
+  - frontend/src/features/memories/components/MemoryAssetBuckets.vue
+acceptanceCriteria:
+  - id: memory.media-library.allowed-types
+    statement: Allowed image/video formats are detected from bytes.
+    coverage:
+      backend:
+        unit:
+          - testName: detects allowed image and video formats from file bytes
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaTypeDetectorTest.kt
+  - id: memory.media-library.disallowed-types
+    statement: SVG, text and unknown bytes are rejected.
+    coverage:
+      backend:
+        unit:
+          - testName: rejects svg text and unknown bytes
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaTypeDetectorTest.kt
+  - id: memory.media-library.metadata-extraction
+    statement: Image dimensions, EXIF orientation and metadata are extracted and applied.
+    coverage:
+      backend:
+        unit:
+          - testName: extracts image dimensions from image metadata
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaMetadataExtractorTest.kt
+          - testName: extracts visible image dimensions from exif orientation
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaMetadataExtractorTest.kt
+          - testName: applies extracted metadata to media blob
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaMetadataExtractorTest.kt
+          - testName: rotates image pixels for preview generation
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/library/media/MediaMetadataExtractorTest.kt
+  - id: memory.media-library.thumbnail-preview-use
+    statement: UI grids use thumbnails/previews instead of originals.
+    coverage:
+      frontend:
+        unit:
+          - testName: renders thumbnails in the grid instead of originals
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: marks highlighted media with a star badge in the gallery
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+  - id: memory.media-library.ios-derived-image-cache
+    statement: iOS caches thumbnail, preview, poster and cover preview image variants in memory and on disk with scoped expiry while leaving originals uncached.
+    coverage:
+      ios:
+        unit:
+          - testName: testMediaImageCacheStoresThumbnailInMemoryAndOnDisk
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMediaImageCacheExpiresDiskEntriesAfterTTL
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMediaImageCacheOnlyCachesDerivedMediaVariants
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.cover-preview-use
+    statement: Memory cover URLs use bounded preview variants instead of original media or upload bytes.
+    coverage:
+      backend:
+        integration:
+          - testName: uploads standalone covers and deletes descendant memories and media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: standalone cover upload clears existing cover media reference
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: standalone cover replacement changes preview fingerprint URL
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: sets cover from existing memory media with crop metadata
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testMemoryCoverDecoding
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientSetsMemoryCoverFromMediaWithBearerHeader
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.lightbox-original-download
+    statement: The lightbox can open previews/originals and provide original download links.
+    coverage:
+      frontend:
+        unit:
+          - testName: shows the preview by default and uses it fullscreen when it covers the capped DPR target
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: uses the original fullscreen when the preview is too small for DPR capped at 2
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: keeps fullscreen open and emits navigation from fullscreen controls
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: preloads current previous two and next five media with adaptive image and video poster sources
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: aborts pending preloads when the lightbox unmounts
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: emits navigation and close from keyboard shortcuts
+            kind: positive
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: advances by one media item when the lightbox emits next from an arrow key
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: does not emit unavailable keyboard navigation
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
+  - id: memory.media-library.tenant-dedup-boundary
+    statement: Duplicate uploads reuse blobs only inside a tenant and never across tenants.
+    coverage:
+      backend:
+        integration:
+          - testName: duplicate uploads in same tenant reuse blob but keep separate media assets
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: duplicate uploads across tenants do not share blobs
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-library.delete-lifecycle
+    statement: Deleting media clears cover references and keeps blobs until the final reference is gone.
+    coverage:
+      backend:
+        integration:
+          - testName: deleting duplicate media keeps blob until final reference is gone
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deletes one direct memory media item and clears cover references
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deletes all direct memory media without deleting child memory media
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testAPIClientDeletesMemoryMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteMediaRemovesLoadedDetailItem
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.metadata-correction
+    statement: Batch timestamp correction accepts valid selections and rejects empty or out-of-memory selections.
+    coverage:
+      backend:
+        integration:
+          - testName: batch media metadata offset shifts captured time and marks override
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: batch media metadata offset rejects empty selection
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: batch media metadata offset rejects media outside addressed memory
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: batch media metadata offset uses created time when captured time is missing
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: captured at override stays media specific and does not mutate blob metadata
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      ios:
+        unit:
+          - testName: testAPIClientUpdatesMemoryMediaCapturedAt
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUpdateMediaCapturedAtMergesLoadedDetail
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.bucket-management
+    statement: Bucket move/delete flows preserve primary bucket rules, require typed deletion confirmation and reject nested subbuckets.
+    coverage:
+      backend:
+        integration:
+          - testName: legacy media listing creates primary bucket for uploader and assigns media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: moves selected media into subbucket and deletes selected media
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: rejects nested media buckets below subbuckets
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: bucket listing does not create empty primary bucket for current user before first upload
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: bucket listing does not expose another users empty primary bucket after read
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: subbucket creation with self primary placeholder creates primary bucket lazily
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: bucket listing updates primary user bucket display name after profile rename
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: bucket listing with children hides redundant empty current memory primary bucket
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting subbucket deletes contained media and keeps primary bucket
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: deleting primary bucket deletes media and subbuckets but keeps primary bucket
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: public share deleting anonymous primary bucket removes it and recreates it on later upload
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+      frontend:
+        unit:
+          - testName: renders bucket hierarchy and filters the active bucket by camera
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: shows only media assigned directly to the current memory in buckets
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: deduplicates repeated media ids inside the active bucket
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: hides highlight badges inside bucket media tiles
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: selects one visible media item and submits only that item with offset seconds
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: selects all visible media and clears only visible selection
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: submits all selected media in the uploader bucket when no camera filter is active
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: opens an asset card offset action for just that media item
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: uses created time as the reference fallback when captured time is missing
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: shows a readable offset preview
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: moves a single media item from the asset card actions
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: deletes a single media item from the asset card actions
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: opens a styled delete dialog for selected media
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: emits the deleted bucket after a confirmed bucket delete succeeds
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: renders a local current user primary bucket when the server list is empty
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: does not render a local current user primary bucket when disabled
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: omits the bucket id when uploading or dropping onto the local primary bucket
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: submits the local primary placeholder as parent for new subbuckets
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: does not show rename or delete actions for the local primary bucket
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: keeps batch actions disabled without a selection or without a changed reference time
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: opens the bucket gallery lightbox with the camera-filtered media and selects the current media with s
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+  - id: memory.media-library.video-preview-delivery
+    statement: Video media summaries expose poster URLs and cacheable poster responses.
+    coverage:
+      backend:
+        integration:
+          - testName: video summaries expose poster url and poster response is cacheable
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.media-library.upload-primary-action
+    statement: Memory detail exposes upload as a primary Memory action.
+    coverage:
+      frontend:
+        integration:
+          - testName: memory detail exposes upload as a primary memory action
+            kind: positive
+            ref: frontend/e2e/memory-detail.spec.ts
+      ios:
+        unit:
+          - testName: testMemoryDetailUploadIconUsesMediaImportSymbol
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.drag-drop-memory-upload
+    statement: Web Memory detail accepts dropped photo/video files and starts a private Memory upload while ignoring unsupported file types.
+    coverage:
+      frontend:
+        unit:
+          - testName: starts a memory upload batch when media files are dropped on the gallery
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+  - id: memory.media-library.drag-drop-chapter-upload
+    statement: Web chapter targets accept dropped photo/video files and upload them into that child Memory.
+    coverage:
+      frontend:
+        unit:
+          - testName: starts a child memory upload batch when media files are dropped on a chapter
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+  - id: memory.media-library.drag-drop-bucket-upload
+    statement: Web bucket targets accept dropped photo/video files and preserve the active bucket id for the upload.
+    coverage:
+      frontend:
+        unit:
+          - testName: emits selected media files when dropping onto the active bucket
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+  - id: memory.media-library.gallery-layout
+    statement: Media grids keep useful tile shapes across extreme, missing and normal aspect ratios.
+    coverage:
+      frontend:
+        unit:
+          - testName: bounds extreme aspect ratios for gallery thumbnails
+            kind: positive
+            ref: frontend/src/components/media/mediaGridLayout.test.ts
+          - testName: keeps normal aspect ratios and falls back when dimensions are missing
+            kind: negative
+            ref: frontend/src/components/media/mediaGridLayout.test.ts
+          - testName: keeps portrait and landscape media in visibly different tile shapes
+            kind: positive
+            ref: frontend/src/components/media/mediaGridLayout.test.ts
+          - testName: prefers thumbnails before previews and originals for gallery previews
+            kind: positive
+            ref: frontend/src/shared/utils/mediaUrls.test.ts
+          - testName: keeps content, preview-only, poster and image display variants explicit
+            kind: negative
+            ref: frontend/src/shared/utils/mediaUrls.test.ts
+          - testName: renders media after a hidden gallery tab becomes measurable
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+  - id: memory.media-library.ios-highlight-filter
+    statement: iOS Memory detail keeps the All Media versus Highlights selection separate per Memory and consistent across gallery and map media points.
+    coverage:
+      ios:
+        unit:
+          - testName: testMemoryMediaFilterReturnsHighlightsOrAllMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaFilterStateIsSeparatedPerMemory
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.detail-gallery-updates
+    statement: Memory detail keeps media gallery and bucket counts consistent during upload, move, delete and live creation update actions.
+    coverage:
+      backend:
+        integration:
+          - testName: lists updated memory media after updated cursor
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: memory media updates return changed media and current ids when media is deleted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: memory media updates do not repeat the cursor media when database timestamp is more precise than the api cursor
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: media updates endpoint accepts openapi date-time cursor
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryMediaResourceTest.kt
+      frontend:
+        unit:
+          - testName: shows newly uploaded media immediately and updates only its bucket count
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: deduplicates visible media and updates local counts for uploads and deletes
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: shows media uploaded directly into a visible child bucket and updates that count
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: accepts uploads into visible child buckets even when the media belongs to a child memory
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: deduplicates repeated media ids before rendering gallery and buckets
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: updates bucket counts after moving media locally
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: applies moves and bucket deletion effects without mutating source data
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: zeros a deleted primary bucket count even when counted media is not loaded
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: removes a deleted anonymous primary bucket because later uploads recreate it
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: removes anonymous primary buckets immediately after deleting a bucket with unloaded media
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: wires tenant media deletion and removes deleted media locally
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: resets optimistic state when the active memory changes
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryDetailMediaState.test.ts
+          - testName: merges long-polled Memory media and refreshes buckets and header counts
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: removes deleted media from long-polled current media ids without refetching media
+            kind: positive
+            ref: frontend/src/features/memories/composables/useMemoryRouteData.test.ts
+          - testName: removes a deleted highlighted media from the highlighted filter view
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: keeps the opened lightbox media stable when new media is inserted before it
+            kind: positive
+            ref: frontend/src/components/media/MediaGrid.test.ts
+          - testName: merges public share media live updates and refreshes header and buckets
+            kind: positive
+            ref: frontend/src/views/PublicShareView.test.ts
+          - testName: long-polls for new memory media with the updated cursor
+            kind: positive
+            ref: frontend/src/api/memoryApi.test.ts
+          - testName: shows the active bucket dropzone only during a file drag
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryAssetBuckets.test.ts
+          - testName: shows the gallery drop hint only while dragging media files
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+          - testName: shows child memory drop hints only for the active drag target
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
+      ios:
+        unit:
+          - testName: testAPIClientWaitsForMemoryMediaUpdatesWithCursorAndHash
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaSetHashMatchesServerCanonicalFormat
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testMemoryMediaUpdatesMergeAndRemoveMissingMedia
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media-library.upload-dialog
+    statement: Upload dialogs queue selected files with stable titles and bucket targets.
+    coverage:
+      frontend:
+        unit:
+          - testName: uploads selected media files with their file names as titles
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: removes individual selected media files and clears the full selection
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: keeps the submitted bucket for every queued file when the visible bucket changes
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: keeps Safari Photos multi-select files when Safari populates the file input late
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: adds files from repeated Safari Photos selections instead of replacing the existing pick
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: starts a background upload batch and closes the dialog
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts

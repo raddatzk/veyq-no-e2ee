@@ -38,7 +38,7 @@ class ApiExceptionMapperTest {
     }
 
     @Test
-    fun `does not expose sql constraint details`() {
+    fun `does not expose persistence constraint details`() {
         val response = mapper.toResponse(
             ConstraintViolationException(
                 "Duplicate key user_email_unique",
@@ -59,4 +59,3 @@ class ApiExceptionMapperTest {
         assertThat(response.entity).isEqualTo(ErrorResponse("INTERNAL_SERVER_ERROR", "Internal server error"))
     }
 }
-

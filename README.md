@@ -146,6 +146,7 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend, fronte
 - [`docs/product/playlists.md`](docs/product/playlists.md): Memory playlist links, permissions and API surface.
 - [`docs/product/capabilities.md`](docs/product/capabilities.md): Server capability IDs, current baseline and maintenance rules.
 - [`docs/product/features/README.md`](docs/product/features/README.md): Feature catalog conventions and YAML feature files for acceptance criteria, test names, test links and coverage gaps.
+- [`docs/product/feature-pentest-governance.md`](docs/product/feature-pentest-governance.md): Shared governance for feature files, pentest discovery, private findings and publication.
 - [`docs/product/test-feature-reverse-audit.md`](docs/product/test-feature-reverse-audit.md): Reverse-audit status for current tests and explicit delete candidates.
 - [`docs/product/documentation-and-acceptance-coverage.md`](docs/product/documentation-and-acceptance-coverage.md): Feature documentation, acceptance criteria, test coverage mapping and deterministic validation.
 - [`docs/product/mobile-apps.md`](docs/product/mobile-apps.md): Native iOS/Android app direction, V1 scope and roadmap.

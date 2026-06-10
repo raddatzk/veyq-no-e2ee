@@ -1,0 +1,65 @@
+version: 1
+description: >
+  Rebuilt feature catalog index. Feature files remain the source of truth for
+  acceptance criteria, coverage and explicit gaps; this catalog groups them by
+  product and security boundary so pentest discovery can inspect the same
+  structure without embedding attack paths in feature YAML.
+groups:
+  - id: identity-access
+    title: Identity, Sessions And Access Boundaries
+    intent: Login, account lifecycle, session security, tenant/group access and settings authorization.
+    features:
+      - auth.password-login
+      - auth.password-management
+      - auth.passkey-login
+      - auth.passkey-management
+      - auth.totp-login
+      - auth.totp-management
+      - auth.invitations
+      - auth.session-security
+      - user.profile-settings
+      - user.lifecycle
+      - spaces.memory-scopes
+      - admin.tenant-group-settings
+  - id: memory-private
+    title: Private Memory Authoring And Media
+    intent: Internal Memory creation, organization, media, journals, maps, tracks and playlists.
+    features:
+      - memory.structure
+      - memory.media-library
+      - memory.media-resumable-uploads
+      - memory.media-upload-progress
+      - memory.media-archives
+      - memory.journal-content
+      - memory.journal-collaboration
+      - memory.location-map
+      - memory.gpx-tracks
+      - memory.playlist-links
+  - id: memory-public
+    title: Public Memory Access
+    intent: Public shares, role boundaries, uploader-only links and public-facing Memory surfaces.
+    features:
+      - sharing.memory-shares
+      - sharing.uploader-links
+  - id: client-experience
+    title: Web And Mobile Client Experience
+    intent: Browser shell, localization/theme behavior and native app link handling.
+    features:
+      - web.workspace-shell
+      - web.localization-theme
+      - mobile.deep-links
+  - id: platform-runtime
+    title: Platform Runtime And API Trust
+    intent: API contracts, generated clients, runtime formatting and request security controls.
+    features:
+      - platform.openapi-contracts
+      - web.api-runtime
+      - platform.capability-discovery
+      - platform.request-security
+  - id: server-operations
+    title: Self-Hosted Operations
+    intent: Self-hosted setup, capability discovery, backups, upgrades and auto-updates.
+    features:
+      - operations.initial-setup
+      - operations.backup-upgrade
+      - operations.auto-updates

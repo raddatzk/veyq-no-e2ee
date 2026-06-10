@@ -79,6 +79,16 @@ class SecurityPipelineTest {
     }
 
     @Test
+    fun `pentest reset endpoint is unavailable outside pentest profile`() {
+        given()
+            .cookie("VEYQ_ACCESS_TOKEN", login(owner))
+            .header("X-Veyq-Pentest-Reset-Token", "test-reset-token")
+            .`when`().post("/api/pentest/reset")
+            .then()
+            .statusCode(404)
+    }
+
+    @Test
     fun `setup filter returns stable setup required code`() {
         serverState.setupCompleted = false
         try {

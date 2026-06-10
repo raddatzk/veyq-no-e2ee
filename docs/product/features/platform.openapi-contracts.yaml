@@ -1,0 +1,99 @@
+id: platform.openapi-contracts
+title: OpenAPI Contract Governance
+status: implemented
+capabilities: []
+
+productArea: API-first OpenAPI contracts and generated backend/frontend API usage.
+entryPoints:
+  - docs/api
+  - backend/gradle/openapi.gradle.kts
+  - frontend/scripts/generate-openapi.mjs
+acceptanceCriteria:
+  - id: platform.openapi-contracts.operation-quality
+    statement: OpenAPI operations carry descriptions, examples, preconditions and implementation status.
+    coverage:
+      backend:
+        integration:
+          - testName: openapi operations carry descriptions examples preconditions and implementation status
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.resources-covered
+    statement: Implemented backend resource endpoints are covered by OpenAPI specs.
+    coverage:
+      backend:
+        integration:
+          - testName: implemented backend resource endpoints are covered by openapi specs
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.stable-errors
+    statement: Common error response exposes stable codes and fallback messages.
+    coverage:
+      backend:
+        integration:
+          - testName: common error response exposes stable codes and fallback messages
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.generated-interfaces
+    statement: Backend resources implement generated OpenAPI interfaces.
+    coverage:
+      backend:
+        integration:
+          - testName: backend api resources implement their generated openapi interfaces
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.generated-models
+    statement: Generated interfaces use generated request and response models for JSON contracts.
+    coverage:
+      backend:
+        integration:
+          - testName: generated interfaces use generated request and response models for json contracts
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.shared-packages
+    statement: Backend OpenAPI code uses one shared generated API/model package.
+    coverage:
+      backend:
+        integration:
+          - testName: backend openapi code uses one shared generated api and model package
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/contract/OpenApiContractTest.kt
+  - id: platform.openapi-contracts.error-sanitization
+    statement: API errors expose stable codes and safe fallback messages without leaking implementation details.
+    coverage:
+      backend:
+        unit:
+          - testName: maps api exceptions with their stable code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: maps rate limits with retry after and stable code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: maps generic web exceptions to generic status codes
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: does not expose persistence constraint details
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+          - testName: does not expose unhandled exception details
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/ApiExceptionMapperTest.kt
+  - id: platform.openapi-contracts.request-validation-annotations
+    statement: Shared OpenAPI request schemas attach backend validation annotations for reusable syntactic input rules.
+    coverage:
+      backend:
+        unit:
+          - testName: name accepts url safe non reserved names
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: display name requires visible text
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: positive byte values require values above zero
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+          - testName: required text rejects blank values
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/common/validation/PasswordValidatorTest.kt
+gaps:
+  - reason: Generated frontend artifact freshness should be covered by a future deterministic validator.
+    followUp: Add the validator before treating frontend generation freshness as proven.

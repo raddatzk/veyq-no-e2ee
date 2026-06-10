@@ -4,35 +4,89 @@ This directory is the source of truth for feature-level acceptance coverage in v
 
 The catalog is for humans first and agents second: names should stay readable, while IDs and coverage references should stay stable enough for deterministic validation.
 
-## Feature Files
+Shared rules for feature files, pentest discovery, private findings and
+publication are documented in
+[`../feature-pentest-governance.md`](../feature-pentest-governance.md).
 
-- [`api.openapi-contracts.yaml`](api.openapi-contracts.yaml)
-- [`auth.local-accounts-passkeys.yaml`](auth.local-accounts-passkeys.yaml)
-- [`frontend.localization-theme.yaml`](frontend.localization-theme.yaml)
-- [`frontend.shell-navigation.yaml`](frontend.shell-navigation.yaml)
-- [`memory.core.yaml`](memory.core.yaml)
-- [`memory.journal-markdown.yaml`](memory.journal-markdown.yaml)
-- [`memory.maps.yaml`](memory.maps.yaml)
-- [`memory.media.yaml`](memory.media.yaml)
-- [`memory.media-resumable-upload.yaml`](memory.media-resumable-upload.yaml)
-- [`memory.media-upload-eta.yaml`](memory.media-upload-eta.yaml)
-- [`memory.media-zip-download.yaml`](memory.media-zip-download.yaml)
-- [`memory.playlists.yaml`](memory.playlists.yaml)
-- [`memory.public-sharing.yaml`](memory.public-sharing.yaml)
-- [`memory.public-uploader-links.yaml`](memory.public-uploader-links.yaml)
-- [`memory.tracks.yaml`](memory.tracks.yaml)
-- [`mobile.app-links.yaml`](mobile.app-links.yaml)
-- [`platform.api-runtime.yaml`](platform.api-runtime.yaml)
-- [`platform.auth-session-security.yaml`](platform.auth-session-security.yaml)
-- [`platform.security-pipeline.yaml`](platform.security-pipeline.yaml)
-- [`server.auto-updates.yaml`](server.auto-updates.yaml)
-- [`server.backup-upgrade.yaml`](server.backup-upgrade.yaml)
-- [`server.capability-discovery.yaml`](server.capability-discovery.yaml)
-- [`server.setup.yaml`](server.setup.yaml)
-- [`settings.tenant-group-admin.yaml`](settings.tenant-group-admin.yaml)
-- [`spaces.tenant-group-personal.yaml`](spaces.tenant-group-personal.yaml)
-- [`user.account-lifecycle.yaml`](user.account-lifecycle.yaml)
-- [`user.profile-account-settings.yaml`](user.profile-account-settings.yaml)
+## Feature File Rules
+
+Feature files are product and acceptance-coverage documents. They must keep the
+trust-chain structure that maps behavior to proof:
+
+- one focused feature ID and title
+- product area and entry points
+- acceptance criteria
+- coverage grouped by execution domain, such as `backend`, `frontend`, `ios` or
+  future `e2e`
+- coverage grouped by test level below that domain, such as `unit` or
+  `integration`
+- positive/negative test kind, exact test name and test file reference
+- explicit AC-level gaps where coverage does not exist yet
+
+Feature files must stay free of concrete pentest attack paths and direct
+technical attack hints. They must not contain exploit families, payload ideas,
+framework-specific probes or persistence-specific hints. Those belong to the
+per-run pentest discovery artifact, where they can be derived from the tested
+commit.
+
+## Catalog Shape
+
+The rebuilt feature catalog is organized in [`catalog.yml`](catalog.yml). The
+catalog groups feature files by product and security boundary, while each
+feature file remains the source of truth for acceptance criteria, automated
+coverage and gaps.
+
+### Identity, Sessions And Access Boundaries
+
+- [`auth.password-login.yaml`](auth.password-login.yaml)
+- [`auth.password-management.yaml`](auth.password-management.yaml)
+- [`auth.passkey-login.yaml`](auth.passkey-login.yaml)
+- [`auth.passkey-management.yaml`](auth.passkey-management.yaml)
+- [`auth.totp-login.yaml`](auth.totp-login.yaml)
+- [`auth.totp-management.yaml`](auth.totp-management.yaml)
+- [`auth.invitations.yaml`](auth.invitations.yaml)
+- [`auth.session-security.yaml`](auth.session-security.yaml)
+- [`user.profile-settings.yaml`](user.profile-settings.yaml)
+- [`user.lifecycle.yaml`](user.lifecycle.yaml)
+- [`spaces.memory-scopes.yaml`](spaces.memory-scopes.yaml)
+- [`admin.tenant-group-settings.yaml`](admin.tenant-group-settings.yaml)
+
+### Private Memory Authoring And Media
+
+- [`memory.structure.yaml`](memory.structure.yaml)
+- [`memory.media-library.yaml`](memory.media-library.yaml)
+- [`memory.media-resumable-uploads.yaml`](memory.media-resumable-uploads.yaml)
+- [`memory.media-upload-progress.yaml`](memory.media-upload-progress.yaml)
+- [`memory.media-archives.yaml`](memory.media-archives.yaml)
+- [`memory.journal-content.yaml`](memory.journal-content.yaml)
+- [`memory.journal-collaboration.yaml`](memory.journal-collaboration.yaml)
+- [`memory.location-map.yaml`](memory.location-map.yaml)
+- [`memory.gpx-tracks.yaml`](memory.gpx-tracks.yaml)
+- [`memory.playlist-links.yaml`](memory.playlist-links.yaml)
+
+### Public Memory Access
+
+- [`sharing.memory-shares.yaml`](sharing.memory-shares.yaml)
+- [`sharing.uploader-links.yaml`](sharing.uploader-links.yaml)
+
+### Web And Mobile Client Experience
+
+- [`web.workspace-shell.yaml`](web.workspace-shell.yaml)
+- [`web.localization-theme.yaml`](web.localization-theme.yaml)
+- [`mobile.deep-links.yaml`](mobile.deep-links.yaml)
+
+### Platform Runtime And API Trust
+
+- [`platform.openapi-contracts.yaml`](platform.openapi-contracts.yaml)
+- [`web.api-runtime.yaml`](web.api-runtime.yaml)
+- [`platform.capability-discovery.yaml`](platform.capability-discovery.yaml)
+- [`platform.request-security.yaml`](platform.request-security.yaml)
+
+### Self-Hosted Operations
+
+- [`operations.initial-setup.yaml`](operations.initial-setup.yaml)
+- [`operations.backup-upgrade.yaml`](operations.backup-upgrade.yaml)
+- [`operations.auto-updates.yaml`](operations.auto-updates.yaml)
 
 ## Relationship To Capabilities
 
@@ -45,8 +99,8 @@ A feature may have no linked capability, one linked capability, or several linke
 Every feature file uses this structure:
 
 ```yaml
-id: memory.public-sharing
-title: Public Memory Sharing
+id: sharing.memory-shares
+title: Public Memory Shares
 status: implemented
 capabilities:
   - memory.public-sharing
@@ -56,7 +110,7 @@ entryPoints:
   - frontend/src/views/PublicShareView.vue
 
 acceptanceCriteria:
-  - id: memory.public-sharing.viewer-readonly
+  - id: sharing.memory-shares.viewer-readonly
     statement: Viewer shares can read Memory view but cannot write or delete.
     coverage:
       backend:
@@ -75,16 +129,16 @@ acceptanceCriteria:
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
 
-gaps:
-  - reason: No real full-stack browser E2E exists for public share permissions yet.
-    followUp: Add e2e.browser coverage after a full-stack browser harness exists.
+    gaps:
+      - reason: No real full-stack browser E2E exists for public share permissions yet.
+        followUp: Add e2e.browser coverage after a full-stack browser harness exists.
 ```
 
 Criteria without current proof should carry an AC-level `gaps` list instead of empty coverage:
 
 ```yaml
 acceptanceCriteria:
-  - id: server.auto-updates.failure-notification
+  - id: operations.auto-updates.failure-notification
     statement: Update failures should produce ServerOwner notification.
     gaps:
       - reason: No automated update simulation currently proves ServerOwner failure notification behavior.
@@ -116,6 +170,17 @@ Each coverage item must include:
 
 Use `positive` for intended success paths and `negative` for unauthorized, invalid, unavailable or boundary behavior. A single test may appear under several acceptance criteria when the feature file makes the mapping explicit.
 
+## Pentest Discovery Boundary
+
+Feature files must not define concrete pentest attack paths or direct technical
+attack hints. They describe product and security behavior through acceptance
+criteria, coverage and explicit gaps.
+
+Before every pentest run, the runner derives attack paths by inspecting previous
+runs, feature acceptance criteria, documentation, API contracts and the current
+codebase. Technical attack choices belong in the run discovery artifact and
+manifest, not in feature YAML.
+
 ## Coverage Standard
 
 veyq does not require blanket 100% code coverage. Tests exist to create justified trust in documented behavior, not to satisfy coverage numbers.
@@ -137,6 +202,8 @@ The deterministic validator should check:
 - Coverage keys use only the standard hierarchy.
 - Every coverage item has `testName`, `kind` and an existing `ref`.
 - `kind` is only `positive` or `negative`.
+- Feature YAML rejects concrete `attackPaths` and `dynamicAttackPathSignals`;
+  pentest paths must be derived during run discovery instead.
 - Linked capability IDs exist in [`docs/product/capabilities.md`](../capabilities.md).
 - Every current Kotlin, Vitest and Playwright test is referenced by a Feature YAML or explicitly listed as a delete candidate in the reverse audit.
 

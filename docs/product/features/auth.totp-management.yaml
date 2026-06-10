@@ -1,0 +1,38 @@
+id: auth.totp-management
+title: TOTP Management
+status: implemented
+capabilities:
+  - auth.totp-mfa
+productArea: TOTP enrollment, manual setup, password-account eligibility and user-controlled TOTP disablement.
+entryPoints:
+  - docs/api/auth.openapi.yaml
+  - frontend/src/features/settings/components/UserSettingsForm.vue
+acceptanceCriteria:
+  - id: auth.totp-management.enrollment-and-disablement
+    statement: Users with password login can enroll and disable TOTP only with the required password and current-code confirmations.
+    coverage:
+      backend:
+        integration:
+          - testName: totp can be disabled with password and current code
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+          - testName: totp enable requires current password
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/auth/AuthResourceTest.kt
+      frontend:
+        unit:
+          - testName: enables TOTP after showing the enrollment QR code
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: shows manual TOTP secret only after fallback request
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: hides TOTP setup for passkey-only accounts
+            kind: negative
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+          - testName: disables TOTP with password and current code
+            kind: positive
+            ref: frontend/src/features/settings/components/UserSettingsForm.test.ts
+    gaps:
+      - reason: Recovery codes, ServerOwner reset and tenant/server MFA enforcement policy are intentionally outside the first TOTP management slice.
+        followUp: Add a dedicated TOTP recovery and policy feature after policy and recovery decisions are documented.

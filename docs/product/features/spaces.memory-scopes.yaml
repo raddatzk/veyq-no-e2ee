@@ -1,0 +1,87 @@
+id: spaces.memory-scopes
+title: Tenant, Group And Personal Memory Scopes
+status: implemented
+capabilities:
+  - spaces.tenant-group-personal
+productArea: Tenant, group and personal Memory scopes with tenant switching and route isolation.
+entryPoints:
+  - docs/api/tenants.openapi.yaml
+  - docs/api/groups.openapi.yaml
+  - frontend/src/components/app/TenantSidebar.vue
+acceptanceCriteria:
+  - id: spaces.memory-scopes.tenant-create-owner-only
+    statement: Tenant creation requires server owner authority, valid unique tenant identity and an invited owner email before submission, while the workspace dialog derives the internal tenant address instead of exposing a permalink field.
+    coverage:
+      backend:
+        integration:
+          - testName: tenant creation validates name and requires server owner
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
+          - testName: tenant creation validates required unique domain
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+      frontend:
+        unit:
+          - testName: requires an owner email before creating the tenant
+            kind: negative
+            ref: frontend/src/components/tenant/CreateTenantDialog.test.ts
+  - id: spaces.memory-scopes.visible-tenants-only
+    statement: Users list only accepted active tenants they can access.
+    coverage:
+      backend:
+        integration:
+          - testName: tenant creation invites owner and lists only accepted active tenants
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
+  - id: spaces.memory-scopes.tenant-route-isolation
+    statement: Tenant routes reject unauthenticated users, outsiders and missing tenant memberships.
+    coverage:
+      backend:
+        integration:
+          - testName: tenant filter protects tenant routes
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
+  - id: spaces.memory-scopes.group-create-scope
+    statement: Groups are tenant-scoped and the creator becomes group owner.
+    coverage:
+      backend:
+        integration:
+          - testName: groups are tenant scoped and creator is group owner
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
+  - id: spaces.memory-scopes.group-access-control
+    statement: Group update requires active tenant members and group owner authority.
+    coverage:
+      backend:
+        integration:
+          - testName: group update requires active tenant members and a group owner
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/tenant/MultiTenantResourceTest.kt
+  - id: spaces.memory-scopes.scope-navigation
+    statement: Workspace navigation surfaces route tenant, personal and group roots without legacy areas.
+    coverage:
+      frontend:
+        unit:
+          - testName: keeps scope roots visible while refreshing favorites
+            kind: positive
+            ref: frontend/src/components/app/TenantSidebar.test.ts
+        integration:
+          - testName: tenant home renders memory navigation without legacy areas
+            kind: positive
+            ref: frontend/e2e/tenant-navigation.spec.ts
+          - testName: sidebar scope links navigate to personal and group roots
+            kind: positive
+            ref: frontend/e2e/tenant-navigation.spec.ts
+      ios:
+        unit:
+          - testName: testGroupSpacesExposeVisibleGroupScopes
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDisablingSelectedTenantPersistsAndSelectsNextEnabledTenant
+            kind: positive
+            ref: ios/VeyqTests/VeyqTests.swift
+      e2e:
+        ios:
+          - testName: testConnectAndOpenMemoryDetail
+            kind: positive
+            ref: ios/VeyqUITests/VeyqUITests.swift
