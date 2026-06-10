@@ -356,10 +356,7 @@ class UserManagementResourceTest {
             .body("rp.id", equalTo(tenant.domain))
 
         entityManager.clear()
-        val stagedPasskeyUser = userRepo.findByEmail("join-passkey-$runId@example.com")
-        assertThat(stagedPasskeyUser).isNotNull
-        assertThat(stagedPasskeyUser?.passwordSetAt).isNull()
-        assertThat(tenantMemberRepo.findByTenantAndUser(tenant, stagedPasskeyUser!!)).isNull()
+        assertThat(userRepo.findByEmail("join-passkey-$runId@example.com")).isNull()
 
         given()
             .filter(passkeyCookieFilter)

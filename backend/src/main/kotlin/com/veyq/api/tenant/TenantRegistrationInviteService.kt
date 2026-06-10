@@ -13,7 +13,6 @@ import com.veyq.api.auth.passkey.PasskeyHostService
 import com.veyq.api.auth.passkey.PasskeyService
 import com.veyq.api.common.HashingService
 import com.veyq.api.common.Permalinks
-import com.veyq.api.domain.PasskeyCredentialRepo
 import com.veyq.api.domain.ServerRole
 import com.veyq.api.domain.Tenant
 import com.veyq.api.domain.TenantMember
@@ -22,8 +21,6 @@ import com.veyq.api.domain.TenantMemberRepo
 import com.veyq.api.domain.TenantMemberStatus
 import com.veyq.api.domain.TenantRegistrationInvite
 import com.veyq.api.domain.TenantRegistrationInviteRepo
-import com.veyq.api.domain.TenantRegistrationPasskeyStage
-import com.veyq.api.domain.TenantRegistrationPasskeyStageRepo
 import com.veyq.api.domain.TenantRepo
 import com.veyq.api.domain.TenantRole
 import com.veyq.api.domain.User
@@ -61,8 +58,6 @@ class TenantRegistrationInviteService @Inject constructor(
     private val tenantService: TenantService,
     private val tenantMemberRepo: TenantMemberRepo,
     private val userRepo: UserRepo,
-    private val passkeyCredentialRepo: PasskeyCredentialRepo,
-    private val tenantRegistrationPasskeyStageRepo: TenantRegistrationPasskeyStageRepo,
     private val passwordService: PasswordService,
     private val authService: AuthService,
     private val passkeyHostService: PasskeyHostService,
@@ -72,7 +67,6 @@ class TenantRegistrationInviteService @Inject constructor(
     private val veyqConfig: VeyqConfig,
 ) {
     private val random = SecureRandom()
-    private val passkeyStageTtlSeconds = 15L * 60L
 
     @Transactional
     fun create(request: CreateTenantRegistrationInviteRequest): TenantRegistrationInviteCreatedResponse {
@@ -212,8 +206,8 @@ class TenantRegistrationInviteService @Inject constructor(
         val invite = requireValidInviteForCurrentDomain(token, lockForUpdate = false)
         val email = normalizeEmail(request.email)
         val displayName = normalizeDisplayName(request.displayName)
-        val user = stagedPasskeyUser(invite, email, displayName, renewExpiredStage = true)
-        return passkeyService.registrationOptionsForUser(user, routingContext)
+        requireNewPasskeyInviteUser(email)
+        return passkeyService.registrationOptionsForIdentity(email, displayName, routingContext)
     }
 
     @Transactional
@@ -235,9 +229,9 @@ class TenantRegistrationInviteService @Inject constructor(
 
         val email = normalizeEmail(request.email)
         val displayName = normalizeDisplayName(request.displayName)
-        val user = stagedPasskeyUser(invite, email, displayName, renewExpiredStage = false)
+        requireNewPasskeyInviteUser(email)
+        val user = createStagedPasskeyUser(email, displayName)
         passkeyService.createPasskeyForUser(user, request.passkeyDisplayName, request.credential, routingContext)
-        consumePasskeyStage(invite, user)
         capabilityAcknowledgementService.acknowledgeCurrentAnnouncements(user)
         val joined = activateTenantMember(invite.tenant, user)
         if (joined) {
@@ -288,39 +282,18 @@ class TenantRegistrationInviteService @Inject constructor(
         return user
     }
 
-    private fun stagedPasskeyUser(
-        invite: TenantRegistrationInvite,
-        email: String,
-        displayName: String,
-        renewExpiredStage: Boolean,
-    ): User {
+    private fun requireNewPasskeyInviteUser(email: String) {
         val existingUser = userRepo.findByEmail(email)
         if (existingUser != null) {
             if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
                 throw UnauthorizedException("User cannot join this tenant")
             }
-            if (!isPasskeyInviteStagedUser(existingUser)) {
-                throw ConflictException("Existing users must be logged in to join this tenant")
-            }
-            val stage = openPasskeyStage(invite, existingUser)
-                ?: renewExpiredPasskeyStage(invite, existingUser, email, renewExpiredStage)
-            if (stage == null) {
-                throw ConflictException("Existing users must be logged in to join this tenant")
-            }
-            if (renewExpiredStage) {
-                refreshPasskeyStage(stage, email)
-            }
-            existingUser.displayName = displayName
-            if (existingUser.permalink.startsWith("user-")) {
-                existingUser.permalink = uniquePermalink(displayName)
-            }
-            return existingUser
+            throw ConflictException("Existing users must be logged in to join this tenant")
         }
-        return createStagedPasskeyUser(invite, email, displayName)
     }
 
-    private fun createStagedPasskeyUser(invite: TenantRegistrationInvite, email: String, displayName: String): User {
-        val user = User().also {
+    private fun createStagedPasskeyUser(email: String, displayName: String): User =
+        User().also {
             it.email = email
             it.displayName = displayName
             it.permalink = uniquePermalink(displayName)
@@ -330,61 +303,6 @@ class TenantRegistrationInviteService @Inject constructor(
             userRepo.persist(it)
             userRepo.flush()
         }
-        createPasskeyStage(invite, user, email)
-        return user
-    }
-
-    private fun openPasskeyStage(
-        invite: TenantRegistrationInvite,
-        user: User,
-    ): TenantRegistrationPasskeyStage? =
-        tenantRegistrationPasskeyStageRepo.findOpenByInviteAndUser(invite, user, Instant.now())
-
-    private fun createPasskeyStage(
-        invite: TenantRegistrationInvite,
-        user: User,
-        email: String,
-    ): TenantRegistrationPasskeyStage {
-        val now = Instant.now()
-        return TenantRegistrationPasskeyStage().also {
-            it.invite = invite
-            it.user = user
-            it.email = email
-            it.createdAt = now
-            it.expiresAt = now.plusSeconds(passkeyStageTtlSeconds)
-            tenantRegistrationPasskeyStageRepo.persist(it)
-        }
-    }
-
-    private fun renewExpiredPasskeyStage(
-        invite: TenantRegistrationInvite,
-        user: User,
-        email: String,
-        renewExpiredStage: Boolean,
-    ): TenantRegistrationPasskeyStage? {
-        if (!renewExpiredStage) {
-            return null
-        }
-        if (tenantRegistrationPasskeyStageRepo.findLatestByInviteAndUser(invite, user) == null) {
-            return null
-        }
-        return createPasskeyStage(invite, user, email)
-    }
-
-    private fun refreshPasskeyStage(stage: TenantRegistrationPasskeyStage, email: String) {
-        stage.email = email
-        stage.expiresAt = Instant.now().plusSeconds(passkeyStageTtlSeconds)
-    }
-
-    private fun consumePasskeyStage(invite: TenantRegistrationInvite, user: User) {
-        openPasskeyStage(invite, user)?.consumedAt = Instant.now()
-    }
-
-    private fun isPasskeyInviteStagedUser(user: User): Boolean =
-        user.role == ServerRole.ServerMember &&
-            user.passwordSetAt == null &&
-            passkeyCredentialRepo.countByUser(user) == 0L &&
-            tenantMemberRepo.listByUser(user).isEmpty()
 
     private fun requireLoggedInExistingUser(existingUser: User, email: String): User {
         if (existingUser.disabledAt != null || existingUser.deletedAt != null || existingUser.systemUser) {
