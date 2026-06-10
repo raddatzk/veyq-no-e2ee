@@ -64,6 +64,23 @@ veyq runs as a single instance with global users and multiple tenants. External 
    - invalidates the current tokens
    - clears both cookies
 
+## Rate Limiting
+
+`RateLimitService` enforces in-memory fixed-window counters (a `ConcurrentHashMap` of buckets) keyed by a scope plus the resolved client IP. The client IP comes from `ClientIpResolver`, which only trusts `X-Forwarded-For` from configured proxies. Two bucket shapes exist: *attempt* buckets that count every call, and *failure* buckets that count only failures and are cleared on success. Exceeding a limit returns `429` with a `Retry-After` header.
+
+| Scope / key | Limit | Window | Counts | Used by |
+| --- | --- | --- | --- | --- |
+| `auth:login:ip` | 30 | 15 min | every attempt | `POST /api/auth/login` |
+| `auth:login:email:<email>:ip` | 5 | 15 min | failures (cleared on success) | `POST /api/auth/login` |
+| `share:login:ip` | 60 | 15 min | every attempt | public share login |
+| `share:login:<shareId>:ip` | 5 | 15 min | failures (cleared on success) | public share login |
+| `auth:forgot:email:<email>` | 3 | 1 h | every request | password forgot |
+| `auth:forgot:ip` | 10 | 1 h | every request | password forgot |
+| `auth:token:<purpose>:<target>:ip` | 5 | 15 min | token-validation failures (cleared on success) | `password-reset`, `passkey-reset`, `email-change`, `invitation`, `tenant-registration-invite` |
+| `public:<purpose>:ip` | 30 | 15 min | every attempt | `tenant-registration-invite` (join, join/passkey, passkey-options) |
+
+The `auth:token:*` failure counter is keyed by the token hash, so it only throttles repeated failures against one specific token — it does not bound guessing across many tokens or email enumeration with a valid token. The `public:*:ip` counter closes that gap by capping all attempts per IP on the public, unauthenticated tenant-registration endpoints, regardless of token or supplied email.
+
 ## Setup and Invitation Flow
 
 1. `GET /api/setup`

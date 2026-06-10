@@ -55,6 +55,15 @@ acceptanceCriteria:
           - testName: tenant registration invite rejects wrong domain revoked expired and exhausted links
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant registration passkey invite cannot claim pending existing user
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant registration passkey options are token rate limited
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
+          - testName: tenant registration passkey options enumeration is ip rate limited per valid token
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt
           - testName: tenant owner invites new tenant user by email without server role escalation and manages tenant role
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/usermgmt/UserManagementResourceTest.kt

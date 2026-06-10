@@ -68,6 +68,10 @@ class RateLimitService @Inject constructor(
         clear("auth:token:$purpose:${normalize(target)}:ip:${clientKey()}")
     }
 
+    fun checkPublicAttempt(purpose: String) {
+        consume("public:$purpose:ip:${clientKey()}", 30, Duration.ofMinutes(15))
+    }
+
     fun clearAll() {
         buckets.clear()
     }

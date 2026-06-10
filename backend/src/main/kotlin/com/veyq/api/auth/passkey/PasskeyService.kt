@@ -104,11 +104,14 @@ class PasskeyService @Inject constructor(
         return registrationOptionsForUser(user, routingContext)
     }
 
-    fun registrationOptionsForUser(user: User, routingContext: RoutingContext): String {
+    fun registrationOptionsForUser(user: User, routingContext: RoutingContext): String =
+        registrationOptionsForIdentity(user.email, user.displayName, routingContext)
+
+    fun registrationOptionsForIdentity(email: String, displayName: String, routingContext: RoutingContext): String {
         passkeyHostService.requireAllowedCurrentDomain(routingContext)
         resetChallenge(routingContext)
         val options = webAuthnSecurity
-            .getRegisterChallenge(user.email, user.displayName, routingContext)
+            .getRegisterChallenge(email, displayName, routingContext)
             .await()
             .indefinitely()
         return webAuthnSecurity.toJsonString(options)
