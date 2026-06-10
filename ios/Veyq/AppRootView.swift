@@ -13,8 +13,10 @@ struct AppRootView: View {
         Group {
             if store.isConnected {
                 MainTabView {
-                    store.disconnect()
-                    savedInstanceURL = ""
+                    Task {
+                        await store.disconnect()
+                        savedInstanceURL = ""
+                    }
                 }
             } else if !store.hasCompletedSessionRestore {
                 ProgressView()
