@@ -490,6 +490,41 @@ describe('Memory detail dialogs', () => {
     }, expect.any(Object))
   })
 
+  it('does not upload a manually removed media file from a stale native selection', async () => {
+    const secret = new File(['secret'], 'secret.jpg', { type: 'image/jpeg' })
+    const keep = new File(['keep'], 'keep.jpg', { type: 'image/jpeg' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+    setInputFiles(input.element, [secret, keep])
+    await input.trigger('change')
+    await wrapper.find('button[aria-label="secret.jpg aus Auswahl entfernen"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('secret.jpg')
+    expect(wrapper.text()).toContain('keep.jpg')
+    expect(wrapper.text()).toContain('1 Medien ausgewählt')
+
+    await wrapper.find('form').trigger('submit')
+    await waitForTestSubmitPreparation()
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(1)
+    expect(uploadMemoryMediaMock).toHaveBeenCalledWith('tenant', 'mem-1', {
+      file: keep,
+      title: 'keep.jpg'
+    }, expect.any(Object))
+  })
+
   it('removes individual selected media files and clears the full selection', async () => {
     const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
     const second = new File(['second'], 'clip.mov', { type: 'video/quicktime' })

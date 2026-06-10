@@ -470,6 +470,9 @@ acceptanceCriteria:
           - testName: removes individual selected media files and clears the full selection
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: does not upload a manually removed media file from a stale native selection
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: keeps the submitted bucket for every queued file when the visible bucket changes
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
