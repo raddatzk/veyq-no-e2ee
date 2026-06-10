@@ -20,8 +20,70 @@ on:
     - cron: '21 16 * * 6'
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      languages: ${{ steps.languages.outputs.languages }}
+    steps:
+      - name: Checkout repository
+        if: github.event_name != 'schedule'
+        uses: actions/checkout@v4
+
+      - name: Filter changed paths
+        if: github.event_name != 'schedule'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            actions:
+              - '.github/workflows/codeql.yml'
+              - '.github/**'
+            java-kotlin:
+              - '.github/workflows/codeql.yml'
+              - 'backend/**'
+            javascript-typescript:
+              - '.github/workflows/codeql.yml'
+              - 'frontend/**'
+              - 'collaboration/**'
+              - 'load/**'
+              - 'site/**'
+              - '**/*.js'
+              - '**/*.mjs'
+              - '**/*.cjs'
+              - '**/*.ts'
+              - '**/*.tsx'
+            python:
+              - '.github/workflows/codeql.yml'
+              - '**/*.py'
+            ruby:
+              - '.github/workflows/codeql.yml'
+              - '**/*.rb'
+              - '**/Gemfile'
+            swift:
+              - '.github/workflows/codeql.yml'
+              - 'ios/**'
+
+      # The weekly scheduled run always analyzes everything so alerts stay
+      # current even for code that has not changed recently.
+      - name: Resolve languages to analyze
+        id: languages
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo 'languages=["actions","java-kotlin","javascript-typescript","python","ruby","swift"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "languages=$CHANGED" >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
     name: Analyze (${{ matrix.language }})
+    needs: changes
+    if: needs.changes.outputs.languages != '[]'
     # Runner size impacts CodeQL analysis time. To learn more, please see:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
     #   - https://gh.io/supported-runners-and-hardware-resources
@@ -42,19 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - language: actions
-            build-mode: none
-          - language: java-kotlin
-            build-mode: autobuild
-          - language: javascript-typescript
-            build-mode: none
-          - language: python
-            build-mode: none
-          - language: ruby
-            build-mode: none
-          - language: swift
-            build-mode: autobuild
+        language: ${{ fromJSON(needs.changes.outputs.languages) }}
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
         # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
@@ -78,30 +128,13 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
+          build-mode: ${{ (matrix.language == 'java-kotlin' || matrix.language == 'swift') && 'autobuild' || 'none' }}
           # If you wish to specify custom queries, you can do so here or in a config file.
           # By default, queries listed here will override any specified in a config file.
           # Prefix the list here with "+" to use these queries and those in the config file.
 
           # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
           # queries: security-extended,security-and-quality
-
-      # If the analyze step fails for one of the languages you are analyzing with
-      # "We were unable to automatically build your code", modify the matrix above
-      # to set the build mode to "manual" for that language. Then modify this step
-      # to build your code.
-      # ℹ️ Command-line programs to run using the OS shell.
-      # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-      - name: Run manual build steps
-        if: matrix.build-mode == 'manual'
-        shell: bash
-        run: |
-          echo 'If you are using a "manual" build mode for one or more of the' \
-            'languages you are analyzing, replace this with the commands to build' \
-            'your code, for example:'
-          echo '  make bootstrap'
-          echo '  make release'
-          exit 1
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
