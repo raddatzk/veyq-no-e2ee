@@ -375,18 +375,24 @@ class MemoryShareService @Inject constructor(
         timeoutSeconds: Long,
     ): PublicShareMediaUpdates = concurrencyLimitService.withPublicShareLongPoll {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
-        fun poll() = self.get().listPublicShareMemoryMediaUpdates(
+        // Evaluate the (unbounded) media-set hash only once per request: the first poll uses the
+        // supplied hash, subsequent polls pass null. Deletion detection is a snapshot reconciliation,
+        // so re-running the full-set scan on every 750ms iteration is unnecessary and would let a
+        // single long-poll request trigger dozens of full-set scans. This matters most here because
+        // the public-share route is reachable by no-password viewer shares. Additions are still
+        // detected on every iteration via the capped update query.
+        fun poll(mediaSetHash: String?) = self.get().listPublicShareMemoryMediaUpdates(
             shareId,
             memoryId,
             includeChildren,
             afterUpdatedAt,
             afterMediaId,
-            knownMediaSetHash,
+            mediaSetHash,
         )
-        var updates = poll()
+        var updates = poll(knownMediaSetHash)
         while (updates.media.isEmpty() && updates.currentMediaIds == null && System.nanoTime() < deadline) {
             TimeUnit.MILLISECONDS.sleep(750)
-            updates = poll()
+            updates = poll(null)
         }
         updates
     }

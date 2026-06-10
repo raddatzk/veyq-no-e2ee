@@ -120,17 +120,30 @@ class MediaService @Inject constructor(
         timeoutSeconds: Long,
     ): MemoryMediaUpdates {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
-        while (true) {
+        // Evaluate the (unbounded) media-set hash only once per request. Deletion detection is a
+        // snapshot reconciliation, so re-running the full-set scan on every 750ms poll iteration is
+        // unnecessary and would let a single long-poll request trigger dozens of full-set scans.
+        // Additions are still detected on every iteration via the LIVE_MEDIA_LIMIT-capped query.
+        val firstPass = self.get().listMemoryMediaUpdates(
+            memoryId,
+            includeChildren,
+            afterUpdatedAt,
+            afterMediaId,
+            knownMediaSetHash,
+        )
+        if (firstPass.media.isNotEmpty() || firstPass.currentMediaIds != null) return firstPass
+        while (System.nanoTime() < deadline) {
+            TimeUnit.MILLISECONDS.sleep(750)
             val updates = self.get().listMemoryMediaUpdates(
                 memoryId,
                 includeChildren,
                 afterUpdatedAt,
                 afterMediaId,
-                knownMediaSetHash,
+                null,
             )
-            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
-            TimeUnit.MILLISECONDS.sleep(750)
+            if (updates.media.isNotEmpty()) return updates
         }
+        return firstPass
     }
 
     @Transactional
