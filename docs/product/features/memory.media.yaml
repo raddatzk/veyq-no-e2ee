@@ -479,7 +479,10 @@ acceptanceCriteria:
           - testName: keeps Safari Photos multi-select files when Safari populates the file input late
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
-          - testName: adds files from repeated Safari Photos selections instead of replacing the existing pick
+          - testName: replaces the previous upload selection when the picker is opened again
+            kind: positive
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: replaces the remaining files after a removal when the picker is opened again
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: starts a background upload batch and closes the dialog

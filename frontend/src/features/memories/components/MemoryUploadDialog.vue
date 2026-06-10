@@ -38,6 +38,7 @@ let fileSelectionToken = 0
 let fileSelectionTimers: number[] = []
 let fileSelectionBest: File[] = []
 let fileSelectionRemovedSignatures = new Set<string>()
+let fileSelectionPendingPickerOpen = false
 let fileSelectionStartedAt = 0
 let fileSelectionLastChangedAt = 0
 
@@ -62,6 +63,7 @@ function clearFiles() {
   clearFileSelectionTimers()
   fileSelectionBest = []
   fileSelectionRemovedSignatures = new Set()
+  fileSelectionPendingPickerOpen = false
   fileSelectionStartedAt = 0
   fileSelectionLastChangedAt = 0
   files.value = []
@@ -103,6 +105,7 @@ async function submit() {
     clearFileSelectionTimers()
     fileSelectionBest = []
     fileSelectionRemovedSignatures = new Set()
+    fileSelectionPendingPickerOpen = false
     fileSelectionStartedAt = 0
     fileSelectionLastChangedAt = 0
     if (fileInput.value) fileInput.value.value = ''
@@ -117,10 +120,21 @@ function emitUploadedMedia(media: MemoryMedia) {
   emit('uploaded', media)
 }
 
-function readFileSelection(input: HTMLInputElement) {
+function prepareForNextFileSelection() {
+  if (loading.value) return
   clearFileSelectionTimers()
   fileSelectionBest = files.value
   fileSelectionRemovedSignatures = new Set()
+  fileSelectionPendingPickerOpen = true
+  fileSelectionStartedAt = 0
+  fileSelectionLastChangedAt = 0
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+function readFileSelection(input: HTMLInputElement) {
+  clearFileSelectionTimers()
+  fileSelectionPendingPickerOpen = false
+  fileSelectionBest = []
   fileSelectionStartedAt = Date.now()
   fileSelectionLastChangedAt = fileSelectionStartedAt
   const token = ++fileSelectionToken
@@ -138,27 +152,14 @@ function readFileSelection(input: HTMLInputElement) {
 }
 
 function applyBestFileSelection(input: HTMLInputElement) {
-  const nextFiles = mergeMediaFiles(
-    fileSelectionBest,
-    mediaFilesFromList(input.files || []).filter((file) => !fileSelectionRemovedSignatures.has(fileSignature(file)))
+  const nextFiles = mediaFilesFromList(input.files || []).filter(
+    (file) => !fileSelectionRemovedSignatures.has(fileSignature(file))
   )
   if (nextFiles.length >= fileSelectionBest.length) {
     if (nextFiles.length > fileSelectionBest.length) fileSelectionLastChangedAt = Date.now()
     fileSelectionBest = nextFiles
     files.value = nextFiles
   }
-}
-
-function mergeMediaFiles(existing: File[], incoming: File[]) {
-  const merged = [...existing]
-  const known = new Set(existing.map(fileSignature))
-  incoming.forEach((file) => {
-    const signature = fileSignature(file)
-    if (known.has(signature)) return
-    known.add(signature)
-    merged.push(file)
-  })
-  return merged
 }
 
 function fileSignature(file: File) {
@@ -171,6 +172,7 @@ function clearFileSelectionTimers() {
 }
 
 async function waitForPreparedFileSelection(input: HTMLInputElement) {
+  if (fileSelectionPendingPickerOpen) return
   const token = fileSelectionToken
   while (token === fileSelectionToken && shouldWaitForFileSelection()) {
     applyBestFileSelection(input)
@@ -214,6 +216,7 @@ async function delay(ms: number) {
           multiple
           :accept="mediaFileAccept"
           :disabled="loading"
+          @click="prepareForNextFileSelection"
           @change="updateFiles"
         />
         <span>{{ files.length ? t('media.selectedCount', { count: files.length }) : t('media.noneSelected') }}</span>

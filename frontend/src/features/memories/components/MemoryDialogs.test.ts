@@ -451,7 +451,7 @@ describe('Memory detail dialogs', () => {
     }, expect.any(Object))
   })
 
-  it('adds files from repeated Safari Photos selections instead of replacing the existing pick', async () => {
+  it('replaces the previous upload selection when the picker is opened again', async () => {
     const first = new File(['first'], 'beach.jpg', { type: 'image/jpeg' })
     const second = new File(['second'], 'IMG_0002.HEIC', { type: '' })
     const third = new File(['third'], 'clip.MOV', { type: '' })
@@ -467,24 +467,25 @@ describe('Memory detail dialogs', () => {
     })
 
     await selectMemoryUploadFiles(wrapper, [first])
+    expect(wrapper.text()).toContain('beach.jpg')
     expect(wrapper.text()).toContain('1 Medien ausgewählt')
-    await selectMemoryUploadFiles(wrapper, [first, second, third])
-    expect(wrapper.text()).toContain('3 Medien ausgewählt')
+
+    await selectMemoryUploadFiles(wrapper, [second, third])
+    expect(wrapper.text()).not.toContain('beach.jpg')
+    expect(wrapper.text()).toContain('IMG_0002.HEIC')
+    expect(wrapper.text()).toContain('clip.MOV')
+    expect(wrapper.text()).toContain('2 Medien ausgewählt')
 
     await wrapper.find('form').trigger('submit')
     await waitForTestSubmitPreparation()
     await flushPromises()
 
-    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(3)
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(2)
     expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
-      file: first,
-      title: 'beach.jpg'
-    }, expect.any(Object))
-    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
       file: second,
       title: 'IMG_0002.HEIC'
     }, expect.any(Object))
-    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(3, 'tenant', 'mem-1', {
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
       file: third,
       title: 'clip.MOV'
     }, expect.any(Object))
@@ -505,6 +506,7 @@ describe('Memory detail dialogs', () => {
     })
 
     const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+    await input.trigger('click')
     setInputFiles(input.element, [secret, keep])
     await input.trigger('change')
     await wrapper.find('button[aria-label="secret.jpg aus Auswahl entfernen"]').trigger('click')
@@ -522,6 +524,68 @@ describe('Memory detail dialogs', () => {
     expect(uploadMemoryMediaMock).toHaveBeenCalledWith('tenant', 'mem-1', {
       file: keep,
       title: 'keep.jpg'
+    }, expect.any(Object))
+  })
+
+  it('replaces the remaining files after a removal when the picker is opened again', async () => {
+    const removed = new File(['removed'], 'removed.jpg', { type: 'image/jpeg' })
+    const keep = new File(['keep'], 'keep.jpg', { type: 'image/jpeg' })
+    const added = new File(['added'], 'added.jpg', { type: 'image/jpeg' })
+    uploadMemoryMediaMock.mockResolvedValue(media())
+
+    const wrapper = mount(MemoryUploadDialog, {
+      props: {
+        visible: true,
+        tenantName: 'tenant',
+        memoryId: 'mem-1'
+      },
+      global: { stubs: dialogStubs() }
+    })
+
+    const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+    await input.trigger('click')
+    setInputFiles(input.element, [removed, keep])
+    await input.trigger('change')
+    await waitForTestFileSelection()
+    await wrapper.find('button[aria-label="removed.jpg aus Auswahl entfernen"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('removed.jpg')
+    expect(wrapper.text()).toContain('keep.jpg')
+    expect(wrapper.text()).toContain('1 Medien ausgewählt')
+
+    await input.trigger('click')
+    setInputFiles(input.element, [added])
+    await input.trigger('change')
+    await waitForTestFileSelection()
+
+    expect(wrapper.text()).not.toContain('removed.jpg')
+    expect(wrapper.text()).not.toContain('keep.jpg')
+    expect(wrapper.text()).toContain('added.jpg')
+    expect(wrapper.text()).toContain('1 Medien ausgewählt')
+
+    await input.trigger('click')
+    setInputFiles(input.element, [removed, added])
+    await input.trigger('change')
+    await waitForTestFileSelection()
+
+    expect(wrapper.text()).toContain('removed.jpg')
+    expect(wrapper.text()).not.toContain('keep.jpg')
+    expect(wrapper.text()).toContain('added.jpg')
+    expect(wrapper.text()).toContain('2 Medien ausgewählt')
+
+    await wrapper.find('form').trigger('submit')
+    await waitForTestSubmitPreparation()
+    await flushPromises()
+
+    expect(uploadMemoryMediaMock).toHaveBeenCalledTimes(2)
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(1, 'tenant', 'mem-1', {
+      file: removed,
+      title: 'removed.jpg'
+    }, expect.any(Object))
+    expect(uploadMemoryMediaMock).toHaveBeenNthCalledWith(2, 'tenant', 'mem-1', {
+      file: added,
+      title: 'added.jpg'
     }, expect.any(Object))
   })
 
@@ -1177,6 +1241,7 @@ function dialogGlobal() {
 
 async function selectMemoryUploadFiles(wrapper: VueWrapper, files: File[]) {
   const input = wrapper.find<HTMLInputElement>('input.memory-upload-native-fallback')
+  await input.trigger('click')
   setInputFiles(input.element, files)
   await input.trigger('change')
   await waitForTestFileSelection()
