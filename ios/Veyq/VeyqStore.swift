@@ -1153,6 +1153,44 @@ final class VeyqStore: ObservableObject {
         }
     }
 
+    private func activateUploadTargetAccountIfNeeded(_ target: UploadTargetMemory) async -> Bool {
+        guard target.isAccountBound else { return true }
+
+        do {
+            guard let targetSession = try sessionStore.loadAll().first(where: { target.matches(session: $0) }) else {
+                errorMessage = L10n.string("The account selected in the share sheet is no longer available.")
+                return false
+            }
+
+            let activeSession = try sessionStore.loadActive()
+            let activeSessionMismatch = activeSession.map { !target.matches(session: $0) } ?? true
+            if connectedInstanceURL != targetSession.instanceURL || activeSessionMismatch {
+                try sessionStore.save(targetSession)
+                instances = try sessionStore.loadAll()
+                try await activate(targetSession)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func enqueuePendingImportHandoff(_ batch: PendingImportBatch, target: UploadTargetMemory) async {
+        guard target.isAccountBound else {
+            UploadQueuePersistence.removePendingImportBatch(id: batch.id)
+            errorMessage = L10n.string("Shared files could not be opened securely. Please choose the Memory again.")
+            return
+        }
+
+        guard await activateUploadTargetAccountIfNeeded(target) else {
+            UploadQueuePersistence.removePendingImportBatch(id: batch.id)
+            return
+        }
+
+        enqueuePendingImport(batch, target: target)
+    }
+
     func enqueuePendingImport(_ batch: PendingImportBatch, target: UploadTargetMemory) {
         let hasMediaFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) != .track }
         let hasTrackFiles = batch.fileURLs.contains { inferredPendingImportKind(for: $0) == .track }
@@ -1462,8 +1500,29 @@ final class VeyqStore: ObservableObject {
     }
 
     private func performUpload(itemId: String) async {
-        guard let index = uploadItems.firstIndex(where: { $0.id == itemId }), let apiClient else {
+        guard let index = uploadItems.firstIndex(where: { $0.id == itemId }) else {
             uploadTasks[itemId] = nil
+            return
+        }
+        let item = uploadItems[index]
+        guard await activateUploadTargetAccountIfNeeded(item.target) else {
+            uploadItems[index].state = .failed
+            uploadItems[index].errorMessage = errorMessage
+            uploadItems[index].retryable = false
+            uploadItems[index].progressUpdatedAt = Date()
+            persistUploads()
+            uploadTasks[itemId] = nil
+            runNextUploadIfNeeded()
+            return
+        }
+        guard let apiClient else {
+            uploadItems[index].state = .failed
+            uploadItems[index].errorMessage = L10n.string("No native session is stored.")
+            uploadItems[index].retryable = true
+            uploadItems[index].progressUpdatedAt = Date()
+            persistUploads()
+            uploadTasks[itemId] = nil
+            runNextUploadIfNeeded()
             return
         }
         guard FileManager.default.isReadableFile(atPath: uploadItems[index].localFileURL.path) else {
@@ -1485,7 +1544,6 @@ final class VeyqStore: ObservableObject {
         uploadItems[index].progressUpdatedAt = Date()
         persistUploads()
 
-        let item = uploadItems[index]
         do {
             let media = try await apiClient.uploadMemoryMediaFile(
                 tenantName: item.target.tenantName,
@@ -1756,6 +1814,7 @@ final class VeyqStore: ObservableObject {
         if mockMode {
             return
         }
+        guard await activateUploadTargetAccountIfNeeded(target) else { return }
         guard supportsCapability("memory.tracks") else {
             errorMessage = L10n.string("This instance does not support GPX tracks.")
             return

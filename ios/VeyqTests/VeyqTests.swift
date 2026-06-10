@@ -388,6 +388,37 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(action, .enqueueTargeted([targeted]))
     }
 
+    func testUploadTargetMemoryRequiresCompleteAccountBinding() {
+        let unbound = makeUploadTarget()
+        let partiallyBound = UploadTargetMemory(
+            tenantName: "family",
+            memoryId: "summer-south-tyrol",
+            memoryTitle: "Summer in South Tyrol",
+            accountId: "https://memories.example.test",
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: nil,
+            userId: 1
+        )
+        let bound = makeBoundUploadTarget()
+
+        XCTAssertFalse(unbound.isAccountBound)
+        XCTAssertFalse(partiallyBound.isAccountBound)
+        XCTAssertTrue(bound.isAccountBound)
+    }
+
+    func testUploadTargetMemoryMatchesOnlySelectedAccountSession() {
+        let target = makeBoundUploadTarget()
+        let matchingSession = testStoredNativeSession()
+        let differentSession = testStoredNativeSession(
+            instanceURL: "https://other.example.test",
+            apiBaseURL: "https://other.example.test/api"
+        )
+
+        XCTAssertTrue(target.matches(session: matchingSession))
+        XCTAssertFalse(target.matches(session: differentSession))
+        XCTAssertFalse(makeUploadTarget().matches(session: matchingSession))
+    }
+
     @MainActor
     func testRetryFailedUploadReturnsItToQueuedState() {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
@@ -3038,6 +3069,18 @@ final class VeyqTests: XCTestCase {
             tenantName: "family",
             memoryId: "summer-south-tyrol",
             memoryTitle: "Summer in South Tyrol"
+        )
+    }
+
+    private func makeBoundUploadTarget() -> UploadTargetMemory {
+        UploadTargetMemory(
+            tenantName: "family",
+            memoryId: "summer-south-tyrol",
+            memoryTitle: "Summer in South Tyrol",
+            accountId: "https://memories.example.test",
+            instanceURL: URL(string: "https://memories.example.test")!,
+            apiBaseURL: URL(string: "https://memories.example.test/api")!,
+            userId: 1
         )
     }
 

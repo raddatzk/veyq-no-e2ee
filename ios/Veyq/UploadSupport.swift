@@ -26,6 +26,40 @@ struct UploadTargetMemory: Codable, Equatable {
     let tenantName: String
     let memoryId: String
     let memoryTitle: String
+    let accountId: String?
+    let instanceURL: URL?
+    let apiBaseURL: URL?
+    let userId: Int?
+
+    init(
+        tenantName: String,
+        memoryId: String,
+        memoryTitle: String,
+        accountId: String? = nil,
+        instanceURL: URL? = nil,
+        apiBaseURL: URL? = nil,
+        userId: Int? = nil
+    ) {
+        self.tenantName = tenantName
+        self.memoryId = memoryId
+        self.memoryTitle = memoryTitle
+        self.accountId = accountId
+        self.instanceURL = instanceURL
+        self.apiBaseURL = apiBaseURL
+        self.userId = userId
+    }
+
+    var isAccountBound: Bool {
+        accountId != nil && instanceURL != nil && apiBaseURL != nil && userId != nil
+    }
+
+    func matches(session: StoredNativeSession) -> Bool {
+        guard let accountId, let instanceURL, let apiBaseURL, let userId else { return false }
+        return accountId == session.instanceURL.absoluteString
+            && instanceURL == session.instanceURL
+            && apiBaseURL == session.apiBaseURL
+            && userId == session.user.userId
+    }
 }
 
 struct UploadQueueItem: Identifiable, Codable, Equatable {
