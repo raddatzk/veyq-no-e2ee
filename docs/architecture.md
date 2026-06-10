@@ -1,167 +1,183 @@
-# veyq Architektur
+# veyq Architecture
 
-## Zielbild
+## Target Picture
 
-veyq läuft als eine Instanz mit globalen Usern und mehreren Tenants. Externe Domains, TLS und Root-Pfad-Rewrites werden von einem vorgelagerten Proxy verwaltet. Das Backend kennt keine Host-Mappings und scoped fachliche Daten über den Tenant-Namen im Pfad.
+veyq runs as a single instance with global users and multiple tenants. External domains, TLS and root-path rewrites are managed by an upstream proxy. The backend knows no host mappings and scopes business data via the tenant name in the path.
 
-## Laufzeit
+## Runtime
 
-- Quarkus Backend liefert API und eingebautes Vue-Frontend aus.
-- MariaDB ist die produktive Datenbank.
-- Flyway verwaltet das Schema über versionierte Migrationen.
-- Docker Compose startet App und Datenbank lokal.
-- OpenAPI-Specs unter `docs/api` sind der öffentliche API-Zielvertrag.
-- Backend und Frontend verwenden generierte API-Artefakte aus denselben Specs.
+- The Quarkus backend serves the API and the embedded Vue frontend.
+- MariaDB is the production database.
+- Flyway manages the schema through versioned migrations.
+- Docker Compose starts the app and the database locally.
+- The OpenAPI specs under `docs/api` are the public API target contract.
+- Backend and frontend use generated API artifacts from the same specs.
 
-## Domänenmodell
+## Domain Model
 
 - `veyq_user`
-  - globale User inkl. `email`, `password_hash`, `display_name`, `role`, `password_set_at`
+  - global users including `email`, `password_hash`, `display_name`, `role`, `password_set_at`
 - `veyq_user_invitation`
-  - gehashte Einladungstokens, Ablaufdatum, Accepted-/Revoked-Zeitpunkte
+  - hashed invitation tokens, expiry date, accepted/revoked timestamps
 - `veyq_refresh_token` / `veyq_access_token`
-  - gehashte Tokens, Ablaufdaten, Revocation und Refresh-Rotation
+  - hashed tokens, expiry dates, revocation and refresh rotation
 - `veyq_tenant`
-  - tenant-scoped Bereich mit eindeutigem `name` und eindeutiger `domain`
+  - tenant-scoped area with a unique `name` and a unique `domain`
 - `veyq_tenant_member`
-  - User-Mitgliedschaft pro Tenant mit `TenantOwner` oder `TenantMember`
+  - user membership per tenant with `TenantOwner` or `TenantMember`
 - `veyq_tenant_group`
-  - Gruppen innerhalb eines Tenants
+  - groups within a tenant
 - `veyq_tenant_group_member`
-  - Gruppenmitgliedschaft mit `GroupOwner` oder `GroupMember`
+  - group membership with `GroupOwner` or `GroupMember`
 - `veyq_media_blob`
-  - tenant-scoped, content-addressed Originale und Previews mit internem SHA-256, Storage-Key, Preview-Storage-Key, MIME-Type, Byte-Größe und extrahierten Kamera-/GPS-/Dimensionsdaten
+  - tenant-scoped, content-addressed originals and previews with internal SHA-256, storage key, preview storage key, MIME type, byte size and extracted camera/GPS/dimension data
 - `veyq_media`
-  - Memory-spezifische Medien-Assets mit interner `id`, öffentlicher 16-Zeichen-`public_id`, Tenant, Uploader oder Share-Identität, Zugriffsscope, direkter Memory-Zuordnung, Titel, Originaldateiname und Referenz auf `veyq_media_blob`
+  - memory-specific media assets with internal `id`, public 16-character `public_id`, tenant, uploader or share identity, access scope, direct memory assignment, title, original filename and a reference to `veyq_media_blob`
 - `veyq_memory`
-  - neue Memory-Zielstruktur mit öffentlicher `public_id`, Parent-Memory, Zugriffsscope, Cover-Media und direkter Media-Zuordnung
+  - the new memory target structure with public `public_id`, parent memory, access scope, cover media and direct media assignment
 - `veyq_memory_track`
-  - Memory-spezifische GPX-Tracks mit öffentlicher `public_id`, Titel, Aktivitätstyp, Bounding Box, Distanz, Punktanzahl, Zeitspanne und Storage-Key für die Original-GPX-Datei
-- `veyq_memory_share` / `veyq_memory_share_identity` / Share-Token-Tabellen
-  - Public-Share-Links für Memory-Subtrees, anonyme Share-Identitäten, share-scoped Access-/Refresh-Tokens und Rollen für Viewer, Contributor, Manager und Uploader
+  - memory-specific GPX tracks with public `public_id`, title, activity type, bounding box, distance, point count, time span and a storage key for the original GPX file
+- `veyq_memory_share` / `veyq_memory_share_identity` / share token tables
+  - public share links for memory subtrees, anonymous share identities, share-scoped access/refresh tokens and roles for viewer, contributor, manager and uploader
 - `veyq_config`
-  - technische App-Konfiguration wie Argon2id-Parameter
+  - technical app configuration such as Argon2id parameters
 
-## Auth-Flow
+## Auth Flow
 
 1. `POST /api/auth/login`
-   - validiert E-Mail/Passwort
-   - erzeugt Access- und Refresh-Token
-   - setzt beide Tokens als Cookies
+   - validates email/password
+   - issues access and refresh tokens
+   - sets both tokens as cookies
 
-2. Geschützte API-Aufrufe
-   - `VeyqAuthenticationMechanism` liest das passende Cookie
-   - `VeyqIdentityProvider` validiert Token und baut die `SecurityIdentity`
-   - `RequestContextFilter` befüllt den request-scoped `RequestContext`
-   - `VeyqHttpSecurityPolicy` blockt anonyme Requests auf geschützte `/api/**` Pfade
+2. Protected API calls
+   - `VeyqAuthenticationMechanism` reads the matching cookie
+   - `VeyqIdentityProvider` validates the token and builds the `SecurityIdentity`
+   - `RequestContextFilter` populates the request-scoped `RequestContext`
+   - `VeyqHttpSecurityPolicy` blocks anonymous requests to protected `/api/**` paths
 
 3. `POST /api/auth/refresh`
-   - liest Refresh-Cookie
-   - rotiert Token
-   - setzt ein neues Cookie-Paar
+   - reads the refresh cookie
+   - rotates the token
+   - sets a new cookie pair
 
 4. `POST /api/auth/logout`
-   - invalidiert aktuelle Token
-   - löscht beide Cookies
+   - invalidates the current tokens
+   - clears both cookies
 
-## Setup- und Einladungs-Flow
+## Setup and Invitation Flow
 
 1. `GET /api/setup`
-   - liefert, ob initiales Admin-Setup oder Tenant-Erstellung im Frontend angeboten werden soll
+   - reports whether initial admin setup or tenant creation should be offered in the frontend
 
 2. `POST /api/setup/admin`
-   - erstellt den ersten globalen Server-Owner
-   - ist gesperrt, sobald ein User existiert
+   - creates the first global server owner
+   - is locked once a user exists
 
 3. `POST /api/tenants/{tenantName}/users/invite`
-   - lädt durch einen TenantOwner einen User per E-Mail in den Tenant ein
-   - verwendet einen bestehenden globalen User mit gleicher E-Mail oder erstellt einen Pending-User
-   - erzeugt eine Einladung mit TTL und sendet einen Link im Format `https://{tenant.domain}/invite/{userId}/{token}`
+   - lets a TenantOwner invite a user into the tenant by email
+   - uses an existing global user with the same email or creates a pending user
+   - creates an invitation with a TTL and sends a link in the format `https://{tenant.domain}/invite/{userId}/{token}`
 
 4. `POST /api/users/{userId}/invite/accept`
-   - akzeptiert die Einladung mit `{ password, token }`
-   - setzt das Passwort und Auth-Cookies
+   - accepts the invitation with `{ password, token }`
+   - sets the password and auth cookies
 
-## Berechtigungen
+## Permissions
 
-Globale Rechte:
+Global rights:
 
 - `ServerRole.ServerOwner`
 - `ServerRole.ServerMember`
-- `@ServerRolesRequired(...)` schützt serverweite Aktionen wie `POST /api/tenants` und User-Management.
+- `@ServerRolesRequired(...)` protects server-wide actions such as `POST /api/tenants` and user management.
 
-Tenant-Rechte:
+Tenant rights:
 
-- `TenantMembershipFilter` greift automatisch auf Routen mit `@PathParam("tenantName")`.
-- Unbekannter Tenant ergibt `404`.
-- Anonymer Request ergibt `401`.
-- Eingeloggter User ohne Tenant-Membership ergibt `403`.
-- `@TenantOwnerRequired` ist nur für Owner-only Tenant-Aktionen gedacht.
+- `TenantMembershipFilter` applies automatically to routes with `@PathParam("tenantName")`.
+- An unknown tenant yields `404`.
+- An anonymous request yields `401`.
+- A logged-in user without tenant membership yields `403`.
+- `@TenantOwnerRequired` is intended only for owner-only tenant actions.
 
-Gruppenrechte:
+Group rights:
 
-- Wer eine Gruppe erstellt, wird `GroupOwner`.
-- `@GroupOwnerRequired` schützt Gruppenverwaltung.
-- Normale Gruppenmitgliedschaft ist getrennt von Tenant-Mitgliedschaft.
+- Whoever creates a group becomes `GroupOwner`.
+- `@GroupOwnerRequired` protects group administration.
+- Normal group membership is separate from tenant membership.
 
-## API-first Vertrag
+## API-first Contract
 
-- Jede Backend-API-Domäne hat eine eigene OpenAPI-Datei: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `memories`.
-- Operationen enthalten `summary`, `description`, Beispiele, Fehlerfälle, `x-preconditions`, `x-implementation-status` und bei Bedarf Rollen-/Membership-Hinweise.
-- Der Gradle-Build generiert JAX-RS-Interfaces und Kotlin-Models. Resource-Klassen implementieren die generierten Interfaces direkt.
-- Services konvertieren an Domain-Grenzen zwischen Domain-Entities/-Enums und generated API-Models.
-- `OpenApiContractTest` prüft Spec-Vollständigkeit, implementierte Endpunkte, Resource-Interface-Bindung und dass JSON-Signaturen generated Models verwenden.
-- Das Vue-Frontend generiert TypeScript-Fetch-Clients nach `frontend/src/api/generated/<domain>` und nutzt sie über `frontend/src/api/generatedClient.ts`.
-- Frontend-spezifische Facades bleiben als stabile Imports erhalten; sie kapseln generated Clients, Error-Mapping, Cookie-Refresh und Media-Sonderfälle.
+- Each backend API domain has its own OpenAPI file: `auth`, `setup`, `users`, `tenants`, `groups`, `server`, `settings`, `memories`.
+- Operations include `summary`, `description`, examples, error cases, `x-preconditions`, `x-implementation-status` and, where needed, role/membership hints.
+- The Gradle build generates JAX-RS interfaces and Kotlin models. Resource classes implement the generated interfaces directly.
+- Services convert between domain entities/enums and generated API models at domain boundaries.
+- `OpenApiContractTest` verifies spec completeness, implemented endpoints, resource interface binding and that JSON signatures use the generated models.
+- The Vue frontend generates TypeScript fetch clients into `frontend/src/api/generated/<domain>` and uses them via `frontend/src/api/generatedClient.ts`.
+- Frontend-specific facades remain as stable imports; they encapsulate generated clients, error mapping, cookie refresh and media special cases.
 
-## Memory- und Medienzugriff
+## Backend Modularity
 
-Ordner, Memories und Medien haben einen eindeutigen Zugriffsscope:
+The backend layers should stay API-first, but internal modularity must not mirror the breadth of an OpenAPI spec or a generated interface.
 
-- `TENANT`: alle Tenant-Mitglieder
-- `GROUP`: Mitglieder der jeweiligen Tenant-Gruppe
-- `USER`: nur der jeweilige User
+- Resource classes are HTTP adapters. They implement generated API interfaces and handle JAX-RS `Response`, cookies, headers, multipart/temp files and simple parameter normalization. Business logic and longer-lived orchestration belong in smaller application services.
+- Services are cut by business responsibility or clear technical capabilities, not by API specs, generated interfaces or endpoint lists. A service should be describable in a single short sentence.
+- Constructor dependencies are a refactoring signal. From roughly six to nine dependencies, review the responsibility deliberately; from ten dependencies on, actively investigate a service for separable policies, resolvers, mappers, stores or use cases.
+- Use-case services and technical infrastructure stay separate. A memory media upload use case decides about memory, scope, uploader, bucket and API result; a resumable upload session store only knows upload IDs, chunks, session metadata, TTL and cleanup.
+- Visibility, roles, scope resolution, path resolution and share access belong in small policy or resolver components, for example `ShareAccessPolicy`, `MemoryVisibilityPolicy` or `LibraryPathResolver`, instead of being embedded in large services.
+- Business package dependencies should stay directed. If `memory` builds on `library`, then `library` must not reach back directly into `memory`. Shared rules are modeled through neutral components or small interfaces.
+- Mappers produce target models directly from the richer source model. Chains like `domain.toSummary().toSomethingElse()` are to be avoided, because API DTOs are end products and not intermediate representations.
+- Generated API models stay at resource, mapper or application-service boundaries. Policies, technical services and storage components preferably work with domain objects or their own small command/result types.
+- Shared service logic is preferably composed in. Base classes for tenant, scope, path or context logic increase coupling and should not be expanded further as a default pattern.
+- Entities and repositories should not grow into unstructured catch-all files. New larger aggregates or repository groups get their own files or clearly bounded files.
+- Refactorings happen incrementally and risk-based. First, clearly separable policies, resolvers, mappers, session stores, archive or derivative components are extracted; afterwards, broad use-case services are cut further.
 
-Child-Ordner und root-level Memories in Ordnern erben den Scope ihres Parent-Ordners. Child-Memories erben den Scope ihres Parent-Memory. Medien übernehmen den Scope der Memory, in die sie hochgeladen werden. Tenant-Membership ist Voraussetzung für jede Tenant-API; innerhalb eines sichtbaren Scopes dürfen Mitglieder lesen und schreiben.
+## Memory and Media Access
 
-Medien werden öffentlich über `Media.publicId` adressiert. Memory-Media-Listen laufen über `/api/{tenantName}/memories/{memoryId}/media`; Binärcontent und Previews laufen über `/api/{tenantName}/memory-media/{mediaId}/...` und unterstützen Range-Requests für Originalcontent. Intern liest Content über `Media.blob.storageKey`; Hashes, Blob-IDs und Storage-Keys werden nicht über öffentliche APIs exponiert.
+Folders, memories and media have a single access scope:
 
-Aus EXIF extrahierte GPS-Koordinaten bleiben Teil der Media-Metadaten. Das Frontend kann daraus eine Leaflet-basierte Medienkarte bauen. Externe OpenStreetMap-Kacheln werden nicht automatisch geladen; die Entscheidung liegt als globales Browser-Opt-in unter `veyq:osm-tiles-enabled` und kann über Karte, Public-Share-Seite oder Settings zurückgenommen werden.
+- `TENANT`: all tenant members
+- `GROUP`: members of the respective tenant group
+- `USER`: only the respective user
 
-## Memory-Schicht
+Child folders and root-level memories in folders inherit the scope of their parent folder. Child memories inherit the scope of their parent memory. Media take on the scope of the memory they are uploaded into. Tenant membership is a precondition for every tenant API; within a visible scope, members may read and write.
 
-Memory UI und die Memory APIs sind die aktive fachliche Ebene. Tenant Home, persönliche Bereiche, Gruppenbereiche, Ordner und Memory-Details werden über Memory-Navigation, Folder- und Memory-Endpunkte abgebildet.
+Media are addressed publicly via `Media.publicId`. Memory media lists run through `/api/{tenantName}/memories/{memoryId}/media`; binary content and previews run through `/api/{tenantName}/memory-media/{mediaId}/...` and support range requests for original content. Internally, content is read via `Media.blob.storageKey`; hashes, blob IDs and storage keys are not exposed through public APIs.
 
-Memories sind verschachtelbar und gehören zu genau einem Tenant-, Group- oder User-Scope. Child-Memories erben den Scope ihres Parent-Memory. Neue Memory-Media-Uploads schreiben die direkte `memory_id` an `veyq_media`; ein Asset gehört im Memory-Modell genau zu einem Memory. Identische Uploads innerhalb eines Tenants können denselben `veyq_media_blob` wiederverwenden, bleiben aber getrennte `veyq_media`-Assets. `includeChildren=true` bei Memory-Media-Listen aggregiert Medien aus sichtbaren Descendant-Memories, ohne die direkte Ownership zu verändern.
+GPS coordinates extracted from EXIF remain part of the media metadata. The frontend can build a Leaflet-based media map from them. External OpenStreetMap tiles are not loaded automatically; the decision lives as a global browser opt-in under `veyq:osm-tiles-enabled` and can be revoked from the map, the public share page or settings.
 
-Originale und Previews gehören zu `veyq_media_blob`. Previews werden pro Blob gespeichert und wiederverwendet. Beim Löschen eines Media-Assets wird der Blob erst entfernt, wenn kein weiteres Media mehr darauf zeigt. Explizite Memory-Cover-Uploads bleiben davon getrennte Memory-Dateien; Cover können alternativ auf ein bestehendes Memory-Media-Asset zeigen.
+## Memory Layer
 
-GPX-Tracks gehören direkt zu einer Memory. Uploads werden serverseitig geparst und mit Activity Type, Bounds, Distanz, Punktzahl und optionaler Zeitspanne gespeichert. Die Original-GPX-Datei bleibt downloadbar und wird in Memory-ZIP-Archive aufgenommen. Public Shares dürfen Tracks je nach Rolle lesen, hochladen, bearbeiten oder löschen. Journal-Referenzen auf gelöschte Tracks bleiben als Markdown erhalten und rendern als nicht verfügbar.
+Memory UI and the Memory APIs are the active business layer. Tenant home, personal areas, group areas, folders and memory details are represented through memory navigation and folder and memory endpoints.
 
-Memory-Playlists gehören ebenfalls direkt zu einer Memory. `veyq_memory_playlist` speichert Titel, Notiz, Featured-Status sowie genau einen externen Playlist-Link mit Provider und External-ID. Major Line 1 unterstützt Spotify, Apple Music, YouTube, SoundCloud und Deezer. Public Shares dürfen Playlists je nach Rolle lesen und bei Contributor-/Manager-Rechten bearbeiten. Externe Player werden in Major Line 1 nicht eingebettet; die UI öffnet den gespeicherten Anbieter-Link extern. Journal-Referenzen auf gelöschte Playlists bleiben als Markdown erhalten und rendern als nicht verfügbar.
+Memories are nestable and belong to exactly one tenant, group or user scope. Child memories inherit the scope of their parent memory. New memory media uploads write the direct `memory_id` to `veyq_media`; in the memory model an asset belongs to exactly one memory. Identical uploads within a tenant can reuse the same `veyq_media_blob` but remain separate `veyq_media` assets. `includeChildren=true` on memory media lists aggregates media from visible descendant memories without changing direct ownership.
 
-Memory-Journale werden als Markdown in `veyq_memory_journal` gespeichert. Web-Editoren können für interne Memories und öffentliche Manager-Shares eine kurzlebige Live-Session anfordern und sich über den optionalen `veyq-collaboration` Hocuspocus/Yjs-Sidecar verbinden. Der Sidecar synchronisiert offene Editor-Sessions, hält aktive Yjs-Dokumente nur im Speicher und persistiert Markdown-Snapshots über einen sidecar-authentifizierten Backend-Kanal zurück an veyq; das Backend bleibt die Autorisierungs- und Embed-Validierungsgrenze. REST-Lesen und REST-Updates bleiben als Fallback und für native read-only Clients erhalten.
+Originals and previews belong to `veyq_media_blob`. Previews are stored per blob and reused. When a media asset is deleted, the blob is only removed once no other media still points to it. Explicit memory cover uploads remain separate memory files; covers can alternatively point to an existing memory media asset.
 
-Public Shares sind separate Ressourcen auf Memory-Subtrees. Registrierte Benutzer, die intern Zugriff auf die Root-Memory haben, erhalten beim Öffnen eines Share-Links ein `redirectUrl` auf die normale interne Memory-Route. Externe Besucher nutzen share-scoped HttpOnly-Cookies auf `/api/public-shares`; Uploader-only Shares bleiben auf den fokussierten Upload-Flow beschränkt.
+GPX tracks belong directly to a memory. Uploads are parsed server-side and stored with activity type, bounds, distance, point count and an optional time span. The original GPX file stays downloadable and is included in memory ZIP archives. Public shares may read, upload, edit or delete tracks depending on the role. Journal references to deleted tracks are preserved as Markdown and render as unavailable.
 
-Die Baseline-Migration legt die Memory-Tabelle, die direkte `memory_id`-Zuordnung auf Medien, tenant-scoped Blob-Speicher, Memory-GPX-Tracks und Memory-Playlists an. Album-Tabellen sind aus dem Schema entfernt; nicht-produktive Alt-Daten werden nicht weiter migriert.
+Memory playlists also belong directly to a memory. `veyq_memory_playlist` stores title, note, featured status and exactly one external playlist link with provider and external ID. Major line 1 supports Spotify, Apple Music, YouTube, SoundCloud and Deezer. Public shares may read playlists and, with contributor/manager rights, edit them depending on the role. External players are not embedded in major line 1; the UI opens the stored provider link externally. Journal references to deleted playlists are preserved as Markdown and render as unavailable.
+
+Memory journals are stored as Markdown in `veyq_memory_journal`. Web editors can request a short-lived live session for internal memories and public manager shares and connect through the optional `veyq-collaboration` Hocuspocus/Yjs sidecar. The sidecar synchronizes open editor sessions, keeps active Yjs documents in memory only, and persists Markdown snapshots back to veyq over a sidecar-authenticated backend channel; the backend remains the authorization and embed-validation boundary. REST reads and REST updates remain as a fallback and for native read-only clients.
+
+Public shares are separate resources on memory subtrees. Registered users who have internal access to the root memory receive a `redirectUrl` to the normal internal memory route when opening a share link. External visitors use share-scoped HttpOnly cookies on `/api/public-shares`; uploader-only shares stay limited to the focused upload flow.
+
+The baseline migration creates the memory table, the direct `memory_id` assignment on media, tenant-scoped blob storage, memory GPX tracks and memory playlists. Album tables are removed from the schema; non-production legacy data is not migrated further.
 
 ## Testing
 
-Backend-Tests laufen mit Quarkus-Test, H2 im MySQL-Modus und Flyway Clean/Migrate pro Testlauf.
+Backend tests run with Quarkus Test, H2 in MySQL mode and Flyway clean/migrate per test run.
 
-Abgedeckt sind:
+Covered are:
 
-- Passwort-Hashing und Argon2id-Parameter
-- Cookie-Erzeugung
-- Token-Rotation, Revocation und Cleanup
-- Auth-Endpunkte
-- Setup-Flow
-- Server-Owner Tenant-Erstellung
-- Tenant-Membership-Filter
-- Gruppen-Scoping und Gruppen-Owner
-- Scope-basierte Memory-/Media-Sichtbarkeit und `publicId`
-- Memory-Tree-Invarianten, Scope-Sichtbarkeit, Memory-Media-Ownership und Cover-Regeln
-- Public-Share-Rollen, Share-Cookies, Upload-Flows, Memory-Track-Verhalten und Memory-Playlist-Verhalten
-- OpenAPI-Contract-Tests für API-first Bindung
-- Frontend-Codegen-Facades, NDJSON-Parsing, Upload-Composables und UI-Komponenten über Vitest
+- password hashing and Argon2id parameters
+- cookie creation
+- token rotation, revocation and cleanup
+- auth endpoints
+- the setup flow
+- server-owner tenant creation
+- the tenant membership filter
+- group scoping and group owner
+- scope-based memory/media visibility and `publicId`
+- memory tree invariants, scope visibility, memory media ownership and cover rules
+- public share roles, share cookies, upload flows, memory track behavior and memory playlist behavior
+- OpenAPI contract tests for API-first binding
+- frontend codegen facades, NDJSON parsing, upload composables and UI components via Vitest
