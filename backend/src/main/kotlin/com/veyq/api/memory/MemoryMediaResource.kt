@@ -14,7 +14,7 @@ import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.*
+import java.time.OffsetDateTime
 
 @ApplicationScoped
 class MemoryMediaResource @Inject constructor(
@@ -30,7 +30,7 @@ class MemoryMediaResource @Inject constructor(
         tenantName: String,
         memoryId: String,
         includeChildren: Boolean?,
-        afterUpdatedAt: Date?,
+        afterUpdatedAt: OffsetDateTime?,
         afterMediaId: String?,
         knownMediaSetHash: String?,
         timeoutSeconds: Int?,

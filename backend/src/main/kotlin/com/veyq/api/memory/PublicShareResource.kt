@@ -24,6 +24,7 @@ import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.OffsetDateTime
 
 @ApplicationScoped
 class PublicShareResource @Inject constructor(
@@ -96,7 +97,7 @@ class PublicShareResource @Inject constructor(
         shareId: String,
         memoryId: String,
         includeChildren: Boolean?,
-        afterUpdatedAt: java.util.Date?,
+        afterUpdatedAt: OffsetDateTime?,
         afterMediaId: String?,
         knownMediaSetHash: String?,
         timeoutSeconds: Int?,

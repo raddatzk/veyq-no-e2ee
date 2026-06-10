@@ -67,10 +67,11 @@ class MemoryMediaResourceTest {
             .then()
             .statusCode(200)
 
-        val firstUpdatedAt = Instant.parse("2026-06-01T10:00:00Z")
+        val firstUpdatedAt = Instant.parse("2026-06-01T10:00:00.123456Z")
+        val secondUpdatedAt = Instant.parse("2026-06-01T10:00:00.123900Z")
         inTransaction {
             mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt, first.publicId)
-            mediaRepo.update("updatedAt = ?1 where publicId = ?2", firstUpdatedAt.plusSeconds(12), second.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", secondUpdatedAt, second.publicId)
         }
 
         given()

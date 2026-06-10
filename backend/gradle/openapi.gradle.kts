@@ -33,6 +33,7 @@ val openApiGeneratorOptions = mapOf(
     "hideGenerationTimestamp" to "true",
     "useTags" to "true",
     "useBeanValidation" to "true",
+    "dateLibrary" to "java8",
 )
 
 val openApiApiOnlyGlobalProperties = mapOf(
