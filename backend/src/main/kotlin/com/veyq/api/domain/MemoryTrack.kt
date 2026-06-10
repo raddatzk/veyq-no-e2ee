@@ -58,7 +58,7 @@ class MemoryTrack : PanacheEntityBase {
     @Column(name = "activity_type", nullable = false, length = 64)
     lateinit var activityType: MemoryTrackActivityType
 
-    @Column(name = "original_filename", nullable = false)
+    @Column(name = "original_filename", nullable = false, length = 255)
     lateinit var originalFilename: String
 
     @Column(name = "storage_key", nullable = false, length = 512)

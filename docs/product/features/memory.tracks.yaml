@@ -30,7 +30,7 @@ acceptanceCriteria:
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
   - id: memory.tracks.panel-upload
-    statement: Track panel uploads a selected GPX file with inferred title/default activity type.
+    statement: Track panel uploads a selected GPX file with inferred title/default activity type and bounds preserved filenames to the storage limit.
     coverage:
       backend:
         integration:

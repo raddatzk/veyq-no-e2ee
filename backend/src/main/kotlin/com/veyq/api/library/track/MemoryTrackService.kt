@@ -138,7 +138,7 @@ class MemoryTrackService(
     ): MemoryTrack {
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty", "MEMORY_TRACK_UPLOAD_EMPTY")
-        val filename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "track.gpx"
+        val filename = normalizedTrackFilename(originalFilename)
         if (!filename.endsWith(".gpx", ignoreCase = true)) {
             throw BadRequestException("Only GPX tracks are supported", "MEMORY_TRACK_UPLOAD_TYPE_UNSUPPORTED")
         }
@@ -239,6 +239,26 @@ class MemoryTrackService(
         mediaStorageService.writeAtomic(source, storageKey, "track-")
     }
 
+    private fun normalizedTrackFilename(originalFilename: String?): String {
+        val filename = originalFilename
+            ?.trim()
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('\\')
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_TRACK_FILENAME
+        return truncateFilename(filename, MAX_ORIGINAL_FILENAME_LENGTH)
+    }
+
+    private fun truncateFilename(filename: String, maxLength: Int): String {
+        if (filename.length <= maxLength) return filename
+        val extension = filename.substringAfterLast('.', missingDelimiterValue = "")
+            .takeIf { it.isNotBlank() }
+            ?.let { ".$it" }
+            ?: ""
+        if (extension.isBlank() || extension.length >= maxLength) return filename.take(maxLength)
+        return filename.substringBeforeLast('.').take(maxLength - extension.length) + extension
+    }
+
     private fun storagePath(storageKey: String): Path {
         return mediaStorageService.path(
             storageKey,
@@ -319,6 +339,9 @@ class MemoryTrackService(
         if (name.substringAfterLast('/').contains('.')) name else "$name.gpx"
 
     companion object {
+        private const val DEFAULT_TRACK_FILENAME = "track.gpx"
+        private const val MAX_ORIGINAL_FILENAME_LENGTH = 255
+
         private val ARCHIVE_TIMESTAMP_FORMAT = java.time.format.DateTimeFormatter
             .ofPattern("yyyy-MM-dd HH-mm-ss")
             .withZone(ZoneOffset.UTC)

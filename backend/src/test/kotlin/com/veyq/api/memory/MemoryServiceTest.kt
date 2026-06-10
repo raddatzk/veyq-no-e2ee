@@ -1402,6 +1402,20 @@ class MemoryServiceTest {
             val content = memoryTrackService.memoryTrackContent(memory.id, uploaded.id)
             assertThat(content.getHeaderString("Content-Disposition"))
                 .isEqualTo("inline; filename=\"ridge-day-2.gpx\"")
+
+            val longFilename = "a".repeat(260) + ".gpx"
+            val uploadedLongFilename = memoryTrackService.uploadMemoryTrack(
+                memory.id,
+                gpx,
+                longFilename,
+                title = "Long Ridge",
+                activityType = com.veyq.api.generated.model.MemoryTrackActivityType.HIKING,
+            )
+
+            assertThat(uploadedLongFilename.originalFilename)
+                .isEqualTo("a".repeat(251) + ".gpx")
+            assertThat(uploadedLongFilename.originalFilename).hasSize(255)
+            assertThat(uploadedLongFilename.title).isEqualTo("Long Ridge")
         } finally {
             Files.deleteIfExists(gpx)
         }
