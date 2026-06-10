@@ -120,14 +120,16 @@ class MediaService @Inject constructor(
         timeoutSeconds: Long,
     ): MemoryMediaUpdates {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
+        var pendingMediaSetHash = knownMediaSetHash
         while (true) {
             val updates = self.get().listMemoryMediaUpdates(
                 memoryId,
                 includeChildren,
                 afterUpdatedAt,
                 afterMediaId,
-                knownMediaSetHash,
+                pendingMediaSetHash,
             )
+            pendingMediaSetHash = null
             if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
             TimeUnit.MILLISECONDS.sleep(750)
         }

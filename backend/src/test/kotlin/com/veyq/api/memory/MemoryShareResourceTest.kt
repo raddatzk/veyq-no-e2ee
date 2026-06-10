@@ -3,6 +3,7 @@ package com.veyq.api.memory
 import com.veyq.api.auth.PasswordService
 import com.veyq.api.domain.*
 import com.veyq.api.library.media.MediaConfig
+import com.veyq.api.library.media.MediaService
 import com.veyq.api.security.RateLimitService
 import com.veyq.api.setup.ServerState
 import io.quarkus.test.junit.QuarkusTest
@@ -36,6 +37,7 @@ class MemoryShareResourceTest {
     @Inject lateinit var shareRepo: MemoryShareRepo
     @Inject lateinit var passwordService: PasswordService
     @Inject lateinit var mediaConfig: MediaConfig
+    @Inject lateinit var mediaService: MediaService
     @Inject lateinit var rateLimitService: RateLimitService
     @Inject lateinit var serverState: ServerState
     @Inject lateinit var transaction: UserTransaction
@@ -1070,6 +1072,26 @@ class MemoryShareResourceTest {
             .`when`().post("/api/public-shares/$shareId/memories/${memory.publicId}/children")
             .then()
             .statusCode(401)
+    }
+
+    @Test
+    fun `public share media updates return current ids when media is deleted`() {
+        val first = createMedia("Public Live First", createdAt = Instant.parse("2026-05-01T10:00:00Z"))
+        val second = createMedia("Public Live Second", createdAt = Instant.parse("2026-05-01T10:01:00Z"))
+        val knownHash = mediaService.mediaSetHash(listOf(first.publicId, second.publicId))
+        inTransaction {
+            mediaRepo.delete("publicId", second.publicId)
+        }
+        val shareId = createShare("VIEWER", password = null)
+
+        given()
+            .queryParam("knownMediaSetHash", knownHash)
+            .queryParam("timeoutSeconds", 1)
+            .`when`().get("/api/public-shares/$shareId/memories/${memory.publicId}/media/updates")
+            .then()
+            .statusCode(200)
+            .body("media", hasSize<Any>(0))
+            .body("currentMediaIds", equalTo(listOf(first.publicId)))
     }
 
     @Test

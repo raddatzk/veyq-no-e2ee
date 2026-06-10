@@ -874,7 +874,7 @@ paths:
         - The current user must be a member of the addressed tenant.
         - The current user can see the addressed Memory.
       description: |-
-        Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server's current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries.
+        Long-polls for media updated after the supplied `updatedAt` plus media id cursor. The response contains changed media ordered by update time and id. Clients merge the returned media locally and may refresh aggregate header or bucket state separately. When `knownMediaSetHash` is supplied and does not match the server's current sorted visible media id set, the response also includes `currentMediaIds` so clients can remove deleted media without refetching all media summaries. The server evaluates the media-set hash at most once per long-poll request; later deletions are reported on the next poll.
 
         Vorbedingungen:
         - A valid access token cookie must be present.

@@ -373,6 +373,7 @@ class MemoryShareService @Inject constructor(
         timeoutSeconds: Long,
     ): PublicShareMediaUpdates {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
+        var pendingMediaSetHash = knownMediaSetHash
         while (true) {
             val updates = self.get().listPublicShareMemoryMediaUpdates(
                 shareId,
@@ -380,8 +381,9 @@ class MemoryShareService @Inject constructor(
                 includeChildren,
                 afterUpdatedAt,
                 afterMediaId,
-                knownMediaSetHash,
+                pendingMediaSetHash,
             )
+            pendingMediaSetHash = null
             if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
             TimeUnit.MILLISECONDS.sleep(750)
         }
@@ -404,7 +406,7 @@ class MemoryShareService @Inject constructor(
             .map { mediaService.publicShareSummary(it, access.share.publicId) }
         return PublicShareMediaUpdates(
             media = media,
-            currentMediaIds = publicShareCurrentMediaIdsIfChanged(access, memories, knownMediaSetHash),
+            currentMediaIds = publicShareCurrentMediaIdsIfChanged(memories, knownMediaSetHash),
         )
     }
 
@@ -945,14 +947,11 @@ class MemoryShareService @Inject constructor(
     }
 
     private fun publicShareCurrentMediaIdsIfChanged(
-        access: ShareAccess,
         memories: List<Memory>,
         knownMediaSetHash: String?,
     ): List<String>? {
         if (knownMediaSetHash.isNullOrBlank()) return null
-        val currentMediaIds = mediaRepo.listByMemoriesOrdered(memories)
-            .filter { isPublicMediaVisible(access, it) }
-            .map { it.publicId }
+        val currentMediaIds = mediaRepo.listPublicIdsByMemories(memories)
             .distinct()
             .sorted()
         return if (mediaService.mediaSetHash(currentMediaIds) == knownMediaSetHash) null else currentMediaIds

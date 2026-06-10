@@ -383,6 +383,9 @@ acceptanceCriteria:
           - testName: media updates endpoint accepts openapi date-time cursor
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryMediaResourceTest.kt
+          - testName: public share media updates return current ids when media is deleted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
       frontend:
         unit:
           - testName: shows newly uploaded media immediately and updates only its bucket count
