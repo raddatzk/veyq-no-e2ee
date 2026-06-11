@@ -1,6 +1,8 @@
 package com.veyq.api.security
 
 import com.veyq.api.auth.filterchain.RequestContext
+import com.veyq.api.domain.Tenant
+import com.veyq.api.domain.User
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -45,12 +47,31 @@ class ConcurrencyLimitServiceTest {
         }
     }
 
+    @Test
+    fun `bounds authenticated memory long polls per user`() {
+        val requestContext = RequestContext().apply {
+            tenant = Tenant().apply { id = 1 }
+            user = User().apply { id = 7 }
+        }
+        val service = ConcurrencyLimitService(
+            requestContext,
+            securityConfig(perIp = 64, total = 64, perUser = 2, memoryTotal = 64),
+        )
+
+        withConcurrentHolders(service, holders = 2, holdSlot = { service.withMemoryLongPoll(it) }) {
+            assertThatThrownBy {
+                service.withMemoryLongPoll { "should not run" }
+            }.isInstanceOf(RateLimitExceededException::class.java)
+        }
+    }
+
     /**
      * Holds [holders] concurrent long-poll slots open while [whileHeld] runs, then releases them.
      */
     private fun withConcurrentHolders(
         service: ConcurrencyLimitService,
         holders: Int,
+        holdSlot: (() -> Unit) -> Unit = { service.withPublicShareLongPoll(it) },
         whileHeld: () -> Unit,
     ) {
         val started = CountDownLatch(holders)
@@ -58,7 +79,7 @@ class ConcurrencyLimitServiceTest {
         val running = AtomicInteger(0)
         val threads = (1..holders).map {
             Thread {
-                service.withPublicShareLongPoll {
+                holdSlot {
                     running.incrementAndGet()
                     started.countDown()
                     release.await()
@@ -75,12 +96,21 @@ class ConcurrencyLimitServiceTest {
         }
     }
 
-    private fun securityConfig(perIp: Int, total: Int): SecurityConfig =
+    private fun securityConfig(
+        perIp: Int,
+        total: Int,
+        perUser: Int = perIp,
+        memoryTotal: Int = total,
+    ): SecurityConfig =
         object : SecurityConfig {
             override val trustForwardedFor = false
             override val publicShareUpdates = object : SecurityConfig.PublicShareUpdates {
                 override val maxConcurrentPerIp = perIp
                 override val maxConcurrentTotal = total
+            }
+            override val memoryUpdates = object : SecurityConfig.MemoryUpdates {
+                override val maxConcurrentPerUser = perUser
+                override val maxConcurrentTotal = memoryTotal
             }
         }
 }

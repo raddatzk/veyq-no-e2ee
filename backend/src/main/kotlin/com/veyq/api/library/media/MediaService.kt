@@ -13,6 +13,7 @@ import com.veyq.api.library.LibraryService
 import com.veyq.api.library.track.MemoryTrackService
 import com.veyq.api.memory.MemoryJournalService
 import com.veyq.api.memory.MemoryJournalService.JournalReferenceKind
+import com.veyq.api.security.ConcurrencyLimitService
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
@@ -54,6 +55,7 @@ class MediaService @Inject constructor(
     private val mediaResponseMapper: MediaResponseMapper,
     private val trackService: MemoryTrackService,
     private val memoryJournalService: MemoryJournalService,
+    private val concurrencyLimitService: ConcurrencyLimitService,
     folderRepo: TenantFolderRepo,
     groupRepo: TenantGroupRepo,
     private val mediaGroupMemberRepo: TenantGroupMemberRepo,
@@ -118,32 +120,26 @@ class MediaService @Inject constructor(
         afterMediaId: String?,
         knownMediaSetHash: String?,
         timeoutSeconds: Long,
-    ): MemoryMediaUpdates {
+    ): MemoryMediaUpdates = concurrencyLimitService.withMemoryLongPoll {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
-        // Evaluate the (unbounded) media-set hash only once per request. Deletion detection is a
-        // snapshot reconciliation, so re-running the full-set scan on every 750ms poll iteration is
-        // unnecessary and would let a single long-poll request trigger dozens of full-set scans.
-        // Additions are still detected on every iteration via the LIVE_MEDIA_LIMIT-capped query.
-        val firstPass = self.get().listMemoryMediaUpdates(
+        // Evaluate the (unbounded) media-set hash only once per request: the first poll uses the
+        // supplied hash, subsequent polls pass null. Deletion detection is a snapshot reconciliation,
+        // so re-running the full-set scan on every 750ms iteration is unnecessary and would let a
+        // single long-poll request trigger dozens of full-set scans. Additions are still detected on
+        // every iteration via the LIVE_MEDIA_LIMIT-capped query.
+        fun poll(mediaSetHash: String?) = self.get().listMemoryMediaUpdates(
             memoryId,
             includeChildren,
             afterUpdatedAt,
             afterMediaId,
-            knownMediaSetHash,
+            mediaSetHash,
         )
-        if (firstPass.media.isNotEmpty() || firstPass.currentMediaIds != null) return firstPass
-        while (System.nanoTime() < deadline) {
+        var updates = poll(knownMediaSetHash)
+        while (updates.media.isEmpty() && updates.currentMediaIds == null && System.nanoTime() < deadline) {
             TimeUnit.MILLISECONDS.sleep(750)
-            val updates = self.get().listMemoryMediaUpdates(
-                memoryId,
-                includeChildren,
-                afterUpdatedAt,
-                afterMediaId,
-                null,
-            )
-            if (updates.media.isNotEmpty()) return updates
+            updates = poll(null)
         }
-        return firstPass
+        updates
     }
 
     @Transactional

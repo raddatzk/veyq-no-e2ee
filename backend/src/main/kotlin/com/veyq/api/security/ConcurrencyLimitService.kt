@@ -39,6 +39,17 @@ class ConcurrencyLimitService @Inject constructor(
         }
     }
 
+    fun <T> withMemoryLongPoll(block: () -> T): T {
+        val limits = securityConfig.memoryUpdates
+        val key = "memory-updates:${authenticatedKey()}"
+        acquire(key, limits.maxConcurrentPerUser, limits.maxConcurrentTotal)
+        try {
+            return block()
+        } finally {
+            release(key)
+        }
+    }
+
     fun clearAll() {
         perKeyCounters.clear()
         totalCounter.set(0)
@@ -85,6 +96,15 @@ class ConcurrencyLimitService @Inject constructor(
 
     private fun clientKey(): String =
         requestContext.clientIp.trim().lowercase().ifBlank { "unknown" }
+
+    // Authenticated long polls are bounded per user rather than per IP: a single account behind a
+    // NAT should still get its own budget, and the user id is a more meaningful, attributable key
+    // than the source address. Falls back to the client address if the request is not authenticated.
+    private fun authenticatedKey(): String {
+        val user = requestContext.user
+        val tenant = requestContext.tenant
+        return if (user != null && tenant != null) "user:${tenant.id}:${user.id}" else clientKey()
+    }
 
     private companion object {
         const val CONCURRENCY_RETRY_AFTER_SECONDS = 1L

@@ -960,12 +960,20 @@ class MemoryShareService @Inject constructor(
         knownMediaSetHash: String?,
     ): List<String>? {
         if (knownMediaSetHash.isNullOrBlank()) return null
-        val currentMediaIds = mediaRepo.listByMemoriesOrdered(memories)
-            .filter { isPublicMediaVisible(access, it) }
+        // The memories are already constrained to the shared subtree, so every row is a
+        // descendant-or-self of the share root; only the share-identity scoping still has to be
+        // applied. Projecting just (publicId, shareIdentityId) avoids hydrating full Media entities.
+        val currentMediaIds = mediaRepo.listPublicIdVisibilityByMemories(memories)
+            .filter { isPublicRowVisible(access, it) }
             .map { it.publicId }
             .distinct()
             .sorted()
         return if (mediaService.mediaSetHash(currentMediaIds) == knownMediaSetHash) null else currentMediaIds
+    }
+
+    private fun isPublicRowVisible(access: ShareAccess, row: PublicMediaVisibilityRow): Boolean {
+        if (access.canViewGallery) return true
+        return access.shareIdentity != null && row.shareIdentityId == access.shareIdentity.id
     }
 
     private fun requireMediaManageAccess(access: ShareAccess, media: Media) {
