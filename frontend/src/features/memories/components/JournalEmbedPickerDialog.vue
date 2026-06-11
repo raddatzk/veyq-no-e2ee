@@ -24,6 +24,7 @@ const props = defineProps<{
   selectedIds: string[]
   items: JournalEmbedPickerItem[]
   multiple?: boolean
+  maxSelectable?: number
   canDelete?: boolean
 }>()
 
@@ -43,6 +44,17 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value)
 })
+
+const selectionFull = computed(
+  () =>
+    props.multiple === true &&
+    props.maxSelectable !== undefined &&
+    props.selectedIds.length >= props.maxSelectable
+)
+
+function isItemDisabled(itemId: string): boolean {
+  return selectionFull.value && !props.selectedIds.includes(itemId)
+}
 </script>
 
 <template>
@@ -64,6 +76,9 @@ const dialogVisible = computed({
           @input="$emit('labelInput')"
         />
       </label>
+      <p v-if="selectionFull" class="memory-journal-embed-picker-limit">
+        {{ t('memory.journalTrackSelectionLimit', { count: maxSelectable }) }}
+      </p>
       <div v-if="items.length" class="memory-journal-embed-picker-list">
         <button
           v-for="item in items"
@@ -71,6 +86,7 @@ const dialogVisible = computed({
           type="button"
           class="memory-journal-embed-option"
           :class="{ 'memory-journal-embed-option-selected': selectedIds.includes(item.id) }"
+          :disabled="isItemDisabled(item.id)"
           @click="$emit('select', item.id)"
         >
           <span class="memory-journal-embed-option-icon">
