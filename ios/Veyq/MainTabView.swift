@@ -521,7 +521,7 @@ private struct RecentMemoriesView: View {
 
 private struct RecentMemoryRow: View {
     @EnvironmentObject private var store: VeyqStore
-    let target: ShareImportMemoryTarget
+    let target: MemoryTarget
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -587,7 +587,7 @@ private struct RecentMemoryRow: View {
     }
 }
 
-private extension ShareImportMemoryTarget {
+private extension MemoryTarget {
     var memoryValue: Memory {
         Memory(
             id: id,

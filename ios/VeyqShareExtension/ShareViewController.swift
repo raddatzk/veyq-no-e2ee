@@ -354,8 +354,9 @@ final class ShareViewController: UIViewController {
     }
 
     private func addRecentTargets(tenantName: String) {
-        let targets = (loadShareImportTargets()?.targets ?? [])
-            .filter { $0.tenantName == tenantName }
+        guard let activeInstanceURL = activeAccount?.instanceURL.absoluteString else { return }
+        let targets = (loadMemoryTargets()?.targets ?? [])
+            .filter { $0.tenantName == tenantName && $0.instanceURL == activeInstanceURL }
             .prefix(8)
         guard !targets.isEmpty else { return }
 
@@ -675,13 +676,36 @@ final class ShareViewController: UIViewController {
         return batch
     }
 
-    private func loadShareImportTargets() -> ShareImportTargetSnapshot? {
-        let url = sharedContainerURL()?.appendingPathComponent("share-import-targets.json")
+    private func loadMemoryTargets() -> MemoryTargetSnapshot? {
+        migrateLegacyMemoryTargetCacheIfNeeded()
+        let url = sharedContainerURL()?.appendingPathComponent("memory-targets.json")
         guard let url, let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ShareImportTargetSnapshot.self, from: data)
+        return try? JSONDecoder().decode(MemoryTargetSnapshot.self, from: data)
     }
 
-    private func persistSelectedTarget(_ target: ShareImportMemoryTarget) throws -> SharePendingImportBatch {
+    // Mirror UploadQueuePersistence.migrateLegacyMemoryTargetCacheIfNeeded so the
+    // share extension still finds cached targets/covers when it runs after an app
+    // update before the containing app has had a chance to migrate.
+    private func migrateLegacyMemoryTargetCacheIfNeeded() {
+        guard let container = sharedContainerURL() else { return }
+        let fileManager = FileManager.default
+
+        let legacySnapshot = container.appendingPathComponent("share-import-targets.json")
+        let currentSnapshot = container.appendingPathComponent("memory-targets.json")
+        if fileManager.fileExists(atPath: legacySnapshot.path),
+           !fileManager.fileExists(atPath: currentSnapshot.path) {
+            try? fileManager.moveItem(at: legacySnapshot, to: currentSnapshot)
+        }
+
+        let legacyCovers = container.appendingPathComponent("ShareImportCovers", isDirectory: true)
+        let currentCovers = container.appendingPathComponent("MemoryTargetCovers", isDirectory: true)
+        if fileManager.fileExists(atPath: legacyCovers.path),
+           !fileManager.fileExists(atPath: currentCovers.path) {
+            try? fileManager.moveItem(at: legacyCovers, to: currentCovers)
+        }
+    }
+
+    private func persistSelectedTarget(_ target: MemoryTarget) throws -> SharePendingImportBatch {
         guard let stagedBatch else { throw ShareImportError.missingBatch }
         guard let activeAccount else { throw ShareImportError.missingAccount }
         let uploadTarget = ShareUploadTargetMemory(
@@ -706,16 +730,16 @@ final class ShareViewController: UIViewController {
     }
 
     private func persistLastUsedTarget(_ targetId: String) {
-        guard let snapshot = loadShareImportTargets(),
+        guard let snapshot = loadMemoryTargets(),
               let data = try? JSONEncoder().encode(
-                ShareImportTargetSnapshot(
+                MemoryTargetSnapshot(
                     targets: snapshot.targets,
                     lastUsedMemoryId: targetId,
                     updatedAt: Date(),
                     includesOnlyKnownChapters: snapshot.includesOnlyKnownChapters
                 )
               ),
-              let url = sharedContainerURL()?.appendingPathComponent("share-import-targets.json")
+              let url = sharedContainerURL()?.appendingPathComponent("memory-targets.json")
         else {
             return
         }
@@ -1110,10 +1134,10 @@ final class ShareViewController: UIViewController {
         targetStack.addArrangedSubview(row)
     }
 
-    private func addMemoryTarget(_ target: ShareImportMemoryTarget) {
+    private func addMemoryTarget(_ target: MemoryTarget) {
         let card = MemoryTargetCardControl(
             target: target,
-            isSelected: loadShareImportTargets()?.lastUsedMemoryId == target.id,
+            isSelected: isLastUsedTarget(target),
             placeholder: Self.placeholderCoverImage()
         )
         loadCachedCover(for: target, into: card)
@@ -1123,8 +1147,22 @@ final class ShareViewController: UIViewController {
         targetStack.addArrangedSubview(card)
     }
 
+    private func isLastUsedTarget(_ target: MemoryTarget) -> Bool {
+        guard let activeInstanceURL = activeAccount?.instanceURL.absoluteString,
+              let snapshot = loadMemoryTargets(),
+              snapshot.lastUsedMemoryId == target.id
+        else {
+            return false
+        }
+        return snapshot.targets.contains { cached in
+            cached.id == target.id
+                && cached.tenantName == target.tenantName
+                && cached.instanceURL == activeInstanceURL
+        }
+    }
+
     private func showMemoryTargets(
-        _ targets: [ShareImportMemoryTarget],
+        _ targets: [MemoryTarget],
         selectedId: String?,
         includesOnlyKnownChapters: Bool
     ) {
@@ -1157,7 +1195,7 @@ final class ShareViewController: UIViewController {
         targetStack.addArrangedSubview(headerStack)
         targetStack.setCustomSpacing(16, after: headerStack)
 
-        let orderedTargets: [ShareImportMemoryTarget]
+        let orderedTargets: [MemoryTarget]
         if let selectedId, let selectedTarget = targets.first(where: { $0.id == selectedId }) {
             orderedTargets = [selectedTarget] + targets.filter { $0.id != selectedId }
         } else {
@@ -1178,9 +1216,9 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    private func loadCachedCover(for target: ShareImportMemoryTarget, into card: MemoryTargetCardControl) {
+    private func loadCachedCover(for target: MemoryTarget, into card: MemoryTargetCardControl) {
         guard let filename = target.coverThumbnailFilename,
-              let url = shareImportCoverURL(filename: filename),
+              let url = memoryTargetCoverURL(filename: filename),
               let image = UIImage(contentsOfFile: url.path)
         else {
             return
@@ -1189,15 +1227,15 @@ final class ShareViewController: UIViewController {
         card.setCoverImage(thumbnail)
     }
 
-    private func shareImportCoverURL(filename: String) -> URL? {
+    private func memoryTargetCoverURL(filename: String) -> URL? {
         sharedContainerURL()?
-            .appendingPathComponent("ShareImportCovers", isDirectory: true)
+            .appendingPathComponent("MemoryTargetCovers", isDirectory: true)
             .appendingPathComponent((filename as NSString).lastPathComponent)
     }
 
-    private func cachedCoverImage(for target: ShareImportMemoryTarget, size: CGSize) -> UIImage {
+    private func cachedCoverImage(for target: MemoryTarget, size: CGSize) -> UIImage {
         guard let filename = target.coverThumbnailFilename,
-              let url = shareImportCoverURL(filename: filename),
+              let url = memoryTargetCoverURL(filename: filename),
               let image = UIImage(contentsOfFile: url.path)
         else {
             return Self.placeholderCoverImage()
@@ -1248,7 +1286,7 @@ final class ShareViewController: UIViewController {
         UIColor(red: 0.20, green: 0.39, blue: 0.82, alpha: 1)
     }
 
-    private func confirmTarget(_ target: ShareImportMemoryTarget, sourceView: UIView?) {
+    private func confirmTarget(_ target: MemoryTarget, sourceView: UIView?) {
         let alert = UIAlertController(
             title: target.title,
             message: Self.localizedFormat("Import shared files into %@?", target.title),
@@ -1265,12 +1303,12 @@ final class ShareViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    private func showMemoryPreview(_ target: ShareImportMemoryTarget) {
+    private func showMemoryPreview(_ target: MemoryTarget) {
         renderMemoryPreview(target: target, header: nil, media: [], isLoading: true, errorMessage: nil)
         Task { await loadMemoryPreview(target) }
     }
 
-    private func loadMemoryPreview(_ target: ShareImportMemoryTarget) async {
+    private func loadMemoryPreview(_ target: MemoryTarget) async {
         guard let apiClient else {
             renderMemoryPreview(target: target, header: nil, media: [], isLoading: false, errorMessage: Self.localized("No native session is stored."))
             return
@@ -1291,7 +1329,7 @@ final class ShareViewController: UIViewController {
     }
 
     private func renderMemoryPreview(
-        target: ShareImportMemoryTarget,
+        target: MemoryTarget,
         header: ShareMemoryHeader?,
         media: [ShareMemoryMedia],
         isLoading: Bool,
@@ -1325,7 +1363,7 @@ final class ShareViewController: UIViewController {
         showConfirmBar(for: target)
     }
 
-    private func previewSubtitle(target: ShareImportMemoryTarget, header: ShareMemoryHeader?) -> String {
+    private func previewSubtitle(target: MemoryTarget, header: ShareMemoryHeader?) -> String {
         let dateRange: String
         if let header {
             dateRange = header.startDate == header.endDate ? header.startDate : "\(header.startDate) - \(header.endDate)"
@@ -1362,7 +1400,7 @@ final class ShareViewController: UIViewController {
         targetStack.setCustomSpacing(2, after: row)
     }
 
-    private func addPreviewMemoryHeader(target: ShareImportMemoryTarget, header: ShareMemoryHeader?, mediaCountFallback: Int) {
+    private func addPreviewMemoryHeader(target: MemoryTarget, header: ShareMemoryHeader?, mediaCountFallback: Int) {
         let container = UIStackView()
         container.axis = .vertical
         container.alignment = .leading
@@ -1574,7 +1612,7 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    private func showConfirmBar(for target: ShareImportMemoryTarget) {
+    private func showConfirmBar(for target: MemoryTarget) {
         spaceBarScrollView.alwaysBounceHorizontal = false
         spaceBarStack.arrangedSubviews.forEach { view in
             spaceBarStack.removeArrangedSubview(view)
@@ -1614,7 +1652,7 @@ final class ShareViewController: UIViewController {
         spaceBarHeightConstraint?.constant = 84
     }
 
-    private func chooseTarget(_ target: ShareImportMemoryTarget) {
+    private func chooseTarget(_ target: MemoryTarget) {
         do {
             let batch = try persistSelectedTarget(target)
             showStatus(Self.localizedFormat("Preparing import for %@...", target.title))
@@ -2077,7 +2115,7 @@ private final class RecentTargetPillControl: UIControl {
         }
     }
 
-    init(target: ShareImportMemoryTarget, coverImage: UIImage) {
+    init(target: MemoryTarget, coverImage: UIImage) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .secondarySystemBackground
@@ -2230,7 +2268,7 @@ private final class MemoryTargetCardControl: UIControl {
         }
     }
 
-    init(target: ShareImportMemoryTarget, isSelected: Bool, placeholder: UIImage) {
+    init(target: MemoryTarget, isSelected: Bool, placeholder: UIImage) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .secondarySystemBackground
@@ -2494,11 +2532,12 @@ private struct ShareUploadTargetMemory: Codable {
     let userId: Int
 }
 
-private struct ShareImportMemoryTarget: Codable {
+private struct MemoryTarget: Codable {
     let id: String
     let title: String
     let dateRange: String
     let tenantName: String
+    let instanceURL: String?
     let coverUrl: String?
     let coverCrop: ShareCoverCrop?
     let coverThumbnailFilename: String?
@@ -2508,8 +2547,8 @@ private struct ShareImportMemoryTarget: Codable {
     let childCount: Int?
 }
 
-private struct ShareImportTargetSnapshot: Codable {
-    let targets: [ShareImportMemoryTarget]
+private struct MemoryTargetSnapshot: Codable {
+    let targets: [MemoryTarget]
     let lastUsedMemoryId: String?
     let updatedAt: Date
     let includesOnlyKnownChapters: Bool?
@@ -2799,12 +2838,13 @@ private struct ShareMemory: Codable, Identifiable, Hashable {
         return "/" + segments.dropLast().joined(separator: "/")
     }
 
-    func target(tenantName: String, parentMemoryTitle: String? = nil, depth: Int = 0) -> ShareImportMemoryTarget {
-        ShareImportMemoryTarget(
+    func target(tenantName: String, parentMemoryTitle: String? = nil, depth: Int = 0) -> MemoryTarget {
+        MemoryTarget(
             id: id,
             title: displayName,
             dateRange: dateRange,
             tenantName: tenantName,
+            instanceURL: nil,
             coverUrl: coverUrl,
             coverCrop: coverCrop,
             coverThumbnailFilename: nil,
@@ -2968,9 +3008,10 @@ private struct ShareExtensionAPIClient {
     }
 
     private func mediaData(from urlString: String) async throws -> Data {
-        var request = URLRequest(url: try mediaURL(from: urlString))
+        let url = try mediaURL(from: urlString)
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        return try await sendData(request)
+        return try await sendData(request, authenticated: shouldAuthenticateRequest(to: url))
     }
 
     private func get<T: Decodable>(path: String, query: [String: String] = [:]) async throws -> T {
@@ -3008,6 +3049,16 @@ private struct ShareExtensionAPIClient {
             throw ShareExtensionError.serverStatus(http.statusCode)
         }
         return data
+    }
+
+    private func shouldAuthenticateRequest(to url: URL) -> Bool {
+        isSameOrigin(url, session.instanceURL) || isSameOrigin(url, session.apiBaseURL)
+    }
+
+    private func isSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.scheme?.lowercased() == rhs.scheme?.lowercased()
+            && lhs.host?.lowercased() == rhs.host?.lowercased()
+            && lhs.effectivePort == rhs.effectivePort
     }
 
     private func mediaURL(from urlString: String) throws -> URL {
@@ -3052,6 +3103,13 @@ private enum ShareExtensionError: LocalizedError {
 }
 
 private extension URL {
+    var effectivePort: Int? {
+        if let port { return port }
+        if scheme?.lowercased() == "https" { return 443 }
+        if scheme?.lowercased() == "http" { return 80 }
+        return nil
+    }
+
     func appendingVeyqShareEncodedPath(_ path: String, query: [String: String] = [:]) -> URL {
         var url = self
         path.split(separator: "/").forEach { segment in

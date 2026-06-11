@@ -249,11 +249,12 @@ enum PendingImportPresentationPlanner {
     }
 }
 
-struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
+struct MemoryTarget: Identifiable, Codable, Equatable {
     let id: String
     let title: String
     let dateRange: String
     let tenantName: String
+    let instanceURL: String?
     let coverUrl: String?
     let coverCrop: CoverCrop?
     let coverThumbnailFilename: String?
@@ -267,6 +268,7 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         title: String,
         dateRange: String,
         tenantName: String,
+        instanceURL: String? = nil,
         coverUrl: String?,
         coverCrop: CoverCrop? = nil,
         coverThumbnailFilename: String?,
@@ -279,6 +281,7 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         self.title = title
         self.dateRange = dateRange
         self.tenantName = tenantName
+        self.instanceURL = instanceURL
         self.coverUrl = coverUrl
         self.coverCrop = coverCrop
         self.coverThumbnailFilename = coverThumbnailFilename
@@ -287,16 +290,33 @@ struct ShareImportMemoryTarget: Identifiable, Codable, Equatable {
         self.mediaCount = mediaCount
         self.childCount = childCount
     }
+
+    func scoped(toInstanceURL instanceURL: String) -> MemoryTarget {
+        MemoryTarget(
+            id: id,
+            title: title,
+            dateRange: dateRange,
+            tenantName: tenantName,
+            instanceURL: instanceURL,
+            coverUrl: coverUrl,
+            coverCrop: coverCrop,
+            coverThumbnailFilename: coverThumbnailFilename,
+            parentMemoryTitle: parentMemoryTitle,
+            depth: depth ?? 0,
+            mediaCount: mediaCount,
+            childCount: childCount
+        )
+    }
 }
 
-struct ShareImportTargetSnapshot: Codable, Equatable {
-    let targets: [ShareImportMemoryTarget]
+struct MemoryTargetSnapshot: Codable, Equatable {
+    let targets: [MemoryTarget]
     let lastUsedMemoryId: String?
     let updatedAt: Date
     let includesOnlyKnownChapters: Bool?
 
     init(
-        targets: [ShareImportMemoryTarget],
+        targets: [MemoryTarget],
         lastUsedMemoryId: String?,
         updatedAt: Date,
         includesOnlyKnownChapters: Bool? = nil
@@ -397,9 +417,9 @@ enum UploadQueuePersistence {
         return directory
     }
 
-    static var shareImportCoverDirectory: URL {
+    static var memoryTargetCoverDirectory: URL {
         let root = sharedContainerURL()
-        let directory = root.appendingPathComponent("ShareImportCovers", isDirectory: true)
+        let directory = root.appendingPathComponent("MemoryTargetCovers", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
@@ -415,25 +435,48 @@ enum UploadQueuePersistence {
         try? data.write(to: queueFileURL, options: [.atomic])
     }
 
-    static func saveShareImportTargets(_ snapshot: ShareImportTargetSnapshot) {
+    static func saveMemoryTargets(_ snapshot: MemoryTargetSnapshot) {
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        try? data.write(to: shareImportTargetsFileURL, options: [.atomic])
+        try? data.write(to: memoryTargetsFileURL, options: [.atomic])
     }
 
-    static func loadShareImportTargets() -> ShareImportTargetSnapshot? {
-        guard let data = try? Data(contentsOf: shareImportTargetsFileURL) else { return nil }
-        return try? JSONDecoder().decode(ShareImportTargetSnapshot.self, from: data)
+    static func loadMemoryTargets() -> MemoryTargetSnapshot? {
+        migrateLegacyMemoryTargetCacheIfNeeded()
+        guard let data = try? Data(contentsOf: memoryTargetsFileURL) else { return nil }
+        return try? JSONDecoder().decode(MemoryTargetSnapshot.self, from: data)
     }
 
-    static func shareImportCoverURL(filename: String) -> URL {
-        shareImportCoverDirectory.appendingPathComponent((filename as NSString).lastPathComponent)
+    // The memory-targets cache was historically named after its first consumer, the
+    // share extension ("share-import-targets.json" / "ShareImportCovers"). Move any
+    // legacy files to the current names once so existing Recent entries and cover
+    // thumbnails survive an app update instead of silently rebuilding.
+    private static func migrateLegacyMemoryTargetCacheIfNeeded() {
+        let fileManager = FileManager.default
+        let container = sharedContainerURL()
+
+        let legacySnapshot = container.appendingPathComponent("share-import-targets.json")
+        if fileManager.fileExists(atPath: legacySnapshot.path),
+           !fileManager.fileExists(atPath: memoryTargetsFileURL.path) {
+            try? fileManager.moveItem(at: legacySnapshot, to: memoryTargetsFileURL)
+        }
+
+        let legacyCovers = container.appendingPathComponent("ShareImportCovers", isDirectory: true)
+        let currentCovers = container.appendingPathComponent("MemoryTargetCovers", isDirectory: true)
+        if fileManager.fileExists(atPath: legacyCovers.path),
+           !fileManager.fileExists(atPath: currentCovers.path) {
+            try? fileManager.moveItem(at: legacyCovers, to: currentCovers)
+        }
     }
 
-    static func removeUnreferencedShareImportCovers(keeping filenames: Set<String>) {
-        removeUnreferencedShareImportCovers(in: shareImportCoverDirectory, keeping: filenames)
+    static func memoryTargetCoverURL(filename: String) -> URL {
+        memoryTargetCoverDirectory.appendingPathComponent((filename as NSString).lastPathComponent)
     }
 
-    static func removeUnreferencedShareImportCovers(in directory: URL, keeping filenames: Set<String>) {
+    static func removeUnreferencedMemoryTargetCovers(keeping filenames: Set<String>) {
+        removeUnreferencedMemoryTargetCovers(in: memoryTargetCoverDirectory, keeping: filenames)
+    }
+
+    static func removeUnreferencedMemoryTargetCovers(in directory: URL, keeping filenames: Set<String>) {
         guard let coverFiles = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: nil,
@@ -525,8 +568,8 @@ enum UploadQueuePersistence {
         uploadDirectory.appendingPathComponent("queue.json")
     }
 
-    private static var shareImportTargetsFileURL: URL {
-        sharedContainerURL().appendingPathComponent("share-import-targets.json")
+    private static var memoryTargetsFileURL: URL {
+        sharedContainerURL().appendingPathComponent("memory-targets.json")
     }
 
     private static func sanitizedFilename(_ value: String, fallbackExtension: String) -> String {

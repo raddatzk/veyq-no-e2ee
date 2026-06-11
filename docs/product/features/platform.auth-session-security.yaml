@@ -117,6 +117,9 @@ acceptanceCriteria:
           - testName: testKeychainSessionStoreSaveLoadDeleteWithIsolatedService
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testAPIClientDoesNotSendBearerHeaderToExternalMediaURL
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
   - id: platform.auth-session-security.public-share-token-reuse
     statement: Public share refresh token reuse revokes rotated token chains.
     coverage:
