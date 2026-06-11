@@ -375,20 +375,20 @@ class MemoryShareService @Inject constructor(
         timeoutSeconds: Long,
     ): PublicShareMediaUpdates = concurrencyLimitService.withPublicShareLongPoll {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
-        while (true) {
-            val updates = self.get().listPublicShareMemoryMediaUpdates(
-                shareId,
-                memoryId,
-                includeChildren,
-                afterUpdatedAt,
-                afterMediaId,
-                knownMediaSetHash,
-            )
-            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) {
-                return@withPublicShareLongPoll updates
-            }
+        fun poll() = self.get().listPublicShareMemoryMediaUpdates(
+            shareId,
+            memoryId,
+            includeChildren,
+            afterUpdatedAt,
+            afterMediaId,
+            knownMediaSetHash,
+        )
+        var updates = poll()
+        while (updates.media.isEmpty() && updates.currentMediaIds == null && System.nanoTime() < deadline) {
             TimeUnit.MILLISECONDS.sleep(750)
+            updates = poll()
         }
+        updates
     }
 
     @Transactional

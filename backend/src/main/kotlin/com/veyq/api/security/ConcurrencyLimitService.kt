@@ -21,7 +21,11 @@ class ConcurrencyLimitService @Inject constructor(
     private val requestContext: RequestContext,
     private val securityConfig: SecurityConfig,
 ) {
-    private val perKeyCounters = ConcurrentHashMap<String, AtomicInteger>()
+    // Per-key counts are mutated only inside ConcurrentHashMap.compute, so each
+    // acquire/release on a key is atomic: a bucket is created when it first goes
+    // positive and removed the moment it returns to zero, with no lost updates and
+    // no window where an empty bucket lingers or a non-empty bucket is dropped.
+    private val perKeyCounters = ConcurrentHashMap<String, Int>()
     private val totalCounter = AtomicInteger(0)
 
     fun <T> withPublicShareLongPoll(block: () -> T): T {
@@ -41,25 +45,41 @@ class ConcurrencyLimitService @Inject constructor(
     }
 
     private fun acquire(key: String, perKeyLimit: Int, totalLimit: Int) {
-        val counter = perKeyCounters.computeIfAbsent(key) { AtomicInteger(0) }
-        if (counter.incrementAndGet() > perKeyLimit) {
-            counter.decrementAndGet()
+        if (!tryAcquirePerKey(key, perKeyLimit)) {
             throw RateLimitExceededException(CONCURRENCY_RETRY_AFTER_SECONDS)
         }
         if (totalCounter.incrementAndGet() > totalLimit) {
             totalCounter.decrementAndGet()
-            counter.decrementAndGet()
+            releasePerKey(key)
             throw RateLimitExceededException(CONCURRENCY_RETRY_AFTER_SECONDS)
         }
     }
 
     private fun release(key: String) {
         totalCounter.decrementAndGet()
-        val counter = perKeyCounters[key] ?: return
-        if (counter.decrementAndGet() <= 0) {
-            // Only drop the bucket if it is still empty, so we do not retain a
-            // per-IP entry for every caller that has ever connected.
-            perKeyCounters.remove(key, counter)
+        releasePerKey(key)
+    }
+
+    private fun tryAcquirePerKey(key: String, limit: Int): Boolean {
+        var acquired = false
+        perKeyCounters.compute(key) { _, current ->
+            val count = current ?: 0
+            if (count >= limit) {
+                current
+            } else {
+                acquired = true
+                count + 1
+            }
+        }
+        return acquired
+    }
+
+    private fun releasePerKey(key: String) {
+        // Returning null removes the bucket; this only happens when the count
+        // actually reaches zero within the same atomic compute.
+        perKeyCounters.compute(key) { _, current ->
+            val next = (current ?: 1) - 1
+            if (next <= 0) null else next
         }
     }
 
