@@ -76,6 +76,36 @@ class GpxTrackParserTest {
     }
 
     @Test
+    fun `ignores non-finite and implausibly large elevation values`() {
+        val file = Files.createTempFile("veyq-track-", ".gpx")
+        try {
+            // 1e309 overflows a Double to Infinity and previously rounded to
+            // Long.MAX_VALUE, which could overflow Int64 aggregates on clients.
+            Files.writeString(
+                file,
+                """
+                <gpx version="1.1" creator="veyq-test">
+                  <trk>
+                    <trkseg>
+                      <trkpt lat="47.45" lon="11.03"><ele>1e309</ele></trkpt>
+                      <trkpt lat="47.46" lon="11.04"><ele>500000000</ele></trkpt>
+                    </trkseg>
+                  </trk>
+                </gpx>
+                """.trimIndent(),
+            )
+
+            val parsed = parser.parse(file)
+
+            // Both elevations are dropped, so no ascent/descent is derived.
+            assertThat(parsed.ascentMeters).isNull()
+            assertThat(parsed.descentMeters).isNull()
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
     fun `rejects gpx without enough points`() {
         val file = Files.createTempFile("veyq-track-", ".gpx")
         try {
