@@ -2748,6 +2748,23 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(aggregate.title, "2 tracks")
     }
 
+    func testMemoryTrackAggregateClampsOverflowingMetricsInsteadOfCrashing() {
+        // A crafted journal can reference the same malicious track twice, so the
+        // aggregate must saturate rather than trap on Int64 overflow.
+        let evil = makeTrack(
+            id: "evil-track",
+            distanceMeters: .max,
+            ascentMeters: .max,
+            descentMeters: .min
+        )
+
+        let aggregate = MemoryTrackAggregate(tracks: [evil, evil])
+
+        XCTAssertEqual(aggregate.distanceMeters, .max)
+        XCTAssertEqual(aggregate.ascentMeters, .max)
+        XCTAssertEqual(aggregate.descentMeters, .min)
+    }
+
     @MainActor
     func testMergeUploadedMediaKeepsDetailMediaChronological() async {
         let store = VeyqStore(sessionStore: InMemoryNativeSessionStore(), mockMode: true)
@@ -2896,6 +2913,35 @@ final class VeyqTests: XCTestCase {
             imageHeight: 768,
             gpsLatitude: nil,
             gpsLongitude: nil
+        )
+    }
+
+    private func makeTrack(
+        id: String,
+        distanceMeters: Int64,
+        ascentMeters: Int64?,
+        descentMeters: Int64?
+    ) -> MemoryTrack {
+        MemoryTrack(
+            id: id,
+            memoryId: "summer-south-tyrol",
+            title: id,
+            activityType: "HIKING",
+            originalFilename: "\(id).gpx",
+            distanceMeters: distanceMeters,
+            ascentMeters: ascentMeters,
+            descentMeters: descentMeters,
+            pointCount: 2,
+            startedAt: nil,
+            endedAt: nil,
+            bounds: MemoryTrackBounds(minLatitude: 46.49, minLongitude: 11.34, maxLatitude: 46.53, maxLongitude: 11.40),
+            geometry: MemoryTrackGeometry(
+                type: "LineString",
+                coordinates: [[11.3461, 46.4924], [11.398, 46.526]]
+            ),
+            contentUrl: "/api/family/memories/summer-south-tyrol/tracks/\(id)/content",
+            createdAt: Date(timeIntervalSince1970: 1_775_034_300),
+            updatedAt: Date(timeIntervalSince1970: 1_775_034_300)
         )
     }
 
