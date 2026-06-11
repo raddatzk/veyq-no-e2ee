@@ -23,7 +23,7 @@ final class VeyqStore: ObservableObject {
     @Published private(set) var searchLoading = false
     @Published private(set) var searchErrorMessage: String?
     @Published private(set) var memoryDetails: [String: LoadedMemoryDetail] = [:]
-    @Published private(set) var recentMemoryTargets: [ShareImportMemoryTarget] = []
+    @Published private(set) var recentMemoryTargets: [MemoryTarget] = []
     @Published private(set) var memoryDetailLoadingIDs: Set<String> = []
     @Published private(set) var memoryDetailMediaErrors: [String: String] = [:]
     @Published private(set) var memoryMediaFilters: [String: MemoryMediaFilter] = [:]
@@ -669,7 +669,7 @@ final class VeyqStore: ObservableObject {
 
         mergeCreatedMemory(created, parentMemory: parentMemory)
         if let tenantName = selectedTenant?.name {
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         }
         return created
     }
@@ -713,7 +713,7 @@ final class VeyqStore: ObservableObject {
 
         mergeUpdatedMemory(updated)
         if let tenantName = selectedTenant?.name {
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         }
         return updated
     }
@@ -732,7 +732,7 @@ final class VeyqStore: ObservableObject {
             removeDeletedMemory(memory)
         }
         if let tenantName = selectedTenant?.name {
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         }
     }
 
@@ -758,7 +758,7 @@ final class VeyqStore: ObservableObject {
         }
         mergeUpdatedMemory(updated)
         if let tenantName = selectedTenant?.name {
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         }
         return updated
     }
@@ -779,7 +779,7 @@ final class VeyqStore: ObservableObject {
         }
         mergeUpdatedMemory(updated)
         if let tenantName = selectedTenant?.name {
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         }
         return updated
     }
@@ -804,7 +804,7 @@ final class VeyqStore: ObservableObject {
                 tracks: MemoryTrack.samples.filter { $0.memoryId == memory.id }
             )
             if let tenantName = selectedTenant?.name {
-                await persistShareImportTargets(tenantName: tenantName)
+                await persistMemoryTargets(tenantName: tenantName)
             }
             return
         }
@@ -843,7 +843,7 @@ final class VeyqStore: ObservableObject {
                 media: MemoryMedia.chronologicallySorted(loadedMedia),
                 tracks: loadedTracks
             )
-            await persistShareImportTargets(tenantName: tenantName)
+            await persistMemoryTargets(tenantName: tenantName)
         } catch {
             guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
@@ -1651,7 +1651,7 @@ final class VeyqStore: ObservableObject {
             if !hasCachedSnapshot || memoryNavigationLoadSequence == loadSequence {
                 applyMemoryNavigationSnapshot(snapshot)
             }
-            await persistShareImportTargets(tenantName: tenant.name)
+            await persistMemoryTargets(tenantName: tenant.name)
         } catch {
             guard !Self.isCancellation(error) else { return }
             errorMessage = error.localizedDescription
@@ -1755,19 +1755,19 @@ final class VeyqStore: ObservableObject {
         return basename.isEmpty ? L10n.string("GPX Track") : basename
     }
 
-    private func persistShareImportTargets(tenantName: String) async {
+    private func persistMemoryTargets(tenantName: String) async {
         guard let activeInstanceURL = connectedInstanceURL?.absoluteString else { return }
-        let targets = await shareImportTargets(tenantName: tenantName)
-        let previousSnapshot = UploadQueuePersistence.loadShareImportTargets()
+        let targets = await memoryTargets(tenantName: tenantName)
+        let previousSnapshot = UploadQueuePersistence.loadMemoryTargets()
         let retainedTargets = (previousSnapshot?.targets ?? []).filter { previous in
             previous.instanceURL != nil && previous.instanceURL != activeInstanceURL
         }
         let cachedTargets = targets + retainedTargets
-        UploadQueuePersistence.removeUnreferencedShareImportCovers(
+        UploadQueuePersistence.removeUnreferencedMemoryTargetCovers(
             keeping: Set(cachedTargets.compactMap(\.coverThumbnailFilename))
         )
-        UploadQueuePersistence.saveShareImportTargets(
-            ShareImportTargetSnapshot(
+        UploadQueuePersistence.saveMemoryTargets(
+            MemoryTargetSnapshot(
                 targets: cachedTargets,
                 lastUsedMemoryId: previousSnapshot?.lastUsedMemoryId,
                 updatedAt: Date(),
@@ -1780,7 +1780,7 @@ final class VeyqStore: ObservableObject {
     func refreshRecentMemoryTargets() {
         guard let tenantName = selectedTenant?.name,
               let activeInstanceURL = connectedInstanceURL?.absoluteString,
-              let snapshot = UploadQueuePersistence.loadShareImportTargets()
+              let snapshot = UploadQueuePersistence.loadMemoryTargets()
         else {
             recentMemoryTargets = []
             return
@@ -1793,7 +1793,7 @@ final class VeyqStore: ObservableObject {
     func recordRecentMemory(_ memory: Memory) {
         guard let tenantName = selectedTenant?.name else { return }
         recordRecentTarget(
-            ShareImportMemoryTarget(
+            MemoryTarget(
                 id: memory.id,
                 title: memory.title,
                 dateRange: memory.dateRange,
@@ -1808,16 +1808,16 @@ final class VeyqStore: ObservableObject {
         )
     }
 
-    func recordRecentTarget(_ target: ShareImportMemoryTarget) {
+    func recordRecentTarget(_ target: MemoryTarget) {
         guard let activeInstanceURL = connectedInstanceURL?.absoluteString else { return }
         let scopedTarget = target.scoped(toInstanceURL: activeInstanceURL)
-        let snapshot = UploadQueuePersistence.loadShareImportTargets()
+        let snapshot = UploadQueuePersistence.loadMemoryTargets()
         let retainedTargets = (snapshot?.targets ?? []).filter { previous in
             previous.instanceURL != nil && !(previous.instanceURL == activeInstanceURL && previous.id == scopedTarget.id)
         }
         let nextTargets = [scopedTarget] + retainedTargets
-        UploadQueuePersistence.saveShareImportTargets(
-            ShareImportTargetSnapshot(
+        UploadQueuePersistence.saveMemoryTargets(
+            MemoryTargetSnapshot(
                 targets: Array(nextTargets.prefix(40)),
                 lastUsedMemoryId: scopedTarget.id,
                 updatedAt: Date(),
@@ -1827,16 +1827,16 @@ final class VeyqStore: ObservableObject {
         refreshRecentMemoryTargets()
     }
 
-    func shareImportTargets(tenantName: String) async -> [ShareImportMemoryTarget] {
-        var targets: [ShareImportMemoryTarget] = []
+    func memoryTargets(tenantName: String) async -> [MemoryTarget] {
+        var targets: [MemoryTarget] = []
         targets.reserveCapacity(memories.count)
 
         for memory in memories {
-            targets.append(await shareImportTarget(for: memory, tenantName: tenantName))
+            targets.append(await memoryTarget(for: memory, tenantName: tenantName))
 
-            let chapters = await shareImportChapters(for: memory, tenantName: tenantName)
+            let chapters = await memoryTargetChapters(for: memory, tenantName: tenantName)
             for chapter in chapters {
-                targets.append(await shareImportTarget(
+                targets.append(await memoryTarget(
                     for: chapter,
                     tenantName: tenantName,
                     parentMemoryTitle: memory.title,
@@ -1848,21 +1848,21 @@ final class VeyqStore: ObservableObject {
         return targets
     }
 
-    private func shareImportChapters(for memory: Memory, tenantName: String) async -> [Memory] {
+    private func memoryTargetChapters(for memory: Memory, tenantName: String) async -> [Memory] {
         if let detail = memoryDetails[memory.id] {
             return detail.chapters
         }
         return []
     }
 
-    private func shareImportTarget(
+    private func memoryTarget(
         for memory: Memory,
         tenantName: String,
         parentMemoryTitle: String? = nil,
         depth: Int = 0
-    ) async -> ShareImportMemoryTarget {
-        let thumbnailFilename = await shareImportCoverThumbnailFilename(for: memory)
-        return ShareImportMemoryTarget(
+    ) async -> MemoryTarget {
+        let thumbnailFilename = await memoryTargetCoverThumbnailFilename(for: memory)
+        return MemoryTarget(
             id: memory.id,
             title: memory.title,
             dateRange: memory.dateRange,
@@ -1878,7 +1878,7 @@ final class VeyqStore: ObservableObject {
         )
     }
 
-    private func shareImportCoverThumbnailFilename(for memory: Memory) async -> String? {
+    private func memoryTargetCoverThumbnailFilename(for memory: Memory) async -> String? {
         guard !mockMode,
               let coverUrl = memory.coverUrl,
               !coverUrl.isEmpty
@@ -1889,7 +1889,7 @@ final class VeyqStore: ObservableObject {
         let thumbnail = image.preparingThumbnail(of: CGSize(width: 72, height: 72)) ?? image
         guard let data = thumbnail.jpegData(compressionQuality: 0.82) else { return nil }
         let filename = "\(memory.id)-cover.jpg"
-        let destination = UploadQueuePersistence.shareImportCoverURL(filename: filename)
+        let destination = UploadQueuePersistence.memoryTargetCoverURL(filename: filename)
         do {
             try data.write(to: destination, options: [.atomic])
             return filename

@@ -308,13 +308,13 @@ acceptanceCriteria:
           - testName: testMockMemoryDetailIncludesNavigableChapters
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testShareImportTargetsIncludeChapters
+          - testName: testMemoryTargetsIncludeChapters
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testShareImportTargetsDoNotFetchUnknownChapters
+          - testName: testMemoryTargetsDoNotFetchUnknownChapters
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testShareImportMemoryTargetDecodesChapterMetadata
+          - testName: testMemoryTargetDecodesChapterMetadata
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
           - testName: testRecentTargetsAreScopedToConnectedInstance

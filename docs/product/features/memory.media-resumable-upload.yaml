@@ -22,10 +22,10 @@ acceptanceCriteria:
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
       ios:
         unit:
-          - testName: testShareImportTargetsIncludeChapters
+          - testName: testMemoryTargetsIncludeChapters
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testShareImportTargetsDoNotFetchUnknownChapters
+          - testName: testMemoryTargetsDoNotFetchUnknownChapters
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
           - testName: testPendingImportPlannerEnqueuesTargetedBatchWithoutSheet
