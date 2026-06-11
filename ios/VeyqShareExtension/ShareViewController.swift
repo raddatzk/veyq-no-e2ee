@@ -677,9 +677,32 @@ final class ShareViewController: UIViewController {
     }
 
     private func loadMemoryTargets() -> MemoryTargetSnapshot? {
+        migrateLegacyMemoryTargetCacheIfNeeded()
         let url = sharedContainerURL()?.appendingPathComponent("memory-targets.json")
         guard let url, let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(MemoryTargetSnapshot.self, from: data)
+    }
+
+    // Mirror UploadQueuePersistence.migrateLegacyMemoryTargetCacheIfNeeded so the
+    // share extension still finds cached targets/covers when it runs after an app
+    // update before the containing app has had a chance to migrate.
+    private func migrateLegacyMemoryTargetCacheIfNeeded() {
+        guard let container = sharedContainerURL() else { return }
+        let fileManager = FileManager.default
+
+        let legacySnapshot = container.appendingPathComponent("share-import-targets.json")
+        let currentSnapshot = container.appendingPathComponent("memory-targets.json")
+        if fileManager.fileExists(atPath: legacySnapshot.path),
+           !fileManager.fileExists(atPath: currentSnapshot.path) {
+            try? fileManager.moveItem(at: legacySnapshot, to: currentSnapshot)
+        }
+
+        let legacyCovers = container.appendingPathComponent("ShareImportCovers", isDirectory: true)
+        let currentCovers = container.appendingPathComponent("MemoryTargetCovers", isDirectory: true)
+        if fileManager.fileExists(atPath: legacyCovers.path),
+           !fileManager.fileExists(atPath: currentCovers.path) {
+            try? fileManager.moveItem(at: legacyCovers, to: currentCovers)
+        }
     }
 
     private func persistSelectedTarget(_ target: MemoryTarget) throws -> SharePendingImportBatch {

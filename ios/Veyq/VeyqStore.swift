@@ -1756,19 +1756,23 @@ final class VeyqStore: ObservableObject {
     }
 
     private func persistMemoryTargets(tenantName: String) async {
-        guard let activeInstanceURL = connectedInstanceURL?.absoluteString else { return }
+        guard connectedInstanceURL != nil else { return }
         let targets = await memoryTargets(tenantName: tenantName)
         let previousSnapshot = UploadQueuePersistence.loadMemoryTargets()
-        let retainedTargets = (previousSnapshot?.targets ?? []).filter { previous in
-            previous.instanceURL != nil && previous.instanceURL != activeInstanceURL
+        let previousTargets = previousSnapshot?.targets ?? []
+        // Keep previously cached targets that the freshly fetched set does not
+        // replace, so browsing one folder does not drop valid targets from other
+        // folders/instances. Cross-instance isolation is enforced at display time
+        // (refreshRecentMemoryTargets / the share extension filter by instanceURL).
+        let mergedTargets = targets + previousTargets.filter { previous in
+            !targets.contains { $0.id == previous.id }
         }
-        let cachedTargets = targets + retainedTargets
         UploadQueuePersistence.removeUnreferencedMemoryTargetCovers(
-            keeping: Set(cachedTargets.compactMap(\.coverThumbnailFilename))
+            keeping: Set(mergedTargets.compactMap(\.coverThumbnailFilename))
         )
         UploadQueuePersistence.saveMemoryTargets(
             MemoryTargetSnapshot(
-                targets: cachedTargets,
+                targets: mergedTargets,
                 lastUsedMemoryId: previousSnapshot?.lastUsedMemoryId,
                 updatedAt: Date(),
                 includesOnlyKnownChapters: true
