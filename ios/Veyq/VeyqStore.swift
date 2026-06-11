@@ -1161,18 +1161,52 @@ final class VeyqStore: ObservableObject {
             return .accountMissing
         }
 
+        let previousActiveSession: StoredNativeSession?
         do {
-            let activeSession = try sessionStore.loadActive()
-            let activeSessionMismatch = activeSession.map { !target.matches(session: $0) } ?? true
-            if connectedInstanceURL != targetSession.instanceURL || activeSessionMismatch {
-                try sessionStore.save(targetSession)
-                instances = try sessionStore.loadAll()
-                try await activate(targetSession)
-            }
-            return .ready
+            previousActiveSession = try sessionStore.loadActive()
         } catch {
             errorMessage = error.localizedDescription
             return .transientFailure
+        }
+
+        let activeSessionMismatch = previousActiveSession.map { !target.matches(session: $0) } ?? true
+        guard connectedInstanceURL != targetSession.instanceURL || activeSessionMismatch else {
+            return .ready
+        }
+
+        do {
+            try sessionStore.save(targetSession)
+            instances = try sessionStore.loadAll()
+            try await activate(targetSession)
+            return .ready
+        } catch {
+            // The switch to the target account failed partway through, leaving the
+            // active session (keychain + in-memory client) pointed at the target.
+            // Roll back to the previous account so existing queued (unbound) uploads
+            // keep running against the account they were queued on instead of this
+            // half-activated session.
+            await restorePreviousActiveSession(previousActiveSession)
+            errorMessage = error.localizedDescription
+            return .transientFailure
+        }
+    }
+
+    private func restorePreviousActiveSession(_ session: StoredNativeSession?) async {
+        guard let session else {
+            clearActiveState()
+            return
+        }
+        do {
+            try sessionStore.save(session)
+            instances = try sessionStore.loadAll()
+            try await activate(session)
+        } catch {
+            // Restoring the previous session also failed (likely still offline).
+            // Keep the keychain pointed at the previous account, but clear the
+            // in-memory client so no upload can run against a mismatched account.
+            try? sessionStore.save(session)
+            instances = (try? sessionStore.loadAll()) ?? instances
+            clearActiveState()
         }
     }
 
