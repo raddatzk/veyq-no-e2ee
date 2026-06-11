@@ -1343,16 +1343,6 @@ final class VeyqStore: ObservableObject {
 
     /// Refreshes the session and persists the rotated tokens before returning.
     ///
-    /// The backend invalidates the presented refresh token and issues a successor as part of
-    /// the refresh, so the rotated tokens must be stored immediately. Otherwise a later logout
-    /// failure would leave the stored account holding the now-invalid refresh token while the
-    /// freshly rotated server session stays valid and unrevoked.
-    private func persistedRefresh(_ session: StoredNativeSession) async throws -> StoredNativeSession {
-        let refreshed = try await refresh(session)
-        try? sessionStore.update(refreshed)
-        return refreshed
-    }
-
     /// Attempts to revoke the session server-side before any local deletion.
     ///
     /// Returns `true` when the server confirms the session is gone — either a successful
@@ -1361,50 +1351,75 @@ final class VeyqStore: ObservableObject {
     /// unreachable, so the caller must keep the local credentials for a later retry instead
     /// of silently leaving an unrevoked refresh token valid remotely.
     private func revokeMobileSession(_ session: StoredNativeSession) async -> Bool {
-        var sessionForLogout = session
-        var refreshedBeforeLogout = false
+        // If the access token is (near) expired, refresh first so logout presents a valid token.
         if shouldRefreshAccessToken(session) {
             do {
-                sessionForLogout = try await persistedRefresh(session)
-                refreshedBeforeLogout = true
+                let rotated = try await refresh(session)
+                return await persistThenLogout(rotated)
             } catch VeyqAPIError.unauthorized {
                 // The refresh token is already rejected by the server: the session is gone remotely.
                 return true
             } catch {
-                // Server unreachable or another failure: revocation could not be confirmed.
+                // Server unreachable or another failure: the stored token is untouched, keep it.
                 return false
             }
         }
 
+        // The stored access token still looks valid: try logout directly, refreshing once if the
+        // server rejects it (the access token may have expired earlier than expected).
         do {
-            try await VeyqAPIClient(
-                instanceURL: sessionForLogout.instanceURL,
-                apiBaseURL: sessionForLogout.apiBaseURL,
-                accessToken: sessionForLogout.accessToken,
-                session: apiSession
-            ).logoutMobileSession()
+            try await rawLogout(session)
             return true
-        } catch VeyqAPIError.unauthorized where !refreshedBeforeLogout {
+        } catch VeyqAPIError.unauthorized {
             do {
-                let refreshedSession = try await persistedRefresh(session)
-                try await VeyqAPIClient(
-                    instanceURL: refreshedSession.instanceURL,
-                    apiBaseURL: refreshedSession.apiBaseURL,
-                    accessToken: refreshedSession.accessToken,
-                    session: apiSession
-                ).logoutMobileSession()
-                return true
+                let rotated = try await refresh(session)
+                return await persistThenLogout(rotated)
             } catch VeyqAPIError.unauthorized {
-                // The token is already rejected by the server: the session is gone remotely.
+                // The refresh token is also rejected: the session is gone remotely.
                 return true
             } catch {
                 return false
             }
-        } catch VeyqAPIError.unauthorized {
-            // The server rejected the token: the session is already invalid remotely.
-            return true
         } catch {
             // Server unreachable or another failure: revocation could not be confirmed.
+            return false
+        }
+    }
+
+    /// Persists the freshly rotated tokens and then revokes the session.
+    ///
+    /// The refresh has already invalidated the old refresh token server-side and issued
+    /// `rotated`, so the new tokens must be stored before logout; otherwise a kept (unreachable)
+    /// logout would leave the durable account holding an invalid token and a later retry could
+    /// not revoke the rotated server session. If the durable write fails we cannot rely on a
+    /// later retry, so we revoke the rotated session immediately while we are still online rather
+    /// than silently proceeding as if the stored credentials were current.
+    private func persistThenLogout(_ rotated: StoredNativeSession) async -> Bool {
+        // Store the rotated tokens so a later retry can revoke the current server session. The
+        // write is atomic, so a failure leaves the previous credentials intact rather than
+        // dropping them; either way we revoke the rotated session now while we are still online.
+        try? sessionStore.update(rotated)
+        return await confirmLogout(rotated)
+    }
+
+    private func rawLogout(_ session: StoredNativeSession) async throws {
+        try await VeyqAPIClient(
+            instanceURL: session.instanceURL,
+            apiBaseURL: session.apiBaseURL,
+            accessToken: session.accessToken,
+            session: apiSession
+        ).logoutMobileSession()
+    }
+
+    /// Attempts a logout and reports whether the server session is confirmed gone. A successful
+    /// logout or an unauthorized (already-rejected) token both count as confirmed.
+    private func confirmLogout(_ session: StoredNativeSession) async -> Bool {
+        do {
+            try await rawLogout(session)
+            return true
+        } catch VeyqAPIError.unauthorized {
+            return true
+        } catch {
             return false
         }
     }
