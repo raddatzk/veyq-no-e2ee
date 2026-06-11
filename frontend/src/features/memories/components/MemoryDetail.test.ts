@@ -965,6 +965,44 @@ describe('MemoryDetail', () => {
     )
   })
 
+  it('caps journal track selection at the maximum and disables further tracks', async () => {
+    const tracks = Array.from({ length: 21 }, (_, index) =>
+      track({ id: `track-${index + 1}`, title: `Route ${index + 1}` })
+    )
+    const wrapper = mount(MemoryDetail, {
+      props: {
+        tenantName: 'tenant',
+        memory: memory(),
+        header: header(),
+        journal: journal(),
+        childMemories: [],
+        media: [],
+        playlists: [],
+        tracks
+      },
+      global: { stubs: detailStubs() }
+    })
+
+    await wrapper.find('.memory-journal-empty button').trigger('click')
+    await findButton(wrapper, 'Track einfügen').trigger('click')
+
+    const options = wrapper.findAll('.memory-journal-embed-option')
+    for (let index = 0; index < 20; index += 1) {
+      await options[index].trigger('click')
+    }
+
+    expect(wrapper.find('.memory-journal-embed-picker-limit').exists()).toBe(true)
+    const cappedOptions = wrapper.findAll('.memory-journal-embed-option')
+    expect((cappedOptions[20].element as HTMLButtonElement).disabled).toBe(true)
+    await cappedOptions[20].trigger('click')
+
+    await findButton(wrapper, 'Track einfügen', 1).trigger('click')
+    const textarea = wrapper.find('.memory-journal-field textarea')
+    const embeddedTrackIds =
+      (textarea.element as HTMLTextAreaElement).value.match(/::track:([^\s]+)/)?.[1] ?? ''
+    expect(embeddedTrackIds.split(',')).toHaveLength(20)
+  })
+
   it('opens the media picker when typing media target and replaces the trigger', async () => {
     const wrapper = mount(MemoryDetail, {
       props: {

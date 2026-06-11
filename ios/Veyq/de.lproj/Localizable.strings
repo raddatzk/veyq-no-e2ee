@@ -148,7 +148,6 @@
 "Descent" = "Abstieg";
 "Details" = "Details";
 "Dimensions" = "Abmessungen";
-"Disconnect" = "Trennen";
 "Display Name" = "Anzeigename";
 "Distance" = "Strecke";
 "Done" = "Fertig";
@@ -318,6 +317,7 @@
 "The selected upload file could not be read." = "Die ausgewählte Upload-Datei konnte nicht gelesen werden.";
 "The server returned HTTP %d." = "Der Server hat HTTP %d zurückgegeben.";
 "The session is no longer valid." = "Die Sitzung ist nicht mehr gültig.";
+"This account could not be logged out because its server is unreachable. Please try again." = "Dieser Account konnte nicht abgemeldet werden, weil sein Server nicht erreichbar ist. Bitte versuche es erneut.";
 "This does not look like a compatible veyq instance." = "Das sieht nicht nach einer kompatiblen veyq-Instanz aus.";
 "This instance does not support %@." = "Diese Instanz unterstützt %@ nicht.";
 "This instance does not support GPX tracks." = "Diese Instanz unterstützt GPX-Tracks nicht.";

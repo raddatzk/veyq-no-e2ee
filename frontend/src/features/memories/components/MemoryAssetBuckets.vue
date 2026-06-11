@@ -14,6 +14,7 @@ import {
 } from '../api'
 import { updateMemoryMediaMetadataBatch } from '../api'
 import { mediaPreviewUrl } from '../../../shared/utils/mediaUrls'
+import { getErrorMessage } from '../../../shared/utils/errors'
 
 type BucketRow = MemoryMediaBucket & {
   depth: number
@@ -674,7 +675,7 @@ async function deleteSelectedMedia() {
     deleteMediaConfirmation.value = ''
     isDeleteMediaDialogOpen.value = false
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('media.deleteFailed')
+    saveError.value = getErrorMessage(error, t('media.deleteFailed'))
   } finally {
     isSaving.value = false
   }
@@ -840,6 +841,7 @@ function handleBucketDrop(event: DragEvent) {
             :show-filter="false"
             :enable-lightbox="true"
             :show-highlight-badges="false"
+            :can-highlight="false"
             @shortcut-select="toggleMediaSelection"
           >
             <template #tileActions="{ media: item }">

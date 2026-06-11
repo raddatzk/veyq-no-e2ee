@@ -148,7 +148,6 @@
 "Descent" = "Descent";
 "Details" = "Details";
 "Dimensions" = "Dimensions";
-"Disconnect" = "Disconnect";
 "Display Name" = "Display Name";
 "Distance" = "Distance";
 "Done" = "Done";
@@ -318,6 +317,7 @@
 "The selected upload file could not be read." = "The selected upload file could not be read.";
 "The server returned HTTP %d." = "The server returned HTTP %d.";
 "The session is no longer valid." = "The session is no longer valid.";
+"This account could not be logged out because its server is unreachable. Please try again." = "This account could not be logged out because its server is unreachable. Please try again.";
 "This does not look like a compatible veyq instance." = "This does not look like a compatible veyq instance.";
 "This instance does not support %@." = "This instance does not support %@.";
 "This instance does not support GPX tracks." = "This instance does not support GPX tracks.";

@@ -639,6 +639,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "429":
+          "$ref": "./common.openapi.yaml#/components/responses/429"
   "/api/public-shares/{shareId}/memories/{memoryId}/media-buckets":
     get:
       tags: [PublicShares]
@@ -2123,6 +2125,7 @@ components:
               filename:
                 type: string
                 nullable: true
+                maxLength: 255
                 description: Original client-side filename to preserve for track listings and downloads.
               title:
                 type: string

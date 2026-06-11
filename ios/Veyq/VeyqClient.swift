@@ -747,16 +747,24 @@ final class KeychainNativeSessionStore: NativeSessionStoring {
     }
 
     private func writeCollection(_ collection: StoredNativeSessionCollection) throws {
-        try delete()
         let data = try JSONEncoder.veyq.encode(collection)
-        let item: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data
+            kSecAttrAccount as String: account
         ]
-        let status = SecItemAdd(item as CFDictionary, nil)
-        guard status == errSecSuccess else { throw VeyqAPIError.missingSession }
+        // Upsert atomically: update the existing item in place, or add it when missing. This
+        // avoids a delete-before-add that could wipe the stored collection if the write fails.
+        let updateStatus = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        if updateStatus == errSecSuccess { return }
+        if updateStatus == errSecItemNotFound {
+            var addItem = query
+            addItem[kSecValueData as String] = data
+            let addStatus = SecItemAdd(addItem as CFDictionary, nil)
+            guard addStatus == errSecSuccess else { throw VeyqAPIError.missingSession }
+            return
+        }
+        throw VeyqAPIError.missingSession
     }
 
     func delete() throws {

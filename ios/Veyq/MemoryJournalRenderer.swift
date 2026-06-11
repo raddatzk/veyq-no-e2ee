@@ -451,7 +451,7 @@ struct MemoryTrackAggregate: Equatable {
     }
 
     var distanceMeters: Int64 {
-        tracks.map(\.distanceMeters).reduce(0, +)
+        tracks.map(\.distanceMeters).reduce(0, MemoryTrackAggregate.saturatingAdd)
     }
 
     var durationSeconds: TimeInterval? {
@@ -471,7 +471,16 @@ struct MemoryTrackAggregate: Equatable {
     private func sumOptional(_ values: [Int64?]) -> Int64? {
         let present = values.compactMap { $0 }
         guard !present.isEmpty else { return nil }
-        return present.reduce(0, +)
+        return present.reduce(0, MemoryTrackAggregate.saturatingAdd)
+    }
+
+    /// Adds two values, clamping to the representable `Int64` range instead of
+    /// trapping. Aggregate metrics are derived from server-supplied track data,
+    /// so a crafted track could otherwise overflow and crash the renderer.
+    private static func saturatingAdd(_ lhs: Int64, _ rhs: Int64) -> Int64 {
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        guard overflow else { return sum }
+        return rhs > 0 ? .max : .min
     }
 }
 

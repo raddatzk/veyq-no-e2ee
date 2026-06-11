@@ -99,6 +99,33 @@ describe('MediaLightbox', () => {
     vi.useRealTimers()
   })
 
+  it('keeps highlighting disabled when allowed but no update callback is supplied', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(MediaLightbox, {
+      props: {
+        tenantName: 'tenant',
+        media: media(),
+        canShowPrevious: false,
+        canShowNext: false,
+        canHighlight: true
+      },
+      global: {
+        stubs: {
+          RouterLink: true
+        }
+      }
+    })
+
+    expect(wrapper.find('.lightbox-star-button').exists()).toBe(false)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await flushPromises()
+
+    expect(wrapper.emitted('updated')).toBeUndefined()
+    expect(wrapper.text()).toContain('Du kannst nur eigene Medien als Highlight markieren.')
+    vi.useRealTimers()
+  })
+
   it('uses the original fullscreen when the preview is too small for DPR capped at 2', async () => {
     setViewport(1600, 1000, 3)
     const wrapper = mount(MediaLightbox, {

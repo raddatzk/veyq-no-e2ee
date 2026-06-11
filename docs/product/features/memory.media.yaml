@@ -377,7 +377,10 @@ acceptanceCriteria:
           - testName: memory media updates return changed media and current ids when media is deleted
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
-          - testName: memory media updates do not repeat the cursor media when database timestamp is more precise than the api cursor
+          - testName: memory media updates store the cursor timestamp at millisecond precision
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: memory media updates never skip or repeat a same-millisecond row
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: media updates endpoint accepts openapi date-time cursor
@@ -468,6 +471,9 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: removes individual selected media files and clears the full selection
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
+          - testName: does not upload a manually removed media file from a stale native selection
             kind: negative
             ref: frontend/src/features/memories/components/MemoryDialogs.test.ts
           - testName: keeps the submitted bucket for every queued file when the visible bucket changes

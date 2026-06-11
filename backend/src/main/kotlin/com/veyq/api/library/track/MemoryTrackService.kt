@@ -138,10 +138,7 @@ class MemoryTrackService(
     ): MemoryTrack {
         val size = Files.size(uploadPath)
         if (size <= 0) throw BadRequestException("file must not be empty", "MEMORY_TRACK_UPLOAD_EMPTY")
-        val filename = originalFilename?.trim()?.takeIf { it.isNotBlank() } ?: "track.gpx"
-        if (!filename.endsWith(".gpx", ignoreCase = true)) {
-            throw BadRequestException("Only GPX tracks are supported", "MEMORY_TRACK_UPLOAD_TYPE_UNSUPPORTED")
-        }
+        val filename = resolveOriginalFilename(originalFilename)
 
         val parsed = gpxTrackParser.parse(uploadPath)
         val publicId = NanoIdUtils.randomNanoId(16)
@@ -227,6 +224,22 @@ class MemoryTrackService(
 
     private fun isDescendantOrSelf(memory: Memory, root: Memory): Boolean =
         generateSequence(memory) { it.parentMemory }.any { it.id == root.id }
+
+    private fun resolveOriginalFilename(value: String?): String {
+        val basename = value?.trim()
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('\\')
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: "track.gpx"
+        if (!basename.endsWith(".gpx", ignoreCase = true)) {
+            throw BadRequestException("Only GPX tracks are supported", "MEMORY_TRACK_UPLOAD_TYPE_UNSUPPORTED")
+        }
+        if (basename.length > MAX_ORIGINAL_FILENAME_LENGTH) {
+            throw BadRequestException("filename is too long", "MEMORY_TRACK_FILENAME_TOO_LONG")
+        }
+        return basename
+    }
 
     private fun requiredTitle(value: String?): String {
         val title = value?.trim()?.takeIf { it.isNotBlank() }
@@ -319,6 +332,7 @@ class MemoryTrackService(
         if (name.substringAfterLast('/').contains('.')) name else "$name.gpx"
 
     companion object {
+        private const val MAX_ORIGINAL_FILENAME_LENGTH = 255
         private val ARCHIVE_TIMESTAMP_FORMAT = java.time.format.DateTimeFormatter
             .ofPattern("yyyy-MM-dd HH-mm-ss")
             .withZone(ZoneOffset.UTC)

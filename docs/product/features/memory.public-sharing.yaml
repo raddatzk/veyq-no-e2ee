@@ -96,6 +96,9 @@ acceptanceCriteria:
           - testName: hides highlighting and shows a shortcut hint when highlighting is not allowed
             kind: negative
             ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: keeps highlighting disabled when allowed but no update callback is supplied
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: disables lightbox highlighting when a media bucket is missing from the provided bucket list
             kind: negative
             ref: frontend/src/components/media/MediaGrid.test.ts
@@ -155,6 +158,22 @@ acceptanceCriteria:
           - testName: share login rate limit ignores spoofed forwarded for by default
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryShareResourceTest.kt
+  - id: memory.public-sharing.live-updates-concurrency-limit
+    statement: >-
+      Public share media-update long polls are capped per client IP and in total
+      so anonymous callers cannot exhaust worker capacity.
+    coverage:
+      backend:
+        unit:
+          - testName: rejects long polls beyond the per-ip limit
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/ConcurrencyLimitServiceTest.kt
+          - testName: rejects long polls beyond the global limit even across ips
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/ConcurrencyLimitServiceTest.kt
+          - testName: releases slots once the long poll completes
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/security/ConcurrencyLimitServiceTest.kt
   - id: memory.public-sharing.stable-error-codes
     statement: Public share upload and cover errors return stable API codes.
     coverage:

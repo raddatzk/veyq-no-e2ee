@@ -45,9 +45,15 @@ jobs:
             java-kotlin:
               - '.github/workflows/codeql.yml'
               - 'backend/**'
+              # OpenAPI specs generate JAX-RS interfaces and Kotlin models that
+              # are compiled into the backend main source set.
+              - 'docs/api/**'
             javascript-typescript:
               - '.github/workflows/codeql.yml'
               - 'frontend/**'
+              # OpenAPI specs generate the TypeScript fetch clients consumed by
+              # the frontend.
+              - 'docs/api/**'
               - 'collaboration/**'
               - 'load/**'
               - 'site/**'

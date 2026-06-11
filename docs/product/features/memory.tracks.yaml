@@ -21,6 +21,9 @@ acceptanceCriteria:
           - testName: keeps elevation metadata empty when gpx has no elevation
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
+          - testName: ignores non-finite and implausibly large elevation values
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
   - id: memory.tracks.reject-invalid-gpx
     statement: GPX without enough points is rejected.
     coverage:
@@ -56,6 +59,17 @@ acceptanceCriteria:
           - testName: testUploadStoreKeepsGPXTrackFallbackExtensionAndMimeType
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.tracks.validate-filename
+    statement: Uploaded track filenames are normalized to a basename and rejected when longer than the storage column limit.
+    coverage:
+      backend:
+        integration:
+          - testName: uploads memory track normalizes filename to basename
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: rejects memory track filename longer than column limit
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
   - id: memory.tracks.panel-update-delete
     statement: Track panel updates and deletes existing tracks, with title confirmation before deletion.
     coverage:

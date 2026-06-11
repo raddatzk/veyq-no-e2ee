@@ -267,6 +267,7 @@ export const messages = {
       journalSaveFailed: 'Journal konnte nicht gespeichert werden',
       journalStart: 'Journal starten',
       journalTrackMissingCount: '{count} Tracks nicht verfügbar',
+      journalTrackSelectionLimit: 'Maximal {count} Tracks pro Karte ausgewählt',
       journalTrackSelectionTitle: '{count} Tracks',
       journalUpdated: 'Zuletzt aktualisiert: {date}',
       loadFailed: 'Memory konnte nicht geladen werden',
@@ -1054,6 +1055,8 @@ export const messages = {
       MEMORY_DATE_RANGE_INVALID: 'Das Enddatum darf nicht vor dem Startdatum liegen.',
       MEMORY_DATE_RANGE_REQUIRED: 'Bitte gib Start- und Enddatum an.',
       MEMORY_DISPLAY_NAME_REQUIRED: 'Bitte gib einen Memory-Titel ein.',
+      MEMORY_JOURNAL_REFERENCE_CONFLICT:
+        'Dieses Element kann nicht gelöscht werden, solange es im Memory-Journal verwendet wird.',
       MEMORY_MOVE_INTO_SELF: 'Ein Memory kann nicht in sich selbst verschoben werden.',
       MEMORY_NAME_CONFLICT: 'Dieser Permalink ist bereits vergeben.',
       MEMORY_NAME_INVALID: 'Der Memory-Permalink ist ungültig.',
@@ -1342,6 +1345,7 @@ export const messages = {
       journalSaveFailed: 'Journal could not be saved',
       journalStart: 'Start journal',
       journalTrackMissingCount: '{count} tracks unavailable',
+      journalTrackSelectionLimit: 'A map can show up to {count} tracks',
       journalTrackSelectionTitle: '{count} tracks',
       journalUpdated: 'Last updated: {date}',
       loadFailed: 'Memory could not be loaded',
@@ -2122,6 +2126,8 @@ export const messages = {
       MEMORY_DATE_RANGE_INVALID: 'The end date cannot be before the start date.',
       MEMORY_DATE_RANGE_REQUIRED: 'Please enter start and end date.',
       MEMORY_DISPLAY_NAME_REQUIRED: 'Please enter a Memory title.',
+      MEMORY_JOURNAL_REFERENCE_CONFLICT:
+        "This item can't be deleted while it is referenced by the Memory journal.",
       MEMORY_MOVE_INTO_SELF: 'A Memory cannot be moved into itself.',
       MEMORY_NAME_CONFLICT: 'This permalink is already taken.',
       MEMORY_NAME_INVALID: 'The Memory permalink is invalid.',

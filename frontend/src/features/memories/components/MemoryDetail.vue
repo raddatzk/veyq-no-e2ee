@@ -82,6 +82,7 @@ import { useMemoryDetailMediaState } from '../composables/useMemoryDetailMediaSt
 import { mediaFilesFromList, startMemoryMediaUpload } from '../composables/useMemoryMediaUpload'
 import { useAuthState } from '../../../shared/state/useAuthState'
 import {
+  JOURNAL_TRACK_EMBED_MAX_IDS,
   journalEmbedRangeAtPosition,
   journalEmbedTypeTriggerRange,
   journalEmbedMarkdown,
@@ -1118,7 +1119,11 @@ function syncMediaPickerCaption() {
 
 function selectJournalEmbed(itemId: string) {
   if (embedPickerKind.value === 'track') {
-    selectedJournalEmbedIds.value = selectedJournalEmbedIds.value.includes(itemId)
+    const alreadySelected = selectedJournalEmbedIds.value.includes(itemId)
+    if (!alreadySelected && selectedJournalEmbedIds.value.length >= JOURNAL_TRACK_EMBED_MAX_IDS) {
+      return
+    }
+    selectedJournalEmbedIds.value = alreadySelected
       ? selectedJournalEmbedIds.value.filter((id) => id !== itemId)
       : [...selectedJournalEmbedIds.value, itemId]
   } else {
@@ -1963,6 +1968,7 @@ function handleJournalDoubleClick(event: MouseEvent) {
       :selected-ids="selectedJournalEmbedIds"
       :items="journalEmbedPickerItems"
       :multiple="embedPickerKind === 'track'"
+      :max-selectable="embedPickerKind === 'track' ? JOURNAL_TRACK_EMBED_MAX_IDS : undefined"
       :can-delete="canDeleteCurrentJournalEmbed"
       @update:embed-label="embedPickerLabel = $event"
       @label-input="embedPickerLabelEdited = true"

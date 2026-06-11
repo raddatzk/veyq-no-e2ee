@@ -12,10 +12,7 @@ struct AppRootView: View {
     var body: some View {
         Group {
             if store.isConnected {
-                MainTabView {
-                    store.disconnect()
-                    savedInstanceURL = ""
-                }
+                MainTabView()
             } else if !store.hasCompletedSessionRestore {
                 ProgressView()
                     .accessibilityIdentifier("session-restore-progress")

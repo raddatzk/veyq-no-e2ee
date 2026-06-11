@@ -105,7 +105,7 @@ class GpxTrackParser(
         val nodes = point.getElementsByTagNameNS("*", "ele")
         return (0 until nodes.length)
             .mapNotNull { nodes.item(it)?.textContent?.trim()?.toDoubleOrNull() }
-            .firstOrNull()
+            .firstOrNull { it.isFinite() && abs(it) <= MAX_ELEVATION_METERS }
     }
 
     private fun distanceMeters(points: List<TrackPoint>): Long =
@@ -167,5 +167,10 @@ class GpxTrackParser(
         private const val MAX_GPX_BYTES = 25L * 1024L * 1024L
         private const val MAX_POINTS = 50_000
         private const val MAX_GEOMETRY_POINTS = 2_000
+
+        // Clamp elevations to a physically plausible range so that crafted GPX
+        // files cannot persist absurd (or overflowing) ascent/descent metrics.
+        // Comfortably beyond Mount Everest (8849 m) and the Mariana Trench.
+        private const val MAX_ELEVATION_METERS = 100_000.0
     }
 }

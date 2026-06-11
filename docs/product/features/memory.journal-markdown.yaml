@@ -43,6 +43,29 @@ acceptanceCriteria:
           - testName: rejects journal carousel embeds when any media is outside the current memory
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+  - id: memory.journal-markdown.track-embed-bounds
+    statement: Track embeds collapse duplicate IDs and reject more than 20 unique tracks per embed before expensive validation or rendering.
+    coverage:
+      backend:
+        integration:
+          - testName: rejects journal track embeds with too many unique tracks
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+      frontend:
+        unit:
+          - testName: deduplicates and caps comma-separated track embed ids
+            kind: negative
+            ref: frontend/src/features/memories/utils/journalMediaMarkdown.test.ts
+          - testName: deduplicates and caps track ids while producing embed markdown
+            kind: negative
+            ref: frontend/src/features/memories/utils/journalMediaMarkdown.test.ts
+          - testName: deduplicates repeated track entries before rendering route layers
+            kind: negative
+            ref: frontend/src/features/memories/components/TrackMap.test.ts
+        integration:
+          - testName: caps journal track selection at the maximum and disables further tracks
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
   - id: memory.journal-markdown.legacy-veyq-links
     statement: Legacy `veyq:` Markdown link and image targets are no longer treated as veyq journal embeds.
     coverage:
