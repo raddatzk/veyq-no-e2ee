@@ -42,6 +42,10 @@ final class VeyqStore: ObservableObject {
     private let mediaImageCache: MediaImageCache
     private let mockMode: Bool
     private var uploadTasks: [String: Task<Void, Never>] = [:]
+    /// Tail of the serial chain of in-flight share handoffs. Each handoff awaits
+    /// its predecessor so account switching + capability validation + enqueue stay
+    /// atomic per batch and concurrent handoffs for different accounts can't interleave.
+    private var pendingImportHandoffTail: Task<Void, Never>?
     private var activeCapabilities = Set<String>()
     private var memoryNavigationCache: [MemoryNavigationCacheKey: MemoryNavigationSnapshot] = [:]
     private var memoryNavigationLoadSequence = 0
@@ -1176,7 +1180,25 @@ final class VeyqStore: ObservableObject {
     /// `enqueuePendingImport`, it requires the target to carry the selected-account
     /// binding and switches the host app to that account before uploading, so shared
     /// files cannot be sent to an unrelated currently-active account/instance.
+    ///
+    /// Handoffs are serialized into a chain: switching the global session and
+    /// validating active capabilities for one batch must not interleave with another
+    /// batch targeting a different account, which would otherwise let a batch be
+    /// admitted or uploaded against the wrong account's session.
     func enqueuePendingImportHandoff(_ batch: PendingImportBatch, target: UploadTargetMemory) async {
+        let predecessor = pendingImportHandoffTail
+        let task = Task { @MainActor [weak self] in
+            await predecessor?.value
+            await self?.runPendingImportHandoff(batch, target: target)
+        }
+        pendingImportHandoffTail = task
+        await task.value
+        if pendingImportHandoffTail == task {
+            pendingImportHandoffTail = nil
+        }
+    }
+
+    private func runPendingImportHandoff(_ batch: PendingImportBatch, target: UploadTargetMemory) async {
         guard target.isAccountBound else {
             UploadQueuePersistence.removePendingImportBatch(id: batch.id)
             errorMessage = L10n.string("Shared files could not be opened securely. Please choose the Memory again.")
