@@ -683,10 +683,15 @@ final class ShareViewController: UIViewController {
 
     private func persistSelectedTarget(_ target: ShareImportMemoryTarget) throws -> SharePendingImportBatch {
         guard let stagedBatch else { throw ShareImportError.missingBatch }
+        guard let activeAccount else { throw ShareImportError.missingAccount }
         let uploadTarget = ShareUploadTargetMemory(
             tenantName: target.tenantName,
             memoryId: target.id,
-            memoryTitle: target.title
+            memoryTitle: target.title,
+            accountId: activeAccount.id,
+            instanceURL: activeAccount.instanceURL,
+            apiBaseURL: activeAccount.apiBaseURL,
+            userId: activeAccount.userId
         )
         let selectedBatch = SharePendingImportBatch(
             id: stagedBatch.id,
@@ -2483,6 +2488,10 @@ private struct ShareUploadTargetMemory: Codable {
     let tenantName: String
     let memoryId: String
     let memoryTitle: String
+    let accountId: String
+    let instanceURL: URL
+    let apiBaseURL: URL
+    let userId: Int
 }
 
 private struct ShareImportMemoryTarget: Codable {
@@ -3096,6 +3105,7 @@ private extension ISO8601DateFormatter {
 private enum ShareImportError: LocalizedError {
     case appGroupUnavailable
     case missingBatch
+    case missingAccount
 
     var errorDescription: String? {
         switch self {
@@ -3103,6 +3113,8 @@ private enum ShareImportError: LocalizedError {
             NSLocalizedString("The veyq App Group is not available for this build. Check the app and extension signing capabilities for group.app.veyq.ios.", comment: "")
         case .missingBatch:
             NSLocalizedString("Shared files could not be prepared.", comment: "")
+        case .missingAccount:
+            NSLocalizedString("Choose an account before selecting a Memory.", comment: "")
         }
     }
 }

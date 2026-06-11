@@ -354,3 +354,6 @@
 "Write a short note to give this Memory context beyond the media." = "Write a short note to give this Memory context beyond the media.";
 "Yes" = "Yes";
 "Your Memories stay on the instance you choose." = "Your Memories stay on the instance you choose.";
+"Choose an account before selecting a Memory." = "Choose an account before selecting a Memory.";
+"Shared files could not be opened securely. Please choose the Memory again." = "Shared files could not be opened securely. Please choose the Memory again.";
+"The account selected in the share sheet is no longer available." = "The account selected in the share sheet is no longer available.";

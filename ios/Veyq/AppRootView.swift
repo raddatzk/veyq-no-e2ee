@@ -114,11 +114,9 @@ struct AppRootView: View {
         }
 
         activeImportHandoffBatchIDs.insert(batchId)
-        defer {
-            activeImportHandoffBatchIDs.remove(batchId)
-        }
 
         guard let batch = UploadQueuePersistence.loadPendingImportBatch(id: batchId) else {
+            activeImportHandoffBatchIDs.remove(batchId)
             store.reportError(L10n.string("Shared files could not be opened."))
             return
         }
@@ -127,10 +125,17 @@ struct AppRootView: View {
             if pendingImportBatch?.id == batch.id {
                 pendingImportBatch = nil
             }
-            store.enqueuePendingImport(batch, target: target)
+            // Keep the batch reserved until the async enqueue (account switch,
+            // file copy, batch removal) finishes, so a concurrent
+            // presentLatestPendingImportIfAvailable cannot schedule it twice.
+            Task { @MainActor in
+                await store.enqueuePendingImportHandoff(batch, target: target)
+                activeImportHandoffBatchIDs.remove(batchId)
+            }
             return
         }
         UploadQueuePersistence.removePendingImportBatch(id: batch.id)
+        activeImportHandoffBatchIDs.remove(batchId)
     }
 
     private func presentLatestPendingImportIfAvailable() {
@@ -148,7 +153,12 @@ struct AppRootView: View {
         case .enqueueTargeted(let targetedBatches):
             for batch in targetedBatches {
                 guard let target = batch.targetMemory else { continue }
-                store.enqueuePendingImport(batch, target: target)
+                guard !activeImportHandoffBatchIDs.contains(batch.id) else { continue }
+                activeImportHandoffBatchIDs.insert(batch.id)
+                Task { @MainActor in
+                    await store.enqueuePendingImportHandoff(batch, target: target)
+                    activeImportHandoffBatchIDs.remove(batch.id)
+                }
             }
         case .none:
             break

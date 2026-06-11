@@ -354,3 +354,6 @@
 "Write a short note to give this Memory context beyond the media." = "Schreibe eine kurze Notiz, damit diese Memory mehr Kontext als nur Medien hat.";
 "Yes" = "Ja";
 "Your Memories stay on the instance you choose." = "Deine Memories bleiben auf der Instanz, die du auswählst.";
+"Choose an account before selecting a Memory." = "Wähle ein Konto aus, bevor du eine Memory auswählst.";
+"Shared files could not be opened securely. Please choose the Memory again." = "Geteilte Dateien konnten nicht sicher geöffnet werden. Bitte wähle die Memory erneut aus.";
+"The account selected in the share sheet is no longer available." = "Das im Teilen-Dialog ausgewählte Konto ist nicht mehr verfügbar.";

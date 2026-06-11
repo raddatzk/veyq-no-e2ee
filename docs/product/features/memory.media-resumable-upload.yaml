@@ -40,6 +40,12 @@ acceptanceCriteria:
           - testName: testPendingImportPlannerPrioritizesTargetedBatchOverUntargetedBatch
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadTargetMemoryRequiresCompleteAccountBinding
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testUploadTargetMemoryMatchesOnlySelectedAccountSession
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
           - testName: testUploadQueueItemDecodesLegacyQueueWithoutProgressMetadata
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
