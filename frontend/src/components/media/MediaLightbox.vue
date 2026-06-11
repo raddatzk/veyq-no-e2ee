@@ -7,7 +7,6 @@ import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import {
   updateMemoryMediaCapturedAt,
-  updateMemoryMediaHighlight,
   type MemoryMedia,
   type UpdateMemoryMediaCapturedAtRequest,
   type UpdateMemoryMediaHighlightRequest
@@ -110,7 +109,7 @@ const uploaderLink = computed(() =>
 )
 const canEditMetadata = computed(() => props.canEditMetadata !== false)
 const canDeleteMedia = computed(() => Boolean(props.canDelete && props.deleteMedia))
-const canHighlightMedia = computed(() => props.canHighlight !== false)
+const canHighlightMedia = computed(() => props.canHighlight !== false && Boolean(props.updateHighlight))
 const canFullscreenOriginal = computed(
   () => canUseFullscreen.value && (isImage.value || isVideo.value)
 )
@@ -264,7 +263,8 @@ async function saveCapturedAt() {
 }
 
 async function saveHighlight() {
-  if (!canHighlightMedia.value) {
+  const updateHighlight = props.updateHighlight
+  if (!canHighlightMedia.value || !updateHighlight) {
     showTemporaryActionError(t('media.highlightUnavailable'))
     return
   }
@@ -273,14 +273,7 @@ async function saveHighlight() {
   saveError.value = ''
   try {
     const request = { highlight: !isHighlighted.value }
-    const updated = props.updateHighlight
-      ? await props.updateHighlight(props.media.id, props.media.memoryId, request)
-      : await updateMemoryMediaHighlight(
-          props.tenantName,
-          props.media.memoryId,
-          props.media.id,
-          request
-        )
+    const updated = await updateHighlight(props.media.id, props.media.memoryId, request)
     emit('updated', updated)
   } catch (error) {
     saveError.value = error instanceof Error ? error.message : t('media.highlightSaveFailed')

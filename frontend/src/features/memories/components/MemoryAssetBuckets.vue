@@ -840,6 +840,7 @@ function handleBucketDrop(event: DragEvent) {
             :show-filter="false"
             :enable-lightbox="true"
             :show-highlight-badges="false"
+            :can-highlight="false"
             @shortcut-select="toggleMediaSelection"
           >
             <template #tileActions="{ media: item }">
