@@ -307,30 +307,64 @@ class MemoryServiceTest {
     }
 
     @Test
-    fun `memory media updates do not repeat the cursor media when database timestamp is more precise than the api cursor`() {
-        val trip = memoryService.createMemory(CreateMemoryRequest("live-precise-cursor-trip", "Live Precise Cursor Trip"))
-        val preciseUpdatedAt = Instant.parse("2026-01-02T10:00:00.123456Z")
-        val media = createMedia(
-            owner,
-            memory(trip.id),
-            "Precise Cursor",
-            createdAt = preciseUpdatedAt,
-        )
+    fun `memory media updates store the cursor timestamp at millisecond precision`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-ms-precision-trip", "Live Ms Precision Trip"))
+        // The media update cursor resumes from a millisecond-precision client timestamp,
+        // so the lifecycle hooks must floor updated_at to milliseconds. If updated_at kept
+        // sub-millisecond precision, the keyset predicate would be inconsistent with the
+        // "order by updatedAt, publicId" ordering and could skip same-millisecond updates.
+        createMedia(owner, memory(trip.id), "Ms Precision", createdAt = Instant.parse("2026-01-02T10:00:00.123456Z"))
+
+        val updatedAt = mediaService.listMemoryMedia(trip.id, false).single().updatedAt.toInstant()
+
+        assertThat(updatedAt).isEqualTo(updatedAt.truncatedTo(ChronoUnit.MILLIS))
+    }
+
+    @Test
+    fun `memory media updates never skip or repeat a same-millisecond row`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-same-ms-trip", "Live Same Millisecond Trip"))
+        val a = createMedia(owner, memory(trip.id), "Same Ms A", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        val b = createMedia(owner, memory(trip.id), "Same Ms B", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        // Assign buckets before pinning updated_at so the polls below do not rewrite it.
         mediaService.listMemoryMedia(trip.id, false)
+
+        // Pin both rows to the exact same millisecond. updated_at is stored at millisecond
+        // precision in production, so within a millisecond the only tie-breaker is publicId.
+        val sharedUpdatedAt = Instant.parse("2026-01-02T10:00:00.123Z")
         inTransaction {
-            mediaRepo.update("updatedAt = ?1 where publicId = ?2", preciseUpdatedAt, media.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", sharedUpdatedAt, a.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", sharedUpdatedAt, b.publicId)
         }
 
-        val updates = mediaService.listMemoryMediaUpdates(
+        // Server ordering within the millisecond bucket (by publicId).
+        val ordered = mediaService.listMemoryMediaUpdates(
             memoryId = trip.id,
             includeChildren = false,
-            afterUpdatedAt = preciseUpdatedAt.truncatedTo(ChronoUnit.MILLIS),
-            afterMediaId = media.publicId,
-            knownMediaSetHash = mediaService.mediaSetHash(listOf(media.publicId)),
-        )
+            afterUpdatedAt = Instant.parse("2026-01-02T10:00:00.122Z"),
+            afterMediaId = null,
+            knownMediaSetHash = null,
+        ).media.map { it.id }
+        assertThat(ordered).hasSize(2)
 
-        assertThat(updates.media).isEmpty()
-        assertThat(updates.currentMediaIds).isNull()
+        // Resuming from the first row must return the second (never skipped).
+        val afterFirst = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = sharedUpdatedAt,
+            afterMediaId = ordered[0],
+            knownMediaSetHash = null,
+        )
+        assertThat(afterFirst.media.map { it.id }).containsExactly(ordered[1])
+
+        // Resuming from the last row must return nothing (never repeated).
+        val afterSecond = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = sharedUpdatedAt,
+            afterMediaId = ordered[1],
+            knownMediaSetHash = null,
+        )
+        assertThat(afterSecond.media).isEmpty()
     }
 
     @Test

@@ -234,13 +234,15 @@ class Media : PanacheEntityBase {
             createdAt = Instant.now()
         }
         if (!::updatedAt.isInitialized) {
-            updatedAt = createdAt
+            // The media update cursor resumes from a millisecond-precision client
+            // timestamp, so updated_at must not carry sub-millisecond precision.
+            updatedAt = createdAt.truncatedTo(ChronoUnit.MILLIS)
         }
     }
 
     @PreUpdate
     fun updateUpdatedAt() {
-        updatedAt = Instant.now()
+        updatedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS)
     }
 }
 
@@ -361,20 +363,24 @@ class MediaRepo : PanacheRepository<Media> {
         val query = if (afterUpdatedAt == null) {
             find("memory in ?1 order by updatedAt, publicId", memories)
         } else {
+            // updated_at is stored at millisecond precision (see Media lifecycle
+            // hooks and V4 migration), matching the millisecond-precision cursor.
+            // Truncating the cursor as well keeps a sub-millisecond client value
+            // from skipping its own millisecond bucket. The keyset is then exactly
+            // consistent with "order by updatedAt, publicId": ties within a
+            // millisecond are broken solely by publicId.
             val afterUpdatedAtMillis = afterUpdatedAt.truncatedTo(ChronoUnit.MILLIS)
-            val nextUpdatedAtMillis = afterUpdatedAtMillis.plus(1, ChronoUnit.MILLIS)
             find(
                 """
                 memory in ?1 and (
-                    updatedAt >= ?4
-                    or (updatedAt >= ?2 and updatedAt < ?4 and publicId > ?3)
+                    updatedAt > ?2
+                    or (updatedAt = ?2 and publicId > ?3)
                 )
                 order by updatedAt, publicId
                 """.trimIndent(),
                 memories,
                 afterUpdatedAtMillis,
                 afterPublicId ?: "",
-                nextUpdatedAtMillis,
             )
         }
         return query.page(0, limit).list()
