@@ -148,7 +148,6 @@
 "Descent" = "Abstieg";
 "Details" = "Details";
 "Dimensions" = "Abmessungen";
-"Disconnect" = "Trennen";
 "Display Name" = "Anzeigename";
 "Distance" = "Strecke";
 "Done" = "Fertig";
@@ -301,7 +300,6 @@
 "Signed-in Instances" = "Eingeloggte Instanzen";
 "Size" = "Größe";
 "Skiing" = "Ski";
-"Some accounts could not be logged out because their server is unreachable." = "Einige Accounts konnten nicht abgemeldet werden, weil ihr Server nicht erreichbar ist.";
 "Something needs attention" = "Etwas braucht Aufmerksamkeit";
 "Space" = "Bereich";
 "Start Date" = "Startdatum";

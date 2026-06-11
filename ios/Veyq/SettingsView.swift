@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    let onDisconnect: () -> Void
     @EnvironmentObject private var store: VeyqStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppThemePreference.storageKey) private var themePreferenceRawValue = AppThemePreference.system.rawValue
@@ -84,14 +83,6 @@ struct SettingsView: View {
                         Text(L10n.string("Tenants are selected as workspace context; instances are shown here as connected sessions."))
                     }
                 }
-
-                Button(role: .destructive) {
-                    onDisconnect()
-                    dismiss()
-                } label: {
-                    Label(L10n.string("Disconnect"), systemImage: "rectangle.portrait.and.arrow.right")
-                }
-                .accessibilityIdentifier("settings-disconnect-button")
             }
             .listStyle(.insetGrouped)
             .navigationTitle(L10n.string("Settings"))

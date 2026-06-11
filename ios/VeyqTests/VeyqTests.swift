@@ -800,52 +800,6 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
-    func testDisconnectRevokesEveryStoredNativeSession() async throws {
-        URLProtocolStub.reset()
-        URLProtocolStub.queuedResponses = [
-            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: Data()),
-            URLProtocolStub.Response(statusCode: 200, data: Data())
-        ]
-
-        let sessionStore = InMemoryNativeSessionStore()
-        let activeSession = testStoredNativeSession(
-            instanceURL: "https://active.example.test",
-            apiBaseURL: "https://active.example.test/api",
-            accessToken: "active-access",
-            refreshToken: "active-refresh"
-        )
-        let inactiveSession = testStoredNativeSession(
-            instanceURL: "https://inactive.example.test",
-            apiBaseURL: "https://inactive.example.test/api",
-            accessToken: "inactive-access",
-            refreshToken: "inactive-refresh"
-        )
-        try sessionStore.save(activeSession)
-        try sessionStore.update(inactiveSession)
-        let store = VeyqStore(
-            sessionStore: sessionStore,
-            apiSession: URLSession(configuration: .stubbed)
-        )
-        await store.restoreSession()
-
-        await store.disconnect()
-
-        let logoutRequests = URLProtocolStub.requestHistory.suffix(2)
-        XCTAssertEqual(logoutRequests.map { $0.url?.absoluteString }, [
-            "https://active.example.test/api/auth/mobile/logout",
-            "https://inactive.example.test/api/auth/mobile/logout"
-        ])
-        XCTAssertEqual(logoutRequests.map { $0.value(forHTTPHeaderField: "Authorization") }, [
-            "Bearer active-access",
-            "Bearer inactive-access"
-        ])
-        XCTAssertTrue(try sessionStore.loadAll().isEmpty)
-    }
-
-    @MainActor
     func testDeleteInstanceKeepsAccountWhenServerUnreachable() async throws {
         URLProtocolStub.reset()
         URLProtocolStub.queuedResponses = [
@@ -910,45 +864,6 @@ final class VeyqTests: XCTestCase {
         XCTAssertEqual(stored.refreshToken, "new-inactive-refresh")
         XCTAssertEqual(stored.accessToken, "new-inactive-access")
         XCTAssertEqual(store.instances.first?.refreshToken, "new-inactive-refresh")
-        XCTAssertNotNil(store.errorMessage)
-    }
-
-    @MainActor
-    func testDisconnectKeepsUnreachableAccountAndRevokesReachable() async throws {
-        URLProtocolStub.reset()
-        URLProtocolStub.queuedResponses = [
-            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!),
-            URLProtocolStub.Response(statusCode: 200, data: Data()),
-            URLProtocolStub.Response(error: URLError(.cannotConnectToHost))
-        ]
-
-        let sessionStore = InMemoryNativeSessionStore()
-        let activeSession = testStoredNativeSession(
-            instanceURL: "https://active.example.test",
-            apiBaseURL: "https://active.example.test/api",
-            accessToken: "active-access",
-            refreshToken: "active-refresh"
-        )
-        let unreachableSession = testStoredNativeSession(
-            instanceURL: "https://unreachable.example.test",
-            apiBaseURL: "https://unreachable.example.test/api",
-            accessToken: "unreachable-access",
-            refreshToken: "unreachable-refresh"
-        )
-        try sessionStore.save(activeSession)
-        try sessionStore.update(unreachableSession)
-        let store = VeyqStore(
-            sessionStore: sessionStore,
-            apiSession: URLSession(configuration: .stubbed)
-        )
-        await store.restoreSession()
-
-        await store.disconnect()
-
-        // The reachable account is revoked and removed; the unreachable one is kept for a retry.
-        XCTAssertEqual(try sessionStore.loadAll().map(\.instanceURL), [unreachableSession.instanceURL])
         XCTAssertNotNil(store.errorMessage)
     }
 

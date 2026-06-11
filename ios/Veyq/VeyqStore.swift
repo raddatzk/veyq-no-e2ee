@@ -179,50 +179,6 @@ final class VeyqStore: ObservableObject {
         return normalized
     }
 
-    func disconnect() async {
-        let sessionsToRevoke = (try? sessionStore.loadAll()) ?? []
-        var someServerUnreachable = false
-        if !mockMode {
-            mediaImageCache.removeAllDiskCache()
-            for session in sessionsToRevoke {
-                if await revokeMobileSession(session) {
-                    try? sessionStore.delete(instanceURL: session.instanceURL)
-                } else {
-                    someServerUnreachable = true
-                }
-            }
-        }
-        cancelRunningUploadTasks()
-        connectedInstanceURL = nil
-        instances = []
-        user = nil
-        tenants = []
-        selectedTenant = nil
-        spaces = []
-        selectedSpace = nil
-        memories = []
-        searchResults = []
-        searchLoading = false
-        searchErrorMessage = nil
-        memoryDetails = [:]
-        recentMemoryTargets = []
-        memoryMediaFilters = [:]
-        memoryNavigationCache = [:]
-        searchSequence = 0
-        memoryNavigationLoading = false
-        apiClient = nil
-        activeCapabilities = []
-        errorMessage = someServerUnreachable
-            ? L10n.string("Some accounts could not be logged out because their server is unreachable.")
-            : nil
-        uploadItems = mockMode ? UploadQueueItem.samples : UploadQueuePersistence.loadQueue()
-        if !mockMode {
-            // Keep any sessions whose server was unreachable so the user can retry logout later.
-            instances = (try? sessionStore.loadAll()) ?? []
-        }
-        persistSharedAccounts()
-    }
-
     func switchInstance(_ session: StoredNativeSession) async {
         do {
             try sessionStore.save(session)

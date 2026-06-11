@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct MainTabView: View {
-    let onDisconnect: () -> Void
     @EnvironmentObject private var store: VeyqStore
     @AppStorage("veyq.root.tab.customization.v2") private var rootTabCustomization = TabViewCustomization()
     @State private var selectedRootTab = RootScopeTab.recent
@@ -63,7 +62,7 @@ struct MainTabView: View {
                 .environmentObject(store)
         }
         .sheet(isPresented: $settingsPresented) {
-            SettingsView(onDisconnect: onDisconnect)
+            SettingsView()
                 .environmentObject(store)
         }
         .sheet(isPresented: $createMemoryPresented) {

@@ -111,12 +111,6 @@ acceptanceCriteria:
           - testName: testDeleteInstancePersistsRotatedTokenWhenLogoutUnreachable
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testDisconnectRevokesEveryStoredNativeSession
-            kind: negative
-            ref: ios/VeyqTests/VeyqTests.swift
-          - testName: testDisconnectKeepsUnreachableAccountAndRevokesReachable
-            kind: negative
-            ref: ios/VeyqTests/VeyqTests.swift
           - testName: testStoredNativeSessionDecodesLegacyPayloadWithoutCapabilities
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
