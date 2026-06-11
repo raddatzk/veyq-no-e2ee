@@ -639,6 +639,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/401"
         "404":
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        "429":
+          "$ref": "./common.openapi.yaml#/components/responses/429"
   "/api/public-shares/{shareId}/memories/{memoryId}/media-buckets":
     get:
       tags: [PublicShares]

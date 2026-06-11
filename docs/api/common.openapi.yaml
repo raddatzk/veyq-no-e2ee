@@ -112,6 +112,21 @@ components:
             code: RANGE_NOT_SATISFIABLE
             message: Requested range not satisfiable
 
+    '429':
+      description: Zu viele Anfragen; ein Rate- oder Concurrency-Limit wurde ueberschritten.
+      headers:
+        Retry-After:
+          description: Anzahl Sekunden, die der Client vor einem erneuten Versuch warten sollte.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: RATE_LIMITED
+            message: Too many requests
+
   schemas:
     LoginSession:
       description: Authenticated session summary returned after login or token refresh.
