@@ -874,6 +874,46 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
+    func testDeleteInstancePersistsRotatedTokenWhenLogoutUnreachable() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "new-inactive-access", refreshToken: "new-inactive-refresh").data(using: .utf8)!),
+            URLProtocolStub.Response(error: URLError(.timedOut))
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        let inactiveSession = testStoredNativeSession(
+            instanceURL: "https://inactive.example.test",
+            apiBaseURL: "https://inactive.example.test/api",
+            accessToken: "expired-inactive-access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_700_000_000),
+            refreshToken: "old-inactive-refresh"
+        )
+        try sessionStore.save(inactiveSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.deleteInstance(inactiveSession)
+
+        // Refresh rotates the server tokens; when the follow-up logout times out the account is
+        // kept, but the stored and in-memory credentials must hold the rotated refresh token so a
+        // later retry can actually revoke the current server session instead of a dead one.
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(requestedURLs, [
+            "https://inactive.example.test/api/auth/mobile/session/refresh",
+            "https://inactive.example.test/api/auth/mobile/logout"
+        ])
+        let stored = try XCTUnwrap(try sessionStore.loadAll().first)
+        XCTAssertEqual(stored.instanceURL, inactiveSession.instanceURL)
+        XCTAssertEqual(stored.refreshToken, "new-inactive-refresh")
+        XCTAssertEqual(stored.accessToken, "new-inactive-access")
+        XCTAssertEqual(store.instances.first?.refreshToken, "new-inactive-refresh")
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    @MainActor
     func testDisconnectKeepsUnreachableAccountAndRevokesReachable() async throws {
         URLProtocolStub.reset()
         URLProtocolStub.queuedResponses = [

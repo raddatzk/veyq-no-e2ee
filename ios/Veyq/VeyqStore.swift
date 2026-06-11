@@ -237,6 +237,9 @@ final class VeyqStore: ObservableObject {
         do {
             if !mockMode {
                 guard await revokeMobileSession(session) else {
+                    // Revocation may have rotated and persisted new tokens; reflect them so a retry
+                    // logs out the current server session rather than an already-invalidated one.
+                    instances = (try? sessionStore.loadAll()) ?? instances
                     errorMessage = L10n.string("This account could not be logged out because its server is unreachable. Please try again.")
                     return
                 }
@@ -1338,6 +1341,18 @@ final class VeyqStore: ObservableObject {
         )
     }
 
+    /// Refreshes the session and persists the rotated tokens before returning.
+    ///
+    /// The backend invalidates the presented refresh token and issues a successor as part of
+    /// the refresh, so the rotated tokens must be stored immediately. Otherwise a later logout
+    /// failure would leave the stored account holding the now-invalid refresh token while the
+    /// freshly rotated server session stays valid and unrevoked.
+    private func persistedRefresh(_ session: StoredNativeSession) async throws -> StoredNativeSession {
+        let refreshed = try await refresh(session)
+        try? sessionStore.update(refreshed)
+        return refreshed
+    }
+
     /// Attempts to revoke the session server-side before any local deletion.
     ///
     /// Returns `true` when the server confirms the session is gone — either a successful
@@ -1350,7 +1365,7 @@ final class VeyqStore: ObservableObject {
         var refreshedBeforeLogout = false
         if shouldRefreshAccessToken(session) {
             do {
-                sessionForLogout = try await refresh(session)
+                sessionForLogout = try await persistedRefresh(session)
                 refreshedBeforeLogout = true
             } catch VeyqAPIError.unauthorized {
                 // The refresh token is already rejected by the server: the session is gone remotely.
@@ -1371,7 +1386,7 @@ final class VeyqStore: ObservableObject {
             return true
         } catch VeyqAPIError.unauthorized where !refreshedBeforeLogout {
             do {
-                let refreshedSession = try await refresh(session)
+                let refreshedSession = try await persistedRefresh(session)
                 try await VeyqAPIClient(
                     instanceURL: refreshedSession.instanceURL,
                     apiBaseURL: refreshedSession.apiBaseURL,
