@@ -90,6 +90,7 @@ The install script prompts for the common values and writes them to `.env`. Thes
 - `INVITATION_TTL_DAYS`, `EMAIL_CHANGE_TTL_HOURS`, `RESET_PASSWORD_TTL_HOURS`, `USER_CLEANUP_CRON`, `USER_CLEANUP_RETENTION_DAYS`: user workflow token lifetimes and cleanup.
 - `ARGON2_TARGET_MS`, `ARGON2_MEMORY_KIB`, `ARGON2_MIN_ITERATIONS`, `ARGON2_MAX_ITERATIONS`, `ARGON2_PARALLELISM`, `ARGON2_BENCHMARK_SAMPLES`: Argon2id password hashing benchmark and bounds.
 - `PWNED_PASSWORDS_ENABLED`, `PWNED_PASSWORDS_ENDPOINT`, `PWNED_PASSWORDS_TIMEOUT_MS`, `PWNED_PASSWORDS_FAIL_CLOSED`: optional Have I Been Pwned Pwned Passwords range check for new account passwords. Only the first five SHA-1 hash characters are sent to the configured endpoint. The default is enabled and fail-open.
+- `PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_PER_IP`, `PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_TOTAL`: caps on how many public-share live media-update long polls may be held open concurrently per client IP and in total. Excess requests are rejected with HTTP 429 to protect worker capacity. Defaults are `2` and `64`.
 - `COMPOSE_PROFILES=reset`, `RESET_TRAEFIK_RULE`, `RESET_USERNAME`, `RESET_PASSWORD`, `RESET_RESTART_CONTAINER`: optional reset sidecar for disposable test instances only.
 
 See [`infra/.env.template`](infra/.env.template) for all defaults and comments.

@@ -35,5 +35,9 @@ class ClientIpResolverTest {
     private fun securityConfig(trusted: Boolean): SecurityConfig =
         object : SecurityConfig {
             override val trustForwardedFor = trusted
+            override val publicShareUpdates = object : SecurityConfig.PublicShareUpdates {
+                override val maxConcurrentPerIp = 2
+                override val maxConcurrentTotal = 64
+            }
         }
 }

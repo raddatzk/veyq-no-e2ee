@@ -44,6 +44,7 @@ import com.veyq.api.library.media.MediaService
 import com.veyq.api.library.media.MediaStorageService
 import com.veyq.api.library.playlist.MemoryPlaylistService
 import com.veyq.api.library.track.MemoryTrackService
+import com.veyq.api.security.ConcurrencyLimitService
 import com.veyq.api.security.RateLimitService
 import io.vertx.ext.web.RoutingContext
 import jakarta.enterprise.context.ApplicationScoped
@@ -82,6 +83,7 @@ class MemoryShareService @Inject constructor(
     private val cookieConfig: CookieConfig,
     private val tokenConfig: TokenConfig,
     private val rateLimitService: RateLimitService,
+    private val concurrencyLimitService: ConcurrencyLimitService,
     private val noticeMarkdown: NoticeMarkdown,
     private val publicShareMemoryMapper: PublicShareMemoryMapper,
     private val memoryShareMapper: MemoryShareMapper,
@@ -371,7 +373,7 @@ class MemoryShareService @Inject constructor(
         afterMediaId: String?,
         knownMediaSetHash: String?,
         timeoutSeconds: Long,
-    ): PublicShareMediaUpdates {
+    ): PublicShareMediaUpdates = concurrencyLimitService.withPublicShareLongPoll {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds.coerceIn(1, 30))
         while (true) {
             val updates = self.get().listPublicShareMemoryMediaUpdates(
@@ -382,7 +384,9 @@ class MemoryShareService @Inject constructor(
                 afterMediaId,
                 knownMediaSetHash,
             )
-            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) return updates
+            if (updates.media.isNotEmpty() || updates.currentMediaIds != null || System.nanoTime() >= deadline) {
+                return@withPublicShareLongPoll updates
+            }
             TimeUnit.MILLISECONDS.sleep(750)
         }
     }
