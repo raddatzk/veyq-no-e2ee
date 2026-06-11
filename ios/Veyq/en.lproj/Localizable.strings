@@ -301,6 +301,7 @@
 "Signed-in Instances" = "Signed-in Instances";
 "Size" = "Size";
 "Skiing" = "Skiing";
+"Some accounts could not be logged out because their server is unreachable." = "Some accounts could not be logged out because their server is unreachable.";
 "Something needs attention" = "Something needs attention";
 "Space" = "Space";
 "Start Date" = "Start Date";
@@ -318,6 +319,7 @@
 "The selected upload file could not be read." = "The selected upload file could not be read.";
 "The server returned HTTP %d." = "The server returned HTTP %d.";
 "The session is no longer valid." = "The session is no longer valid.";
+"This account could not be logged out because its server is unreachable. Please try again." = "This account could not be logged out because its server is unreachable. Please try again.";
 "This does not look like a compatible veyq instance." = "This does not look like a compatible veyq instance.";
 "This instance does not support %@." = "This instance does not support %@.";
 "This instance does not support GPX tracks." = "This instance does not support GPX tracks.";

@@ -105,7 +105,13 @@ acceptanceCriteria:
           - testName: testDeleteInstanceRefreshesExpiredInactiveSessionBeforeLogout
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteInstanceKeepsAccountWhenServerUnreachable
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
           - testName: testDisconnectRevokesEveryStoredNativeSession
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDisconnectKeepsUnreachableAccountAndRevokesReachable
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
           - testName: testStoredNativeSessionDecodesLegacyPayloadWithoutCapabilities

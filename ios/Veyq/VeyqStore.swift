@@ -181,12 +181,16 @@ final class VeyqStore: ObservableObject {
 
     func disconnect() async {
         let sessionsToRevoke = (try? sessionStore.loadAll()) ?? []
+        var someServerUnreachable = false
         if !mockMode {
             mediaImageCache.removeAllDiskCache()
             for session in sessionsToRevoke {
-                await revokeMobileSession(session)
+                if await revokeMobileSession(session) {
+                    try? sessionStore.delete(instanceURL: session.instanceURL)
+                } else {
+                    someServerUnreachable = true
+                }
             }
-            try? sessionStore.delete()
         }
         cancelRunningUploadTasks()
         connectedInstanceURL = nil
@@ -208,8 +212,14 @@ final class VeyqStore: ObservableObject {
         memoryNavigationLoading = false
         apiClient = nil
         activeCapabilities = []
-        errorMessage = nil
+        errorMessage = someServerUnreachable
+            ? L10n.string("Some accounts could not be logged out because their server is unreachable.")
+            : nil
         uploadItems = mockMode ? UploadQueueItem.samples : UploadQueuePersistence.loadQueue()
+        if !mockMode {
+            // Keep any sessions whose server was unreachable so the user can retry logout later.
+            instances = (try? sessionStore.loadAll()) ?? []
+        }
         persistSharedAccounts()
     }
 
@@ -226,7 +236,10 @@ final class VeyqStore: ObservableObject {
     func deleteInstance(_ session: StoredNativeSession) async {
         do {
             if !mockMode {
-                await revokeMobileSession(session)
+                guard await revokeMobileSession(session) else {
+                    errorMessage = L10n.string("This account could not be logged out because its server is unreachable. Please try again.")
+                    return
+                }
             }
             try sessionStore.delete(instanceURL: session.instanceURL)
             if !mockMode {
@@ -1325,15 +1338,26 @@ final class VeyqStore: ObservableObject {
         )
     }
 
-    private func revokeMobileSession(_ session: StoredNativeSession) async {
+    /// Attempts to revoke the session server-side before any local deletion.
+    ///
+    /// Returns `true` when the server confirms the session is gone — either a successful
+    /// logout or a rejected (unauthorized) token, meaning the remote session is already
+    /// invalid. Returns `false` when revocation could not be confirmed, e.g. the server is
+    /// unreachable, so the caller must keep the local credentials for a later retry instead
+    /// of silently leaving an unrevoked refresh token valid remotely.
+    private func revokeMobileSession(_ session: StoredNativeSession) async -> Bool {
         var sessionForLogout = session
         var refreshedBeforeLogout = false
         if shouldRefreshAccessToken(session) {
             do {
                 sessionForLogout = try await refresh(session)
                 refreshedBeforeLogout = true
+            } catch VeyqAPIError.unauthorized {
+                // The refresh token is already rejected by the server: the session is gone remotely.
+                return true
             } catch {
-                sessionForLogout = session
+                // Server unreachable or another failure: revocation could not be confirmed.
+                return false
             }
         }
 
@@ -1344,6 +1368,7 @@ final class VeyqStore: ObservableObject {
                 accessToken: sessionForLogout.accessToken,
                 session: apiSession
             ).logoutMobileSession()
+            return true
         } catch VeyqAPIError.unauthorized where !refreshedBeforeLogout {
             do {
                 let refreshedSession = try await refresh(session)
@@ -1353,11 +1378,19 @@ final class VeyqStore: ObservableObject {
                     accessToken: refreshedSession.accessToken,
                     session: apiSession
                 ).logoutMobileSession()
+                return true
+            } catch VeyqAPIError.unauthorized {
+                // The token is already rejected by the server: the session is gone remotely.
+                return true
             } catch {
-                // Logout is best-effort so users can still remove inaccessible local credentials.
+                return false
             }
+        } catch VeyqAPIError.unauthorized {
+            // The server rejected the token: the session is already invalid remotely.
+            return true
         } catch {
-            // Logout is best-effort so users can still remove inaccessible local credentials.
+            // Server unreachable or another failure: revocation could not be confirmed.
+            return false
         }
     }
 
