@@ -1,3 +1,5 @@
+export const JOURNAL_TRACK_EMBED_MAX_IDS = 20
+
 export type MediaInsertRange = {
   start: number
   end: number
@@ -91,7 +93,7 @@ export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
         return { start, end, kind, label, targetId: mediaIds[0], targetIds: mediaIds, mediaIds }
       }
       if (kind === 'track') {
-        const trackIds = target.split(',').map((id) => id.trim()).filter(Boolean)
+        const trackIds = normalizeJournalTrackIds(target.split(','))
         return { start, end, kind, label, targetId: trackIds[0], targetIds: trackIds }
       }
       return { start, end, kind, label, targetId: target, targetIds: [target] }
@@ -101,7 +103,14 @@ export function journalEmbedRanges(markdown: string): JournalEmbedRange[] {
 }
 
 export function journalEmbedMarkdown(kind: JournalEmbedKind, ids: string[], label?: string): string {
-  const target = ids.join(',')
+  const target = (kind === 'track' ? normalizeJournalTrackIds(ids) : ids).join(',')
   const suffix = label?.trim() ? ` ${label.trim()}` : ''
   return `::${kind}:${target}${suffix}`
+}
+
+export function normalizeJournalTrackIds(ids: string[]): string[] {
+  return Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).slice(
+    0,
+    JOURNAL_TRACK_EMBED_MAX_IDS
+  )
 }

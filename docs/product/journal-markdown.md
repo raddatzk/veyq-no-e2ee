@@ -91,7 +91,7 @@ Playlist embeds reference Memory playlist objects. A playlist cannot be deleted 
 
 Track embeds reference stored GPX tracks in the current Memory context. A track cannot be deleted while it is referenced by the Memory journal.
 
-Multiple comma-separated track ids render as one map with all selected GPX routes. The UI adds distance, duration, ascent and descent across the selected tracks.
+Multiple comma-separated track ids render as one map with all selected GPX routes. Duplicate track IDs are collapsed, and a single track embed may reference at most 20 unique tracks. The UI adds distance, duration, ascent and descent across the selected tracks.
 
 ## Validation Rules
 
@@ -101,7 +101,7 @@ The backend validates `::` veyq tokens when a journal is saved:
 - Media embeds must point to visible media in the allowed Memory context. Carousel embeds validate every comma-separated media id.
 - Memory embeds must point to visible Memories in the allowed Memory context.
 - Stored playlist embeds must point to a visible playlist in the allowed Memory context.
-- Track embeds must point to visible stored tracks in the allowed Memory context.
+- Track embeds must point to visible stored tracks in the allowed Memory context, after duplicate IDs are collapsed, and may include at most 20 unique track IDs per embed.
 - Journal Markdown must be present and may not exceed the backend size limit.
 
 Invalid or unauthorized references fail the save request. Existing journals are not partially updated.
