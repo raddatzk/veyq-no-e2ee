@@ -1038,7 +1038,7 @@ final class VeyqStore: ObservableObject {
             errorMessage = L10n.string("No active tenant is selected.")
             return
         }
-        let target = UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
+        let target = accountBoundUploadTarget(tenantName: tenantName, memory: memory)
         var newItems: [UploadQueueItem] = []
 
         for fileURL in fileURLs {
@@ -1081,7 +1081,7 @@ final class VeyqStore: ObservableObject {
         recordRecentMemory(memory)
         enqueuePendingImport(
             batch,
-            target: UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
+            target: accountBoundUploadTarget(tenantName: tenantName, memory: memory)
         )
     }
 
@@ -1123,7 +1123,7 @@ final class VeyqStore: ObservableObject {
         }
         guard !storedURLs.isEmpty else { return }
 
-        let target = UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
+        let target = accountBoundUploadTarget(tenantName: tenantName, memory: memory)
         Task {
             await uploadPendingImportTracks(fileURLs: storedURLs, target: target)
         }
@@ -1603,7 +1603,11 @@ final class VeyqStore: ObservableObject {
     private func runNextUploadIfNeeded() {
         guard !mockMode, apiClient != nil else { return }
         guard uploadTasks.isEmpty else { return }
-        guard let item = uploadItems.first(where: { $0.state == .queued }) else { return }
+        // Only start uploads whose target belongs to the currently active account,
+        // so switching accounts (e.g. a share handoff) never drains a queued upload
+        // through the wrong session. Uploads for other accounts wait until that
+        // account is active again.
+        guard let item = uploadItems.first(where: { $0.state == .queued && uploadTargetMatchesActiveAccount($0.target) }) else { return }
 
         let task = Task<Void, Never> { [weak self] in
             guard let self else { return }
@@ -1612,25 +1616,61 @@ final class VeyqStore: ObservableObject {
         uploadTasks[item.id] = task
     }
 
+    /// A target created inside the host app is bound to the account it was queued
+    /// on. Legacy/unbound targets fall back to the current session.
+    private func uploadTargetMatchesActiveAccount(_ target: UploadTargetMemory) -> Bool {
+        guard target.isAccountBound else { return true }
+        guard let activeSession = try? sessionStore.loadActive() else { return false }
+        return target.matches(session: activeSession)
+    }
+
+    private func accountBoundUploadTarget(tenantName: String, memory: Memory) -> UploadTargetMemory {
+        guard let session = try? sessionStore.loadActive() else {
+            return UploadTargetMemory(tenantName: tenantName, memoryId: memory.id, memoryTitle: memory.title)
+        }
+        return UploadTargetMemory(
+            tenantName: tenantName,
+            memoryId: memory.id,
+            memoryTitle: memory.title,
+            accountId: session.instanceURL.absoluteString,
+            instanceURL: session.instanceURL,
+            apiBaseURL: session.apiBaseURL,
+            userId: session.user.userId
+        )
+    }
+
     private func performUpload(itemId: String) async {
         guard let preflightIndex = uploadItems.firstIndex(where: { $0.id == itemId }) else {
             uploadTasks[itemId] = nil
             return
         }
         let target = uploadItems[preflightIndex].target
-        let activation = await activateUploadTargetAccountIfNeeded(target)
-        if activation != .ready {
-            if let failIndex = uploadItems.firstIndex(where: { $0.id == itemId }) {
-                uploadItems[failIndex].state = .failed
-                uploadItems[failIndex].errorMessage = errorMessage ?? L10n.string("The account selected in the share sheet is no longer available.")
-                // A missing account can never succeed; a transient switch failure can be retried.
-                uploadItems[failIndex].retryable = (activation == .transientFailure)
-                uploadItems[failIndex].progressUpdatedAt = Date()
-                persistUploads()
+        // Account-bound uploads must run on their own account. We never switch the
+        // session here (that would race the serialized handoff activation); instead
+        // we only run when the target's account is already active, and leave the item
+        // queued otherwise so it resumes once that account becomes active again.
+        if target.isAccountBound {
+            let knownAccounts = (try? sessionStore.loadAll()) ?? []
+            guard knownAccounts.contains(where: { target.matches(session: $0) }) else {
+                // The account this upload was queued on no longer exists; it can never succeed.
+                if let failIndex = uploadItems.firstIndex(where: { $0.id == itemId }) {
+                    uploadItems[failIndex].state = .failed
+                    uploadItems[failIndex].errorMessage = L10n.string("The account selected in the share sheet is no longer available.")
+                    uploadItems[failIndex].retryable = false
+                    uploadItems[failIndex].progressUpdatedAt = Date()
+                    persistUploads()
+                }
+                uploadTasks[itemId] = nil
+                runNextUploadIfNeeded()
+                return
             }
-            uploadTasks[itemId] = nil
-            runNextUploadIfNeeded()
-            return
+            guard uploadTargetMatchesActiveAccount(target) else {
+                // The active account changed after this item was picked; leave it queued
+                // and advance to an upload for the now-active account.
+                uploadTasks[itemId] = nil
+                runNextUploadIfNeeded()
+                return
+            }
         }
         guard let index = uploadItems.firstIndex(where: { $0.id == itemId }), let apiClient else {
             if let failIndex = uploadItems.firstIndex(where: { $0.id == itemId }) {
