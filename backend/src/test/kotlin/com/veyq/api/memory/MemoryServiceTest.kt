@@ -73,6 +73,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import jakarta.ws.rs.core.StreamingOutput
 import java.util.zip.ZipInputStream
@@ -304,6 +305,44 @@ class MemoryServiceTest {
         assertThat(updates.media.map { it.id }).containsExactly(first.publicId)
         assertThat(updates.media.single().highlight).isTrue()
         assertThat(updates.currentMediaIds).containsExactly(first.publicId)
+    }
+
+    @Test
+    fun `waiting for memory media updates reports deletions on the first poll without spinning`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-wait-delete-trip", "Live Wait Delete Trip"))
+        val first = createMedia(
+            owner,
+            memory(trip.id),
+            "First",
+            createdAt = Instant.parse("2026-01-02T10:00:00Z"),
+        )
+        val second = createMedia(
+            owner,
+            memory(trip.id),
+            "Second",
+            createdAt = Instant.parse("2026-01-02T10:01:00Z"),
+        )
+        val initial = mediaService.listMemoryMedia(trip.id, false)
+        val cursor = initial.maxWith(compareBy({ it.updatedAt }, { it.id }))
+        val knownHash = mediaService.mediaSetHash(initial.map { it.id })
+
+        mediaService.deleteMemoryMedia(trip.id, second.publicId)
+
+        val startedAt = System.nanoTime()
+        val updates = mediaService.waitForMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = cursor.updatedAt.toInstant(),
+            afterMediaId = cursor.id,
+            knownMediaSetHash = knownHash,
+            timeoutSeconds = 25,
+        )
+        val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+
+        // The change is already visible when the request arrives, so the long poll must return on the
+        // first evaluation rather than sleeping (the loop sleeps 750ms between iterations).
+        assertThat(updates.currentMediaIds).containsExactly(first.publicId)
+        assertThat(elapsedMs).isLessThan(750)
     }
 
     @Test

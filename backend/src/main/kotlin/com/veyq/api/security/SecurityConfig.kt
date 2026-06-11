@@ -12,6 +12,9 @@ interface SecurityConfig {
     @get:WithName("public-share-updates")
     val publicShareUpdates: PublicShareUpdates
 
+    @get:WithName("memory-updates")
+    val memoryUpdates: MemoryUpdates
+
     interface PublicShareUpdates {
         @get:WithName("max-concurrent-per-ip")
         @get:WithDefault("2")
@@ -19,6 +22,16 @@ interface SecurityConfig {
 
         @get:WithName("max-concurrent-total")
         @get:WithDefault("64")
+        val maxConcurrentTotal: Int
+    }
+
+    interface MemoryUpdates {
+        @get:WithName("max-concurrent-per-user")
+        @get:WithDefault("4")
+        val maxConcurrentPerUser: Int
+
+        @get:WithName("max-concurrent-total")
+        @get:WithDefault("128")
         val maxConcurrentTotal: Int
     }
 }

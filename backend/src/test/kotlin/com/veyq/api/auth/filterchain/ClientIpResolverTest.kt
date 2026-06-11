@@ -39,5 +39,9 @@ class ClientIpResolverTest {
                 override val maxConcurrentPerIp = 2
                 override val maxConcurrentTotal = 64
             }
+            override val memoryUpdates = object : SecurityConfig.MemoryUpdates {
+                override val maxConcurrentPerUser = 4
+                override val maxConcurrentTotal = 128
+            }
         }
 }

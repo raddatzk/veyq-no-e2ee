@@ -298,6 +298,11 @@ data class ArchiveMediaKeyset(
     val id: Long,
 )
 
+data class PublicMediaVisibilityRow(
+    val publicId: String,
+    val shareIdentityId: Long?,
+)
+
 @ApplicationScoped
 class MediaRepo : PanacheRepository<Media> {
     @Inject lateinit var archiveEntityManager: EntityManager
@@ -350,6 +355,25 @@ class MediaRepo : PanacheRepository<Media> {
         return archiveEntityManager.createQuery(
             "select m.publicId from Media m where m.memory in :memories order by m.publicId",
             String::class.java,
+        ).setParameter("memories", memories).resultList
+    }
+
+    /**
+     * Projects only the columns needed to evaluate public-share visibility (public id and the
+     * owning share identity), avoiding the full-entity hydration that [listByMemoriesOrdered]
+     * incurs when the caller merely needs to compute the visible media-id set.
+     */
+    fun listPublicIdVisibilityByMemories(memories: List<Memory>): List<PublicMediaVisibilityRow> {
+        if (memories.isEmpty()) return emptyList()
+        // Left join so media without a share identity (the common case) are retained; navigating
+        // m.shareIdentity.id directly would force an inner join and silently drop those rows.
+        return archiveEntityManager.createQuery(
+            """
+            select new com.veyq.api.domain.PublicMediaVisibilityRow(m.publicId, si.id)
+            from Media m left join m.shareIdentity si
+            where m.memory in :memories
+            """.trimIndent(),
+            PublicMediaVisibilityRow::class.java,
         ).setParameter("memories", memories).resultList
     }
 

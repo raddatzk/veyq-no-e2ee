@@ -931,6 +931,8 @@ paths:
           "$ref": "./common.openapi.yaml#/components/responses/403"
         '404':
           "$ref": "./common.openapi.yaml#/components/responses/404"
+        '429':
+          "$ref": "./common.openapi.yaml#/components/responses/429"
   "/api/{tenantName}/memories/{memoryId}/media-buckets":
     get:
       tags:
