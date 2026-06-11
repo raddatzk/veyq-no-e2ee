@@ -21,6 +21,9 @@ acceptanceCriteria:
           - testName: keeps elevation metadata empty when gpx has no elevation
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
+          - testName: ignores non-finite and implausibly large elevation values
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/library/track/GpxTrackParserTest.kt
   - id: memory.tracks.reject-invalid-gpx
     statement: GPX without enough points is rejected.
     coverage:
