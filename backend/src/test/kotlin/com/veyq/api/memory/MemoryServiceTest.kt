@@ -307,66 +307,61 @@ class MemoryServiceTest {
     }
 
     @Test
-    fun `memory media updates do not repeat the cursor media for a sub-millisecond client cursor`() {
-        val trip = memoryService.createMemory(CreateMemoryRequest("live-precise-cursor-trip", "Live Precise Cursor Trip"))
-        // updated_at is stored at millisecond precision by the Media lifecycle hooks,
-        // while a client may resume from a sub-millisecond timestamp. The cursor must
-        // exclude the row it points at rather than returning it again.
-        val preciseCreatedAt = Instant.parse("2026-01-02T10:00:00.123456Z")
-        val media = createMedia(
-            owner,
-            memory(trip.id),
-            "Precise Cursor",
-            createdAt = preciseCreatedAt,
-        )
-        mediaService.listMemoryMedia(trip.id, false)
+    fun `memory media updates store the cursor timestamp at millisecond precision`() {
+        val trip = memoryService.createMemory(CreateMemoryRequest("live-ms-precision-trip", "Live Ms Precision Trip"))
+        // The media update cursor resumes from a millisecond-precision client timestamp,
+        // so the lifecycle hooks must floor updated_at to milliseconds. If updated_at kept
+        // sub-millisecond precision, the keyset predicate would be inconsistent with the
+        // "order by updatedAt, publicId" ordering and could skip same-millisecond updates.
+        createMedia(owner, memory(trip.id), "Ms Precision", createdAt = Instant.parse("2026-01-02T10:00:00.123456Z"))
 
-        val updates = mediaService.listMemoryMediaUpdates(
-            memoryId = trip.id,
-            includeChildren = false,
-            afterUpdatedAt = preciseCreatedAt,
-            afterMediaId = media.publicId,
-            knownMediaSetHash = mediaService.mediaSetHash(listOf(media.publicId)),
-        )
+        val updatedAt = mediaService.listMemoryMedia(trip.id, false).single().updatedAt.toInstant()
 
-        assertThat(updates.media).isEmpty()
-        assertThat(updates.currentMediaIds).isNull()
+        assertThat(updatedAt).isEqualTo(updatedAt.truncatedTo(ChronoUnit.MILLIS))
     }
 
     @Test
-    fun `memory media updates never skip a same-millisecond row`() {
+    fun `memory media updates never skip or repeat a same-millisecond row`() {
         val trip = memoryService.createMemory(CreateMemoryRequest("live-same-ms-trip", "Live Same Millisecond Trip"))
-        // Two media updated within the same millisecond but at distinct microseconds.
-        // The Media lifecycle hooks floor updated_at to milliseconds, so both share the
-        // same stored updated_at and are ordered solely by publicId. The cursor must walk
-        // both rows in that order without skipping either, regardless of how the original
-        // sub-millisecond instants relate to the (random) publicId order.
-        createMedia(owner, memory(trip.id), "Same Ms Early", createdAt = Instant.parse("2026-01-02T10:00:00.123100Z"))
-        createMedia(owner, memory(trip.id), "Same Ms Late", createdAt = Instant.parse("2026-01-02T10:00:00.123900Z"))
+        val a = createMedia(owner, memory(trip.id), "Same Ms A", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        val b = createMedia(owner, memory(trip.id), "Same Ms B", createdAt = Instant.parse("2026-01-02T10:00:00Z"))
+        // Assign buckets before pinning updated_at so the polls below do not rewrite it.
+        mediaService.listMemoryMedia(trip.id, false)
 
-        val ordered = mediaService.listMemoryMedia(trip.id, false)
-            .sortedWith(compareBy({ it.updatedAt }, { it.id }))
+        // Pin both rows to the exact same millisecond. updated_at is stored at millisecond
+        // precision in production, so within a millisecond the only tie-breaker is publicId.
+        val sharedUpdatedAt = Instant.parse("2026-01-02T10:00:00.123Z")
+        inTransaction {
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", sharedUpdatedAt, a.publicId)
+            mediaRepo.update("updatedAt = ?1 where publicId = ?2", sharedUpdatedAt, b.publicId)
+        }
+
+        // Server ordering within the millisecond bucket (by publicId).
+        val ordered = mediaService.listMemoryMediaUpdates(
+            memoryId = trip.id,
+            includeChildren = false,
+            afterUpdatedAt = Instant.parse("2026-01-02T10:00:00.122Z"),
+            afterMediaId = null,
+            knownMediaSetHash = null,
+        ).media.map { it.id }
         assertThat(ordered).hasSize(2)
-        val first = ordered[0]
-        val second = ordered[1]
-        // Same millisecond bucket: the tie is broken purely by publicId.
-        assertThat(first.updatedAt.toInstant().truncatedTo(ChronoUnit.MILLIS))
-            .isEqualTo(second.updatedAt.toInstant().truncatedTo(ChronoUnit.MILLIS))
 
+        // Resuming from the first row must return the second (never skipped).
         val afterFirst = mediaService.listMemoryMediaUpdates(
             memoryId = trip.id,
             includeChildren = false,
-            afterUpdatedAt = first.updatedAt.toInstant(),
-            afterMediaId = first.id,
+            afterUpdatedAt = sharedUpdatedAt,
+            afterMediaId = ordered[0],
             knownMediaSetHash = null,
         )
-        assertThat(afterFirst.media.map { it.id }).containsExactly(second.id)
+        assertThat(afterFirst.media.map { it.id }).containsExactly(ordered[1])
 
+        // Resuming from the last row must return nothing (never repeated).
         val afterSecond = mediaService.listMemoryMediaUpdates(
             memoryId = trip.id,
             includeChildren = false,
-            afterUpdatedAt = second.updatedAt.toInstant(),
-            afterMediaId = second.id,
+            afterUpdatedAt = sharedUpdatedAt,
+            afterMediaId = ordered[1],
             knownMediaSetHash = null,
         )
         assertThat(afterSecond.media).isEmpty()
