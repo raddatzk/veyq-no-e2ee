@@ -18,6 +18,7 @@ import {
   mediaPreviewOnlyUrl
 } from '../../shared/utils/mediaUrls'
 import { memoryPathToTenantRoute } from '../../shared/utils/paths'
+import { getErrorMessage } from '../../shared/utils/errors'
 
 const props = defineProps<{
   tenantName: string
@@ -291,7 +292,7 @@ async function deleteCurrentMedia() {
     await props.deleteMedia(props.media.id, props.media.memoryId)
     emit('deleted', props.media)
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : t('media.deleteFailed')
+    saveError.value = getErrorMessage(error, t('media.deleteFailed'))
   } finally {
     isSaving.value = false
   }
