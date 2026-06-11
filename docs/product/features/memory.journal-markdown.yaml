@@ -62,6 +62,10 @@ acceptanceCriteria:
           - testName: deduplicates repeated track entries before rendering route layers
             kind: negative
             ref: frontend/src/features/memories/components/TrackMap.test.ts
+        integration:
+          - testName: caps journal track selection at the maximum and disables further tracks
+            kind: negative
+            ref: frontend/src/features/memories/components/MemoryDetail.test.ts
   - id: memory.journal-markdown.legacy-veyq-links
     statement: Legacy `veyq:` Markdown link and image targets are no longer treated as veyq journal embeds.
     coverage:
