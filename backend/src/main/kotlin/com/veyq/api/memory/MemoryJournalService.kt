@@ -322,6 +322,7 @@ class MemoryJournalService @Inject constructor(
     }
 
     private fun verifyToken(token: String, allowExpiredToken: Boolean = false): JournalLiveTokenPayload {
+        requireConfiguredLiveTokenSecret()
         val payload = token.substringBefore('.', "")
         val signature = token.substringAfter('.', "")
         if (payload.isBlank() || signature.isBlank() || !constantTimeEquals(hmac(payload), signature)) {
