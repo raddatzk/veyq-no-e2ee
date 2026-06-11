@@ -725,6 +725,149 @@ final class VeyqTests: XCTestCase {
     }
 
     @MainActor
+    func testDeleteInstanceRevokesInactiveNativeSessionBeforeLocalRemoval() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: capabilitiesJSON(["auth.mobile-handoff", "memory.core"]).data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: bootstrapJSON().data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: navigationJSON().data(using: .utf8)!)
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        let activeSession = testStoredNativeSession(
+            instanceURL: "https://active.example.test",
+            apiBaseURL: "https://active.example.test/api",
+            accessToken: "active-access",
+            refreshToken: "active-refresh"
+        )
+        let inactiveSession = testStoredNativeSession(
+            instanceURL: "https://inactive.example.test",
+            apiBaseURL: "https://inactive.example.test/api",
+            accessToken: "inactive-access",
+            refreshToken: "inactive-refresh"
+        )
+        try sessionStore.save(activeSession)
+        try sessionStore.update(inactiveSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+        await store.restoreSession()
+        URLProtocolStub.requestHistory = []
+        URLProtocolStub.responseData = Data()
+
+        await store.deleteInstance(inactiveSession)
+
+        let request = try XCTUnwrap(URLProtocolStub.requestHistory.first)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://inactive.example.test/api/auth/mobile/logout")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer inactive-access")
+        XCTAssertEqual(try sessionStore.loadAll().map(\.instanceURL), [activeSession.instanceURL])
+    }
+
+    @MainActor
+    func testDeleteInstanceRefreshesExpiredInactiveSessionBeforeLogout() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "new-inactive-access", refreshToken: "new-inactive-refresh").data(using: .utf8)!),
+            URLProtocolStub.Response(statusCode: 200, data: Data())
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        let inactiveSession = testStoredNativeSession(
+            instanceURL: "https://inactive.example.test",
+            apiBaseURL: "https://inactive.example.test/api",
+            accessToken: "expired-inactive-access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_700_000_000),
+            refreshToken: "inactive-refresh"
+        )
+        try sessionStore.save(inactiveSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.deleteInstance(inactiveSession)
+
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(requestedURLs, [
+            "https://inactive.example.test/api/auth/mobile/session/refresh",
+            "https://inactive.example.test/api/auth/mobile/logout"
+        ])
+        XCTAssertEqual(URLProtocolStub.requestHistory.first?.value(forHTTPHeaderField: "Authorization"), nil)
+        XCTAssertEqual(URLProtocolStub.requestHistory.dropFirst().first?.value(forHTTPHeaderField: "Authorization"), "Bearer new-inactive-access")
+        XCTAssertTrue(try sessionStore.loadAll().isEmpty)
+    }
+
+    @MainActor
+    func testDeleteInstanceKeepsAccountWhenServerUnreachable() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(error: URLError(.cannotConnectToHost))
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        let inactiveSession = testStoredNativeSession(
+            instanceURL: "https://inactive.example.test",
+            apiBaseURL: "https://inactive.example.test/api",
+            accessToken: "inactive-access",
+            refreshToken: "inactive-refresh"
+        )
+        try sessionStore.save(inactiveSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.deleteInstance(inactiveSession)
+
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(requestedURLs, ["https://inactive.example.test/api/auth/mobile/logout"])
+        XCTAssertEqual(try sessionStore.loadAll().map(\.instanceURL), [inactiveSession.instanceURL])
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    @MainActor
+    func testDeleteInstancePersistsRotatedTokenWhenLogoutUnreachable() async throws {
+        URLProtocolStub.reset()
+        URLProtocolStub.queuedResponses = [
+            URLProtocolStub.Response(statusCode: 200, data: nativeSessionJSON(accessToken: "new-inactive-access", refreshToken: "new-inactive-refresh").data(using: .utf8)!),
+            URLProtocolStub.Response(error: URLError(.timedOut))
+        ]
+
+        let sessionStore = InMemoryNativeSessionStore()
+        let inactiveSession = testStoredNativeSession(
+            instanceURL: "https://inactive.example.test",
+            apiBaseURL: "https://inactive.example.test/api",
+            accessToken: "expired-inactive-access",
+            accessTokenExpiresAt: Date(timeIntervalSince1970: 1_700_000_000),
+            refreshToken: "old-inactive-refresh"
+        )
+        try sessionStore.save(inactiveSession)
+        let store = VeyqStore(
+            sessionStore: sessionStore,
+            apiSession: URLSession(configuration: .stubbed)
+        )
+
+        await store.deleteInstance(inactiveSession)
+
+        // Refresh rotates the server tokens; when the follow-up logout times out the account is
+        // kept, but the stored and in-memory credentials must hold the rotated refresh token so a
+        // later retry can actually revoke the current server session instead of a dead one.
+        let requestedURLs = URLProtocolStub.requestHistory.compactMap { $0.url?.absoluteString }
+        XCTAssertEqual(requestedURLs, [
+            "https://inactive.example.test/api/auth/mobile/session/refresh",
+            "https://inactive.example.test/api/auth/mobile/logout"
+        ])
+        let stored = try XCTUnwrap(try sessionStore.loadAll().first)
+        XCTAssertEqual(stored.instanceURL, inactiveSession.instanceURL)
+        XCTAssertEqual(stored.refreshToken, "new-inactive-refresh")
+        XCTAssertEqual(stored.accessToken, "new-inactive-access")
+        XCTAssertEqual(store.instances.first?.refreshToken, "new-inactive-refresh")
+        XCTAssertNotNil(store.errorMessage)
+    }
+
+    @MainActor
     func testRestoreRecoversWhenStoredNativeSessionWasAlreadyRotated() async throws {
         URLProtocolStub.reset()
         URLProtocolStub.queuedResponses = [
@@ -2963,6 +3106,26 @@ final class VeyqTests: XCTestCase {
             tenantName: "family",
             memoryId: "summer-south-tyrol",
             memoryTitle: "Summer in South Tyrol"
+        )
+    }
+
+    private func testStoredNativeSession(
+        instanceURL: String = "https://memories.example.test",
+        apiBaseURL: String = "https://memories.example.test/api",
+        accessToken: String = "access",
+        accessTokenExpiresAt: Date = Date(timeIntervalSince1970: 1_900_000_000),
+        refreshToken: String = "refresh",
+        refreshTokenExpiresAt: Date = Date(timeIntervalSince1970: 1_900_003_600)
+    ) -> StoredNativeSession {
+        StoredNativeSession(
+            instanceURL: URL(string: instanceURL)!,
+            apiBaseURL: URL(string: apiBaseURL)!,
+            accessToken: accessToken,
+            accessTokenExpiresAt: accessTokenExpiresAt,
+            refreshToken: refreshToken,
+            refreshTokenExpiresAt: refreshTokenExpiresAt,
+            user: testUser(),
+            capabilities: [VeyqCapability(id: "memory.core", introducedInVersion: "1.0", audience: "ALL_USERS")]
         )
     }
 

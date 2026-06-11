@@ -99,6 +99,18 @@ acceptanceCriteria:
           - testName: testRestoreRefreshesExpiredNativeSessionBeforeBootstrap
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteInstanceRevokesInactiveNativeSessionBeforeLocalRemoval
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteInstanceRefreshesExpiredInactiveSessionBeforeLogout
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteInstanceKeepsAccountWhenServerUnreachable
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
+          - testName: testDeleteInstancePersistsRotatedTokenWhenLogoutUnreachable
+            kind: negative
+            ref: ios/VeyqTests/VeyqTests.swift
           - testName: testStoredNativeSessionDecodesLegacyPayloadWithoutCapabilities
             kind: negative
             ref: ios/VeyqTests/VeyqTests.swift
