@@ -366,6 +366,16 @@ acceptanceCriteria:
           - testName: testMemoryMediaFilterStateIsSeparatedPerMemory
             kind: positive
             ref: ios/VeyqTests/VeyqTests.swift
+  - id: memory.media.live-updates-concurrency-limit
+    statement: >-
+      Authenticated memory media-update long polls are capped per user and in total
+      so a single account cannot exhaust worker capacity.
+    coverage:
+      backend:
+        unit:
+          - testName: bounds authenticated memory long polls per user
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/api/security/ConcurrencyLimitServiceTest.kt
   - id: memory.media.detail-gallery-updates
     statement: Memory detail keeps media gallery and bucket counts consistent during upload, move, delete and live creation update actions.
     coverage:
@@ -375,6 +385,9 @@ acceptanceCriteria:
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: memory media updates return changed media and current ids when media is deleted
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
+          - testName: waiting for memory media updates reports deletions on the first poll without spinning
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/api/memory/MemoryServiceTest.kt
           - testName: memory media updates store the cursor timestamp at millisecond precision
