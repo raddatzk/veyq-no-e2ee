@@ -96,6 +96,9 @@ acceptanceCriteria:
           - testName: hides highlighting and shows a shortcut hint when highlighting is not allowed
             kind: negative
             ref: frontend/src/components/media/MediaLightbox.test.ts
+          - testName: keeps highlighting disabled when allowed but no update callback is supplied
+            kind: negative
+            ref: frontend/src/components/media/MediaLightbox.test.ts
           - testName: disables lightbox highlighting when a media bucket is missing from the provided bucket list
             kind: negative
             ref: frontend/src/components/media/MediaGrid.test.ts
