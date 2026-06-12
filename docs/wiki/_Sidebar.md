@@ -14,6 +14,7 @@
 **Cross-cutting**
 
 - [Security Model](crosscutting/security-model)
+- [Account Keys & Recovery (illustrated)](crosscutting/account-key-model)
 - [Agent Mode](crosscutting/agent-mode)
 - [Search](crosscutting/search)
 - [Live Collaboration](crosscutting/live-collaboration)

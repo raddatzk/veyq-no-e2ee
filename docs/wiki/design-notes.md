@@ -17,6 +17,11 @@
 5. **Later** — Key Transparency rollout; encrypted-relay CRDT details for shared journals; convergent-
    encryption-for-dedup tuning; full legal/DPA apparatus before SaaS launch.
 
+6. **Key-directory trust hardening (Later)** — **manual key verification** (out-of-band fingerprint/QR,
+   Signal-style) as a user action atop TOFU/KT; and **identity-key rotation** (re-wrap all grants
+   old→new, sign with the old key, sync the new pair to all devices) for the compromised-key case. Both
+   lean on Key Transparency.
+
 ## Delivery note — sequencing the E2EE rollout
 
 The architecture target is **E2EE everywhere**. Delivery can still be incremental: the **personal

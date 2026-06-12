@@ -27,3 +27,32 @@
 | **Operator** | Whoever runs the veyq instance — a self-hoster (possibly hosting for others) or the SaaS provider. |
 | **Depicted person** | A person appearing in content who is not necessarily a user; a first-class privacy subject. |
 | **Capability discovery** | The server advertising available features so clients/workers adapt. |
+
+## Key vocabulary
+
+> The canonical names for every key in the model. Keep the **confusable pairs** (below) distinct.
+
+| Key | Role |
+|---|---|
+| **identity key pair** → **identity public key** / **identity private key** | a user's personal keypair; the public key is published to the directory (others wrap access to it), the private key is the crown jewel |
+| **master key** | symmetric key that wraps the *identity private key* — the single hub every unlock method opens |
+| **KEK** (key-encryption key) | ephemeral key derived from one unlock method that wraps the *master key*; **never stored** (one wrapped copy of the master key per method) |
+| **secret key (2SKD)** | high-entropy second factor combined with the password (an unlock *input*); never sent to the server — also in the table above |
+| **device key** | device-bound key in the OS keystore; the "this device" unlock method |
+| **passkey** → **passkey public key** + **PRF secret** | a WebAuthn credential doing double duty: its public key verifies login (auth), its PRF secret unlocks the master key |
+| **scope key pair** → **scope public/private key** | per-scope keypair (personal/group/tenant); content keys wrap to the scope public key; members get the scope private key wrapped to their identity public key |
+| **content key** | per-subtree symmetric key encrypting content — also in the table above |
+| **share key** | per-share key; a subtree's content key is wrapped to it, token-unlocked |
+
+**Confusable pairs — always kept distinct:**
+- **secret key** (2SKD unlock factor) ≠ **private key** (private half of a keypair) — the main trap.
+- **master key** (wraps your identity private key) ≠ **KEK** (wraps the master key).
+- **identity public key** (others wrap access to you) ≠ **passkey public key** (verifies your login).
+
+## Key-directory trust terms
+
+| Term | Definition |
+|---|---|
+| **TOFU / key pinning** | *Trust On First Use*: accept the public key seen on first contact, **pin** (remember) it locally, and **warn if it later changes** (like SSH `known_hosts`). Catches substitution *after* first use; the first contact itself is unprotected — closed later by **Key Transparency**. |
+| **Manual key verification** | Two users confirm each other's identity-key fingerprint out-of-band (QR / safety numbers, à la Signal) — covers even the first contact. A user's **own** public key and pinned keys live in **protected client state**, never re-fetched-and-trusted from the server. |
+| **Identity-key rotation** | Replacing one's identity key pair (e.g. after compromise): re-wrap every scope grant old→new, publish the new key **signed by the old**, retire the old, and **sync the new pair to all devices**. Heavy; depends on a trustworthy key directory. |

@@ -4,6 +4,9 @@
 > scopes: personal, group, tenant). The **server is always blind** — it stores ciphertext, metadata
 > and an opaque job queue. Every other concept (processing, search, sharing, deletion) is designed
 > around this. The paramount invariant lives in [Goals & Quality](../overview/goals-stakeholders-quality.md).
+>
+> **New to this?** Start with the plain-language, illustrated companion:
+> [Account keys, devices & recovery](account-key-model.md).
 
 ## Threat model & trust boundaries
 
@@ -74,9 +77,11 @@ client-side alias history for 301-style redirects is a later refinement). See [A
 title Envelope encryption -- key hierarchy
 skinparam shadowing false
 
-rectangle "Master password\n(+ optional Secret Key)" as pw
-rectangle "Recovery anchor" as rec
-rectangle "Master Unlock Key" as muk
+rectangle "Password + Secret Key" as pw
+rectangle "Passkey (PRF)" as pk
+rectangle "Recovery code" as rec
+rectangle "This device" as dev
+rectangle "Master Key" as muk
 rectangle "User private key" as sk
 rectangle "Scope private key" as spk
 rectangle "Per-subtree content keys" as ck
@@ -84,8 +89,10 @@ rectangle "Memories, media,\njournal, sensitive metadata" as content
 rectangle "Members" as members
 rectangle "Public share" as share
 
-pw --> muk
-rec ..> muk : recovery
+pw --> muk : wrap
+pk --> muk : wrap
+rec --> muk : wrap
+dev --> muk : wrap
 muk --> sk : unlocks
 sk --> spk : unwraps
 spk --> ck : unwraps
@@ -104,8 +111,11 @@ ck --> share : a subtree key wrapped to a share key (token-unlocked)
   scope key to the new member" of *Key provisioning* below. Sharing = wrap one subtree key to a share.
   **Revoking a member = rotate the scope keypair** (re-wrap to the remaining members; new content under
   rotated keys); already-read content cannot be retroactively revoked (documented limitation).
-- The user's private key is protected by the **Master Unlock Key** (password + optional Secret Key;
-  see *Key recovery* and *Secret Key* below).
+- The user's private key is protected by the **Master Key**, itself wrapped **separately by each unlock
+  method** — **password + Secret Key** (the mandatory floor), an optional **passkey (PRF)**, the
+  **recovery code**, and each **trusted device**. Each wrap is a **separate stored blob**; the **KEK**
+  that opens it is derived on demand on the client and **never stored server-side**. Adding/removing a
+  method changes one wrap, not the content. See *Key recovery* and *Secret Key* below.
 
 ## Cryptographic primitives, agility & post-quantum
 
@@ -185,8 +195,8 @@ three independent ways back in:
    user's private key** (the only path that survives a forgotten password with no device). It is a
    *standalone* bypass of both password and Secret Key, so it must be stored safely and is
    **single-use**: redeeming it **invalidates it and generates a new one** the user must save (a used
-   code may have been exposed). After recovery the user sets a new password and the private key is
-   re-wrapped under the new password + Secret Key.
+   code may have been exposed). After recovery the user sets a **new password and a new Secret Key**
+   (a fresh Emergency Kit); the master key itself is unchanged, so all content stays intact.
 
 Only losing **all** paths (no device, no Emergency Kit, no recovery code, no password) is
 unrecoverable — the documented, accepted residual loss. A recovery-group/escrow tier is explicitly
@@ -201,6 +211,16 @@ malicious server could serve an attacker's key instead (key-substitution / MITM)
 - **Now:** client-side **key-pinning / TOFU** — clients remember keys and warn on change.
 - **Later (core hardening):** **Key Transparency** — an append-only, verifiable key log so the server
   cannot equivocate undetectably. With E2EE everywhere and pervasive sharing, this is core, not optional.
+- **The first-use gap (stated honestly):** TOFU only catches a key that *changes*. If the operator
+  substitutes Bob's key **before** Alice ever saw the real one — and then **re-wraps the content to
+  Bob's genuine key too** — Bob keeps normal access and *nothing looks wrong*, while the operator
+  silently holds a copy. There is **no functional symptom** to notice (a removed user *would* notice;
+  this attacker does not remove anyone). Only Key Transparency (or out-of-band **manual verification**)
+  makes the substitution itself detectable.
+- **Trust anchors live client-side:** a client uses its **own locally-held** identity public key for
+  verification/signing (never the server's copy), and keeps **pinned contact keys** in protected local
+  state — the server distributes keys but is never the trust anchor. **Manual verification** (Signal-style
+  fingerprints) and **identity-key rotation** are later hardenings (see [design notes](../design-notes.md)).
 
 ## Key provisioning & onboarding
 
