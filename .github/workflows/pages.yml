@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "site/**"
+      - "docs/api/**"
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,11 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
+      - name: Bundle internal API specs for Redoc
+        run: |
+          mkdir -p site/api/specs
+          cp docs/api/*.openapi.yaml site/api/specs/
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3

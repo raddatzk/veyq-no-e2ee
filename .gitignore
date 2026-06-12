@@ -195,6 +195,9 @@ yarn-error.log
 playwright-report/
 test-results/
 
+# veyq local wiki diagram preview (scripts/render-diagrams.sh)
+.wiki-preview/
+
 # Local deployment secrets
 infra/.env
 load/k6/users.local.json

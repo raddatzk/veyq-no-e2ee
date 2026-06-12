@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>veyq API reference (internal)</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; }
+      #bar {
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid #e2e2e2;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 10;
+      }
+      #bar strong { font-weight: 600; }
+      #bar .note { color: #888; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <strong>veyq API</strong>
+      <label>Domain: <select id="domain"></select></label>
+      <span class="note">Internal contract — generated from docs/api. Not a public API.</span>
+    </div>
+    <div id="redoc"></div>
+    <script src="https://cdn.redocly.com/redoc/latest/bundles/redoc.standalone.js"></script>
+    <script>
+      // Domains mirror docs/api/*.openapi.yaml (bundled into ./specs by the Pages workflow).
+      const domains = [
+        'auth', 'common', 'frontend', 'groups', 'memories', 'server',
+        'settings', 'setup', 'shares', 'tenant-registration-invites', 'tenants', 'users',
+      ];
+      const select = document.getElementById('domain');
+      for (const d of domains) {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        select.appendChild(opt);
+      }
+      function render(domain) {
+        Redoc.init(`./specs/${domain}.openapi.yaml`, {}, document.getElementById('redoc'));
+      }
+      select.addEventListener('change', (e) => render(e.target.value));
+      render(domains[0]);
+    </script>
+  </body>
+</html>
