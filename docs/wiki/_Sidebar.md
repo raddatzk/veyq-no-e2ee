@@ -15,6 +15,7 @@
 
 - [Security Model](crosscutting/security-model)
 - [Account Keys & Recovery (illustrated)](crosscutting/account-key-model)
+- [Crypto Wire-Format Spec](crosscutting/crypto-spec)
 - [Agent Mode](crosscutting/agent-mode)
 - [Search](crosscutting/search)
 - [Live Collaboration](crosscutting/live-collaboration)

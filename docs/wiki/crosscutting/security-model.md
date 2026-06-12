@@ -146,6 +146,9 @@ now and upgraded later.
 
 > Cost: ML-KEM keys/ciphertexts are ~1 KB (vs ~32 B for X25519) → N member-wraps are N×~1 KB, fine for
 > the small groups veyq targets. Decision: [AD-25](../decisions/README.md).
+>
+> The exact byte formats (suite `v1`, the KEM combiner, wrap layouts) live in the
+> [Crypto Wire-Format Spec](crypto-spec.md) — the contract every client stack implements identically.
 
 ## Streaming & segmented media
 
