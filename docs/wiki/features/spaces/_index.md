@@ -8,6 +8,6 @@ Multiple **tenants**, collaborative **groups** and a **personal** space, with fa
 - **Decisions:** [AD-02/03](../../decisions/README.md) (scopes & keys).
 
 ## Use-cases
-- ☐ `uc.spaces.switch-tenant` — switch between tenants
-- ☐ `uc.spaces.use-group` — use a group space
-- ☐ `uc.spaces.use-personal` — use the personal space
+- ★ [Switch tenant](use-cases/uc.spaces.switch-tenant.md)
+- ★ [Use a group space](use-cases/uc.spaces.use-group.md) — incl. the grant path for existing users
+- ★ [Use the personal space](use-cases/uc.spaces.use-personal.md)

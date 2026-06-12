@@ -11,9 +11,9 @@ handling of reported shares.
   `docs/`, not in this wiki — see [Deployment](../../overview/deployment.md).
 
 ## Use-cases
-- ☐ `uc.admin.setup-server` — first-run server setup
-- ☐ `uc.admin.create-tenant-invite-owner` — create a tenant and invite its owner
-- ☐ `uc.admin.invite-members-roles` — invite members and assign roles
+- ★ [First-run server setup](use-cases/uc.admin.setup-server.md)
+- ★ [Create a tenant and invite its owner](use-cases/uc.admin.create-tenant-invite-owner.md)
+- ★ [Invite members, grant access & assign roles](use-cases/uc.admin.invite-members-roles.md) — incl. remove & deactivate
 - ☐ `uc.admin.branding-terms` — tenant branding and legal terms
 - ☐ `uc.admin.backup-upgrade` — back up and upgrade
 - ☐ `uc.admin.takedown-reported-share` — act on a reported public share
