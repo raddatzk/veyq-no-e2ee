@@ -1,0 +1,16 @@
+{
+  "name": "veyq-crypto-ref",
+  "private": true,
+  "type": "module",
+  "description": "Reference implementation of the veyq v1 crypto suite; generates shared conformance test vectors.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "latest",
+    "@noble/post-quantum": "latest",
+    "@noble/hashes": "latest",
+    "@noble/ciphers": "latest",
+    "hash-wasm": "latest"
+  }
+}
