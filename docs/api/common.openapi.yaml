@@ -57,6 +57,14 @@ components:
         wrappedKey: { type: string }
         kdfParams: { type: string }
         credentialRef: { type: string }
+    AuthVerifier:
+      type: object
+      description: Proves an unlock to the server without revealing the master key.
+      required: [kind, suiteId, verifier]
+      properties:
+        kind: { type: string, enum: [ARGON2_PROOF, WEBAUTHN] }
+        suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
+        verifier: { type: string }
   responses:
     BadRequest:
       description: Bad request

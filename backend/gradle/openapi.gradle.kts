@@ -49,6 +49,7 @@ val sharedSchemaMappings = mapOf(
     "Blob" to "$modelPackageName.Blob",
     "MasterKeyWrap" to "$modelPackageName.MasterKeyWrap",
     "KemPublicKey" to "$modelPackageName.KemPublicKey",
+    "AuthVerifier" to "$modelPackageName.AuthVerifier",
 )
 
 val openApiSpecs = listOf(

@@ -85,6 +85,34 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenant-invites/{inviteId}/register:
+    post:
+      tags: [RegisterViaInvitation]
+      operationId: registerViaInvitation
+      summary: Register a brand-new account from an owner invite and claim the tenant in one step.
+      description: >
+        The invitee (not yet authenticated) presents the bootstrap secret together with all freshly
+        generated key material — identity public key, the wrapped identity private key, master-key
+        unlock wraps and an auth verifier — plus the minted tenant scope public key and the scope
+        private key wrapped to their own identity (a self scope grant). The server creates the account,
+        activates the tenant + Owner membership, consumes the invite and issues a session. It stores
+        ciphertext + public material only; it never sees a private key.
+      parameters:
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterViaInvitationRequest' }
+      responses:
+        '200':
+          description: The new account's session + the activated tenant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterViaInvitationResponse' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/tenants/{tenantId}/scope:
     get:
       tags: [TenantProvisioning]
@@ -147,3 +175,28 @@ components:
       properties:
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    RegisterViaInvitationRequest:
+      type: object
+      required:
+        [bootstrapSecret, email, displayName, identityPublicKey, wrappedIdentityPrivateKey,
+         masterKeyWraps, authVerifier, scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        bootstrapSecret: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+        wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        masterKeyWraps:
+          type: array
+          minItems: 1
+          items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
+        authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    RegisterViaInvitationResponse:
+      type: object
+      required: [sessionToken, user, tenant]
+      properties:
+        sessionToken: { type: string }
+        user: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        tenant: { $ref: '#/components/schemas/TenantSummary' }
