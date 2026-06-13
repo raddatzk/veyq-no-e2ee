@@ -68,6 +68,11 @@ public enum V1 {
     public static func symWrap(kek: Data, targetKey: Data, context: String, nonce: Data) throws -> Data {
         Data([0x02]) + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: Data(("v1" + context).utf8)))
     }
+    public static func symUnwrap(kek: Data, blob: Data, context: String) throws -> Data {
+        let nonce = Data(blob.dropFirst().prefix(12))
+        let aead = Data(blob.dropFirst(1 + 12))
+        return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: Data(("v1" + context).utf8))
+    }
     public static func asymUnwrap(skX: Data, mlkemSeed: Data, pkX: Data, pkM: Data, blob: Data, context: String) throws -> Data {
         let body = Data(blob.dropFirst())
         let ct = Data(body.prefix(1120))
@@ -136,5 +141,20 @@ public enum V1 {
 
     public static func serializeIdentityPrivate(_ id: Identity) -> Data {
         lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
+    }
+
+    public struct IdentityPrivate { public let kemX: Data; public let mlkemSeed: Data; public let sign: Data }
+
+    /// Inverse of serializeIdentityPrivate: read three length-prefixed fields.
+    public static func deserializeIdentityPrivate(_ bytes: Data) -> IdentityPrivate {
+        var o = bytes.startIndex
+        func next() -> Data {
+            let len = Int(bytes[o]) << 24 | Int(bytes[o + 1]) << 16 | Int(bytes[o + 2]) << 8 | Int(bytes[o + 3])
+            o += 4
+            let v = bytes.subdata(in: o ..< o + len)
+            o += len
+            return v
+        }
+        return IdentityPrivate(kemX: next(), mlkemSeed: next(), sign: next())
     }
 }
