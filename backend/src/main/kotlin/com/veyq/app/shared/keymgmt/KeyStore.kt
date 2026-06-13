@@ -58,4 +58,6 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
 }
 
 @ApplicationScoped
-class AuthVerifierRepository : PanacheRepositoryBase<AuthVerifier, String>
+class AuthVerifierRepository : PanacheRepositoryBase<AuthVerifier, String> {
+    fun findByUserId(userId: String): AuthVerifier? = find("userId", userId).firstResult()
+}

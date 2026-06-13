@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: veyq auth
+  version: 0.1.0
+paths:
+  /api/login:
+    post:
+      tags: [Login]
+      operationId: login
+      summary: Authenticate (password) and receive a session + the wrapped key bag.
+      description: >
+        The server verifies the password against the stored Argon2id auth verifier, issues a session
+        token and returns the wrapped key bag (ciphertext only). The master key is never sent — unlock
+        happens client-side from the returned blobs (auth != unlock).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Session token + wrapped key bag.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me:
+    get:
+      tags: [Login]
+      operationId: getCurrentUser
+      summary: The authenticated user for a session token (proves the session resolves).
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: 'Bearer <sessionToken>'
+          schema: { type: string }
+      responses:
+        '200':
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    LoginResponse:
+      type: object
+      required: [sessionToken, user, keyBag]
+      properties:
+        sessionToken: { type: string }
+        user: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        keyBag: { $ref: '#/components/schemas/KeyBag' }
+    KeyBag:
+      type: object
+      description: The wrapped key material needed to unlock the master key client-side.
+      required: [identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps]
+      properties:
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+        wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        masterKeyWraps:
+          type: array
+          items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }

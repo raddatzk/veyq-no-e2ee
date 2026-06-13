@@ -25,6 +25,31 @@ components:
         email: { type: string }
         displayName: { type: string }
         serverRole: { $ref: '#/components/schemas/ServerRole' }
+    IdentityPublicKey:
+      type: object
+      description: The user's hybrid KEM public key + Ed25519 signing public key (base64url).
+      required: [suiteId, kemPublicKey, signPublicKey]
+      properties:
+        suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
+        kemPublicKey: { type: string }
+        signPublicKey: { type: string }
+    Blob:
+      type: object
+      description: An opaque, self-describing ciphertext blob (base64url bytes + its suite id).
+      required: [suiteId, bytes]
+      properties:
+        suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
+        bytes: { type: string }
+    MasterKeyWrap:
+      type: object
+      description: One wrapped copy of the master key, openable by a single unlock method.
+      required: [unlockMethod, suiteId, wrappedKey]
+      properties:
+        unlockMethod: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
+        suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
+        wrappedKey: { type: string }
+        kdfParams: { type: string }
+        credentialRef: { type: string }
   responses:
     BadRequest:
       description: Bad request
@@ -33,6 +58,11 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     Conflict:
       description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Unauthorized
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }

@@ -52,38 +52,13 @@ components:
       properties:
         email: { type: string }
         displayName: { type: string }
-        identityPublicKey: { $ref: '#/components/schemas/IdentityPublicKey' }
-        wrappedIdentityPrivateKey: { $ref: '#/components/schemas/Blob' }
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+        wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         masterKeyWraps:
           type: array
           minItems: 1
-          items: { $ref: '#/components/schemas/MasterKeyWrap' }
+          items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: '#/components/schemas/AuthVerifier' }
-    IdentityPublicKey:
-      type: object
-      description: The user's hybrid KEM public key + Ed25519 signing public key (base64url).
-      required: [suiteId, kemPublicKey, signPublicKey]
-      properties:
-        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
-        kemPublicKey: { type: string }
-        signPublicKey: { type: string }
-    Blob:
-      type: object
-      description: An opaque, self-describing ciphertext blob (base64url bytes + its suite id).
-      required: [suiteId, bytes]
-      properties:
-        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
-        bytes: { type: string }
-    MasterKeyWrap:
-      type: object
-      description: One wrapped copy of the master key, openable by a single unlock method.
-      required: [unlockMethod, suiteId, wrappedKey]
-      properties:
-        unlockMethod: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
-        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
-        wrappedKey: { type: string }
-        kdfParams: { type: string }
-        credentialRef: { type: string }
     AuthVerifier:
       type: object
       description: Proves an unlock to the server without revealing the master key.

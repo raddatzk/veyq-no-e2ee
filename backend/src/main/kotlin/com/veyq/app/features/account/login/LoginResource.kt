@@ -1,0 +1,17 @@
+package com.veyq.app.features.account.login
+
+import com.veyq.app.generated.api.LoginApi
+import com.veyq.app.generated.model.LoginRequest
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.ws.rs.core.Response
+
+/** Thin REST entry implementing the generated LoginApi; delegates to the handler. */
+@ApplicationScoped
+class LoginResource(private val handler: LoginHandler) : LoginApi {
+
+    override fun login(loginRequest: LoginRequest): Response =
+        Response.ok(handler.login(loginRequest)).build()
+
+    override fun getCurrentUser(authorization: String): Response =
+        Response.ok(handler.currentUser(authorization)).build()
+}
