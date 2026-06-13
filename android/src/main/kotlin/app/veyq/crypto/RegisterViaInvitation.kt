@@ -34,8 +34,13 @@ object RegisterViaInvitation {
         return JSONObject(resp.body())
     }
 
+    /** Builds the tenant scope grant (scopePublicKey, wrappedScopePrivateKey — both base64url). */
+    fun interface TenantScopeProvider {
+        fun grant(idPubKemX: ByteArray, idPubKemM: ByteArray): Pair<String, String>
+    }
+
     fun buildRequestJson(
-        bootstrapSecret: String, email: String, displayName: String, password: String,
+        bootstrapSecret: String, email: String, displayName: String, password: String, tenantScope: TenantScopeProvider,
     ): Pair<String, SetupServer.EmergencyKit> {
         val id = V1.generateIdentity()
         val masterKey = V1.randomBytes(32)
@@ -58,10 +63,8 @@ object RegisterViaInvitation {
             id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(personal), "personal-scope-grant", V1.randomBytes(12),
         )
 
-        // mint the tenant scope keypair and grant it to self (wrapped to our own identity public key)
-        val scope = V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
-        val scopePublic = scope.pubKemX + scope.pubKemM
-        val grant = V1.asymWrap(id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(scope), "scope-grant", V1.randomBytes(12))
+        // the tenant scope grant — minted (owner) or temp-unwrapped + re-wrapped (member)
+        val (scopePublic, grant) = tenantScope.grant(id.pubKemX, id.pubKemM)
 
         // base64url and the simple ASCII inputs need no JSON escaping in this flow.
         val json = """{"bootstrapSecret":"$bootstrapSecret","email":"$email","displayName":"$displayName",""" +
@@ -71,15 +74,26 @@ object RegisterViaInvitation {
             """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
             """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
             """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +
-            """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(scopePublic)}"},""" +
-            """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(grant)}"}}"""
+            """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePublic"},""" +
+            """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$grant"}}"""
         return json to SetupServer.EmergencyKit(b64url(secretKey))
     }
 
+    /** Register from an owner invite — the empty tenant's scope keypair is minted here (self grant). */
     fun registerViaInvitation(
         apiBase: String, inviteId: String, bootstrapSecret: String, email: String, displayName: String, password: String,
+    ): RegisterResult = registerWithScope(apiBase, inviteId, bootstrapSecret, email, displayName, password) { idX, idM ->
+        val scope = V1.generateIdentity()
+        b64url(scope.pubKemX + scope.pubKemM) to
+            b64url(V1.asymWrap(idX, idM, V1.serializeIdentityPrivate(scope), "scope-grant", V1.randomBytes(12)))
+    }
+
+    /** Core registration assembly shared by the owner-claim and temp-wrap member flows. */
+    fun registerWithScope(
+        apiBase: String, inviteId: String, bootstrapSecret: String, email: String, displayName: String, password: String,
+        tenantScope: TenantScopeProvider,
     ): RegisterResult {
-        val (json, kit) = buildRequestJson(bootstrapSecret, email, displayName, password)
+        val (json, kit) = buildRequestJson(bootstrapSecret, email, displayName, password, tenantScope)
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/register"))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(json))

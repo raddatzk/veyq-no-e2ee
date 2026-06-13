@@ -4,6 +4,7 @@
 // ever sees ciphertext + the recipient id + role.
 import * as v1 from '../../../shared/crypto/v1'
 import { getMyScopeGrant } from '../createTenantInviteOwner/tenant'
+import { getInviteMetadata, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
 import type { UnlockedSession } from '../../account/login/login'
 
 function b64url(b: Uint8Array): string {
@@ -71,4 +72,84 @@ export async function grantScopeToMember(
   })
   if (!res.ok) throw new Error(`grant failed: ${res.status} ${await res.text()}`)
   return res.json()
+}
+
+export type MemberInvite = { inviteId: string; bootstrapSecret: string; tempPrivateKey: string }
+
+/**
+ * Issue a temp-wrap invite for a NEW user. The owner unwraps their own scope private key, generates a
+ * one-time temp keypair, and wraps the scope to the temp public key. The server stores only the temp
+ * public key + ciphertext; the temp private key is returned to ride the invite URL fragment.
+ */
+export async function issueMemberInvite(
+  apiBase: string,
+  owner: UnlockedSession,
+  tenantId: string,
+  role: MemberRole,
+): Promise<MemberInvite> {
+  const myGrant = await getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
+  const ownerKem = fromB64url(owner.identityPublicKey.kemPublicKey)
+  const sk = v1.hybridSecret(owner.identity)
+  const scopePrivateBytes = v1.asymUnwrap(
+    sk,
+    { x: ownerKem.slice(0, 32), m: ownerKem.slice(32) },
+    fromB64url(myGrant.wrappedScopePrivateKey.bytes),
+    'scope-grant',
+  )
+
+  const temp = v1.generateIdentity()
+  const tempPublic = v1.concat(temp.pub.kemX, temp.pub.kemM)
+  const tempWrapped = v1.asymWrap({ x: temp.pub.kemX, m: temp.pub.kemM }, scopePrivateBytes, 'scope-grant', {
+    nonce: v1.randomBytes(12),
+  })
+
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/member-invites`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.sessionToken}` },
+    body: JSON.stringify({
+      role,
+      tempPublicKey: { suiteId: 'v1', kemPublicKey: b64url(tempPublic) },
+      tempWrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(tempWrapped) },
+    }),
+  })
+  if (!res.ok) throw new Error(`member-invite failed: ${res.status} ${await res.text()}`)
+  const body = await res.json()
+  return {
+    inviteId: body.inviteId,
+    bootstrapSecret: body.bootstrapSecret,
+    tempPrivateKey: b64url(v1.serializeIdentityPrivate(temp)),
+  }
+}
+
+/**
+ * Register a NEW account from a temp-wrap member invite. The invitee unwraps the scope private key with
+ * the temp private key (from the URL fragment) and re-wraps it to their own identity — the temp-wrap
+ * counterpart to the owner-claim path. The tenant scope is the existing one (echoed from metadata).
+ */
+export async function registerViaMemberInvite(
+  apiBase: string,
+  inviteId: string,
+  bootstrapSecret: string,
+  tempPrivateKeyB64: string,
+  email: string,
+  displayName: string,
+  password: string,
+): Promise<RegisterResult> {
+  const meta = await getInviteMetadata(apiBase, inviteId)
+  if (!meta.tempPublicKey || !meta.tempWrappedScopePrivateKey || !meta.scopePublicKey) {
+    throw new Error('invite is not a temp-wrap member invite')
+  }
+  const tempPriv = v1.deserializeIdentityPrivate(fromB64url(tempPrivateKeyB64))
+  const tempKem = fromB64url(meta.tempPublicKey.kemPublicKey)
+  const scopePrivateBytes = v1.asymUnwrap(
+    v1.hybridSecret(tempPriv),
+    { x: tempKem.slice(0, 32), m: tempKem.slice(32) },
+    fromB64url(meta.tempWrappedScopePrivateKey.bytes),
+    'scope-grant',
+  )
+  const scopePublicKey = meta.scopePublicKey.kemPublicKey
+  return registerWithScope(apiBase, inviteId, bootstrapSecret, email, displayName, password, (idPub) => ({
+    scopePublicKey,
+    wrappedScopePrivateKey: b64url(v1.asymWrap(idPub, scopePrivateBytes, 'scope-grant', { nonce: v1.randomBytes(12) })),
+  }))
 }

@@ -20,6 +20,7 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
@@ -60,6 +61,7 @@ class RegisterViaInvitationHandler(
     private val suites: CryptoSuiteRegistry,
 ) {
     private val dec = Base64.getUrlDecoder()
+    private val enc = Base64.getUrlEncoder().withoutPadding()
 
     @Transactional
     fun registerViaInvitation(inviteId: String, req: RegisterViaInvitationRequest): RegisterViaInvitationResponse {
@@ -133,26 +135,44 @@ class RegisterViaInvitationHandler(
             },
         )
 
-        // 3. the tenant scope, born as a self grant (mirrors the claim path's first key-holder)
-        val scope = Scope().apply {
-            id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
-            suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
+        // 3. the tenant scope grant — born here for an owner claim, or re-wrapped from a temp invite
+        if (invite.kind == InviteKind.MEMBER.name) {
+            // MEMBER: the scope already exists. The invitee unwrapped it with the temp key (from the URL
+            // fragment) and re-wrapped it to their own identity — add their grant only. No new scope, no
+            // re-activation. The posted scope public key must match the existing scope (integrity).
+            val scope = invite.scopeId?.let { scopes.findById(it) } ?: throw notFound("Scope")
+            if (enc.encodeToString(scope.kemPublicKey) != req.scopePublicKey.kemPublicKey) {
+                throw ApiException(400, "SCOPE_MISMATCH", "Scope public key does not match the invite")
+            }
+            grants.persist(
+                ScopeGrant().apply {
+                    id = newId(); scopeId = scope.id; userId = user.id
+                    suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                },
+            )
+        } else {
+            // OWNER: an empty tenant — the scope keypair is born here (self grant) and the tenant activates.
+            val scope = Scope().apply {
+                id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
+                suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
+            }
+            scopes.persist(scope)
+            grants.persist(
+                ScopeGrant().apply {
+                    id = newId(); scopeId = scope.id; userId = user.id
+                    suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
+                },
+            )
+            tenant.status = TenantStatus.ACTIVE.name
         }
-        scopes.persist(scope)
-        grants.persist(
-            ScopeGrant().apply {
-                id = newId(); scopeId = scope.id; userId = user.id
-                suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
-            },
-        )
+
         memberships.persist(
             Membership().apply {
                 id = newId(); tenantId = tenant.id; userId = user.id; role = invite.role; status = "ACTIVE"; createdAt = now
             },
         )
 
-        // 4. activate the tenant, consume the invite, hand back a session
-        tenant.status = TenantStatus.ACTIVE.name
+        // 4. consume the invite, hand back a session
         invite.status = InviteStatus.CONSUMED.name
         invite.consumedBy = user.id
 

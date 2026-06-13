@@ -13,11 +13,22 @@ function b64url(b: Uint8Array): string {
 }
 
 export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
+export type Blob = { suiteId: string; bytes: string }
+export type KemPublicKey = { suiteId: string; kemPublicKey: string }
 export type InviteMetadata = {
   inviteId: string
   tenant: TenantSummary
   role: string
   status: string
+  kind: string
+  scopePublicKey?: KemPublicKey
+  tempPublicKey?: KemPublicKey
+  tempWrappedScopePrivateKey?: Blob
+}
+/** Builds the tenant scope grant for the new account, given the invitee's identity public key. */
+export type TenantScopeProvider = (idPub: { x: Uint8Array; m: Uint8Array }) => {
+  scopePublicKey: string
+  wrappedScopePrivateKey: string
 }
 export type RegisterResult = {
   sessionToken: string
@@ -35,18 +46,19 @@ export async function getInviteMetadata(apiBase: string, inviteId: string): Prom
 }
 
 /**
- * Register a new account from an owner invite and claim the (empty) tenant. The invitee generates a
- * fresh identity, wraps it under a master key (password + Secret Key), mints the tenant scope keypair
- * and wraps its private key to their own identity public key (a self scope grant) — the empty-tenant
- * counterpart to the existing-user claim path.
+ * Core registration assembly shared by the owner-claim and temp-wrap member flows. The invitee
+ * generates a fresh identity + master-key unlock wrap + auth verifier + personal scope; the tenant
+ * scope grant is supplied by `tenantScope` (mint a new scope for an owner claim, or re-wrap a
+ * temp-unwrapped scope for a member invite).
  */
-export async function registerViaInvitation(
+export async function registerWithScope(
   apiBase: string,
   inviteId: string,
   bootstrapSecret: string,
   email: string,
   displayName: string,
   password: string,
+  tenantScope: TenantScopeProvider,
 ): Promise<RegisterResult> {
   const id = v1.generateIdentity()
   const masterKey = v1.randomBytes(32)
@@ -74,15 +86,8 @@ export async function registerViaInvitation(
     { nonce: v1.randomBytes(12) },
   )
 
-  // mint the tenant scope keypair and grant it to self (wrapped to our own identity public key)
-  const scope = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
-  const scopePublic = v1.concat(scope.pub.kemX, scope.pub.kemM)
-  const grant = v1.asymWrap(
-    { x: id.pub.kemX, m: id.pub.kemM },
-    v1.serializeIdentityPrivate(scope),
-    'scope-grant',
-    { nonce: v1.randomBytes(12) },
-  )
+  // the tenant scope grant — minted (owner) or temp-unwrapped + re-wrapped (member)
+  const scope = tenantScope({ x: id.pub.kemX, m: id.pub.kemM })
 
   const request = {
     bootstrapSecret,
@@ -100,8 +105,8 @@ export async function registerViaInvitation(
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
     wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
-    scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(scopePublic) },
-    wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(grant) },
+    scopePublicKey: { suiteId: 'v1', kemPublicKey: scope.scopePublicKey },
+    wrappedScopePrivateKey: { suiteId: 'v1', bytes: scope.wrappedScopePrivateKey },
   }
 
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/register`, {
@@ -112,4 +117,24 @@ export async function registerViaInvitation(
   if (!res.ok) throw new Error(`register failed: ${res.status} ${await res.text()}`)
   const body = await res.json()
   return { ...body, emergencyKit: { secretKey: b64url(secretKey) } }
+}
+
+/** Register from an owner invite — the empty tenant's scope keypair is minted here (self grant). */
+export function registerViaInvitation(
+  apiBase: string,
+  inviteId: string,
+  bootstrapSecret: string,
+  email: string,
+  displayName: string,
+  password: string,
+): Promise<RegisterResult> {
+  return registerWithScope(apiBase, inviteId, bootstrapSecret, email, displayName, password, (idPub) => {
+    const scope = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+    return {
+      scopePublicKey: b64url(v1.concat(scope.pub.kemX, scope.pub.kemM)),
+      wrappedScopePrivateKey: b64url(
+        v1.asymWrap(idPub, v1.serializeIdentityPrivate(scope), 'scope-grant', { nonce: v1.randomBytes(12) }),
+      ),
+    }
+  })
 }

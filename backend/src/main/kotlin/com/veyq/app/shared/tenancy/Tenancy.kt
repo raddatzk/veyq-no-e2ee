@@ -10,6 +10,7 @@ import java.time.Instant
 
 enum class TenantStatus { PENDING, ACTIVE }
 enum class InviteStatus { PENDING, CONSUMED, REVOKED }
+enum class InviteKind { OWNER, MEMBER }
 
 @Entity
 @Table(name = "veyq_tenant")
@@ -31,6 +32,11 @@ class TenantInvite {
     @Column(nullable = false) var role: String = ""
     @Column(name = "secret_hash", nullable = false) var secretHash: ByteArray = ByteArray(0)
     @Column(nullable = false) var status: String = InviteStatus.PENDING.name
+    @Column(nullable = false) var kind: String = InviteKind.OWNER.name
+    @Column(name = "scope_id") var scopeId: String? = null
+    @Column(name = "temp_public_key") var tempPublicKey: ByteArray? = null
+    @Column(name = "temp_wrapped_scope_private_key") var tempWrappedScopePrivateKey: ByteArray? = null
+    @Column(name = "temp_wrap_suite_id") var tempWrapSuiteId: String? = null
     @Column(name = "consumed_by") var consumedBy: String? = null
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH

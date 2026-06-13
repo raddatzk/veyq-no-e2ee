@@ -17,6 +17,11 @@ create table veyq_tenant_invite (
     role         varchar(32)    not null,
     secret_hash  varbinary(64)  not null,  -- SHA-256 of the one-time bootstrap secret
     status       varchar(32)    not null,  -- PENDING, CONSUMED, REVOKED
+    kind         varchar(16)    not null default 'OWNER',  -- OWNER (mint new scope) | MEMBER (temp-wrap)
+    scope_id     varchar(64),   -- MEMBER: the granted scope (veyq_scope.id; FK omitted, table defined later)
+    temp_public_key                varbinary(2048),  -- MEMBER: onboarding temp keypair public key
+    temp_wrapped_scope_private_key varbinary(8192),  -- MEMBER: scope private key wrapped to the temp public key
+    temp_wrap_suite_id             varchar(64),
     consumed_by  varchar(64)    references veyq_user (id),
     created_by   varchar(64)    not null references veyq_user (id),
     created_at   timestamp      not null,

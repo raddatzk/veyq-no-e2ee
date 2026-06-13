@@ -44,6 +44,33 @@ paths:
               schema: { $ref: '#/components/schemas/OwnerInvite' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/member-invites:
+    post:
+      tags: [MemberInvites]
+      operationId: issueMemberInvite
+      summary: Issue a temp-wrap member invite carrying the scope keys wrapped to a one-time temp key.
+      description: >
+        A key-holding Tenant Owner wraps the tenant scope private key to a one-time temp public key and
+        issues an invite. The temp private key travels in the invite URL fragment (never to the server);
+        a new user unwraps with it and re-wraps the scope to their own identity during
+        register-via-invitation. The server stores only the temp public key + ciphertext.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueMemberInviteRequest' }
+      responses:
+        '200':
+          description: The member invitation (bootstrap secret shown once).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerInvite' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenant-invites/{inviteId}:
     get:
       tags: [TenantProvisioning]
@@ -201,12 +228,29 @@ components:
         status: { type: string }
     TenantInviteInfo:
       type: object
-      required: [inviteId, tenant, role, status]
+      required: [inviteId, tenant, role, status, kind]
       properties:
         inviteId: { type: string }
         tenant: { $ref: '#/components/schemas/TenantSummary' }
         role: { type: string }
         status: { type: string, enum: [PENDING, CONSUMED, REVOKED] }
+        kind: { type: string, enum: [OWNER, MEMBER] }
+        scopePublicKey:
+          $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
+          description: MEMBER invites only — the existing scope's public key.
+        tempPublicKey:
+          $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
+          description: MEMBER invites only — the onboarding temp keypair public key.
+        tempWrappedScopePrivateKey:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: MEMBER invites only — the scope private key wrapped to the temp public key.
+    IssueMemberInviteRequest:
+      type: object
+      required: [role, tempPublicKey, tempWrappedScopePrivateKey]
+      properties:
+        role: { type: string, enum: [Owner, Member] }
+        tempPublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        tempWrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ClaimTenantOwnershipRequest:
       type: object
       required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]

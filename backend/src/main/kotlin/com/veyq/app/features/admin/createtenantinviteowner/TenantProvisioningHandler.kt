@@ -96,11 +96,22 @@ class TenantProvisioningHandler(
     fun getTenantInvite(inviteId: String): TenantInviteInfo {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
+        // MEMBER invites carry the temp-wrapped scope grant so the invitee can unwrap with the temp
+        // private key (from the URL fragment) and re-wrap to their own identity. The token never leaks.
+        val scope = invite.scopeId?.let { scopes.findById(it) }
         return TenantInviteInfo(
             inviteId = invite.id,
             tenant = tenant.toSummary(),
             role = invite.role,
             status = TenantInviteInfo.Status.valueOf(invite.status),
+            kind = TenantInviteInfo.Kind.valueOf(invite.kind),
+            scopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
+            tempPublicKey = invite.tempPublicKey?.let {
+                KemPublicKey(suiteId = invite.tempWrapSuiteId ?: (scope?.suiteId ?: ""), kemPublicKey = enc.encodeToString(it))
+            },
+            tempWrappedScopePrivateKey = invite.tempWrappedScopePrivateKey?.let {
+                Blob(suiteId = invite.tempWrapSuiteId ?: "", bytes = enc.encodeToString(it))
+            },
         )
     }
 

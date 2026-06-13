@@ -61,4 +61,69 @@ public enum InviteMembers {
         }
         return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
     }
+
+    struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
+    struct MemberInviteRequest: Codable { let role: String; let tempPublicKey: KemPublicKeyDTO; let tempWrappedScopePrivateKey: BlobDTO }
+    struct OwnerInviteDTO: Codable { let inviteId, bootstrapSecret, expiresAt: String }
+    public struct MemberInvite { public let inviteId, bootstrapSecret, tempPrivateKey: String }
+
+    /// Issue a temp-wrap invite for a NEW user. The owner unwraps their own scope private key, generates a
+    /// one-time temp keypair, and wraps the scope to the temp public key. The temp private key is returned
+    /// to ride the invite URL fragment; the server stores only the temp public key + ciphertext.
+    public static func issueMemberInvite(
+        apiBase: String, owner: Login.UnlockedSession, tenantId: String, role: String
+    ) async throws -> MemberInvite {
+        let myGrant = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: owner.sessionToken, tenantId: tenantId)
+        let ownerPkX = Data(owner.kemPublicKey.prefix(32))
+        let ownerPkM = Data(owner.kemPublicKey.dropFirst(32))
+        let scopePrivateBytes = try V1.asymUnwrap(
+            skX: owner.identity.kemX, mlkemSeed: owner.identity.mlkemSeed, pkX: ownerPkX, pkM: ownerPkM,
+            blob: Login.b64urlDecode(myGrant.wrappedScopePrivateKey.bytes), context: "scope-grant")
+
+        let temp = try V1.generateIdentity()
+        let tempWrapped = try V1.asymWrap(
+            pkX: temp.pubKemX, pkM: temp.pubKemM, targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))
+
+        let req = MemberInviteRequest(
+            role: role,
+            tempPublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(temp.pubKemX + temp.pubKemM)),
+            tempWrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(tempWrapped)))
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/member-invites")!)
+        r.httpMethod = "POST"
+        r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.memberinvite", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "member-invite failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        let body = try JSONDecoder().decode(OwnerInviteDTO.self, from: data)
+        return MemberInvite(
+            inviteId: body.inviteId, bootstrapSecret: body.bootstrapSecret,
+            tempPrivateKey: SetupServer.b64url(V1.serializeIdentityPrivate(temp)))
+    }
+
+    /// Register a NEW account from a temp-wrap member invite: unwrap the scope with the temp private key
+    /// (from the URL fragment), re-wrap it to the new identity, register onto the existing scope.
+    public static func registerViaMemberInvite(
+        apiBase: String, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String,
+        email: String, displayName: String, password: String
+    ) async throws -> RegisterViaInvitation.RegisterResult {
+        let meta = try await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId)
+        guard let tempPub = meta.tempPublicKey, let tempWrapped = meta.tempWrappedScopePrivateKey, let scopePub = meta.scopePublicKey else {
+            throw NSError(domain: "veyq.memberinvite", code: 2, userInfo: [NSLocalizedDescriptionKey: "not a temp-wrap member invite"])
+        }
+        let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
+        let tempKem = Login.b64urlDecode(tempPub.kemPublicKey)
+        let scopePrivateBytes = try V1.asymUnwrap(
+            skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
+            blob: Login.b64urlDecode(tempWrapped.bytes), context: "scope-grant")
+        let scopePublicKey = scopePub.kemPublicKey
+        return try await RegisterViaInvitation.registerWithScope(
+            apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret, email: email, displayName: displayName, password: password
+        ) { idX, idM in
+            (scopePublicKey, SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))))
+        }
+    }
 }
