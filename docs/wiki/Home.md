@@ -41,7 +41,7 @@ auto-synced from `docs/wiki/**` — **edit the repo, not the wiki**.
 - [Memory](features/memory/_index.md) · [Uploads](features/uploads/_index.md) ·
   [Journal](features/journal/_index.md) · [Sharing](features/sharing/_index.md) ·
   [People](features/people/_index.md) · [Search](features/search/_index.md) ·
-  [Spaces](features/spaces/_index.md) · [Account & Auth](features/account/_index.md) ·
+  [Spaces](features/spaces/_index.md) · [Keys](features/keys/_index.md) · [Account & Auth](features/account/_index.md) ·
   [Administration & Operations](features/admin/_index.md) · [Mobile](features/mobile/_index.md)
 
 ## Decisions

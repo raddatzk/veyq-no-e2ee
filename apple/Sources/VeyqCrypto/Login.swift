@@ -11,9 +11,23 @@ public enum Login {
         return Data(base64Encoded: t) ?? Data()
     }
 
-    public struct BlobDTO: Codable { public let suiteId, bytes: String }
+    public struct BlobDTO: Codable {
+        public let suiteId, bytes: String
+
+        public init(suiteId: String, bytes: String) {
+            self.suiteId = suiteId
+            self.bytes = bytes
+        }
+    }
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
-    public struct KemPublicKeyDTO: Codable { public let suiteId, kemPublicKey: String }
+    public struct KemPublicKeyDTO: Codable {
+        public let suiteId, kemPublicKey: String
+
+        public init(suiteId: String, kemPublicKey: String) {
+            self.suiteId = suiteId
+            self.kemPublicKey = kemPublicKey
+        }
+    }
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
     struct KeyBagDTO: Codable {
         let identityPublicKey: IdentityPublicKeyDTO
@@ -22,6 +36,7 @@ public enum Login {
     }
     public struct UserSummaryDTO: Codable { public let id, email, displayName, serverRole: String }
     public struct PersonalScopeGrantDTO: Codable {
+        public let scopeId: String
         public let scopePublicKey: KemPublicKeyDTO
         public let wrappedScopePrivateKey: BlobDTO
     }

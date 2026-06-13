@@ -148,6 +148,7 @@ class TenantProvisioningHandler(
         val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
         val grant = grants.find(scope.id, user.id) ?: throw notFound("Scope grant")
         return MyScopeGrant(
+            scopeId = scope.id,
             scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
             wrappedScopePrivateKey = Blob(suiteId = grant.suiteId, bytes = enc.encodeToString(grant.wrappedPrivateKey)),
         )

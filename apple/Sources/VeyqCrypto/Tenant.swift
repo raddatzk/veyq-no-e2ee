@@ -13,7 +13,7 @@ public enum Tenant {
     struct OwnerInviteDTO: Codable { let inviteId, bootstrapSecret, expiresAt: String }
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
-    struct MyScopeGrantDTO: Codable { let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
+    struct MyScopeGrantDTO: Codable { let scopeId: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
     struct ClaimRequest: Codable { let bootstrapSecret: String; let scopePublicKey: KemPublicKeyDTO; let wrappedScopePrivateKey: BlobDTO }
 
     private static func send<T: Decodable>(_ apiBase: String, _ path: String, _ token: String, method: String, body: Data? = nil) async throws -> T {

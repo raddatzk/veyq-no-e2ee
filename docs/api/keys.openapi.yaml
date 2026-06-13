@@ -1,0 +1,45 @@
+openapi: 3.1.0
+info:
+  title: veyq key management
+  version: 0.1.0
+paths:
+  /api/scopes/{scopeId}/grants/me:
+    put:
+      tags: [Keys]
+      operationId: rewrapMyScopeGrant
+      summary: Replace the authenticated user's wrapped grant for a scope.
+      description: >
+        The caller must already hold a grant for the scope. The client unwraps the scope key locally,
+        wraps it to the current identity key and uploads only the replacement ciphertext. The server
+        never sees scope private key material and cannot create new access through this endpoint.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RewrapMyScopeGrantRequest' }
+      responses:
+        '200':
+          description: The updated caller grant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScopeGrantResponse' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+components:
+  schemas:
+    RewrapMyScopeGrantRequest:
+      type: object
+      required: [wrappedScopePrivateKey]
+      properties:
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    ScopeGrantResponse:
+      type: object
+      required: [scopeId, scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        scopeId: { type: string }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

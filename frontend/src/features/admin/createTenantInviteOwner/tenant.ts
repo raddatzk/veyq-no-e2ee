@@ -16,6 +16,7 @@ function fromB64url(s: string): Uint8Array {
 export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
 export type OwnerInvite = { inviteId: string; bootstrapSecret: string; expiresAt: string }
 export type MyScopeGrant = {
+  scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
   wrappedScopePrivateKey: { suiteId: string; bytes: string }
 }

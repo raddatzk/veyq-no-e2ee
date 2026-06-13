@@ -92,7 +92,8 @@ components:
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
     PersonalScopeGrant:
       type: object
-      required: [scopePublicKey, wrappedScopePrivateKey]
+      required: [scopeId, scopePublicKey, wrappedScopePrivateKey]
       properties:
+        scopeId: { type: string }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

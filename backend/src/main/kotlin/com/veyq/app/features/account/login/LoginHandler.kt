@@ -85,6 +85,7 @@ class LoginHandler(
         val scope = scopes.findPersonalByOwnerUserId(userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope not found")
         val grant = grants.find(scope.id, userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope grant not found")
         return PersonalScopeGrant(
+            scopeId = scope.id,
             scopePublicKey = KemPublicKey(
                 suiteId = scope.suiteId,
                 kemPublicKey = b64.encodeToString(scope.kemPublicKey),

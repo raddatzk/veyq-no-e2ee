@@ -26,6 +26,7 @@ export type LoginResponse = {
   keyBag: KeyBag
 }
 export type PersonalScopeGrant = {
+  scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
   wrappedScopePrivateKey: Blob
 }
