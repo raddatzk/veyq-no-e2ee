@@ -10,6 +10,7 @@ import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMExtractor
+import org.bouncycastle.pqc.crypto.mlkem.MLKEMGenerator
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMPublicKeyParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMKeyGenerationParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMKeyPairGenerator
@@ -90,6 +91,27 @@ object V1 {
         val nonce = blob.copyOfRange(1, 1 + 12)
         val aead = blob.copyOfRange(1 + 12, blob.size)
         return aeadOpen(kek, nonce, aead, ("v1$context").toByteArray(Charsets.UTF_8))
+    }
+
+    /** Encapsulate to a recipient's hybrid KEM public key. Randomized (ephemeral X25519 + ML-KEM). */
+    fun kemEncap(pkX: ByteArray, pkM: ByteArray): Pair<ByteArray, ByteArray> {
+        val esk = X25519PrivateKeyParameters(SecureRandom())
+        val epkX = esk.generatePublicKey().encoded
+        val agr = X25519Agreement()
+        agr.init(esk)
+        val ssX = ByteArray(agr.agreementSize)
+        agr.calculateAgreement(X25519PublicKeyParameters(pkX, 0), ssX, 0)
+        val mPub = MLKEMPublicKeyParameters(MLKEMParameters.ml_kem_768, pkM)
+        val enc = MLKEMGenerator(SecureRandom()).generateEncapsulated(mPub)
+        val ss = combiner(enc.secret, ssX, enc.encapsulation, epkX, pkM, pkX)
+        return Pair(epkX + enc.encapsulation, ss)
+    }
+
+    /** §5a asymmetric wrap: 0x01 || ct(1120) || nonce(12) || aead */
+    fun asymWrap(pkX: ByteArray, pkM: ByteArray, targetKey: ByteArray, context: String, nonce: ByteArray): ByteArray {
+        val (ct, ss) = kemEncap(pkX, pkM)
+        val kek = hkdf(ss, ByteArray(0), ("veyq/v1/wrap$context").toByteArray(Charsets.UTF_8), 32)
+        return byteArrayOf(0x01) + ct + nonce + aeadSeal(kek, nonce, targetKey, ("v1$context").toByteArray(Charsets.UTF_8))
     }
 
     fun asymUnwrap(skX: ByteArray, mlkemSeed: ByteArray, pkX: ByteArray, pkM: ByteArray, blob: ByteArray, context: String): ByteArray {
