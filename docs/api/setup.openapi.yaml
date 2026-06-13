@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: veyq setup
+  version: 0.1.0
+paths:
+  /api/setup:
+    get:
+      tags: [SetupServer]
+      operationId: getSetupStatus
+      summary: Setup status and advertised crypto suites.
+      responses:
+        '200':
+          description: Setup status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupStatus' }
+  /api/setup/owner:
+    post:
+      tags: [SetupServer]
+      operationId: createServerOwner
+      summary: Create the first Server Owner (cold E2EE registration).
+      description: >
+        The client generates all key material; the server stores opaque ciphertext + public keys + an
+        auth verifier and flips the setup gate. The server never sees a private key, the master key,
+        a KEK, the secret key or the recovery code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateServerOwnerRequest' }
+      responses:
+        '200':
+          description: The created Server Owner.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+components:
+  schemas:
+    SetupStatus:
+      type: object
+      required: [setupRequired, suites]
+      properties:
+        setupRequired: { type: boolean }
+        suites:
+          type: array
+          items: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+    CreateServerOwnerRequest:
+      type: object
+      required: [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authVerifier]
+      properties:
+        email: { type: string }
+        displayName: { type: string }
+        identityPublicKey: { $ref: '#/components/schemas/IdentityPublicKey' }
+        wrappedIdentityPrivateKey: { $ref: '#/components/schemas/Blob' }
+        masterKeyWraps:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/MasterKeyWrap' }
+        authVerifier: { $ref: '#/components/schemas/AuthVerifier' }
+    IdentityPublicKey:
+      type: object
+      description: The user's hybrid KEM public key + Ed25519 signing public key (base64url).
+      required: [suiteId, kemPublicKey, signPublicKey]
+      properties:
+        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+        kemPublicKey: { type: string }
+        signPublicKey: { type: string }
+    Blob:
+      type: object
+      description: An opaque, self-describing ciphertext blob (base64url bytes + its suite id).
+      required: [suiteId, bytes]
+      properties:
+        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+        bytes: { type: string }
+    MasterKeyWrap:
+      type: object
+      description: One wrapped copy of the master key, openable by a single unlock method.
+      required: [unlockMethod, suiteId, wrappedKey]
+      properties:
+        unlockMethod: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
+        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+        wrappedKey: { type: string }
+        kdfParams: { type: string }
+        credentialRef: { type: string }
+    AuthVerifier:
+      type: object
+      description: Proves an unlock to the server without revealing the master key.
+      required: [kind, suiteId, verifier]
+      properties:
+        kind: { type: string, enum: [ARGON2_PROOF, WEBAUTHN] }
+        suiteId: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+        verifier: { type: string }

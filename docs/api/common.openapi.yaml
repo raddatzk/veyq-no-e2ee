@@ -1,0 +1,38 @@
+openapi: 3.1.0
+info:
+  title: veyq common
+  version: 0.1.0
+paths: {}
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    ServerRole:
+      type: string
+      enum: [ServerOwner, ServerMember]
+    CryptoSuiteId:
+      type: string
+      description: Versioned crypto-suite identifier, e.g. "v1".
+    UserSummary:
+      type: object
+      required: [id, email, displayName, serverRole]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+        serverRole: { $ref: '#/components/schemas/ServerRole' }
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }

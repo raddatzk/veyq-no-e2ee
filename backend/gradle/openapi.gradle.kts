@@ -1,11 +1,12 @@
 buildscript {
-    repositories {
-        mavenCentral()
-    }
+    repositories { mavenCentral() }
     dependencies {
         classpath("org.openapitools:openapi-generator:7.21.0")
     }
 }
+
+// Greenfield spec-first OpenAPI generation: JAX-RS interfaces + Kotlin models from docs/api specs.
+// Slice Resources implement the generated `*Api` interfaces (one tag per use-case).
 
 data class OpenApiSpec(
     val domain: String,
@@ -19,9 +20,9 @@ val generatedApiDir = layout.buildDirectory.dir("generated/openapi-api")
 val generatedModelsDir = layout.buildDirectory.dir("generated/openapi-models")
 val bundledSpecDir = layout.buildDirectory.dir("generated/openapi-bundled")
 
-val apiPackageName = "com.veyq.api.generated.api"
-val modelPackageName = "com.veyq.api.generated.model"
-val invokerPackageName = "com.veyq.api.generated"
+val apiPackageName = "com.veyq.app.generated.api"
+val modelPackageName = "com.veyq.app.generated.model"
+val invokerPackageName = "com.veyq.app.generated"
 
 val openApiGeneratorOptions = mapOf(
     "interfaceOnly" to "true",
@@ -35,44 +36,20 @@ val openApiGeneratorOptions = mapOf(
     "useBeanValidation" to "true",
 )
 
-val openApiApiOnlyGlobalProperties = mapOf(
-    "apis" to "",
-    "supportingFiles" to "false",
-)
+val openApiApiOnlyGlobalProperties = mapOf("apis" to "", "supportingFiles" to "false")
+val openApiModelOnlyGlobalProperties = mapOf("models" to "", "supportingFiles" to "false")
 
-val openApiModelOnlyGlobalProperties = mapOf(
-    "models" to "",
-    "supportingFiles" to "false",
-)
-
+// Only object schemas that are actually generated as classes belong here. String-typed schemas
+// (e.g. CryptoSuiteId) are inlined as kotlin.String and must NOT be mapped.
 val sharedSchemaMappings = mapOf(
-    "ServerRole" to "$modelPackageName.ServerRole",
     "ErrorResponse" to "$modelPackageName.ErrorResponse",
-    "LoginSession" to "$modelPackageName.LoginSession",
+    "ServerRole" to "$modelPackageName.ServerRole",
     "UserSummary" to "$modelPackageName.UserSummary",
-    "PublicUserSummary" to "$modelPackageName.PublicUserSummary",
-)
-
-val sharedPrimitiveTypeMappings = mapOf(
-    "EmailAddress" to "kotlin.String",
-    "DisplayName" to "kotlin.String",
-    "Name" to "kotlin.String",
-    "Password" to "kotlin.String",
 )
 
 val openApiSpecs = listOf(
     OpenApiSpec("common", "../docs/api/common.openapi.yaml", generateApi = false),
-    OpenApiSpec("settings", "../docs/api/settings.openapi.yaml"),
-    OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("setup", "../docs/api/setup.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("users", "../docs/api/users.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml"),
-    OpenApiSpec("tenant-registration-invites", "../docs/api/tenant-registration-invites.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("groups", "../docs/api/groups.openapi.yaml"),
-    OpenApiSpec("memories", "../docs/api/memories.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("shares", "../docs/api/shares.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("server", "../docs/api/server.openapi.yaml"),
-    OpenApiSpec("frontend", "../docs/api/frontend.openapi.yaml"),
 )
 
 val yamlMapper = com.fasterxml.jackson.databind.ObjectMapper(
@@ -81,44 +58,21 @@ val yamlMapper = com.fasterxml.jackson.databind.ObjectMapper(
 
 @Suppress("UNCHECKED_CAST")
 fun readYamlMap(specPath: String): MutableMap<String, Any?> =
-    yamlMapper.readValue(
-        layout.projectDirectory.file(specPath).asFile,
-        MutableMap::class.java,
-    ) as MutableMap<String, Any?>
+    yamlMapper.readValue(layout.projectDirectory.file(specPath).asFile, MutableMap::class.java) as MutableMap<String, Any?>
 
 @Suppress("UNCHECKED_CAST")
 fun MutableMap<String, Any?>.mutableMapAt(key: String): MutableMap<String, Any?> =
     getOrPut(key) { linkedMapOf<String, Any?>() } as MutableMap<String, Any?>
 
-@Suppress("UNCHECKED_CAST")
 fun rewriteExternalComponentRefs(value: Any?): Any? =
     when (value) {
         is String -> value
             .replace("./common.openapi.yaml#/components/schemas/", "#/components/schemas/")
             .replace("./common.openapi.yaml#/components/responses/", "#/components/responses/")
             .replace("./common.openapi.yaml#/components/parameters/", "#/components/parameters/")
-            .replace("./tenants.openapi.yaml#/components/schemas/", "#/components/schemas/")
-            .replace("./tenants.openapi.yaml#/components/responses/", "#/components/responses/")
-            .replace("./tenants.openapi.yaml#/components/parameters/", "#/components/parameters/")
-            .replace("./users.openapi.yaml#/components/schemas/", "#/components/schemas/")
-            .replace("./users.openapi.yaml#/components/responses/", "#/components/responses/")
-            .replace("./users.openapi.yaml#/components/parameters/", "#/components/parameters/")
-            .replace("./memories.openapi.yaml#/components/schemas/", "#/components/schemas/")
-            .replace("./memories.openapi.yaml#/components/responses/", "#/components/responses/")
-            .replace("./memories.openapi.yaml#/components/requestBodies/", "#/components/requestBodies/")
-            .replace("./memories.openapi.yaml#/components/parameters/", "#/components/parameters/")
-        is MutableMap<*, *> -> {
-            val rewritten = linkedMapOf<String, Any?>()
-            value.forEach { (entryKey, entryValue) ->
-                rewritten[entryKey.toString()] = rewriteExternalComponentRefs(entryValue)
-            }
-            rewritten
-        }
         is Map<*, *> -> {
             val rewritten = linkedMapOf<String, Any?>()
-            value.forEach { (entryKey, entryValue) ->
-                rewritten[entryKey.toString()] = rewriteExternalComponentRefs(entryValue)
-            }
+            value.forEach { (k, v) -> rewritten[k.toString()] = rewriteExternalComponentRefs(v) }
             rewritten
         }
         is List<*> -> value.map(::rewriteExternalComponentRefs)
@@ -130,26 +84,18 @@ fun bundleOpenApiSpec(spec: OpenApiSpec): String {
     if (spec.domain == "common") {
         return layout.projectDirectory.file(spec.specPath).asFile.absolutePath
     }
-
-    val sharedComponentSources = listOf(
-        readYamlMap("../docs/api/common.openapi.yaml"),
-        readYamlMap("../docs/api/tenants.openapi.yaml"),
-        readYamlMap("../docs/api/users.openapi.yaml"),
-        readYamlMap("../docs/api/memories.openapi.yaml"),
-    )
+    val sharedComponentSources = listOf(readYamlMap("../docs/api/common.openapi.yaml"))
     val bundled = rewriteExternalComponentRefs(readYamlMap(spec.specPath)) as MutableMap<String, Any?>
     val bundledComponents = bundled.mutableMapAt("components")
-
     listOf("schemas", "responses", "parameters", "requestBodies").forEach { componentKey ->
         val targetComponents = bundledComponents.mutableMapAt(componentKey)
         sharedComponentSources.forEach { source ->
-            val sourceComponents = source.mutableMapAt("components")[componentKey] as? Map<String, Any?> ?: emptyMap()
+            val sourceComponents = (source.mutableMapAt("components")[componentKey] as? Map<String, Any?>) ?: emptyMap()
             sourceComponents.forEach { (name, component) ->
                 targetComponents.putIfAbsent(name, rewriteExternalComponentRefs(component))
             }
         }
     }
-
     val bundledFile = bundledSpecDir.get().file("${spec.domain}.openapi.yaml").asFile
     bundledFile.parentFile.mkdirs()
     yamlMapper.writeValue(bundledFile, bundled)
@@ -175,7 +121,6 @@ fun runOpenApiGenerator(
         .setOutputDir(outputDirectory.get().asFile.absolutePath)
         .setGlobalProperties(globalProperties)
         .setAdditionalProperties(configOptions.mapValues { it.value })
-
     library?.let(configurator::setLibrary)
     apiPackage?.let(configurator::setApiPackage)
     modelPackage?.let(configurator::setModelPackage)
@@ -184,22 +129,16 @@ fun runOpenApiGenerator(
     if (useSharedSchemaMappings) {
         configurator.setImportMappings(sharedSchemaMappings)
         configurator.setSchemaMappings(sharedSchemaMappings)
-        configurator.setTypeMappings(sharedPrimitiveTypeMappings)
     }
-
-    org.openapitools.codegen.DefaultGenerator()
-        .opts(configurator.toClientOptInput())
-        .generate()
+    org.openapitools.codegen.DefaultGenerator().opts(configurator.toClientOptInput()).generate()
 }
 
 tasks.register("openApiGenerateSpecs") {
     group = "openapi tools"
-    description = "Generates every backend OpenAPI interface and Kotlin model from docs/api specs."
+    description = "Generates backend OpenAPI interfaces + Kotlin models from docs/api specs."
     inputs.files(openApiSpecs.map { layout.projectDirectory.file(it.specPath) })
     outputs.dirs(generatedApiDir, generatedModelsDir, bundledSpecDir)
-    doFirst {
-        delete(generatedApiDir, generatedModelsDir, bundledSpecDir)
-    }
+    doFirst { delete(generatedApiDir, generatedModelsDir, bundledSpecDir) }
     doLast {
         val bundledSpecs = openApiSpecs.associateWith(::bundleOpenApiSpec)
         openApiSpecs.filter { it.generateModels }.forEach { spec ->
@@ -210,7 +149,6 @@ tasks.register("openApiGenerateSpecs") {
                 openApiModelOnlyGlobalProperties,
                 mapOf(
                     "serializationLibrary" to "jackson",
-                    "dateLibrary" to "java8",
                     "enumPropertyNaming" to "original",
                     "collectionType" to "list",
                 ),
@@ -235,59 +173,22 @@ tasks.register("openApiGenerateSpecs") {
     }
 }
 
-tasks.register("openApiValidateSpecs") {
-    group = "openapi tools"
-    description = "Validates every backend OpenAPI spec in docs/api."
-    inputs.files(openApiSpecs.map { layout.projectDirectory.file(it.specPath) })
-    doLast {
-        openApiSpecs.forEach { spec ->
-            val specFile = layout.projectDirectory.file(spec.specPath).asFile.absolutePath
-            val result = io.swagger.v3.parser.OpenAPIV3Parser().readLocation(specFile, null, null)
-            if (result.messages.isNotEmpty()) {
-                throw GradleException(
-                    "OpenAPI spec ${spec.domain} is invalid:\n${result.messages.joinToString("\n")}"
-                )
-            }
-        }
-    }
-}
-
 extensions.configure<org.gradle.api.tasks.SourceSetContainer>("sourceSets") {
-    named("main") {
-        java {
-            srcDir(generatedApiDir.map { it.dir("src/gen/java") })
-        }
-    }
+    named("main") { java { srcDir(generatedApiDir.map { it.dir("src/gen/java") }) } }
 }
 
 @Suppress("UNCHECKED_CAST")
-val kotlinSourceSets = extensions
-    .getByName("kotlin")
-    .javaClass
-    .methods
+val kotlinSourceSets = extensions.getByName("kotlin").javaClass.methods
     .single { it.name == "getSourceSets" && it.parameterCount == 0 }
     .invoke(extensions.getByName("kotlin")) as org.gradle.api.NamedDomainObjectContainer<Any>
 
 kotlinSourceSets.named("main") {
-    val kotlinSourceDirectorySet = javaClass
-        .methods
-        .single { it.name == "getKotlin" && it.parameterCount == 0 }
-        .invoke(this)
-    val srcDir = kotlinSourceDirectorySet.javaClass
-        .methods
+    val kotlinSourceDirectorySet = javaClass.methods
+        .single { it.name == "getKotlin" && it.parameterCount == 0 }.invoke(this)
+    val srcDir = kotlinSourceDirectorySet.javaClass.methods
         .first { it.name == "srcDir" && it.parameterCount == 1 }
-
     srcDir.invoke(kotlinSourceDirectorySet, generatedModelsDir.map { it.dir("src/main/kotlin") })
 }
 
-tasks.named("compileKotlin") {
-    dependsOn(tasks.named("openApiGenerateSpecs"))
-}
-
-tasks.named("compileJava") {
-    dependsOn(tasks.named("openApiGenerateSpecs"))
-}
-
-tasks.named("check") {
-    dependsOn(tasks.named("openApiValidateSpecs"))
-}
+tasks.named("compileKotlin") { dependsOn(tasks.named("openApiGenerateSpecs")) }
+tasks.named("compileJava") { dependsOn(tasks.named("openApiGenerateSpecs")) }
