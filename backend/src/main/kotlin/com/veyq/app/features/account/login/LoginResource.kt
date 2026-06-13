@@ -14,4 +14,7 @@ class LoginResource(private val handler: LoginHandler) : LoginApi {
 
     override fun getCurrentUser(authorization: String): Response =
         Response.ok(handler.currentUser(authorization)).build()
+
+    override fun getPersonalScope(authorization: String): Response =
+        Response.ok(handler.personalScope(authorization)).build()
 }

@@ -18,6 +18,8 @@ export type CreateServerOwnerRequest = {
   wrappedIdentityPrivateKey: { suiteId: string; bytes: string }
   masterKeyWraps: Array<{ unlockMethod: string; suiteId: string; wrappedKey: string; kdfParams?: string }>
   authVerifier: { kind: string; suiteId: string; verifier: string }
+  personalScopePublicKey: { suiteId: string; kemPublicKey: string }
+  wrappedPersonalScopePrivateKey: { suiteId: string; bytes: string }
 }
 
 export type EmergencyKit = { secretKey: string }
@@ -44,6 +46,16 @@ export function buildCreateServerOwnerRequest(
   const authSalt = v1.randomBytes(16)
   const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
 
+  // personal scope is self-owned and unshared; grant it only to this identity
+  const personal = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+  const personalPublic = v1.concat(personal.pub.kemX, personal.pub.kemM)
+  const personalGrant = v1.asymWrap(
+    { x: id.pub.kemX, m: id.pub.kemM },
+    v1.serializeIdentityPrivate(personal),
+    'personal-scope-grant',
+    { nonce: v1.randomBytes(12) },
+  )
+
   const request: CreateServerOwnerRequest = {
     email,
     displayName,
@@ -57,6 +69,8 @@ export function buildCreateServerOwnerRequest(
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(salt) },
     ],
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
+    personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
+    wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
   }
   return { request, emergencyKit: { secretKey: b64url(secretKey) } }
 }

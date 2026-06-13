@@ -179,7 +179,8 @@ components:
       type: object
       required:
         [bootstrapSecret, email, displayName, identityPublicKey, wrappedIdentityPrivateKey,
-         masterKeyWraps, authVerifier, scopePublicKey, wrappedScopePrivateKey]
+         masterKeyWraps, authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey,
+         scopePublicKey, wrappedScopePrivateKey]
       properties:
         bootstrapSecret: { type: string }
         email: { type: string }
@@ -191,6 +192,8 @@ components:
           minItems: 1
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+        personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     RegisterViaInvitationResponse:

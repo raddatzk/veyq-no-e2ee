@@ -1,6 +1,9 @@
 package com.veyq.app.features.admin.setupserver
 
+import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
+import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
@@ -15,9 +18,20 @@ import kotlin.test.assertContentEquals
 class SetupServerSliceTest {
 
     @Inject
+    lateinit var users: UserRepository
+    @Inject
     lateinit var keyBlobs: KeyBlobRepository
+    @Inject
+    lateinit var scopes: ScopeRepository
+    @Inject
+    lateinit var grants: ScopeGrantRepository
 
     private val passwordWrap = "AQIDBA" // base64url of 0x01020304
+    private val personalPublicKey = "cGVyc29uYWw" // base64url("personal")
+    private val personalGrant = "cGVyc29uYWxncmFudA" // base64url("personalgrant")
+
+    private fun decode(s: String): ByteArray =
+        Base64.getUrlDecoder().decode(s.padEnd(s.length + (4 - s.length % 4) % 4, '='))
 
     private val request = """
         {
@@ -28,7 +42,9 @@ class SetupServerSliceTest {
           "masterKeyWraps": [
             { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "$passwordWrap" }
           ],
-          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "dmVy" }
+          "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "dmVy" },
+          "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "$personalPublicKey" },
+          "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "$personalGrant" }
         }
     """.trimIndent()
 
@@ -52,9 +68,16 @@ class SetupServerSliceTest {
             .then().statusCode(200)
             .body("setupRequired", `is`(false))
 
-        // 4. blindness: the stored blob is byte-identical to what was posted
+        // 4. blindness: the stored blobs are byte-identical to what was posted
         val stored = QuarkusTransaction.requiringNew().call { keyBlobs.listAll().first().wrappedKey }
-        assertContentEquals(Base64.getUrlDecoder().decode(passwordWrap), stored)
+        assertContentEquals(decode(passwordWrap), stored)
+        val personal = QuarkusTransaction.requiringNew().call {
+            val user = users.findByEmail("owner@example.com") ?: error("missing setup owner")
+            val scope = scopes.findPersonalByOwnerUserId(user.id) ?: error("missing personal scope")
+            scope.kemPublicKey to (grants.find(scope.id, scope.ownerUserId!!)?.wrappedPrivateKey ?: error("missing personal grant"))
+        }
+        assertContentEquals(decode(personalPublicKey), personal.first)
+        assertContentEquals(decode(personalGrant), personal.second)
 
         // 5. a second setup is rejected
         given().contentType(ContentType.JSON).body(request)

@@ -48,7 +48,9 @@ components:
           items: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
     CreateServerOwnerRequest:
       type: object
-      required: [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps, authVerifier]
+      required:
+        [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps,
+         authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey]
       properties:
         email: { type: string }
         displayName: { type: string }
@@ -59,3 +61,5 @@ components:
           minItems: 1
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+        personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

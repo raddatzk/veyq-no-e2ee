@@ -51,6 +51,13 @@ object RegisterViaInvitation {
             Normalizer.normalize(password, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), authSalt, argon,
         )
 
+        // create the unshared personal scope; only this user receives a grant
+        val personal = V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+        val personalPublic = personal.pubKemX + personal.pubKemM
+        val personalGrant = V1.asymWrap(
+            id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(personal), "personal-scope-grant", V1.randomBytes(12),
+        )
+
         // mint the tenant scope keypair and grant it to self (wrapped to our own identity public key)
         val scope = V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
         val scopePublic = scope.pubKemX + scope.pubKemM
@@ -62,6 +69,8 @@ object RegisterViaInvitation {
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
             """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(salt)}"}],""" +
             """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
+            """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
+            """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +
             """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(scopePublic)}"},""" +
             """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(grant)}"}}"""
         return json to SetupServer.EmergencyKit(b64url(secretKey))

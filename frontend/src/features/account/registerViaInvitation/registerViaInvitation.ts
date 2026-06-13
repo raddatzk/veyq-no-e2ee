@@ -64,6 +64,16 @@ export async function registerViaInvitation(
   const authSalt = v1.randomBytes(16)
   const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
 
+  // create the unshared personal scope; only this user receives a grant
+  const personal = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+  const personalPublic = v1.concat(personal.pub.kemX, personal.pub.kemM)
+  const personalGrant = v1.asymWrap(
+    { x: id.pub.kemX, m: id.pub.kemM },
+    v1.serializeIdentityPrivate(personal),
+    'personal-scope-grant',
+    { nonce: v1.randomBytes(12) },
+  )
+
   // mint the tenant scope keypair and grant it to self (wrapped to our own identity public key)
   const scope = v1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
   const scopePublic = v1.concat(scope.pub.kemX, scope.pub.kemM)
@@ -88,6 +98,8 @@ export async function registerViaInvitation(
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(salt) },
     ],
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
+    personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
+    wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
     scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(scopePublic) },
     wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(grant) },
   }

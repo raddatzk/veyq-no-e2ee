@@ -9,6 +9,10 @@ import com.veyq.app.shared.keymgmt.IdentityKey
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
+import com.veyq.app.shared.keymgmt.Scope
+import com.veyq.app.shared.keymgmt.ScopeGrant
+import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
@@ -31,6 +35,8 @@ class LoginSliceTest {
     @Inject lateinit var identityKeys: IdentityKeyRepository
     @Inject lateinit var keyBlobs: KeyBlobRepository
     @Inject lateinit var authVerifiers: AuthVerifierRepository
+    @Inject lateinit var scopes: ScopeRepository
+    @Inject lateinit var grants: ScopeGrantRepository
 
     private val email = "login@example.com"
     private val password = "correct horse battery staple"
@@ -79,6 +85,18 @@ class LoginSliceTest {
                     verifier = verifierBytes(); createdAt = now
                 },
             )
+            scopes.persist(
+                Scope().apply {
+                    id = "login-personal-scope"; ownerUserId = user.id; kind = "PERSONAL_ROOT"; suiteId = "v1"
+                    kemPublicKey = "personal".toByteArray(); createdAt = now
+                },
+            )
+            grants.persist(
+                ScopeGrant().apply {
+                    id = "login-personal-grant"; scopeId = "login-personal-scope"; userId = user.id; suiteId = "v1"
+                    wrappedPrivateKey = "personalgrant".toByteArray(); createdAt = now
+                },
+            )
         }
     }
 
@@ -105,16 +123,26 @@ class LoginSliceTest {
             .then().statusCode(200)
             .body("email", `is`(email))
 
-        // 3. a wrong password is rejected, no session
+        // 3. the session resolves the user's personal scope grant (ciphertext only)
+        given().header("Authorization", "Bearer $sessionToken")
+            .get("/api/me/personal-scope")
+            .then().statusCode(200)
+            .body("scopePublicKey.kemPublicKey", `is`("cGVyc29uYWw")) // base64url("personal")
+            .body("wrappedScopePrivateKey.bytes", `is`("cGVyc29uYWxncmFudA")) // base64url("personalgrant")
+
+        // 4. a wrong password is rejected, no session
         given().contentType(ContentType.JSON)
             .body("""{"email":"$email","password":"wrong"}""")
             .post("/api/login")
             .then().statusCode(401)
             .body("code", `is`("INVALID_CREDENTIALS"))
 
-        // 4. a bogus token does not resolve
+        // 5. a bogus token does not resolve
         given().header("Authorization", "Bearer nope")
             .get("/api/me")
+            .then().statusCode(401)
+        given().header("Authorization", "Bearer nope")
+            .get("/api/me/personal-scope")
             .then().statusCode(401)
     }
 }

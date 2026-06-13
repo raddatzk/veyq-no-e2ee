@@ -25,6 +25,10 @@ export type LoginResponse = {
   user: { id: string; email: string; displayName: string; serverRole: string }
   keyBag: KeyBag
 }
+export type PersonalScopeGrant = {
+  scopePublicKey: { suiteId: string; kemPublicKey: string }
+  wrappedScopePrivateKey: Blob
+}
 
 export type UnlockedSession = {
   sessionToken: string
@@ -64,4 +68,24 @@ export async function fetchCurrentUser(apiBase: string, sessionToken: string): P
   const res = await fetch(`${apiBase}/api/me`, { headers: { authorization: `Bearer ${sessionToken}` } })
   if (!res.ok) throw new Error(`me failed: ${res.status}`)
   return res.json()
+}
+
+/** Fetches the authenticated user's unshared personal scope grant. */
+export async function fetchPersonalScope(apiBase: string, sessionToken: string): Promise<PersonalScopeGrant> {
+  const res = await fetch(`${apiBase}/api/me/personal-scope`, { headers: { authorization: `Bearer ${sessionToken}` } })
+  if (!res.ok) throw new Error(`personal scope failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Unwrap the user's personal scope grant with their identity key. */
+export function openPersonalScopeGrant(
+  grant: PersonalScopeGrant,
+  identityPriv: v1.Identity['priv'],
+  identityKemPublicKeyB64: string,
+): v1.Identity['priv'] {
+  const idKem = fromB64url(identityKemPublicKeyB64)
+  const sk = v1.hybridSecret(identityPriv)
+  const pk = { x: idKem.slice(0, 32), m: idKem.slice(32) }
+  const scopePrivBytes = v1.asymUnwrap(sk, pk, fromB64url(grant.wrappedScopePrivateKey.bytes), 'personal-scope-grant')
+  return v1.deserializeIdentityPrivate(scopePrivBytes)
 }

@@ -67,4 +67,22 @@ object Login {
         if (resp.statusCode() != 200) throw RuntimeException("me failed: ${resp.statusCode()}")
         return resp.body()
     }
+
+    /** Returns the authenticated user's unshared personal scope grant, or throws on non-200. */
+    fun fetchPersonalScope(apiBase: String, sessionToken: String): JSONObject {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/personal-scope"))
+            .header("Authorization", "Bearer $sessionToken").GET().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("personal scope failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
+    /** Unwrap the personal scope grant with the holder's identity key. */
+    fun openPersonalScopeGrant(grant: JSONObject, identity: V1.IdentityPrivate, identityKemPublicKey: ByteArray): V1.IdentityPrivate {
+        val pkX = identityKemPublicKey.copyOfRange(0, 32)
+        val pkM = identityKemPublicKey.copyOfRange(32, identityKemPublicKey.size)
+        val wrapped = b64d.decode(grant.getJSONObject("wrappedScopePrivateKey").getString("bytes"))
+        val scopePrivBytes = V1.asymUnwrap(identity.kemX, identity.mlkemSeed, pkX, pkM, wrapped, "personal-scope-grant")
+        return V1.deserializeIdentityPrivate(scopePrivBytes)
+    }
 }

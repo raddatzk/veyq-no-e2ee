@@ -76,6 +76,8 @@ class RegisterViaInvitationHandler(
         requireSuite(req.wrappedIdentityPrivateKey.suiteId)
         requireSuite(req.authVerifier.suiteId)
         req.masterKeyWraps.forEach { requireSuite(it.suiteId) }
+        requireSuite(req.personalScopePublicKey.suiteId)
+        requireSuite(req.wrappedPersonalScopePrivateKey.suiteId)
         requireSuite(req.scopePublicKey.suiteId)
         requireSuite(req.wrappedScopePrivateKey.suiteId)
         if (users.findByEmail(req.email) != null) {
@@ -116,7 +118,22 @@ class RegisterViaInvitationHandler(
             },
         )
 
-        // 2. the tenant scope, born as a self grant (mirrors the claim path's first key-holder)
+        // 2. the personal scope, born as self-owned and unshared
+        val personalScope = Scope().apply {
+            id = newId(); ownerUserId = user.id; kind = "PERSONAL_ROOT"
+            suiteId = req.personalScopePublicKey.suiteId
+            kemPublicKey = dec.decode(req.personalScopePublicKey.kemPublicKey); createdAt = now
+        }
+        scopes.persist(personalScope)
+        grants.persist(
+            ScopeGrant().apply {
+                id = newId(); scopeId = personalScope.id; userId = user.id
+                suiteId = req.wrappedPersonalScopePrivateKey.suiteId
+                wrappedPrivateKey = dec.decode(req.wrappedPersonalScopePrivateKey.bytes); createdAt = now
+            },
+        )
+
+        // 3. the tenant scope, born as a self grant (mirrors the claim path's first key-holder)
         val scope = Scope().apply {
             id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
             suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
@@ -134,7 +151,7 @@ class RegisterViaInvitationHandler(
             },
         )
 
-        // 3. activate the tenant, consume the invite, hand back a session
+        // 4. activate the tenant, consume the invite, hand back a session
         tenant.status = TenantStatus.ACTIVE.name
         invite.status = InviteStatus.CONSUMED.name
         invite.consumedBy = user.id

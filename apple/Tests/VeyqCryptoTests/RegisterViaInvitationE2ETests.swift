@@ -37,6 +37,13 @@ final class RegisterViaInvitationE2ETests: XCTestCase {
         let session = try await Login.login(apiBase: apiBase, email: "tenant-owner@example.com", password: inviteePassword, secretKeyB64: result.emergencyKit.secretKey)
         XCTAssertEqual(session.user.id, result.user.id)
 
+        // and recover its personal scope grant — unshared, scoped to this account
+        let personalGrant = try await Login.fetchPersonalScope(apiBase: apiBase, sessionToken: session.sessionToken)
+        let personalPriv = try Login.openPersonalScopeGrant(grant: personalGrant, identity: session.identity, identityKemPublicKey: session.kemPublicKey)
+        let recoveredPersonalXPub = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: personalPriv.kemX).publicKey.rawRepresentation
+        let storedPersonalXPub = Data(Login.b64urlDecode(personalGrant.scopePublicKey.kemPublicKey).prefix(32))
+        XCTAssertEqual(recoveredPersonalXPub, storedPersonalXPub)
+
         // and recover its tenant scope grant — the server never held the scope private key
         let grant = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: session.sessionToken, tenantId: tenant.id)
         let scopePriv = try Tenant.openScopeGrant(grant: grant, identity: session.identity, identityKemPublicKey: session.kemPublicKey)

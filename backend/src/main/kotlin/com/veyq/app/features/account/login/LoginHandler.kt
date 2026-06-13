@@ -3,9 +3,11 @@ package com.veyq.app.features.account.login
 import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.IdentityPublicKey
 import com.veyq.app.generated.model.KeyBag
+import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.LoginRequest
 import com.veyq.app.generated.model.LoginResponse
 import com.veyq.app.generated.model.MasterKeyWrap
+import com.veyq.app.generated.model.PersonalScopeGrant
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.Argon2Verifier
@@ -15,6 +17,8 @@ import com.veyq.app.shared.keymgmt.AuthVerifierRepository
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
+import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -31,6 +35,8 @@ class LoginHandler(
     private val identityKeys: IdentityKeyRepository,
     private val keyBlobs: KeyBlobRepository,
     private val authVerifiers: AuthVerifierRepository,
+    private val scopes: ScopeRepository,
+    private val grants: ScopeGrantRepository,
     private val argon2: Argon2Verifier,
     private val sessions: SessionService,
 ) {
@@ -71,6 +77,23 @@ class LoginHandler(
         val userId = sessions.resolve(authorization) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
         return user.toSummary()
+    }
+
+    @Transactional
+    fun personalScope(authorization: String?): PersonalScopeGrant {
+        val userId = sessions.resolve(authorization) ?: throw unauthorized()
+        val scope = scopes.findPersonalByOwnerUserId(userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope not found")
+        val grant = grants.find(scope.id, userId) ?: throw ApiException(404, "NOT_FOUND", "Personal scope grant not found")
+        return PersonalScopeGrant(
+            scopePublicKey = KemPublicKey(
+                suiteId = scope.suiteId,
+                kemPublicKey = b64.encodeToString(scope.kemPublicKey),
+            ),
+            wrappedScopePrivateKey = Blob(
+                suiteId = grant.suiteId,
+                bytes = b64.encodeToString(grant.wrappedPrivateKey),
+            ),
+        )
     }
 
     private fun toWrap(blob: KeyBlob): MasterKeyWrap =

@@ -42,6 +42,14 @@ class RegisterViaInvitationE2ETest {
         // the new account can log in independently (proves the auth verifier + master wrap are consistent)
         val session = Login.login(apiBase, "tenant-owner@example.com", inviteePassword, result.emergencyKit.secretKey)
 
+        // and recover its personal scope grant — unshared, scoped to this account
+        val personalGrant = Login.fetchPersonalScope(apiBase, session.sessionToken)
+        val personalPriv = Login.openPersonalScopeGrant(personalGrant, session.identity, session.kemPublicKey)
+        val recoveredPersonalXPub = X25519PrivateKeyParameters(personalPriv.kemX, 0).generatePublicKey().encoded
+        val storedPersonalXPub = Base64.getUrlDecoder()
+            .decode(personalGrant.getJSONObject("scopePublicKey").getString("kemPublicKey")).copyOfRange(0, 32)
+        assertContentEquals(recoveredPersonalXPub, storedPersonalXPub)
+
         // and recover its tenant scope grant — the server never held the scope private key
         val grant = Tenant.getMyScopeGrant(apiBase, session.sessionToken, tenant.getString("id"))
         val scopePriv = Tenant.openScopeGrant(grant, session.identity, session.kemPublicKey)

@@ -71,7 +71,13 @@ class RegisterViaInvitationSliceTest {
             .get("/api/me").then().statusCode(200)
             .body("email", `is`("invitee@example.com"))
 
-        // blindness: the stored scope grant is byte-identical to what was posted
+        // personal access is resolved through the session and remains ciphertext-only
+        given().header("Authorization", "Bearer $session")
+            .get("/api/me/personal-scope").then().statusCode(200)
+            .body("scopePublicKey.kemPublicKey", `is`("cGVyc29uYWw"))
+            .body("wrappedScopePrivateKey.bytes", `is`("cGVyc29uYWxncmFudA"))
+
+        // blindness: the stored tenant scope grant is byte-identical to what was posted
         given().header("Authorization", "Bearer $session")
             .get("/api/tenants/$tenantId/scope").then().statusCode(200)
             .body("scopePublicKey.kemPublicKey", `is`("a2Vt"))
@@ -112,6 +118,8 @@ class RegisterViaInvitationSliceTest {
             { "unlockMethod": "PASSWORD", "suiteId": "v1", "wrappedKey": "bWs", "kdfParams": "c2FsdA" }
           ],
           "authVerifier": { "kind": "ARGON2_PROOF", "suiteId": "v1", "verifier": "dmVyaWZpZXI" },
+          "personalScopePublicKey": { "suiteId": "v1", "kemPublicKey": "cGVyc29uYWw" },
+          "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWxncmFudA" },
           "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "a2Vt" },
           "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "Z3JhbnQ" }
         }

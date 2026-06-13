@@ -2,28 +2,28 @@
 
 - **ID:** uc.spaces.use-personal
 - **Primary actor:** Memory Curator
-- **Goal:** Use the private personal space — maximally confidential, even from the operator.
-- **Preconditions:** Authenticated; holds the **personal-space keys** (created at registration).
-- **Postconditions (success):** Personal memories are created/curated under the user's own keys;
-  unshared content stays confidential from everyone, including the operator.
+- **Goal:** Access the private personal space key material — maximally confidential, even from the operator.
+- **Preconditions:** Authenticated; has a self-owned **personal-space grant** created during account
+  registration.
+- **Postconditions (success):** The client can open the user's personal scope locally; unshared
+  content remains inaccessible to everyone else, including the operator.
 
 ## Main flow
-1. The user selects their **personal space**.
-2. The client uses the **personal-space keys** (self-owned, created at registration, **never granted**
-   to anyone) to decrypt/encrypt content.
-3. The user curates private memories; nothing is shared unless they take an **explicit, informed**
-   sharing action.
+1. The authenticated client requests the user's **personal scope grant**.
+2. The server resolves the session and returns only the personal scope public key plus the wrapped
+   private key grant for that user.
+3. The client opens the personal scope locally with the user's identity key; the server never sees
+   personal scope private key material.
 
 ## Alternate / exception flows
-- A1: The user **shares** a personal memory → it becomes "shared" (keys wrapped to recipients) — a
-  deliberate, owner-only confidentiality-lowering act.
 - E1: Keys unavailable on this device → unlock or recover first.
+- E2: Session unavailable or invalid → the personal scope grant is not returned.
 
 ## Quality notes
 - *Paramount invariant in full:* unshared personal content reaches no one — not other users, not the
   operator; **only the owner** lowers it.
-- *Self-owned keys:* the personal scope keypair is the user's own; there is no grant and no other
-  key-holder.
+- *Self-owned keys:* the personal scope keypair is the user's own; only the owner receives a wrapped
+  self-grant.
 
 ## Related
 - Feature: [Spaces](../_index.md) · Actors: [Memory Curator](../../../actors.md)

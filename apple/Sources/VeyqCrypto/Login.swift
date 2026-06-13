@@ -11,8 +11,9 @@ public enum Login {
         return Data(base64Encoded: t) ?? Data()
     }
 
-    struct BlobDTO: Codable { let suiteId, bytes: String }
+    public struct BlobDTO: Codable { public let suiteId, bytes: String }
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
+    public struct KemPublicKeyDTO: Codable { public let suiteId, kemPublicKey: String }
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
     struct KeyBagDTO: Codable {
         let identityPublicKey: IdentityPublicKeyDTO
@@ -20,6 +21,10 @@ public enum Login {
         let masterKeyWraps: [MasterKeyWrapDTO]
     }
     public struct UserSummaryDTO: Codable { public let id, email, displayName, serverRole: String }
+    public struct PersonalScopeGrantDTO: Codable {
+        public let scopePublicKey: KemPublicKeyDTO
+        public let wrappedScopePrivateKey: BlobDTO
+    }
     struct LoginResponseDTO: Codable { let sessionToken: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
 
     public struct UnlockedSession {
@@ -63,5 +68,26 @@ public enum Login {
             throw NSError(domain: "veyq.login", code: 3, userInfo: [NSLocalizedDescriptionKey: "me failed"])
         }
         return try JSONDecoder().decode(UserSummaryDTO.self, from: data)
+    }
+
+    public static func fetchPersonalScope(apiBase: String, sessionToken: String) async throws -> PersonalScopeGrantDTO {
+        var request = URLRequest(url: URL(string: "\(apiBase)/api/me/personal-scope")!)
+        request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: request)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.login", code: 4, userInfo: [NSLocalizedDescriptionKey: "personal scope failed"])
+        }
+        return try JSONDecoder().decode(PersonalScopeGrantDTO.self, from: data)
+    }
+
+    static func openPersonalScopeGrant(
+        grant: PersonalScopeGrantDTO, identity: V1.IdentityPrivate, identityKemPublicKey: Data
+    ) throws -> V1.IdentityPrivate {
+        let pkX = Data(identityKemPublicKey.prefix(32))
+        let pkM = Data(identityKemPublicKey.dropFirst(32))
+        let scopePrivBytes = try V1.asymUnwrap(
+            skX: identity.kemX, mlkemSeed: identity.mlkemSeed, pkX: pkX, pkM: pkM,
+            blob: b64urlDecode(grant.wrappedScopePrivateKey.bytes), context: "personal-scope-grant")
+        return V1.deserializeIdentityPrivate(scopePrivBytes)
     }
 }

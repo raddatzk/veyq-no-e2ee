@@ -13,6 +13,7 @@ public enum SetupServer {
     }
 
     struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
+    struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct BlobDTO: Codable { let suiteId, bytes: String }
     struct MasterKeyWrapDTO: Codable { let unlockMethod, suiteId, wrappedKey: String; let kdfParams: String? }
     struct AuthVerifierDTO: Codable { let kind, suiteId, verifier: String }
@@ -22,6 +23,8 @@ public enum SetupServer {
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
         let authVerifier: AuthVerifierDTO
+        let personalScopePublicKey: KemPublicKeyDTO
+        let wrappedPersonalScopePrivateKey: BlobDTO
     }
     public struct UserSummaryDTO: Codable { public let id, email, displayName, serverRole: String }
     public struct EmergencyKit { public let secretKey: String }
@@ -39,12 +42,21 @@ public enum SetupServer {
         let authSalt = V1.randomBytes(16)
         let verifier = try V1.kekRecovery(recoveryCode: Data(password.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: argon)
 
+        // personal scope is self-owned and unshared; grant it only to this identity.
+        let personal = try V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+        let personalPublic = personal.pubKemX + personal.pubKemM
+        let personalGrant = try V1.asymWrap(
+            pkX: id.pubKemX, pkM: id.pubKemM, targetKey: V1.serializeIdentityPrivate(personal),
+            context: "personal-scope-grant", nonce: V1.randomBytes(12))
+
         let req = CreateServerOwnerRequest(
             email: email, displayName: displayName,
             identityPublicKey: IdentityPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(id.pubKemX + id.pubKemM), signPublicKey: b64url(id.pubSign)),
             wrappedIdentityPrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(wrappedPriv)),
             masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(salt))],
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: b64url(authSalt + verifier))
+            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: b64url(authSalt + verifier)),
+            personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(personalPublic)),
+            wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(personalGrant))
         )
         return (req, EmergencyKit(secretKey: b64url(secretKey)))
     }

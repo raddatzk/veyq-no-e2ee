@@ -14,6 +14,10 @@ import com.veyq.app.shared.keymgmt.IdentityKey
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
 import com.veyq.app.shared.keymgmt.KeyBlob
 import com.veyq.app.shared.keymgmt.KeyBlobRepository
+import com.veyq.app.shared.keymgmt.Scope
+import com.veyq.app.shared.keymgmt.ScopeGrant
+import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SetupGate
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -29,6 +33,8 @@ class SetupServerHandler(
     private val identityKeys: IdentityKeyRepository,
     private val keyBlobs: KeyBlobRepository,
     private val authVerifiers: AuthVerifierRepository,
+    private val scopes: ScopeRepository,
+    private val grants: ScopeGrantRepository,
     private val suites: CryptoSuiteRegistry,
     private val setupGate: SetupGate,
 ) {
@@ -46,6 +52,8 @@ class SetupServerHandler(
         requireSuite(req.identityPublicKey.suiteId)
         requireSuite(req.wrappedIdentityPrivateKey.suiteId)
         requireSuite(req.authVerifier.suiteId)
+        requireSuite(req.personalScopePublicKey.suiteId)
+        requireSuite(req.wrappedPersonalScopePrivateKey.suiteId)
         if (req.masterKeyWraps.isEmpty()) {
             throw ApiException(400, "NO_UNLOCK_METHOD", "At least one unlock method is required")
         }
@@ -97,6 +105,26 @@ class SetupServerHandler(
                 kind = req.authVerifier.kind.value
                 suiteId = req.authVerifier.suiteId
                 verifier = b64.decode(req.authVerifier.verifier)
+                createdAt = now
+            },
+        )
+
+        val personalScope = Scope().apply {
+            id = newId()
+            ownerUserId = user.id
+            kind = "PERSONAL_ROOT"
+            suiteId = req.personalScopePublicKey.suiteId
+            kemPublicKey = b64.decode(req.personalScopePublicKey.kemPublicKey)
+            createdAt = now
+        }
+        scopes.persist(personalScope)
+        grants.persist(
+            ScopeGrant().apply {
+                id = newId()
+                scopeId = personalScope.id
+                userId = user.id
+                suiteId = req.wrappedPersonalScopePrivateKey.suiteId
+                wrappedPrivateKey = b64.decode(req.wrappedPersonalScopePrivateKey.bytes)
                 createdAt = now
             },
         )

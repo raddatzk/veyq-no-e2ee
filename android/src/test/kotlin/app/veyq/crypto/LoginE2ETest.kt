@@ -2,6 +2,7 @@ package app.veyq.crypto
 
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.json.JSONObject
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -27,6 +28,13 @@ class LoginE2ETest {
 
         val me = JSONObject(Login.fetchCurrentUser(apiBase, session.sessionToken))
         assertEquals(email, me.getString("email"))
+
+        val personalGrant = Login.fetchPersonalScope(apiBase, session.sessionToken)
+        val personalPriv = Login.openPersonalScopeGrant(personalGrant, session.identity, session.kemPublicKey)
+        val recoveredPersonalXPub = X25519PrivateKeyParameters(personalPriv.kemX, 0).generatePublicKey().encoded
+        val storedPersonalXPub = Base64.getUrlDecoder()
+            .decode(personalGrant.getJSONObject("scopePublicKey").getString("kemPublicKey")).copyOfRange(0, 32)
+        assertContentEquals(recoveredPersonalXPub, storedPersonalXPub)
 
         // the recovered private key matches the server's stored public key (X25519 half)
         val recoveredXPub = X25519PrivateKeyParameters(session.identity.kemX, 0).generatePublicKey().encoded

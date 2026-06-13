@@ -25,11 +25,18 @@ create table veyq_tenant_invite (
 
 create table veyq_scope (
     id              varchar(64)     primary key,
-    tenant_id       varchar(64)     not null references veyq_tenant (id),
-    kind            varchar(32)     not null,  -- TENANT_ROOT
+    tenant_id       varchar(64)     references veyq_tenant (id),
+    owner_user_id   varchar(64)     references veyq_user (id),
+    kind            varchar(32)     not null,  -- TENANT_ROOT, PERSONAL_ROOT
     suite_id        varchar(64)     not null,
     kem_public_key  varbinary(8192) not null,
-    created_at      timestamp       not null
+    created_at      timestamp       not null,
+    constraint chk_scope_owner
+        check (
+            (kind = 'TENANT_ROOT' and tenant_id is not null and owner_user_id is null)
+            or
+            (kind = 'PERSONAL_ROOT' and tenant_id is null and owner_user_id is not null)
+        )
 );
 
 create table veyq_scope_grant (
@@ -51,5 +58,8 @@ create table veyq_membership (
 );
 
 create index idx_scope_tenant on veyq_scope (tenant_id);
+create unique index uq_scope_owner_personal on veyq_scope (owner_user_id, kind);
+create index idx_scope_owner on veyq_scope (owner_user_id);
 create index idx_grant_user on veyq_scope_grant (user_id);
+create unique index uq_grant_scope_user on veyq_scope_grant (scope_id, user_id);
 create index idx_membership_tenant on veyq_membership (tenant_id);

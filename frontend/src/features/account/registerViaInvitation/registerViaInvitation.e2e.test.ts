@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { registerServerOwner } from '../../admin/setupServer/setupServer'
-import { login } from '../login/login'
+import { fetchPersonalScope, login, openPersonalScopeGrant } from '../login/login'
 import { createTenant, issueOwnerInvite, getMyScopeGrant, openScopeGrant } from '../../admin/createTenantInviteOwner/tenant'
 import { getInviteMetadata, registerViaInvitation } from './registerViaInvitation'
 
@@ -48,6 +48,13 @@ suite('register-via-invitation E2E (web -> live backend)', () => {
     // the new account can log in independently (proves the auth verifier + master wrap are consistent)
     const session = await login(apiBase, 'tenant-owner@example.com', inviteePassword, result.emergencyKit.secretKey)
     expect(session.user.id).toBe(result.user.id)
+
+    // and recover its personal scope grant — unshared, scoped to this account
+    const personalGrant = await fetchPersonalScope(apiBase, session.sessionToken)
+    const personalPriv = openPersonalScopeGrant(personalGrant, session.identity, session.identityPublicKey.kemPublicKey)
+    const recoveredPersonalXPub = x25519.getPublicKey(personalPriv.kemX)
+    const storedPersonalXPub = fromB64url(personalGrant.scopePublicKey.kemPublicKey).slice(0, 32)
+    expect(Array.from(recoveredPersonalXPub)).toEqual(Array.from(storedPersonalXPub))
 
     // and recover its tenant scope grant — the server never held the scope private key
     const grant = await getMyScopeGrant(apiBase, session.sessionToken, tenant.id)

@@ -1,0 +1,85 @@
+id: uc.spaces.use-personal
+title: Use the personal space
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/spaces/_index.md
+  - type: useCase
+    ref: docs/wiki/features/spaces/use-cases/uc.spaces.use-personal.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/account-key-model.md
+  - type: api
+    ref: docs/api/auth.openapi.yaml
+  - type: api
+    ref: docs/api/setup.openapi.yaml
+  - type: api
+    ref: docs/api/tenants.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/admin/setupserver/SetupServerHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/account/login/login.ts
+  - type: entryPoint
+    ref: android/src/main/kotlin/app/veyq/crypto/Login.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/Login.swift
+acceptanceCriteria:
+  - id: uc.spaces.use-personal.self-owned-scope
+    statement: Account creation creates a self-owned personal scope and stores only the posted wrapped self-grant.
+    coverage:
+      backend:
+        integration:
+          - testName: coldRegistrationFlow
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+          - testName: registersNewOwnerAndActivatesTenant
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+  - id: uc.spaces.use-personal.fetches-owner-grant
+    statement: An authenticated user can fetch and locally open their own personal scope grant.
+    coverage:
+      backend:
+        integration:
+          - testName: loginUnlockAndSession
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+          - testName: registersNewOwnerAndActivatesTenant
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+      web:
+        e2e:
+          - testName: registers, logs in, and unlocks the identity key matching the stored public key
+            kind: positive
+            ref: frontend/src/features/account/login/login.e2e.test.ts
+          - testName: registers a new owner from an invite, then logs in and round-trips the scope grant
+            kind: positive
+            ref: frontend/src/features/account/registerViaInvitation/registerViaInvitation.e2e.test.ts
+      android:
+        e2e:
+          - testName: loginAndUnlock
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
+          - testName: registerNewOwnerThenLoginAndGrant
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+      apple:
+        e2e:
+          - testName: testLoginAndUnlock
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/LoginE2ETests.swift
+          - testName: testRegisterNewOwnerThenLoginAndGrant
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/RegisterViaInvitationE2ETests.swift
+  - id: uc.spaces.use-personal.rejects-invalid-session
+    statement: A missing or invalid session cannot fetch a personal scope grant.
+    coverage:
+      backend:
+        integration:
+          - testName: loginUnlockAndSession
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt

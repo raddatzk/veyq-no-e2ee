@@ -23,6 +23,12 @@ final class LoginE2ETests: XCTestCase {
         let me = try await Login.fetchCurrentUser(apiBase: apiBase, sessionToken: session.sessionToken)
         XCTAssertEqual(me.email, email)
 
+        let personalGrant = try await Login.fetchPersonalScope(apiBase: apiBase, sessionToken: session.sessionToken)
+        let personalPriv = try Login.openPersonalScopeGrant(grant: personalGrant, identity: session.identity, identityKemPublicKey: session.kemPublicKey)
+        let recoveredPersonalXPub = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: personalPriv.kemX).publicKey.rawRepresentation
+        let storedPersonalXPub = Data(Login.b64urlDecode(personalGrant.scopePublicKey.kemPublicKey).prefix(32))
+        XCTAssertEqual(recoveredPersonalXPub, storedPersonalXPub)
+
         // the recovered private key matches the server's stored public key (X25519 half)
         let recoveredXPub = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: session.identity.kemX).publicKey.rawRepresentation
         XCTAssertEqual(recoveredXPub, Data(session.kemPublicKey.prefix(32)))

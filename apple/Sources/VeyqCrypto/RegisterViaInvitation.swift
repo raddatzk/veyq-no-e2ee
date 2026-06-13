@@ -15,6 +15,8 @@ public enum RegisterViaInvitation {
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
         let authVerifier: AuthVerifierDTO
+        let personalScopePublicKey: KemPublicKeyDTO
+        let wrappedPersonalScopePrivateKey: BlobDTO
         let scopePublicKey: KemPublicKeyDTO
         let wrappedScopePrivateKey: BlobDTO
     }
@@ -62,6 +64,13 @@ public enum RegisterViaInvitation {
         let authSalt = V1.randomBytes(16)
         let verifier = try V1.kekRecovery(recoveryCode: Data(password.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: SetupServer.argon)
 
+        // create the unshared personal scope; only this user receives a grant
+        let personal = try V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+        let personalPublic = personal.pubKemX + personal.pubKemM
+        let personalGrant = try V1.asymWrap(
+            pkX: id.pubKemX, pkM: id.pubKemM, targetKey: V1.serializeIdentityPrivate(personal),
+            context: "personal-scope-grant", nonce: V1.randomBytes(12))
+
         // mint the tenant scope keypair and grant it to self (wrapped to our own identity public key)
         let scope = try V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
         let scopePublic = scope.pubKemX + scope.pubKemM
@@ -73,6 +82,8 @@ public enum RegisterViaInvitation {
             wrappedIdentityPrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrappedPriv)),
             masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(masterWrap), kdfParams: SetupServer.b64url(salt))],
             authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
+            personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(personalPublic)),
+            wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(personalGrant)),
             scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(scopePublic)),
             wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(grant)))
         return (req, SetupServer.EmergencyKit(secretKey: SetupServer.b64url(secretKey)))

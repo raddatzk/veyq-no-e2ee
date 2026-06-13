@@ -43,6 +43,28 @@ paths:
             application/json:
               schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/personal-scope:
+    get:
+      tags: [Login]
+      operationId: getPersonalScope
+      summary: Return the authenticated user's personal root scope grant.
+      description: >
+        The personal scope is self-owned and unshared. The server returns only the public scope key and
+        the scope private key wrapped to the authenticated user's identity key.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: 'Bearer <sessionToken>'
+          schema: { type: string }
+      responses:
+        '200':
+          description: The user's personal root scope grant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalScopeGrant' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     LoginRequest:
@@ -68,3 +90,9 @@ components:
         masterKeyWraps:
           type: array
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
+    PersonalScopeGrant:
+      type: object
+      required: [scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

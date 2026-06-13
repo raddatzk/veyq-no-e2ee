@@ -33,12 +33,21 @@ object SetupServer {
             authSalt, argon,
         )
 
+        // personal scope is self-owned and unshared; grant it only to this identity.
+        val personal = V1.generateIdentity() // reuse the hybrid-KEM bundle for the scope (sign field unused)
+        val personalPublic = personal.pubKemX + personal.pubKemM
+        val personalGrant = V1.asymWrap(
+            id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(personal), "personal-scope-grant", V1.randomBytes(12),
+        )
+
         // base64url and the simple ASCII inputs need no JSON escaping in this flow.
         val json = """{"email":"$email","displayName":"$displayName",""" +
             """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
             """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(salt)}"}],""" +
-            """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"}}"""
+            """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
+            """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
+            """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"}}"""
         return json to EmergencyKit(b64url(secretKey))
     }
 

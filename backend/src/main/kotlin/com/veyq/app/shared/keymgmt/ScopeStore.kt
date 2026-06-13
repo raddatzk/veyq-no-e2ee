@@ -15,7 +15,8 @@ import java.time.Instant
 @Table(name = "veyq_scope")
 class Scope {
     @Id var id: String = ""
-    @Column(name = "tenant_id", nullable = false) var tenantId: String = ""
+    @Column(name = "tenant_id") var tenantId: String? = null
+    @Column(name = "owner_user_id") var ownerUserId: String? = null
     @Column(nullable = false) var kind: String = ""
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "kem_public_key", nullable = false) var kemPublicKey: ByteArray = ByteArray(0)
@@ -36,6 +37,8 @@ class ScopeGrant {
 @ApplicationScoped
 class ScopeRepository : PanacheRepositoryBase<Scope, String> {
     fun findByTenantId(tenantId: String): Scope? = find("tenantId", tenantId).firstResult()
+    fun findPersonalByOwnerUserId(userId: String): Scope? =
+        find("ownerUserId = ?1 and kind = ?2", userId, "PERSONAL_ROOT").firstResult()
 }
 
 @ApplicationScoped
