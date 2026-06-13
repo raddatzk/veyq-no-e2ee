@@ -10,8 +10,15 @@ let package = Package(
     products: [
         .library(name: "VeyqCrypto", targets: ["VeyqCrypto"])
     ],
+    dependencies: [
+        // Argon2id is not in CryptoKit; libsodium (ARM-native) provides it via crypto_pwhash.
+        .package(url: "https://github.com/jedisct1/swift-sodium", from: "0.9.1")
+    ],
     targets: [
-        .target(name: "VeyqCrypto"),
+        .target(
+            name: "VeyqCrypto",
+            dependencies: [.product(name: "Sodium", package: "swift-sodium")]
+        ),
         .testTarget(name: "VeyqCryptoTests", dependencies: ["VeyqCrypto"])
     ]
 )

@@ -94,6 +94,8 @@ const vectors = {
   },
   kem_v1: {
     decap_kat: {
+      note: "Reconstruct the ML-KEM private key from mlkem_seed (FIPS 203 keygen) for stacks that do not import an expanded secret key (CryptoKit, BouncyCastle); noble can use sk_mlkem directly. X25519 secret is raw bytes.",
+      mlkem_seed: hex(mlkemSeed),
       sk_x25519: hex(sk.x), sk_mlkem: hex(sk.m),
       pk_x25519: hex(pk.x), pk_mlkem: hex(pk.m),
       ct: hex(ct),
