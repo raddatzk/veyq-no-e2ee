@@ -136,3 +136,16 @@ export function generateIdentity(): Identity {
 /** Serialize the identity private bundle (wrapped under the master key). */
 export const serializeIdentityPrivate = (id: Identity): Uint8Array =>
   concat(lp(id.priv.kemX), lp(id.priv.mlkemSeed), lp(id.priv.sign))
+
+/** Inverse of serializeIdentityPrivate: read three length-prefixed fields. */
+export function deserializeIdentityPrivate(bytes: Uint8Array): Identity['priv'] {
+  let o = 0
+  const next = (): Uint8Array => {
+    const len = new DataView(bytes.buffer, bytes.byteOffset + o, 4).getUint32(0, false)
+    o += 4
+    const v = bytes.slice(o, o + len)
+    o += len
+    return v
+  }
+  return { kemX: next(), mlkemSeed: next(), sign: next() }
+}
