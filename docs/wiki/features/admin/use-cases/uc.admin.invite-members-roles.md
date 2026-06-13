@@ -24,7 +24,9 @@
 ## Alternate / exception flows
 - A1: **Remove a member** → membership becomes "Removed" (soft, rejoinable — ADR 0017); the grant is
   revoked + the **scope key is rotated** ([AD-24](../../../decisions/README.md)); content & attribution
-  are preserved; rejoining re-grants access.
+  are preserved; rejoining re-grants access. If the scope already has a content key, rotation also
+  re-wraps that stable content key to the new scope keypair so existing encrypted content remains
+  readable by remaining members.
 - A2: **Server Owner deactivation** of an account → **login blocked** (auth), keys untouched, reversible
   — a *global* action, distinct from tenant removal.
 - A3: Change an existing member's role.
@@ -37,11 +39,13 @@
 - *Role ≠ access (ADR 0005):* roles govern membership/settings; the set of decryptable scopes governs
   content.
 - *Removal = two-layer revocation ([AD-24](../../../decisions/README.md)):* instant token/access
-  invalidation + eventual key rotation; already-downloaded content cannot be retracted.
+  invalidation + eventual key rotation; already-downloaded content cannot be retracted. Scope-key
+  rotation preserves the content key by re-wrapping it to the new scope keypair.
 
 ## Related
 - Feature: [Administration & Operations](../_index.md) · Actors: [Tenant Owner](../../../actors.md), [Invited User](../../../actors.md)
-- Concepts: [Security Model](../../../crosscutting/security-model.md) (provisioning, revocation,
-  temp-wrap invites, revocation)
-- Decisions: [AD-21](../../../decisions/README.md) (onboarding), [AD-24](../../../decisions/README.md) (revocation); ADR 0005, ADR 0017 (legacy)
+- Concepts: [Security Model](../../../crosscutting/security-model.md) (provisioning, temp-wrap invites,
+  content keys, revocation)
+- Decisions: [AD-21](../../../decisions/README.md) (onboarding), [AD-03](../../../decisions/README.md)
+  (content keys), [AD-24](../../../decisions/README.md) (revocation); ADR 0005, ADR 0017 (legacy)
 - Related use-cases: `uc.account.register-via-invitation`, `uc.spaces.use-group`, `uc.account.erase-account`

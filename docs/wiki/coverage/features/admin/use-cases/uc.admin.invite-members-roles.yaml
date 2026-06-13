@@ -107,7 +107,7 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/features/admin/inviteMembersRoles/removeMember.e2e.test.ts
   - id: uc.admin.invite-members-roles.rotate-scope
-    statement: Scope rotation replaces the tenant scope keypair and re-grants exactly the active members.
+    statement: Scope rotation replaces the tenant scope keypair, re-grants exactly the active members and re-wraps an existing content key so encrypted content remains readable.
     coverage:
       backend:
         integration:
@@ -122,16 +122,25 @@ acceptanceCriteria:
           - testName: rotates the scope, re-granting a new keypair to every active member
             kind: positive
             ref: frontend/src/features/admin/inviteMembersRoles/rotateScope.e2e.test.ts
+          - testName: re-wraps the content key on rotation; content stays readable and new members can read it
+            kind: positive
+            ref: frontend/src/features/content/contentSurvivesRotation.e2e.test.ts
       android:
         e2e:
           - testName: rotateScopeReGrantsEveryActiveMember
             kind: positive
             ref: android/src/test/kotlin/app/veyq/crypto/RotateScopeE2ETest.kt
+          - testName: contentKeyReWrappedOnRotation
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/ContentSurvivesRotationE2ETest.kt
       apple:
         e2e:
           - testName: testRotateScopeReGrantsEveryActiveMember
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/RotateScopeE2ETests.swift
+          - testName: testContentKeyReWrappedOnRotation
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/ContentSurvivesRotationE2ETests.swift
   - id: uc.admin.invite-members-roles.role-change
     statement: A Tenant Owner can change member roles without changing content grants, and the last owner cannot be demoted.
     coverage:
