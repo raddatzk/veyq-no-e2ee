@@ -4,7 +4,7 @@ import Sodium
 
 /// veyq v1 crypto suite — Apple (Swift/CryptoKit). Conformance: docs/api/crypto-vectors/v1.json.
 public enum V1 {
-    public struct ArgonParams {
+    public struct ArgonParams: Sendable {
         public let t: Int
         public let m: Int
         public let p: Int
@@ -103,5 +103,38 @@ public enum V1 {
     }
     public static func kekPasskey(prfOutput: Data) -> Data {
         hkdf(ikm: prfOutput, salt: Data(), info: Data("veyq/v1/passkey-kek".utf8), len: 32)
+    }
+
+    // ---- Identity generation ----
+    public static func randomBytes(_ n: Int) -> Data {
+        Data((0..<n).map { _ in UInt8.random(in: UInt8.min...UInt8.max) })
+    }
+
+    public struct Identity {
+        public let pubKemX: Data
+        public let pubKemM: Data
+        public let pubSign: Data
+        public let privKemX: Data
+        public let mlkemSeed: Data
+        public let privSign: Data
+    }
+
+    public static func generateIdentity() throws -> Identity {
+        let xPriv = Curve25519.KeyAgreement.PrivateKey()
+        let mlkemSeed = randomBytes(64)
+        let mPriv = try MLKEM768.PrivateKey(seedRepresentation: mlkemSeed, publicKey: nil)
+        let sPriv = Curve25519.Signing.PrivateKey()
+        return Identity(
+            pubKemX: xPriv.publicKey.rawRepresentation,
+            pubKemM: mPriv.publicKey.rawRepresentation,
+            pubSign: sPriv.publicKey.rawRepresentation,
+            privKemX: xPriv.rawRepresentation,
+            mlkemSeed: mlkemSeed,
+            privSign: sPriv.rawRepresentation
+        )
+    }
+
+    public static func serializeIdentityPrivate(_ id: Identity) -> Data {
+        lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
     }
 }
