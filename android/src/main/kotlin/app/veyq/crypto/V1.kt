@@ -6,9 +6,11 @@ import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.generators.HKDFBytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import org.bouncycastle.crypto.params.HKDFParameters
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMExtractor
+import org.bouncycastle.pqc.crypto.mlkem.MLKEMPublicKeyParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMKeyGenerationParameters
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMKeyPairGenerator
 import org.bouncycastle.pqc.crypto.mlkem.MLKEMParameters
@@ -116,6 +118,33 @@ object V1 {
         argon2id(recoveryCode, salt, params)
     fun kekPasskey(prfOutput: ByteArray): ByteArray =
         hkdf(prfOutput, ByteArray(0), "veyq/v1/passkey-kek".toByteArray(Charsets.UTF_8), 32)
+
+    // ---- Identity generation ----
+    fun randomBytes(n: Int): ByteArray = ByteArray(n).also { SecureRandom().nextBytes(it) }
+
+    data class Identity(
+        val pubKemX: ByteArray, val pubKemM: ByteArray, val pubSign: ByteArray,
+        val privKemX: ByteArray, val mlkemSeed: ByteArray, val privSign: ByteArray,
+    )
+
+    fun generateIdentity(): Identity {
+        val xPriv = X25519PrivateKeyParameters(SecureRandom())
+        val mlkemSeed = randomBytes(64)
+        val kpg = MLKEMKeyPairGenerator()
+        kpg.init(MLKEMKeyGenerationParameters(SeededRandom(mlkemSeed), MLKEMParameters.ml_kem_768))
+        val mkp = kpg.generateKeyPair()
+        val sPriv = Ed25519PrivateKeyParameters(SecureRandom())
+        return Identity(
+            pubKemX = xPriv.generatePublicKey().encoded,
+            pubKemM = (mkp.public as MLKEMPublicKeyParameters).encoded,
+            pubSign = sPriv.generatePublicKey().encoded,
+            privKemX = xPriv.encoded,
+            mlkemSeed = mlkemSeed,
+            privSign = sPriv.encoded,
+        )
+    }
+
+    fun serializeIdentityPrivate(id: Identity): ByteArray = lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
 }
 
 /** Deterministic RNG that replays a fixed seed — used to reconstruct an ML-KEM key from its seed. */
