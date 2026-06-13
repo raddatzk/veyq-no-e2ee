@@ -13,6 +13,7 @@ layer around key-directory changes.
 - ✅ `uc.keys.rewrap-scope-grant` — replace the caller's own wrapped grant for any scope.
 - ✅ `uc.keys.upsert-unlock-wrap` — add or replace a master-key unlock wrap.
 - ✅ `uc.keys.remove-unlock-method` — remove a master-key unlock wrap.
-- ☐ `uc.keys.rotate-identity` — rotate the account identity key and rewrap owned grants.
-- ☐ `uc.keys.rotate-scope` — rotate a scope keypair after membership revocation.
+- ✅ `uc.keys.rotate-identity` — rotate the account identity key and rewrap owned grants.
+- ✅ `uc.keys.rotate-scope` — rotate a scope keypair after membership revocation (implemented as
+  `uc.admin.invite-members-roles` scope rotation: re-grants active members + re-wraps the content key).
 - ☐ `uc.keys.verify-directory` — detect identity-key substitution via transparency/pinning.
