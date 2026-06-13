@@ -47,6 +47,11 @@ auto-synced from `docs/wiki/**` — **edit the repo, not the wiki**.
 
 - [Architecture Decisions (ADR log)](decisions/README.md)
 
+## Acceptance Coverage
+
+- [Greenfield Use-Case Coverage](coverage/README.md) — active trust chain mirroring the feature/use-case
+  tree and linking each covered use-case to automated proof or explicit gaps
+
 ## Companion
 
 - [Actors](actors.md) — used by use-cases
@@ -62,6 +67,7 @@ The **repo is the single source of truth**; the wiki and website are published v
 |---|---|---|---|
 | **Architecture** (this wiki) | developers, architects, AI | `docs/wiki/` | GitHub Wiki (auto-synced) |
 | **AI working methodology** | AI agents | `docs/ai/` | — (repo-only) |
+| **Greenfield acceptance coverage** | developers, reviewers, AI | `docs/wiki/coverage/` | GitHub Wiki (auto-synced) |
 | **Operator runbook** (install, env, backup, upgrade, agent, troubleshooting) | self-hosters, SaaS ops | `docs/` (versioned with the code) | optional website "self-host docs" |
 | **End-user help** | Memory Curators, guests | in-product first | website Help / FAQ |
 | **API reference** | our own clients | `docs/api` (OpenAPI) | Redoc on GitHub Pages |

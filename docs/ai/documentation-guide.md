@@ -11,6 +11,7 @@ content in the right track:
 |---|---|---|
 | **Architecture** (arc42) | `docs/wiki/` | GitHub Wiki (auto-synced) |
 | **AI working methodology** (these rules) | `docs/ai/` | — (repo-only, never synced) |
+| **Greenfield acceptance coverage** | `docs/wiki/coverage/` | GitHub Wiki (auto-synced) |
 | **Operator runbook** (install, env, backup, upgrade, agent, troubleshooting) | `docs/` (versioned with code) | optional website "self-host docs" |
 | **End-user help** | in-product first; help text/FAQ | website Help / FAQ |
 | **API reference** | `docs/api` (OpenAPI) | Redoc on GitHub Pages |
@@ -33,6 +34,10 @@ chapter order):
 - `crosscutting/` — shared concepts (security model, agent mode, search, live collaboration, platform,
   patterns) — **one source**, referenced by features and **never copied** into them
 - `features/<feature>/` — `_index.md` + `use-cases/` (vertical slices)
+- `coverage/features/<feature>/use-cases/` — active Greenfield acceptance coverage, mirroring
+  `features/<feature>/use-cases/`. Each use-case coverage file links the feature/use-case plus
+  relevant shared concepts, decisions, API contracts and entry points to positive/negative automated
+  tests or explicit gaps.
 - `decisions/` — the ADR log; plus `actors.md` and `design-notes.md`
 
 A feature index composes the shared building blocks and cross-cutting concepts **by link**. A
@@ -94,7 +99,7 @@ tag + priority may be added per use-case.
 
 - `node scripts/validate-usecases.mjs` — every use-case has the required sections, a known
   `primaryActor`, an ID matching its filename, and unique IDs.
-- `node scripts/validate-feature-coverage.mjs` — the existing feature/test trust chain.
+- `node scripts/validate-feature-coverage.mjs` — Greenfield coverage/test trust chain.
 
 ## Wiki publishing
 

@@ -23,12 +23,13 @@ lives in **[`docs/ai/`](docs/ai/README.md)**; the architecture lives in **[`docs
 - Product language: **Memory / Chapter**; never reintroduce *Album* / *Explorer*.
 - Capture stable decisions as **ADRs**; document before or alongside implementation.
 - All repository docs in **English**; code identifiers/tables/config keys unchanged.
-- Run `node scripts/validate-feature-coverage.mjs` after feature/test changes and
+- Run `node scripts/validate-feature-coverage.mjs` after coverage/test changes and
   `node scripts/validate-usecases.mjs` after use-case changes.
 
 ## Documentation map
 
 - **Architecture (arc42):** [`docs/wiki/`](docs/wiki/Home.md)
 - **Features & use-cases:** [`docs/wiki/features/`](docs/wiki/features/)
+- **Acceptance coverage:** [`docs/wiki/coverage/`](docs/wiki/coverage/)
 - **AI working methodology:** [`docs/ai/`](docs/ai/README.md)
 - **Reference (being retired):** legacy `docs/` (`architecture.md`, `product/**`, `adr/**`).

@@ -8,8 +8,7 @@ on:
       - "**/*.md"
       - "docs/**"
       - "!docs/api/**"
-      - "!docs/product/capabilities.md"
-      - "!docs/product/features/**"
+      - "!docs/wiki/coverage/**"
       - "!docs/product/test-feature-reverse-audit.md"
       - "site/**"
       - ".github"
@@ -20,8 +19,7 @@ on:
       - "**/*.md"
       - "docs/**"
       - "!docs/api/**"
-      - "!docs/product/capabilities.md"
-      - "!docs/product/features/**"
+      - "!docs/wiki/coverage/**"
       - "!docs/product/test-feature-reverse-audit.md"
       - "site/**"
       - ".github"
@@ -73,8 +71,8 @@ jobs:
         working-directory: frontend
         run: npm run check
 
-  feature-coverage:
-    name: Feature coverage validation
+  acceptance-coverage:
+    name: Acceptance coverage validation
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -91,5 +89,5 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Validate feature coverage
+      - name: Validate acceptance coverage
         run: node scripts/validate-feature-coverage.mjs

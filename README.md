@@ -131,7 +131,7 @@ Keep new public API behavior documented in the relevant OpenAPI spec before or a
 
 ## CI
 
-GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend, frontend and feature-coverage checks, and [`container.yml`](.github/workflows/container.yml) for building and publishing runtime images to GitHub Container Registry. The feature-coverage job validates the Feature -> acceptance criteria -> tests trust chain whenever API contracts, feature YAML, capability metadata, reverse-audit mappings or validator code changes.
+GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend, frontend and acceptance-coverage checks, and [`container.yml`](.github/workflows/container.yml) for building and publishing runtime images to GitHub Container Registry. The coverage job validates the Greenfield trust chain from documentation artifacts to acceptance criteria, positive/negative tests and explicit gaps whenever API contracts, coverage YAML, reverse-audit mappings or validator code changes.
 
 ## Documentation Map
 
@@ -147,7 +147,8 @@ GitHub Actions includes [`ci.yml`](.github/workflows/ci.yml) for backend, fronte
 - [`docs/product/ios-feature-parity.md`](docs/product/ios-feature-parity.md): browser-to-iOS parity map and first native implementation track.
 - [`docs/product/playlists.md`](docs/product/playlists.md): Memory playlist links, permissions and API surface.
 - [`docs/product/capabilities.md`](docs/product/capabilities.md): Server capability IDs, current baseline and maintenance rules.
-- [`docs/product/features/README.md`](docs/product/features/README.md): Feature catalog conventions and YAML feature files for acceptance criteria, test names, test links and coverage gaps.
+- [`docs/wiki/coverage/README.md`](docs/wiki/coverage/README.md): Greenfield use-case coverage conventions and YAML files mirroring the feature/use-case tree with test links and gaps.
+- [`docs/product/features/README.md`](docs/product/features/README.md): Legacy feature catalog reference while old product detail is migrated.
 - [`docs/product/test-feature-reverse-audit.md`](docs/product/test-feature-reverse-audit.md): Reverse-audit status for current tests and explicit delete candidates.
 - [`docs/product/documentation-and-acceptance-coverage.md`](docs/product/documentation-and-acceptance-coverage.md): Feature documentation, acceptance criteria, test coverage mapping and deterministic validation.
 - [`docs/product/mobile-apps.md`](docs/product/mobile-apps.md): Native iOS/Android app direction, V1 scope and roadmap.
@@ -173,8 +174,8 @@ Read [`AGENTS.md`](AGENTS.md) before making product or architecture changes. In 
 - Preserve privacy and self-hosting assumptions.
 - Record durable product and architecture decisions in ADRs.
 - Keep the API-first workflow intact.
-- Keep feature documentation, acceptance criteria and positive/negative test links current for product, API, UI and operator behavior changes.
-- Run `node scripts/validate-feature-coverage.mjs` after changing feature docs or tests.
+- Keep use-case coverage, acceptance criteria and positive/negative test links current for product, API, UI and operator behavior changes.
+- Run `node scripts/validate-feature-coverage.mjs` after changing coverage docs or tests.
 
 ## License
 

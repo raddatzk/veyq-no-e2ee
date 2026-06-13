@@ -58,7 +58,7 @@ cd frontend
 npm run check
 ```
 
-Feature coverage validation:
+Greenfield acceptance coverage validation:
 
 ```bash
 cd frontend
@@ -94,7 +94,7 @@ Memory stabilization checks currently expected before review:
 
 - Backend check with Java 21 when needed.
 - Frontend `npm run check`.
-- Feature coverage validation with `node scripts/validate-feature-coverage.mjs` after frontend dependencies are installed.
+- Greenfield acceptance coverage validation with `node scripts/validate-feature-coverage.mjs` after frontend dependencies are installed.
 - Frontend `npm run e2e` for setup and workspace shell regressions.
 - Frontend `npm run generate:api` after API spec edits.
 - Manual `git diff --stat` review for migration, OpenAPI and generated client changes.

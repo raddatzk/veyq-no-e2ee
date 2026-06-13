@@ -34,17 +34,20 @@ baseline. *Album* and *Explorer* are historical and must not be reintroduced.
 
 ## The trust chain (acceptance coverage)
 
-The existing feature-centered trust chain remains in force for current code:
+The Greenfield trust chain is use-case centered:
 
 ```
-Feature → Acceptance criteria → Positive/negative tests or explicit gaps → CI
+Feature → Use-case → Coverage file → Acceptance criteria → Positive/negative tests or explicit gaps → CI
 ```
 
-- Treat the feature catalog (`docs/product/features/`) as the source of truth for acceptance
-  coverage; every behavior change maps to a documented feature with linked tests or an explicit gap.
+- Treat the mirrored Greenfield coverage tree (`docs/wiki/coverage/features/<feature>/use-cases/`) as
+  the source of truth for acceptance coverage. Every implemented behavior maps to a use-case coverage
+  file with the same ID and feature folder as its `docs/wiki/features/<feature>/use-cases/` source.
+- The legacy feature catalog (`docs/product/features/`) is reference while old product detail is
+  migrated; do not add new active coverage there.
 - Prefer meaningful, risk-based coverage over coverage percentages; use positive **and** negative
   tests where behavior has real success/failure paths.
-- Run `node scripts/validate-feature-coverage.mjs` after changing feature docs or tests.
+- Run `node scripts/validate-feature-coverage.mjs` after changing coverage docs or tests.
 - New architecture documents live under `docs/wiki/` (arc42); run
   `node scripts/validate-usecases.mjs` after changing use-cases.
 
@@ -69,6 +72,6 @@ Feature → Acceptance criteria → Positive/negative tests or explicit gaps →
 
 ## When changing behavior
 
-Check the affected feature, acceptance criteria, positive/negative coverage and remaining gaps
+Check the affected use-case coverage file, acceptance criteria, positive/negative coverage and remaining gaps
 before considering the work complete. When you touch a security/privacy/sharing path, re-read
 the [Security Model](../wiki/crosscutting/security-model.md) and confirm the paramount invariant still holds.

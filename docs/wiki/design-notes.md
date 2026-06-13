@@ -38,6 +38,6 @@ and the feature indexes.
 
 ## Reference material being mined (legacy `docs/`)
 
-`memory-product-context.md`, `architecture.md`, the feature catalog `product/features/*.yaml`, and the
-20 ADRs under `docs/adr/`. These are **reference** and are retired section-by-section as these pages
-supersede them.
+`memory-product-context.md`, `architecture.md`, the legacy feature catalog `product/features/*.yaml`,
+and the 20 ADRs under `docs/adr/`. These are **reference** and are retired section-by-section as these
+pages and the active [Greenfield acceptance coverage](coverage/README.md) supersede them.

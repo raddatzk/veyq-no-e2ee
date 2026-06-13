@@ -37,6 +37,7 @@
 
 **More**
 
+- [Acceptance Coverage](coverage/README)
 - [Decisions](decisions/README)
 - [Actors](actors)
 - [Design Notes](design-notes)

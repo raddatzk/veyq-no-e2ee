@@ -21,6 +21,6 @@
 |---|---|---|
 | D1 | **Flat permission model** (legacy ADR 0005: anyone with access can delete). | Superseded by the deletion-privilege model (see [Security Model](../crosscutting/security-model.md)). |
 | D2 | Docs split between legacy `docs/` and the new `docs/wiki/`. | Legacy is reference; migrate and retire section-by-section. |
-| D3 | No real full-stack `e2e.browser` coverage yet. | Tracked in the feature catalog; address per use-case during hardening. |
+| D3 | No real full-stack browser coverage for every slice yet. | Tracked in [Greenfield acceptance coverage](../coverage/README.md); address per use-case during hardening. |
 | D4 | Current system is not yet E2EE. | Target-architecture migration; code follows the docs, use-case by use-case. |
 | D5 | The current `collaboration/` **Hocuspocus** sidecar is content-aware (holds/merges plaintext) — incompatible with E2E. | Replace with a thin **blind encrypted-update relay** (AD-19); Yjs CRDT moves fully client-side. |
