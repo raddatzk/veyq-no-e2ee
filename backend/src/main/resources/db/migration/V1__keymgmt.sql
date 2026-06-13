@@ -32,6 +32,9 @@ create table veyq_key_blob (
     created_at     timestamp      not null
 );
 
+create index idx_key_blob_user on veyq_key_blob (user_id);
+create index idx_key_blob_user_method on veyq_key_blob (user_id, unlock_method);
+
 create table veyq_auth_verifier (
     id          varchar(64)    primary key,
     user_id     varchar(64)    not null references veyq_user (id),

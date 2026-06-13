@@ -1,0 +1,28 @@
+package com.veyq.app.features.keys.upsertunlockwrap
+
+import com.veyq.app.generated.api.KeysApi
+import com.veyq.app.generated.model.RewrapMyScopeGrantRequest
+import com.veyq.app.generated.model.UpsertMasterKeyWrapRequest
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.ws.rs.core.Response
+
+/** Thin REST entry implementing the generated KeysApi; delegates to key-management handlers. */
+@ApplicationScoped
+class UnlockWrapResource(
+    private val unlockWraps: UnlockWrapHandler,
+    private val scopeGrants: com.veyq.app.features.keys.rewrapscopegrant.ScopeGrantRewrapHandler,
+) : KeysApi {
+    override fun upsertMyMasterKeyWrap(
+        authorization: String,
+        unlockMethod: String,
+        upsertMasterKeyWrapRequest: UpsertMasterKeyWrapRequest,
+    ): Response =
+        Response.ok(unlockWraps.upsertMyMasterKeyWrap(authorization, unlockMethod, upsertMasterKeyWrapRequest)).build()
+
+    override fun rewrapMyScopeGrant(
+        authorization: String,
+        scopeId: String,
+        rewrapMyScopeGrantRequest: RewrapMyScopeGrantRequest,
+    ): Response =
+        Response.ok(scopeGrants.rewrapMyScopeGrant(authorization, scopeId, rewrapMyScopeGrantRequest)).build()
+}

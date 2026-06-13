@@ -7,6 +7,27 @@ export type ScopeGrantResponse = {
   scopePublicKey: { suiteId: string; kemPublicKey: string }
   wrappedScopePrivateKey: WrappedScopePrivateKey
 }
+export type MasterKeyWrap = {
+  unlockMethod: 'PASSWORD' | 'PASSKEY' | 'RECOVERY' | 'DEVICE'
+  suiteId: string
+  wrappedKey: string
+  kdfParams?: string
+  credentialRef?: string
+}
+
+export async function upsertMyMasterKeyWrap(
+  apiBase: string,
+  sessionToken: string,
+  masterKeyWrap: MasterKeyWrap,
+): Promise<MasterKeyWrap> {
+  const res = await fetch(`${apiBase}/api/me/key-wraps/${encodeURIComponent(masterKeyWrap.unlockMethod)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${sessionToken}` },
+    body: JSON.stringify({ masterKeyWrap }),
+  })
+  if (!res.ok) throw new Error(`master key wrap upsert failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
 
 export async function rewrapMyScopeGrant(
   apiBase: string,

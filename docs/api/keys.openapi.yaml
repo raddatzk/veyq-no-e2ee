@@ -3,6 +3,34 @@ info:
   title: veyq key management
   version: 0.1.0
 paths:
+  /api/me/key-wraps/{unlockMethod}:
+    put:
+      tags: [Keys]
+      operationId: upsertMyMasterKeyWrap
+      summary: Add or replace one of the authenticated user's master-key unlock wraps.
+      description: >
+        The client has already unlocked the master key locally and uploads a replacement wrapped copy
+        for one unlock method. The server stores only opaque ciphertext and does not learn the master
+        key or the KEK that can open this wrap.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - name: unlockMethod
+          in: path
+          required: true
+          schema: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpsertMasterKeyWrapRequest' }
+      responses:
+        '200':
+          description: The stored master-key wrap.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/scopes/{scopeId}/grants/me:
     put:
       tags: [Keys]
@@ -31,6 +59,11 @@ paths:
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
+    UpsertMasterKeyWrapRequest:
+      type: object
+      required: [masterKeyWrap]
+      properties:
+        masterKeyWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
     RewrapMyScopeGrantRequest:
       type: object
       required: [wrappedScopePrivateKey]

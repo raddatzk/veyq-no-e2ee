@@ -14,6 +14,19 @@ import java.nio.charset.StandardCharsets
 object Keys {
     private val client = HttpClient.newHttpClient()
 
+    fun upsertMyMasterKeyWrap(apiBase: String, sessionToken: String, masterKeyWrap: JSONObject): JSONObject {
+        val unlockMethod = URLEncoder.encode(masterKeyWrap.getString("unlockMethod"), StandardCharsets.UTF_8)
+        val body = JSONObject().put("masterKeyWrap", masterKeyWrap).toString()
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/key-wraps/$unlockMethod"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $sessionToken")
+            .PUT(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("master key wrap upsert failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
     fun rewrapMyScopeGrant(apiBase: String, sessionToken: String, scopeId: String, wrappedScopePrivateKey: JSONObject): JSONObject {
         val encodedScopeId = URLEncoder.encode(scopeId, StandardCharsets.UTF_8)
         val body = JSONObject().put("wrappedScopePrivateKey", wrappedScopePrivateKey).toString()
