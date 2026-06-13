@@ -16,6 +16,8 @@ documents:
     ref: docs/api/setup.openapi.yaml
   - type: api
     ref: docs/api/tenants.openapi.yaml
+  - type: api
+    ref: docs/api/content.openapi.yaml
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/account/login/LoginHandler.kt
   - type: entryPoint
@@ -23,7 +25,17 @@ documents:
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationHandler.kt
   - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentKeyHandler.kt
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/content/scopecontent/ScopeItemsHandler.kt
+  - type: entryPoint
     ref: frontend/src/features/account/login/login.ts
+  - type: entryPoint
+    ref: frontend/src/features/content/scopeContent.ts
+  - type: entryPoint
+    ref: android/src/main/kotlin/app/veyq/crypto/ScopeContent.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/ScopeContent.swift
   - type: entryPoint
     ref: android/src/main/kotlin/app/veyq/crypto/Login.kt
   - type: entryPoint
@@ -83,3 +95,29 @@ acceptanceCriteria:
           - testName: loginUnlockAndSession
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+  - id: uc.spaces.use-personal.encrypted-content
+    statement: A personal-scope key-holder can provision the scope content key once, store encrypted items and read ciphertext back for local decryption; non-key-holders are rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: storesAndServesEncryptedContentForKeyHoldersOnly
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
+          - testName: storesAndServesEncryptedContentForKeyHoldersOnly
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ScopeContentSliceTest.kt
+      web:
+        e2e:
+          - testName: "writes and reads encrypted content under the personal scope; the server stays blind"
+            kind: positive
+            ref: frontend/src/features/content/scopeContent.e2e.test.ts
+      android:
+        e2e:
+          - testName: writeAndReadEncryptedContentUnderPersonalScope
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/ScopeContentE2ETest.kt
+      apple:
+        e2e:
+          - testName: testWriteAndReadEncryptedContentUnderPersonalScope
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/ScopeContentE2ETests.swift
