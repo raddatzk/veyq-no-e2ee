@@ -1,5 +1,5 @@
 // veyq v1 crypto suite — web (TS). Conformance: docs/api/crypto-vectors/v1.json (see crypto-spec.md).
-import { x25519 } from '@noble/curves/ed25519.js'
+import { x25519, ed25519 } from '@noble/curves/ed25519.js'
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -113,3 +113,26 @@ export const kekRecovery = (recoveryCode: Uint8Array, salt: Uint8Array, params: 
 
 export const kekPasskey = (prfOutput: Uint8Array): Uint8Array =>
   hkdf(sha256, prfOutput, new Uint8Array(0), utf8('veyq/v1/passkey-kek'), 32)
+
+export const randomBytes = (n: number): Uint8Array => crypto.getRandomValues(new Uint8Array(n))
+
+/** The user's identity: a hybrid KEM keypair (X25519 + ML-KEM-768) + an Ed25519 signing keypair. */
+export type Identity = {
+  pub: { kemX: Uint8Array; kemM: Uint8Array; sign: Uint8Array }
+  priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }
+}
+
+export function generateIdentity(): Identity {
+  const kemX = randomBytes(32)
+  const mlkemSeed = randomBytes(64)
+  const mk = ml_kem768.keygen(mlkemSeed)
+  const sign = randomBytes(32)
+  return {
+    pub: { kemX: x25519.getPublicKey(kemX), kemM: mk.publicKey, sign: ed25519.getPublicKey(sign) },
+    priv: { kemX, mlkemSeed, sign },
+  }
+}
+
+/** Serialize the identity private bundle (wrapped under the master key). */
+export const serializeIdentityPrivate = (id: Identity): Uint8Array =>
+  concat(lp(id.priv.kemX), lp(id.priv.mlkemSeed), lp(id.priv.sign))
