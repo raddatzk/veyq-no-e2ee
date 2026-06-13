@@ -44,6 +44,23 @@ public enum Keys {
         return try JSONDecoder().decode(MasterKeyWrapDTO.self, from: data)
     }
 
+    public static func removeMyMasterKeyWrap(
+        apiBase: String, sessionToken: String, unlockMethod: String, credentialRef: String? = nil
+    ) async throws {
+        var components = URLComponents(string: "\(apiBase)/api/me/key-wraps/\(unlockMethod)")!
+        if let credentialRef {
+            components.queryItems = [URLQueryItem(name: "credentialRef", value: credentialRef)]
+        }
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: request)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 204 else {
+            throw NSError(domain: "veyq.keys", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "master key wrap removal failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+    }
+
     public static func rewrapMyScopeGrant(
         apiBase: String, sessionToken: String, scopeId: String, wrappedScopePrivateKey: Login.BlobDTO
     ) async throws -> ScopeGrantResponseDTO {

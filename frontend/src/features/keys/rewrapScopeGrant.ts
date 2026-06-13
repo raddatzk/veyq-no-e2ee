@@ -29,6 +29,20 @@ export async function upsertMyMasterKeyWrap(
   return res.json()
 }
 
+export async function removeMyMasterKeyWrap(
+  apiBase: string,
+  sessionToken: string,
+  unlockMethod: MasterKeyWrap['unlockMethod'],
+  credentialRef?: string,
+): Promise<void> {
+  const params = credentialRef === undefined ? '' : `?credentialRef=${encodeURIComponent(credentialRef)}`
+  const res = await fetch(`${apiBase}/api/me/key-wraps/${encodeURIComponent(unlockMethod)}${params}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${sessionToken}` },
+  })
+  if (!res.ok) throw new Error(`master key wrap removal failed: ${res.status} ${await res.text()}`)
+}
+
 export async function rewrapMyScopeGrant(
   apiBase: string,
   sessionToken: string,

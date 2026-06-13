@@ -57,6 +57,7 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
     fun listByUserId(userId: String): List<KeyBlob> = list("userId", userId)
     fun findByUserIdAndUnlockMethod(userId: String, unlockMethod: String): List<KeyBlob> =
         list("userId = ?1 and unlockMethod = ?2", userId, unlockMethod)
+    fun countByUserId(userId: String): Long = count("userId", userId)
 }
 
 @ApplicationScoped

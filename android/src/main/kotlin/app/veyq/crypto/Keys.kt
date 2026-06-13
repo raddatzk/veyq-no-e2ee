@@ -27,6 +27,17 @@ object Keys {
         return JSONObject(resp.body())
     }
 
+    fun removeMyMasterKeyWrap(apiBase: String, sessionToken: String, unlockMethod: String, credentialRef: String? = null) {
+        val encodedMethod = URLEncoder.encode(unlockMethod, StandardCharsets.UTF_8)
+        val query = if (credentialRef == null) "" else "?credentialRef=${URLEncoder.encode(credentialRef, StandardCharsets.UTF_8)}"
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/key-wraps/$encodedMethod$query"))
+            .header("Authorization", "Bearer $sessionToken")
+            .DELETE()
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 204) throw RuntimeException("master key wrap removal failed: ${resp.statusCode()} ${resp.body()}")
+    }
+
     fun rewrapMyScopeGrant(apiBase: String, sessionToken: String, scopeId: String, wrappedScopePrivateKey: JSONObject): JSONObject {
         val encodedScopeId = URLEncoder.encode(scopeId, StandardCharsets.UTF_8)
         val body = JSONObject().put("wrappedScopePrivateKey", wrappedScopePrivateKey).toString()

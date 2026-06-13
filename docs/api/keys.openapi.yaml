@@ -31,6 +31,31 @@ paths:
               schema: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+    delete:
+      tags: [Keys]
+      operationId: removeMyMasterKeyWrap
+      summary: Remove one of the authenticated user's master-key unlock wraps.
+      description: >
+        Removes a stored wrapped copy of the Master Key for the current user. Removing the final
+        surviving unlock wrap is rejected so an account cannot be locked out through this endpoint.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - name: unlockMethod
+          in: path
+          required: true
+          schema: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
+        - name: credentialRef
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '204':
+          description: The unlock wrap was removed.
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/scopes/{scopeId}/grants/me:
     put:
       tags: [Keys]

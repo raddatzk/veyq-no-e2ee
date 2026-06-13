@@ -30,11 +30,7 @@ class UnlockWrapHandler(
     fun upsertMyMasterKeyWrap(auth: String?, unlockMethod: String, req: UpsertMasterKeyWrapRequest): MasterKeyWrap {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         val wrap = req.masterKeyWrap
-        val method = try {
-            MasterKeyWrap.UnlockMethod.valueOf(unlockMethod)
-        } catch (_: IllegalArgumentException) {
-            throw ApiException(400, "UNKNOWN_UNLOCK_METHOD", "Unknown unlock method: $unlockMethod")
-        }
+        val method = parseMethod(unlockMethod)
         if (wrap.unlockMethod != method) {
             throw ApiException(400, "UNLOCK_METHOD_MISMATCH", "Path unlockMethod must match the payload")
         }
@@ -69,6 +65,13 @@ class UnlockWrapHandler(
     private fun requireSuite(suiteId: String) {
         if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
     }
+
+    private fun parseMethod(unlockMethod: String): MasterKeyWrap.UnlockMethod =
+        try {
+            MasterKeyWrap.UnlockMethod.valueOf(unlockMethod)
+        } catch (_: IllegalArgumentException) {
+            throw ApiException(400, "UNKNOWN_UNLOCK_METHOD", "Unknown unlock method: $unlockMethod")
+        }
 
     private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }
