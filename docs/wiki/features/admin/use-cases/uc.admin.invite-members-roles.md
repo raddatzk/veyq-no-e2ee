@@ -18,8 +18,7 @@
    identity:
    - **New user** → [register-via-invitation](../../account/use-cases/uc.account.register-via-invitation.md)
      (creates the account in the same step).
-   - **Existing user** → **confirm** the invite on their existing account (no new account) — *planned;
-     the new-user path is built first*.
+   - **Existing user** → **confirm** the invite on their existing account (no new account).
 4. Roles govern membership and settings — **content access is the wraps, not the role** (ADR 0005).
 
 ## Alternate / exception flows
@@ -39,12 +38,10 @@
   content.
 - *Removal = two-layer revocation ([AD-24](../../../decisions/README.md)):* instant token/access
   invalidation + eventual key rotation; already-downloaded content cannot be retracted.
-- *Key-directory trust:* granting to an existing user relies on their published public key
-  (TOFU/KT, [AD-07](../../../decisions/README.md)).
 
 ## Related
 - Feature: [Administration & Operations](../_index.md) · Actors: [Tenant Owner](../../../actors.md), [Invited User](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (provisioning, revocation,
-  key-directory trust)
-- Decisions: [AD-21](../../../decisions/README.md) (onboarding), [AD-24](../../../decisions/README.md) (revocation), [AD-07](../../../decisions/README.md) (key-directory trust); ADR 0005, ADR 0017 (legacy)
+  temp-wrap invites, revocation)
+- Decisions: [AD-21](../../../decisions/README.md) (onboarding), [AD-24](../../../decisions/README.md) (revocation); ADR 0005, ADR 0017 (legacy)
 - Related use-cases: `uc.account.register-via-invitation`, `uc.spaces.use-group`, `uc.account.erase-account`

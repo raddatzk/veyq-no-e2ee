@@ -11,6 +11,8 @@ documents:
   - type: api
     ref: docs/api/tenants.openapi.yaml
   - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteHandler.kt
+  - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/MemberInviteHandler.kt
   - type: entryPoint
     ref: backend/src/main/kotlin/com/veyq/app/features/admin/invitemembersroles/RemoveMemberHandler.kt
@@ -51,6 +53,32 @@ acceptanceCriteria:
           - testName: testTempWrapMemberInviteRegistersOnExistingScope
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/MemberInviteE2ETests.swift
+  - id: uc.admin.invite-members-roles.accept-existing-account
+    statement: An authenticated existing user can confirm a temp-wrap member invite onto their existing account without creating a new account.
+    coverage:
+      backend:
+        integration:
+          - testName: acceptsMemberInviteOntoExistingAccount
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
+          - testName: acceptsMemberInviteOntoExistingAccount
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/account/acceptmemberinvite/AcceptMemberInviteSliceTest.kt
+      web:
+        e2e:
+          - testName: an existing user confirms a member invite onto their existing account (no new account)
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/acceptMemberInvite.e2e.test.ts
+      android:
+        e2e:
+          - testName: existingUserConfirmsInviteOntoExistingAccount
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/AcceptMemberInviteE2ETest.kt
+      apple:
+        e2e:
+          - testName: testExistingUserConfirmsInviteOntoExistingAccount
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/AcceptMemberInviteE2ETests.swift
   - id: uc.admin.invite-members-roles.member-list
     statement: Active tenant members can list the tenant roster with identity public keys for rotation, while outsiders are rejected.
     coverage:
