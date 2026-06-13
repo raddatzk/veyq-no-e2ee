@@ -28,6 +28,7 @@ class ScopeRotationHandler(
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
+    private val contentKeys: com.veyq.app.shared.content.ScopeContentKeyRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -71,6 +72,17 @@ class ScopeRotationHandler(
                     wrappedPrivateKey = dec.decode(input.wrappedScopePrivateKey.bytes); createdAt = now
                 },
             )
+        }
+
+        // the content key is stable across rotation, but its wrapping is to the OLD keypair — re-wrap it to
+        // the new one so encrypted content survives. Required iff the scope actually has a content key.
+        val contentKey = contentKeys.findByScopeId(scope.id)
+        if (contentKey != null) {
+            val rewrapped = req.wrappedContentKey
+                ?: throw ApiException(400, "CONTENT_KEY_REQUIRED", "The scope has content — re-wrap its content key to the new keypair")
+            requireSuite(rewrapped.suiteId)
+            contentKey.suiteId = rewrapped.suiteId
+            contentKey.wrappedKey = dec.decode(rewrapped.bytes)
         }
 
         return RotateScopeResponse(scopeId = scope.id, memberCount = req.grants.size)

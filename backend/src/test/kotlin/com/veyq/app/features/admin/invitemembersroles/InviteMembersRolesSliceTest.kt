@@ -271,6 +271,19 @@ class InviteMembersRolesSliceTest {
             .get("/api/tenants/$rotTenantId/scope").then().statusCode(200)
             .body("scopePublicKey.kemPublicKey", `is`("bmV3LXNjb3Bl"))
             .body("wrappedScopePrivateKey.bytes", `is`("b3duZXItbmV3"))
+
+        // once the scope has a content key, rotation must re-wrap it to the new keypair or content orphans
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"Y2tleQ"}}""")
+            .put("/api/scopes/$rotScopeId/content-key").then().statusCode(200)
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(rotateBody("c2Vjb25k", listOf("im-owner" to "bzI", "im-member" to "bTI")))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("CONTENT_KEY_REQUIRED"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(rotateBody("c2Vjb25k", listOf("im-owner" to "bzI", "im-member" to "bTI"), "cmV3cmFwcGVkLWNr"))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(200)
+        given().header("Authorization", ownerToken)
+            .get("/api/scopes/$rotScopeId/content-key").then().statusCode(200)
+            .body("wrappedContentKey.bytes", `is`("cmV3cmFwcGVkLWNr"))
     }
 
     @Test
@@ -296,11 +309,12 @@ class InviteMembersRolesSliceTest {
             .body("role", `is`("Member"))
     }
 
-    private fun rotateBody(scopePub: String, grants: List<Pair<String, String>>): String {
+    private fun rotateBody(scopePub: String, grants: List<Pair<String, String>>, contentKey: String? = null): String {
         val grantsJson = grants.joinToString(",") { (uid, bytes) ->
             """{"userId":"$uid","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$bytes"}}"""
         }
-        return """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePub"},"grants":[$grantsJson]}"""
+        val ck = if (contentKey != null) ""","wrappedContentKey":{"suiteId":"v1","bytes":"$contentKey"}""" else ""
+        return """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePub"},"grants":[$grantsJson]$ck}"""
     }
 
     private fun memberInviteBody(role: String) = """

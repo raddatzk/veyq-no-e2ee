@@ -2,6 +2,7 @@
 // AD-03: a stable per-scope content key (wrapped to the scope public key) seals items; the server only
 // ever stores ciphertext. Targets the personal scope here, but the ops are scope-generic.
 import * as v1 from '../../shared/crypto/v1'
+import { getMyScopeGrant, openScopeGrant } from '../admin/createTenantInviteOwner/tenant'
 import type { UnlockedSession } from '../account/login/login'
 
 function b64url(b: Uint8Array): string {
@@ -33,6 +34,14 @@ export async function openPersonalScope(apiBase: string, session: UnlockedSessio
   )
   const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
   return { scopeId: g.scopeId, scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) }, scopePriv: v1.deserializeIdentityPrivate(scopePrivBytes) }
+}
+
+/** Fetch + open a tenant scope the caller holds a grant for (re-fetches the current grant each call). */
+export async function openTenantScope(apiBase: string, session: UnlockedSession, tenantId: string): Promise<OpenScope> {
+  const g = await getMyScopeGrant(apiBase, session.sessionToken, tenantId)
+  const scopePriv = openScopeGrant(g, session.identity, session.identityPublicKey.kemPublicKey)
+  const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
+  return { scopeId: g.scopeId, scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) }, scopePriv }
 }
 
 /** Get the scope's content key, provisioning one (wrapped to the scope) on first use. */

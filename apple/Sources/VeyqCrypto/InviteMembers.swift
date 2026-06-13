@@ -14,7 +14,8 @@ public enum InviteMembers {
     }
     struct TenantMemberListDTO: Codable { let members: [TenantMemberDTO] }
     struct ScopeGrantInputDTO: Codable { let userId: String; let wrappedScopePrivateKey: BlobDTO }
-    struct RotateScopeRequestDTO: Codable { let scopePublicKey: KemPublicKeyDTO; let grants: [ScopeGrantInputDTO] }
+    struct RotateScopeRequestDTO: Codable { let scopePublicKey: KemPublicKeyDTO; let grants: [ScopeGrantInputDTO]; let wrappedContentKey: BlobDTO? }
+    struct ContentKeyDTO: Codable { let wrappedContentKey: BlobDTO }
     public struct RotateScopeResultDTO: Codable { public let scopeId: String; public let memberCount: Int }
 
     /// List a tenant's members with their published identity public keys (for re-wrapping a rotated scope).
@@ -41,8 +42,29 @@ public enum InviteMembers {
                 pkX: Data(kem.prefix(32)), pkM: Data(kem.dropFirst(32)), targetKey: newScopePrivate, context: "scope-grant", nonce: V1.randomBytes(12))
             return ScopeGrantInputDTO(userId: m.userId, wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrapped)))
         }
+
+        // re-wrap the content key (if any) from the OLD scope keypair to the NEW one, so content survives
+        let myGrant = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: owner.sessionToken, tenantId: tenantId)
+        var wrappedContentKey: BlobDTO? = nil
+        var ckReq = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(myGrant.scopeId)/content-key")!)
+        ckReq.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
+        let (ckData, ckResp) = try await URLSession.shared.data(for: ckReq)
+        let ckCode = (ckResp as? HTTPURLResponse)?.statusCode ?? 0
+        if ckCode == 200 {
+            let oldScopePriv = try Tenant.openScopeGrant(grant: myGrant, identity: owner.identity, identityKemPublicKey: owner.kemPublicKey)
+            let oldKem = Login.b64urlDecode(myGrant.scopePublicKey.kemPublicKey)
+            let ck = try V1.asymUnwrap(
+                skX: oldScopePriv.kemX, mlkemSeed: oldScopePriv.mlkemSeed, pkX: Data(oldKem.prefix(32)), pkM: Data(oldKem.dropFirst(32)),
+                blob: Login.b64urlDecode(try JSONDecoder().decode(ContentKeyDTO.self, from: ckData).wrappedContentKey.bytes), context: "content-key")
+            let rewrapped = try V1.asymWrap(pkX: newScope.pubKemX, pkM: newScope.pubKemM, targetKey: ck, context: "content-key", nonce: V1.randomBytes(12))
+            wrappedContentKey = BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(rewrapped))
+        } else if ckCode != 404 {
+            throw NSError(domain: "veyq.rotate", code: 3, userInfo: [NSLocalizedDescriptionKey: "content-key fetch failed: \(ckCode)"])
+        }
+
         let req = RotateScopeRequestDTO(
-            scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(newScope.pubKemX + newScope.pubKemM)), grants: grants)
+            scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(newScope.pubKemX + newScope.pubKemM)), grants: grants,
+            wrappedContentKey: wrappedContentKey)
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/scope/rotate")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")

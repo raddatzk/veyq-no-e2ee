@@ -45,6 +45,14 @@ object ScopeContent {
         return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), V1.deserializeIdentityPrivate(scopePrivBytes))
     }
 
+    /** Fetch + open a tenant scope the caller holds a grant for (re-fetches the current grant each call). */
+    fun openTenantScope(apiBase: String, session: Login.UnlockedSession, tenantId: String): OpenScope {
+        val g = Tenant.getMyScopeGrant(apiBase, session.sessionToken, tenantId)
+        val scopePriv = Tenant.openScopeGrant(g, session.identity, session.kemPublicKey)
+        val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
+        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), scopePriv)
+    }
+
     /** Get the scope's content key, provisioning one (wrapped to the scope) on first use. */
     fun getOrCreateContentKey(apiBase: String, session: Login.UnlockedSession, scope: OpenScope): ByteArray {
         val path = "/api/scopes/${scope.scopeId}/content-key"

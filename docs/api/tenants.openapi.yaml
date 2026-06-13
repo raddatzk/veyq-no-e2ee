@@ -358,6 +358,11 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/ScopeGrantInput' }
+        wrappedContentKey:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: >
+            Required iff the scope has a content key — the stable content key re-wrapped to the NEW scope
+            public key, so encrypted content survives the keypair rotation (AD-03).
     RotateScopeResponse:
       type: object
       required: [scopeId, memberCount]

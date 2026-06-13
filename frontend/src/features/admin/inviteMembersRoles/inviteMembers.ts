@@ -2,7 +2,7 @@
 // people (email / white-label link), listing + rotating the scope, removing members and changing roles.
 // Adding people is invite-only — there is no directory lookup of arbitrary emails. The server stays blind.
 import * as v1 from '../../../shared/crypto/v1'
-import { getMyScopeGrant } from '../createTenantInviteOwner/tenant'
+import { getMyScopeGrant, openScopeGrant } from '../createTenantInviteOwner/tenant'
 import { getInviteMetadata, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
 import type { UnlockedSession } from '../../account/login/login'
 
@@ -47,6 +47,7 @@ export async function rotateScope(
   const members = (await listTenantMembers(apiBase, owner.sessionToken, tenantId)).filter((m) => m.status === 'ACTIVE')
   const newScope = v1.generateIdentity()
   const newScopePrivate = v1.serializeIdentityPrivate(newScope)
+  const newScopePub = { x: newScope.pub.kemX, m: newScope.pub.kemM }
   const grants = members.map((m) => {
     const kem = fromB64url(m.identityPublicKey.kemPublicKey)
     return {
@@ -57,12 +58,30 @@ export async function rotateScope(
       },
     }
   })
+
+  // re-wrap the content key (if any) from the OLD scope keypair to the NEW one, so content survives
+  const myGrant = await getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
+  let wrappedContentKey: { suiteId: string; bytes: string } | undefined
+  const ckRes = await fetch(`${apiBase}/api/scopes/${myGrant.scopeId}/content-key`, { headers: { authorization: `Bearer ${owner.sessionToken}` } })
+  if (ckRes.ok) {
+    const oldScopePriv = openScopeGrant(myGrant, owner.identity, owner.identityPublicKey.kemPublicKey)
+    const oldKem = fromB64url(myGrant.scopePublicKey.kemPublicKey)
+    const ck = v1.asymUnwrap(
+      v1.hybridSecret(oldScopePriv),
+      { x: oldKem.slice(0, 32), m: oldKem.slice(32) },
+      fromB64url((await ckRes.json()).wrappedContentKey.bytes),
+      'content-key',
+    )
+    wrappedContentKey = { suiteId: 'v1', bytes: b64url(v1.asymWrap(newScopePub, ck, 'content-key', { nonce: v1.randomBytes(12) })) }
+  } else if (ckRes.status !== 404) throw new Error(`content-key fetch failed: ${ckRes.status}`)
+
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope/rotate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.sessionToken}` },
     body: JSON.stringify({
       scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(v1.concat(newScope.pub.kemX, newScope.pub.kemM)) },
       grants,
+      ...(wrappedContentKey ? { wrappedContentKey } : {}),
     }),
   })
   if (!res.ok) throw new Error(`rotate scope failed: ${res.status} ${await res.text()}`)

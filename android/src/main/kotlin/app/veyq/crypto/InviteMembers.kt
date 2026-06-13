@@ -43,8 +43,25 @@ object InviteMembers {
             val wrapped = V1.asymWrap(kem.copyOfRange(0, 32), kem.copyOfRange(32, kem.size), newScopePrivate, "scope-grant", V1.randomBytes(12))
             grantParts.add("""{"userId":"${m.getString("userId")}","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"}}""")
         }
+        // re-wrap the content key (if any) from the OLD scope keypair to the NEW one, so content survives
+        val myGrant = Tenant.getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
+        val ckReq = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/${myGrant.getString("scopeId")}/content-key"))
+            .header("Authorization", "Bearer ${owner.sessionToken}").GET().build()
+        val ckResp = client.send(ckReq, HttpResponse.BodyHandlers.ofString())
+        var ckPart = ""
+        if (ckResp.statusCode() == 200) {
+            val oldScopePriv = Tenant.openScopeGrant(myGrant, owner.identity, owner.kemPublicKey)
+            val oldKem = dec.decode(myGrant.getJSONObject("scopePublicKey").getString("kemPublicKey"))
+            val wrappedCk = dec.decode(JSONObject(ckResp.body()).getJSONObject("wrappedContentKey").getString("bytes"))
+            val ck = V1.asymUnwrap(oldScopePriv.kemX, oldScopePriv.mlkemSeed, oldKem.copyOfRange(0, 32), oldKem.copyOfRange(32, oldKem.size), wrappedCk, "content-key")
+            val rewrapped = V1.asymWrap(newScope.pubKemX, newScope.pubKemM, ck, "content-key", V1.randomBytes(12))
+            ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"}"""
+        } else if (ckResp.statusCode() != 404) {
+            throw RuntimeException("content-key fetch failed: ${ckResp.statusCode()}")
+        }
+
         val json = """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(newScope.pubKemX + newScope.pubKemM)}"},""" +
-            """"grants":[${grantParts.joinToString(",")}]}"""
+            """"grants":[${grantParts.joinToString(",")}]$ckPart}"""
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/scope/rotate"))
             .header("Authorization", "Bearer ${owner.sessionToken}")
             .header("Content-Type", "application/json")

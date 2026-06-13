@@ -43,6 +43,14 @@ public enum ScopeContent {
                          scopePriv: V1.deserializeIdentityPrivate(scopePrivBytes))
     }
 
+    /// Fetch + open a tenant scope the caller holds a grant for (re-fetches the current grant each call).
+    public static func openTenantScope(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws -> OpenScope {
+        let g = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: session.sessionToken, tenantId: tenantId)
+        let scopePriv = try Tenant.openScopeGrant(grant: g, identity: session.identity, identityKemPublicKey: session.kemPublicKey)
+        let scopeKem = Login.b64urlDecode(g.scopePublicKey.kemPublicKey)
+        return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)), scopePriv: scopePriv)
+    }
+
     /// Get the scope's content key, provisioning one (wrapped to the scope) on first use.
     public static func getOrCreateContentKey(apiBase: String, session: Login.UnlockedSession, scope: OpenScope) async throws -> Data {
         let path = "/api/scopes/\(scope.scopeId)/content-key"
