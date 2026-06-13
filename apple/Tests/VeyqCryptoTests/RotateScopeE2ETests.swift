@@ -10,7 +10,7 @@ final class RotateScopeE2ETests: XCTestCase {
         try XCTSkipUnless(env["VEYQ_E2E"] == "1", "set VEYQ_E2E=1 to run against a live backend")
         let apiBase = env["VEYQ_API_BASE"] ?? "http://localhost:8080"
 
-        // owner A claims T1, user B registers, A grants B membership
+        // owner A claims T1; member B joins via a temp-wrap invite
         let aPass = "correct horse battery staple"
         let (_, aKit) = try await SetupServer.registerServerOwner(apiBase: apiBase, email: "admin@example.com", displayName: "Admin", password: aPass)
         let a = try await Login.login(apiBase: apiBase, email: "admin@example.com", password: aPass, secretKeyB64: aKit.secretKey)
@@ -19,12 +19,12 @@ final class RotateScopeE2ETests: XCTestCase {
         _ = try await Tenant.claimTenantOwnership(apiBase: apiBase, token: a.sessionToken, inviteId: inv.inviteId, bootstrapSecret: inv.bootstrapSecret, identityKemPublicKey: a.kemPublicKey)
 
         let bPass = "a whole new passphrase entirely"
-        let t2 = try await Tenant.createTenant(apiBase: apiBase, token: a.sessionToken, name: "globex", displayName: "Globex", domain: nil)
-        let t2Invite = try await Tenant.issueOwnerInvite(apiBase: apiBase, token: a.sessionToken, tenantId: t2.id)
-        let bReg = try await RegisterViaInvitation.registerViaInvitation(
-            apiBase: apiBase, inviteId: t2Invite.inviteId, bootstrapSecret: t2Invite.bootstrapSecret, email: "b@example.com", displayName: "B", password: bPass)
+        let memberInvite = try await InviteMembers.issueMemberInvite(apiBase: apiBase, owner: a, tenantId: t1.id, role: "Member")
+        let bReg = try await InviteMembers.registerViaMemberInvite(
+            apiBase: apiBase, inviteId: memberInvite.inviteId, bootstrapSecret: memberInvite.bootstrapSecret,
+            tempPrivateKeyB64: memberInvite.tempPrivateKey, email: "b@example.com", displayName: "B", password: bPass)
+        _ = bReg
         let b = try await Login.login(apiBase: apiBase, email: "b@example.com", password: bPass, secretKeyB64: bReg.emergencyKit.secretKey)
-        _ = try await InviteMembers.grantScopeToMember(apiBase: apiBase, owner: a, tenantId: t1.id, recipientEmail: "b@example.com", role: "Member")
 
         let before = try await xPub(apiBase, a, t1.id)
 

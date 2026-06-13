@@ -14,7 +14,7 @@ class RotateScopeE2ETest {
     fun rotateScopeReGrantsEveryActiveMember() {
         if (System.getenv("VEYQ_E2E") != "1") return // opt-in: requires a live backend
 
-        // owner A claims T1, user B registers, A grants B membership
+        // owner A claims T1; member B joins via a temp-wrap invite
         val aPass = "correct horse battery staple"
         val (_, aKit) = SetupServer.registerServerOwner(apiBase, "admin@example.com", "Admin", aPass)
         val a = Login.login(apiBase, "admin@example.com", aPass, aKit.secretKey)
@@ -23,12 +23,10 @@ class RotateScopeE2ETest {
         Tenant.claimTenantOwnership(apiBase, a.sessionToken, inv.getString("inviteId"), inv.getString("bootstrapSecret"), a.kemPublicKey)
 
         val bPass = "a whole new passphrase entirely"
-        val t2 = Tenant.createTenant(apiBase, a.sessionToken, "globex", "Globex", null)
-        val t2Invite = Tenant.issueOwnerInvite(apiBase, a.sessionToken, t2.getString("id"))
-        val bReg = RegisterViaInvitation.registerViaInvitation(
-            apiBase, t2Invite.getString("inviteId"), t2Invite.getString("bootstrapSecret"), "b@example.com", "B", bPass)
+        val memberInvite = InviteMembers.issueMemberInvite(apiBase, a, t1.getString("id"), "Member")
+        val bReg = InviteMembers.registerViaMemberInvite(
+            apiBase, memberInvite.inviteId, memberInvite.bootstrapSecret, memberInvite.tempPrivateKey, "b@example.com", "B", bPass)
         val b = Login.login(apiBase, "b@example.com", bPass, bReg.emergencyKit.secretKey)
-        InviteMembers.grantScopeToMember(apiBase, a, t1.getString("id"), "b@example.com", "Member")
 
         val before = xPub(a, t1.getString("id"))
 

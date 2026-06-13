@@ -4,8 +4,7 @@ import { x25519 } from '@noble/curves/ed25519.js'
 import { registerServerOwner } from '../setupServer/setupServer'
 import { login } from '../../account/login/login'
 import { createTenant, issueOwnerInvite, claimTenantOwnership, getMyScopeGrant, openScopeGrant } from '../createTenantInviteOwner/tenant'
-import { registerViaInvitation } from '../../account/registerViaInvitation/registerViaInvitation'
-import { grantScopeToMember, rotateScope } from './inviteMembers'
+import { issueMemberInvite, registerViaMemberInvite, rotateScope } from './inviteMembers'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -20,7 +19,7 @@ const xPubOf = (g: Awaited<ReturnType<typeof getMyScopeGrant>>, session: Awaited
 
 suite('invite-members-roles rotation E2E (web -> live backend)', () => {
   it('rotates the scope, re-granting a new keypair to every active member', async () => {
-    // owner A claims T1, user B registers, A grants B membership
+    // owner A claims T1; member B joins via a temp-wrap invite
     const aPass = 'correct horse battery staple'
     const { emergencyKit: aKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', aPass)
     const a = await login(apiBase, 'admin@example.com', aPass, aKit.secretKey)
@@ -29,11 +28,9 @@ suite('invite-members-roles rotation E2E (web -> live backend)', () => {
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
 
     const bPass = 'a whole new passphrase entirely'
-    const t2 = await createTenant(apiBase, a.sessionToken, 'globex', 'Globex')
-    const t2Invite = await issueOwnerInvite(apiBase, a.sessionToken, t2.id)
-    const bReg = await registerViaInvitation(apiBase, t2Invite.inviteId, t2Invite.bootstrapSecret, 'b@example.com', 'B', bPass)
+    const memberInvite = await issueMemberInvite(apiBase, a, t1.id, 'Member')
+    const bReg = await registerViaMemberInvite(apiBase, memberInvite.inviteId, memberInvite.bootstrapSecret, memberInvite.tempPrivateKey, 'b@example.com', 'B', bPass)
     const b = await login(apiBase, 'b@example.com', bPass, bReg.emergencyKit.secretKey)
-    await grantScopeToMember(apiBase, a, t1.id, 'b@example.com', 'Member')
 
     const before = fromB64url((await getMyScopeGrant(apiBase, a.sessionToken, t1.id)).scopePublicKey.kemPublicKey).slice(0, 32)
 

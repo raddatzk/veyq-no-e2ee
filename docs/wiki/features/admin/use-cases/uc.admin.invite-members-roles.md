@@ -9,15 +9,18 @@
   assigned; removed members lose **future** access via revocation + rotation.
 
 ## Main flow
-1. The owner picks who to add and **which scopes** they get (tenant, specific groups).
-2. **New user** → the owner issues a **temp-wrap invite**: the selected scope keys are wrapped to a temp
-   public key; the link (token in fragment) goes to the invitee →
-   [register-via-invitation](../../account/use-cases/uc.account.register-via-invitation.md).
-3. **Existing user** → **direct grant**: the owner wraps the selected scope keys to the user's
-   **existing identity public key** (from the key directory) — no new account, no temp-wrap; the
-   recipient's client unwraps automatically.
-4. The owner assigns a **role** (TenantMember/TenantOwner; group roles). Roles govern membership and
-   settings — **content access is the wraps, not the role** (ADR 0005).
+1. The owner picks who to add and **which scopes** they get (tenant, specific groups), and a **role**.
+2. The owner issues a **temp-wrap invite**: the selected scope keys are wrapped to a one-time temp public
+   key; the link (token in fragment) goes to the invitee by **email or a white-label link**. Adding people
+   is **invite-only** — the owner never adds a user directly, and there is no directory lookup of arbitrary
+   emails (account existence stays private).
+3. The invitee accepts via the link, unwrapping the scope with the temp key and re-wrapping it to their own
+   identity:
+   - **New user** → [register-via-invitation](../../account/use-cases/uc.account.register-via-invitation.md)
+     (creates the account in the same step).
+   - **Existing user** → **confirm** the invite on their existing account (no new account) — *planned;
+     the new-user path is built first*.
+4. Roles govern membership and settings — **content access is the wraps, not the role** (ADR 0005).
 
 ## Alternate / exception flows
 - A1: **Remove a member** → membership becomes "Removed" (soft, rejoinable — ADR 0017); the grant is
@@ -26,11 +29,12 @@
 - A2: **Server Owner deactivation** of an account → **login blocked** (auth), keys untouched, reversible
   — a *global* action, distinct from tenant removal.
 - A3: Change an existing member's role.
-- E1: The owner doesn't hold the scope keys → granting is blocked (you can only grant what you can read).
+- E1: The owner doesn't hold the scope keys → issuing the invite is blocked (you can only hand on what you can read).
 
 ## Quality notes
-- *Invite vs. grant:* new users bootstrap via a **temp-wrap**; existing users via a **direct wrap** to
-  their public key — same access, different mechanism.
+- *Invite-only:* both new and existing users join through a **temp-wrap invite** (email / white-label link);
+  the difference is only at accept time (register a new account vs. confirm on an existing one). There is no
+  direct-add and no global directory lookup — the operator cannot be used to enumerate accounts.
 - *Role ≠ access (ADR 0005):* roles govern membership/settings; the set of decryptable scopes governs
   content.
 - *Removal = two-layer revocation ([AD-24](../../../decisions/README.md)):* instant token/access

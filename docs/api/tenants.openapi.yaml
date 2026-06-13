@@ -253,34 +253,6 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
-  /api/tenants/{tenantId}/grants:
-    post:
-      tags: [TenantMembers]
-      operationId: grantScopeAccess
-      summary: Grant an existing user access to the tenant scope and assign a role (direct wrap).
-      description: >
-        A Tenant Owner who holds the tenant scope re-wraps its private key to an existing user's
-        published identity public key (from the key directory) and assigns a role. The server verifies
-        the caller is an Owner holding the scope (you can only grant what you can read), then stores the
-        recipient's grant (ciphertext only) and their membership. No temp-wrap: the recipient already
-        has an identity, so their client unwraps the grant directly.
-      parameters:
-        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
-        - { name: tenantId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/GrantScopeAccessRequest' }
-      responses:
-        '200':
-          description: The recipient's membership.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MembershipSummary' }
-        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
-        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     CreateTenantRequest:
@@ -306,15 +278,6 @@ components:
         inviteId: { type: string }
         bootstrapSecret: { type: string, description: One-time secret (base64url); goes in the URL fragment. }
         expiresAt: { type: string, format: date-time }
-    GrantScopeAccessRequest:
-      type: object
-      required: [recipientUserId, role, wrappedScopePrivateKey]
-      properties:
-        recipientUserId: { type: string }
-        role: { type: string, enum: [Owner, Member] }
-        wrappedScopePrivateKey:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
-          description: The tenant scope private key wrapped to the recipient's identity public key.
     MembershipSummary:
       type: object
       required: [tenantId, userId, role, status]

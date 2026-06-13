@@ -132,69 +132,6 @@ class InviteMembersRolesSliceTest {
     }
 
     @Test
-    fun lookUpDirectoryEntry() {
-        given().header("Authorization", ownerToken)
-            .queryParam("email", "im-recipient@example.com")
-            .get("/api/directory/users").then().statusCode(200)
-            .body("userId", `is`("im-recipient"))
-            .body("identityPublicKey.kemPublicKey", notNullValue())
-
-        // a directory read needs a valid session, and an unknown email is a 404
-        given().header("Authorization", "Bearer nope")
-            .queryParam("email", "im-recipient@example.com")
-            .get("/api/directory/users").then().statusCode(401)
-        given().header("Authorization", ownerToken)
-            .queryParam("email", "nobody@example.com")
-            .get("/api/directory/users").then().statusCode(404)
-    }
-
-    @Test
-    fun grantsScopeAccessOnlyAsAKeyHoldingOwner() {
-        // a non-owner cannot grant
-        given().header("Authorization", memberToken).contentType(ContentType.JSON)
-            .body(grantBody("im-recipient", "Member", "Z3JhbnRlZA"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(403)
-            .body("code", `is`("FORBIDDEN"))
-
-        // an Owner who does not hold the scope cannot grant what they cannot read (E1)
-        given().header("Authorization", noKeyOwnerToken).contentType(ContentType.JSON)
-            .body(grantBody("im-recipient", "Member", "Z3JhbnRlZA"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(403)
-            .body("code", `is`("NOT_A_KEY_HOLDER"))
-
-        // self-grant and unknown recipient are rejected
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body(grantBody("im-owner", "Member", "Z3JhbnRlZA"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(400).body("code", `is`("SELF_GRANT"))
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body(grantBody("ghost", "Member", "Z3JhbnRlZA"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(404)
-
-        // the key-holding Owner grants the recipient access + a role
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body(grantBody("im-recipient", "Member", "Z3JhbnRlZA"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(200)
-            .body("userId", `is`("im-recipient"))
-            .body("role", `is`("Member"))
-            .body("status", `is`("ACTIVE"))
-
-        // blindness: the recipient now reads back the exact ciphertext that was posted
-        val recipientToken = "Bearer ${sessions.issue("im-recipient")}"
-        given().header("Authorization", recipientToken)
-            .get("/api/tenants/$tenantId/scope").then().statusCode(200)
-            .body("wrappedScopePrivateKey.bytes", `is`("Z3JhbnRlZA"))
-
-        // re-granting replaces the wrapped key (idempotent upsert)
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body(grantBody("im-recipient", "Owner", "cmV3cmFwcGVk"))
-            .post("/api/tenants/$tenantId/grants").then().statusCode(200)
-            .body("role", `is`("Owner"))
-        given().header("Authorization", recipientToken)
-            .get("/api/tenants/$tenantId/scope").then().statusCode(200)
-            .body("wrappedScopePrivateKey.bytes", `is`("cmV3cmFwcGVk"))
-    }
-
-    @Test
     fun issuesTempWrapMemberInviteAndRegistersNewUserOnExistingScope() {
         // a non-key-holding Owner cannot hand the scope on
         given().header("Authorization", noKeyOwnerToken).contentType(ContentType.JSON)
@@ -387,14 +324,6 @@ class InviteMembersRolesSliceTest {
           "wrappedPersonalScopePrivateKey": { "suiteId": "v1", "bytes": "cGVyc29uYWwtZ3JhbnQ" },
           "scopePublicKey": { "suiteId": "v1", "kemPublicKey": "$scopePub" },
           "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "bWVtYmVyLWdyYW50" }
-        }
-    """.trimIndent()
-
-    private fun grantBody(recipientUserId: String, role: String, bytes: String) = """
-        {
-          "recipientUserId": "$recipientUserId",
-          "role": "$role",
-          "wrappedScopePrivateKey": { "suiteId": "v1", "bytes": "$bytes" }
         }
     """.trimIndent()
 }
