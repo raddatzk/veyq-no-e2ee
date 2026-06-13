@@ -14,8 +14,8 @@ java {
 
 dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.79")
+    implementation("org.json:json:20240303") // platform-provided on Android; explicit for this JVM core
     testImplementation(kotlin("test"))
-    testImplementation("org.json:json:20240303")
 }
 
 tasks.test {

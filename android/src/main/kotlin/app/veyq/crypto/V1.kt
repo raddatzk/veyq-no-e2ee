@@ -86,6 +86,12 @@ object V1 {
     fun symWrap(kek: ByteArray, targetKey: ByteArray, context: String, nonce: ByteArray): ByteArray =
         byteArrayOf(0x02) + nonce + aeadSeal(kek, nonce, targetKey, ("v1$context").toByteArray(Charsets.UTF_8))
 
+    fun symUnwrap(kek: ByteArray, blob: ByteArray, context: String): ByteArray {
+        val nonce = blob.copyOfRange(1, 1 + 12)
+        val aead = blob.copyOfRange(1 + 12, blob.size)
+        return aeadOpen(kek, nonce, aead, ("v1$context").toByteArray(Charsets.UTF_8))
+    }
+
     fun asymUnwrap(skX: ByteArray, mlkemSeed: ByteArray, pkX: ByteArray, pkM: ByteArray, blob: ByteArray, context: String): ByteArray {
         val ct = blob.copyOfRange(1, 1 + 1120)
         val nonce = blob.copyOfRange(1 + 1120, 1 + 1120 + 12)
@@ -145,6 +151,21 @@ object V1 {
     }
 
     fun serializeIdentityPrivate(id: Identity): ByteArray = lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
+
+    data class IdentityPrivate(val kemX: ByteArray, val mlkemSeed: ByteArray, val sign: ByteArray)
+
+    /** Inverse of serializeIdentityPrivate: read three length-prefixed fields. */
+    fun deserializeIdentityPrivate(bytes: ByteArray): IdentityPrivate {
+        var o = 0
+        fun next(): ByteArray {
+            val len = ByteBuffer.wrap(bytes, o, 4).int
+            o += 4
+            val v = bytes.copyOfRange(o, o + len)
+            o += len
+            return v
+        }
+        return IdentityPrivate(next(), next(), next())
+    }
 }
 
 /** Deterministic RNG that replays a fixed seed — used to reconstruct an ML-KEM key from its seed. */
