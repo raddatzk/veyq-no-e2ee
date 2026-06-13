@@ -122,6 +122,16 @@ export type Identity = {
   priv: { kemX: Uint8Array; mlkemSeed: Uint8Array; sign: Uint8Array }
 }
 
+/**
+ * Build a HybridSecret usable for kemDecap/asymUnwrap from a stored private bundle. noble decapsulates
+ * with the *expanded* ML-KEM secret key, so we re-derive it from the stored 64-byte seed (the other
+ * stacks reconstruct from the seed directly).
+ */
+export const hybridSecret = (priv: Identity['priv']): HybridSecret => ({
+  x: priv.kemX,
+  m: ml_kem768.keygen(priv.mlkemSeed).secretKey,
+})
+
 export function generateIdentity(): Identity {
   const kemX = randomBytes(32)
   const mlkemSeed = randomBytes(64)
