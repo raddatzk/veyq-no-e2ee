@@ -64,6 +64,20 @@ public enum V1 {
         return combiner(ssM: ssM, ssX: ssX, ctM: ctM, epkX: epkX, pkM: pkM, pkX: pkX)
     }
 
+    /// Encapsulate to a recipient's hybrid KEM public key. Randomized (ephemeral X25519 + ML-KEM).
+    public static func kemEncap(pkX: Data, pkM: Data) throws -> (ct: Data, ss: Data) {
+        let esk = Curve25519.KeyAgreement.PrivateKey()
+        let epkX = esk.publicKey.rawRepresentation
+        let xPub = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: pkX)
+        let ssX = bytes(try esk.sharedSecretFromKeyAgreement(with: xPub))
+        let mPub = try MLKEM768.PublicKey(rawRepresentation: pkM)
+        let enc = try mPub.encapsulate()
+        let ssM = bytes(enc.sharedSecret)
+        let ctM = enc.encapsulated
+        let ss = combiner(ssM: ssM, ssX: ssX, ctM: ctM, epkX: epkX, pkM: pkM, pkX: pkX)
+        return (epkX + ctM, ss)
+    }
+
     // ---- Wraps ----
     public static func symWrap(kek: Data, targetKey: Data, context: String, nonce: Data) throws -> Data {
         Data([0x02]) + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: Data(("v1" + context).utf8)))
@@ -72,6 +86,12 @@ public enum V1 {
         let nonce = Data(blob.dropFirst().prefix(12))
         let aead = Data(blob.dropFirst(1 + 12))
         return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: Data(("v1" + context).utf8))
+    }
+    /// §5a asymmetric wrap: 0x01 || ct(1120) || nonce(12) || aead
+    public static func asymWrap(pkX: Data, pkM: Data, targetKey: Data, context: String, nonce: Data) throws -> Data {
+        let (ct, ss) = try kemEncap(pkX: pkX, pkM: pkM)
+        let kek = hkdf(ikm: ss, salt: Data(), info: Data(("veyq/v1/wrap" + context).utf8), len: 32)
+        return Data([0x01]) + ct + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: Data(("v1" + context).utf8)))
     }
     public static func asymUnwrap(skX: Data, mlkemSeed: Data, pkX: Data, pkM: Data, blob: Data, context: String) throws -> Data {
         let body = Data(blob.dropFirst())
