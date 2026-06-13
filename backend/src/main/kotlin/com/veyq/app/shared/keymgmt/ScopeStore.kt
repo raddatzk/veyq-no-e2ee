@@ -45,4 +45,6 @@ class ScopeRepository : PanacheRepositoryBase<Scope, String> {
 class ScopeGrantRepository : PanacheRepositoryBase<ScopeGrant, String> {
     fun find(scopeId: String, userId: String): ScopeGrant? =
         find("scopeId = ?1 and userId = ?2", scopeId, userId).firstResult()
+
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }

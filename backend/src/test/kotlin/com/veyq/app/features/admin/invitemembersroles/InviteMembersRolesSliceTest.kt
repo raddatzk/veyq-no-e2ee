@@ -42,6 +42,10 @@ class InviteMembersRolesSliceTest {
     private lateinit var removableToken: String
     private val tenantId = "im-tenant"
     private val scopeId = "im-scope"
+    // a dedicated tenant with a stable active-member set ({im-owner Owner, im-member Member}) — other
+    // tests mutate im-tenant's membership, which would make rotation's "exactly the active members" flaky.
+    private val rotTenantId = "im-rot-tenant"
+    private val rotScopeId = "im-rot-scope"
 
     @BeforeTest
     fun seed() {
@@ -81,6 +85,30 @@ class InviteMembersRolesSliceTest {
                 seedMembership("im-m-member", "im-member", "Member")
                 seedMembership("im-m-nokey", "im-nokey-owner", "Owner")
                 seedMembership("im-m-removable", "im-removable", "Member")
+
+                // dedicated rotation tenant: stable active members {im-owner Owner, im-member Member}
+                tenants.persist(Tenant().apply {
+                    id = rotTenantId; name = "im-rot-acme"; displayName = "RotAcme"; status = "ACTIVE"
+                    createdBy = "im-owner"; createdAt = now
+                })
+                scopes.persist(Scope().apply {
+                    id = rotScopeId; tenantId = rotTenantId; kind = "TENANT_ROOT"
+                    suiteId = "v1"; kemPublicKey = "rot-pub".toByteArray(); createdAt = now
+                })
+                grants.persist(ScopeGrant().apply {
+                    id = "im-rot-grant-owner"; scopeId = rotScopeId; userId = "im-owner"
+                    suiteId = "v1"; wrappedPrivateKey = "rot-owner".toByteArray(); createdAt = now
+                })
+                grants.persist(ScopeGrant().apply {
+                    id = "im-rot-grant-member"; scopeId = rotScopeId; userId = "im-member"
+                    suiteId = "v1"; wrappedPrivateKey = "rot-member".toByteArray(); createdAt = now
+                })
+                memberships.persist(Membership().apply {
+                    id = "im-rot-m-owner"; tenantId = rotTenantId; userId = "im-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now
+                })
+                memberships.persist(Membership().apply {
+                    id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
+                })
             }
         }
         ownerToken = "Bearer ${sessions.issue("im-owner")}"
@@ -250,6 +278,55 @@ class InviteMembersRolesSliceTest {
         given().header("Authorization", removableToken).get("/api/me").then().statusCode(401)
         val grantGone = QuarkusTransaction.requiringNew().call { grants.find(scopeId, "im-removable") == null }
         kotlin.test.assertTrue(grantGone)
+    }
+
+    @Test
+    fun listsTenantMembers() {
+        // a member sees the roster with identity public keys; a non-member is forbidden
+        given().header("Authorization", ownerToken)
+            .get("/api/tenants/$rotTenantId/members").then().statusCode(200)
+            .body("members.size()", `is`(2))
+            .body("members.userId", org.hamcrest.Matchers.containsInAnyOrder("im-owner", "im-member"))
+            .body("members.find { it.userId == 'im-owner' }.identityPublicKey.kemPublicKey", notNullValue())
+
+        given().header("Authorization", noKeyOwnerToken)
+            .get("/api/tenants/$rotTenantId/members").then().statusCode(403)
+            .body("code", `is`("FORBIDDEN"))
+    }
+
+    @Test
+    fun rotatesScopeReGrantingExactlyTheActiveMembers() {
+        // a non-member cannot rotate
+        given().header("Authorization", noKeyOwnerToken).contentType(ContentType.JSON)
+            .body(rotateBody("bmV3LXNjb3Bl", listOf("im-owner" to "b3duZXItbmV3", "im-member" to "bWVtYmVyLW5ldw")))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(403).body("code", `is`("FORBIDDEN"))
+
+        // leaving a member out, or granting an outsider, is rejected
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(rotateBody("bmV3LXNjb3Bl", listOf("im-owner" to "b3duZXItbmV3")))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("INCOMPLETE_ROTATION"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(rotateBody("bmV3LXNjb3Bl", listOf("im-owner" to "b3duZXItbmV3", "im-member" to "bWVtYmVyLW5ldw", "im-recipient" to "b3V0c2lkZXI")))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("INCOMPLETE_ROTATION"))
+
+        // rotate: new scope public key + a fresh grant for each active member
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(rotateBody("bmV3LXNjb3Bl", listOf("im-owner" to "b3duZXItbmV3", "im-member" to "bWVtYmVyLW5ldw")))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(200)
+            .body("memberCount", `is`(2))
+
+        // the owner now reads the rotated public key + their new wrapped grant
+        given().header("Authorization", ownerToken)
+            .get("/api/tenants/$rotTenantId/scope").then().statusCode(200)
+            .body("scopePublicKey.kemPublicKey", `is`("bmV3LXNjb3Bl"))
+            .body("wrappedScopePrivateKey.bytes", `is`("b3duZXItbmV3"))
+    }
+
+    private fun rotateBody(scopePub: String, grants: List<Pair<String, String>>): String {
+        val grantsJson = grants.joinToString(",") { (uid, bytes) ->
+            """{"userId":"$uid","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$bytes"}}"""
+        }
+        return """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePub"},"grants":[$grantsJson]}"""
     }
 
     private fun memberInviteBody(role: String) = """

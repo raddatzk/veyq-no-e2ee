@@ -156,6 +156,53 @@ paths:
               schema: { $ref: '#/components/schemas/MyScopeGrant' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/members:
+    get:
+      tags: [MemberList]
+      operationId: listTenantMembers
+      summary: List a tenant's members with their published identity public keys.
+      description: >
+        For a member (e.g. an Owner driving a scope rotation) to enumerate who must receive a re-wrapped
+        grant. Returns public material only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The tenant's members.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantMemberList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/scope/rotate:
+    post:
+      tags: [ScopeRotation]
+      operationId: rotateScope
+      summary: Rotate the tenant scope keypair and re-wrap it to all remaining members (AD-24 eventual layer).
+      description: >
+        A key-holding Owner mints a NEW scope keypair and re-wraps its private key to every active
+        member. The server swaps the scope public key and atomically replaces all grants. After a
+        removal this denies the removed member key access to future content. The request must cover
+        exactly the active members (no member left without a grant, no grant for a non-member).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RotateScopeRequest' }
+      responses:
+        '200':
+          description: The rotated scope.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RotateScopeResponse' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenants/{tenantId}/members/{userId}:
     delete:
       tags: [MemberRemoval]
@@ -249,6 +296,43 @@ components:
         userId: { type: string }
         role: { type: string }
         status: { type: string }
+    TenantMember:
+      type: object
+      required: [userId, displayName, role, status, identityPublicKey]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        role: { type: string }
+        status: { type: string }
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+    TenantMemberList:
+      type: object
+      required: [members]
+      properties:
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/TenantMember' }
+    ScopeGrantInput:
+      type: object
+      required: [userId, wrappedScopePrivateKey]
+      properties:
+        userId: { type: string }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    RotateScopeRequest:
+      type: object
+      required: [scopePublicKey, grants]
+      properties:
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        grants:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ScopeGrantInput' }
+    RotateScopeResponse:
+      type: object
+      required: [scopeId, memberCount]
+      properties:
+        scopeId: { type: string }
+        memberCount: { type: integer }
     TenantInviteInfo:
       type: object
       required: [inviteId, tenant, role, status, kind]

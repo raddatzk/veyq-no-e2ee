@@ -4,7 +4,7 @@ import Foundation
 /// their own scope grant, unwraps the scope private key, re-wraps it to an existing user's published
 /// identity public key (from the key directory) and assigns a role. The server stays blind.
 public enum InviteMembers {
-    struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
+    public struct IdentityPublicKeyDTO: Codable { public let suiteId, kemPublicKey, signPublicKey: String }
     public struct DirectoryEntryDTO: Codable {
         public let userId, displayName: String
         let identityPublicKey: IdentityPublicKeyDTO
@@ -60,6 +60,54 @@ public enum InviteMembers {
                           userInfo: [NSLocalizedDescriptionKey: "grant failed: \(String(data: data, encoding: .utf8) ?? "")"])
         }
         return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
+    }
+
+    public struct TenantMemberDTO: Codable {
+        public let userId, displayName, role, status: String
+        public let identityPublicKey: IdentityPublicKeyDTO
+    }
+    struct TenantMemberListDTO: Codable { let members: [TenantMemberDTO] }
+    struct ScopeGrantInputDTO: Codable { let userId: String; let wrappedScopePrivateKey: BlobDTO }
+    struct RotateScopeRequestDTO: Codable { let scopePublicKey: KemPublicKeyDTO; let grants: [ScopeGrantInputDTO] }
+    public struct RotateScopeResultDTO: Codable { public let scopeId: String; public let memberCount: Int }
+
+    /// List a tenant's members with their published identity public keys (for re-wrapping a rotated scope).
+    public static func listTenantMembers(apiBase: String, token: String, tenantId: String) async throws -> [TenantMemberDTO] {
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members")!)
+        r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.members", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "list members failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(TenantMemberListDTO.self, from: data).members
+    }
+
+    /// Rotate the tenant scope (eventual layer of AD-24): mint a NEW scope keypair and re-wrap it to every
+    /// active member, so a previously-removed member loses key access to future content.
+    public static func rotateScope(apiBase: String, owner: Login.UnlockedSession, tenantId: String) async throws -> RotateScopeResultDTO {
+        let members = try await listTenantMembers(apiBase: apiBase, token: owner.sessionToken, tenantId: tenantId).filter { $0.status == "ACTIVE" }
+        let newScope = try V1.generateIdentity()
+        let newScopePrivate = V1.serializeIdentityPrivate(newScope)
+        let grants = try members.map { m -> ScopeGrantInputDTO in
+            let kem = Login.b64urlDecode(m.identityPublicKey.kemPublicKey)
+            let wrapped = try V1.asymWrap(
+                pkX: Data(kem.prefix(32)), pkM: Data(kem.dropFirst(32)), targetKey: newScopePrivate, context: "scope-grant", nonce: V1.randomBytes(12))
+            return ScopeGrantInputDTO(userId: m.userId, wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrapped)))
+        }
+        let req = RotateScopeRequestDTO(
+            scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(newScope.pubKemX + newScope.pubKemM)), grants: grants)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/scope/rotate")!)
+        r.httpMethod = "POST"
+        r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.rotate", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "rotate scope failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(RotateScopeResultDTO.self, from: data)
     }
 
     /// Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto.

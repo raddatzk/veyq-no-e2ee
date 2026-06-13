@@ -74,6 +74,56 @@ export async function grantScopeToMember(
   return res.json()
 }
 
+export type TenantMember = {
+  userId: string
+  displayName: string
+  role: string
+  status: string
+  identityPublicKey: { suiteId: string; kemPublicKey: string; signPublicKey: string }
+}
+
+/** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
+export async function listTenantMembers(apiBase: string, token: string, tenantId: string): Promise<TenantMember[]> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members`, { headers: { authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`list members failed: ${res.status} ${await res.text()}`)
+  return (await res.json()).members
+}
+
+/**
+ * Rotate the tenant scope (eventual layer of AD-24): a key-holding Owner mints a NEW scope keypair and
+ * re-wraps it to every active member, so a previously-removed member loses key access to future content.
+ * The owner needs no old key — a fresh scope is born and granted to all remaining members.
+ */
+export async function rotateScope(
+  apiBase: string,
+  owner: UnlockedSession,
+  tenantId: string,
+): Promise<{ scopeId: string; memberCount: number }> {
+  const members = (await listTenantMembers(apiBase, owner.sessionToken, tenantId)).filter((m) => m.status === 'ACTIVE')
+  const newScope = v1.generateIdentity()
+  const newScopePrivate = v1.serializeIdentityPrivate(newScope)
+  const grants = members.map((m) => {
+    const kem = fromB64url(m.identityPublicKey.kemPublicKey)
+    return {
+      userId: m.userId,
+      wrappedScopePrivateKey: {
+        suiteId: 'v1',
+        bytes: b64url(v1.asymWrap({ x: kem.slice(0, 32), m: kem.slice(32) }, newScopePrivate, 'scope-grant', { nonce: v1.randomBytes(12) })),
+      },
+    }
+  })
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope/rotate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${owner.sessionToken}` },
+    body: JSON.stringify({
+      scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(v1.concat(newScope.pub.kemX, newScope.pub.kemM)) },
+      grants,
+    }),
+  })
+  if (!res.ok) throw new Error(`rotate scope failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
 /**
  * Remove a member (instant layer of AD-24): the Owner revokes the member's scope grant + sessions. The
  * membership becomes REMOVED (rejoinable). No crypto — eventual scope-key rotation is a separate step.

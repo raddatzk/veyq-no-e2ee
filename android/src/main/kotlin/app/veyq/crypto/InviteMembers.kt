@@ -1,5 +1,6 @@
 package app.veyq.crypto
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 import java.net.URLEncoder
@@ -55,6 +56,43 @@ object InviteMembers {
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() != 200) throw RuntimeException("grant failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
+    /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
+    fun listTenantMembers(apiBase: String, token: String, tenantId: String): JSONArray {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members"))
+            .header("Authorization", "Bearer $token").GET().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("list members failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body()).getJSONArray("members")
+    }
+
+    /**
+     * Rotate the tenant scope (eventual layer of AD-24): mint a NEW scope keypair and re-wrap it to every
+     * active member, so a previously-removed member loses key access to future content.
+     */
+    fun rotateScope(apiBase: String, owner: Login.UnlockedSession, tenantId: String): JSONObject {
+        val members = listTenantMembers(apiBase, owner.sessionToken, tenantId)
+        val newScope = V1.generateIdentity()
+        val newScopePrivate = V1.serializeIdentityPrivate(newScope)
+        val grantParts = mutableListOf<String>()
+        for (i in 0 until members.length()) {
+            val m = members.getJSONObject(i)
+            if (m.getString("status") != "ACTIVE") continue
+            val kem = dec.decode(m.getJSONObject("identityPublicKey").getString("kemPublicKey"))
+            val wrapped = V1.asymWrap(kem.copyOfRange(0, 32), kem.copyOfRange(32, kem.size), newScopePrivate, "scope-grant", V1.randomBytes(12))
+            grantParts.add("""{"userId":"${m.getString("userId")}","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"}}""")
+        }
+        val json = """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(newScope.pubKemX + newScope.pubKemM)}"},""" +
+            """"grants":[${grantParts.joinToString(",")}]}"""
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/scope/rotate"))
+            .header("Authorization", "Bearer ${owner.sessionToken}")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("rotate scope failed: ${resp.statusCode()} ${resp.body()}")
         return JSONObject(resp.body())
     }
 

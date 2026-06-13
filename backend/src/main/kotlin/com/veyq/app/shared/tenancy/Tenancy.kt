@@ -66,4 +66,9 @@ class TenantInviteRepository : PanacheRepositoryBase<TenantInvite, String>
 class MembershipRepository : PanacheRepositoryBase<Membership, String> {
     fun find(tenantId: String, userId: String): Membership? =
         find("tenantId = ?1 and userId = ?2", tenantId, userId).firstResult()
+
+    fun listByTenant(tenantId: String): List<Membership> = list("tenantId", tenantId)
+
+    fun listActive(tenantId: String): List<Membership> =
+        list("tenantId = ?1 and status = ?2", tenantId, "ACTIVE")
 }
