@@ -58,6 +58,15 @@ object InviteMembers {
         return JSONObject(resp.body())
     }
 
+    /** Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto. */
+    fun removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String): JSONObject {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId"))
+            .header("Authorization", "Bearer $ownerToken").DELETE().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("remove member failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
     data class MemberInvite(val inviteId: String, val bootstrapSecret: String, val tempPrivateKey: String)
 
     /**

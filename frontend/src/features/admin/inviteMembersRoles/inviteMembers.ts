@@ -74,6 +74,24 @@ export async function grantScopeToMember(
   return res.json()
 }
 
+/**
+ * Remove a member (instant layer of AD-24): the Owner revokes the member's scope grant + sessions. The
+ * membership becomes REMOVED (rejoinable). No crypto — eventual scope-key rotation is a separate step.
+ */
+export async function removeMember(
+  apiBase: string,
+  ownerToken: string,
+  tenantId: string,
+  userId: string,
+): Promise<MembershipSummary> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${ownerToken}` },
+  })
+  if (!res.ok) throw new Error(`remove member failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
 export type MemberInvite = { inviteId: string; bootstrapSecret: string; tempPrivateKey: string }
 
 /**

@@ -62,6 +62,19 @@ public enum InviteMembers {
         return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
     }
 
+    /// Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto.
+    public static func removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String) async throws -> MembershipSummaryDTO {
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members/\(userId)")!)
+        r.httpMethod = "DELETE"
+        r.setValue("Bearer \(ownerToken)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.removemember", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "remove member failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
+    }
+
     struct KemPublicKeyDTO: Codable { let suiteId, kemPublicKey: String }
     struct MemberInviteRequest: Codable { let role: String; let tempPublicKey: KemPublicKeyDTO; let tempWrappedScopePrivateKey: BlobDTO }
     struct OwnerInviteDTO: Codable { let inviteId, bootstrapSecret, expiresAt: String }

@@ -27,6 +27,7 @@ class Session {
 @ApplicationScoped
 class SessionRepository : PanacheRepositoryBase<Session, String> {
     fun findByToken(token: String): Session? = find("token", token).firstResult()
+    fun deleteByUserId(userId: String): Long = delete("userId", userId)
 }
 
 @ApplicationScoped
@@ -51,6 +52,10 @@ class SessionService(private val sessions: SessionRepository) {
         )
         return token
     }
+
+    /** Invalidates every session for a user (instant token revocation). Returns how many were dropped. */
+    @Transactional
+    fun invalidateAll(userId: String): Long = sessions.deleteByUserId(userId)
 
     /** Resolves a `Bearer <token>` header to a user id, or null if missing/unknown/expired. */
     @Transactional

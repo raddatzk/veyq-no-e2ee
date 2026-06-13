@@ -156,6 +156,29 @@ paths:
               schema: { $ref: '#/components/schemas/MyScopeGrant' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/members/{userId}:
+    delete:
+      tags: [MemberRemoval]
+      operationId: removeMember
+      summary: Remove a member — revoke their scope grant + sessions (the instant layer of AD-24).
+      description: >
+        A Tenant Owner soft-removes a member: the membership becomes REMOVED (rejoinable), the member's
+        scope grant is deleted and their sessions are invalidated, so the server immediately stops
+        handing them keys or resolving their tokens. Eventual scope-key rotation is a separate step —
+        already-downloaded content cannot be retracted (AD-24).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The removed membership.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MembershipSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenants/{tenantId}/grants:
     post:
       tags: [TenantMembers]

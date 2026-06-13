@@ -39,6 +39,7 @@ class InviteMembersRolesSliceTest {
     private lateinit var ownerToken: String
     private lateinit var memberToken: String
     private lateinit var noKeyOwnerToken: String
+    private lateinit var removableToken: String
     private val tenantId = "im-tenant"
     private val scopeId = "im-scope"
 
@@ -50,10 +51,12 @@ class InviteMembersRolesSliceTest {
             seedUser("im-recipient", "im-recipient@example.com")
             seedUser("im-member", "im-member@example.com")
             seedUser("im-nokey-owner", "im-nokey-owner@example.com")
+            seedUser("im-removable", "im-removable@example.com")
             seedIdentityKey("im-owner")
             seedIdentityKey("im-recipient")
             seedIdentityKey("im-member")
             seedIdentityKey("im-nokey-owner")
+            seedIdentityKey("im-removable")
 
             if (tenants.findById(tenantId) == null) {
                 tenants.persist(Tenant().apply {
@@ -69,14 +72,21 @@ class InviteMembersRolesSliceTest {
                     id = "im-grant-owner"; this.scopeId = this@InviteMembersRolesSliceTest.scopeId; userId = "im-owner"
                     suiteId = "v1"; wrappedPrivateKey = "owner-grant".toByteArray(); createdAt = now
                 })
+                // a removable member who actually holds a grant (to prove removal revokes key access)
+                grants.persist(ScopeGrant().apply {
+                    id = "im-grant-removable"; this.scopeId = this@InviteMembersRolesSliceTest.scopeId; userId = "im-removable"
+                    suiteId = "v1"; wrappedPrivateKey = "removable-grant".toByteArray(); createdAt = now
+                })
                 seedMembership("im-m-owner", "im-owner", "Owner")
                 seedMembership("im-m-member", "im-member", "Member")
                 seedMembership("im-m-nokey", "im-nokey-owner", "Owner")
+                seedMembership("im-m-removable", "im-removable", "Member")
             }
         }
         ownerToken = "Bearer ${sessions.issue("im-owner")}"
         memberToken = "Bearer ${sessions.issue("im-member")}"
         noKeyOwnerToken = "Bearer ${sessions.issue("im-nokey-owner")}"
+        removableToken = "Bearer ${sessions.issue("im-removable")}"
     }
 
     @Test
@@ -214,6 +224,32 @@ class InviteMembersRolesSliceTest {
             this.id = id; tenantId = this@InviteMembersRolesSliceTest.tenantId; this.userId = userId
             this.role = role; status = "ACTIVE"; createdAt = Instant.now()
         })
+    }
+
+    @Test
+    fun removesMemberRevokingGrantAndSessions() {
+        // the removable member's session resolves and they hold a grant up front
+        given().header("Authorization", removableToken).get("/api/me").then().statusCode(200)
+            .body("email", `is`("im-removable@example.com"))
+
+        // only an Owner may remove; you cannot remove yourself; unknown members 404
+        given().header("Authorization", memberToken)
+            .delete("/api/tenants/$tenantId/members/im-removable").then().statusCode(403).body("code", `is`("FORBIDDEN"))
+        given().header("Authorization", ownerToken)
+            .delete("/api/tenants/$tenantId/members/im-owner").then().statusCode(400).body("code", `is`("CANNOT_REMOVE_SELF"))
+        given().header("Authorization", ownerToken)
+            .delete("/api/tenants/$tenantId/members/ghost").then().statusCode(404)
+
+        // the Owner removes the member
+        given().header("Authorization", ownerToken)
+            .delete("/api/tenants/$tenantId/members/im-removable").then().statusCode(200)
+            .body("userId", `is`("im-removable"))
+            .body("status", `is`("REMOVED"))
+
+        // instant revocation: their session no longer resolves, and their scope grant is gone
+        given().header("Authorization", removableToken).get("/api/me").then().statusCode(401)
+        val grantGone = QuarkusTransaction.requiringNew().call { grants.find(scopeId, "im-removable") == null }
+        kotlin.test.assertTrue(grantGone)
     }
 
     private fun memberInviteBody(role: String) = """
