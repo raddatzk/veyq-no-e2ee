@@ -8,6 +8,8 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.Membership
+import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -27,10 +29,12 @@ class ScopeContentSliceTest {
     @Inject lateinit var tenants: TenantRepository
     @Inject lateinit var scopes: ScopeRepository
     @Inject lateinit var grants: ScopeGrantRepository
+    @Inject lateinit var memberships: MembershipRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var holderToken: String
     private lateinit var outsiderToken: String
+    private lateinit var ghostToken: String
     private val scopeId = "ci-scope"
 
     @BeforeTest
@@ -40,13 +44,18 @@ class ScopeContentSliceTest {
             if (users.findByEmail("ci-owner@example.com") == null) {
                 users.persist(User().apply { id = "ci-owner"; email = "ci-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
                 users.persist(User().apply { id = "ci-outsider"; email = "ci-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
+                users.persist(User().apply { id = "ci-ghost"; email = "ci-ghost@example.com"; displayName = "Ghost"; serverRole = ServerRole.ServerMember; createdAt = now })
                 tenants.persist(Tenant().apply { id = "ci-tenant"; name = "ci-acme"; displayName = "CiAcme"; status = "ACTIVE"; createdBy = "ci-owner"; createdAt = now })
                 scopes.persist(Scope().apply { id = scopeId; tenantId = "ci-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "pub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ci-grant"; this.scopeId = this@ScopeContentSliceTest.scopeId; userId = "ci-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
+                memberships.persist(Membership().apply { id = "ci-m"; tenantId = "ci-tenant"; userId = "ci-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
+                // a grant-holder who is NOT an active member (e.g. a missed cleanup) must still be denied
+                grants.persist(ScopeGrant().apply { id = "ci-ghost-grant"; this.scopeId = this@ScopeContentSliceTest.scopeId; userId = "ci-ghost"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             }
         }
         holderToken = "Bearer ${sessions.issue("ci-owner")}"
         outsiderToken = "Bearer ${sessions.issue("ci-outsider")}"
+        ghostToken = "Bearer ${sessions.issue("ci-ghost")}"
     }
 
     @Test
@@ -54,6 +63,8 @@ class ScopeContentSliceTest {
         // only a key-holder may touch content; outsiders and unknown scopes are rejected
         given().header("Authorization", outsiderToken).get("/api/scopes/$scopeId/content-key").then().statusCode(403).body("code", `is`("NOT_A_KEY_HOLDER"))
         given().header("Authorization", holderToken).get("/api/scopes/ghost/content-key").then().statusCode(404)
+        // a grant-holder without active membership is denied (defense in depth)
+        given().header("Authorization", ghostToken).get("/api/scopes/$scopeId/content-key").then().statusCode(403).body("code", `is`("NOT_A_MEMBER"))
 
         // no content key until provisioned
         given().header("Authorization", holderToken).get("/api/scopes/$scopeId/content-key").then().statusCode(404)

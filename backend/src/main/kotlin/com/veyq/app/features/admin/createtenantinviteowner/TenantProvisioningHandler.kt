@@ -128,6 +128,7 @@ class TenantProvisioningHandler(
         requireSuite(req.wrappedScopePrivateKey.suiteId)
 
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
+        if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
         val now = Instant.now()
 
         val scope = Scope().apply {

@@ -41,12 +41,18 @@ class LoginHandler(
     private val sessions: SessionService,
 ) {
     private val b64 = Base64.getUrlEncoder().withoutPadding()
+    // a fixed dummy verifier (salt||proof) so an unknown email still runs Argon2 — no enumeration oracle
+    private val dummyVerifier = ByteArray(48)
 
     @Transactional
     fun login(req: LoginRequest): LoginResponse {
-        val user = users.findByEmail(req.email) ?: throw invalidCredentials()
-        val verifier = authVerifiers.findByUserId(user.id) ?: throw invalidCredentials()
-        if (verifier.kind != "ARGON2_PROOF" || !argon2.verifyPassword(req.password, verifier.verifier)) {
+        val user = users.findByEmail(req.email)
+        val verifier = user?.let { authVerifiers.findByUserId(it.id) }
+        if (user == null || verifier == null || verifier.kind != "ARGON2_PROOF") {
+            argon2.verifyPassword(req.password, dummyVerifier) // equalize timing vs the real path
+            throw invalidCredentials()
+        }
+        if (!argon2.verifyPassword(req.password, verifier.verifier)) {
             throw invalidCredentials()
         }
 

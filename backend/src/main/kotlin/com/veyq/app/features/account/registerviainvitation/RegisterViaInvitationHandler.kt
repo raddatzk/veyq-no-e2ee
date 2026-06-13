@@ -152,6 +152,7 @@ class RegisterViaInvitationHandler(
             )
         } else {
             // OWNER: an empty tenant — the scope keypair is born here (self grant) and the tenant activates.
+            if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
             val scope = Scope().apply {
                 id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
                 suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now

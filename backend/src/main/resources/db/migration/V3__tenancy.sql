@@ -62,7 +62,8 @@ create table veyq_membership (
     created_at  timestamp    not null
 );
 
-create index idx_scope_tenant on veyq_scope (tenant_id);
+-- one TENANT_ROOT scope per tenant (personal scopes have a null tenant_id; H2 allows multiple nulls)
+create unique index uq_scope_tenant on veyq_scope (tenant_id);
 create unique index uq_scope_owner_personal on veyq_scope (owner_user_id, kind);
 create index idx_scope_owner on veyq_scope (owner_user_id);
 create index idx_grant_user on veyq_scope_grant (user_id);

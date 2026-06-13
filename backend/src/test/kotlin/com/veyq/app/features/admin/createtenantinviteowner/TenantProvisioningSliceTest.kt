@@ -93,6 +93,14 @@ class TenantProvisioningSliceTest {
             .post("/api/tenant-invites/$inviteId/claim").then().statusCode(409)
             .body("code", `is`("INVITE_NOT_PENDING"))
 
+        // 7b. a fresh owner invite on the already-claimed tenant cannot mint a second scope
+        val invite2 = given().header("Authorization", ownerToken)
+            .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(claimBody(invite2.path<String>("bootstrapSecret")))
+            .post("/api/tenant-invites/${invite2.path<String>("inviteId")}/claim").then().statusCode(409)
+            .body("code", `is`("TENANT_ALREADY_CLAIMED"))
+
         // 8. a bogus session does not resolve
         given().header("Authorization", "Bearer nope").contentType(ContentType.JSON)
             .body("""{"name":"other","displayName":"Other"}""")
