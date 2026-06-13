@@ -40,6 +40,13 @@ components:
       properties:
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
         bytes: { type: string }
+    KemPublicKey:
+      type: object
+      description: A hybrid KEM public key (X25519 || ML-KEM-768), base64url. Used as a scope/recipient key.
+      required: [suiteId, kemPublicKey]
+      properties:
+        suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
+        kemPublicKey: { type: string }
     MasterKeyWrap:
       type: object
       description: One wrapped copy of the master key, openable by a single unlock method.
@@ -66,3 +73,15 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  parameters:
+    AuthHeader:
+      name: Authorization
+      in: header
+      required: true
+      description: 'Bearer <sessionToken>'
+      schema: { type: string }

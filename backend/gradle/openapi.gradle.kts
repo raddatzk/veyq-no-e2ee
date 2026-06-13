@@ -48,12 +48,14 @@ val sharedSchemaMappings = mapOf(
     "IdentityPublicKey" to "$modelPackageName.IdentityPublicKey",
     "Blob" to "$modelPackageName.Blob",
     "MasterKeyWrap" to "$modelPackageName.MasterKeyWrap",
+    "KemPublicKey" to "$modelPackageName.KemPublicKey",
 )
 
 val openApiSpecs = listOf(
     OpenApiSpec("common", "../docs/api/common.openapi.yaml", generateApi = false),
     OpenApiSpec("setup", "../docs/api/setup.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
 )
 
 val yamlMapper = com.fasterxml.jackson.databind.ObjectMapper(

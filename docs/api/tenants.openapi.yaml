@@ -1,0 +1,149 @@
+openapi: 3.1.0
+info:
+  title: veyq tenant provisioning
+  version: 0.1.0
+paths:
+  /api/tenants:
+    post:
+      tags: [TenantProvisioning]
+      operationId: createTenant
+      summary: Create a tenant shell (metadata only — no content keys). Server Owner only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTenantRequest' }
+      responses:
+        '200':
+          description: The created (PENDING) tenant shell.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenants/{tenantId}/owner-invite:
+    post:
+      tags: [TenantProvisioning]
+      operationId: issueOwnerInvite
+      summary: Issue a single-use owner-claim invitation. Server Owner only.
+      description: >
+        Returns a one-time bootstrap secret; the client places it in the invite URL fragment. The server
+        stores only its hash. Claiming the (empty) tenant is an ownership claim — there are no scope keys
+        to temp-wrap; the claimer's client mints the tenant scope keypair.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The owner invitation (bootstrap secret shown once).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerInvite' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenant-invites/{inviteId}:
+    get:
+      tags: [TenantProvisioning]
+      operationId: getTenantInvite
+      summary: Public invite metadata (the bootstrap secret is never sent to the server here).
+      parameters:
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Public invite metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantInviteInfo' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenant-invites/{inviteId}/claim:
+    post:
+      tags: [TenantProvisioning]
+      operationId: claimTenantOwnership
+      summary: Claim ownership of an empty tenant; the caller becomes its first key-holder.
+      description: >
+        The authenticated existing user presents the bootstrap secret, the freshly minted tenant scope
+        public key and the scope private key wrapped to their own identity public key (a self scope
+        grant). The server activates the tenant + membership and stores ciphertext only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimTenantOwnershipRequest' }
+      responses:
+        '200':
+          description: The activated tenant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenants/{tenantId}/scope:
+    get:
+      tags: [TenantProvisioning]
+      operationId: getMyScopeGrant
+      summary: The caller's scope grant for a tenant (wrapped scope private key + scope public key).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The caller's scope grant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyScopeGrant' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+components:
+  schemas:
+    CreateTenantRequest:
+      type: object
+      required: [name, displayName]
+      properties:
+        name: { type: string, description: Unique slug-like tenant name. }
+        displayName: { type: string }
+        domain: { type: string }
+    TenantSummary:
+      type: object
+      required: [id, name, displayName, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        displayName: { type: string }
+        domain: { type: string }
+        status: { type: string, enum: [PENDING, ACTIVE] }
+    OwnerInvite:
+      type: object
+      required: [inviteId, bootstrapSecret, expiresAt]
+      properties:
+        inviteId: { type: string }
+        bootstrapSecret: { type: string, description: One-time secret (base64url); goes in the URL fragment. }
+        expiresAt: { type: string, format: date-time }
+    TenantInviteInfo:
+      type: object
+      required: [inviteId, tenant, role, status]
+      properties:
+        inviteId: { type: string }
+        tenant: { $ref: '#/components/schemas/TenantSummary' }
+        role: { type: string }
+        status: { type: string, enum: [PENDING, CONSUMED, REVOKED] }
+    ClaimTenantOwnershipRequest:
+      type: object
+      required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        bootstrapSecret: { type: string }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    MyScopeGrant:
+      type: object
+      required: [scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
