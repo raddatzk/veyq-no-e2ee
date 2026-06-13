@@ -31,6 +31,7 @@ auto-synced from `docs/wiki/**` — **edit the repo, not the wiki**.
 - [Security & Encryption Model](crosscutting/security-model.md)
 - [Agent Mode — Processing Pipeline](crosscutting/agent-mode.md)
 - [Search](crosscutting/search.md)
+- [Space Navigation](crosscutting/space-navigation.md)
 - [Live Collaboration (Journal)](crosscutting/live-collaboration.md)
 - [Platform Concepts](crosscutting/platform-concepts.md) (auth, ML, i18n, robustness, capabilities)
 - [Patterns & Conventions](crosscutting/patterns-and-conventions.md)

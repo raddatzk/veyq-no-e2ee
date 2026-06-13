@@ -18,6 +18,7 @@
 - [Crypto Wire-Format Spec](crosscutting/crypto-spec)
 - [Agent Mode](crosscutting/agent-mode)
 - [Search](crosscutting/search)
+- [Space Navigation](crosscutting/space-navigation)
 - [Live Collaboration](crosscutting/live-collaboration)
 - [Platform Concepts](crosscutting/platform-concepts)
 - [Patterns & Conventions](crosscutting/patterns-and-conventions)

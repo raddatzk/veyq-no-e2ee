@@ -27,6 +27,7 @@
 
 ## Related
 - Feature: [Spaces](../_index.md) · Actors: [Memory Curator](../../../actors.md)
-- Concepts: [Security Model](../../../crosscutting/security-model.md) (paramount invariant, shared vs. unshared)
+- Concepts: [Security Model](../../../crosscutting/security-model.md) (paramount invariant, shared vs. unshared),
+  [Space Navigation](../../../crosscutting/space-navigation.md) (personal scope context)
 - Decisions: [AD-02](../../../decisions/README.md), [AD-04](../../../decisions/README.md) (shared vs. unshared)
 - Related use-cases: `uc.spaces.use-group`, `uc.memory.create-tree`

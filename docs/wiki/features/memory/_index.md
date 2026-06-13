@@ -6,6 +6,7 @@ playlists). A second, plain file-storage model ("Drive") is planned — see [des
 
 - **Touched contexts:** Memory, Media, Journal — see [System Architecture](../../overview/architecture.md).
 - **Cross-cutting:** [Security Model](../../crosscutting/security-model.md) (scope & keys),
+  [Space Navigation](../../crosscutting/space-navigation.md) (folders, Memories and chapters),
   [Agent Mode](../../crosscutting/agent-mode.md) (media processing), [Search](../../crosscutting/search.md).
 - **Decisions:** [AD-03/04](../../decisions/README.md) (keys, shared-vs-unshared), [AD-10](../../decisions/README.md) (deletion).
 

@@ -55,6 +55,7 @@ Within a Memory, media are grouped into per-uploader **buckets** — an axis ort
 ## Related
 - Feature: [Memory](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (scope keys, slug tokens,
-  encrypted vs. visible), [Search](../../../crosscutting/search.md) (ordering metadata)
+  encrypted vs. visible), [Space Navigation](../../../crosscutting/space-navigation.md) (tree model and listing),
+  [Search](../../../crosscutting/search.md) (ordering metadata)
 - Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys), [AD-26](../../../decisions/README.md) (blinded slug tokens)
 - Related use-cases: `uc.uploads.add-media`, `uc.memory.curate`

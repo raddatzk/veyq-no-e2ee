@@ -25,6 +25,7 @@
 
 ## Related
 - Feature: [Spaces](../_index.md) · Actors: [Memory Curator](../../../actors.md)
-- Concepts: [Security Model](../../../crosscutting/security-model.md) (membership, scope keys)
+- Concepts: [Security Model](../../../crosscutting/security-model.md) (membership, scope keys),
+  [Space Navigation](../../../crosscutting/space-navigation.md) (active scope context)
 - Decisions: [AD-02](../../../decisions/README.md) (E2EE)
 - Related use-cases: `uc.spaces.use-group`, `uc.spaces.use-personal`

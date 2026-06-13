@@ -47,7 +47,9 @@
 
 ## Related
 - Feature: [Memory](../_index.md) · Actors: [Memory Curator](../../../actors.md), [Public Viewer](../../../actors.md)
-- Concepts: [Security Model](../../../crosscutting/security-model.md), [Search](../../../crosscutting/search.md),
+- Concepts: [Security Model](../../../crosscutting/security-model.md),
+  [Space Navigation](../../../crosscutting/space-navigation.md) (scope-aware browsing),
+  [Search](../../../crosscutting/search.md),
   [Agent Mode](../../../crosscutting/agent-mode.md) (derivatives & streaming)
 - Decisions: [AD-02](../../../decisions/README.md) (E2E / blind server), [AD-13](../../../decisions/README.md) (ordering metadata), [AD-28](../../../decisions/README.md) (segmented streaming)
 - Related use-cases: `uc.memory.curate`, `uc.memory.organize-buckets`, `uc.memory.add-map-tracks`, `uc.memory.download-zip`

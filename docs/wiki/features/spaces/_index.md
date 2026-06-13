@@ -4,6 +4,7 @@ Multiple **tenants**, collaborative **groups** and a **personal** space, with fa
 
 - **Touched contexts:** Spaces, Identity & Access — see [System Architecture](../../overview/architecture.md).
 - **Cross-cutting:** [Security Model](../../crosscutting/security-model.md) (scope keys, membership),
+  [Space Navigation](../../crosscutting/space-navigation.md) (scope context and tree listing),
   [Live Collaboration](../../crosscutting/live-collaboration.md) (shared journals).
 - **Decisions:** [AD-02/03](../../decisions/README.md) (scopes & keys).
 

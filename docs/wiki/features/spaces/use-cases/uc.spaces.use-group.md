@@ -29,6 +29,7 @@
 ## Related
 - Feature: [Spaces](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (scope keys, shared vs. unshared),
+  [Space Navigation](../../../crosscutting/space-navigation.md) (group scope context),
   [Live Collaboration](../../../crosscutting/live-collaboration.md)
 - Decisions: [AD-02](../../../decisions/README.md), [AD-03](../../../decisions/README.md) (scopes & keys); ADR 0005 (legacy)
 - Related use-cases: `uc.admin.invite-members-roles`, `uc.memory.create-tree`
