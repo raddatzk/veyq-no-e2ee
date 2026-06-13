@@ -58,6 +58,7 @@ val openApiSpecs = listOf(
     OpenApiSpec("auth", "../docs/api/auth.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("tenants", "../docs/api/tenants.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("keys", "../docs/api/keys.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
+    OpenApiSpec("directory", "../docs/api/directory.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
 )
 
 val yamlMapper = com.fasterxml.jackson.databind.ObjectMapper(

@@ -1,0 +1,64 @@
+import Foundation
+
+/// uc.admin.invite-members-roles (Apple) — existing-user direct grant. A key-holding Tenant Owner reads
+/// their own scope grant, unwraps the scope private key, re-wraps it to an existing user's published
+/// identity public key (from the key directory) and assigns a role. The server stays blind.
+public enum InviteMembers {
+    struct IdentityPublicKeyDTO: Codable { let suiteId, kemPublicKey, signPublicKey: String }
+    public struct DirectoryEntryDTO: Codable {
+        public let userId, displayName: String
+        let identityPublicKey: IdentityPublicKeyDTO
+    }
+    public struct MembershipSummaryDTO: Codable { public let tenantId, userId, role, status: String }
+    struct BlobDTO: Codable { let suiteId, bytes: String }
+    struct GrantRequest: Codable { let recipientUserId, role: String; let wrappedScopePrivateKey: BlobDTO }
+
+    /// Look up a user's published identity public key by email (the key directory).
+    public static func lookupDirectoryEntry(apiBase: String, token: String, email: String) async throws -> DirectoryEntryDTO {
+        let q = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? email
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/directory/users?email=\(q)")!)
+        r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.directory", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "directory lookup failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(DirectoryEntryDTO.self, from: data)
+    }
+
+    /// Grant an existing user (by email) access to the tenant scope + a role via a direct wrap.
+    public static func grantScopeToMember(
+        apiBase: String, owner: Login.UnlockedSession, tenantId: String, recipientEmail: String, role: String
+    ) async throws -> MembershipSummaryDTO {
+        // 1. read our own grant and recover the scope private key (raw serialized bytes)
+        let myGrant = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: owner.sessionToken, tenantId: tenantId)
+        let ownerPkX = Data(owner.kemPublicKey.prefix(32))
+        let ownerPkM = Data(owner.kemPublicKey.dropFirst(32))
+        let scopePrivateBytes = try V1.asymUnwrap(
+            skX: owner.identity.kemX, mlkemSeed: owner.identity.mlkemSeed, pkX: ownerPkX, pkM: ownerPkM,
+            blob: Login.b64urlDecode(myGrant.wrappedScopePrivateKey.bytes), context: "scope-grant")
+
+        // 2. look up the recipient and re-wrap the scope private key to their identity public key
+        let recipient = try await lookupDirectoryEntry(apiBase: apiBase, token: owner.sessionToken, email: recipientEmail)
+        let rKem = Login.b64urlDecode(recipient.identityPublicKey.kemPublicKey)
+        let rewrapped = try V1.asymWrap(
+            pkX: Data(rKem.prefix(32)), pkM: Data(rKem.dropFirst(32)), targetKey: scopePrivateBytes,
+            context: "scope-grant", nonce: V1.randomBytes(12))
+
+        // 3. hand the server ciphertext + the recipient + the role
+        let req = GrantRequest(
+            recipientUserId: recipient.userId, role: role,
+            wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(rewrapped)))
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/grants")!)
+        r.httpMethod = "POST"
+        r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.grant", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "grant failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
+    }
+}

@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: veyq key directory
+  version: 0.1.0
+paths:
+  /api/directory/users:
+    get:
+      tags: [Directory]
+      operationId: lookupDirectoryEntry
+      summary: Look up a user's published identity public key by email (the key directory).
+      description: >
+        Returns only public material — the user id, display name and identity public key — so a grantor
+        can wrap a scope key to the recipient. Trust is TOFU/pinning now, Key Transparency later (AD-07).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: email, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The directory entry for the user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DirectoryEntry' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+components:
+  schemas:
+    DirectoryEntry:
+      type: object
+      required: [userId, displayName, identityPublicKey]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
