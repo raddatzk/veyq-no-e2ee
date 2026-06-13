@@ -47,6 +47,7 @@ public enum Login {
         public let user: UserSummaryDTO
         public let identity: V1.IdentityPrivate
         public let kemPublicKey: Data
+        public let masterKey: Data
     }
 
     public static func login(apiBase: String, email: String, password: String, secretKeyB64: String) async throws -> UnlockedSession {
@@ -72,7 +73,7 @@ public enum Login {
 
         return UnlockedSession(
             sessionToken: body.sessionToken, user: body.user, identity: identity,
-            kemPublicKey: b64urlDecode(body.keyBag.identityPublicKey.kemPublicKey))
+            kemPublicKey: b64urlDecode(body.keyBag.identityPublicKey.kemPublicKey), masterKey: masterKey)
     }
 
     public static func fetchCurrentUser(apiBase: String, sessionToken: String) async throws -> UserSummaryDTO {

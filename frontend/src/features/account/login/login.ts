@@ -36,6 +36,7 @@ export type UnlockedSession = {
   user: LoginResponse['user']
   identity: v1.Identity['priv']
   identityPublicKey: KeyBag['identityPublicKey']
+  masterKey: Uint8Array
 }
 
 /** Authenticate with the password path (password + Secret Key from the Emergency Kit). */
@@ -61,7 +62,7 @@ export async function login(
   const privBytes = v1.symUnwrap(masterKey, fromB64url(body.keyBag.wrappedIdentityPrivateKey.bytes), 'identity-priv')
   const identity = v1.deserializeIdentityPrivate(privBytes)
 
-  return { sessionToken: body.sessionToken, user: body.user, identity, identityPublicKey: body.keyBag.identityPublicKey }
+  return { sessionToken: body.sessionToken, user: body.user, identity, identityPublicKey: body.keyBag.identityPublicKey, masterKey }
 }
 
 /** Proves the session resolves on the server. */

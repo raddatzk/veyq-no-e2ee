@@ -24,6 +24,7 @@ object Login {
         val serverRole: String,
         val identity: V1.IdentityPrivate,
         val kemPublicKey: ByteArray,
+        val masterKey: ByteArray,
     )
 
     fun login(apiBase: String, email: String, password: String, secretKeyB64: String): UnlockedSession {
@@ -56,6 +57,7 @@ object Login {
             serverRole = user.getString("serverRole"),
             identity = identity,
             kemPublicKey = b64url(keyBag.getJSONObject("identityPublicKey").getString("kemPublicKey")),
+            masterKey = masterKey,
         )
     }
 

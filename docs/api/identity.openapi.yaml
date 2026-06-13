@@ -1,0 +1,80 @@
+openapi: 3.1.0
+info:
+  title: veyq account identity
+  version: 0.1.0
+paths:
+  /api/me/grants:
+    get:
+      tags: [MyGrants]
+      operationId: listMyGrants
+      summary: List every scope grant the caller holds (for re-wrapping on identity rotation).
+      description: >
+        Returns the scope id, kind, scope public key and the grant ciphertext for each scope the caller
+        holds. Public material + opaque ciphertext only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The caller's grants.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyGrantList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/identity/rotate:
+    post:
+      tags: [IdentityRotation]
+      operationId: rotateIdentity
+      summary: Rotate the account identity keypair and re-wrap every owned grant to it.
+      description: >
+        The client generates a new identity keypair, wraps its private key under the unchanged master key,
+        and re-wraps each scope grant to the new identity public key. The server swaps the identity public
+        key + wrapped private key and atomically replaces every grant. The re-wrapped grants must cover
+        exactly the caller's current grants. The server never sees a private key.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RotateIdentityRequest' }
+      responses:
+        '200':
+          description: The account after rotation.
+          content:
+            application/json:
+              schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+components:
+  schemas:
+    OwnedGrant:
+      type: object
+      required: [scopeId, kind, scopePublicKey, wrappedScopePrivateKey]
+      properties:
+        scopeId: { type: string }
+        kind: { type: string, description: 'PERSONAL_ROOT or TENANT_ROOT — selects the wrap context.' }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    MyGrantList:
+      type: object
+      required: [grants]
+      properties:
+        grants:
+          type: array
+          items: { $ref: '#/components/schemas/OwnedGrant' }
+    IdentityGrantRewrap:
+      type: object
+      required: [scopeId, wrappedScopePrivateKey]
+      properties:
+        scopeId: { type: string }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    RotateIdentityRequest:
+      type: object
+      required: [identityPublicKey, wrappedIdentityPrivateKey, grants]
+      properties:
+        identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
+        wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        grants:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/IdentityGrantRewrap' }
