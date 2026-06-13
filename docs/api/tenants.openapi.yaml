@@ -226,6 +226,33 @@ paths:
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/members/{userId}/role:
+    put:
+      tags: [MemberRole]
+      operationId: changeMemberRole
+      summary: Change a member's role (membership/settings authority only — not content access, ADR 0005).
+      description: >
+        A Tenant Owner reassigns a member's role. Roles govern membership and settings; the set of
+        decryptable scopes governs content, so this touches no grants. Demoting the last Owner is rejected.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeMemberRoleRequest' }
+      responses:
+        '200':
+          description: The updated membership.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MembershipSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/tenants/{tenantId}/grants:
     post:
       tags: [TenantMembers]
@@ -312,6 +339,11 @@ components:
         members:
           type: array
           items: { $ref: '#/components/schemas/TenantMember' }
+    ChangeMemberRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [Owner, Member] }
     ScopeGrantInput:
       type: object
       required: [userId, wrappedScopePrivateKey]

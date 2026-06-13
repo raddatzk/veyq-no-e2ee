@@ -46,6 +46,8 @@ class InviteMembersRolesSliceTest {
     // tests mutate im-tenant's membership, which would make rotation's "exactly the active members" flaky.
     private val rotTenantId = "im-rot-tenant"
     private val rotScopeId = "im-rot-scope"
+    // a dedicated tenant for role changes ({im-owner Owner, im-member Member}); role ≠ access, no grants.
+    private val roleTenantId = "im-role-tenant"
 
     @BeforeTest
     fun seed() {
@@ -108,6 +110,18 @@ class InviteMembersRolesSliceTest {
                 })
                 memberships.persist(Membership().apply {
                     id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
+                })
+
+                // dedicated role-change tenant: one Owner + one Member, no grants (role ≠ access)
+                tenants.persist(Tenant().apply {
+                    id = roleTenantId; name = "im-role-acme"; displayName = "RoleAcme"; status = "ACTIVE"
+                    createdBy = "im-owner"; createdAt = now
+                })
+                memberships.persist(Membership().apply {
+                    id = "im-role-m-owner"; tenantId = roleTenantId; userId = "im-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now
+                })
+                memberships.persist(Membership().apply {
+                    id = "im-role-m-member"; tenantId = roleTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
                 })
             }
         }
@@ -320,6 +334,29 @@ class InviteMembersRolesSliceTest {
             .get("/api/tenants/$rotTenantId/scope").then().statusCode(200)
             .body("scopePublicKey.kemPublicKey", `is`("bmV3LXNjb3Bl"))
             .body("wrappedScopePrivateKey.bytes", `is`("b3duZXItbmV3"))
+    }
+
+    @Test
+    fun changesMemberRoleAndProtectsTheLastOwner() {
+        // only an Owner may change roles
+        given().header("Authorization", memberToken).contentType(ContentType.JSON).body("""{"role":"Owner"}""")
+            .put("/api/tenants/$roleTenantId/members/im-member/role").then().statusCode(403).body("code", `is`("FORBIDDEN"))
+
+        // the last Owner cannot be demoted, and an unknown member is a 404
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"Member"}""")
+            .put("/api/tenants/$roleTenantId/members/im-owner/role").then().statusCode(409).body("code", `is`("LAST_OWNER"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"Member"}""")
+            .put("/api/tenants/$roleTenantId/members/ghost/role").then().statusCode(404)
+
+        // promote the member to Owner (no grant touched — role ≠ access)
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"Owner"}""")
+            .put("/api/tenants/$roleTenantId/members/im-member/role").then().statusCode(200)
+            .body("userId", `is`("im-member")).body("role", `is`("Owner"))
+
+        // now that a second Owner exists, the original Owner can be demoted
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"Member"}""")
+            .put("/api/tenants/$roleTenantId/members/im-owner/role").then().statusCode(200)
+            .body("role", `is`("Member"))
     }
 
     private fun rotateBody(scopePub: String, grants: List<Pair<String, String>>): String {

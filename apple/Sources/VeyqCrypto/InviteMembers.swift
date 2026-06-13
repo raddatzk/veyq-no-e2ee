@@ -110,6 +110,21 @@ public enum InviteMembers {
         return try JSONDecoder().decode(RotateScopeResultDTO.self, from: data)
     }
 
+    /// Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto.
+    public static func changeMemberRole(apiBase: String, ownerToken: String, tenantId: String, userId: String, role: String) async throws -> MembershipSummaryDTO {
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members/\(userId)/role")!)
+        r.httpMethod = "PUT"
+        r.setValue("Bearer \(ownerToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(["role": role])
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.role", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "change role failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
+    }
+
     /// Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto.
     public static func removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String) async throws -> MembershipSummaryDTO {
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/members/\(userId)")!)

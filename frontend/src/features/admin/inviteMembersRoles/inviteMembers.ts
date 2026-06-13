@@ -142,6 +142,23 @@ export async function removeMember(
   return res.json()
 }
 
+/** Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto. */
+export async function changeMemberRole(
+  apiBase: string,
+  ownerToken: string,
+  tenantId: string,
+  userId: string,
+  role: MemberRole,
+): Promise<MembershipSummary> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members/${encodeURIComponent(userId)}/role`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ role }),
+  })
+  if (!res.ok) throw new Error(`change role failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
 export type MemberInvite = { inviteId: string; bootstrapSecret: string; tempPrivateKey: string }
 
 /**

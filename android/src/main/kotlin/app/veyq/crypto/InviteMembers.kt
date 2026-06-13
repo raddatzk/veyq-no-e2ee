@@ -96,6 +96,18 @@ object InviteMembers {
         return JSONObject(resp.body())
     }
 
+    /** Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto. */
+    fun changeMemberRole(apiBase: String, ownerToken: String, tenantId: String, userId: String, role: String): JSONObject {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId/role"))
+            .header("Authorization", "Bearer $ownerToken")
+            .header("Content-Type", "application/json")
+            .method("PUT", HttpRequest.BodyPublishers.ofString("""{"role":"$role"}"""))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("change role failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
     /** Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto. */
     fun removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String): JSONObject {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId"))
