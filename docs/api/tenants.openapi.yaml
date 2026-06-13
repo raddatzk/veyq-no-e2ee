@@ -140,6 +140,34 @@ paths:
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenant-invites/{inviteId}/accept:
+    post:
+      tags: [AcceptInvite]
+      operationId: acceptMemberInvite
+      summary: Accept a member invite onto an EXISTING account (no new account).
+      description: >
+        An already-authenticated user accepts a temp-wrap member invite: their client unwrapped the scope
+        with the temp key (from the URL fragment) and re-wrapped it to their own identity. The server adds
+        the grant + membership on the existing scope and consumes the invite. No new account, no session
+        issued — the caller is already logged in.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcceptMemberInviteRequest' }
+      responses:
+        '200':
+          description: The caller's new membership.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MembershipSummary' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/tenants/{tenantId}/scope:
     get:
       tags: [TenantProvisioning]
@@ -286,6 +314,14 @@ components:
         userId: { type: string }
         role: { type: string }
         status: { type: string }
+    AcceptMemberInviteRequest:
+      type: object
+      required: [bootstrapSecret, wrappedScopePrivateKey]
+      properties:
+        bootstrapSecret: { type: string }
+        wrappedScopePrivateKey:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: The scope private key re-wrapped to the caller's own identity public key.
     TenantMember:
       type: object
       required: [userId, displayName, role, status, identityPublicKey]

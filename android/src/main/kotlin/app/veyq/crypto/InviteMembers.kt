@@ -131,4 +131,31 @@ object InviteMembers {
             scopePub to enc.encodeToString(V1.asymWrap(idX, idM, scopePrivateBytes, "scope-grant", V1.randomBytes(12)))
         }
     }
+
+    /**
+     * Accept a temp-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.
+     * Unwrap with the temp key, re-wrap to the caller's own identity; the server adds grant + membership.
+     */
+    fun acceptMemberInvite(
+        apiBase: String, session: Login.UnlockedSession, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String,
+    ): JSONObject {
+        val meta = RegisterViaInvitation.getInviteMetadata(apiBase, inviteId)
+        val tempKem = dec.decode(meta.getJSONObject("tempPublicKey").getString("kemPublicKey"))
+        val tempWrapped = dec.decode(meta.getJSONObject("tempWrappedScopePrivateKey").getString("bytes"))
+        val tempPriv = V1.deserializeIdentityPrivate(dec.decode(tempPrivateKeyB64))
+        val scopePrivateBytes = V1.asymUnwrap(
+            tempPriv.kemX, tempPriv.mlkemSeed, tempKem.copyOfRange(0, 32), tempKem.copyOfRange(32, tempKem.size), tempWrapped, "scope-grant",
+        )
+        val ownKem = session.kemPublicKey
+        val rewrapped = V1.asymWrap(ownKem.copyOfRange(0, 32), ownKem.copyOfRange(32, ownKem.size), scopePrivateBytes, "scope-grant", V1.randomBytes(12))
+        val json = """{"bootstrapSecret":"$bootstrapSecret","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"}}"""
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/accept"))
+            .header("Authorization", "Bearer ${session.sessionToken}")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("accept failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
 }

@@ -148,4 +148,38 @@ public enum InviteMembers {
             (scopePublicKey, SetupServer.b64url(try V1.asymWrap(pkX: idX, pkM: idM, targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))))
         }
     }
+
+    struct AcceptRequest: Codable { let bootstrapSecret: String; let wrappedScopePrivateKey: BlobDTO }
+
+    /// Accept a temp-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.
+    /// Unwrap with the temp key, re-wrap to the caller's own identity; the server adds grant + membership.
+    public static func acceptMemberInvite(
+        apiBase: String, session: Login.UnlockedSession, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String
+    ) async throws -> MembershipSummaryDTO {
+        let meta = try await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId)
+        guard let tempPub = meta.tempPublicKey, let tempWrapped = meta.tempWrappedScopePrivateKey else {
+            throw NSError(domain: "veyq.accept", code: 1, userInfo: [NSLocalizedDescriptionKey: "not a temp-wrap member invite"])
+        }
+        let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
+        let tempKem = Login.b64urlDecode(tempPub.kemPublicKey)
+        let scopePrivateBytes = try V1.asymUnwrap(
+            skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
+            blob: Login.b64urlDecode(tempWrapped.bytes), context: "scope-grant")
+        let rewrapped = try V1.asymWrap(
+            pkX: Data(session.kemPublicKey.prefix(32)), pkM: Data(session.kemPublicKey.dropFirst(32)),
+            targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))
+
+        let req = AcceptRequest(bootstrapSecret: bootstrapSecret, wrappedScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(rewrapped)))
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant-invites/\(inviteId)/accept")!)
+        r.httpMethod = "POST"
+        r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.accept", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "accept failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(MembershipSummaryDTO.self, from: data)
+    }
 }

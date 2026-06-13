@@ -183,3 +183,38 @@ export async function registerViaMemberInvite(
     wrappedScopePrivateKey: b64url(v1.asymWrap(idPub, scopePrivateBytes, 'scope-grant', { nonce: v1.randomBytes(12) })),
   }))
 }
+
+/**
+ * Accept a temp-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.
+ * Unwrap the scope with the temp key (from the URL fragment) and re-wrap it to the caller's own identity;
+ * the server adds the grant + membership on the existing scope. No new account.
+ */
+export async function acceptMemberInvite(
+  apiBase: string,
+  session: UnlockedSession,
+  inviteId: string,
+  bootstrapSecret: string,
+  tempPrivateKeyB64: string,
+): Promise<MembershipSummary> {
+  const meta = await getInviteMetadata(apiBase, inviteId)
+  if (!meta.tempPublicKey || !meta.tempWrappedScopePrivateKey) throw new Error('invite is not a temp-wrap member invite')
+  const tempPriv = v1.deserializeIdentityPrivate(fromB64url(tempPrivateKeyB64))
+  const tempKem = fromB64url(meta.tempPublicKey.kemPublicKey)
+  const scopePrivateBytes = v1.asymUnwrap(
+    v1.hybridSecret(tempPriv),
+    { x: tempKem.slice(0, 32), m: tempKem.slice(32) },
+    fromB64url(meta.tempWrappedScopePrivateKey.bytes),
+    'scope-grant',
+  )
+  const ownKem = fromB64url(session.identityPublicKey.kemPublicKey)
+  const rewrapped = v1.asymWrap({ x: ownKem.slice(0, 32), m: ownKem.slice(32) }, scopePrivateBytes, 'scope-grant', {
+    nonce: v1.randomBytes(12),
+  })
+  const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/accept`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify({ bootstrapSecret, wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(rewrapped) } }),
+  })
+  if (!res.ok) throw new Error(`accept failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
