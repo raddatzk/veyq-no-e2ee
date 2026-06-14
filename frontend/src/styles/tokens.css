@@ -1,0 +1,77 @@
+/* veyq design tokens — ported from the reference UI (legacy base.css). Dark is the default in the
+   screenshots; light is kept for parity. Every greenfield screen styles against these variables. */
+:root {
+  --app-bg: #f7f8fb;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f4f6fb;
+  --app-text: #111827;
+  --app-muted: #667085;
+  --app-line: #dce2ec;
+  --app-accent: #5b4df5;
+  --app-accent-soft: #f0eeff;
+  --app-success: #0f766e;
+  --app-success-soft: #ecfdf5;
+  --app-danger: #b42318;
+  --app-danger-soft: #fef2f2;
+  --app-danger-line: #fecaca;
+  --app-hover: #f3f5fa;
+  --app-control-bg: #f8fafc;
+  --app-control-text: #334155;
+  --app-on-strong: #fff;
+  --app-radius: 12px;
+  --app-radius-sm: 10px;
+  --app-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --app-shadow-md: 0 14px 40px rgb(15 23 42 / 0.08);
+  --app-background-pattern:
+    radial-gradient(circle at 18% 12%, rgba(91, 77, 245, 0.13), transparent 28rem),
+    radial-gradient(circle at 82% 24%, rgba(14, 165, 233, 0.1), transparent 30rem),
+    var(--app-bg);
+  --app-sidebar-width: 304px;
+  --app-topbar-height: 72px;
+  color-scheme: light;
+}
+
+:root.veyq-dark {
+  --app-bg: #101418;
+  --app-surface: #171c22;
+  --app-surface-muted: #20262e;
+  --app-text: #eef3f8;
+  --app-muted: #9aa7b5;
+  --app-line: #333d49;
+  --app-accent: #9b8cff;
+  --app-accent-soft: #2a2541;
+  --app-success: #2dd4bf;
+  --app-success-soft: #132b21;
+  --app-danger: #f87171;
+  --app-danger-soft: #3b1d24;
+  --app-danger-line: #7f1d1d;
+  --app-hover: #242b34;
+  --app-control-bg: #20262e;
+  --app-control-text: #eef3f8;
+  --app-on-strong: #fff;
+  --app-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.26);
+  --app-shadow-md: 0 18px 50px rgb(0 0 0 / 0.34);
+  --app-background-pattern:
+    radial-gradient(circle at 18% 12%, rgba(155, 140, 255, 0.16), transparent 28rem),
+    radial-gradient(circle at 82% 24%, rgba(45, 212, 191, 0.08), transparent 30rem),
+    var(--app-bg);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: clip;
+  font-family: Inter, 'Avenir Next', 'Segoe UI', sans-serif;
+  background: var(--app-bg);
+  color: var(--app-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}

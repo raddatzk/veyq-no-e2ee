@@ -1,22 +1,46 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
+import { applyTheme, session } from './app/session'
+import { getSetupStatus } from './features/account/instance/instance'
+import SetupPanel from './app/auth/SetupPanel.vue'
+import LoginPanel from './app/auth/LoginPanel.vue'
+import LandedPanel from './app/LandedPanel.vue'
 
-const health = ref<string>('…')
+// Slice 1 (web): same-origin instance → on boot check setup status → setup (first run) or login →
+// landed. The real MemoryHome is slice 2.
+applyTheme(session.theme)
+
+type Phase = 'loading' | 'setup' | 'login' | 'error'
+const phase = ref<Phase>('loading')
+const prefill = ref<{ email?: string; secretKey?: string }>({})
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/health')
-    const body = (await res.json()) as { name: string; status: string }
-    health.value = `${body.name}: ${body.status}`
+    const status = await getSetupStatus(session.apiBase)
+    phase.value = status.setupRequired ? 'setup' : 'login'
   } catch {
-    health.value = 'backend unreachable'
+    phase.value = 'error'
   }
 })
+
+function onSetupDone(email: string, secretKey: string) {
+  prefill.value = { email, secretKey }
+  phase.value = 'login'
+}
 </script>
 
 <template>
-  <main>
-    <h1>veyq</h1>
-    <p>backend health: {{ health }}</p>
-  </main>
+  <LandedPanel v-if="session.unlocked" />
+  <div v-else-if="phase === 'loading'" class="auth-screen">
+    <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">Lädt…</p></div>
+  </div>
+  <div v-else-if="phase === 'error'" class="auth-screen">
+    <div class="auth-card">
+      <p class="auth-wordmark">veyq</p>
+      <h1 class="auth-title">Instanz nicht erreichbar</h1>
+      <p class="auth-sub">Der veyq-Server antwortet nicht. Lade die Seite neu.</p>
+    </div>
+  </div>
+  <SetupPanel v-else-if="phase === 'setup'" @done="onSetupDone" />
+  <LoginPanel v-else :prefill="prefill" />
 </template>
