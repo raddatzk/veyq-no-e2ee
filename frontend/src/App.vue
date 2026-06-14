@@ -4,7 +4,7 @@ import { applyTheme, session } from './app/session'
 import { getSetupStatus } from './features/account/instance/instance'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
-import LandedPanel from './app/LandedPanel.vue'
+import HomeView from './app/home/HomeView.vue'
 
 // Slice 1 (web): same-origin instance → on boot check setup status → setup (first run) or login →
 // landed. The real MemoryHome is slice 2.
@@ -30,7 +30,7 @@ function onSetupDone(email: string, secretKey: string) {
 </script>
 
 <template>
-  <LandedPanel v-if="session.unlocked" />
+  <HomeView v-if="session.unlocked" />
   <div v-else-if="phase === 'loading'" class="auth-screen">
     <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">Lädt…</p></div>
   </div>

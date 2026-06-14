@@ -1,0 +1,148 @@
+/* MemoryHome — sidebar (spaces) + topbar (breadcrumb/search) + content (memory & folder grids),
+   matching the reference shell. */
+.home {
+  display: grid;
+  grid-template-columns: var(--app-sidebar-width) 1fr;
+  grid-template-rows: var(--app-topbar-height) 1fr;
+  height: 100vh;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.home-sidebar {
+  grid-row: 1 / span 2;
+  border-right: 1px solid var(--app-line);
+  background: var(--app-surface);
+  display: flex;
+  flex-direction: column;
+  padding: 0.9rem 0.75rem;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.home-brand {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  padding: 0.3rem 0.5rem 0.6rem;
+}
+
+.home-section {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+  padding: 0.7rem 0.5rem 0.3rem;
+}
+
+.space-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.space-row:hover { background: var(--app-hover); }
+.space-row.active { background: var(--app-accent-soft); }
+
+.space-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--app-on-strong);
+  background: var(--app-accent);
+}
+
+.space-meta { min-width: 0; }
+.space-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.space-sub { font-size: 0.74rem; color: var(--app-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.home-spacer { flex: 1; }
+
+.home-topbar {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--app-line);
+}
+
+.crumbs { display: flex; align-items: center; gap: 0.35rem; font-size: 0.95rem; min-width: 0; flex-wrap: wrap; }
+.crumb { background: none; border: none; color: var(--app-muted); cursor: pointer; font: inherit; padding: 0.1rem 0.2rem; border-radius: 6px; }
+.crumb:hover { color: var(--app-text); background: var(--app-hover); }
+.crumb.current { color: var(--app-text); font-weight: 600; cursor: default; }
+.crumb-sep { color: var(--app-muted); opacity: 0.6; }
+
+.home-search {
+  margin-left: auto;
+  width: min(340px, 36vw);
+  padding: 0.5rem 0.7rem;
+  background: var(--app-control-bg);
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  color: var(--app-muted);
+  font: inherit;
+}
+
+.home-content { grid-column: 2; overflow-y: auto; padding: 1.5rem; }
+
+.content-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0 0.9rem; }
+.content-title { font-size: 1.05rem; font-weight: 700; }
+.content-count { color: var(--app-muted); font-size: 0.9rem; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.memory-card {
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.memory-card:hover { box-shadow: var(--app-shadow-md); }
+.memory-cover { aspect-ratio: 4 / 3; background: var(--app-surface-muted); display: block; width: 100%; object-fit: cover; }
+.memory-cover.placeholder { display: grid; place-items: center; color: var(--app-muted); font-size: 0.8rem; }
+.memory-label { padding: 0.6rem 0.7rem; }
+.memory-name { font-weight: 600; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.folder-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.folder-card:hover { background: var(--app-hover); }
+.folder-icon { font-size: 1.2rem; }
+.folder-name { font-weight: 600; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.home-empty { color: var(--app-muted); font-size: 0.9rem; padding: 0.5rem; }
