@@ -20,6 +20,7 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
@@ -115,6 +116,11 @@ class TenantProvisioningHandler(
     @Transactional
     fun getInviteMaterial(inviteId: String, req: GetInviteMaterialRequest): TenantInviteMaterial {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
+        if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
+        if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
+        if (invite.kind != InviteKind.MEMBER.name) {
+            throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites expose temp-wrapped onboarding material")
+        }
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }

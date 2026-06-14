@@ -10,9 +10,11 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.Tenant
+import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
@@ -23,6 +25,7 @@ import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
 import org.hamcrest.CoreMatchers.nullValue
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
@@ -35,6 +38,7 @@ class InviteMembersRolesSliceTest {
     @Inject lateinit var scopes: ScopeRepository
     @Inject lateinit var grants: ScopeGrantRepository
     @Inject lateinit var memberships: MembershipRepository
+    @Inject lateinit var invites: TenantInviteRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
@@ -177,6 +181,33 @@ class InviteMembersRolesSliceTest {
             .body("user.email", `is`("im-newmember@example.com"))
             .body("tenant.status", `is`("ACTIVE"))
             .extract().path<String>("sessionToken")
+
+        // consumed, expired and revoked invites no longer release temp-wrapped material even with the secret
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$bootstrapSecret"}""")
+            .post("/api/tenant-invites/$inviteId/material").then().statusCode(409)
+            .body("code", `is`("INVITE_NOT_PENDING"))
+        val expiredInvite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(memberInviteBody("Member"))
+            .post("/api/tenants/$tenantId/member-invites").then().statusCode(200).extract()
+        val expiredInviteId = expiredInvite.path<String>("inviteId")
+        val expiredSecret = expiredInvite.path<String>("bootstrapSecret")
+        QuarkusTransaction.requiringNew().run {
+            invites.findById(expiredInviteId)!!.expiresAt = Instant.now().minus(1, ChronoUnit.DAYS)
+        }
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$expiredSecret"}""")
+            .post("/api/tenant-invites/$expiredInviteId/material").then().statusCode(409)
+            .body("code", `is`("INVITE_EXPIRED"))
+        val revokedInvite = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body(memberInviteBody("Member"))
+            .post("/api/tenants/$tenantId/member-invites").then().statusCode(200).extract()
+        val revokedInviteId = revokedInvite.path<String>("inviteId")
+        val revokedSecret = revokedInvite.path<String>("bootstrapSecret")
+        QuarkusTransaction.requiringNew().run {
+            invites.findById(revokedInviteId)!!.status = InviteStatus.REVOKED.name
+        }
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$revokedSecret"}""")
+            .post("/api/tenant-invites/$revokedInviteId/material").then().statusCode(409)
+            .body("code", `is`("INVITE_NOT_PENDING"))
 
         // the new user reads the existing scope's public key back + their own wrapped grant
         given().header("Authorization", "Bearer $session")

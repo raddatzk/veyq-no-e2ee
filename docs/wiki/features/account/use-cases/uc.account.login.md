@@ -53,6 +53,8 @@ C -> S : enroll device (add device wrap, ciphertext only)
 - A3 — **New device, device-to-device:** an existing trusted device approves the new one and wraps the
   Master Key to it (like linking a messenger app) — **no Secret Key or password-unlock needed**.
 - A4 — **Logout:** the session is dropped; the device **stays trusted** (the device wrap is retained).
+- A4b — **Expired session cleanup:** expired session rows are swept opportunistically or by the
+  scheduled job; still-valid sessions remain usable.
 - A5 — **Deauthorize device** (e.g. lost device): the device wrap is removed → the device forgets the
   keys; ties into two-layer revocation ([AD-24](../../../decisions/README.md)).
 - E1 — **Authenticated but locked:** auth succeeds but unlock fails (wrong Secret Key, no PRF) → the UI

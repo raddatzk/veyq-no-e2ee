@@ -52,3 +52,11 @@ acceptanceCriteria:
           - testName: loginUnlockAndSession
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/account/login/LoginSliceTest.kt
+  - id: uc.account.login.session-hygiene
+    statement: Expired sessions are swept without dropping still-valid sessions.
+    coverage:
+      backend:
+        integration:
+          - testName: purgeExpiredDropsOnlyExpiredRows
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/SessionGcTest.kt
