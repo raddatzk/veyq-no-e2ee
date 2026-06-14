@@ -132,6 +132,20 @@ export function slugToken(contentKey: Uint8Array, parentSlot: string, slug: stri
   return hmac(sha256, slugKey, utf8(slug))
 }
 
+/**
+ * Chunked-AEAD frame (resumable upload + segmented streaming): a large blob is split into independent,
+ * self-contained frames so chunks resume individually and segments decrypt without the whole file. Each
+ * frame = nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad) with aad = u32be(index) || u32be(total),
+ * binding the chunk's position so a dropped, reordered or appended frame fails to open (anti-truncation).
+ */
+const frameAad = (index: number, total: number): Uint8Array => concat(u32be(index), u32be(total))
+export function sealFrame(contentKey: Uint8Array, index: number, total: number, plaintext: Uint8Array, nonce: Uint8Array): Uint8Array {
+  return concat(nonce, aeadSeal(contentKey, nonce, plaintext, frameAad(index, total)))
+}
+export function openFrame(contentKey: Uint8Array, index: number, total: number, frame: Uint8Array): Uint8Array {
+  return aeadOpen(contentKey, frame.slice(0, 12), frame.slice(12), frameAad(index, total))
+}
+
 export const kekPasswordSecret = (
   secretKey: Uint8Array,
   password: string,

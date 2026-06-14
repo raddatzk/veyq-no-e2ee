@@ -59,5 +59,14 @@ class V1ConformanceTest {
             slug.getString("token"),
             hex(V1.slugToken(unhex(slug.getString("contentKey")), slug.getString("parentSlot"), slug.getString("slug"))),
         )
+        val f = v.getJSONObject("chunk_frame")
+        assertEquals(
+            f.getString("frame"),
+            hex(V1.sealFrame(unhex(f.getString("contentKey")), f.getInt("index"), f.getInt("total"), unhex(f.getString("plaintext")), unhex(f.getString("nonce")))),
+        )
+        assertEquals(
+            f.getString("plaintext"),
+            hex(V1.openFrame(unhex(f.getString("contentKey")), f.getInt("index"), f.getInt("total"), unhex(f.getString("frame")))),
+        )
     }
 }

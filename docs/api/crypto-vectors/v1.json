@@ -81,5 +81,14 @@
     "parentSlot": "b6b1f2c0-0000-4000-8000-00000000aa01",
     "slug": "italien-2026-caf\u00e9",
     "token": "7bab374606a8ff5d04d1ebdc6ed6226524f64d242219dfdcaf6e592f5e21c868"
+  },
+  "chunk_frame": {
+    "note": "Chunked-AEAD frame: nonce(12) || AEAD(contentKey, nonce, plaintext, aad) with aad = u32be(index) || u32be(total). For resumable upload + segmented streaming.",
+    "contentKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "nonce": "a0a1a2a3a4a5a6a7a8a9aaab",
+    "plaintext": "89504e470d0a1a0a",
+    "index": 2,
+    "total": 4,
+    "frame": "a0a1a2a3a4a5a6a7a8a9aaab6f48326a48c118b5729a770476c35c0c21d1600ebcc93105"
   }
 }

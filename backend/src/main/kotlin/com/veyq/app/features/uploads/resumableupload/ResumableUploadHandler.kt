@@ -1,0 +1,153 @@
+package com.veyq.app.features.uploads.resumableupload
+
+import com.veyq.app.generated.model.Blob
+import com.veyq.app.generated.model.ChunkResponse
+import com.veyq.app.generated.model.CreateUploadRequest
+import com.veyq.app.generated.model.PutChunkRequest
+import com.veyq.app.generated.model.UploadProgress
+import com.veyq.app.generated.model.UploadSession as ApiUploadSession
+import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.MediaChunk
+import com.veyq.app.shared.content.MediaChunkRepository
+import com.veyq.app.shared.content.NodeRepository
+import com.veyq.app.shared.content.ScopeContentKeyRepository
+import com.veyq.app.shared.content.UploadSession
+import com.veyq.app.shared.content.UploadSessionRepository
+import com.veyq.app.shared.content.UploadStatus
+import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
+import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.storage.BlobStore
+import com.veyq.app.shared.tenancy.MembershipRepository
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.Base64
+import java.util.UUID
+
+/**
+ * uc.uploads.resumable-upload — chunked, resumable media upload. A large media is split into independent
+ * AEAD frames; the ciphertext frames go to the BlobStore (not the DB) and the manifest tracks which indices
+ * landed. The session survives interruptions: the client asks which chunks exist and re-sends only the
+ * missing ones, then finalizes. The server only ever moves opaque frames — it is blind to the media.
+ */
+@ApplicationScoped
+class ResumableUploadHandler(
+    private val scopes: ScopeRepository,
+    private val grants: ScopeGrantRepository,
+    private val nodes: NodeRepository,
+    private val contentKeys: ScopeContentKeyRepository,
+    private val sessions: UploadSessionRepository,
+    private val chunks: MediaChunkRepository,
+    private val blobs: BlobStore,
+    private val memberships: MembershipRepository,
+    private val auth: SessionService,
+) {
+    private val enc = Base64.getUrlEncoder().withoutPadding()
+    private val dec = Base64.getUrlDecoder()
+
+    @Transactional
+    fun createUpload(authz: String?, scopeId: String, nodeId: String, req: CreateUploadRequest): ApiUploadSession {
+        val userId = requireKeyHolder(scopeId, authz)
+        requireMemoryNode(scopeId, nodeId)
+        contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before uploading")
+        if (req.totalChunks <= 0) throw ApiException(400, "INVALID_CHUNK_COUNT", "totalChunks must be positive")
+        if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
+        val s = UploadSession().apply {
+            id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
+            totalChunks = req.totalChunks; mimeType = req.mimeType; byteSize = req.byteSize
+            takenAt = req.takenAt.toInstant(); status = UploadStatus.OPEN.name; createdBy = userId; createdAt = Instant.now()
+        }
+        sessions.persist(s)
+        return toApi(s)
+    }
+
+    @Transactional
+    fun putChunk(authz: String?, uploadId: String, index: Int, req: PutChunkRequest) {
+        val s = requireSessionHolder(uploadId, authz)
+        if (s.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
+        if (index < 0 || index >= s.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
+        val frame = dec.decode(req.frame.bytes)
+        val key = "$uploadId/$index"
+        blobs.put(key, frame) // idempotent overwrite — re-PUT on resume is harmless
+        val existing = chunks.find(uploadId, index)
+        if (existing == null) {
+            chunks.persist(
+                MediaChunk().apply {
+                    id = UUID.randomUUID().toString(); this.uploadId = uploadId; chunkIndex = index
+                    objectKey = key; byteSize = frame.size.toLong(); createdAt = Instant.now()
+                },
+            )
+        } else {
+            existing.byteSize = frame.size.toLong()
+        }
+    }
+
+    @Transactional
+    fun getUpload(authz: String?, uploadId: String): UploadProgress {
+        val s = requireSessionHolder(uploadId, authz)
+        return UploadProgress(
+            uploadId = s.id,
+            totalChunks = s.totalChunks,
+            receivedChunks = chunks.listByUploadId(uploadId).map { it.chunkIndex },
+            status = UploadProgress.Status.valueOf(s.status),
+        )
+    }
+
+    @Transactional
+    fun completeUpload(authz: String?, uploadId: String): ApiUploadSession {
+        val s = requireSessionHolder(uploadId, authz)
+        if (s.status == UploadStatus.COMPLETED.name) return toApi(s) // idempotent
+        val received = chunks.listByUploadId(uploadId).map { it.chunkIndex }.toSet()
+        if (received != (0 until s.totalChunks).toSet()) {
+            throw ApiException(409, "INCOMPLETE_UPLOAD", "Not all chunks have been uploaded")
+        }
+        s.status = UploadStatus.COMPLETED.name
+        return toApi(s)
+    }
+
+    @Transactional
+    fun getChunk(authz: String?, uploadId: String, index: Int): ChunkResponse {
+        val s = requireSessionHolder(uploadId, authz)
+        val chunk = chunks.find(uploadId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
+        val frame = blobs.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
+        return ChunkResponse(frame = Blob(suiteId = "v1", bytes = enc.encodeToString(frame)))
+    }
+
+    private fun toApi(s: UploadSession): ApiUploadSession =
+        ApiUploadSession(
+            uploadId = s.id, scopeId = s.scopeId, nodeId = s.nodeId, totalChunks = s.totalChunks,
+            mimeType = s.mimeType, byteSize = s.byteSize,
+            takenAt = OffsetDateTime.ofInstant(s.takenAt, ZoneOffset.UTC),
+            status = ApiUploadSession.Status.valueOf(s.status),
+            createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC),
+        )
+
+    /** Resolve the session and gate on holding its scope (any key-holder may contribute, like add-media). */
+    private fun requireSessionHolder(uploadId: String, authz: String?): UploadSession {
+        val s = sessions.findById(uploadId) ?: throw ApiException(404, "UPLOAD_NOT_FOUND", "Upload not found")
+        requireKeyHolder(s.scopeId, authz)
+        return s
+    }
+
+    private fun requireMemoryNode(scopeId: String, nodeId: String) {
+        val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
+        if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
+        if (node.type != "MEMORY" && node.type != "CHAPTER") {
+            throw ApiException(400, "NOT_A_MEMORY", "Media can only be attached to a Memory or Chapter")
+        }
+    }
+
+    private fun requireKeyHolder(scopeId: String, authz: String?): String {
+        val userId = auth.resolve(authz) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
+        val scope = scopes.findById(scopeId) ?: throw ApiException(404, "NOT_FOUND", "Scope not found")
+        grants.find(scope.id, userId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
+        val tenantId = scope.tenantId
+        if (tenantId != null && memberships.find(tenantId, userId)?.status != "ACTIVE") {
+            throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
+        }
+        return userId
+    }
+}

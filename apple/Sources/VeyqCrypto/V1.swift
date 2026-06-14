@@ -128,6 +128,17 @@ public enum V1 {
         return Data(mac)
     }
 
+    /// Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
+    /// plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
+    /// reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).
+    private static func frameAad(_ index: Int, _ total: Int) -> Data { u32be(index) + u32be(total) }
+    public static func sealFrame(contentKey: Data, index: Int, total: Int, plaintext: Data, nonce: Data) throws -> Data {
+        nonce + (try aeadSeal(key: contentKey, nonce: nonce, plaintext: plaintext, aad: frameAad(index, total)))
+    }
+    public static func openFrame(contentKey: Data, index: Int, total: Int, frame: Data) throws -> Data {
+        try aeadOpen(key: contentKey, nonce: Data(frame.prefix(12)), aead: Data(frame.dropFirst(12)), aad: frameAad(index, total))
+    }
+
     // ---- Per-method KEKs ----
     static func argon2id(input: Data, salt: Data, params: ArgonParams) throws -> Data {
         // libsodium crypto_pwhash: opsLimit = t, memLimit = m KiB * 1024 (bytes), p is fixed at 1.

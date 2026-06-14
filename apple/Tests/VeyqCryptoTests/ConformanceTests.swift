@@ -83,5 +83,15 @@ final class ConformanceTests: XCTestCase {
         XCTAssertEqual(
             toHex(V1.slugToken(contentKey: hex(slug["contentKey"]!), parentSlot: slug["parentSlot"]!, slug: slug["slug"]!)),
             slug["token"]!, "blinded slug token")
+
+        let f = v["chunk_frame"] as! [String: Any]
+        XCTAssertEqual(
+            toHex(try V1.sealFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,
+                                   plaintext: hex(f["plaintext"] as! String), nonce: hex(f["nonce"] as! String))),
+            f["frame"] as! String, "chunked-AEAD frame")
+        XCTAssertEqual(
+            toHex(try V1.openFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,
+                                   frame: hex(f["frame"] as! String))),
+            f["plaintext"] as! String, "chunked-AEAD frame open")
     }
 }

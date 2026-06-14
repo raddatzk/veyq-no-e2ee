@@ -155,6 +155,17 @@ object V1 {
         return mac.doFinal(nfc)
     }
 
+    /**
+     * Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
+     * plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
+     * reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).
+     */
+    private fun frameAad(index: Int, total: Int): ByteArray = u32be(index) + u32be(total)
+    fun sealFrame(contentKey: ByteArray, index: Int, total: Int, plaintext: ByteArray, nonce: ByteArray): ByteArray =
+        nonce + aeadSeal(contentKey, nonce, plaintext, frameAad(index, total))
+    fun openFrame(contentKey: ByteArray, index: Int, total: Int, frame: ByteArray): ByteArray =
+        aeadOpen(contentKey, frame.copyOfRange(0, 12), frame.copyOfRange(12, frame.size), frameAad(index, total))
+
     private fun argon2id(input: ByteArray, salt: ByteArray, params: ArgonParams): ByteArray {
         val gen = Argon2BytesGenerator()
         gen.init(
