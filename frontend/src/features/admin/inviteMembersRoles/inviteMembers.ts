@@ -4,6 +4,7 @@
 import * as v1 from '../../../shared/crypto/v1'
 import { getMyScopeGrant, openScopeGrant } from '../createTenantInviteOwner/tenant'
 import { getInviteMetadata, getInviteMaterial, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
+import { decodeNode, resealNode, slugTokenFor, type MemoryNode } from '../../memory/createTree/memoryTree'
 import type { UnlockedSession } from '../../account/login/login'
 
 function b64url(b: Uint8Array): string {
@@ -66,6 +67,7 @@ export async function rotateScope(
   const myGrant = await getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
   let wrappedContentKey: { suiteId: string; bytes: string } | undefined
   let reSealedItems: { id: string; sealedContent: { suiteId: string; bytes: string } }[] | undefined
+  let reSealedNodes: { id: string; slugToken: string; sealedContent: { suiteId: string; bytes: string } }[] | undefined
   const ckRes = await fetch(`${apiBase}/api/scopes/${myGrant.scopeId}/content-key`, { headers: { authorization: `Bearer ${owner.sessionToken}` } })
   if (ckRes.ok) {
     const oldScopePriv = openScopeGrant(myGrant, owner.identity, owner.identityPublicKey.kemPublicKey)
@@ -87,6 +89,15 @@ export async function rotateScope(
       const nonce = v1.randomBytes(12)
       return { id: it.id, sealedContent: { suiteId: 'v1', bytes: b64url(v1.concat(nonce, v1.aeadSeal(newCk, nonce, pt, EMPTY))) } }
     })
+
+    // Memory-tree nodes are sealed under the content key too (name + slug → slug token). Re-seal each under
+    // the fresh key and recompute its slug token, or names orphan and a removed member's cached key reads them.
+    const nodesRes = await fetch(`${apiBase}/api/scopes/${myGrant.scopeId}/nodes`, { headers: { authorization: `Bearer ${owner.sessionToken}` } })
+    if (!nodesRes.ok) throw new Error(`node list failed: ${nodesRes.status}`)
+    reSealedNodes = (await nodesRes.json()).nodes.map((n: MemoryNode) => {
+      const content = decodeNode(oldCk, n)
+      return { id: n.id, slugToken: slugTokenFor(newCk, content.slug), sealedContent: { suiteId: 'v1', bytes: b64url(resealNode(newCk, content)) } }
+    })
   } else if (ckRes.status !== 404) throw new Error(`content-key fetch failed: ${ckRes.status}`)
 
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope/rotate`, {
@@ -97,6 +108,7 @@ export async function rotateScope(
       grants,
       ...(wrappedContentKey ? { wrappedContentKey } : {}),
       ...(reSealedItems ? { reSealedItems } : {}),
+      ...(reSealedNodes ? { reSealedNodes } : {}),
     }),
   })
   if (!res.ok) throw new Error(`rotate scope failed: ${res.status} ${await res.text()}`)

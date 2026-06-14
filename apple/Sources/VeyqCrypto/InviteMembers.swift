@@ -15,9 +15,10 @@ public enum InviteMembers {
     struct TenantMemberListDTO: Codable { let members: [TenantMemberDTO] }
     struct ScopeGrantInputDTO: Codable { let userId: String; let wrappedScopePrivateKey: BlobDTO }
     struct ScopeItemResealDTO: Codable { let id: String; let sealedContent: BlobDTO }
+    struct ScopeNodeResealDTO: Codable { let id: String; let slugToken: String; let sealedContent: BlobDTO }
     struct RotateScopeRequestDTO: Codable {
         let scopePublicKey: KemPublicKeyDTO; let grants: [ScopeGrantInputDTO]
-        let wrappedContentKey: BlobDTO?; let reSealedItems: [ScopeItemResealDTO]?
+        let wrappedContentKey: BlobDTO?; let reSealedItems: [ScopeItemResealDTO]?; let reSealedNodes: [ScopeNodeResealDTO]?
     }
     struct ContentKeyDTO: Codable { let wrappedContentKey: BlobDTO }
     struct RotateItemDTO: Codable { let id: String; let sealedContent: BlobDTO }
@@ -55,6 +56,7 @@ public enum InviteMembers {
         let myGrant = try await Tenant.getMyScopeGrant(apiBase: apiBase, token: owner.sessionToken, tenantId: tenantId)
         var wrappedContentKey: BlobDTO? = nil
         var reSealedItems: [ScopeItemResealDTO]? = nil
+        var reSealedNodes: [ScopeNodeResealDTO]? = nil
         var ckReq = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(myGrant.scopeId)/content-key")!)
         ckReq.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")
         let (ckData, ckResp) = try await URLSession.shared.data(for: ckReq)
@@ -82,13 +84,23 @@ public enum InviteMembers {
                 let resealed = nonce + (try V1.aeadSeal(key: newCk, nonce: nonce, plaintext: pt, aad: Data()))
                 return ScopeItemResealDTO(id: it.id, sealedContent: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(resealed)))
             }
+
+            // Memory-tree nodes are sealed under the content key too — re-seal each + recompute its slug token.
+            let scopeNodes = try await MemoryTree.listNodes(apiBase: apiBase, session: owner, scopeId: myGrant.scopeId)
+            reSealedNodes = try scopeNodes.map { n in
+                let content = try MemoryTree.decodeNode(contentKey: oldCk, node: n)
+                let resealed = try MemoryTree.resealNode(contentKey: newCk, content: content)
+                return ScopeNodeResealDTO(
+                    id: n.id, slugToken: MemoryTree.slugTokenFor(contentKey: newCk, slug: content.slug),
+                    sealedContent: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(resealed)))
+            }
         } else if ckCode != 404 {
             throw NSError(domain: "veyq.rotate", code: 3, userInfo: [NSLocalizedDescriptionKey: "content-key fetch failed: \(ckCode)"])
         }
 
         let req = RotateScopeRequestDTO(
             scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(newScope.pubKemX + newScope.pubKemM)), grants: grants,
-            wrappedContentKey: wrappedContentKey, reSealedItems: reSealedItems)
+            wrappedContentKey: wrappedContentKey, reSealedItems: reSealedItems, reSealedNodes: reSealedNodes)
         var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/scope/rotate")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(owner.sessionToken)", forHTTPHeaderField: "Authorization")

@@ -1,5 +1,7 @@
 package com.veyq.app.features.admin.invitemembersroles
 
+import com.veyq.app.shared.content.Node
+import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
@@ -39,6 +41,7 @@ class InviteMembersRolesSliceTest {
     @Inject lateinit var grants: ScopeGrantRepository
     @Inject lateinit var memberships: MembershipRepository
     @Inject lateinit var invites: TenantInviteRepository
+    @Inject lateinit var nodes: NodeRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
@@ -115,6 +118,11 @@ class InviteMembersRolesSliceTest {
                 })
                 memberships.persist(Membership().apply {
                     id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
+                })
+                // a Memory-tree node in the rotation scope — rotation must re-seal it under the fresh key too
+                nodes.persist(Node().apply {
+                    id = "im-rot-node"; scopeId = rotScopeId; parentId = rotScopeId; type = "MEMORY"
+                    slugToken = "rot-tok-old"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now
                 })
 
                 // dedicated role-change tenant: one Owner + one Member, no grants (role ≠ access)
@@ -322,12 +330,23 @@ class InviteMembersRolesSliceTest {
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("CONTENT_KEY_REQUIRED"))
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw"))
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("RESEAL_REQUIRED"))
-        // a fresh content key + (empty) re-seal set succeeds; the stored content key is the fresh one
+        // items re-sealed but the nodes left out — rejected (Memory-tree names would orphan / leak to a cached key)
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]"))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("RESEAL_NODES_REQUIRED"))
+        // an empty node re-seal does not cover the scope's node — rejected
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]", "[]"))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("INCOMPLETE_NODE_RESEAL"))
+        // a fresh content key + items + the node re-sealed (new sealed name + new slug token) succeeds
+        val nodeReseal = """[{"id":"im-rot-node","slugToken":"rot-tok-new","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZQ"}}]"""
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]", nodeReseal))
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(200)
         given().header("Authorization", ownerToken)
             .get("/api/scopes/$rotScopeId/content-key").then().statusCode(200)
             .body("wrappedContentKey.bytes", `is`("ZnJlc2hjaw"))
+        // the node now carries the new slug token + re-sealed name
+        given().header("Authorization", ownerToken).get("/api/scopes/$rotScopeId/nodes").then().statusCode(200)
+            .body("nodes[0].slugToken", `is`("rot-tok-new"))
+            .body("nodes[0].sealedContent.bytes", `is`("bmV3bmFtZQ"))
     }
 
     @Test
@@ -353,13 +372,20 @@ class InviteMembersRolesSliceTest {
             .body("role", `is`("Member"))
     }
 
-    private fun rotateBody(scopePub: String, grants: List<Pair<String, String>>, contentKey: String? = null, reSealed: String? = null): String {
+    private fun rotateBody(
+        scopePub: String,
+        grants: List<Pair<String, String>>,
+        contentKey: String? = null,
+        reSealed: String? = null,
+        reSealedNodes: String? = null,
+    ): String {
         val grantsJson = grants.joinToString(",") { (uid, bytes) ->
             """{"userId":"$uid","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$bytes"}}"""
         }
         val ck = if (contentKey != null) ""","wrappedContentKey":{"suiteId":"v1","bytes":"$contentKey"}""" else ""
         val rs = if (reSealed != null) ""","reSealedItems":$reSealed""" else ""
-        return """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePub"},"grants":[$grantsJson]$ck$rs}"""
+        val rn = if (reSealedNodes != null) ""","reSealedNodes":$reSealedNodes""" else ""
+        return """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePub"},"grants":[$grantsJson]$ck$rs$rn}"""
     }
 
     private fun memberInviteBody(role: String) = """

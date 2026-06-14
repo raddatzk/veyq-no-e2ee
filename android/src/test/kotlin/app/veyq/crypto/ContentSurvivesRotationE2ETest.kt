@@ -1,6 +1,7 @@
 package app.veyq.crypto
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -23,6 +24,8 @@ class ContentSurvivesRotationE2ETest {
         val scopeBefore = ScopeContent.openTenantScope(apiBase, a, t1.getString("id"))
         val ckBefore = ScopeContent.getOrCreateContentKey(apiBase, a, scopeBefore)
         ScopeContent.writeItem(apiBase, a, scopeBefore, ckBefore, "trip notes")
+        // also a Memory-tree node (name + slug sealed under the content key), to prove the tree survives rotation
+        val nodeBefore = MemoryTree.createNode(apiBase, a, scopeBefore.scopeId, ckBefore, "FOLDER", "Urlaube", "urlaube", 0)
 
         // member B joins T1 via a temp-wrap invite
         val bPass = "a whole new passphrase entirely"
@@ -45,6 +48,18 @@ class ContentSurvivesRotationE2ETest {
         var oldKeyFailed = false
         try { ScopeContent.readItems(apiBase, a, aScope, ckBefore) } catch (e: Exception) { oldKeyFailed = true }
         assertTrue(oldKeyFailed, "old content key must not decrypt re-sealed content")
+
+        // the Memory-tree node was re-sealed too: its name reads under the fresh key, its slug token was
+        // recomputed under the fresh key, and the cached old key can no longer decrypt the node name
+        val nodesAfter = MemoryTree.listNodes(apiBase, a, aScope.scopeId)
+        var node: org.json.JSONObject? = null
+        for (i in 0 until nodesAfter.length()) if (nodesAfter.getJSONObject(i).getString("id") == nodeBefore.getString("id")) node = nodesAfter.getJSONObject(i)
+        assertEquals("Urlaube", MemoryTree.decodeNodeName(aCk, node!!))
+        assertEquals(MemoryTree.slugTokenFor(aCk, "urlaube"), node.getString("slugToken"))
+        assertFalse(node.getString("slugToken") == nodeBefore.getString("slugToken"))
+        var oldKeyNodeFailed = false
+        try { MemoryTree.decodeNode(ckBefore, node) } catch (e: Exception) { oldKeyNodeFailed = true }
+        assertTrue(oldKeyNodeFailed, "old content key must not decrypt the re-sealed node")
 
         // and B — granted only at rotation — reads content written before B even joined
         val bScope = ScopeContent.openTenantScope(apiBase, b, t1.getString("id"))

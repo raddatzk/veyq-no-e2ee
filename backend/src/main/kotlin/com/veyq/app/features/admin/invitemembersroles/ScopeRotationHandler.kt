@@ -30,6 +30,7 @@ class ScopeRotationHandler(
     private val grants: ScopeGrantRepository,
     private val contentKeys: com.veyq.app.shared.content.ScopeContentKeyRepository,
     private val items: com.veyq.app.shared.content.ScopeItemRepository,
+    private val nodes: com.veyq.app.shared.content.NodeRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -91,6 +92,18 @@ class ScopeRotationHandler(
             if (reSealedIds.toSet() != scopeItems.map { it.id }.toSet()) {
                 throw ApiException(400, "INCOMPLETE_RESEAL", "Rotation must re-seal exactly the scope's items")
             }
+            // Memory-tree nodes are sealed under the content key too (name + blinded slug token), so they
+            // must be re-sealed under the fresh key as well — otherwise their names become unreadable to
+            // members holding the new key, and a removed member's cached old key could still read them.
+            val reSealedNodes = req.reSealedNodes
+                ?: throw ApiException(400, "RESEAL_NODES_REQUIRED", "The scope has content — re-seal its nodes under the new content key")
+            val scopeNodes = nodes.listByScopeId(scope.id)
+            val reSealedNodeIds = reSealedNodes.map { it.id }
+            if (reSealedNodeIds.size != reSealedNodeIds.toSet().size) throw ApiException(400, "DUPLICATE_NODE", "Duplicate node in re-seal")
+            if (reSealedNodeIds.toSet() != scopeNodes.map { it.id }.toSet()) {
+                throw ApiException(400, "INCOMPLETE_NODE_RESEAL", "Rotation must re-seal exactly the scope's nodes")
+            }
+
             contentKey.suiteId = newCk.suiteId
             contentKey.wrappedKey = dec.decode(newCk.bytes)
             val byId = scopeItems.associateBy { it.id }
@@ -99,6 +112,14 @@ class ScopeRotationHandler(
                 val item = byId.getValue(rs.id)
                 item.suiteId = rs.sealedContent.suiteId
                 item.sealedContent = dec.decode(rs.sealedContent.bytes)
+            }
+            val nodeById = scopeNodes.associateBy { it.id }
+            reSealedNodes.forEach { rn ->
+                requireSuite(rn.sealedContent.suiteId)
+                val node = nodeById.getValue(rn.id)
+                node.suiteId = rn.sealedContent.suiteId
+                node.sealedContent = dec.decode(rn.sealedContent.bytes)
+                node.slugToken = rn.slugToken
             }
         }
 

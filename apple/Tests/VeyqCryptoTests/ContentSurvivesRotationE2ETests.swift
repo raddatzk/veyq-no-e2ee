@@ -20,6 +20,8 @@ final class ContentSurvivesRotationE2ETests: XCTestCase {
         let scopeBefore = try await ScopeContent.openTenantScope(apiBase: apiBase, session: a, tenantId: t1.id)
         let ckBefore = try await ScopeContent.getOrCreateContentKey(apiBase: apiBase, session: a, scope: scopeBefore)
         try await ScopeContent.writeItem(apiBase: apiBase, session: a, scope: scopeBefore, contentKey: ckBefore, plaintext: "trip notes")
+        // also a Memory-tree node (name + slug sealed under the content key), to prove the tree survives rotation
+        let nodeBefore = try await MemoryTree.createNode(apiBase: apiBase, session: a, scopeId: scopeBefore.scopeId, contentKey: ckBefore, type: "FOLDER", name: "Urlaube", slug: "urlaube", orderIndex: 0)
 
         // member B joins T1 via a temp-wrap invite
         let bPass = "a whole new passphrase entirely"
@@ -45,6 +47,17 @@ final class ContentSurvivesRotationE2ETests: XCTestCase {
         do { _ = try await ScopeContent.readItems(apiBase: apiBase, session: a, scope: aScope, contentKey: ckBefore) }
         catch { oldKeyFailed = true }
         XCTAssertTrue(oldKeyFailed, "old content key must not decrypt re-sealed content")
+
+        // the Memory-tree node was re-sealed too: its name reads under the fresh key, its slug token was
+        // recomputed under the fresh key, and the cached old key can no longer decrypt the node name
+        let nodesAfter = try await MemoryTree.listNodes(apiBase: apiBase, session: a, scopeId: aScope.scopeId)
+        let node = nodesAfter.first { $0.id == nodeBefore.id }!
+        XCTAssertEqual(try MemoryTree.decodeNode(contentKey: aCk, node: node).name, "Urlaube")
+        XCTAssertEqual(node.slugToken, MemoryTree.slugTokenFor(contentKey: aCk, slug: "urlaube"))
+        XCTAssertNotEqual(node.slugToken, nodeBefore.slugToken)
+        var oldKeyNodeFailed = false
+        do { _ = try MemoryTree.decodeNode(contentKey: ckBefore, node: node) } catch { oldKeyNodeFailed = true }
+        XCTAssertTrue(oldKeyNodeFailed, "old content key must not decrypt the re-sealed node")
 
         // and B — granted only at rotation — reads content written before B even joined
         let bScope = try await ScopeContent.openTenantScope(apiBase: apiBase, session: b, tenantId: t1.id)

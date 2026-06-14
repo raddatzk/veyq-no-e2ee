@@ -73,8 +73,20 @@ object InviteMembers {
                 val resealed = nonce + V1.aeadSeal(newCk, nonce, pt, ByteArray(0))
                 reSealedParts.add("""{"id":"${it.getString("id")}","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
             }
+
+            // Memory-tree nodes are sealed under the content key too — re-seal each + recompute its slug token
+            val nodesArr = MemoryTree.listNodes(apiBase, owner, myGrant.getString("scopeId"))
+            val reSealedNodeParts = mutableListOf<String>()
+            for (i in 0 until nodesArr.length()) {
+                val n = nodesArr.getJSONObject(i)
+                val content = MemoryTree.decodeNode(oldCk, n)
+                val resealed = MemoryTree.resealNode(newCk, content)
+                val token = MemoryTree.slugTokenFor(newCk, content.getString("slug"))
+                reSealedNodeParts.add("""{"id":"${n.getString("id")}","slugToken":"$token","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
+            }
             ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"},""" +
-                """"reSealedItems":[${reSealedParts.joinToString(",")}]"""
+                """"reSealedItems":[${reSealedParts.joinToString(",")}],""" +
+                """"reSealedNodes":[${reSealedNodeParts.joinToString(",")}]"""
         } else if (ckResp.statusCode() != 404) {
             throw RuntimeException("content-key fetch failed: ${ckResp.statusCode()}")
         }

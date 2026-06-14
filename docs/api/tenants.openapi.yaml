@@ -374,6 +374,14 @@ components:
       properties:
         id: { type: string }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    ScopeNodeReseal:
+      type: object
+      description: A Memory-tree node re-sealed under the fresh content key — new sealed name + new slug token.
+      required: [id, slugToken, sealedContent]
+      properties:
+        id: { type: string }
+        slugToken: { type: string, description: 'The blinded slug token recomputed under the fresh content key.' }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ScopeGrantInput:
       type: object
       required: [userId, wrappedScopePrivateKey]
@@ -401,6 +409,13 @@ components:
             Required iff the scope has a content key — every existing item re-sealed under the fresh
             content key, so existing content stays readable. Must cover exactly the scope's current items.
           items: { $ref: '#/components/schemas/ScopeItemReseal' }
+        reSealedNodes:
+          type: array
+          description: >
+            Required iff the scope has a content key — every Memory-tree node re-sealed under the fresh
+            content key (new sealed name + recomputed slug token). Must cover exactly the scope's current
+            nodes, or their names become unreadable and a removed member's cached key could still read them.
+          items: { $ref: '#/components/schemas/ScopeNodeReseal' }
     RotateScopeResponse:
       type: object
       required: [scopeId, memberCount]

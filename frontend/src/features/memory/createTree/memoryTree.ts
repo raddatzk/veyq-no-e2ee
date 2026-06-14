@@ -30,7 +30,10 @@ export type MemoryNode = {
 
 export type CreateNode = { type: NodeType; name: string; slug: string; orderIndex: number; parentId?: string }
 
-/** Create one node: the name is sealed under the content key, the slug becomes a blinded token. */
+/** A node's decrypted metadata. The slug is sealed alongside the name so rotation can recompute the token. */
+export type NodeContent = { name: string; slug: string }
+
+/** Create one node: {name, slug} is sealed under the content key, the slug becomes a blinded token. */
 export async function createNode(
   apiBase: string,
   session: UnlockedSession,
@@ -39,7 +42,8 @@ export async function createNode(
   node: CreateNode,
 ): Promise<MemoryNode> {
   const nonce = v1.randomBytes(12)
-  const sealed = v1.concat(nonce, v1.aeadSeal(contentKey, nonce, v1.utf8(node.name), EMPTY))
+  const payload = v1.utf8(JSON.stringify({ name: node.name, slug: node.slug }))
+  const sealed = v1.concat(nonce, v1.aeadSeal(contentKey, nonce, payload, EMPTY))
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
@@ -62,10 +66,22 @@ export async function listNodes(apiBase: string, session: UnlockedSession, scope
   return (await res.json()).nodes
 }
 
-/** Decrypt a node's sealed name with the scope content key. */
-export function decodeNodeName(contentKey: Uint8Array, node: MemoryNode): string {
+/** Decrypt a node's sealed metadata ({name, slug}) with the scope content key. */
+export function decodeNode(contentKey: Uint8Array, node: MemoryNode): NodeContent {
   const sealed = fromB64url(node.sealedContent.bytes)
-  return new TextDecoder().decode(v1.aeadOpen(contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY))
+  const pt = new TextDecoder().decode(v1.aeadOpen(contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY))
+  return JSON.parse(pt)
+}
+
+/** Convenience: a node's decrypted display name. */
+export function decodeNodeName(contentKey: Uint8Array, node: MemoryNode): string {
+  return decodeNode(contentKey, node).name
+}
+
+/** Re-seal a node's metadata under a fresh content key, returning the new sealed blob (nonce || AEAD). */
+export function resealNode(contentKey: Uint8Array, content: NodeContent): Uint8Array {
+  const nonce = v1.randomBytes(12)
+  return v1.concat(nonce, v1.aeadSeal(contentKey, nonce, v1.utf8(JSON.stringify(content)), EMPTY))
 }
 
 /** The blinded slug token for a slug under a scope's content key (matches what the server stored). */

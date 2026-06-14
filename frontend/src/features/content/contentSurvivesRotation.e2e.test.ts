@@ -5,6 +5,7 @@ import { login } from '../account/login/login'
 import { createTenant, issueOwnerInvite, claimTenantOwnership } from '../admin/createTenantInviteOwner/tenant'
 import { issueMemberInvite, registerViaMemberInvite, rotateScope } from '../admin/inviteMembersRoles/inviteMembers'
 import { openTenantScope, getOrCreateContentKey, writeItem, readItems } from './scopeContent'
+import { createNode, listNodes, decodeNode, slugTokenFor } from '../memory/createTree/memoryTree'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -23,6 +24,8 @@ suite('content survives scope rotation E2E (web -> live backend)', () => {
     const scopeBefore = await openTenantScope(apiBase, a, t1.id)
     const ckBefore = await getOrCreateContentKey(apiBase, a, scopeBefore)
     await writeItem(apiBase, a, scopeBefore, ckBefore, 'trip notes')
+    // also a Memory-tree node (name + slug sealed under the content key), to prove the tree survives rotation
+    const nodeBefore = await createNode(apiBase, a, scopeBefore.scopeId, ckBefore, { type: 'FOLDER', name: 'Urlaube', slug: 'urlaube', orderIndex: 0 })
 
     // member B joins T1 via a temp-wrap invite
     const bPass = 'a whole new passphrase entirely'
@@ -42,6 +45,15 @@ suite('content survives scope rotation E2E (web -> live backend)', () => {
     // the item ciphertext was re-sealed under the fresh key, so the cached key no longer decrypts it
     expect(Buffer.from(aCk).equals(Buffer.from(ckBefore))).toBe(false)
     await expect(readItems(apiBase, a, aScope, ckBefore)).rejects.toThrow()
+
+    // the Memory-tree node was re-sealed too: its name reads under the fresh key, its slug token was
+    // recomputed under the fresh key, and the cached old key can no longer decrypt the node name
+    const nodesAfter = await listNodes(apiBase, a, aScope.scopeId)
+    const node = nodesAfter.find((n) => n.id === nodeBefore.id)!
+    expect(decodeNode(aCk, node).name).toBe('Urlaube')
+    expect(node.slugToken).toBe(slugTokenFor(aCk, 'urlaube'))
+    expect(node.slugToken).not.toBe(nodeBefore.slugToken)
+    expect(() => decodeNode(ckBefore, node)).toThrow()
 
     // and B — granted only at rotation — reads content written before B even joined
     const bScope = await openTenantScope(apiBase, b, t1.id)

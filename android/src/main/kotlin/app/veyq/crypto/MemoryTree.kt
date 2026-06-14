@@ -6,7 +6,6 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
-import java.text.Normalizer
 import java.util.Base64
 
 /**
@@ -25,9 +24,7 @@ object MemoryTree {
         apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray,
         type: String, name: String, slug: String, orderIndex: Int, parentId: String? = null,
     ): JSONObject {
-        val nonce = V1.randomBytes(12)
-        val normalized = Normalizer.normalize(name, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
-        val sealed = nonce + V1.aeadSeal(contentKey, nonce, normalized, EMPTY)
+        val sealed = sealContent(contentKey, name, slug)
         val parentPart = if (parentId == null) "" else """"parentId":"$parentId","""
         val json = """{$parentPart"type":"$type","slugToken":"${enc.encodeToString(V1.slugToken(contentKey, slug))}",""" +
             """"orderIndex":$orderIndex,"sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(sealed)}"}}"""
@@ -48,11 +45,26 @@ object MemoryTree {
         return JSONObject(resp.body()).getJSONArray("nodes")
     }
 
-    /** Decrypt a node's sealed name with the scope content key. */
-    fun decodeNodeName(contentKey: ByteArray, node: JSONObject): String {
-        val sealed = dec.decode(node.getJSONObject("sealedContent").getString("bytes"))
-        return String(V1.aeadOpen(contentKey, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), EMPTY), Charsets.UTF_8)
+    /** Seal a node's {name, slug} metadata under the content key (nonce || AEAD). */
+    private fun sealContent(contentKey: ByteArray, name: String, slug: String): ByteArray {
+        val nonce = V1.randomBytes(12)
+        val payload = JSONObject().put("name", name).put("slug", slug).toString().toByteArray(Charsets.UTF_8)
+        return nonce + V1.aeadSeal(contentKey, nonce, payload, EMPTY)
     }
+
+    /** Decrypt a node's sealed metadata ({name, slug}) with the scope content key. */
+    fun decodeNode(contentKey: ByteArray, node: JSONObject): JSONObject {
+        val sealed = dec.decode(node.getJSONObject("sealedContent").getString("bytes"))
+        val pt = V1.aeadOpen(contentKey, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), EMPTY)
+        return JSONObject(String(pt, Charsets.UTF_8))
+    }
+
+    /** Convenience: a node's decrypted display name. */
+    fun decodeNodeName(contentKey: ByteArray, node: JSONObject): String = decodeNode(contentKey, node).getString("name")
+
+    /** Re-seal a node's metadata under a content key, returning the new sealed blob (nonce || AEAD). */
+    fun resealNode(contentKey: ByteArray, content: JSONObject): ByteArray =
+        sealContent(contentKey, content.getString("name"), content.getString("slug"))
 
     /** The blinded slug token for a slug under a scope's content key (matches what the server stored). */
     fun slugTokenFor(contentKey: ByteArray, slug: String): String = enc.encodeToString(V1.slugToken(contentKey, slug))
