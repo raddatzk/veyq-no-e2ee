@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -45,6 +46,9 @@ class UploadSessionRepository : PanacheRepositoryBase<UploadSession, String> {
     /** OPEN sessions started before the cutoff — abandoned uploads the GC sweep reclaims. */
     fun listStaleOpen(cutoff: java.time.Instant): List<UploadSession> =
         list("status = ?1 and createdAt < ?2", UploadStatus.OPEN.name, cutoff)
+
+    /** Row-locked session read — serialize concurrent chunk PUTs so the cumulative budget can't be overshot. */
+    fun lockById(id: String): UploadSession? = find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
 }
 
 @ApplicationScoped

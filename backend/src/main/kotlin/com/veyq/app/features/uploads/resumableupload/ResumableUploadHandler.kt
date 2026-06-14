@@ -73,7 +73,9 @@ class ResumableUploadHandler(
 
     @Transactional
     fun putChunk(authz: String?, uploadId: String, index: Int, req: PutChunkRequest) {
-        val s = requireSessionHolder(uploadId, authz)
+        // lock the session row so concurrent chunk PUTs serialize — otherwise parallel PUTs on different
+        // indices each read the same pre-write total and could together overshoot the declared budget.
+        val s = requireSessionHolder(uploadId, authz, lock = true)
         if (s.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
         if (index < 0 || index >= s.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
         if (req.frame.suiteId != "v1") throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
@@ -166,8 +168,9 @@ class ResumableUploadHandler(
         )
 
     /** Resolve the session and gate on holding its scope (any key-holder may contribute, like add-media). */
-    private fun requireSessionHolder(uploadId: String, authz: String?): UploadSession {
-        val s = sessions.findById(uploadId) ?: throw ApiException(404, "UPLOAD_NOT_FOUND", "Upload not found")
+    private fun requireSessionHolder(uploadId: String, authz: String?, lock: Boolean = false): UploadSession {
+        val s = (if (lock) sessions.lockById(uploadId) else sessions.findById(uploadId))
+            ?: throw ApiException(404, "UPLOAD_NOT_FOUND", "Upload not found")
         requireKeyHolder(s.scopeId, authz)
         return s
     }

@@ -69,14 +69,17 @@ class AddMediaHandler(
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before adding media")
         if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
 
-        // dedup: reuse the existing ciphertext blob for this content, or store it once (ref-counted).
-        val existing = mediaBlobs.findByScopeAndToken(scopeId, req.dedupToken)
-        val blob = existing ?: run {
+        // dedup: reuse the existing ciphertext blob for this content, or store it once (ref-counted). The
+        // fast path (content already stored) needs no lock; only the first upload of new content takes a
+        // per-scope row lock + re-checks, so two concurrent first uploads of the same token serialize
+        // (one inserts, the other reads it) instead of racing into the UNIQUE(scope, token) constraint.
+        val blob = mediaBlobs.findByScopeAndToken(scopeId, req.dedupToken) ?: run {
             val sealed = req.sealedBlob ?: throw ApiException(400, "BLOB_REQUIRED", "New content must include the sealed blob")
             if (!suites.isKnown(sealed.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
             // bound the ciphertext BEFORE decoding (a giant base64 body must not be allocated to OOM the server)
             val bytes = decodeBounded(sealed.bytes, maxInlineBytes, "MEDIA_TOO_LARGE")
-            MediaBlob().apply {
+            scopes.lockById(scopeId)
+            mediaBlobs.findByScopeAndToken(scopeId, req.dedupToken) ?: MediaBlob().apply {
                 id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = req.dedupToken
                 suiteId = sealed.suiteId; sealedBlob = bytes; byteSize = req.byteSize; createdAt = Instant.now()
             }.also(mediaBlobs::persist)

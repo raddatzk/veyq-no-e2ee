@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -39,6 +40,9 @@ class ScopeRepository : PanacheRepositoryBase<Scope, String> {
     fun findByTenantId(tenantId: String): Scope? = find("tenantId", tenantId).firstResult()
     fun findPersonalByOwnerUserId(userId: String): Scope? =
         find("ownerUserId = ?1 and kind = ?2", userId, "PERSONAL_ROOT").firstResult()
+
+    /** Row-locked scope read — serialize per-scope insert-if-absent paths (e.g. dedup blob first upload). */
+    fun lockById(id: String): Scope? = find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
 }
 
 @ApplicationScoped

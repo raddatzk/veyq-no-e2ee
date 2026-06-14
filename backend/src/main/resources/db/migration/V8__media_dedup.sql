@@ -15,6 +15,9 @@ create table veyq_media_blob (
     constraint uq_media_blob unique (scope_id, dedup_token)
 );
 
--- the attachment now references the deduplicated blob instead of carrying the bytes inline
+-- the attachment now references the deduplicated blob instead of carrying the bytes inline.
+-- NB: this is a greenfield, DESTRUCTIVE change — dropping sealed_blob discards any inline media bytes from
+-- V6 and does NOT backfill veyq_media_blob (a real migration would move existing rows into blobs first).
+-- Backward compatibility is intentionally not required here.
 alter table veyq_media drop column sealed_blob;
 alter table veyq_media add column blob_id varchar(64) references veyq_media_blob (id);
