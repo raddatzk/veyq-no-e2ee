@@ -15,6 +15,7 @@ function fromB64url(s: string): Uint8Array {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
   return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
 }
+const EMPTY = new Uint8Array(0)
 
 export type MembershipSummary = { tenantId: string; userId: string; role: string; status: string }
 export type MemberRole = 'Owner' | 'Member'
@@ -59,20 +60,33 @@ export async function rotateScope(
     }
   })
 
-  // re-wrap the content key (if any) from the OLD scope keypair to the NEW one, so content survives
+  // Forward secrecy: if the scope has content, mint a FRESH content key (not a re-wrap) and re-seal every
+  // item under it. A removed member who cached the OLD content key cannot read content written after the
+  // rotation, and the old ciphertext is overwritten — so the cached key opens nothing going forward.
   const myGrant = await getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
   let wrappedContentKey: { suiteId: string; bytes: string } | undefined
+  let reSealedItems: { id: string; sealedContent: { suiteId: string; bytes: string } }[] | undefined
   const ckRes = await fetch(`${apiBase}/api/scopes/${myGrant.scopeId}/content-key`, { headers: { authorization: `Bearer ${owner.sessionToken}` } })
   if (ckRes.ok) {
     const oldScopePriv = openScopeGrant(myGrant, owner.identity, owner.identityPublicKey.kemPublicKey)
     const oldKem = fromB64url(myGrant.scopePublicKey.kemPublicKey)
-    const ck = v1.asymUnwrap(
+    const oldCk = v1.asymUnwrap(
       v1.hybridSecret(oldScopePriv),
       { x: oldKem.slice(0, 32), m: oldKem.slice(32) },
       fromB64url((await ckRes.json()).wrappedContentKey.bytes),
       'content-key',
     )
-    wrappedContentKey = { suiteId: 'v1', bytes: b64url(v1.asymWrap(newScopePub, ck, 'content-key', { nonce: v1.randomBytes(12) })) }
+    const newCk = v1.randomBytes(32)
+    wrappedContentKey = { suiteId: 'v1', bytes: b64url(v1.asymWrap(newScopePub, newCk, 'content-key', { nonce: v1.randomBytes(12) })) }
+
+    const itemsRes = await fetch(`${apiBase}/api/scopes/${myGrant.scopeId}/items`, { headers: { authorization: `Bearer ${owner.sessionToken}` } })
+    if (!itemsRes.ok) throw new Error(`item list failed: ${itemsRes.status}`)
+    reSealedItems = (await itemsRes.json()).items.map((it: { id: string; sealedContent: { bytes: string } }) => {
+      const sealed = fromB64url(it.sealedContent.bytes)
+      const pt = v1.aeadOpen(oldCk, sealed.slice(0, 12), sealed.slice(12), EMPTY)
+      const nonce = v1.randomBytes(12)
+      return { id: it.id, sealedContent: { suiteId: 'v1', bytes: b64url(v1.concat(nonce, v1.aeadSeal(newCk, nonce, pt, EMPTY))) } }
+    })
   } else if (ckRes.status !== 404) throw new Error(`content-key fetch failed: ${ckRes.status}`)
 
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/scope/rotate`, {
@@ -82,6 +96,7 @@ export async function rotateScope(
       scopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(v1.concat(newScope.pub.kemX, newScope.pub.kemM)) },
       grants,
       ...(wrappedContentKey ? { wrappedContentKey } : {}),
+      ...(reSealedItems ? { reSealedItems } : {}),
     }),
   })
   if (!res.ok) throw new Error(`rotate scope failed: ${res.status} ${await res.text()}`)

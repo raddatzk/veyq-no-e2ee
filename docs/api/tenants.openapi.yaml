@@ -343,6 +343,12 @@ components:
       required: [role]
       properties:
         role: { type: string, enum: [Owner, Member] }
+    ScopeItemReseal:
+      type: object
+      required: [id, sealedContent]
+      properties:
+        id: { type: string }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ScopeGrantInput:
       type: object
       required: [userId, wrappedScopePrivateKey]
@@ -361,8 +367,15 @@ components:
         wrappedContentKey:
           $ref: './common.openapi.yaml#/components/schemas/Blob'
           description: >
-            Required iff the scope has a content key — the stable content key re-wrapped to the NEW scope
-            public key, so encrypted content survives the keypair rotation (AD-03).
+            Required iff the scope has a content key — a FRESH content key wrapped to the NEW scope public
+            key. Rotation mints a new content key (not a re-wrap), so a removed member who cached the old
+            content key cannot read content written after rotation (forward secrecy, AD-24).
+        reSealedItems:
+          type: array
+          description: >
+            Required iff the scope has a content key — every existing item re-sealed under the fresh
+            content key, so existing content stays readable. Must cover exactly the scope's current items.
+          items: { $ref: '#/components/schemas/ScopeItemReseal' }
     RotateScopeResponse:
       type: object
       required: [scopeId, memberCount]

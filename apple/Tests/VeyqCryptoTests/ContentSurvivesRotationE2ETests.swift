@@ -29,14 +29,22 @@ final class ContentSurvivesRotationE2ETests: XCTestCase {
             tempPrivateKeyB64: memberInvite.tempPrivateKey, email: "b@example.com", displayName: "B", password: bPass)
         let b = try await Login.login(apiBase: apiBase, email: "b@example.com", password: bPass, secretKeyB64: bReg.emergencyKit.secretKey)
 
-        // A rotates the scope — the content key is re-wrapped to the new keypair
+        // A rotates the scope — a FRESH content key is minted and every item re-sealed under it
         _ = try await InviteMembers.rotateScope(apiBase: apiBase, owner: a, tenantId: t1.id)
 
-        // A still reads pre-rotation content under the freshly-granted new keypair
+        // A still reads pre-rotation content under the freshly-granted new keypair + fresh content key
         let aScope = try await ScopeContent.openTenantScope(apiBase: apiBase, session: a, tenantId: t1.id)
         let aCk = try await ScopeContent.getOrCreateContentKey(apiBase: apiBase, session: a, scope: aScope)
         let aItems = try await ScopeContent.readItems(apiBase: apiBase, session: a, scope: aScope, contentKey: aCk)
         XCTAssertTrue(aItems.contains("trip notes"))
+
+        // forward secrecy: the OLD content key (which a removed member could have cached) opens nothing now —
+        // the item ciphertext was re-sealed under the fresh key, so the cached key no longer decrypts it
+        XCTAssertNotEqual(aCk, ckBefore)
+        var oldKeyFailed = false
+        do { _ = try await ScopeContent.readItems(apiBase: apiBase, session: a, scope: aScope, contentKey: ckBefore) }
+        catch { oldKeyFailed = true }
+        XCTAssertTrue(oldKeyFailed, "old content key must not decrypt re-sealed content")
 
         // and B — granted only at rotation — reads content written before B even joined
         let bScope = try await ScopeContent.openTenantScope(apiBase: apiBase, session: b, tenantId: t1.id)

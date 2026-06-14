@@ -30,13 +30,18 @@ suite('content survives scope rotation E2E (web -> live backend)', () => {
     const bReg = await registerViaMemberInvite(apiBase, memberInvite.inviteId, memberInvite.bootstrapSecret, memberInvite.tempPrivateKey, 'b@example.com', 'B', bPass)
     const b = await login(apiBase, 'b@example.com', bPass, bReg.emergencyKit.secretKey)
 
-    // A rotates the scope (new keypair) — the content key is re-wrapped to it
+    // A rotates the scope (new keypair) — a FRESH content key is minted and every item re-sealed under it
     await rotateScope(apiBase, a, t1.id)
 
-    // A still reads the pre-rotation content under the freshly-granted new keypair
+    // A still reads the pre-rotation content under the freshly-granted new keypair + fresh content key
     const aScope = await openTenantScope(apiBase, a, t1.id)
     const aCk = await getOrCreateContentKey(apiBase, a, aScope)
     expect(await readItems(apiBase, a, aScope, aCk)).toContain('trip notes')
+
+    // forward secrecy: the OLD content key (which a removed member could have cached) opens nothing now —
+    // the item ciphertext was re-sealed under the fresh key, so the cached key no longer decrypts it
+    expect(Buffer.from(aCk).equals(Buffer.from(ckBefore))).toBe(false)
+    await expect(readItems(apiBase, a, aScope, ckBefore)).rejects.toThrow()
 
     // and B — granted only at rotation — reads content written before B even joined
     const bScope = await openTenantScope(apiBase, b, t1.id)

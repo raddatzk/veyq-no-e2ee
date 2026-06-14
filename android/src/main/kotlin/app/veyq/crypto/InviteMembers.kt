@@ -43,7 +43,9 @@ object InviteMembers {
             val wrapped = V1.asymWrap(kem.copyOfRange(0, 32), kem.copyOfRange(32, kem.size), newScopePrivate, "scope-grant", V1.randomBytes(12))
             grantParts.add("""{"userId":"${m.getString("userId")}","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"}}""")
         }
-        // re-wrap the content key (if any) from the OLD scope keypair to the NEW one, so content survives
+        // Forward secrecy: if the scope has content, mint a FRESH content key (not a re-wrap) and re-seal
+        // every item under it. A removed member who cached the OLD content key cannot read content written
+        // after the rotation, and the old ciphertext is overwritten — so the cached key opens nothing.
         val myGrant = Tenant.getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
         val ckReq = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/${myGrant.getString("scopeId")}/content-key"))
             .header("Authorization", "Bearer ${owner.sessionToken}").GET().build()
@@ -53,9 +55,26 @@ object InviteMembers {
             val oldScopePriv = Tenant.openScopeGrant(myGrant, owner.identity, owner.kemPublicKey)
             val oldKem = dec.decode(myGrant.getJSONObject("scopePublicKey").getString("kemPublicKey"))
             val wrappedCk = dec.decode(JSONObject(ckResp.body()).getJSONObject("wrappedContentKey").getString("bytes"))
-            val ck = V1.asymUnwrap(oldScopePriv.kemX, oldScopePriv.mlkemSeed, oldKem.copyOfRange(0, 32), oldKem.copyOfRange(32, oldKem.size), wrappedCk, "content-key")
-            val rewrapped = V1.asymWrap(newScope.pubKemX, newScope.pubKemM, ck, "content-key", V1.randomBytes(12))
-            ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"}"""
+            val oldCk = V1.asymUnwrap(oldScopePriv.kemX, oldScopePriv.mlkemSeed, oldKem.copyOfRange(0, 32), oldKem.copyOfRange(32, oldKem.size), wrappedCk, "content-key")
+            val newCk = V1.randomBytes(32)
+            val rewrapped = V1.asymWrap(newScope.pubKemX, newScope.pubKemM, newCk, "content-key", V1.randomBytes(12))
+
+            val itemsReq = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/${myGrant.getString("scopeId")}/items"))
+                .header("Authorization", "Bearer ${owner.sessionToken}").GET().build()
+            val itemsResp = client.send(itemsReq, HttpResponse.BodyHandlers.ofString())
+            if (itemsResp.statusCode() != 200) throw RuntimeException("item list failed: ${itemsResp.statusCode()}")
+            val itemsArr = JSONObject(itemsResp.body()).getJSONArray("items")
+            val reSealedParts = mutableListOf<String>()
+            for (i in 0 until itemsArr.length()) {
+                val it = itemsArr.getJSONObject(i)
+                val sealed = dec.decode(it.getJSONObject("sealedContent").getString("bytes"))
+                val pt = V1.aeadOpen(oldCk, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), ByteArray(0))
+                val nonce = V1.randomBytes(12)
+                val resealed = nonce + V1.aeadSeal(newCk, nonce, pt, ByteArray(0))
+                reSealedParts.add("""{"id":"${it.getString("id")}","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
+            }
+            ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"},""" +
+                """"reSealedItems":[${reSealedParts.joinToString(",")}]"""
         } else if (ckResp.statusCode() != 404) {
             throw RuntimeException("content-key fetch failed: ${ckResp.statusCode()}")
         }

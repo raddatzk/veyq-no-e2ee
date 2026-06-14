@@ -29,6 +29,7 @@ class ScopeRotationHandler(
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val contentKeys: com.veyq.app.shared.content.ScopeContentKeyRepository,
+    private val items: com.veyq.app.shared.content.ScopeItemRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -74,15 +75,31 @@ class ScopeRotationHandler(
             )
         }
 
-        // the content key is stable across rotation, but its wrapping is to the OLD keypair — re-wrap it to
-        // the new one so encrypted content survives. Required iff the scope actually has a content key.
+        // rotation mints a FRESH content key (not a re-wrap) and re-seals every item under it, so a removed
+        // member who cached the old content key cannot read content written after rotation (forward secrecy).
+        // Existing content stays readable because it is re-sealed. Required iff the scope has a content key.
         val contentKey = contentKeys.findByScopeId(scope.id)
         if (contentKey != null) {
-            val rewrapped = req.wrappedContentKey
-                ?: throw ApiException(400, "CONTENT_KEY_REQUIRED", "The scope has content — re-wrap its content key to the new keypair")
-            requireSuite(rewrapped.suiteId)
-            contentKey.suiteId = rewrapped.suiteId
-            contentKey.wrappedKey = dec.decode(rewrapped.bytes)
+            val newCk = req.wrappedContentKey
+                ?: throw ApiException(400, "CONTENT_KEY_REQUIRED", "The scope has content — provide a fresh content key wrapped to the new keypair")
+            requireSuite(newCk.suiteId)
+            val reSealed = req.reSealedItems
+                ?: throw ApiException(400, "RESEAL_REQUIRED", "The scope has content — re-seal its items under the new content key")
+            val scopeItems = items.listByScopeId(scope.id)
+            val reSealedIds = reSealed.map { it.id }
+            if (reSealedIds.size != reSealedIds.toSet().size) throw ApiException(400, "DUPLICATE_ITEM", "Duplicate item in re-seal")
+            if (reSealedIds.toSet() != scopeItems.map { it.id }.toSet()) {
+                throw ApiException(400, "INCOMPLETE_RESEAL", "Rotation must re-seal exactly the scope's items")
+            }
+            contentKey.suiteId = newCk.suiteId
+            contentKey.wrappedKey = dec.decode(newCk.bytes)
+            val byId = scopeItems.associateBy { it.id }
+            reSealed.forEach { rs ->
+                requireSuite(rs.sealedContent.suiteId)
+                val item = byId.getValue(rs.id)
+                item.suiteId = rs.sealedContent.suiteId
+                item.sealedContent = dec.decode(rs.sealedContent.bytes)
+            }
         }
 
         return RotateScopeResponse(scopeId = scope.id, memberCount = req.grants.size)

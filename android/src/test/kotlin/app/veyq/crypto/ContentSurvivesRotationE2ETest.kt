@@ -1,6 +1,7 @@
 package app.veyq.crypto
 
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Real end-to-end against a running backend; opt-in via VEYQ_E2E=1 so plain `gradle test` no-ops it. */
@@ -30,13 +31,20 @@ class ContentSurvivesRotationE2ETest {
             apiBase, memberInvite.inviteId, memberInvite.bootstrapSecret, memberInvite.tempPrivateKey, "b@example.com", "B", bPass)
         val b = Login.login(apiBase, "b@example.com", bPass, bReg.emergencyKit.secretKey)
 
-        // A rotates the scope — the content key is re-wrapped to the new keypair
+        // A rotates the scope — a FRESH content key is minted and every item re-sealed under it
         InviteMembers.rotateScope(apiBase, a, t1.getString("id"))
 
-        // A still reads pre-rotation content under the freshly-granted new keypair
+        // A still reads pre-rotation content under the freshly-granted new keypair + fresh content key
         val aScope = ScopeContent.openTenantScope(apiBase, a, t1.getString("id"))
         val aCk = ScopeContent.getOrCreateContentKey(apiBase, a, aScope)
         assertTrue(ScopeContent.readItems(apiBase, a, aScope, aCk).contains("trip notes"))
+
+        // forward secrecy: the OLD content key (which a removed member could have cached) opens nothing now —
+        // the item ciphertext was re-sealed under the fresh key, so the cached key no longer decrypts it
+        assertFalse(aCk.contentEquals(ckBefore))
+        var oldKeyFailed = false
+        try { ScopeContent.readItems(apiBase, a, aScope, ckBefore) } catch (e: Exception) { oldKeyFailed = true }
+        assertTrue(oldKeyFailed, "old content key must not decrypt re-sealed content")
 
         // and B — granted only at rotation — reads content written before B even joined
         val bScope = ScopeContent.openTenantScope(apiBase, b, t1.getString("id"))
