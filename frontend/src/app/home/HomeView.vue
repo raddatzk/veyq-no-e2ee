@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { session, setUnlocked } from '../session'
 import { logout } from '../../features/account/login/login'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import MemoryDetailView from './MemoryDetailView.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -12,6 +13,7 @@ const folders = ref<LevelEntry[]>([])
 const memories = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string | null>>({})
 const error = ref('')
+const selectedMemory = ref<LevelEntry | null>(null)
 
 onMounted(async () => {
   try {
@@ -35,6 +37,7 @@ async function switchSpace(entry: SpaceEntry) {
 }
 
 async function openLevel() {
+  selectedMemory.value = null
   const parentId = crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined
   const entries = await loadLevel(apiBase, session.unlocked!, active.value!, parentId)
   folders.value = entries.filter((e) => e.node.type === 'FOLDER')
@@ -108,25 +111,28 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     </header>
 
     <main class="home-content">
-      <div v-if="error" class="home-empty">{{ error }}</div>
+      <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="selectedMemory = null" />
+      <template v-else>
+        <div v-if="error" class="home-empty">{{ error }}</div>
 
-      <div class="content-head"><span class="content-title">Memories</span><span class="content-count">{{ memories.length }}</span></div>
-      <div v-if="memories.length" class="card-grid">
-        <button v-for="m in memories" :key="m.node.id" class="memory-card">
-          <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
-          <div v-else class="memory-cover placeholder">{{ covers[m.node.id] === null ? 'Kein Cover' : '…' }}</div>
-          <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
-        </button>
-      </div>
-      <div v-else class="home-empty">Noch keine Memories hier.</div>
+        <div class="content-head"><span class="content-title">Memories</span><span class="content-count">{{ memories.length }}</span></div>
+        <div v-if="memories.length" class="card-grid">
+          <button v-for="m in memories" :key="m.node.id" class="memory-card" @click="selectedMemory = m">
+            <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
+            <div v-else class="memory-cover placeholder">{{ covers[m.node.id] === null ? 'Kein Cover' : '…' }}</div>
+            <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
+          </button>
+        </div>
+        <div v-else class="home-empty">Noch keine Memories hier.</div>
 
-      <div class="content-head"><span class="content-title">Ordner</span><span class="content-count">{{ folders.length }}</span></div>
-      <div v-if="folders.length" class="card-grid">
-        <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
-          <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
-        </button>
-      </div>
-      <div v-else class="home-empty">Keine Ordner.</div>
+        <div class="content-head"><span class="content-title">Ordner</span><span class="content-count">{{ folders.length }}</span></div>
+        <div v-if="folders.length" class="card-grid">
+          <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
+            <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
+          </button>
+        </div>
+        <div v-else class="home-empty">Keine Ordner.</div>
+      </template>
     </main>
   </div>
 </template>
