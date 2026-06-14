@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
+import { fileToNewMedia } from '../../features/uploads/clientMedia'
+import { uploadMedia } from '../../features/uploads/media/media'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
@@ -13,6 +15,8 @@ const loading = ref(true)
 const containerWidth = ref(0)
 const galleryEl = ref<HTMLElement | null>(null)
 const lightbox = ref<string | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
 let ro: ResizeObserver | null = null
 
 const layout = computed(() =>
@@ -41,6 +45,27 @@ onBeforeUnmount(() => {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
 })
 
+async function refresh() {
+  tiles.value.forEach((t) => URL.revokeObjectURL(t.url))
+  tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
+}
+
+async function onFilesPicked(event: Event) {
+  const files = Array.from((event.target as HTMLInputElement).files ?? [])
+  if (!files.length) return
+  uploading.value = true
+  try {
+    for (const file of files) {
+      const media = await fileToNewMedia(file)
+      await uploadMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.active.contentKey, props.memory.id, media)
+    }
+    await refresh()
+  } finally {
+    uploading.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+
 async function openLightbox(tile: GalleryTile) {
   lightbox.value = await loadOriginal(session.apiBase, session.unlocked!, props.active, tile)
 }
@@ -56,6 +81,10 @@ function closeLightbox() {
       <button class="crumb" @click="emit('back')">← Zurück</button>
       <h1 class="detail-title">{{ name }}</h1>
       <span class="content-count">{{ tiles.length }} Medien</span>
+      <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
+        {{ uploading ? 'Lädt hoch…' : 'Hochladen' }}
+      </button>
+      <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
     </div>
 
     <div ref="galleryEl" class="gallery" :style="{ height: layout.height + 'px' }">
