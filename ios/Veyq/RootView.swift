@@ -1,17 +1,18 @@
 import SwiftUI
-import VeyqCrypto
 
-/// Placeholder root — replaced by the real space switcher / MemoryHome in slice 1. References the
-/// VeyqCrypto package so the app↔core link is exercised at build time.
+/// Slice 1: connect → login → landed. The real tab bar + MemoryHome arrive in slice 2.
 struct RootView: View {
+    @StateObject private var app = AppState()
+
     var body: some View {
-        VStack(spacing: 12) {
-            Text("veyq")
-                .font(.largeTitle.bold())
-            Text("core linked · frame size \(Media.defaultChunkSize)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+        Group {
+            switch app.phase {
+            case .connect: ConnectView()
+            case .login: LoginView()
+            case .landed: LandedView()
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .environmentObject(app)
+        .preferredColorScheme(.dark)
     }
 }
