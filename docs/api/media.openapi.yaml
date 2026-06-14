@@ -1,23 +1,95 @@
 openapi: 3.1.0
 info:
-  title: veyq media
+  title: veyq unified media
   version: 0.1.0
+# One upload/download path for all bytes. A blob is deduplicated content (a chunk-set; small file = 1 chunk).
+# A media attaches a blob to a Memory/Chapter with typed derivatives (thumbnail/preview, themselves blobs).
+# NB: one operation per tag for the /blobs and /blob-uploads/{id} families (greedy class-@Path codegen gotcha).
 paths:
-  /api/scopes/{scopeId}/media-blobs/{dedupToken}:
-    get:
-      tags: [MediaDedup]
-      operationId: checkMediaBlob
-      summary: Has the scope already stored this content (by dedup token)? — lets the client skip re-upload.
+  /api/scopes/{scopeId}/blobs:
+    post:
+      tags: [BlobStart]
+      operationId: startBlob
+      summary: Begin (or dedup) storing a content blob. If the scope already has it, no upload is needed.
       description: >
-        Returns whether a deduplicated blob with this client-computed dedup token already exists in the
-        scope. The server never sees plaintext and cannot compute the token, so this leaks only blob-equality
-        among members (AD-09). If it exists, the client adds the media WITHOUT re-sending the bytes.
+        The client computes the dedup token over the whole plaintext and declares the chunk count + size.
+        If a blob with that token already exists in the scope → READY with its blobId (skip the upload
+        entirely, even for a huge file). Otherwise → UPLOADING with an uploadId to push the frames to.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
-        - { name: dedupToken, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StartBlobRequest' } } }
       responses:
-        '200': { description: Whether the blob exists., content: { application/json: { schema: { $ref: '#/components/schemas/MediaBlobExists' } } } }
+        '200': { description: A dedup hit (READY) or a new upload (UPLOADING)., content: { application/json: { schema: { $ref: '#/components/schemas/BlobTicket' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+        '429': { $ref: './common.openapi.yaml#/components/responses/TooManyRequests' }
+  /api/scopes/{scopeId}/blob-uploads/{uploadId}:
+    get:
+      tags: [BlobUploadStatus]
+      operationId: getBlobUpload
+      summary: Upload progress — which chunk indices have landed (drives resume).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The upload progress., content: { application/json: { schema: { $ref: '#/components/schemas/BlobUploadProgress' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/blob-uploads/{uploadId}/complete:
+    post:
+      tags: [BlobComplete]
+      operationId: completeBlobUpload
+      summary: Finalize the upload once every chunk has landed; promotes the chunks to a content blob.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The finalized blob., content: { application/json: { schema: { $ref: '#/components/schemas/CompleteBlobResponse' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/scopes/{scopeId}/blob-uploads/{uploadId}/chunks/{index}:
+    put:
+      tags: [BlobChunkUpload]
+      operationId: putBlobChunk
+      summary: Upload one AEAD frame (idempotent — re-PUT is the basis of resume).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+        - { name: index, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PutChunkRequest' } } }
+      responses:
+        '204': { description: The frame was stored (or already present). }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/scopes/{scopeId}/blobs/{blobId}/chunks/{index}:
+    get:
+      tags: [BlobChunkDownload]
+      operationId: getBlobChunk
+      summary: Download one AEAD frame of a finalized blob (the client opens it with openFrame).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: blobId, in: path, required: true, schema: { type: string } }
+        - { name: index, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: The frame ciphertext., content: { application/json: { schema: { $ref: '#/components/schemas/ChunkResponse' } } } }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
@@ -25,90 +97,120 @@ paths:
     get:
       tags: [Media]
       operationId: listMedia
-      summary: A Memory's media, ordered by takenAt (ciphertext + low-sensitivity metadata only).
-      description: >
-        Returns the encrypted media attached to a Memory/Chapter node, ordered by takenAt (the gallery
-        order — there is no separate manual sort field). The bytes and thumbnail are ciphertext; the client
-        decrypts with the scope content key.
+      summary: A Memory's media (original + typed derivatives), ordered by takenAt.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
-        '200':
-          description: The node's media.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MediaList' }
+        '200': { description: The node's media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaList' } } } }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
     post:
       tags: [Media]
-      operationId: addMedia
-      summary: Attach an encrypted media (bytes + light thumbnail) to a Memory/Chapter node.
-      description: >
-        Stores one media: the bytes and an optional client-side thumbnail derivative are AEAD-sealed under
-        the scope content key (the server stays blind). Media live only inside a Memory or Chapter, never a
-        Folder. The server records the node, MIME type, byte size and takenAt for ordering only.
+      operationId: createMedia
+      summary: Attach a stored blob (+ derivatives) to a Memory/Chapter node.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateMediaRequest' }
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateMediaRequest' } } }
       responses:
-        '200':
-          description: The stored media.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MediaItem' }
+        '200': { description: The created media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaItem' } } } }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
 components:
   schemas:
+    StartBlobRequest:
+      type: object
+      required: [dedupToken, totalChunks, byteSize]
+      properties:
+        dedupToken: { type: string }
+        totalChunks: { type: integer, minimum: 1, maximum: 10000 }
+        byteSize: { type: integer, format: int64, minimum: 0, maximum: 10737418240 }
+    BlobTicket:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [READY, UPLOADING] }
+        blobId: { type: string, description: 'Set when READY (dedup hit) — attach this blob directly.' }
+        uploadId: { type: string, description: 'Set when UPLOADING — push the frames here, then complete.' }
+        totalChunks: { type: integer }
+    PutChunkRequest:
+      type: object
+      required: [frame]
+      properties:
+        frame: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    BlobUploadProgress:
+      type: object
+      required: [uploadId, totalChunks, receivedChunks, status]
+      properties:
+        uploadId: { type: string }
+        totalChunks: { type: integer }
+        receivedChunks: { type: array, items: { type: integer } }
+        status: { type: string, enum: [OPEN, COMPLETED] }
+    CompleteBlobResponse:
+      type: object
+      required: [blobId, totalChunks, byteSize]
+      properties:
+        blobId: { type: string }
+        totalChunks: { type: integer }
+        byteSize: { type: integer, format: int64 }
+    ChunkResponse:
+      type: object
+      required: [frame]
+      properties:
+        frame: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    BlobRef:
+      type: object
+      required: [blobId, totalChunks, byteSize]
+      properties:
+        blobId: { type: string }
+        totalChunks: { type: integer }
+        byteSize: { type: integer, format: int64 }
+    MediaDerivativeInput:
+      type: object
+      required: [kind, blobId]
+      properties:
+        kind: { type: string, enum: [THUMBNAIL, PREVIEW] }
+        blobId: { type: string }
+    MediaDerivativeOut:
+      type: object
+      required: [kind, blob]
+      properties:
+        kind: { type: string, enum: [THUMBNAIL, PREVIEW] }
+        blob: { $ref: '#/components/schemas/BlobRef' }
     CreateMediaRequest:
       type: object
-      required: [dedupToken, takenAt, mimeType, byteSize]
+      required: [originalBlobId, takenAt, mimeType]
       properties:
-        dedupToken: { type: string, description: 'Client-computed media dedup token (AD-09); the server stores the bytes once per scope+token.' }
-        takenAt: { type: string, format: date-time, description: 'When the media was taken — orders the gallery.' }
+        originalBlobId: { type: string }
+        takenAt: { type: string, format: date-time }
         mimeType: { type: string }
-        byteSize: { type: integer, format: int64, description: 'Plaintext byte size (server-visible).' }
-        sealedBlob:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
-          description: The sealed bytes — required only when the dedup token is new; omit to reference an existing blob.
-        sealedThumb:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
-          description: Optional light thumbnail derivative, sealed under the content key.
-    MediaBlobExists:
-      type: object
-      required: [exists]
-      properties:
-        exists: { type: boolean }
+        derivatives:
+          type: array
+          items: { $ref: '#/components/schemas/MediaDerivativeInput' }
     MediaItem:
       type: object
-      required: [id, scopeId, nodeId, takenAt, mimeType, byteSize, sealedBlob, createdAt]
+      required: [id, scopeId, nodeId, takenAt, mimeType, original, derivatives, createdAt]
       properties:
         id: { type: string }
         scopeId: { type: string }
         nodeId: { type: string }
         takenAt: { type: string, format: date-time }
         mimeType: { type: string }
-        byteSize: { type: integer, format: int64 }
-        sealedBlob: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        sealedThumb: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        original: { $ref: '#/components/schemas/BlobRef' }
+        derivatives:
+          type: array
+          items: { $ref: '#/components/schemas/MediaDerivativeOut' }
         createdAt: { type: string, format: date-time }
     MediaList:
       type: object
       required: [media]
       properties:
-        media:
-          type: array
-          items: { $ref: '#/components/schemas/MediaItem' }
+        media: { type: array, items: { $ref: '#/components/schemas/MediaItem' } }

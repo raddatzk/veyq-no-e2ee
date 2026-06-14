@@ -63,7 +63,6 @@ val openApiSpecs = listOf(
     OpenApiSpec("spaces", "../docs/api/spaces.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("memory", "../docs/api/memory.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
     OpenApiSpec("media", "../docs/api/media.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
-    OpenApiSpec("uploads", "../docs/api/uploads.openapi.yaml", extraApiConfigOptions = mapOf("returnResponse" to "true")),
 )
 
 val yamlMapper = com.fasterxml.jackson.databind.ObjectMapper(

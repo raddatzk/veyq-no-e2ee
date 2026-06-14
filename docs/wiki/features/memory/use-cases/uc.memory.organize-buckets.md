@@ -47,4 +47,4 @@
 - Feature: [Memory](../_index.md) · Actors: [Memory Curator](../../../actors.md), [Public Contributor](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (scope keys)
 - Decisions: [AD-10](../../../decisions/README.md) (deletion & move privilege)
-- Related use-cases: `uc.uploads.add-media`, `uc.sharing.collect-uploads`, `uc.memory.download-zip`
+- Related use-cases: `uc.uploads.unified-media`, `uc.sharing.collect-uploads`, `uc.memory.download-zip`

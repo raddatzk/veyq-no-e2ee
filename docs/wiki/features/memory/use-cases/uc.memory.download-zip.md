@@ -46,4 +46,4 @@
 - Feature: [Memory](../_index.md) · Actors: [Memory Curator](../../../actors.md)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (client-side decrypt, holds-the-key)
 - Decisions: [AD-02](../../../decisions/README.md) (E2E / blind server), [AD-03](../../../decisions/README.md) (per-subtree keys)
-- Related use-cases: `uc.uploads.add-media`, `uc.memory.create-tree`
+- Related use-cases: `uc.uploads.unified-media`, `uc.memory.create-tree`

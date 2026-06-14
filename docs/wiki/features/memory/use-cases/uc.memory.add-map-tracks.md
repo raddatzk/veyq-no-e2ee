@@ -50,4 +50,4 @@
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (encrypted vs. visible),
   [Platform Concepts](../../../crosscutting/platform-concepts.md) (consent)
 - Decisions: [AD-02](../../../decisions/README.md) (E2E / blind server), [AD-27](../../../decisions/README.md) (external rendering calls)
-- Related use-cases: `uc.memory.curate`, `uc.uploads.add-media`
+- Related use-cases: `uc.memory.curate`, `uc.uploads.unified-media`

@@ -8,5 +8,4 @@ Getting media into a Memory — encrypted upload, resumable sessions, and deferr
 - **Decisions:** [AD-11](../../decisions/README.md) (Agent Mode), [AD-09](../../decisions/README.md) (dedup).
 
 ## Use-cases
-- ☐ `uc.uploads.add-media` — upload media into a Memory (encrypt + light derivatives client-side)
-- ☐ `uc.uploads.resumable-upload` — resume an interrupted upload
+- ☐ `uc.uploads.unified-media` — one upload/download path for all media (small or large, chunked + resumable + deduped), attached to a Memory with client-generated derivatives

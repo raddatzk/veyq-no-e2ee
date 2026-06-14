@@ -1,0 +1,152 @@
+// uc.uploads (web) — ONE upload path, ONE download path for all bytes. Every file becomes a deduplicated
+// "blob": a set of AEAD frames (v1.sealFrame, AAD binds index+total) in the server's BlobStore (never the
+// DB). A small file is one frame; a large one is many — both resumable, both opened frame-by-frame on the
+// way back. A "media" attaches a stored blob to a Memory/Chapter together with typed derivatives
+// (thumbnail/preview), which are themselves ordinary blobs uploaded the same way. The server stays blind:
+// it sees only ciphertext frames, a per-scope dedup token, and low-sensitivity metadata (mime, size, takenAt).
+import * as v1 from '../../../shared/crypto/v1'
+import type { UnlockedSession } from '../../account/login/login'
+
+function b64url(b: Uint8Array): string {
+  let s = ''
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function fromB64url(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
+  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
+}
+const auth = (s: UnlockedSession) => ({ authorization: `Bearer ${s.sessionToken}` })
+
+// 4 MiB plaintext frames: small files stay one frame, large ones chunk transparently.
+export const DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024
+
+export type DerivativeKind = 'THUMBNAIL' | 'PREVIEW'
+export type BlobRef = { blobId: string; totalChunks: number; byteSize: number }
+export type BlobTicket = { status: 'READY' | 'UPLOADING'; blobId?: string; uploadId?: string; totalChunks: number }
+export type UploadProgress = { uploadId: string; totalChunks: number; receivedChunks: number[]; status: 'OPEN' | 'COMPLETED' }
+export type MediaItem = {
+  id: string
+  scopeId: string
+  nodeId: string
+  takenAt: string
+  mimeType: string
+  original: BlobRef
+  derivatives: { kind: DerivativeKind; blob: BlobRef }[]
+  createdAt: string
+}
+export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; takenAt: string; mimeType: string }
+
+// ---- blob layer (the single upload/download path) -------------------------------------------------------
+
+/** Split a plaintext into fixed-size chunks (always ≥1 chunk so an empty file still has one frame). */
+export function chunkBytes(bytes: Uint8Array, chunkSize: number = DEFAULT_CHUNK_SIZE): Uint8Array[] {
+  const out: Uint8Array[] = []
+  for (let o = 0; o < bytes.length; o += chunkSize) out.push(bytes.slice(o, o + chunkSize))
+  return out.length ? out : [new Uint8Array(0)]
+}
+
+/** The per-scope dedup token for some content (matches what the server keys on — a blind dedup token). */
+export function dedupTokenFor(contentKey: Uint8Array, content: Uint8Array): string {
+  return b64url(v1.dedupToken(contentKey, content))
+}
+
+/** Begin (or dedup) storing a blob. READY → already stored, attach blobId directly; UPLOADING → push frames. */
+export async function startBlob(apiBase: string, session: UnlockedSession, scopeId: string, req: { dedupToken: string; totalChunks: number; byteSize: number }): Promise<BlobTicket> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth(session) },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error(`start blob failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Seal one plaintext chunk into a frame and PUT it (idempotent — re-PUT is the basis of resume). */
+export async function putChunk(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string, index: number, total: number, contentKey: Uint8Array, plain: Uint8Array): Promise<void> {
+  const frame = v1.sealFrame(contentKey, index, total, plain, v1.randomBytes(12))
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}/chunks/${index}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...auth(session) },
+    body: JSON.stringify({ frame: { suiteId: 'v1', bytes: b64url(frame) } }),
+  })
+  if (!res.ok) throw new Error(`put chunk ${index} failed: ${res.status} ${await res.text()}`)
+}
+
+/** Which chunk indices have landed (drives resume). */
+export async function getProgress(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<UploadProgress> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}`, { headers: auth(session) })
+  if (!res.ok) throw new Error(`upload progress failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Finalize the upload once every chunk has landed; promotes the frames to a content blob. */
+export async function completeBlob(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<BlobRef> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}/complete`, { method: 'POST', headers: auth(session) })
+  if (!res.ok) throw new Error(`complete blob failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/**
+ * Upload arbitrary content as a deduplicated blob and return its ref. Dedups first (skips the bytes entirely
+ * if the scope already holds them); otherwise opens an upload and pushes only the still-missing frames, so a
+ * retried call resumes a half-done upload rather than restarting it.
+ */
+export async function uploadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, bytes: Uint8Array, chunkSize: number = DEFAULT_CHUNK_SIZE): Promise<BlobRef> {
+  const chunks = chunkBytes(bytes, chunkSize)
+  const ticket = await startBlob(apiBase, session, scopeId, { dedupToken: dedupTokenFor(contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length })
+  if (ticket.status === 'READY') return { blobId: ticket.blobId!, totalChunks: ticket.totalChunks, byteSize: bytes.length }
+  const uploadId = ticket.uploadId!
+  const have = new Set((await getProgress(apiBase, session, scopeId, uploadId)).receivedChunks)
+  for (let i = 0; i < chunks.length; i++) {
+    if (!have.has(i)) await putChunk(apiBase, session, scopeId, uploadId, i, chunks.length, contentKey, chunks[i])
+  }
+  return completeBlob(apiBase, session, scopeId, uploadId)
+}
+
+/** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
+export async function downloadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
+  const parts: Uint8Array[] = []
+  for (let i = 0; i < ref.totalChunks; i++) {
+    const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/chunks/${i}`, { headers: auth(session) })
+    if (!res.ok) throw new Error(`get chunk ${i} failed: ${res.status} ${await res.text()}`)
+    const frame = fromB64url((await res.json()).frame.bytes)
+    parts.push(v1.openFrame(contentKey, i, ref.totalChunks, frame))
+  }
+  return v1.concat(...parts)
+}
+
+// ---- media layer (attach blobs to a Memory) -------------------------------------------------------------
+
+/** Attach a stored blob (+ derivatives) to a Memory/Chapter node. */
+export async function createMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, req: { originalBlobId: string; takenAt: string; mimeType: string; derivatives?: { kind: DerivativeKind; blobId: string }[] }): Promise<MediaItem> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth(session) },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error(`create media failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/**
+ * The full client flow: upload the original bytes (chunked + deduped transparently) and any client-generated
+ * thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a typed derivative —
+ * no special API. Returns the created media (original + derivative blob refs).
+ */
+export async function uploadMedia(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, nodeId: string, m: NewMedia, chunkSize: number = DEFAULT_CHUNK_SIZE): Promise<MediaItem> {
+  const original = await uploadBlob(apiBase, session, scopeId, contentKey, m.bytes, chunkSize)
+  const derivatives: { kind: DerivativeKind; blobId: string }[] = []
+  if (m.thumb) {
+    const thumb = await uploadBlob(apiBase, session, scopeId, contentKey, m.thumb, chunkSize)
+    derivatives.push({ kind: 'THUMBNAIL', blobId: thumb.blobId })
+  }
+  return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, takenAt: m.takenAt, mimeType: m.mimeType, derivatives })
+}
+
+/** List a Memory's media, ordered by takenAt (gallery order). */
+export async function listMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string): Promise<MediaItem[]> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, { headers: auth(session) })
+  if (!res.ok) throw new Error(`list media failed: ${res.status} ${await res.text()}`)
+  return (await res.json()).media
+}

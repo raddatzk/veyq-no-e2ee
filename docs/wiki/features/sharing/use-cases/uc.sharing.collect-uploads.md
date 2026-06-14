@@ -71,4 +71,4 @@ S --> C : upload accepted (attributed to uploader bucket)
 - Concepts: [Security Model](../../../crosscutting/security-model.md) (share keys, token-in-fragment,
   share-boundary T&S), [Agent Mode](../../../crosscutting/agent-mode.md)
 - Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys), [AD-05](../../../decisions/README.md) (T&S), [AD-12](../../../decisions/README.md) (liveness)
-- Related use-cases: `uc.sharing.share-public-viewer`, `uc.uploads.add-media`
+- Related use-cases: `uc.sharing.share-public-viewer`, `uc.uploads.unified-media`

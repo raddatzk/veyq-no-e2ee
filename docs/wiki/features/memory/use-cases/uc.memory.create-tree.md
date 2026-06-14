@@ -58,4 +58,4 @@ Within a Memory, media are grouped into per-uploader **buckets** — an axis ort
   encrypted vs. visible), [Space Navigation](../../../crosscutting/space-navigation.md) (tree model and listing),
   [Search](../../../crosscutting/search.md) (ordering metadata)
 - Decisions: [AD-03](../../../decisions/README.md) (per-subtree keys), [AD-26](../../../decisions/README.md) (blinded slug tokens)
-- Related use-cases: `uc.uploads.add-media`, `uc.memory.curate`
+- Related use-cases: `uc.uploads.unified-media`, `uc.memory.curate`

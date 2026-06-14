@@ -50,4 +50,4 @@
   vs. shared state), [Agent Mode](../../../crosscutting/agent-mode.md) (first-frame derivative),
   [Search](../../../crosscutting/search.md) (ordering metadata)
 - Decisions: [AD-04](../../../decisions/README.md) (shared vs. unshared), [AD-13](../../../decisions/README.md) (ordering metadata), [AD-10](../../../decisions/README.md) (delete/move)
-- Related use-cases: `uc.memory.create-tree`, `uc.memory.add-map-tracks`, `uc.uploads.add-media`
+- Related use-cases: `uc.memory.create-tree`, `uc.memory.add-map-tracks`, `uc.uploads.unified-media`
