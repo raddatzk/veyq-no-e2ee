@@ -65,7 +65,7 @@ class RegisterViaInvitationHandler(
 
     @Transactional
     fun registerViaInvitation(inviteId: String, req: RegisterViaInvitationRequest): RegisterViaInvitationResponse {
-        val invite = invites.findById(inviteId) ?: throw notFound("Invite")
+        val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
         if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {

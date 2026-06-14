@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -60,7 +61,11 @@ class TenantRepository : PanacheRepositoryBase<Tenant, String> {
 }
 
 @ApplicationScoped
-class TenantInviteRepository : PanacheRepositoryBase<TenantInvite, String>
+class TenantInviteRepository : PanacheRepositoryBase<TenantInvite, String> {
+    /** Row-locked invite read for security-sensitive single-use redemption paths. */
+    fun findByIdForUpdate(id: String): TenantInvite? =
+        find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
+}
 
 @ApplicationScoped
 class MembershipRepository : PanacheRepositoryBase<Membership, String> {
