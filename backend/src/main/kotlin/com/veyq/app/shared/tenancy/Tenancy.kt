@@ -71,4 +71,7 @@ class MembershipRepository : PanacheRepositoryBase<Membership, String> {
 
     fun listActive(tenantId: String): List<Membership> =
         list("tenantId = ?1 and status = ?2", tenantId, "ACTIVE")
+
+    fun listActiveByUserId(userId: String): List<Membership> =
+        list("userId = ?1 and status = ?2", userId, "ACTIVE")
 }

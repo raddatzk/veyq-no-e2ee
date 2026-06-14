@@ -1,0 +1,43 @@
+openapi: 3.1.0
+info:
+  title: veyq spaces
+  version: 0.1.0
+paths:
+  /api/me/groups:
+    get:
+      tags: [Spaces]
+      operationId: listMyGroups
+      summary: List the group spaces the caller can enter (active member + holds the scope key).
+      description: >
+        A group space is a tenant the caller is an ACTIVE member of AND holds the tenant-root scope grant
+        for (access = the wrap, ADR 0005 — no separate per-action permission). Returns human context
+        (tenant name + role) plus the scope id + public key so the client can open it and decrypt content.
+        Personal scopes are excluded (that is uc.spaces.use-personal).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The caller's group spaces.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyGroupList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+components:
+  schemas:
+    GroupSpace:
+      type: object
+      required: [tenantId, name, displayName, role, scopeId, scopePublicKey]
+      properties:
+        tenantId: { type: string }
+        name: { type: string }
+        displayName: { type: string }
+        role: { type: string, description: 'The caller''s role in the tenant (membership authority, not content access).' }
+        scopeId: { type: string }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+    MyGroupList:
+      type: object
+      required: [groups]
+      properties:
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/GroupSpace' }
