@@ -1,0 +1,53 @@
+id: uc.uploads.add-media
+title: Add media to a Memory
+status: partial
+documents:
+  - type: feature
+    ref: docs/wiki/features/uploads/_index.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/media.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/uploads/addMedia/addMedia.ts
+  - type: entryPoint
+    ref: android/src/main/kotlin/app/veyq/crypto/AddMedia.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/AddMedia.swift
+notes: >
+  Core slice: encrypted media bytes + a light client-side thumbnail derivative sealed under the scope
+  content key, attached to a Memory/Chapter node, ordered by takenAt. Deduplication (AD-09 convergent /
+  ref-counted), per-uploader buckets (organize-buckets), streaming/transcode derivatives (agent-mode) and
+  resumable uploads (resumable-upload) are separate later slices.
+acceptanceCriteria:
+  - id: uc.uploads.add-media.memory-only
+    statement: Media can only be attached to a Memory or Chapter (never a Folder) within a scope the caller holds, with a content key; outsiders are rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: storesAndServesEncryptedMediaForMemoryNodesOnly
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaSliceTest.kt
+          - testName: storesAndServesEncryptedMediaForMemoryNodesOnly
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaSliceTest.kt
+  - id: uc.uploads.add-media.encrypted-ordered
+    statement: Media bytes + thumbnail are sealed under the content key (server blind), ordered by takenAt, and round-trip byte-identical.
+    coverage:
+      web:
+        e2e:
+          - testName: "seals media + thumbnail under the content key, orders by takenAt, and round-trips the bytes"
+            kind: positive
+            ref: frontend/src/features/uploads/addMedia/addMedia.e2e.test.ts
+      android:
+        e2e:
+          - testName: sealsMediaAndOrdersByTakenAt
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/AddMediaE2ETest.kt
+      apple:
+        e2e:
+          - testName: testSealsMediaAndOrdersByTakenAt
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/AddMediaE2ETests.swift

@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: veyq media
+  version: 0.1.0
+paths:
+  /api/scopes/{scopeId}/nodes/{nodeId}/media:
+    get:
+      tags: [Media]
+      operationId: listMedia
+      summary: A Memory's media, ordered by takenAt (ciphertext + low-sensitivity metadata only).
+      description: >
+        Returns the encrypted media attached to a Memory/Chapter node, ordered by takenAt (the gallery
+        order — there is no separate manual sort field). The bytes and thumbnail are ciphertext; the client
+        decrypts with the scope content key.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The node's media.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [Media]
+      operationId: addMedia
+      summary: Attach an encrypted media (bytes + light thumbnail) to a Memory/Chapter node.
+      description: >
+        Stores one media: the bytes and an optional client-side thumbnail derivative are AEAD-sealed under
+        the scope content key (the server stays blind). Media live only inside a Memory or Chapter, never a
+        Folder. The server records the node, MIME type, byte size and takenAt for ordering only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMediaRequest' }
+      responses:
+        '200':
+          description: The stored media.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaItem' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+components:
+  schemas:
+    CreateMediaRequest:
+      type: object
+      required: [takenAt, mimeType, byteSize, sealedBlob]
+      properties:
+        takenAt: { type: string, format: date-time, description: 'When the media was taken — orders the gallery.' }
+        mimeType: { type: string }
+        byteSize: { type: integer, format: int64, description: 'Plaintext byte size (server-visible).' }
+        sealedBlob: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedThumb:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: Optional light thumbnail derivative, sealed under the content key.
+    MediaItem:
+      type: object
+      required: [id, scopeId, nodeId, takenAt, mimeType, byteSize, sealedBlob, createdAt]
+      properties:
+        id: { type: string }
+        scopeId: { type: string }
+        nodeId: { type: string }
+        takenAt: { type: string, format: date-time }
+        mimeType: { type: string }
+        byteSize: { type: integer, format: int64 }
+        sealedBlob: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedThumb: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        createdAt: { type: string, format: date-time }
+    MediaList:
+      type: object
+      required: [media]
+      properties:
+        media:
+          type: array
+          items: { $ref: '#/components/schemas/MediaItem' }
