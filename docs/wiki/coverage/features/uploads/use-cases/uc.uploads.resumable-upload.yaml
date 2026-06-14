@@ -4,6 +4,8 @@ status: partial
 documents:
   - type: feature
     ref: docs/wiki/features/uploads/_index.md
+  - type: useCase
+    ref: docs/wiki/features/uploads/use-cases/uc.uploads.resumable-upload.md
   - type: crosscutting
     ref: docs/wiki/crosscutting/security-model.md
   - type: api
@@ -59,3 +61,11 @@ acceptanceCriteria:
           - testName: testInterruptAndResumeAChunkedUpload
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/ResumableUploadE2ETests.swift
+  - id: uc.uploads.resumable-upload.resource-limits
+    statement: The server rejects excessive chunk counts, declared sizes, decoded frame sizes and cumulative frame data before expensive memory or BlobStore work.
+    coverage:
+      backend:
+        integration:
+          - testName: rejectsOversizedResumableUploadsBeforeHeavyWork
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/resumableupload/ResumableUploadSliceTest.kt

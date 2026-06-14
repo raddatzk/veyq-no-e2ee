@@ -21,6 +21,7 @@ import com.veyq.app.shared.storage.BlobStore
 import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -44,9 +45,13 @@ class ResumableUploadHandler(
     private val blobs: BlobStore,
     private val memberships: MembershipRepository,
     private val auth: SessionService,
+    @param:ConfigProperty(name = "veyq.uploads.max-chunks", defaultValue = "10000") private val maxChunks: Int,
+    @param:ConfigProperty(name = "veyq.uploads.max-upload-bytes", defaultValue = "10737418240") private val maxUploadBytes: Long,
+    @param:ConfigProperty(name = "veyq.uploads.max-frame-bytes", defaultValue = "16777244") private val maxFrameBytes: Int,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
+    private val maxEncodedFrameChars: Int = ((maxFrameBytes + 2) / 3) * 4
 
     @Transactional
     fun createUpload(authz: String?, scopeId: String, nodeId: String, req: CreateUploadRequest): ApiUploadSession {
@@ -54,7 +59,9 @@ class ResumableUploadHandler(
         requireMemoryNode(scopeId, nodeId)
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before uploading")
         if (req.totalChunks <= 0) throw ApiException(400, "INVALID_CHUNK_COUNT", "totalChunks must be positive")
+        if (req.totalChunks > maxChunks) throw ApiException(400, "UPLOAD_TOO_MANY_CHUNKS", "totalChunks exceeds the configured upload limit")
         if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
+        if (req.byteSize > maxUploadBytes) throw ApiException(400, "UPLOAD_TOO_LARGE", "byteSize exceeds the configured upload limit")
         val s = UploadSession().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
             totalChunks = req.totalChunks; mimeType = req.mimeType; byteSize = req.byteSize
@@ -69,7 +76,11 @@ class ResumableUploadHandler(
         val s = requireSessionHolder(uploadId, authz)
         if (s.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
         if (index < 0 || index >= s.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
+        if (req.frame.suiteId != "v1") throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        if (req.frame.bytes.length > maxEncodedFrameChars) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame exceeds the configured upload limit")
         val frame = dec.decode(req.frame.bytes)
+        if (frame.size > maxFrameBytes) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame exceeds the configured upload limit")
+        ensureUploadBudget(s, index, frame.size.toLong())
         val key = "$uploadId/$index"
         blobs.put(key, frame) // idempotent overwrite — re-PUT on resume is harmless
         val existing = chunks.find(uploadId, index)
@@ -100,8 +111,8 @@ class ResumableUploadHandler(
     fun completeUpload(authz: String?, uploadId: String): ApiUploadSession {
         val s = requireSessionHolder(uploadId, authz)
         if (s.status == UploadStatus.COMPLETED.name) return toApi(s) // idempotent
-        val received = chunks.listByUploadId(uploadId).map { it.chunkIndex }.toSet()
-        if (received != (0 until s.totalChunks).toSet()) {
+        val received = chunks.listByUploadId(uploadId)
+        if (received.size != s.totalChunks || received.any { it.chunkIndex < 0 || it.chunkIndex >= s.totalChunks }) {
             throw ApiException(409, "INCOMPLETE_UPLOAD", "Not all chunks have been uploaded")
         }
         s.status = UploadStatus.COMPLETED.name
@@ -115,6 +126,19 @@ class ResumableUploadHandler(
         val frame = blobs.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
         return ChunkResponse(frame = Blob(suiteId = "v1", bytes = enc.encodeToString(frame)))
     }
+
+    private fun ensureUploadBudget(s: UploadSession, replacingIndex: Int, newFrameSize: Long) {
+        val currentCiphertextBytes = chunks.listByUploadId(s.id)
+            .filter { it.chunkIndex != replacingIndex }
+            .sumOf { it.byteSize }
+        val budget = maxCiphertextBytes(s)
+        if (currentCiphertextBytes > budget || newFrameSize > budget - currentCiphertextBytes) {
+            throw ApiException(400, "UPLOAD_TOO_LARGE", "Uploaded chunk data exceeds the declared or configured upload limit")
+        }
+    }
+
+    private fun maxCiphertextBytes(s: UploadSession): Long =
+        minOf(maxUploadBytes + (maxChunks * FRAME_OVERHEAD_BYTES.toLong()), s.byteSize + (s.totalChunks * FRAME_OVERHEAD_BYTES.toLong()))
 
     private fun toApi(s: UploadSession): ApiUploadSession =
         ApiUploadSession(
@@ -149,5 +173,9 @@ class ResumableUploadHandler(
             throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
         }
         return userId
+    }
+
+    companion object {
+        private const val FRAME_OVERHEAD_BYTES = 28
     }
 }

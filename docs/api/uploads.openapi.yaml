@@ -93,9 +93,18 @@ components:
       type: object
       required: [totalChunks, mimeType, byteSize, takenAt]
       properties:
-        totalChunks: { type: integer }
+        totalChunks:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          description: Number of encrypted frames in this upload; bounded server-side by `veyq.uploads.max-chunks`.
         mimeType: { type: string }
-        byteSize: { type: integer, format: int64 }
+        byteSize:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 10737418240
+          description: Plaintext byte size; bounded server-side by `veyq.uploads.max-upload-bytes`.
         takenAt: { type: string, format: date-time }
     UploadSession:
       type: object
@@ -125,7 +134,9 @@ components:
       type: object
       required: [frame]
       properties:
-        frame: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        frame:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: One chunked-AEAD frame; decoded frame bytes are bounded server-side by `veyq.uploads.max-frame-bytes`.
     ChunkResponse:
       type: object
       required: [frame]

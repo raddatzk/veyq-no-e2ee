@@ -38,6 +38,8 @@ class AddMediaHandler(
     private val memberships: MembershipRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
+    @param:org.eclipse.microprofile.config.inject.ConfigProperty(name = "veyq.uploads.max-inline-bytes", defaultValue = "67108864") private val maxInlineBytes: Int,
+    @param:org.eclipse.microprofile.config.inject.ConfigProperty(name = "veyq.uploads.max-thumb-bytes", defaultValue = "1048576") private val maxThumbBytes: Int,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -56,15 +58,26 @@ class AddMediaHandler(
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before adding media")
         if (!suites.isKnown(req.sealedBlob.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
         if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
+        // bound the ciphertext BEFORE decoding (a giant base64 body must not be allocated to OOM the server)
+        val blob = decodeBounded(req.sealedBlob.bytes, maxInlineBytes, "MEDIA_TOO_LARGE")
+        val thumb = req.sealedThumb?.let { decodeBounded(it.bytes, maxThumbBytes, "THUMB_TOO_LARGE") }
 
         val item = Media().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
             takenAt = req.takenAt.toInstant(); mimeType = req.mimeType; byteSize = req.byteSize
-            suiteId = req.sealedBlob.suiteId; sealedBlob = dec.decode(req.sealedBlob.bytes)
-            sealedThumb = req.sealedThumb?.let { dec.decode(it.bytes) }; createdAt = Instant.now()
+            suiteId = req.sealedBlob.suiteId; sealedBlob = blob; sealedThumb = thumb; createdAt = Instant.now()
         }
         media.persist(item)
         return toApi(item)
+    }
+
+    /** Reject an oversized blob at the base64 length first (no allocation), then verify the decoded size. */
+    private fun decodeBounded(encoded: String, maxBytes: Int, code: String): ByteArray {
+        val maxEncodedChars = ((maxBytes + 2) / 3) * 4
+        if (encoded.length > maxEncodedChars) throw ApiException(400, code, "Sealed content exceeds the configured size limit")
+        val bytes = dec.decode(encoded)
+        if (bytes.size > maxBytes) throw ApiException(400, code, "Sealed content exceeds the configured size limit")
+        return bytes
     }
 
     private fun toApi(m: Media): MediaItem =

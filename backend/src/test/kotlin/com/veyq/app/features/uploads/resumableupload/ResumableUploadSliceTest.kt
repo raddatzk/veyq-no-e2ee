@@ -13,7 +13,9 @@ import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.narayana.jta.QuarkusTransaction
+import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.TestProfile
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import jakarta.inject.Inject
@@ -25,6 +27,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 
 @QuarkusTest
+@TestProfile(ResumableUploadLimitsProfile::class)
 class ResumableUploadSliceTest {
 
     @Inject lateinit var users: UserRepository
@@ -56,6 +59,8 @@ class ResumableUploadSliceTest {
     }
 
     private fun createBody() = """{"totalChunks":3,"mimeType":"video/mp4","byteSize":9000,"takenAt":"2026-01-01T10:00:00Z"}"""
+    private fun createBody(totalChunks: Int, byteSize: Long = 9000) =
+        """{"totalChunks":$totalChunks,"mimeType":"video/mp4","byteSize":$byteSize,"takenAt":"2026-01-01T10:00:00Z"}"""
     private fun chunkBody(bytes: String) = """{"frame":{"suiteId":"v1","bytes":"$bytes"}}"""
 
     @Test
@@ -97,4 +102,34 @@ class ResumableUploadSliceTest {
         // no more chunks after finalize
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(chunkBody("eA")).put("/api/uploads/$uploadId/chunks/0").then().statusCode(409).body("code", `is`("UPLOAD_NOT_OPEN"))
     }
+
+    @Test
+    fun rejectsOversizedResumableUploadsBeforeHeavyWork() {
+        // The test profile keeps limits small enough to prove the controls without large local payloads.
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(createBody(totalChunks = 4))
+            .post("/api/scopes/$scopeId/nodes/ru-mem/uploads").then().statusCode(400).body("code", `is`("UPLOAD_TOO_MANY_CHUNKS"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(createBody(totalChunks = 3, byteSize = 9001))
+            .post("/api/scopes/$scopeId/nodes/ru-mem/uploads").then().statusCode(400).body("code", `is`("UPLOAD_TOO_LARGE"))
+
+        val uploadId = given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(createBody(totalChunks = 1, byteSize = 1))
+            .post("/api/scopes/$scopeId/nodes/ru-mem/uploads").then().statusCode(200).extract().path<String>("uploadId")
+        val tooLargeFrame = "A".repeat(88) // >64 decoded bytes after base64url decoding
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(chunkBody(tooLargeFrame))
+            .put("/api/uploads/$uploadId/chunks/0").then().statusCode(400).body("code", `is`("FRAME_TOO_LARGE"))
+
+        val overDeclaredBudget = "A".repeat(40) // decodes under frame max, but exceeds byteSize + AEAD overhead
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(chunkBody(overDeclaredBudget))
+            .put("/api/uploads/$uploadId/chunks/0").then().statusCode(400).body("code", `is`("UPLOAD_TOO_LARGE"))
+
+        // Completion must fail from the manifest state without constructing an attacker-sized expected set.
+        given().header("Authorization", ownerToken).post("/api/uploads/$uploadId/complete").then().statusCode(409).body("code", `is`("INCOMPLETE_UPLOAD"))
+    }
+}
+
+class ResumableUploadLimitsProfile : QuarkusTestProfile {
+    override fun getConfigOverrides(): Map<String, String> = mapOf(
+        "veyq.uploads.max-chunks" to "3",
+        "veyq.uploads.max-upload-bytes" to "9000",
+        "veyq.uploads.max-frame-bytes" to "64",
+    )
 }

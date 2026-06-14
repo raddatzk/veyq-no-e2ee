@@ -4,6 +4,8 @@ status: partial
 documents:
   - type: feature
     ref: docs/wiki/features/uploads/_index.md
+  - type: useCase
+    ref: docs/wiki/features/uploads/use-cases/uc.uploads.add-media.md
   - type: crosscutting
     ref: docs/wiki/crosscutting/security-model.md
   - type: api
@@ -51,3 +53,11 @@ acceptanceCriteria:
           - testName: testSealsMediaAndOrdersByTakenAt
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/AddMediaE2ETests.swift
+  - id: uc.uploads.add-media.size-limits
+    statement: The server rejects an oversized sealed blob or thumbnail at the base64 length (before decoding/allocating), bounded by config.
+    coverage:
+      backend:
+        integration:
+          - testName: rejectsOversizedMediaBeforeDecode
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaSliceTest.kt

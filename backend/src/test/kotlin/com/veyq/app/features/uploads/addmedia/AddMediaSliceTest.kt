@@ -14,6 +14,8 @@ import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.narayana.jta.QuarkusTransaction
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.QuarkusTestProfile
+import io.quarkus.test.junit.TestProfile
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
 import jakarta.inject.Inject
@@ -22,7 +24,16 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 
+/** Keep the size limits tiny so the controls can be proven without large local payloads. */
+class AddMediaLimitsProfile : QuarkusTestProfile {
+    override fun getConfigOverrides() = mapOf(
+        "veyq.uploads.max-inline-bytes" to "64",
+        "veyq.uploads.max-thumb-bytes" to "16",
+    )
+}
+
 @QuarkusTest
+@TestProfile(AddMediaLimitsProfile::class)
 class AddMediaSliceTest {
 
     @Inject lateinit var users: UserRepository
@@ -84,5 +95,20 @@ class AddMediaSliceTest {
 
         // outsiders cannot list either
         given().header("Authorization", outsiderToken).get("/api/scopes/$scopeId/nodes/md-mem/media").then().statusCode(403)
+    }
+
+    @Test
+    fun rejectsOversizedMediaBeforeDecode() {
+        // an oversized sealed blob is rejected at the base64 length (no allocation) — DoS guard
+        val hugeBlob = "A".repeat(89) // > maxEncodedChars(64)
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"$hugeBlob"}}""")
+            .post("/api/scopes/$scopeId/nodes/md-mem/media").then().statusCode(400).body("code", `is`("MEDIA_TOO_LARGE"))
+
+        // a valid blob with an oversized thumbnail is rejected on the thumbnail
+        val hugeThumb = "A".repeat(25) // > maxEncodedChars(16)
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"c2VhbGVk"},"sealedThumb":{"suiteId":"v1","bytes":"$hugeThumb"}}""")
+            .post("/api/scopes/$scopeId/nodes/md-mem/media").then().statusCode(400).body("code", `is`("THUMB_TOO_LARGE"))
     }
 }
