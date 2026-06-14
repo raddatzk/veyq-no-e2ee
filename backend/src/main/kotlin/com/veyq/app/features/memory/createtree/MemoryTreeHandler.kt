@@ -8,6 +8,7 @@ import com.veyq.app.generated.model.NodeType
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
+import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
@@ -34,6 +35,7 @@ class MemoryTreeHandler(
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val nodes: NodeRepository,
+    private val contentKeys: ScopeContentKeyRepository,
     private val memberships: MembershipRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
@@ -51,6 +53,9 @@ class MemoryTreeHandler(
     fun createNode(auth: String?, scopeId: String, req: CreateNodeRequest): MemoryNode {
         requireKeyHolder(scopeId, auth)
         if (!suites.isKnown(req.sealedContent.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        // a node is sealed under the scope content key, so one must exist — this keeps the invariant
+        // "content-sealed object ⇒ content key" true, which is what scope rotation relies on to re-seal nodes.
+        contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before creating nodes")
 
         // resolve the parent: absent → root (the scope id is the root sentinel); else it must be a node in
         // the SAME scope. The parent's type (or null for root) drives the containment check below.
