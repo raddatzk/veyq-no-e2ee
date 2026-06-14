@@ -85,6 +85,31 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TenantInviteInfo' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenant-invites/{inviteId}/material:
+    post:
+      tags: [TenantProvisioning]
+      operationId: getInviteMaterial
+      summary: The temp-wrapped onboarding key material, released only on proof of the bootstrap secret.
+      description: >
+        A MEMBER invite carries the scope private key wrapped to a one-time temp keypair. That ciphertext
+        is NOT in the public metadata — fetching it requires presenting the bootstrap secret (defense in
+        depth: knowing only the inviteId never yields the wrapped grant). The temp private key still rides
+        the invite URL fragment and never reaches the server.
+      parameters:
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GetInviteMaterialRequest' }
+      responses:
+        '200':
+          description: The temp-wrapped onboarding material.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TenantInviteMaterial' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenant-invites/{inviteId}/claim:
     post:
       tags: [TenantProvisioning]
@@ -393,13 +418,21 @@ components:
         kind: { type: string, enum: [OWNER, MEMBER] }
         scopePublicKey:
           $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
-          description: MEMBER invites only — the existing scope's public key.
-        tempPublicKey:
-          $ref: './common.openapi.yaml#/components/schemas/KemPublicKey'
-          description: MEMBER invites only — the onboarding temp keypair public key.
-        tempWrappedScopePrivateKey:
-          $ref: './common.openapi.yaml#/components/schemas/Blob'
-          description: MEMBER invites only — the scope private key wrapped to the temp public key.
+          description: MEMBER invites only — the existing scope's public key (a public key, safe to expose).
+    GetInviteMaterialRequest:
+      type: object
+      required: [bootstrapSecret]
+      properties:
+        bootstrapSecret: { type: string }
+    TenantInviteMaterial:
+      type: object
+      description: >
+        The temp-wrapped onboarding material for a MEMBER invite, released only after the bootstrap secret
+        is proven. The temp private key (URL fragment) opens tempWrappedScopePrivateKey client-side.
+      required: [tempPublicKey, tempWrappedScopePrivateKey]
+      properties:
+        tempPublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        tempWrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     IssueMemberInviteRequest:
       type: object
       required: [role, tempPublicKey, tempWrappedScopePrivateKey]

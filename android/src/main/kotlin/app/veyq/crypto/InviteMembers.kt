@@ -156,9 +156,11 @@ object InviteMembers {
         email: String, displayName: String, password: String,
     ): RegisterViaInvitation.RegisterResult {
         val meta = RegisterViaInvitation.getInviteMetadata(apiBase, inviteId)
-        val tempKem = dec.decode(meta.getJSONObject("tempPublicKey").getString("kemPublicKey"))
-        val tempWrapped = dec.decode(meta.getJSONObject("tempWrappedScopePrivateKey").getString("bytes"))
         val scopePub = meta.getJSONObject("scopePublicKey").getString("kemPublicKey")
+        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        val material = RegisterViaInvitation.getInviteMaterial(apiBase, inviteId, bootstrapSecret)
+        val tempKem = dec.decode(material.getJSONObject("tempPublicKey").getString("kemPublicKey"))
+        val tempWrapped = dec.decode(material.getJSONObject("tempWrappedScopePrivateKey").getString("bytes"))
         val tempPriv = V1.deserializeIdentityPrivate(dec.decode(tempPrivateKeyB64))
         val scopePrivateBytes = V1.asymUnwrap(
             tempPriv.kemX, tempPriv.mlkemSeed, tempKem.copyOfRange(0, 32), tempKem.copyOfRange(32, tempKem.size), tempWrapped, "scope-grant",
@@ -175,9 +177,10 @@ object InviteMembers {
     fun acceptMemberInvite(
         apiBase: String, session: Login.UnlockedSession, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String,
     ): JSONObject {
-        val meta = RegisterViaInvitation.getInviteMetadata(apiBase, inviteId)
-        val tempKem = dec.decode(meta.getJSONObject("tempPublicKey").getString("kemPublicKey"))
-        val tempWrapped = dec.decode(meta.getJSONObject("tempWrappedScopePrivateKey").getString("bytes"))
+        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        val material = RegisterViaInvitation.getInviteMaterial(apiBase, inviteId, bootstrapSecret)
+        val tempKem = dec.decode(material.getJSONObject("tempPublicKey").getString("kemPublicKey"))
+        val tempWrapped = dec.decode(material.getJSONObject("tempWrappedScopePrivateKey").getString("bytes"))
         val tempPriv = V1.deserializeIdentityPrivate(dec.decode(tempPrivateKeyB64))
         val scopePrivateBytes = V1.asymUnwrap(
             tempPriv.kemX, tempPriv.mlkemSeed, tempKem.copyOfRange(0, 32), tempKem.copyOfRange(32, tempKem.size), tempWrapped, "scope-grant",

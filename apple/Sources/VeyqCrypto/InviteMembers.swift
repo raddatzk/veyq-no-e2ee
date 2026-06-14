@@ -179,14 +179,16 @@ public enum InviteMembers {
         email: String, displayName: String, password: String
     ) async throws -> RegisterViaInvitation.RegisterResult {
         let meta = try await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId)
-        guard let tempPub = meta.tempPublicKey, let tempWrapped = meta.tempWrappedScopePrivateKey, let scopePub = meta.scopePublicKey else {
+        guard let scopePub = meta.scopePublicKey else {
             throw NSError(domain: "veyq.memberinvite", code: 2, userInfo: [NSLocalizedDescriptionKey: "not a temp-wrap member invite"])
         }
+        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        let material = try await RegisterViaInvitation.getInviteMaterial(apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret)
         let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
-        let tempKem = Login.b64urlDecode(tempPub.kemPublicKey)
+        let tempKem = Login.b64urlDecode(material.tempPublicKey.kemPublicKey)
         let scopePrivateBytes = try V1.asymUnwrap(
             skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
-            blob: Login.b64urlDecode(tempWrapped.bytes), context: "scope-grant")
+            blob: Login.b64urlDecode(material.tempWrappedScopePrivateKey.bytes), context: "scope-grant")
         let scopePublicKey = scopePub.kemPublicKey
         return try await RegisterViaInvitation.registerWithScope(
             apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret, email: email, displayName: displayName, password: password
@@ -202,15 +204,13 @@ public enum InviteMembers {
     public static func acceptMemberInvite(
         apiBase: String, session: Login.UnlockedSession, inviteId: String, bootstrapSecret: String, tempPrivateKeyB64: String
     ) async throws -> MembershipSummaryDTO {
-        let meta = try await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId)
-        guard let tempPub = meta.tempPublicKey, let tempWrapped = meta.tempWrappedScopePrivateKey else {
-            throw NSError(domain: "veyq.accept", code: 1, userInfo: [NSLocalizedDescriptionKey: "not a temp-wrap member invite"])
-        }
+        // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+        let material = try await RegisterViaInvitation.getInviteMaterial(apiBase: apiBase, inviteId: inviteId, bootstrapSecret: bootstrapSecret)
         let tempPriv = V1.deserializeIdentityPrivate(Login.b64urlDecode(tempPrivateKeyB64))
-        let tempKem = Login.b64urlDecode(tempPub.kemPublicKey)
+        let tempKem = Login.b64urlDecode(material.tempPublicKey.kemPublicKey)
         let scopePrivateBytes = try V1.asymUnwrap(
             skX: tempPriv.kemX, mlkemSeed: tempPriv.mlkemSeed, pkX: Data(tempKem.prefix(32)), pkM: Data(tempKem.dropFirst(32)),
-            blob: Login.b64urlDecode(tempWrapped.bytes), context: "scope-grant")
+            blob: Login.b64urlDecode(material.tempWrappedScopePrivateKey.bytes), context: "scope-grant")
         let rewrapped = try V1.asymWrap(
             pkX: Data(session.kemPublicKey.prefix(32)), pkM: Data(session.kemPublicKey.dropFirst(32)),
             targetKey: scopePrivateBytes, context: "scope-grant", nonce: V1.randomBytes(12))

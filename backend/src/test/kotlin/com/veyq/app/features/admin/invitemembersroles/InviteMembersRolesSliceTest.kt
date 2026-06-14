@@ -21,6 +21,7 @@ import io.restassured.http.ContentType
 import jakarta.inject.Inject
 import org.hamcrest.CoreMatchers.`is`
 import org.hamcrest.CoreMatchers.notNullValue
+import org.hamcrest.CoreMatchers.nullValue
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -146,13 +147,22 @@ class InviteMembersRolesSliceTest {
         val inviteId = invite.path<String>("inviteId")
         val bootstrapSecret = invite.path<String>("bootstrapSecret")
 
-        // public metadata carries the temp-wrapped grant (token stays in the fragment, never sent here)
+        // public metadata exposes the scope public key but NOT the temp-wrapped grant (defense in depth)
         val meta = given().get("/api/tenant-invites/$inviteId").then().statusCode(200)
             .body("kind", `is`("MEMBER"))
             .body("role", `is`("Member"))
-            .body("tempWrappedScopePrivateKey.bytes", `is`("dGVtcC13cmFwcGVk"))
+            .body("tempWrappedScopePrivateKey", nullValue())
             .extract()
         val scopePub = meta.path<String>("scopePublicKey.kemPublicKey")
+
+        // the temp-wrapped grant is released only on proof of the bootstrap secret
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"AAAA"}""")
+            .post("/api/tenant-invites/$inviteId/material").then().statusCode(400)
+            .body("code", `is`("BAD_BOOTSTRAP_SECRET"))
+        given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$bootstrapSecret"}""")
+            .post("/api/tenant-invites/$inviteId/material").then().statusCode(200)
+            .body("tempWrappedScopePrivateKey.bytes", `is`("dGVtcC13cmFwcGVk"))
+            .body("tempPublicKey.kemPublicKey", `is`("dGVtcC1wdWI"))
 
         // a wrong scope public key is rejected (integrity)
         given().contentType(ContentType.JSON)

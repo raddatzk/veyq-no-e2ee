@@ -34,6 +34,17 @@ object RegisterViaInvitation {
         return JSONObject(resp.body())
     }
 
+    /** Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata). */
+    fun getInviteMaterial(apiBase: String, inviteId: String, bootstrapSecret: String): JSONObject {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/material"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("""{"bootstrapSecret":"$bootstrapSecret"}"""))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("invite material failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body())
+    }
+
     /** Builds the tenant scope grant (scopePublicKey, wrappedScopePrivateKey — both base64url). */
     fun interface TenantScopeProvider {
         fun grant(idPubKemX: ByteArray, idPubKemM: ByteArray): Pair<String, String>

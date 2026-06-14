@@ -3,7 +3,7 @@
 // Adding people is invite-only — there is no directory lookup of arbitrary emails. The server stays blind.
 import * as v1 from '../../../shared/crypto/v1'
 import { getMyScopeGrant, openScopeGrant } from '../createTenantInviteOwner/tenant'
-import { getInviteMetadata, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
+import { getInviteMetadata, getInviteMaterial, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
 import type { UnlockedSession } from '../../account/login/login'
 
 function b64url(b: Uint8Array): string {
@@ -200,15 +200,15 @@ export async function registerViaMemberInvite(
   password: string,
 ): Promise<RegisterResult> {
   const meta = await getInviteMetadata(apiBase, inviteId)
-  if (!meta.tempPublicKey || !meta.tempWrappedScopePrivateKey || !meta.scopePublicKey) {
-    throw new Error('invite is not a temp-wrap member invite')
-  }
+  if (!meta.scopePublicKey) throw new Error('invite is not a temp-wrap member invite')
+  // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+  const material = await getInviteMaterial(apiBase, inviteId, bootstrapSecret)
   const tempPriv = v1.deserializeIdentityPrivate(fromB64url(tempPrivateKeyB64))
-  const tempKem = fromB64url(meta.tempPublicKey.kemPublicKey)
+  const tempKem = fromB64url(material.tempPublicKey.kemPublicKey)
   const scopePrivateBytes = v1.asymUnwrap(
     v1.hybridSecret(tempPriv),
     { x: tempKem.slice(0, 32), m: tempKem.slice(32) },
-    fromB64url(meta.tempWrappedScopePrivateKey.bytes),
+    fromB64url(material.tempWrappedScopePrivateKey.bytes),
     'scope-grant',
   )
   const scopePublicKey = meta.scopePublicKey.kemPublicKey
@@ -230,14 +230,14 @@ export async function acceptMemberInvite(
   bootstrapSecret: string,
   tempPrivateKeyB64: string,
 ): Promise<MembershipSummary> {
-  const meta = await getInviteMetadata(apiBase, inviteId)
-  if (!meta.tempPublicKey || !meta.tempWrappedScopePrivateKey) throw new Error('invite is not a temp-wrap member invite')
+  // the temp-wrapped grant is gated behind the bootstrap secret (not in public metadata)
+  const material = await getInviteMaterial(apiBase, inviteId, bootstrapSecret)
   const tempPriv = v1.deserializeIdentityPrivate(fromB64url(tempPrivateKeyB64))
-  const tempKem = fromB64url(meta.tempPublicKey.kemPublicKey)
+  const tempKem = fromB64url(material.tempPublicKey.kemPublicKey)
   const scopePrivateBytes = v1.asymUnwrap(
     v1.hybridSecret(tempPriv),
     { x: tempKem.slice(0, 32), m: tempKem.slice(32) },
-    fromB64url(meta.tempWrappedScopePrivateKey.bytes),
+    fromB64url(material.tempWrappedScopePrivateKey.bytes),
     'scope-grant',
   )
   const ownKem = fromB64url(session.identityPublicKey.kemPublicKey)

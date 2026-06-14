@@ -3,6 +3,7 @@ package com.veyq.app.features.admin.createtenantinviteowner
 import com.veyq.app.generated.api.TenantProvisioningApi
 import com.veyq.app.generated.model.ClaimTenantOwnershipRequest
 import com.veyq.app.generated.model.CreateTenantRequest
+import com.veyq.app.generated.model.GetInviteMaterialRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -18,6 +19,9 @@ class TenantProvisioningResource(private val handler: TenantProvisioningHandler)
 
     override fun getTenantInvite(inviteId: String): Response =
         Response.ok(handler.getTenantInvite(inviteId)).build()
+
+    override fun getInviteMaterial(inviteId: String, getInviteMaterialRequest: GetInviteMaterialRequest): Response =
+        Response.ok(handler.getInviteMaterial(inviteId, getInviteMaterialRequest)).build()
 
     override fun claimTenantOwnership(authorization: String, inviteId: String, claimTenantOwnershipRequest: ClaimTenantOwnershipRequest): Response =
         Response.ok(handler.claimTenantOwnership(authorization, inviteId, claimTenantOwnershipRequest)).build()

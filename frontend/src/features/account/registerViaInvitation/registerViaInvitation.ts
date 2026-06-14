@@ -22,8 +22,11 @@ export type InviteMetadata = {
   status: string
   kind: string
   scopePublicKey?: KemPublicKey
-  tempPublicKey?: KemPublicKey
-  tempWrappedScopePrivateKey?: Blob
+}
+/** Temp-wrapped onboarding material, released only on proof of the bootstrap secret (defense in depth). */
+export type InviteMaterial = {
+  tempPublicKey: KemPublicKey
+  tempWrappedScopePrivateKey: Blob
 }
 /** Builds the tenant scope grant for the new account, given the invitee's identity public key. */
 export type TenantScopeProvider = (idPub: { x: Uint8Array; m: Uint8Array }) => {
@@ -42,6 +45,17 @@ export type EmergencyKit = { secretKey: string }
 export async function getInviteMetadata(apiBase: string, inviteId: string): Promise<InviteMetadata> {
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}`)
   if (!res.ok) throw new Error(`invite metadata failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata). */
+export async function getInviteMaterial(apiBase: string, inviteId: string, bootstrapSecret: string): Promise<InviteMaterial> {
+  const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}/material`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ bootstrapSecret }),
+  })
+  if (!res.ok) throw new Error(`invite material failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
 

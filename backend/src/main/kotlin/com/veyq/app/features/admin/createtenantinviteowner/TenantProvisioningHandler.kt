@@ -3,10 +3,12 @@ package com.veyq.app.features.admin.createtenantinviteowner
 import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.ClaimTenantOwnershipRequest
 import com.veyq.app.generated.model.CreateTenantRequest
+import com.veyq.app.generated.model.GetInviteMaterialRequest
 import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.MyScopeGrant
 import com.veyq.app.generated.model.OwnerInvite
 import com.veyq.app.generated.model.TenantInviteInfo
+import com.veyq.app.generated.model.TenantInviteMaterial
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
@@ -96,8 +98,8 @@ class TenantProvisioningHandler(
     fun getTenantInvite(inviteId: String): TenantInviteInfo {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
-        // MEMBER invites carry the temp-wrapped scope grant so the invitee can unwrap with the temp
-        // private key (from the URL fragment) and re-wrap to their own identity. The token never leaks.
+        // Public metadata only. The temp-wrapped scope grant is NOT exposed here — it is released by
+        // getInviteMaterial on proof of the bootstrap secret, so an inviteId alone never yields ciphertext.
         val scope = invite.scopeId?.let { scopes.findById(it) }
         return TenantInviteInfo(
             inviteId = invite.id,
@@ -106,12 +108,22 @@ class TenantProvisioningHandler(
             status = TenantInviteInfo.Status.valueOf(invite.status),
             kind = TenantInviteInfo.Kind.valueOf(invite.kind),
             scopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
-            tempPublicKey = invite.tempPublicKey?.let {
-                KemPublicKey(suiteId = invite.tempWrapSuiteId ?: (scope?.suiteId ?: ""), kemPublicKey = enc.encodeToString(it))
-            },
-            tempWrappedScopePrivateKey = invite.tempWrappedScopePrivateKey?.let {
-                Blob(suiteId = invite.tempWrapSuiteId ?: "", bytes = enc.encodeToString(it))
-            },
+        )
+    }
+
+    /** Release the temp-wrapped onboarding material — only to a caller who proves the bootstrap secret. */
+    @Transactional
+    fun getInviteMaterial(inviteId: String, req: GetInviteMaterialRequest): TenantInviteMaterial {
+        val invite = invites.findById(inviteId) ?: throw notFound("Invite")
+        if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
+            throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
+        }
+        val tempPub = invite.tempPublicKey ?: throw notFound("Invite material")
+        val tempWrapped = invite.tempWrappedScopePrivateKey ?: throw notFound("Invite material")
+        val scope = invite.scopeId?.let { scopes.findById(it) }
+        return TenantInviteMaterial(
+            tempPublicKey = KemPublicKey(suiteId = invite.tempWrapSuiteId ?: (scope?.suiteId ?: ""), kemPublicKey = enc.encodeToString(tempPub)),
+            tempWrappedScopePrivateKey = Blob(suiteId = invite.tempWrapSuiteId ?: "", bytes = enc.encodeToString(tempWrapped)),
         )
     }
 

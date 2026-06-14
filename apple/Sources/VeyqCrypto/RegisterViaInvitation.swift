@@ -25,9 +25,13 @@ public enum RegisterViaInvitation {
         public let tenant: Tenant.TenantSummary
         public let role, status, kind: String
         let scopePublicKey: KemPublicKeyDTO?
-        let tempPublicKey: KemPublicKeyDTO?
-        let tempWrappedScopePrivateKey: BlobDTO?
     }
+    /// Temp-wrapped onboarding material, released only on proof of the bootstrap secret (defense in depth).
+    public struct TenantInviteMaterialDTO: Codable {
+        let tempPublicKey: KemPublicKeyDTO
+        let tempWrappedScopePrivateKey: BlobDTO
+    }
+    struct GetInviteMaterialRequest: Codable { let bootstrapSecret: String }
 
     /// Builds the tenant scope grant for the new account, given the invitee's identity public key.
     public typealias TenantScopeProvider = (_ idPubKemX: Data, _ idPubKemM: Data) throws -> (scopePublicKey: String, wrappedScopePrivateKey: String)
@@ -53,6 +57,20 @@ public enum RegisterViaInvitation {
                           userInfo: [NSLocalizedDescriptionKey: "invite metadata failed: \(String(data: data, encoding: .utf8) ?? "")"])
         }
         return try JSONDecoder().decode(TenantInviteInfoDTO.self, from: data)
+    }
+
+    /// Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata).
+    public static func getInviteMaterial(apiBase: String, inviteId: String, bootstrapSecret: String) async throws -> TenantInviteMaterialDTO {
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenant-invites/\(inviteId)/material")!)
+        r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(GetInviteMaterialRequest(bootstrapSecret: bootstrapSecret))
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.register", code: 6,
+                          userInfo: [NSLocalizedDescriptionKey: "invite material failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+        return try JSONDecoder().decode(TenantInviteMaterialDTO.self, from: data)
     }
 
     static func buildRequest(
