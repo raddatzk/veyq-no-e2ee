@@ -103,7 +103,7 @@ A useful vertical slice is:
 
 - Features: [Spaces](../features/spaces/_index.md), [Memory](../features/memory/_index.md)
 - Concepts: [Security Model](security-model.md) (scope keys, shared vs. unshared, blinded slug tokens)
-- Use-cases: [Switch tenant](../features/spaces/use-cases/uc.spaces.switch-tenant.md),
+- Use-cases: [Switch the active space](../features/spaces/use-cases/uc.spaces.switch-active-space.md),
   [Use the personal space](../features/spaces/use-cases/uc.spaces.use-personal.md),
   [Use a group space](../features/spaces/use-cases/uc.spaces.use-group.md),
   [Create a Memory tree](../features/memory/use-cases/uc.memory.create-tree.md),

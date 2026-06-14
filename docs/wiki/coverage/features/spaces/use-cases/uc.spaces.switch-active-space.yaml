@@ -1,0 +1,50 @@
+id: uc.spaces.switch-active-space
+title: Switch the active space
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/spaces/_index.md
+  - type: useCase
+    ref: docs/wiki/features/spaces/use-cases/uc.spaces.switch-active-space.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/space-navigation.md
+  - type: api
+    ref: docs/api/spaces.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/spaces/switchActiveSpace/switchActiveSpace.ts
+  - type: entryPoint
+    ref: android/src/main/kotlin/app/veyq/crypto/SwitchActiveSpace.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/SwitchActiveSpace.swift
+acceptanceCriteria:
+  - id: uc.spaces.switch-active-space.unified-roster
+    statement: The switcher lists the caller's personal space plus every group they hold the scope key for; a membership without the grant is not an enterable space.
+    coverage:
+      backend:
+        integration:
+          - testName: listsPersonalPlusHeldGroupSpaces
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
+          - testName: listsPersonalPlusHeldGroupSpaces
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/spaces/switchactivespace/MySpacesSliceTest.kt
+  - id: uc.spaces.switch-active-space.switch-with-held-keys
+    statement: Switching into a space opens its scope with an already-held wrap (no secrets fetched); each space's content is isolated to its own scope.
+    coverage:
+      web:
+        e2e:
+          - testName: lists personal + group spaces and switches between them with already-held keys
+            kind: positive
+            ref: frontend/src/features/spaces/switchActiveSpace/switchActiveSpace.e2e.test.ts
+      android:
+        e2e:
+          - testName: listsPersonalPlusGroupAndSwitchesBetweenThem
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/SwitchActiveSpaceE2ETest.kt
+      apple:
+        e2e:
+          - testName: testListsPersonalPlusGroupAndSwitchesBetweenThem
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/SwitchActiveSpaceE2ETests.swift

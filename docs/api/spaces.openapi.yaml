@@ -22,6 +22,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MyGroupList' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  # NB: own tag (SpaceRoster) — keeping one operation per tag avoids the jaxrs-spec greedy class-@Path that
+  # would otherwise shadow sibling /api/me/* routes (see docs note on the codegen gotcha).
+  /api/me/spaces:
+    get:
+      tags: [SpaceRoster]
+      operationId: listMySpaces
+      summary: The unified space switcher — every space the caller can enter (personal + groups).
+      description: >
+        One list backing the space switcher: the caller's personal space plus every group they are an
+        active member of AND hold the scope key for (access = the wrap, ADR 0005 — a space appears only if
+        its scope key is actually held). Switching between them is pure client-side context; this fetches no
+        secrets, only the public scope material the client already holds wraps for.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '200':
+          description: The caller's spaces.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MySpaceList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
 components:
   schemas:
     GroupSpace:
@@ -41,3 +62,22 @@ components:
         groups:
           type: array
           items: { $ref: '#/components/schemas/GroupSpace' }
+    SpaceEntry:
+      type: object
+      description: One entry in the space switcher. PERSONAL has no tenant/role; GROUP carries both.
+      required: [kind, displayName, scopeId, scopePublicKey]
+      properties:
+        kind: { type: string, enum: [PERSONAL, GROUP] }
+        tenantId: { type: string, description: 'GROUP only — the backing tenant.' }
+        name: { type: string, description: 'GROUP only — the tenant name (slug).' }
+        displayName: { type: string, description: 'PERSONAL: the user''s display name; GROUP: the tenant display name.' }
+        role: { type: string, description: 'GROUP only — the caller''s role (membership authority, not content access).' }
+        scopeId: { type: string }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+    MySpaceList:
+      type: object
+      required: [spaces]
+      properties:
+        spaces:
+          type: array
+          items: { $ref: '#/components/schemas/SpaceEntry' }
