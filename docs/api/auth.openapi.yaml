@@ -43,6 +43,19 @@ paths:
             application/json:
               schema: { $ref: './common.openapi.yaml#/components/schemas/UserSummary' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+  /api/me/session:
+    delete:
+      tags: [Login]
+      operationId: logout
+      summary: Invalidate the caller's current session token (logout).
+      description: >
+        Deletes the session row for the presented bearer token so it can never resolve again. Idempotent —
+        an unknown or already-expired token still returns 204. Holds no key material; unlock state is local.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+      responses:
+        '204': { description: The session was invalidated (or did not exist). }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
   /api/me/personal-scope:
     get:
       tags: [Login]

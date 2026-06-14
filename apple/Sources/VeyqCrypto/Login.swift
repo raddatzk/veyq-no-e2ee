@@ -77,6 +77,17 @@ public enum Login {
             kemPublicKey: b64urlDecode(body.keyBag.identityPublicKey.kemPublicKey), masterKey: masterKey)
     }
 
+    /// Logout: invalidate the current session token server-side. Idempotent for an already-dead token.
+    public static func logout(apiBase: String, sessionToken: String) async throws {
+        var request = URLRequest(url: URL(string: "\(apiBase)/api/me/session")!)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+        let (_, resp) = try await URLSession.shared.data(for: request)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 204 else {
+            throw NSError(domain: "veyq.login", code: 5, userInfo: [NSLocalizedDescriptionKey: "logout failed"])
+        }
+    }
+
     public static func fetchCurrentUser(apiBase: String, sessionToken: String) async throws -> UserSummaryDTO {
         var request = URLRequest(url: URL(string: "\(apiBase)/api/me")!)
         request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")

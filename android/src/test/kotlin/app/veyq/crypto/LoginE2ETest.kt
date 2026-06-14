@@ -39,5 +39,11 @@ class LoginE2ETest {
         // the recovered private key matches the server's stored public key (X25519 half)
         val recoveredXPub = X25519PrivateKeyParameters(session.identity.kemX, 0).generatePublicKey().encoded
         assertContentEquals(recoveredXPub, session.kemPublicKey.copyOfRange(0, 32))
+
+        // logout invalidates the session: the same token no longer resolves
+        Login.logout(apiBase, session.sessionToken)
+        var resolvesAfterLogout = true
+        try { Login.fetchCurrentUser(apiBase, session.sessionToken) } catch (e: Exception) { resolvesAfterLogout = false }
+        assertTrue(!resolvesAfterLogout, "session must not resolve after logout")
     }
 }

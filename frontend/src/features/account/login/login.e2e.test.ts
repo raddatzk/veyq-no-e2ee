@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { registerServerOwner } from '../../admin/setupServer/setupServer'
-import { login, fetchCurrentUser, fetchPersonalScope, openPersonalScopeGrant } from './login'
+import { login, logout, fetchCurrentUser, fetchPersonalScope, openPersonalScopeGrant } from './login'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -43,5 +43,9 @@ suite('login + unlock E2E (web v1 crypto -> live backend)', () => {
     const recoveredXPub = x25519.getPublicKey(session.identity.kemX)
     const storedXPub = fromB64url(session.identityPublicKey.kemPublicKey).slice(0, 32)
     expect(Array.from(recoveredXPub)).toEqual(Array.from(storedXPub))
+
+    // logout invalidates the session: the same token no longer resolves
+    await logout(apiBase, session.sessionToken)
+    await expect(fetchCurrentUser(apiBase, session.sessionToken)).rejects.toThrow()
   })
 })

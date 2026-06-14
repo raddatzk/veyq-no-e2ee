@@ -32,5 +32,12 @@ final class LoginE2ETests: XCTestCase {
         // the recovered private key matches the server's stored public key (X25519 half)
         let recoveredXPub = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: session.identity.kemX).publicKey.rawRepresentation
         XCTAssertEqual(recoveredXPub, Data(session.kemPublicKey.prefix(32)))
+
+        // logout invalidates the session: the same token no longer resolves
+        try await Login.logout(apiBase: apiBase, sessionToken: session.sessionToken)
+        var resolvesAfterLogout = true
+        do { _ = try await Login.fetchCurrentUser(apiBase: apiBase, sessionToken: session.sessionToken) }
+        catch { resolvesAfterLogout = false }
+        XCTAssertFalse(resolvesAfterLogout, "session must not resolve after logout")
     }
 }

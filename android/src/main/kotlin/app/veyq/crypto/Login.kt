@@ -62,6 +62,14 @@ object Login {
         )
     }
 
+    /** Logout: invalidate the current session token server-side. Idempotent for an already-dead token. */
+    fun logout(apiBase: String, sessionToken: String) {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/session"))
+            .header("Authorization", "Bearer $sessionToken").DELETE().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 204) throw RuntimeException("logout failed: ${resp.statusCode()} ${resp.body()}")
+    }
+
     /** Returns the response body for the resolved session, or throws on non-200. */
     fun fetchCurrentUser(apiBase: String, sessionToken: String): String {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me"))

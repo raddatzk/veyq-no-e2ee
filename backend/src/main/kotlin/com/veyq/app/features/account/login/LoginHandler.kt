@@ -85,6 +85,13 @@ class LoginHandler(
         return user.toSummary()
     }
 
+    /** Logout: drop the caller's session. Idempotent — requires a resolvable session, then invalidates it. */
+    @Transactional
+    fun logout(authorization: String?) {
+        sessions.resolve(authorization) ?: throw unauthorized()
+        sessions.invalidate(authorization)
+    }
+
     @Transactional
     fun personalScope(authorization: String?): PersonalScopeGrant {
         val userId = sessions.resolve(authorization) ?: throw unauthorized()

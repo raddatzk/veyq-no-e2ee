@@ -17,4 +17,9 @@ class LoginResource(private val handler: LoginHandler) : LoginApi {
 
     override fun getPersonalScope(authorization: String): Response =
         Response.ok(handler.personalScope(authorization)).build()
+
+    override fun logout(authorization: String): Response {
+        handler.logout(authorization)
+        return Response.noContent().build()
+    }
 }

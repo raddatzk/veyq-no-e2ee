@@ -64,6 +64,15 @@ export async function login(
   return { sessionToken: body.sessionToken, user: body.user, identity, identityPublicKey: body.keyBag.identityPublicKey, masterKey }
 }
 
+/** Logout: invalidate the current session token server-side. Idempotent for an already-dead token. */
+export async function logout(apiBase: string, sessionToken: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/me/session`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${sessionToken}` },
+  })
+  if (!res.ok) throw new Error(`logout failed: ${res.status} ${await res.text()}`)
+}
+
 /** Proves the session resolves on the server. */
 export async function fetchCurrentUser(apiBase: string, sessionToken: string): Promise<LoginResponse['user']> {
   const res = await fetch(`${apiBase}/api/me`, { headers: { authorization: `Bearer ${sessionToken}` } })

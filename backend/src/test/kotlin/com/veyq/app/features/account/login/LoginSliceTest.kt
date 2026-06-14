@@ -130,14 +130,27 @@ class LoginSliceTest {
             .body("scopePublicKey.kemPublicKey", `is`("cGVyc29uYWw")) // base64url("personal")
             .body("wrappedScopePrivateKey.bytes", `is`("cGVyc29uYWxncmFudA")) // base64url("personalgrant")
 
-        // 4. a wrong password is rejected, no session
+        // 4. logout invalidates the session: the same token no longer resolves
+        given().header("Authorization", "Bearer $sessionToken")
+            .delete("/api/me/session")
+            .then().statusCode(204)
+        given().header("Authorization", "Bearer $sessionToken")
+            .get("/api/me")
+            .then().statusCode(401)
+
+        // 4b. logout itself needs a valid session (a bogus token cannot log out)
+        given().header("Authorization", "Bearer nope")
+            .delete("/api/me/session")
+            .then().statusCode(401)
+
+        // 5. a wrong password is rejected, no session
         given().contentType(ContentType.JSON)
             .body("""{"email":"$email","password":"wrong"}""")
             .post("/api/login")
             .then().statusCode(401)
             .body("code", `is`("INVALID_CREDENTIALS"))
 
-        // 5. a bogus token does not resolve
+        // 6. a bogus token does not resolve
         given().header("Authorization", "Bearer nope")
             .get("/api/me")
             .then().statusCode(401)
