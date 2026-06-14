@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -58,6 +59,10 @@ class KeyBlobRepository : PanacheRepositoryBase<KeyBlob, String> {
     fun findByUserIdAndUnlockMethod(userId: String, unlockMethod: String): List<KeyBlob> =
         list("userId = ?1 and unlockMethod = ?2", userId, unlockMethod)
     fun countByUserId(userId: String): Long = count("userId", userId)
+
+    /** Row-locked snapshot of a user's wraps: serializes concurrent removals so the lockout floor holds. */
+    fun listByUserIdForUpdate(userId: String): List<KeyBlob> =
+        find("userId", userId).withLock(LockModeType.PESSIMISTIC_WRITE).list()
 }
 
 @ApplicationScoped

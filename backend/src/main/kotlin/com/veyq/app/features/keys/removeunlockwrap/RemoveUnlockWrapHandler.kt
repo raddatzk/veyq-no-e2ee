@@ -22,18 +22,22 @@ class RemoveUnlockWrapHandler(
     fun removeMyMasterKeyWrap(auth: String?, unlockMethod: String, credentialRef: String?) {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         val method = parseMethod(unlockMethod)
-        val blob = keyBlobs.findByUserIdAndUnlockMethod(userId, method.value)
-            .firstOrNull { it.credentialRef == credentialRef }
+
+        // Take a row-locked snapshot of all the user's wraps and decide from it. Two concurrent removals
+        // would otherwise both read the pre-delete count, each pass the floor check, and drop below it
+        // (TOCTOU) — the lock serializes them so the lockout guards hold.
+        val blobs = keyBlobs.listByUserIdForUpdate(userId)
+        val blob = blobs.firstOrNull { it.unlockMethod == method.value && it.credentialRef == credentialRef }
             ?: throw ApiException(404, "NOT_FOUND", "Master key wrap not found")
 
         // Removing the last PASSWORD wrap would strip the mandatory recovery path (Emergency Kit),
         // leaving only hardware-bound methods that can all be lost → permanent lockout.
         if (method == MasterKeyWrap.UnlockMethod.PASSWORD &&
-            keyBlobs.findByUserIdAndUnlockMethod(userId, MasterKeyWrap.UnlockMethod.PASSWORD.value).size <= 1
+            blobs.count { it.unlockMethod == MasterKeyWrap.UnlockMethod.PASSWORD.value } <= 1
         ) {
             throw ApiException(409, "LAST_CAPABLE_METHOD", "Cannot remove the last password unlock method")
         }
-        if (keyBlobs.countByUserId(userId) <= 1) {
+        if (blobs.size <= 1) {
             throw ApiException(409, "LAST_UNLOCK_METHOD", "Cannot remove the last unlock method")
         }
 
