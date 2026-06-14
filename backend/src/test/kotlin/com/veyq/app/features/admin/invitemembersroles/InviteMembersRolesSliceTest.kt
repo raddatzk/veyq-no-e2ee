@@ -119,10 +119,14 @@ class InviteMembersRolesSliceTest {
                 memberships.persist(Membership().apply {
                     id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
                 })
-                // a Memory-tree node in the rotation scope — rotation must re-seal it under the fresh key too
+                // two Memory-tree nodes (same parent = root) in the rotation scope — rotation must re-seal both
                 nodes.persist(Node().apply {
                     id = "im-rot-node"; scopeId = rotScopeId; parentId = rotScopeId; type = "MEMORY"
                     slugToken = "rot-tok-old"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now
+                })
+                nodes.persist(Node().apply {
+                    id = "im-rot-node2"; scopeId = rotScopeId; parentId = rotScopeId; type = "MEMORY"
+                    slugToken = "rot-tok2-old"; orderIndex = 1; suiteId = "v1"; sealedContent = "n2".toByteArray(); createdAt = now
                 })
 
                 // dedicated role-change tenant: one Owner + one Member, no grants (role ≠ access)
@@ -333,11 +337,17 @@ class InviteMembersRolesSliceTest {
         // items re-sealed but the nodes left out — rejected (Memory-tree names would orphan / leak to a cached key)
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]"))
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("RESEAL_NODES_REQUIRED"))
-        // an empty node re-seal does not cover the scope's node — rejected
+        // an empty node re-seal does not cover the scope's nodes — rejected
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]", "[]"))
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("INCOMPLETE_NODE_RESEAL"))
-        // a fresh content key + items + the node re-sealed (new sealed name + new slug token) succeeds
-        val nodeReseal = """[{"id":"im-rot-node","slugToken":"rot-tok-new","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZQ"}}]"""
+        // re-sealing both nodes with the SAME (sibling) slug token is rejected as a clean 400, not a DB 500
+        val dupReseal = """[{"id":"im-rot-node","slugToken":"same","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZQ"}},""" +
+            """{"id":"im-rot-node2","slugToken":"same","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZQ"}}]"""
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]", dupReseal))
+            .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(400).body("code", `is`("DUPLICATE_SLUG_TOKEN"))
+        // a fresh content key + items + both nodes re-sealed (new sealed name + distinct new slug tokens) succeeds
+        val nodeReseal = """[{"id":"im-rot-node","slugToken":"rot-tok-new","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZQ"}},""" +
+            """{"id":"im-rot-node2","slugToken":"rot-tok2-new","sealedContent":{"suiteId":"v1","bytes":"bmV3bmFtZTI"}}]"""
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(rotateBody("c2Vjb25k", rot, "ZnJlc2hjaw", "[]", nodeReseal))
             .post("/api/tenants/$rotTenantId/scope/rotate").then().statusCode(200)
         given().header("Authorization", ownerToken)
@@ -345,8 +355,8 @@ class InviteMembersRolesSliceTest {
             .body("wrappedContentKey.bytes", `is`("ZnJlc2hjaw"))
         // the node now carries the new slug token + re-sealed name
         given().header("Authorization", ownerToken).get("/api/scopes/$rotScopeId/nodes").then().statusCode(200)
-            .body("nodes[0].slugToken", `is`("rot-tok-new"))
-            .body("nodes[0].sealedContent.bytes", `is`("bmV3bmFtZQ"))
+            .body("nodes.find { it.id == 'im-rot-node' }.slugToken", `is`("rot-tok-new"))
+            .body("nodes.find { it.id == 'im-rot-node' }.sealedContent.bytes", `is`("bmV3bmFtZQ"))
     }
 
     @Test

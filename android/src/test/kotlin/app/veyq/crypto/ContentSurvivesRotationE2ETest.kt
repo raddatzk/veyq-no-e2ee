@@ -55,7 +55,7 @@ class ContentSurvivesRotationE2ETest {
         var node: org.json.JSONObject? = null
         for (i in 0 until nodesAfter.length()) if (nodesAfter.getJSONObject(i).getString("id") == nodeBefore.getString("id")) node = nodesAfter.getJSONObject(i)
         assertEquals("Urlaube", MemoryTree.decodeNodeName(aCk, node!!))
-        assertEquals(MemoryTree.slugTokenFor(aCk, "urlaube"), node.getString("slugToken"))
+        assertEquals(MemoryTree.slugTokenFor(aCk, aScope.scopeId, "urlaube"), node.getString("slugToken"))
         assertFalse(node.getString("slugToken") == nodeBefore.getString("slugToken"))
         var oldKeyNodeFailed = false
         try { MemoryTree.decodeNode(ckBefore, node) } catch (e: Exception) { oldKeyNodeFailed = true }

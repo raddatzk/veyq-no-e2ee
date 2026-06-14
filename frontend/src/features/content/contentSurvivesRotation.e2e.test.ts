@@ -51,7 +51,7 @@ suite('content survives scope rotation E2E (web -> live backend)', () => {
     const nodesAfter = await listNodes(apiBase, a, aScope.scopeId)
     const node = nodesAfter.find((n) => n.id === nodeBefore.id)!
     expect(decodeNode(aCk, node).name).toBe('Urlaube')
-    expect(node.slugToken).toBe(slugTokenFor(aCk, 'urlaube'))
+    expect(node.slugToken).toBe(slugTokenFor(aCk, aScope.scopeId, 'urlaube'))
     expect(node.slugToken).not.toBe(nodeBefore.slugToken)
     expect(() => decodeNode(ckBefore, node)).toThrow()
 

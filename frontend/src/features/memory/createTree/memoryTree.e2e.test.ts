@@ -26,8 +26,9 @@ suite('create-tree E2E (web -> live backend): an encrypted Folder/Memory/Chapter
     expect(memory.parentId).toBe(folder.id)
     expect(chapter.parentId).toBe(memory.id)
 
-    // the stored slug token is the deterministic blinded token — the server never saw "urlaube"
-    expect(folder.slugToken).toBe(slugTokenFor(ck, 'urlaube'))
+    // the stored slug token is the deterministic blinded token (parent slot = scope id at the root) —
+    // the server never saw "urlaube"
+    expect(folder.slugToken).toBe(slugTokenFor(ck, scope.scopeId, 'urlaube'))
 
     // the client fetches the flat graph and reconstructs names + structure locally
     const nodes = await listNodes(apiBase, a, scope.scopeId)

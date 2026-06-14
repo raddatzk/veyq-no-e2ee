@@ -53,7 +53,7 @@ final class ContentSurvivesRotationE2ETests: XCTestCase {
         let nodesAfter = try await MemoryTree.listNodes(apiBase: apiBase, session: a, scopeId: aScope.scopeId)
         let node = nodesAfter.first { $0.id == nodeBefore.id }!
         XCTAssertEqual(try MemoryTree.decodeNode(contentKey: aCk, node: node).name, "Urlaube")
-        XCTAssertEqual(node.slugToken, MemoryTree.slugTokenFor(contentKey: aCk, slug: "urlaube"))
+        XCTAssertEqual(node.slugToken, MemoryTree.slugTokenFor(contentKey: aCk, parentSlot: aScope.scopeId, slug: "urlaube"))
         XCTAssertNotEqual(node.slugToken, nodeBefore.slugToken)
         var oldKeyNodeFailed = false
         do { _ = try MemoryTree.decodeNode(contentKey: ckBefore, node: node) } catch { oldKeyNodeFailed = true }

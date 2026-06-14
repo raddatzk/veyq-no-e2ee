@@ -81,7 +81,7 @@ final class ConformanceTests: XCTestCase {
 
         let slug = v["slug_token"] as! [String: String]
         XCTAssertEqual(
-            toHex(V1.slugToken(contentKey: hex(slug["contentKey"]!), slug: slug["slug"]!)),
+            toHex(V1.slugToken(contentKey: hex(slug["contentKey"]!), parentSlot: slug["parentSlot"]!, slug: slug["slug"]!)),
             slug["token"]!, "blinded slug token")
     }
 }

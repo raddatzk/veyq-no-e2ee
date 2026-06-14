@@ -22,7 +22,7 @@ final class MemoryTreeE2ETests: XCTestCase {
         XCTAssertNil(folder.parentId)
         XCTAssertEqual(memory.parentId, folder.id)
         XCTAssertEqual(chapter.parentId, memory.id)
-        XCTAssertEqual(folder.slugToken, MemoryTree.slugTokenFor(contentKey: ck, slug: "urlaube"))
+        XCTAssertEqual(folder.slugToken, MemoryTree.slugTokenFor(contentKey: ck, parentSlot: scope.scopeId, slug: "urlaube"))
 
         // fetch the flat graph and reconstruct names + structure locally
         let nodes = try await MemoryTree.listNodes(apiBase: apiBase, session: a, scopeId: scope.scopeId)

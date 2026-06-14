@@ -12,7 +12,7 @@ const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const suite = env.VEYQ_E2E === '1' ? describe : describe.skip
 
 suite('use-group E2E (web -> live backend): two members collaborate on one shared scope', () => {
-  it('lists the group for both members and both read each other\'s shared items', async () => {
+  it("lists the group for both members and both read each other's shared items", async () => {
     // owner A claims tenant T1
     const aPass = 'correct horse battery staple'
     const { emergencyKit: aKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', aPass)

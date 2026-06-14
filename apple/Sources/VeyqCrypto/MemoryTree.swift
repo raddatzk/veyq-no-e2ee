@@ -29,8 +29,10 @@ public enum MemoryTree {
         type: String, name: String, slug: String, orderIndex: Int, parentId: String? = nil
     ) async throws -> MemoryNode {
         let sealed = try resealNode(contentKey: contentKey, content: NodeContent(name: name, slug: slug))
+        // the slug token's parent slot is the parent node id, or the scope id at the root (the server's sentinel)
+        let parentSlot = parentId ?? scopeId
         let body = CreateNodeRequest(
-            parentId: parentId, type: type, slugToken: SetupServer.b64url(V1.slugToken(contentKey: contentKey, slug: slug)),
+            parentId: parentId, type: type, slugToken: SetupServer.b64url(V1.slugToken(contentKey: contentKey, parentSlot: parentSlot, slug: slug)),
             orderIndex: orderIndex, sealedContent: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(sealed)))
         var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/nodes")!)
         r.httpMethod = "POST"
@@ -73,8 +75,8 @@ public enum MemoryTree {
         return nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: try JSONEncoder().encode(content), aad: Data()))
     }
 
-    /// The blinded slug token for a slug under a scope's content key (matches what the server stored).
-    public static func slugTokenFor(contentKey: Data, slug: String) -> String {
-        SetupServer.b64url(V1.slugToken(contentKey: contentKey, slug: slug))
+    /// The blinded slug token for a slug under a given parent slot (parent node id, or scope id at the root).
+    public static func slugTokenFor(contentKey: Data, parentSlot: String, slug: String) -> String {
+        SetupServer.b64url(V1.slugToken(contentKey: contentKey, parentSlot: parentSlot, slug: slug))
     }
 }

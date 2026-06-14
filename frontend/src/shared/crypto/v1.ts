@@ -121,11 +121,14 @@ export function asymUnwrap(sk: HybridSecret, pk: HybridPublic, blob: Uint8Array,
 
 /**
  * Blinded slug token (AD-26): a deterministic, keyed, one-way token of a slug, so the server can enforce
- * per-parent slug uniqueness without ever seeing the name. slugKey = HKDF(contentKey, "veyq/v1/slug-token");
- * token = HMAC-SHA256(slugKey, NFC(slug)). Per-scope (the content key is per-scope) and stable.
+ * per-parent slug uniqueness without ever seeing the name. The slug key is derived PER PARENT —
+ * slugKey = HKDF(contentKey, "veyq/v1/slug-token:" + parentSlot) — so the same slug under different parents
+ * yields different tokens (no cross-parent name-equality leak). `parentSlot` is the node's parent slot:
+ * the parent node id, or the scope id for a root-level node (matching the server's parent_id sentinel).
+ * token = HMAC-SHA256(slugKey, NFC(slug)).
  */
-export function slugToken(contentKey: Uint8Array, slug: string): Uint8Array {
-  const slugKey = hkdf(sha256, contentKey, new Uint8Array(0), utf8('veyq/v1/slug-token'), 32)
+export function slugToken(contentKey: Uint8Array, parentSlot: string, slug: string): Uint8Array {
+  const slugKey = hkdf(sha256, contentKey, new Uint8Array(0), utf8('veyq/v1/slug-token:' + parentSlot), 32)
   return hmac(sha256, slugKey, utf8(slug))
 }
 

@@ -103,6 +103,13 @@ class ScopeRotationHandler(
             if (reSealedNodeIds.toSet() != scopeNodes.map { it.id }.toSet()) {
                 throw ApiException(400, "INCOMPLETE_NODE_RESEAL", "Rotation must re-seal exactly the scope's nodes")
             }
+            // the fresh slug tokens must stay unique among a parent's children — catch a malformed re-seal as
+            // a clean 400 rather than letting UNIQUE(parent_id, slug_token) surface as a 500 at commit
+            val nodeParents = scopeNodes.associate { it.id to it.parentId }
+            val newSlugPairs = reSealedNodes.map { nodeParents.getValue(it.id) to it.slugToken }
+            if (newSlugPairs.size != newSlugPairs.toSet().size) {
+                throw ApiException(400, "DUPLICATE_SLUG_TOKEN", "Two siblings were re-sealed with the same slug token")
+            }
 
             contentKey.suiteId = newCk.suiteId
             contentKey.wrappedKey = dec.decode(newCk.bytes)

@@ -57,7 +57,7 @@ class V1ConformanceTest {
         val slug = v.getJSONObject("slug_token")
         assertEquals(
             slug.getString("token"),
-            hex(V1.slugToken(unhex(slug.getString("contentKey")), slug.getString("slug"))),
+            hex(V1.slugToken(unhex(slug.getString("contentKey")), slug.getString("parentSlot"), slug.getString("slug"))),
         )
     }
 }

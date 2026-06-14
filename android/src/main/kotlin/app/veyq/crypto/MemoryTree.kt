@@ -25,8 +25,10 @@ object MemoryTree {
         type: String, name: String, slug: String, orderIndex: Int, parentId: String? = null,
     ): JSONObject {
         val sealed = sealContent(contentKey, name, slug)
+        // the slug token's parent slot is the parent node id, or the scope id at the root (the server's sentinel)
+        val parentSlot = parentId ?: scopeId
         val parentPart = if (parentId == null) "" else """"parentId":"$parentId","""
-        val json = """{$parentPart"type":"$type","slugToken":"${enc.encodeToString(V1.slugToken(contentKey, slug))}",""" +
+        val json = """{$parentPart"type":"$type","slugToken":"${enc.encodeToString(V1.slugToken(contentKey, parentSlot, slug))}",""" +
             """"orderIndex":$orderIndex,"sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(sealed)}"}}"""
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
@@ -66,6 +68,7 @@ object MemoryTree {
     fun resealNode(contentKey: ByteArray, content: JSONObject): ByteArray =
         sealContent(contentKey, content.getString("name"), content.getString("slug"))
 
-    /** The blinded slug token for a slug under a scope's content key (matches what the server stored). */
-    fun slugTokenFor(contentKey: ByteArray, slug: String): String = enc.encodeToString(V1.slugToken(contentKey, slug))
+    /** The blinded slug token for a slug under a given parent slot (parent node id, or scope id at the root). */
+    fun slugTokenFor(contentKey: ByteArray, parentSlot: String, slug: String): String =
+        enc.encodeToString(V1.slugToken(contentKey, parentSlot, slug))
 }

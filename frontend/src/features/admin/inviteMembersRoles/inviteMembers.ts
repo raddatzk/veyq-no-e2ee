@@ -96,7 +96,8 @@ export async function rotateScope(
     if (!nodesRes.ok) throw new Error(`node list failed: ${nodesRes.status}`)
     reSealedNodes = (await nodesRes.json()).nodes.map((n: MemoryNode) => {
       const content = decodeNode(oldCk, n)
-      return { id: n.id, slugToken: slugTokenFor(newCk, content.slug), sealedContent: { suiteId: 'v1', bytes: b64url(resealNode(newCk, content)) } }
+      const parentSlot = n.parentId ?? myGrant.scopeId // root node → the scope id (the server's parent_id sentinel)
+      return { id: n.id, slugToken: slugTokenFor(newCk, parentSlot, content.slug), sealedContent: { suiteId: 'v1', bytes: b64url(resealNode(newCk, content)) } }
     })
   } else if (ckRes.status !== 404) throw new Error(`content-key fetch failed: ${ckRes.status}`)
 

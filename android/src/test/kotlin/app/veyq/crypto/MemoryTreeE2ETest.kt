@@ -35,7 +35,7 @@ class MemoryTreeE2ETest {
         assertTrue(folder.isNull("parentId"))
         assertEquals(folder.getString("id"), memory.getString("parentId"))
         assertEquals(memory.getString("id"), chapter.getString("parentId"))
-        assertEquals(MemoryTree.slugTokenFor(ck, "urlaube"), folder.getString("slugToken"))
+        assertEquals(MemoryTree.slugTokenFor(ck, scope.scopeId, "urlaube"), folder.getString("slugToken"))
 
         // fetch the flat graph and reconstruct names + structure locally
         val nodes = MemoryTree.listNodes(apiBase, a, scope.scopeId)

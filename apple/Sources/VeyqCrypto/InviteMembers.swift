@@ -90,8 +90,9 @@ public enum InviteMembers {
             reSealedNodes = try scopeNodes.map { n in
                 let content = try MemoryTree.decodeNode(contentKey: oldCk, node: n)
                 let resealed = try MemoryTree.resealNode(contentKey: newCk, content: content)
+                let parentSlot = n.parentId ?? myGrant.scopeId // root node → the scope id (the server's parent_id sentinel)
                 return ScopeNodeResealDTO(
-                    id: n.id, slugToken: MemoryTree.slugTokenFor(contentKey: newCk, slug: content.slug),
+                    id: n.id, slugToken: MemoryTree.slugTokenFor(contentKey: newCk, parentSlot: parentSlot, slug: content.slug),
                     sealedContent: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(resealed)))
             }
         } else if ckCode != 404 {

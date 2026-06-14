@@ -44,13 +44,15 @@ export async function createNode(
   const nonce = v1.randomBytes(12)
   const payload = v1.utf8(JSON.stringify({ name: node.name, slug: node.slug }))
   const sealed = v1.concat(nonce, v1.aeadSeal(contentKey, nonce, payload, EMPTY))
+  // the slug token's parent slot is the parent node id, or the scope id at the root (the server's sentinel)
+  const parentSlot = node.parentId ?? scopeId
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({
       ...(node.parentId ? { parentId: node.parentId } : {}),
       type: node.type,
-      slugToken: b64url(v1.slugToken(contentKey, node.slug)),
+      slugToken: b64url(v1.slugToken(contentKey, parentSlot, node.slug)),
       orderIndex: node.orderIndex,
       sealedContent: { suiteId: 'v1', bytes: b64url(sealed) },
     }),
@@ -84,7 +86,10 @@ export function resealNode(contentKey: Uint8Array, content: NodeContent): Uint8A
   return v1.concat(nonce, v1.aeadSeal(contentKey, nonce, v1.utf8(JSON.stringify(content)), EMPTY))
 }
 
-/** The blinded slug token for a slug under a scope's content key (matches what the server stored). */
-export function slugTokenFor(contentKey: Uint8Array, slug: string): string {
-  return b64url(v1.slugToken(contentKey, slug))
+/**
+ * The blinded slug token for a slug under a given parent slot (matches what the server stored).
+ * parentSlot is the parent node id, or the scope id for a root-level node.
+ */
+export function slugTokenFor(contentKey: Uint8Array, parentSlot: string, slug: string): string {
+  return b64url(v1.slugToken(contentKey, parentSlot, slug))
 }

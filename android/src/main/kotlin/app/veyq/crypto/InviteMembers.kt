@@ -81,7 +81,8 @@ object InviteMembers {
                 val n = nodesArr.getJSONObject(i)
                 val content = MemoryTree.decodeNode(oldCk, n)
                 val resealed = MemoryTree.resealNode(newCk, content)
-                val token = MemoryTree.slugTokenFor(newCk, content.getString("slug"))
+                val parentSlot = if (n.isNull("parentId")) myGrant.getString("scopeId") else n.getString("parentId")
+                val token = MemoryTree.slugTokenFor(newCk, parentSlot, content.getString("slug"))
                 reSealedNodeParts.add("""{"id":"${n.getString("id")}","slugToken":"$token","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
             }
             ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"},""" +

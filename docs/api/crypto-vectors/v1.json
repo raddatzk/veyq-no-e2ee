@@ -76,9 +76,10 @@
     }
   },
   "slug_token": {
-    "note": "AD-26 blinded slug token: slugKey = HKDF(contentKey, \"veyq/v1/slug-token\"); token = HMAC-SHA256(slugKey, NFC(slug)).",
+    "note": "AD-26 blinded slug token: slugKey = HKDF(contentKey, \"veyq/v1/slug-token:\" + parentSlot); token = HMAC-SHA256(slugKey, NFC(slug)). parentSlot = parent node id, or scope id at the root.",
     "contentKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-    "slug": "italien-2026-cafe\u0301",
-    "token": "ae52ddbc46e378d64c83aca863d06fe898bbb77443beb1694e49de4f70898de6"
+    "parentSlot": "b6b1f2c0-0000-4000-8000-00000000aa01",
+    "slug": "italien-2026-caf\u00e9",
+    "token": "7bab374606a8ff5d04d1ebdc6ed6226524f64d242219dfdcaf6e592f5e21c868"
   }
 }
