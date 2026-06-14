@@ -76,7 +76,8 @@ public enum ScopeContent {
     @discardableResult
     public static func writeItem(apiBase: String, session: Login.UnlockedSession, scope: OpenScope, contentKey: Data, plaintext: String) async throws -> String {
         let nonce = V1.randomBytes(12)
-        let sealed = nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(plaintext.utf8), aad: Data()))
+        // NFC-normalize so the same logical string seals identically across platforms (web normalizes too)
+        let sealed = nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(plaintext.precomposedStringWithCanonicalMapping.utf8), aad: Data()))
         let body = try JSONEncoder().encode(CreateItemDTO(sealedContent: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(sealed))))
         let (data, code) = try await send(apiBase, "/api/scopes/\(scope.scopeId)/items", session.sessionToken, method: "POST", body: body)
         guard code == 200 else { throw err("item create failed: \(String(data: data, encoding: .utf8) ?? "")") }

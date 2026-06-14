@@ -5,6 +5,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.text.Normalizer
 import java.util.Base64
 
 /**
@@ -74,7 +75,9 @@ object ScopeContent {
     /** Seal a string under the content key and store it; returns the item id. */
     fun writeItem(apiBase: String, session: Login.UnlockedSession, scope: OpenScope, contentKey: ByteArray, plaintext: String): String {
         val nonce = V1.randomBytes(12)
-        val sealed = nonce + V1.aeadSeal(contentKey, nonce, plaintext.toByteArray(Charsets.UTF_8), EMPTY)
+        // NFC-normalize so the same logical string seals identically across platforms (web normalizes too)
+        val normalized = Normalizer.normalize(plaintext, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
+        val sealed = nonce + V1.aeadSeal(contentKey, nonce, normalized, EMPTY)
         val json = """{"sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(sealed)}"}}"""
         val (code, body) = req(apiBase, "/api/scopes/${scope.scopeId}/items", session.sessionToken, "POST", json)
         if (code != 200) throw RuntimeException("item create failed: $code $body")
