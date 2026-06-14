@@ -1,6 +1,10 @@
 package app.veyq.android.ui
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,14 +41,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.time.Instant
 
 class GalleryController(
     private val apiBase: String,
@@ -56,6 +65,32 @@ class GalleryController(
 
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
+    var uploading by mutableStateOf(false)
+
+    suspend fun upload(items: List<ByteArray>) {
+        uploading = true
+        val takenAt = Instant.now().toString()
+        for (data in items) {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), takenAt, "image/jpeg")
+                }
+            }
+        }
+        load()
+        uploading = false
+    }
+
+    private fun thumbnail(data: ByteArray, maxDim: Int = 400): ByteArray? {
+        val bmp = BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
+        val scale = minOf(1f, maxDim.toFloat() / maxOf(bmp.width, bmp.height))
+        val w = maxOf(1, (bmp.width * scale).toInt())
+        val h = maxOf(1, (bmp.height * scale).toInt())
+        val scaled = Bitmap.createScaledBitmap(bmp, w, h, true)
+        val out = ByteArrayOutputStream()
+        scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
+        return out.toByteArray()
+    }
 
     suspend fun load() {
         try {
@@ -85,7 +120,18 @@ class GalleryController(
 fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
     val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
     var lightbox by remember { mutableStateOf<ImageBitmap?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load() }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            val datas = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri -> context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }
+            }
+            controller.upload(datas)
+        }
+    }
 
     Scaffold(
         containerColor = Veyq.Bg,
@@ -94,6 +140,11 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 title = { Text(name, color = Veyq.Text, fontWeight = FontWeight.Bold, maxLines = 1) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
                 navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 24.sp) } },
+                actions = {
+                    IconButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !controller.uploading) {
+                        Text(if (controller.uploading) "…" else "+", color = Veyq.Accent, fontSize = 22.sp)
+                    }
+                },
             )
         },
     ) { pad ->

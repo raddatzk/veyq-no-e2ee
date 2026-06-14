@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 import UIKit
 import VeyqCrypto
 
@@ -16,6 +17,7 @@ final class GalleryStore: ObservableObject {
 
     @Published var tiles: [Tile] = []
     @Published var loading = true
+    @Published var uploading = false
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String) {
         self.apiBase = apiBase; self.session = session; self.scopeId = scopeId; self.contentKey = contentKey; self.nodeId = nodeId
@@ -38,12 +40,34 @@ final class GalleryStore: ObservableObject {
         }
         loading = false
     }
+
+    func upload(_ datas: [Data]) async {
+        uploading = true
+        let iso = ISO8601DateFormatter()
+        for data in datas {
+            _ = try? await Media.uploadMedia(
+                apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId,
+                bytes: data, thumb: Self.thumbnail(data), takenAt: iso.string(from: Date()), mimeType: "image/jpeg",
+            )
+        }
+        await load()
+        uploading = false
+    }
+
+    static func thumbnail(_ data: Data, maxDim: CGFloat = 400) -> Data? {
+        guard let img = UIImage(data: data) else { return nil }
+        let scale = min(1, maxDim / max(img.size.width, img.size.height))
+        let size = CGSize(width: img.size.width * scale, height: img.size.height * scale)
+        return UIGraphicsImageRenderer(size: size).image { _ in img.draw(in: CGRect(origin: .zero, size: size)) }
+            .jpegData(compressionQuality: 0.8)
+    }
 }
 
 struct MemoryDetailView: View {
     @StateObject private var store: GalleryStore
     let name: String
     @State private var lightbox: UIImage?
+    @State private var pickerItems: [PhotosPickerItem] = []
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
         _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
@@ -71,6 +95,25 @@ struct MemoryDetailView: View {
         }
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
+                    Text(store.uploading ? "Lädt…" : "Hochladen").foregroundStyle(VeyqStyle.accent)
+                }
+                .disabled(store.uploading)
+            }
+        }
+        .onChange(of: pickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task {
+                var datas: [Data] = []
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self) { datas.append(data) }
+                }
+                pickerItems = []
+                await store.upload(datas)
+            }
+        }
         .task { await store.load() }
         .fullScreenCover(item: Binding(get: { lightbox.map { LightboxImage(image: $0) } }, set: { _ in lightbox = nil })) { item in
             ZStack {
