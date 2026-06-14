@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { session, setUnlocked } from '../session'
 import { logout } from '../../features/account/login/login'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import type { SearchHit } from '../../features/search/search'
 import MemoryDetailView from './MemoryDetailView.vue'
+import SearchOverlay from './SearchOverlay.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -14,8 +16,17 @@ const memories = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string | null>>({})
 const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
+const searchOpen = ref(false)
+
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    if (active.value) searchOpen.value = true
+  }
+}
 
 onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
   try {
     spaces.value = await loadSpaces(apiBase, session.unlocked!)
     const personal = spaces.value.find((s) => s.kind === 'PERSONAL') ?? spaces.value[0]
@@ -24,6 +35,17 @@ onMounted(async () => {
     error.value = (e as Error).message
   }
 })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+async function onSearchSelect(hit: SearchHit) {
+  searchOpen.value = false
+  if (hit.type === 'FOLDER') {
+    crumbs.value = [crumbs.value[0], { id: hit.id, name: hit.name }]
+    await openLevel()
+  } else {
+    selectedMemory.value = { node: hit.node, name: hit.name }
+  }
+}
 
 async function switchSpace(entry: SpaceEntry) {
   error.value = ''
@@ -107,8 +129,10 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
           <button class="crumb" :class="{ current: i === crumbs.length - 1 }" @click="gotoCrumb(i)">{{ c.name }}</button>
         </template>
       </nav>
-      <input class="home-search" type="search" placeholder="Suche einfach überall…" disabled />
+      <input class="home-search" type="search" placeholder="Suche einfach überall…  ⌘K" readonly @focus="active && (searchOpen = true)" @click="active && (searchOpen = true)" />
     </header>
+
+    <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
     <main class="home-content">
       <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="selectedMemory = null" />
