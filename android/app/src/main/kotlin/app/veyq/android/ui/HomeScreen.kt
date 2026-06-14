@@ -66,8 +66,10 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     var crumbs by mutableStateOf<List<Crumb>>(emptyList())
     var error by mutableStateOf<String?>(null)
 
-    private var scope: ScopeContent.OpenScope? = null
-    private var contentKey: ByteArray? = null
+    var scope: ScopeContent.OpenScope? = null
+        private set
+    var contentKey: ByteArray? = null
+        private set
 
     suspend fun start() {
         try {
@@ -148,7 +150,16 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
     val controller = remember { HomeController(apiBase, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
+    var detail by remember { mutableStateOf<HomeController.Entry?>(null) }
     LaunchedEffect(Unit) { controller.start() }
+
+    val openMemory = detail
+    val activeScope = controller.scope
+    val activeKey = controller.contentKey
+    if (openMemory != null && activeScope != null && activeKey != null) {
+        GalleryScreen(apiBase, session, activeScope.scopeId, activeKey, openMemory.id, openMemory.name) { detail = null }
+        return
+    }
 
     Scaffold(
         containerColor = Veyq.Bg,
@@ -180,7 +191,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
 
             SectionHeader("Memories", controller.memories.size)
             if (controller.memories.isEmpty()) EmptyText("Noch keine Memories hier.")
-            else MemoryGrid(controller.memories, controller.covers)
+            else MemoryGrid(controller.memories, controller.covers) { detail = it }
 
             SectionHeader("Ordner", controller.folders.size)
             if (controller.folders.isEmpty()) EmptyText("Keine Ordner.")
@@ -218,11 +229,11 @@ private fun SectionHeader(title: String, count: Int) {
 private fun EmptyText(text: String) = Text(text, fontSize = 14.sp, color = Veyq.Muted)
 
 @Composable
-private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>) {
+private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, onOpen: (HomeController.Entry) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         memories.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { m -> Box(Modifier.weight(1f)) { MemoryCard(m, covers[m.id]) } }
+                row.forEach { m -> Box(Modifier.weight(1f)) { MemoryCard(m, covers[m.id], onOpen) } }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
@@ -230,11 +241,12 @@ private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String,
 }
 
 @Composable
-private fun MemoryCard(m: HomeController.Entry, cover: ImageBitmap?) {
+private fun MemoryCard(m: HomeController.Entry, cover: ImageBitmap?, onOpen: (HomeController.Entry) -> Unit) {
     Column(
         Modifier
             .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
-            .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius)),
+            .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
+            .clickable { onOpen(m) },
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).background(Veyq.SurfaceMuted), contentAlignment = Alignment.Center) {
             if (cover != null) Image(cover, null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)

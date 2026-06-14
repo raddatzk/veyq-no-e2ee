@@ -29,8 +29,8 @@ final class HomeStore: ObservableObject {
     @Published var crumbs: [Crumb] = []
     @Published var error: String?
 
-    private var scope: ScopeContent.OpenScope?
-    private var contentKey: Data?
+    private(set) var scope: ScopeContent.OpenScope?
+    private(set) var contentKey: Data?
 
     init(apiBase: String, session: Login.UnlockedSession) {
         self.apiBase = apiBase

@@ -81,22 +81,29 @@ struct MemoryHomeView: View {
     }
 
     private func memoryCard(_ m: HomeStore.Entry) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack {
-                Rectangle().fill(VeyqStyle.surfaceMuted)
-                if let img = store.covers[m.node.id] {
-                    Image(uiImage: img).resizable().scaledToFill()
-                } else {
-                    Image(systemName: "photo").foregroundStyle(VeyqStyle.muted)
-                }
+        NavigationLink {
+            if let scope = store.scope, let key = store.contentKey {
+                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: m.node, name: m.name)
             }
-            .frame(height: 110).clipped()
-            Text(m.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
-                .lineLimit(1).padding(8).frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    Rectangle().fill(VeyqStyle.surfaceMuted)
+                    if let img = store.covers[m.node.id] {
+                        Image(uiImage: img).resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "photo").foregroundStyle(VeyqStyle.muted)
+                    }
+                }
+                .frame(height: 110).clipped()
+                Text(m.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
+                    .lineLimit(1).padding(8).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(VeyqStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
-        .background(VeyqStyle.surface)
-        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+        .buttonStyle(.plain)
     }
 
     private func folderRow(_ f: HomeStore.Entry) -> some View {
