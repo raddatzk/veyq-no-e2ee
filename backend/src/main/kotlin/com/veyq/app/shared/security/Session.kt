@@ -43,7 +43,6 @@ class SessionService(private val sessions: SessionRepository) {
         val raw = ByteArray(32).also { rng.nextBytes(it) }
         val token = b64.encodeToString(raw)
         val now = Instant.now()
-        sessions.deleteExpired(now) // opportunistic GC: stale rows never accumulate (no scheduler needed)
         sessions.persist(
             Session().apply {
                 id = UUID.randomUUID().toString()
@@ -59,6 +58,10 @@ class SessionService(private val sessions: SessionRepository) {
     /** Invalidates every session for a user (instant token revocation). Returns how many were dropped. */
     @Transactional
     fun invalidateAll(userId: String): Long = sessions.deleteByUserId(userId)
+
+    /** Drop every expired session row (the scheduled GC sweep). Returns how many were purged. */
+    @Transactional
+    fun purgeExpired(): Long = sessions.deleteExpired(Instant.now())
 
     /** Logout: drop the session row for a `Bearer <token>` header. Idempotent (unknown token is a no-op). */
     @Transactional
