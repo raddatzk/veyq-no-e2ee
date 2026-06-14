@@ -89,19 +89,23 @@ public enum V1 {
     }
 
     // ---- Wraps ----
+    // AAD binds the envelope TYPE byte (0x02 sym / 0x01 asym) alongside the suite+context, so a ciphertext
+    // authenticated for one wrap type can never be reinterpreted as the other (defense in depth vs confusion).
+    private static func wrapAad(_ type: UInt8, _ context: String) -> Data { Data([type]) + Data(("v1" + context).utf8) }
+
     public static func symWrap(kek: Data, targetKey: Data, context: String, nonce: Data) throws -> Data {
-        Data([0x02]) + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: Data(("v1" + context).utf8)))
+        Data([0x02]) + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: wrapAad(0x02, context)))
     }
     public static func symUnwrap(kek: Data, blob: Data, context: String) throws -> Data {
         let nonce = Data(blob.dropFirst().prefix(12))
         let aead = Data(blob.dropFirst(1 + 12))
-        return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: Data(("v1" + context).utf8))
+        return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: wrapAad(0x02, context))
     }
     /// §5a asymmetric wrap: 0x01 || ct(1120) || nonce(12) || aead
     public static func asymWrap(pkX: Data, pkM: Data, targetKey: Data, context: String, nonce: Data) throws -> Data {
         let (ct, ss) = try kemEncap(pkX: pkX, pkM: pkM)
         let kek = hkdf(ikm: ss, salt: Data(), info: Data(("veyq/v1/wrap" + context).utf8), len: 32)
-        return Data([0x01]) + ct + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: Data(("v1" + context).utf8)))
+        return Data([0x01]) + ct + nonce + (try aeadSeal(key: kek, nonce: nonce, plaintext: targetKey, aad: wrapAad(0x01, context)))
     }
     public static func asymUnwrap(skX: Data, mlkemSeed: Data, pkX: Data, pkM: Data, blob: Data, context: String) throws -> Data {
         let body = Data(blob.dropFirst())
@@ -110,7 +114,7 @@ public enum V1 {
         let aead = Data(body.dropFirst(1120 + 12))
         let ss = try kemDecap(skX: skX, mlkemSeed: mlkemSeed, pkX: pkX, pkM: pkM, ct: ct)
         let kek = hkdf(ikm: ss, salt: Data(), info: Data(("veyq/v1/wrap" + context).utf8), len: 32)
-        return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: Data(("v1" + context).utf8))
+        return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: wrapAad(0x01, context))
     }
 
     // ---- Per-method KEKs ----

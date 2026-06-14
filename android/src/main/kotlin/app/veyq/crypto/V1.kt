@@ -97,13 +97,17 @@ object V1 {
         return combiner(ssM, ssX, ctM, epkX, pkM, pkX)
     }
 
+    // AAD binds the envelope TYPE byte (0x02 sym / 0x01 asym) alongside the suite+context, so a ciphertext
+    // authenticated for one wrap type can never be reinterpreted as the other (defense in depth vs confusion).
+    private fun wrapAad(type: Byte, context: String): ByteArray = byteArrayOf(type) + ("v1$context").toByteArray(Charsets.UTF_8)
+
     fun symWrap(kek: ByteArray, targetKey: ByteArray, context: String, nonce: ByteArray): ByteArray =
-        byteArrayOf(0x02) + nonce + aeadSeal(kek, nonce, targetKey, ("v1$context").toByteArray(Charsets.UTF_8))
+        byteArrayOf(0x02) + nonce + aeadSeal(kek, nonce, targetKey, wrapAad(0x02, context))
 
     fun symUnwrap(kek: ByteArray, blob: ByteArray, context: String): ByteArray {
         val nonce = blob.copyOfRange(1, 1 + 12)
         val aead = blob.copyOfRange(1 + 12, blob.size)
-        return aeadOpen(kek, nonce, aead, ("v1$context").toByteArray(Charsets.UTF_8))
+        return aeadOpen(kek, nonce, aead, wrapAad(0x02, context))
     }
 
     /** Encapsulate to a recipient's hybrid KEM public key. Randomized (ephemeral X25519 + ML-KEM). */
@@ -124,7 +128,7 @@ object V1 {
     fun asymWrap(pkX: ByteArray, pkM: ByteArray, targetKey: ByteArray, context: String, nonce: ByteArray): ByteArray {
         val (ct, ss) = kemEncap(pkX, pkM)
         val kek = hkdf(ss, ByteArray(0), ("veyq/v1/wrap$context").toByteArray(Charsets.UTF_8), 32)
-        return byteArrayOf(0x01) + ct + nonce + aeadSeal(kek, nonce, targetKey, ("v1$context").toByteArray(Charsets.UTF_8))
+        return byteArrayOf(0x01) + ct + nonce + aeadSeal(kek, nonce, targetKey, wrapAad(0x01, context))
     }
 
     fun asymUnwrap(skX: ByteArray, mlkemSeed: ByteArray, pkX: ByteArray, pkM: ByteArray, blob: ByteArray, context: String): ByteArray {
@@ -133,7 +137,7 @@ object V1 {
         val aead = blob.copyOfRange(1 + 1120 + 12, blob.size)
         val ss = kemDecap(skX, mlkemSeed, pkX, pkM, ct)
         val kek = hkdf(ss, ByteArray(0), ("veyq/v1/wrap$context").toByteArray(Charsets.UTF_8), 32)
-        return aeadOpen(kek, nonce, aead, ("v1$context").toByteArray(Charsets.UTF_8))
+        return aeadOpen(kek, nonce, aead, wrapAad(0x01, context))
     }
 
     private fun argon2id(input: ByteArray, salt: ByteArray, params: ArgonParams): ByteArray {

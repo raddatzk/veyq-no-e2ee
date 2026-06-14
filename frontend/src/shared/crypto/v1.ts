@@ -84,12 +84,18 @@ export function kemDecap(sk: HybridSecret, pk: HybridPublic, ct: Uint8Array): Ui
   return combiner(ssM, ssX, ctM, epkX, pk.m, pk.x)
 }
 
+// AAD binds the envelope TYPE byte (0x02 sym / 0x01 asym) alongside the suite+context, so a ciphertext
+// authenticated for one wrap type can never be reinterpreted as the other (defense in depth vs confusion).
+const SYM_TYPE = 0x02
+const ASYM_TYPE = 0x01
+const wrapAad = (type: number, context: string): Uint8Array => concat(Uint8Array.of(type), utf8('v1' + context))
+
 /** §5b symmetric wrap: 0x02 || nonce(12) || aead */
 export function symWrap(kek: Uint8Array, targetKey: Uint8Array, context: string, nonce: Uint8Array): Uint8Array {
-  return concat(Uint8Array.of(0x02), nonce, aeadSeal(kek, nonce, targetKey, utf8('v1' + context)))
+  return concat(Uint8Array.of(SYM_TYPE), nonce, aeadSeal(kek, nonce, targetKey, wrapAad(SYM_TYPE, context)))
 }
 export function symUnwrap(kek: Uint8Array, blob: Uint8Array, context: string): Uint8Array {
-  return aeadOpen(kek, blob.slice(1, 13), blob.slice(13), utf8('v1' + context))
+  return aeadOpen(kek, blob.slice(1, 13), blob.slice(13), wrapAad(SYM_TYPE, context))
 }
 
 /** §5a asymmetric wrap: 0x01 || ct(1120) || nonce(12) || aead */
@@ -101,7 +107,7 @@ export function asymWrap(
 ): Uint8Array {
   const { ct, ss } = kemEncap(pk, opts)
   const kek = hkdf(sha256, ss, new Uint8Array(0), utf8('veyq/v1/wrap' + context), 32)
-  return concat(Uint8Array.of(0x01), ct, opts.nonce, aeadSeal(kek, opts.nonce, targetKey, utf8('v1' + context)))
+  return concat(Uint8Array.of(ASYM_TYPE), ct, opts.nonce, aeadSeal(kek, opts.nonce, targetKey, wrapAad(ASYM_TYPE, context)))
 }
 export function asymUnwrap(sk: HybridSecret, pk: HybridPublic, blob: Uint8Array, context: string): Uint8Array {
   const ct = blob.slice(1, 1 + 1120)
@@ -109,7 +115,7 @@ export function asymUnwrap(sk: HybridSecret, pk: HybridPublic, blob: Uint8Array,
   const aead = blob.slice(1 + 1120 + 12)
   const ss = kemDecap(sk, pk, ct)
   const kek = hkdf(sha256, ss, new Uint8Array(0), utf8('veyq/v1/wrap' + context), 32)
-  return aeadOpen(kek, nonce, aead, utf8('v1' + context))
+  return aeadOpen(kek, nonce, aead, wrapAad(ASYM_TYPE, context))
 }
 
 export const kekPasswordSecret = (
