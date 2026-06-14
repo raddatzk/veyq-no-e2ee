@@ -31,6 +31,10 @@ class NodeRepository : PanacheRepositoryBase<Node, String> {
     fun listByScopeId(scopeId: String): List<Node> =
         list("scopeId = ?1 order by orderIndex, createdAt", scopeId)
 
+    /** Direct children of a parent within a scope (scope-scoped so a foreign parent id can't leak nodes). */
+    fun listByParent(scopeId: String, parentId: String): List<Node> =
+        list("scopeId = ?1 and parentId = ?2 order by orderIndex, createdAt", scopeId, parentId)
+
     fun findByParentAndSlug(parentId: String, slugToken: String): Node? =
         find("parentId = ?1 and slugToken = ?2", parentId, slugToken).firstResult()
 }

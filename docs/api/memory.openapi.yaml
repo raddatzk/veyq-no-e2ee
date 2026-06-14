@@ -15,6 +15,14 @@ paths:
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - name: parentId
+          in: query
+          required: false
+          description: >
+            Omit for the full node graph (e.g. rotation re-sealing). Pass a node id for that node's direct
+            children, or the literal "root" for the scope's root-level children — the level-by-level listing
+            that backs browse / path resolution (the client walks one level per path segment).
+          schema: { type: string }
       responses:
         '200':
           description: The scope's nodes.

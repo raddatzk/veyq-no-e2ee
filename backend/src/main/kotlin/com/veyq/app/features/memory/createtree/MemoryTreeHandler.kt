@@ -43,10 +43,20 @@ class MemoryTreeHandler(
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
 
+    /**
+     * No parentId → the full node graph (rotation re-seal, whole-tree reconstruction). parentId = "root" →
+     * the scope's root-level children; parentId = <nodeId> → that node's direct children — the level-by-level
+     * listing that backs browse. A root node uses the scope id as its parent slot (the DB sentinel).
+     */
     @Transactional
-    fun listNodes(auth: String?, scopeId: String): MemoryNodeList {
+    fun listNodes(auth: String?, scopeId: String, parentId: String?): MemoryNodeList {
         requireKeyHolder(scopeId, auth)
-        return MemoryNodeList(nodes = nodes.listByScopeId(scopeId).map { toApi(it, scopeId) })
+        val list = when (parentId) {
+            null -> nodes.listByScopeId(scopeId)
+            "root" -> nodes.listByParent(scopeId, scopeId)
+            else -> nodes.listByParent(scopeId, parentId)
+        }
+        return MemoryNodeList(nodes = list.map { toApi(it, scopeId) })
     }
 
     @Transactional

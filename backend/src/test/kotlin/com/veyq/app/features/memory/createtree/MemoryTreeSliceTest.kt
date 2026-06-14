@@ -100,10 +100,19 @@ class MemoryTreeSliceTest {
         // a parent in another scope is rejected
         create(ownerToken, "MEMORY", "tok-cross", 2, "mt-foreign-node").then().statusCode(400).body("code", `is`("CROSS_SCOPE_PARENT"))
 
-        // the list returns the graph; the root folder reports a null parent
+        // the full list returns the whole graph; the root folder reports a null parent
         given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes").then().statusCode(200)
             .body("nodes.size()", `is`(4))
             .body("nodes.find { it.id == '$folderId' }.parentId", nullValue())
             .body("nodes.find { it.type == 'CHAPTER' }.parentId", `is`(memId))
+
+        // level-by-level listing (browse): root holds just the folder; the folder holds the two memories;
+        // the memory holds the chapter — one level per path segment, the type comes from each node
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes?parentId=root").then().statusCode(200)
+            .body("nodes.size()", `is`(1)).body("nodes[0].id", `is`(folderId))
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes?parentId=$folderId").then().statusCode(200)
+            .body("nodes.size()", `is`(2))
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes?parentId=$memId").then().statusCode(200)
+            .body("nodes.size()", `is`(1)).body("nodes[0].type", `is`("CHAPTER"))
     }
 }

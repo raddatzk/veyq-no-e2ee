@@ -9,8 +9,8 @@ import jakarta.ws.rs.core.Response
 @ApplicationScoped
 class MemoryTreeResource(private val handler: MemoryTreeHandler) : MemoryTreeApi {
 
-    override fun listNodes(authorization: String, scopeId: String): Response =
-        Response.ok(handler.listNodes(authorization, scopeId)).build()
+    override fun listNodes(authorization: String, scopeId: String, parentId: String?): Response =
+        Response.ok(handler.listNodes(authorization, scopeId, parentId)).build()
 
     override fun createNode(authorization: String, scopeId: String, createNodeRequest: CreateNodeRequest): Response =
         Response.ok(handler.createNode(authorization, scopeId, createNodeRequest)).build()
