@@ -41,11 +41,16 @@ class MediaChunk {
 enum class UploadStatus { OPEN, COMPLETED }
 
 @ApplicationScoped
-class UploadSessionRepository : PanacheRepositoryBase<UploadSession, String>
+class UploadSessionRepository : PanacheRepositoryBase<UploadSession, String> {
+    /** OPEN sessions started before the cutoff — abandoned uploads the GC sweep reclaims. */
+    fun listStaleOpen(cutoff: java.time.Instant): List<UploadSession> =
+        list("status = ?1 and createdAt < ?2", UploadStatus.OPEN.name, cutoff)
+}
 
 @ApplicationScoped
 class MediaChunkRepository : PanacheRepositoryBase<MediaChunk, String> {
     fun listByUploadId(uploadId: String): List<MediaChunk> = list("uploadId = ?1 order by chunkIndex", uploadId)
     fun find(uploadId: String, chunkIndex: Int): MediaChunk? =
         find("uploadId = ?1 and chunkIndex = ?2", uploadId, chunkIndex).firstResult()
+    fun deleteByUploadId(uploadId: String): Long = delete("uploadId", uploadId)
 }

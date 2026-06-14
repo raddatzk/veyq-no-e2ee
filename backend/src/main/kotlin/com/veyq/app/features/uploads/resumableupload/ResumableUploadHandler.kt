@@ -127,6 +127,22 @@ class ResumableUploadHandler(
         return ChunkResponse(frame = Blob(suiteId = "v1", bytes = enc.encodeToString(frame)))
     }
 
+    /**
+     * Reclaim abandoned uploads: OPEN sessions never finalized leak their frames in the BlobStore + manifest
+     * rows forever. The scheduled GC purges sessions older than the cutoff — their blobs, then their rows.
+     * COMPLETED sessions are the media's storage and are never touched here. Returns how many were purged.
+     */
+    @Transactional
+    fun purgeStaleOpenUploads(cutoff: Instant): Int {
+        val stale = sessions.listStaleOpen(cutoff)
+        for (s in stale) {
+            chunks.listByUploadId(s.id).forEach { blobs.delete(it.objectKey) }
+            chunks.deleteByUploadId(s.id)
+            sessions.deleteById(s.id)
+        }
+        return stale.size
+    }
+
     private fun ensureUploadBudget(s: UploadSession, replacingIndex: Int, newFrameSize: Long) {
         val currentCiphertextBytes = chunks.listByUploadId(s.id)
             .filter { it.chunkIndex != replacingIndex }

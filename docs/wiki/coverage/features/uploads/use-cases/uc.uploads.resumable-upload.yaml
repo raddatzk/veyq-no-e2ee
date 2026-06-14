@@ -61,6 +61,14 @@ acceptanceCriteria:
           - testName: testInterruptAndResumeAChunkedUpload
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/ResumableUploadE2ETests.swift
+  - id: uc.uploads.resumable-upload.abandoned-gc
+    statement: A scheduled sweep reclaims abandoned OPEN upload sessions older than the TTL (their frames + manifest rows); fresh OPEN and COMPLETED sessions survive.
+    coverage:
+      backend:
+        integration:
+          - testName: purgesOnlyAbandonedOpenUploads
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/resumableupload/UploadGcSliceTest.kt
   - id: uc.uploads.resumable-upload.resource-limits
     statement: The server rejects excessive chunk counts, declared sizes, decoded frame sizes and cumulative frame data before expensive memory or BlobStore work.
     coverage:
