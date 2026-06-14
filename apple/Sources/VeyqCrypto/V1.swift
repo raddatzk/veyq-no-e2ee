@@ -117,6 +117,16 @@ public enum V1 {
         return try aeadOpen(key: kek, nonce: nonce, aead: aead, aad: wrapAad(0x01, context))
     }
 
+    /// Blinded slug token (AD-26): slugKey = HKDF(contentKey, "veyq/v1/slug-token");
+    /// token = HMAC-SHA256(slugKey, NFC(slug)). Deterministic + per-scope, so the server can enforce
+    /// per-parent slug uniqueness without ever seeing the name.
+    public static func slugToken(contentKey: Data, slug: String) -> Data {
+        let slugKey = hkdf(ikm: contentKey, salt: Data(), info: Data("veyq/v1/slug-token".utf8), len: 32)
+        let nfc = Data(slug.precomposedStringWithCanonicalMapping.utf8)
+        let mac = HMAC<SHA256>.authenticationCode(for: nfc, using: SymmetricKey(data: slugKey))
+        return Data(mac)
+    }
+
     // ---- Per-method KEKs ----
     static func argon2id(input: Data, salt: Data, params: ArgonParams) throws -> Data {
         // libsodium crypto_pwhash: opsLimit = t, memLimit = m KiB * 1024 (bytes), p is fixed at 1.

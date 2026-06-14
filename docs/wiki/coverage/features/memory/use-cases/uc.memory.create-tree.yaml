@@ -1,0 +1,55 @@
+id: uc.memory.create-tree
+title: Create a Memory tree
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/memory/_index.md
+  - type: useCase
+    ref: docs/wiki/features/memory/use-cases/uc.memory.create-tree.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/memory/createTree/memoryTree.ts
+  - type: entryPoint
+    ref: android/src/main/kotlin/app/veyq/crypto/MemoryTree.kt
+  - type: entryPoint
+    ref: apple/Sources/VeyqCrypto/MemoryTree.swift
+acceptanceCriteria:
+  - id: uc.memory.create-tree.containment-and-slug
+    statement: Folders/Memories live at the root or in a Folder; only Chapters nest in a Memory/Chapter; slugs are unique per parent and parents must be in the same scope.
+    coverage:
+      backend:
+        integration:
+          - testName: buildsTreeWithContainmentAndSlugInvariants
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt
+          - testName: buildsTreeWithContainmentAndSlugInvariants
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/createtree/MemoryTreeSliceTest.kt
+  - id: uc.memory.create-tree.blind-encrypted-tree
+    statement: Node names are encrypted and slugs are blinded tokens; the client builds a Folder/Memory/Chapter tree and reconstructs names + structure from the server's ID graph, which never holds names.
+    coverage:
+      backend:
+        integration:
+          - testName: blinded slug token (AD-26)
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      web:
+        e2e:
+          - testName: builds the tree, the server stays blind to names, and the client reconstructs it
+            kind: positive
+            ref: frontend/src/features/memory/createTree/memoryTree.e2e.test.ts
+      android:
+        e2e:
+          - testName: buildsEncryptedFolderMemoryChapterTree
+            kind: positive
+            ref: android/src/test/kotlin/app/veyq/crypto/MemoryTreeE2ETest.kt
+      apple:
+        e2e:
+          - testName: testBuildsEncryptedFolderMemoryChapterTree
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/MemoryTreeE2ETests.swift

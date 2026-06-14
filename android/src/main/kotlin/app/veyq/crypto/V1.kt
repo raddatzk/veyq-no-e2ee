@@ -21,6 +21,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.text.Normalizer
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -138,6 +139,19 @@ object V1 {
         val ss = kemDecap(skX, mlkemSeed, pkX, pkM, ct)
         val kek = hkdf(ss, ByteArray(0), ("veyq/v1/wrap$context").toByteArray(Charsets.UTF_8), 32)
         return aeadOpen(kek, nonce, aead, wrapAad(0x01, context))
+    }
+
+    /**
+     * Blinded slug token (AD-26): slugKey = HKDF(contentKey, "veyq/v1/slug-token");
+     * token = HMAC-SHA256(slugKey, NFC(slug)). Deterministic + per-scope, so the server can enforce
+     * per-parent slug uniqueness without ever seeing the name.
+     */
+    fun slugToken(contentKey: ByteArray, slug: String): ByteArray {
+        val slugKey = hkdf(contentKey, ByteArray(0), "veyq/v1/slug-token".toByteArray(Charsets.UTF_8), 32)
+        val nfc = Normalizer.normalize(slug, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(slugKey, "HmacSHA256"))
+        return mac.doFinal(nfc)
     }
 
     private fun argon2id(input: ByteArray, salt: ByteArray, params: ArgonParams): ByteArray {

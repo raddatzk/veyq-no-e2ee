@@ -2,6 +2,7 @@
 import { x25519, ed25519 } from '@noble/curves/ed25519.js'
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
+import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { argon2id } from '@noble/hashes/argon2.js'
 import { gcm } from '@noble/ciphers/aes.js'
@@ -116,6 +117,16 @@ export function asymUnwrap(sk: HybridSecret, pk: HybridPublic, blob: Uint8Array,
   const ss = kemDecap(sk, pk, ct)
   const kek = hkdf(sha256, ss, new Uint8Array(0), utf8('veyq/v1/wrap' + context), 32)
   return aeadOpen(kek, nonce, aead, wrapAad(ASYM_TYPE, context))
+}
+
+/**
+ * Blinded slug token (AD-26): a deterministic, keyed, one-way token of a slug, so the server can enforce
+ * per-parent slug uniqueness without ever seeing the name. slugKey = HKDF(contentKey, "veyq/v1/slug-token");
+ * token = HMAC-SHA256(slugKey, NFC(slug)). Per-scope (the content key is per-scope) and stable.
+ */
+export function slugToken(contentKey: Uint8Array, slug: string): Uint8Array {
+  const slugKey = hkdf(sha256, contentKey, new Uint8Array(0), utf8('veyq/v1/slug-token'), 32)
+  return hmac(sha256, slugKey, utf8(slug))
 }
 
 export const kekPasswordSecret = (

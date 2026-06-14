@@ -66,4 +66,9 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     )
     expect(hex(recovered)).toBe(a.plaintext)
   })
+
+  it('blinded slug token (AD-26)', () => {
+    const s = vectors.slug_token
+    expect(hex(v1.slugToken(unhex(s.contentKey), s.slug))).toBe(s.token)
+  })
 })

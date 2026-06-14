@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: veyq memory tree
+  version: 0.1.0
+paths:
+  /api/scopes/{scopeId}/nodes:
+    get:
+      tags: [MemoryTree]
+      operationId: listNodes
+      summary: The scope's node graph — Folders, Memories and Chapters (ciphertext + structure only).
+      description: >
+        Returns every node in the scope as a flat list (id, parentId, type, blinded slug token, order index
+        and the sealed name/metadata). The client reconstructs the tree and decrypts names locally; the
+        server never sees names or paths. A root-level node reports parentId = null.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The scope's nodes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemoryNodeList' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [MemoryTree]
+      operationId: createNode
+      summary: Create a Folder, Memory or Chapter under a scope (or at its root).
+      description: >
+        Creates one node. The server enforces the containment invariants from the node type + parent type
+        (Folder/Memory live at the root or in a Folder; a Chapter is a Memory nested in a Memory or Chapter;
+        never a Folder inside a Memory) and slug uniqueness per parent (the blinded slug token must be unique
+        among the parent's children → SLUG_EXISTS). The name/title is sealed client-side; the server stores
+        ciphertext, the structural type, the slug token and the order index only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateNodeRequest' }
+      responses:
+        '200':
+          description: The created node.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemoryNode' }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+components:
+  schemas:
+    NodeType:
+      type: string
+      enum: [FOLDER, MEMORY, CHAPTER]
+    CreateNodeRequest:
+      type: object
+      required: [type, slugToken, orderIndex, sealedContent]
+      properties:
+        parentId:
+          type: string
+          description: The parent node id; omit (or null) to create at the scope root.
+        type: { $ref: '#/components/schemas/NodeType' }
+        slugToken:
+          type: string
+          description: Blinded slug token (HMAC of the normalized slug under a per-scope slug key); opaque to the server.
+        orderIndex: { type: integer, description: 'Manual sibling ordering (server-visible integer; no name exposure).' }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    MemoryNode:
+      type: object
+      required: [id, scopeId, type, slugToken, orderIndex, sealedContent, createdAt]
+      properties:
+        id: { type: string }
+        parentId: { type: string, description: 'The parent node id, or null for a root-level node.' }
+        scopeId: { type: string }
+        type: { $ref: '#/components/schemas/NodeType' }
+        slugToken: { type: string }
+        orderIndex: { type: integer }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        createdAt: { type: string, format: date-time }
+    MemoryNodeList:
+      type: object
+      required: [nodes]
+      properties:
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryNode' }

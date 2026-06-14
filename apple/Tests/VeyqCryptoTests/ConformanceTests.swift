@@ -78,5 +78,10 @@ final class ConformanceTests: XCTestCase {
                                     pkX: hex(asym["pk_x25519"]!), pkM: hex(asym["pk_mlkem"]!),
                                     blob: hex(asym["blob"]!), context: asym["context"]!)),
             asym["plaintext"]!, "asym wrap round-trip")
+
+        let slug = v["slug_token"] as! [String: String]
+        XCTAssertEqual(
+            toHex(V1.slugToken(contentKey: hex(slug["contentKey"]!), slug: slug["slug"]!)),
+            slug["token"]!, "blinded slug token")
     }
 }

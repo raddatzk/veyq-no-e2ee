@@ -54,5 +54,10 @@ class V1ConformanceTest {
             asym.getString("plaintext"),
             hex(V1.asymUnwrap(unhex(d.getString("sk_x25519")), unhex(d.getString("mlkem_seed")), unhex(asym.getString("pk_x25519")), unhex(asym.getString("pk_mlkem")), unhex(asym.getString("blob")), asym.getString("context"))),
         )
+        val slug = v.getJSONObject("slug_token")
+        assertEquals(
+            slug.getString("token"),
+            hex(V1.slugToken(unhex(slug.getString("contentKey")), slug.getString("slug"))),
+        )
     }
 }
