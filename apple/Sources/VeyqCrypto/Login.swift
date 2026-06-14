@@ -3,7 +3,6 @@ import Foundation
 /// uc.account.login (Apple) — authenticate, fetch the wrapped key bag, and unlock the master key
 /// locally. The server returns ciphertext only; the master/identity keys are recovered here.
 public enum Login {
-    static let argon = V1.ArgonParams(t: 3, m: 8192, p: 1, dkLen: 32)
 
     static func b64urlDecode(_ s: String) -> Data {
         var t = s.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
@@ -66,7 +65,9 @@ public enum Login {
             throw NSError(domain: "veyq.login", code: 2, userInfo: [NSLocalizedDescriptionKey: "no PASSWORD unlock wrap"])
         }
 
-        let kek = try V1.kekPasswordSecret(secretKey: b64urlDecode(secretKeyB64), password: password, salt: b64urlDecode(kdf), params: argon)
+        // the unlock cost params travel with the wrap, so a future cost bump never strands this account
+        let (params, salt) = V1.decodeKdfParams(b64urlDecode(kdf))
+        let kek = try V1.kekPasswordSecret(secretKey: b64urlDecode(secretKeyB64), password: password, salt: salt, params: params)
         let masterKey = try V1.symUnwrap(kek: kek, blob: b64urlDecode(wrap.wrappedKey), context: "master-key")
         let privBytes = try V1.symUnwrap(kek: masterKey, blob: b64urlDecode(body.keyBag.wrappedIdentityPrivateKey.bytes), context: "identity-priv")
         let identity = V1.deserializeIdentityPrivate(privBytes)

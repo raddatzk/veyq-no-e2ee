@@ -22,6 +22,16 @@ public enum V1 {
     /// length-prefixed: u32(len) || bytes
     static func lp(_ x: Data) -> Data { u32be(x.count) + x }
 
+    /// kdfParams wire format (crypto agility, AD-25): the unlock cost params travel WITH the wrap so a future
+    /// cost bump never strands an account minted under lighter params. Layout: u32be t || m || p || dkLen || salt.
+    public static func encodeKdfParams(_ p: ArgonParams, salt: Data) -> Data {
+        u32be(p.t) + u32be(p.m) + u32be(p.p) + u32be(p.dkLen) + salt
+    }
+    public static func decodeKdfParams(_ b: Data) -> (params: ArgonParams, salt: Data) {
+        func r(_ o: Int) -> Int { (Int(b[b.startIndex + o]) << 24) | (Int(b[b.startIndex + o + 1]) << 16) | (Int(b[b.startIndex + o + 2]) << 8) | Int(b[b.startIndex + o + 3]) }
+        return (ArgonParams(t: r(0), m: r(4), p: r(8), dkLen: r(12)), b.subdata(in: (b.startIndex + 16)..<b.endIndex))
+    }
+
     // ---- AEAD: AES-256-GCM (12-byte nonce, tag appended) ----
     public static func aeadSeal(key: Data, nonce: Data, plaintext: Data, aad: Data) throws -> Data {
         let box = try AES.GCM.seal(

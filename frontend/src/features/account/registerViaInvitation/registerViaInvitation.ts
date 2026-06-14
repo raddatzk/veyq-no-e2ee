@@ -100,7 +100,7 @@ export async function registerWithScope(
     },
     wrappedIdentityPrivateKey: { suiteId: 'v1', bytes: b64url(wrappedPriv) },
     masterKeyWraps: [
-      { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(salt) },
+      { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, salt)) },
     ],
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },

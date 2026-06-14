@@ -31,6 +31,19 @@ object V1 {
     private fun u32be(n: Int): ByteArray = ByteBuffer.allocate(4).putInt(n).array()
     private fun lp(x: ByteArray): ByteArray = u32be(x.size) + x
 
+    /**
+     * kdfParams wire format (crypto agility, AD-25): the unlock cost params travel WITH the wrap so a future
+     * cost bump never strands an account minted under lighter params. Layout: u32be t || m || p || dkLen || salt.
+     */
+    fun encodeKdfParams(p: ArgonParams, salt: ByteArray): ByteArray =
+        u32be(p.t) + u32be(p.m) + u32be(p.p) + u32be(p.dkLen) + salt
+
+    fun decodeKdfParams(b: ByteArray): Pair<ArgonParams, ByteArray> {
+        val bb = ByteBuffer.wrap(b)
+        val params = ArgonParams(bb.int, bb.int, bb.int, bb.int)
+        return params to b.copyOfRange(16, b.size)
+    }
+
     fun aeadSeal(key: ByteArray, nonce: ByteArray, plaintext: ByteArray, aad: ByteArray): ByteArray {
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))

@@ -32,6 +32,17 @@ export type ArgonParams = { t: number; m: number; p: number; dkLen: number }
 /** production default: m in KiB = 64 MiB (vectors use lighter params, carried in the vector) */
 export const ARGON: ArgonParams = { t: 3, m: 65536, p: 1, dkLen: 32 }
 
+/**
+ * kdfParams wire format (crypto agility, AD-25): the unlock cost params travel WITH the wrap so a future
+ * cost bump never strands an account minted under lighter params. Layout: u32be t || m || p || dkLen || salt.
+ */
+export const encodeKdfParams = (p: ArgonParams, salt: Uint8Array): Uint8Array =>
+  concat(u32be(p.t), u32be(p.m), u32be(p.p), u32be(p.dkLen), salt)
+export const decodeKdfParams = (b: Uint8Array): { params: ArgonParams; salt: Uint8Array } => {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength)
+  return { params: { t: dv.getUint32(0), m: dv.getUint32(4), p: dv.getUint32(8), dkLen: dv.getUint32(12) }, salt: b.slice(16) }
+}
+
 export type HybridPublic = { x: Uint8Array; m: Uint8Array }
 export type HybridSecret = { x: Uint8Array; m: Uint8Array }
 

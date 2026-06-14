@@ -85,7 +85,7 @@ public enum RegisterViaInvitation {
             bootstrapSecret: bootstrapSecret, email: email, displayName: displayName,
             identityPublicKey: IdentityPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(id.pubKemX + id.pubKemM), signPublicKey: SetupServer.b64url(id.pubSign)),
             wrappedIdentityPrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(wrappedPriv)),
-            masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(masterWrap), kdfParams: SetupServer.b64url(salt))],
+            masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(masterWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: salt)))],
             authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(personalGrant)),

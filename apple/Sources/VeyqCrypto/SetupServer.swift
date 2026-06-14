@@ -53,7 +53,7 @@ public enum SetupServer {
             email: email, displayName: displayName,
             identityPublicKey: IdentityPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(id.pubKemX + id.pubKemM), signPublicKey: b64url(id.pubSign)),
             wrappedIdentityPrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(wrappedPriv)),
-            masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(salt))],
+            masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: salt)))],
             authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: b64url(authSalt + verifier)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(personalGrant))

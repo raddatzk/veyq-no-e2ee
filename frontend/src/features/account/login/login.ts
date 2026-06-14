@@ -2,9 +2,6 @@
 // The server returns ciphertext only; the master/identity keys are recovered here (auth != unlock).
 import * as v1 from '../../../shared/crypto/v1'
 
-// Must match the params the master-key wrap was made with (see setupServer.ts).
-const ARGON = { t: 3, m: 8192, p: 1, dkLen: 32 }
-
 function fromB64url(s: string): Uint8Array {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
   const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
@@ -57,7 +54,9 @@ export async function login(
   const wrap = body.keyBag.masterKeyWraps.find((w) => w.unlockMethod === 'PASSWORD')
   if (!wrap?.kdfParams) throw new Error('no PASSWORD unlock wrap in key bag')
 
-  const kek = v1.kekPasswordSecret(fromB64url(secretKeyB64), password, fromB64url(wrap.kdfParams), ARGON)
+  // the unlock cost params travel with the wrap, so a future cost bump never strands this account
+  const { params, salt } = v1.decodeKdfParams(fromB64url(wrap.kdfParams))
+  const kek = v1.kekPasswordSecret(fromB64url(secretKeyB64), password, salt, params)
   const masterKey = v1.symUnwrap(kek, fromB64url(wrap.wrappedKey), 'master-key')
   const privBytes = v1.symUnwrap(masterKey, fromB64url(body.keyBag.wrappedIdentityPrivateKey.bytes), 'identity-priv')
   const identity = v1.deserializeIdentityPrivate(privBytes)

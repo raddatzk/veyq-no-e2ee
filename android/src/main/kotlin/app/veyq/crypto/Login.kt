@@ -12,7 +12,6 @@ import java.util.Base64
  * locally. The server returns ciphertext only; the master/identity keys are recovered here.
  */
 object Login {
-    private val argon = V1.ArgonParams(t = 3, m = 8192, p = 1, dkLen = 32)
     private val b64d = Base64.getUrlDecoder()
     private val client = HttpClient.newHttpClient()
 
@@ -45,7 +44,9 @@ object Login {
         }
         val wrap = passwordWrap ?: throw RuntimeException("no PASSWORD unlock wrap in key bag")
 
-        val kek = V1.kekPasswordSecret(b64url(secretKeyB64), password, b64url(wrap.getString("kdfParams")), argon)
+        // the unlock cost params travel with the wrap, so a future cost bump never strands this account
+        val (params, salt) = V1.decodeKdfParams(b64url(wrap.getString("kdfParams")))
+        val kek = V1.kekPasswordSecret(b64url(secretKeyB64), password, salt, params)
         val masterKey = V1.symUnwrap(kek, b64url(wrap.getString("wrappedKey")), "master-key")
         val privBytes = V1.symUnwrap(masterKey, b64url(keyBag.getJSONObject("wrappedIdentityPrivateKey").getString("bytes")), "identity-priv")
         val identity = V1.deserializeIdentityPrivate(privBytes)

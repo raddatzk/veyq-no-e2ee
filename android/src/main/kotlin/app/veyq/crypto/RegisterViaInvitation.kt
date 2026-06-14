@@ -70,7 +70,7 @@ object RegisterViaInvitation {
         val json = """{"bootstrapSecret":"$bootstrapSecret","email":"$email","displayName":"$displayName",""" +
             """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
-            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(salt)}"}],""" +
+            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"}],""" +
             """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
             """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
             """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +
