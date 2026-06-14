@@ -90,5 +90,11 @@
     "index": 2,
     "total": 4,
     "frame": "a0a1a2a3a4a5a6a7a8a9aaab6f48326a48c118b5729a770476c35c0c21d1600ebcc93105"
+  },
+  "dedup_token": {
+    "note": "AD-09 media dedup token: dedupKey = HKDF(contentKey, \"veyq/v1/media-dedup\"); token = HMAC-SHA256(dedupKey, SHA256(content)).",
+    "contentKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "content": "89504e470d0a1a0affd8",
+    "token": "c6d49ddc86b90925a28a252eecf41b3aaad81f314b326618cd52b02c43296e5b"
   }
 }

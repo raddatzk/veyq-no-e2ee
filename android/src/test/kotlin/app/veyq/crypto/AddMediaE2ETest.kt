@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** Real end-to-end against a running backend; opt-in via VEYQ_E2E=1 so plain `gradle test` no-ops it. */
 class AddMediaE2ETest {
@@ -34,5 +35,11 @@ class AddMediaE2ETest {
         assertContentEquals(photoLater, AddMedia.decodeBlob(ck, items[1].getJSONObject("sealedBlob")))
         assertContentEquals(thumb, AddMedia.decodeBlob(ck, items[1].getJSONObject("sealedThumb")))
         assertFalse(AddMedia.hasThumb(items[0]))
+
+        // dedup (AD-09): the same photo is stored; adding it again references the one blob (no re-upload)
+        assertTrue(AddMedia.checkMediaBlob(apiBase, a, scope.scopeId, AddMedia.dedupTokenFor(ck, photoEarlier)))
+        val dup = AddMedia.addMedia(apiBase, a, scope.scopeId, ck, memId, photoEarlier, null, "2026-02-01T00:00:00Z", "image/png")
+        assertContentEquals(photoEarlier, AddMedia.decodeBlob(ck, dup.getJSONObject("sealedBlob")))
+        assertFalse(AddMedia.checkMediaBlob(apiBase, a, scope.scopeId, AddMedia.dedupTokenFor(ck, byteArrayOf(9, 9, 9))))
     }
 }

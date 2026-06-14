@@ -34,7 +34,23 @@ const seal = (contentKey: Uint8Array, plain: Uint8Array): Blob => {
   return { suiteId: 'v1', bytes: b64url(v1.concat(nonce, v1.aeadSeal(contentKey, nonce, plain, EMPTY))) }
 }
 
-/** Seal a media's bytes (+ optional thumbnail) under the content key and attach it to a Memory/Chapter node. */
+/** The dedup token for some content under a scope's content key (matches what the server keyed on). */
+export function dedupTokenFor(contentKey: Uint8Array, content: Uint8Array): string {
+  return b64url(v1.dedupToken(contentKey, content))
+}
+
+/** Has the scope already stored this content? (AD-09 — lets the caller skip re-uploading the bytes.) */
+export async function checkMediaBlob(apiBase: string, session: UnlockedSession, scopeId: string, dedupToken: string): Promise<boolean> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/media-blobs/${encodeURIComponent(dedupToken)}`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  if (!res.ok) throw new Error(`media-blob check failed: ${res.status} ${await res.text()}`)
+  return (await res.json()).exists
+}
+
+/**
+ * Seal a media's bytes (+ optional thumbnail) and attach it to a Memory/Chapter node. Deduplicates (AD-09):
+ * compute the content's dedup token, and if the scope already stores that blob, attach WITHOUT re-uploading
+ * the bytes; otherwise upload them once. The thumbnail is per-attachment (not deduplicated).
+ */
 export async function addMedia(
   apiBase: string,
   session: UnlockedSession,
@@ -43,14 +59,17 @@ export async function addMedia(
   nodeId: string,
   m: NewMedia,
 ): Promise<MediaItem> {
+  const dedupToken = dedupTokenFor(contentKey, m.bytes)
+  const alreadyStored = await checkMediaBlob(apiBase, session, scopeId, dedupToken)
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({
+      dedupToken,
       takenAt: m.takenAt,
       mimeType: m.mimeType,
       byteSize: m.bytes.length,
-      sealedBlob: seal(contentKey, m.bytes),
+      ...(alreadyStored ? {} : { sealedBlob: seal(contentKey, m.bytes) }),
       ...(m.thumb ? { sealedThumb: seal(contentKey, m.thumb) } : {}),
     }),
   })

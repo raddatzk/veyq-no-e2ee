@@ -3,6 +3,24 @@ info:
   title: veyq media
   version: 0.1.0
 paths:
+  /api/scopes/{scopeId}/media-blobs/{dedupToken}:
+    get:
+      tags: [MediaDedup]
+      operationId: checkMediaBlob
+      summary: Has the scope already stored this content (by dedup token)? — lets the client skip re-upload.
+      description: >
+        Returns whether a deduplicated blob with this client-computed dedup token already exists in the
+        scope. The server never sees plaintext and cannot compute the token, so this leaks only blob-equality
+        among members (AD-09). If it exists, the client adds the media WITHOUT re-sending the bytes.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: dedupToken, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Whether the blob exists., content: { application/json: { schema: { $ref: '#/components/schemas/MediaBlobExists' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/media:
     get:
       tags: [Media]
@@ -57,15 +75,23 @@ components:
   schemas:
     CreateMediaRequest:
       type: object
-      required: [takenAt, mimeType, byteSize, sealedBlob]
+      required: [dedupToken, takenAt, mimeType, byteSize]
       properties:
+        dedupToken: { type: string, description: 'Client-computed media dedup token (AD-09); the server stores the bytes once per scope+token.' }
         takenAt: { type: string, format: date-time, description: 'When the media was taken — orders the gallery.' }
         mimeType: { type: string }
         byteSize: { type: integer, format: int64, description: 'Plaintext byte size (server-visible).' }
-        sealedBlob: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        sealedBlob:
+          $ref: './common.openapi.yaml#/components/schemas/Blob'
+          description: The sealed bytes — required only when the dedup token is new; omit to reference an existing blob.
         sealedThumb:
           $ref: './common.openapi.yaml#/components/schemas/Blob'
           description: Optional light thumbnail derivative, sealed under the content key.
+    MediaBlobExists:
+      type: object
+      required: [exists]
+      properties:
+        exists: { type: boolean }
     MediaItem:
       type: object
       required: [id, scopeId, nodeId, takenAt, mimeType, byteSize, sealedBlob, createdAt]

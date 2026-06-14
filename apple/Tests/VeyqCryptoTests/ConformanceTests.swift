@@ -84,6 +84,11 @@ final class ConformanceTests: XCTestCase {
             toHex(V1.slugToken(contentKey: hex(slug["contentKey"]!), parentSlot: slug["parentSlot"]!, slug: slug["slug"]!)),
             slug["token"]!, "blinded slug token")
 
+        let dd = v["dedup_token"] as! [String: String]
+        XCTAssertEqual(
+            toHex(V1.dedupToken(contentKey: hex(dd["contentKey"]!), content: hex(dd["content"]!))),
+            dd["token"]!, "media dedup token")
+
         let f = v["chunk_frame"] as! [String: Any]
         XCTAssertEqual(
             toHex(try V1.sealFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,

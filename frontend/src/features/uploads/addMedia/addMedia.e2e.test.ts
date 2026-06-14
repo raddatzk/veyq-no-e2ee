@@ -4,7 +4,7 @@ import { registerServerOwner } from '../../admin/setupServer/setupServer'
 import { login } from '../../account/login/login'
 import { openPersonalScope, getOrCreateContentKey } from '../../content/scopeContent'
 import { createNode } from '../../memory/createTree/memoryTree'
-import { addMedia, listMedia, decodeBlob } from './addMedia'
+import { addMedia, listMedia, decodeBlob, checkMediaBlob, dedupTokenFor } from './addMedia'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -37,5 +37,12 @@ suite('add-media E2E (web -> live backend): encrypted media into a Memory', () =
     expect(Array.from(decodeBlob(ck, items[1].sealedBlob))).toEqual(Array.from(photoLater))
     expect(Array.from(decodeBlob(ck, items[1].sealedThumb!))).toEqual(Array.from(thumb))
     expect(items[0].sealedThumb).toBeFalsy() // no thumbnail provided → absent/null
+
+    // dedup (AD-09): the same photo is now stored; adding it again references the one blob (no re-upload)
+    expect(await checkMediaBlob(apiBase, a, scope.scopeId, dedupTokenFor(ck, photoEarlier))).toBe(true)
+    const dup = await addMedia(apiBase, a, scope.scopeId, ck, memory.id, { bytes: photoEarlier, takenAt: '2026-02-01T00:00:00Z', mimeType: 'image/png' })
+    expect(Array.from(decodeBlob(ck, dup.sealedBlob))).toEqual(Array.from(photoEarlier))
+    // and content never added is not present
+    expect(await checkMediaBlob(apiBase, a, scope.scopeId, dedupTokenFor(ck, Uint8Array.from([9, 9, 9])))).toBe(false)
   })
 })

@@ -156,6 +156,19 @@ object V1 {
     }
 
     /**
+     * Media dedup token (AD-09): dedupKey = HKDF(contentKey, "veyq/v1/media-dedup");
+     * token = HMAC-SHA256(dedupKey, SHA256(content)). Per-scope + keyed so the blind server can dedup
+     * identical media among members without a confirmation-of-file attack (it can't compute the token).
+     */
+    fun dedupToken(contentKey: ByteArray, content: ByteArray): ByteArray {
+        val dedupKey = hkdf(contentKey, ByteArray(0), "veyq/v1/media-dedup".toByteArray(Charsets.UTF_8), 32)
+        val hash = MessageDigest.getInstance("SHA-256").digest(content)
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(dedupKey, "HmacSHA256"))
+        return mac.doFinal(hash)
+    }
+
+    /**
      * Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
      * plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
      * reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).

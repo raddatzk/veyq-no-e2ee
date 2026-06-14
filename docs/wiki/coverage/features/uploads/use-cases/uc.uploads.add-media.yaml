@@ -53,6 +53,22 @@ acceptanceCriteria:
           - testName: testSealsMediaAndOrdersByTakenAt
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/AddMediaE2ETests.swift
+  - id: uc.uploads.add-media.dedup
+    statement: Identical content within a scope is stored once (ref-counted blob keyed by a client-computed dedup token); a pre-check lets the client skip re-uploading, and a new token without the bytes is rejected.
+    coverage:
+      backend:
+        integration:
+          - testName: deduplicatesIdenticalContentInTheScope
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaSliceTest.kt
+          - testName: deduplicatesIdenticalContentInTheScope
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/addmedia/AddMediaSliceTest.kt
+      web:
+        e2e:
+          - testName: "seals media + thumbnail under the content key, orders by takenAt, and round-trips the bytes"
+            kind: positive
+            ref: frontend/src/features/uploads/addMedia/addMedia.e2e.test.ts
   - id: uc.uploads.add-media.size-limits
     statement: The server rejects an oversized sealed blob or thumbnail at the base64 length (before decoding/allocating), bounded by config.
     coverage:

@@ -13,10 +13,11 @@ public enum AddMedia {
         public let createdAt: String
     }
     struct MediaListDTO: Codable { let media: [MediaItem] }
+    struct MediaBlobExists: Codable { let exists: Bool }
     struct CreateMediaRequest: Codable {
-        let takenAt, mimeType: String
+        let dedupToken, takenAt, mimeType: String
         let byteSize: Int64
-        let sealedBlob: BlobDTO
+        let sealedBlob: BlobDTO?
         let sealedThumb: BlobDTO?
     }
 
@@ -25,14 +26,34 @@ public enum AddMedia {
         return BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: plain, aad: Data()))))
     }
 
-    /// Seal a media's bytes (+ optional thumbnail) under the content key and attach it to a Memory/Chapter node.
+    /// The dedup token for some content under a scope's content key (matches what the server keyed on).
+    public static func dedupTokenFor(contentKey: Data, content: Data) -> String {
+        SetupServer.b64url(V1.dedupToken(contentKey: contentKey, content: content))
+    }
+
+    /// Has the scope already stored this content? (AD-09 — lets the caller skip re-uploading the bytes.)
+    public static func checkMediaBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String) async throws -> Bool {
+        let enc = dedupToken.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? dedupToken
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/media-blobs/\(enc)")!)
+        r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            throw NSError(domain: "veyq.media", code: 3, userInfo: [NSLocalizedDescriptionKey: "media-blob check failed"])
+        }
+        return try JSONDecoder().decode(MediaBlobExists.self, from: data).exists
+    }
+
+    /// Seal a media (+ optional thumbnail) and attach it to a Memory/Chapter node, deduplicating (AD-09):
+    /// if the scope already stores this content, attach WITHOUT re-uploading the bytes.
     public static func addMedia(
         apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String,
         bytes: Data, thumb: Data? = nil, takenAt: String, mimeType: String
     ) async throws -> MediaItem {
+        let dedupToken = dedupTokenFor(contentKey: contentKey, content: bytes)
+        let alreadyStored = try await checkMediaBlob(apiBase: apiBase, session: session, scopeId: scopeId, dedupToken: dedupToken)
         let body = CreateMediaRequest(
-            takenAt: takenAt, mimeType: mimeType, byteSize: Int64(bytes.count),
-            sealedBlob: try seal(contentKey, bytes), sealedThumb: try thumb.map { try seal(contentKey, $0) })
+            dedupToken: dedupToken, takenAt: takenAt, mimeType: mimeType, byteSize: Int64(bytes.count),
+            sealedBlob: alreadyStored ? nil : (try seal(contentKey, bytes)), sealedThumb: try thumb.map { try seal(contentKey, $0) })
         var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/nodes/\(nodeId)/media")!)
         r.httpMethod = "POST"
         r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")

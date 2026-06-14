@@ -133,6 +133,18 @@ export function slugToken(contentKey: Uint8Array, parentSlot: string, slug: stri
 }
 
 /**
+ * Media dedup token (AD-09): a per-scope, keyed token of the plaintext so the blind server can deduplicate
+ * identical media among members WITHOUT a confirmation-of-file attack (it can't compute tokens — the key is
+ * client-held). dedupKey = HKDF(contentKey, "veyq/v1/media-dedup"); token = HMAC-SHA256(dedupKey, SHA256(content)).
+ * Same plaintext in a scope → same token → the server stores one ciphertext (ref-counted), all members decrypt
+ * it via the shared content key. An ex-member who kept the key can test existence but cannot decrypt.
+ */
+export function dedupToken(contentKey: Uint8Array, content: Uint8Array): Uint8Array {
+  const dedupKey = hkdf(sha256, contentKey, new Uint8Array(0), utf8('veyq/v1/media-dedup'), 32)
+  return hmac(sha256, dedupKey, sha256(content))
+}
+
+/**
  * Chunked-AEAD frame (resumable upload + segmented streaming): a large blob is split into independent,
  * self-contained frames so chunks resume individually and segments decrypt without the whole file. Each
  * frame = nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad) with aad = u32be(index) || u32be(total),

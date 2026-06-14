@@ -128,6 +128,16 @@ public enum V1 {
         return Data(mac)
     }
 
+    /// Media dedup token (AD-09): dedupKey = HKDF(contentKey, "veyq/v1/media-dedup");
+    /// token = HMAC-SHA256(dedupKey, SHA256(content)). Per-scope + keyed so the blind server can dedup
+    /// identical media among members without a confirmation-of-file attack (it can't compute the token).
+    public static func dedupToken(contentKey: Data, content: Data) -> Data {
+        let dedupKey = hkdf(ikm: contentKey, salt: Data(), info: Data("veyq/v1/media-dedup".utf8), len: 32)
+        let hash = Data(SHA256.hash(data: content))
+        let mac = HMAC<SHA256>.authenticationCode(for: hash, using: SymmetricKey(data: dedupKey))
+        return Data(mac)
+    }
+
     /// Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
     /// plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
     /// reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).

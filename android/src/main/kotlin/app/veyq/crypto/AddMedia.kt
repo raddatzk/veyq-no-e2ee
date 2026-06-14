@@ -23,14 +23,32 @@ object AddMedia {
         return enc.encodeToString(nonce + V1.aeadSeal(contentKey, nonce, plain, EMPTY))
     }
 
-    /** Seal a media's bytes (+ optional thumbnail) under the content key and attach it to a Memory/Chapter node. */
+    /** The dedup token for some content under a scope's content key (matches what the server keyed on). */
+    fun dedupTokenFor(contentKey: ByteArray, content: ByteArray): String = enc.encodeToString(V1.dedupToken(contentKey, content))
+
+    /** Has the scope already stored this content? (AD-09 — lets the caller skip re-uploading the bytes.) */
+    fun checkMediaBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String): Boolean {
+        val enc = java.net.URLEncoder.encode(dedupToken, "UTF-8")
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/media-blobs/$enc"))
+            .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("media-blob check failed: ${resp.statusCode()} ${resp.body()}")
+        return JSONObject(resp.body()).getBoolean("exists")
+    }
+
+    /**
+     * Seal a media (+ optional thumbnail) and attach it to a Memory/Chapter node, deduplicating (AD-09): if
+     * the scope already stores this content, attach WITHOUT re-uploading the bytes.
+     */
     fun addMedia(
         apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String,
         bytes: ByteArray, thumb: ByteArray? = null, takenAt: String, mimeType: String,
     ): JSONObject {
+        val dedupToken = dedupTokenFor(contentKey, bytes)
+        val alreadyStored = checkMediaBlob(apiBase, session, scopeId, dedupToken)
+        val blobPart = if (alreadyStored) "" else ""","sealedBlob":{"suiteId":"v1","bytes":"${seal(contentKey, bytes)}"}"""
         val thumbPart = if (thumb == null) "" else ""","sealedThumb":{"suiteId":"v1","bytes":"${seal(contentKey, thumb)}"}"""
-        val json = """{"takenAt":"$takenAt","mimeType":"$mimeType","byteSize":${bytes.size},""" +
-            """"sealedBlob":{"suiteId":"v1","bytes":"${seal(contentKey, bytes)}"}$thumbPart}"""
+        val json = """{"dedupToken":"$dedupToken","takenAt":"$takenAt","mimeType":"$mimeType","byteSize":${bytes.size}$blobPart$thumbPart}"""
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media"))
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(json)).build()

@@ -59,6 +59,11 @@ class V1ConformanceTest {
             slug.getString("token"),
             hex(V1.slugToken(unhex(slug.getString("contentKey")), slug.getString("parentSlot"), slug.getString("slug"))),
         )
+        val dd = v.getJSONObject("dedup_token")
+        assertEquals(
+            dd.getString("token"),
+            hex(V1.dedupToken(unhex(dd.getString("contentKey")), unhex(dd.getString("content")))),
+        )
         val f = v.getJSONObject("chunk_frame")
         assertEquals(
             f.getString("frame"),

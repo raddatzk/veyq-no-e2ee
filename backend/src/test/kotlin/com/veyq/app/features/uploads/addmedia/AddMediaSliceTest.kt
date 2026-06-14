@@ -60,13 +60,15 @@ class AddMediaSliceTest {
             // a Memory (media allowed) and a Folder (media rejected) at the scope root
             nodes.persist(Node().apply { id = "md-mem"; this.scopeId = this@AddMediaSliceTest.scopeId; parentId = this@AddMediaSliceTest.scopeId; type = "MEMORY"; slugToken = "tok-mem"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
             nodes.persist(Node().apply { id = "md-folder"; this.scopeId = this@AddMediaSliceTest.scopeId; parentId = this@AddMediaSliceTest.scopeId; type = "FOLDER"; slugToken = "tok-folder"; orderIndex = 1; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
+            nodes.persist(Node().apply { id = "md-mem2"; this.scopeId = this@AddMediaSliceTest.scopeId; parentId = this@AddMediaSliceTest.scopeId; type = "MEMORY"; slugToken = "tok-mem2"; orderIndex = 2; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("md-owner")}"
         outsiderToken = "Bearer ${sessions.issue("md-outsider")}"
     }
 
-    private fun mediaBody(takenAt: String, blob: String = "c2VhbGVk") =
-        """{"takenAt":"$takenAt","mimeType":"image/jpeg","byteSize":1234,"sealedBlob":{"suiteId":"v1","bytes":"$blob"},"sealedThumb":{"suiteId":"v1","bytes":"dGh1bWI"}}"""
+    // token defaults to the blob, so distinct content gets distinct dedup tokens and identical content dedups
+    private fun mediaBody(takenAt: String, blob: String = "c2VhbGVk", token: String = blob) =
+        """{"dedupToken":"tok-$token","takenAt":"$takenAt","mimeType":"image/jpeg","byteSize":1234,"sealedBlob":{"suiteId":"v1","bytes":"$blob"},"sealedThumb":{"suiteId":"v1","bytes":"dGh1bWI"}}"""
 
     @Test
     fun storesAndServesEncryptedMediaForMemoryNodesOnly() {
@@ -102,13 +104,41 @@ class AddMediaSliceTest {
         // an oversized sealed blob is rejected at the base64 length (no allocation) — DoS guard
         val hugeBlob = "A".repeat(89) // > maxEncodedChars(64)
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"$hugeBlob"}}""")
+            .body("""{"dedupToken":"tok-huge","takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"$hugeBlob"}}""")
             .post("/api/scopes/$scopeId/nodes/md-mem/media").then().statusCode(400).body("code", `is`("MEDIA_TOO_LARGE"))
 
         // a valid blob with an oversized thumbnail is rejected on the thumbnail
         val hugeThumb = "A".repeat(25) // > maxEncodedChars(16)
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"c2VhbGVk"},"sealedThumb":{"suiteId":"v1","bytes":"$hugeThumb"}}""")
+            .body("""{"dedupToken":"tok-thumb","takenAt":"2026-01-01T10:00:00Z","mimeType":"image/jpeg","byteSize":1,"sealedBlob":{"suiteId":"v1","bytes":"c2VhbGVk"},"sealedThumb":{"suiteId":"v1","bytes":"$hugeThumb"}}""")
             .post("/api/scopes/$scopeId/nodes/md-mem/media").then().statusCode(400).body("code", `is`("THUMB_TOO_LARGE"))
+    }
+
+    @Test
+    fun deduplicatesIdenticalContentInTheScope() {
+        // the content is not stored yet
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/media-blobs/tok-dup").then().statusCode(200).body("exists", `is`(false))
+
+        // a NEW dedup token without the sealed bytes is rejected
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"dedupToken":"tok-dup","takenAt":"2026-02-01T10:00:00Z","mimeType":"image/jpeg","byteSize":3}""")
+            .post("/api/scopes/$scopeId/nodes/md-mem2/media").then().statusCode(400).body("code", `is`("BLOB_REQUIRED"))
+
+        // first add stores the blob; the token now exists
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"dedupToken":"tok-dup","takenAt":"2026-02-01T10:00:00Z","mimeType":"image/jpeg","byteSize":3,"sealedBlob":{"suiteId":"v1","bytes":"ZHVw"}}""")
+            .post("/api/scopes/$scopeId/nodes/md-mem2/media").then().statusCode(200).body("sealedBlob.bytes", `is`("ZHVw"))
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/media-blobs/tok-dup").then().statusCode(200).body("exists", `is`(true))
+
+        // a second add of the SAME content WITHOUT the bytes dedups — it references the one stored blob
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"dedupToken":"tok-dup","takenAt":"2026-02-02T10:00:00Z","mimeType":"image/jpeg","byteSize":3}""")
+            .post("/api/scopes/$scopeId/nodes/md-mem2/media").then().statusCode(200).body("sealedBlob.bytes", `is`("ZHVw"))
+
+        // two attachments, one stored blob
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes/md-mem2/media").then().statusCode(200)
+            .body("media.size()", `is`(2))
+            .body("media[0].sealedBlob.bytes", `is`("ZHVw"))
+            .body("media[1].sealedBlob.bytes", `is`("ZHVw"))
     }
 }

@@ -29,5 +29,13 @@ final class AddMediaE2ETests: XCTestCase {
         XCTAssertEqual(try AddMedia.decodeBlob(contentKey: ck, item: items[1]), photoLater)
         XCTAssertEqual(try AddMedia.decodeThumb(contentKey: ck, item: items[1]), thumb)
         XCTAssertFalse(AddMedia.hasThumb(items[0]))
+
+        // dedup (AD-09): the same photo is stored; adding it again references the one blob (no re-upload)
+        let storedAgain = try await AddMedia.checkMediaBlob(apiBase: apiBase, session: a, scopeId: scope.scopeId, dedupToken: AddMedia.dedupTokenFor(contentKey: ck, content: photoEarlier))
+        XCTAssertTrue(storedAgain)
+        let dup = try await AddMedia.addMedia(apiBase: apiBase, session: a, scopeId: scope.scopeId, contentKey: ck, nodeId: memory.id, bytes: photoEarlier, takenAt: "2026-02-01T00:00:00Z", mimeType: "image/png")
+        XCTAssertEqual(try AddMedia.decodeBlob(contentKey: ck, item: dup), photoEarlier)
+        let neverStored = try await AddMedia.checkMediaBlob(apiBase: apiBase, session: a, scopeId: scope.scopeId, dedupToken: AddMedia.dedupTokenFor(contentKey: ck, content: Data([9, 9, 9])))
+        XCTAssertFalse(neverStored)
     }
 }

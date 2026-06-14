@@ -2,10 +2,13 @@ package com.veyq.app.features.uploads.addmedia
 
 import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.CreateMediaRequest
+import com.veyq.app.generated.model.MediaBlobExists
 import com.veyq.app.generated.model.MediaItem
 import com.veyq.app.generated.model.MediaList
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.Media
+import com.veyq.app.shared.content.MediaBlob
+import com.veyq.app.shared.content.MediaBlobRepository
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKeyRepository
@@ -34,6 +37,7 @@ class AddMediaHandler(
     private val grants: ScopeGrantRepository,
     private val nodes: NodeRepository,
     private val media: MediaRepository,
+    private val mediaBlobs: MediaBlobRepository,
     private val contentKeys: ScopeContentKeyRepository,
     private val memberships: MembershipRepository,
     private val sessions: SessionService,
@@ -51,21 +55,38 @@ class AddMediaHandler(
         return MediaList(media = media.listByNodeId(nodeId).map(::toApi))
     }
 
+    /** Has the scope already stored this content (by dedup token)? Lets the client skip re-uploading the bytes. */
+    @Transactional
+    fun checkMediaBlob(auth: String?, scopeId: String, dedupToken: String): MediaBlobExists {
+        requireKeyHolder(scopeId, auth)
+        return MediaBlobExists(exists = mediaBlobs.findByScopeAndToken(scopeId, dedupToken) != null)
+    }
+
     @Transactional
     fun addMedia(auth: String?, scopeId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
         requireKeyHolder(scopeId, auth)
         requireMemoryNode(scopeId, nodeId)
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before adding media")
-        if (!suites.isKnown(req.sealedBlob.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
         if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
-        // bound the ciphertext BEFORE decoding (a giant base64 body must not be allocated to OOM the server)
-        val blob = decodeBounded(req.sealedBlob.bytes, maxInlineBytes, "MEDIA_TOO_LARGE")
+
+        // dedup: reuse the existing ciphertext blob for this content, or store it once (ref-counted).
+        val existing = mediaBlobs.findByScopeAndToken(scopeId, req.dedupToken)
+        val blob = existing ?: run {
+            val sealed = req.sealedBlob ?: throw ApiException(400, "BLOB_REQUIRED", "New content must include the sealed blob")
+            if (!suites.isKnown(sealed.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+            // bound the ciphertext BEFORE decoding (a giant base64 body must not be allocated to OOM the server)
+            val bytes = decodeBounded(sealed.bytes, maxInlineBytes, "MEDIA_TOO_LARGE")
+            MediaBlob().apply {
+                id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = req.dedupToken
+                suiteId = sealed.suiteId; sealedBlob = bytes; byteSize = req.byteSize; createdAt = Instant.now()
+            }.also(mediaBlobs::persist)
+        }
         val thumb = req.sealedThumb?.let { decodeBounded(it.bytes, maxThumbBytes, "THUMB_TOO_LARGE") }
 
         val item = Media().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
             takenAt = req.takenAt.toInstant(); mimeType = req.mimeType; byteSize = req.byteSize
-            suiteId = req.sealedBlob.suiteId; sealedBlob = blob; sealedThumb = thumb; createdAt = Instant.now()
+            suiteId = blob.suiteId; blobId = blob.id; sealedThumb = thumb; createdAt = Instant.now()
         }
         media.persist(item)
         return toApi(item)
@@ -80,15 +101,17 @@ class AddMediaHandler(
         return bytes
     }
 
-    private fun toApi(m: Media): MediaItem =
-        MediaItem(
+    private fun toApi(m: Media): MediaItem {
+        val blob = mediaBlobs.findById(m.blobId) ?: throw ApiException(500, "MISSING_BLOB", "Media blob not found")
+        return MediaItem(
             id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
             takenAt = OffsetDateTime.ofInstant(m.takenAt, ZoneOffset.UTC),
             mimeType = m.mimeType, byteSize = m.byteSize,
-            sealedBlob = Blob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedBlob)),
+            sealedBlob = Blob(suiteId = blob.suiteId, bytes = enc.encodeToString(blob.sealedBlob)),
             sealedThumb = m.sealedThumb?.let { Blob(suiteId = m.suiteId, bytes = enc.encodeToString(it)) },
             createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
         )
+    }
 
     /** Media hang off a Memory or Chapter (a content unit), never a Folder, and only within this scope. */
     private fun requireMemoryNode(scopeId: String, nodeId: String) {
