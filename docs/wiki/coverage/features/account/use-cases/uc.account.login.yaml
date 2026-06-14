@@ -17,7 +17,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/account/login/login.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/Login.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/Login.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/Login.swift
 acceptanceCriteria:
@@ -38,7 +38,7 @@ acceptanceCriteria:
         e2e:
           - testName: loginAndUnlock
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
       apple:
         e2e:
           - testName: testLoginAndUnlock

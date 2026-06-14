@@ -33,11 +33,11 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/content/scopeContent.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/ScopeContent.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/ScopeContent.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/ScopeContent.swift
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/Login.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/Login.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/Login.swift
 acceptanceCriteria:
@@ -75,10 +75,10 @@ acceptanceCriteria:
         e2e:
           - testName: loginAndUnlock
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/LoginE2ETest.kt
           - testName: registerNewOwnerThenLoginAndGrant
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
       apple:
         e2e:
           - testName: testLoginAndUnlock
@@ -115,7 +115,7 @@ acceptanceCriteria:
         e2e:
           - testName: writeAndReadEncryptedContentUnderPersonalScope
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/ScopeContentE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/ScopeContentE2ETest.kt
       apple:
         e2e:
           - testName: testWriteAndReadEncryptedContentUnderPersonalScope

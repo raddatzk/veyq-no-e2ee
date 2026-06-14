@@ -15,7 +15,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/spaces/switchActiveSpace/switchActiveSpace.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/SwitchActiveSpace.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/SwitchActiveSpace.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/SwitchActiveSpace.swift
 acceptanceCriteria:
@@ -42,7 +42,7 @@ acceptanceCriteria:
         e2e:
           - testName: listsPersonalPlusGroupAndSwitchesBetweenThem
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/SwitchActiveSpaceE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SwitchActiveSpaceE2ETest.kt
       apple:
         e2e:
           - testName: testListsPersonalPlusGroupAndSwitchesBetweenThem

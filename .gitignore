@@ -208,6 +208,8 @@ ios/**/xcuserdata/
 ios/**/DerivedData/
 ios/build/
 *.xcuserstate
+# Greenfield iOS project is generated from ios/project.yml via `xcodegen generate`.
+ios/*.xcodeproj/
 
 ### Windows ###
 # Windows thumbnail cache files

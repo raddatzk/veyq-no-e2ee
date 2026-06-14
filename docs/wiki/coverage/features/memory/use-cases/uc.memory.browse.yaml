@@ -15,7 +15,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/memory/browse/browse.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/Browse.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/Browse.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/Browse.swift
 notes: >
@@ -42,7 +42,7 @@ acceptanceCriteria:
         e2e:
           - testName: resolvesACleanSlugPathClientSide
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/BrowseE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/BrowseE2ETest.kt
       apple:
         e2e:
           - testName: testResolvesACleanSlugPathClientSide

@@ -23,7 +23,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/admin/setupServer/setupServer.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/SetupServer.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/SetupServer.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/SetupServer.swift
 acceptanceCriteria:
@@ -57,7 +57,7 @@ acceptanceCriteria:
         e2e:
           - testName: createsFirstUser
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/SetupServerE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SetupServerE2ETest.kt
       apple:
         e2e:
           - testName: testCreatesFirstUser
@@ -96,16 +96,16 @@ acceptanceCriteria:
         unit:
           - testName: suiteId
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
           - testName: mlkem768RoundTrip
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/SmokeTest.kt
           - testName: conformance
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/V1ConformanceTest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/V1ConformanceTest.kt
           - testName: asymWrapRoundTrip
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/V1WrapRoundTripTest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/V1WrapRoundTripTest.kt
       apple:
         unit:
           - testName: testSuiteId

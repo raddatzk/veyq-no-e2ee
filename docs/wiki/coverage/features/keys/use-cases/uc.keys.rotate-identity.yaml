@@ -21,7 +21,7 @@ documents:
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/RotateIdentity.swift
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/RotateIdentity.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/RotateIdentity.kt
 acceptanceCriteria:
   - id: uc.keys.rotate-identity.rotate
     statement: A user can rotate their identity keypair, re-wrapping exactly their owned grants, so they keep access to every scope and its content under the new identity while the master key stays unchanged.
@@ -43,7 +43,7 @@ acceptanceCriteria:
         e2e:
           - testName: rotateIdentityKeepsAccessToScopesAndContent
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RotateIdentityE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RotateIdentityE2ETest.kt
       apple:
         e2e:
           - testName: testRotateIdentityKeepsAccessToScopesAndContent

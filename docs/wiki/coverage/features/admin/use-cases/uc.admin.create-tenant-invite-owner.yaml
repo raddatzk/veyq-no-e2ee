@@ -17,7 +17,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/admin/createTenantInviteOwner/tenant.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/Tenant.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/Tenant.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/Tenant.swift
 acceptanceCriteria:
@@ -54,7 +54,7 @@ acceptanceCriteria:
         e2e:
           - testName: provisionClaimAndGrant
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/TenantE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/TenantE2ETest.kt
       apple:
         e2e:
           - testName: testProvisionClaimAndGrant

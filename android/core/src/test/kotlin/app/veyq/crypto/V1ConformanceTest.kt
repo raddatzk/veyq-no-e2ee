@@ -5,9 +5,22 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/** Walk up from the working dir until a relative path resolves — locates repo-root files from any module. */
+private fun findRepoFile(relative: String): File {
+    var dir: File? = File("").absoluteFile
+    while (dir != null) {
+        val candidate = File(dir, relative)
+        if (candidate.exists()) return candidate
+        dir = dir.parentFile
+    }
+    throw java.io.FileNotFoundException("could not locate $relative from ${File("").absolutePath}")
+}
+
 /** Asserts the Android (Kotlin/BouncyCastle) v1 suite reproduces the shared vectors byte-for-byte. */
 class V1ConformanceTest {
-    private val v = JSONObject(File("../docs/api/crypto-vectors/v1.json").readText())
+    // Resolve the shared vectors by walking up from the module dir to the repo root, so the test works
+    // regardless of how deep this module sits (e.g. `android/core`).
+    private val v = JSONObject(findRepoFile("docs/api/crypto-vectors/v1.json").readText())
 
     private fun unhex(s: String): ByteArray = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     private fun hex(b: ByteArray): String = b.joinToString("") { "%02x".format(it) }

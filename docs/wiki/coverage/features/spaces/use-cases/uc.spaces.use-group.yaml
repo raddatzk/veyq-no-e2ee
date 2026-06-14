@@ -17,7 +17,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/spaces/useGroup/useGroup.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/UseGroup.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/UseGroup.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/UseGroup.swift
 acceptanceCriteria:
@@ -44,7 +44,7 @@ acceptanceCriteria:
         e2e:
           - testName: twoMembersCollaborateOnOneSharedScope
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/UseGroupE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/UseGroupE2ETest.kt
       apple:
         e2e:
           - testName: testTwoMembersCollaborateOnOneSharedScope

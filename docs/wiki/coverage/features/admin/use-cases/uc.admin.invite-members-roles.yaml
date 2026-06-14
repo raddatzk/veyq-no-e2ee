@@ -23,7 +23,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/admin/inviteMembersRoles/inviteMembers.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/InviteMembers.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/InviteMembers.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/InviteMembers.swift
 acceptanceCriteria:
@@ -47,7 +47,7 @@ acceptanceCriteria:
         e2e:
           - testName: tempWrapMemberInviteRegistersOnExistingScope
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/MemberInviteE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MemberInviteE2ETest.kt
       apple:
         e2e:
           - testName: testTempWrapMemberInviteRegistersOnExistingScope
@@ -73,7 +73,7 @@ acceptanceCriteria:
         e2e:
           - testName: existingUserConfirmsInviteOntoExistingAccount
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/AcceptMemberInviteE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/AcceptMemberInviteE2ETest.kt
       apple:
         e2e:
           - testName: testExistingUserConfirmsInviteOntoExistingAccount
@@ -129,10 +129,10 @@ acceptanceCriteria:
         e2e:
           - testName: rotateScopeReGrantsEveryActiveMember
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RotateScopeE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RotateScopeE2ETest.kt
           - testName: contentKeyReWrappedOnRotation
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/ContentSurvivesRotationE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/ContentSurvivesRotationE2ETest.kt
       apple:
         e2e:
           - testName: testRotateScopeReGrantsEveryActiveMember

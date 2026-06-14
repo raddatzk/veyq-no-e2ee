@@ -15,7 +15,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/memory/createTree/memoryTree.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/MemoryTree.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/MemoryTree.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/MemoryTree.swift
 acceptanceCriteria:
@@ -47,7 +47,7 @@ acceptanceCriteria:
         e2e:
           - testName: buildsEncryptedFolderMemoryChapterTree
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/MemoryTreeE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/MemoryTreeE2ETest.kt
       apple:
         e2e:
           - testName: testBuildsEncryptedFolderMemoryChapterTree

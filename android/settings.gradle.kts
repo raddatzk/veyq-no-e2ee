@@ -1,5 +1,21 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 rootProject.name = "veyq-android"
 
-// Greenfield Android. For now this is the pure Kotlin/JVM **crypto core** (BouncyCastle), so it is
-// testable without the Android SDK. The Jetpack Compose app + Android Keystore / Credential Manager
-// are added as an AGP `:app` module once an Android SDK is available; this becomes `:core`.
+// `:core` = pure Kotlin/JVM crypto + slice logic (BouncyCastle), testable headlessly against the live
+// backend. `:app` = the Jetpack Compose / Material 3 app that depends on it. Build the app with
+//   ANDROID_HOME=~/Library/Android/sdk ./gradlew :app:assembleDebug
+include(":core", ":app")

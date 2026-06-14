@@ -21,7 +21,7 @@ documents:
   - type: entryPoint
     ref: frontend/src/features/account/registerViaInvitation/registerViaInvitation.ts
   - type: entryPoint
-    ref: android/src/main/kotlin/app/veyq/crypto/RegisterViaInvitation.kt
+    ref: android/core/src/main/kotlin/app/veyq/crypto/RegisterViaInvitation.kt
   - type: entryPoint
     ref: apple/Sources/VeyqCrypto/RegisterViaInvitation.swift
 acceptanceCriteria:
@@ -42,7 +42,7 @@ acceptanceCriteria:
         e2e:
           - testName: registerNewOwnerThenLoginAndGrant
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
       apple:
         e2e:
           - testName: testRegisterNewOwnerThenLoginAndGrant
@@ -60,7 +60,7 @@ acceptanceCriteria:
         e2e:
           - testName: registerNewOwnerThenLoginAndGrant
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
       apple:
         e2e:
           - testName: testRegisterNewOwnerThenLoginAndGrant
@@ -83,7 +83,7 @@ acceptanceCriteria:
         e2e:
           - testName: registerNewOwnerThenLoginAndGrant
             kind: positive
-            ref: android/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
+            ref: android/core/src/test/kotlin/app/veyq/crypto/RegisterViaInvitationE2ETest.kt
       apple:
         e2e:
           - testName: testRegisterNewOwnerThenLoginAndGrant
