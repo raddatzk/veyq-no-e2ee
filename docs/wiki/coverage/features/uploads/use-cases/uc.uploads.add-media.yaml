@@ -39,6 +39,10 @@ acceptanceCriteria:
     statement: Media bytes + thumbnail are sealed under the content key (server blind), ordered by takenAt, and round-trip byte-identical.
     coverage:
       web:
+        unit:
+          - testName: "media dedup token (AD-09)"
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts
         e2e:
           - testName: "seals media + thumbnail under the content key, orders by takenAt, and round-trips the bytes"
             kind: positive

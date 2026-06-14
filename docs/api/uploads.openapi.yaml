@@ -26,6 +26,7 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+        '429': { $ref: './common.openapi.yaml#/components/responses/TooManyRequests' }
   /api/uploads/{uploadId}:
     get:
       tags: [UploadStatus]

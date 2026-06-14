@@ -48,6 +48,7 @@ class ResumableUploadHandler(
     @param:ConfigProperty(name = "veyq.uploads.max-chunks", defaultValue = "10000") private val maxChunks: Int,
     @param:ConfigProperty(name = "veyq.uploads.max-upload-bytes", defaultValue = "10737418240") private val maxUploadBytes: Long,
     @param:ConfigProperty(name = "veyq.uploads.max-frame-bytes", defaultValue = "16777244") private val maxFrameBytes: Int,
+    @param:ConfigProperty(name = "veyq.uploads.max-open-sessions", defaultValue = "100") private val maxOpenSessions: Long,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -62,6 +63,11 @@ class ResumableUploadHandler(
         if (req.totalChunks > maxChunks) throw ApiException(400, "UPLOAD_TOO_MANY_CHUNKS", "totalChunks exceeds the configured upload limit")
         if (req.byteSize < 0) throw ApiException(400, "INVALID_SIZE", "byteSize must be non-negative")
         if (req.byteSize > maxUploadBytes) throw ApiException(400, "UPLOAD_TOO_LARGE", "byteSize exceeds the configured upload limit")
+        // cap concurrent OPEN sessions per scope so a member can't spam empty sessions to exhaust DB rows
+        // (each costs nothing to create until the abandoned-upload GC reclaims it).
+        if (sessions.countOpenByScope(scopeId) >= maxOpenSessions) {
+            throw ApiException(429, "TOO_MANY_OPEN_UPLOADS", "Too many in-progress uploads — finish or abandon some first")
+        }
         val s = UploadSession().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
             totalChunks = req.totalChunks; mimeType = req.mimeType; byteSize = req.byteSize

@@ -77,3 +77,11 @@ acceptanceCriteria:
           - testName: rejectsOversizedResumableUploadsBeforeHeavyWork
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/uploads/resumableupload/ResumableUploadSliceTest.kt
+  - id: uc.uploads.resumable-upload.open-session-cap
+    statement: A scope can hold only a bounded number of concurrent OPEN upload sessions; further createUpload calls are refused (anti DB-row exhaustion).
+    coverage:
+      backend:
+        integration:
+          - testName: capsConcurrentOpenSessionsPerScope
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/resumableupload/ResumableUploadSliceTest.kt

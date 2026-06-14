@@ -49,6 +49,9 @@ class UploadSessionRepository : PanacheRepositoryBase<UploadSession, String> {
 
     /** Row-locked session read — serialize concurrent chunk PUTs so the cumulative budget can't be overshot. */
     fun lockById(id: String): UploadSession? = find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
+
+    /** How many OPEN (not yet finalized) sessions a scope holds — bounds abandoned-session row exhaustion. */
+    fun countOpenByScope(scopeId: String): Long = count("scopeId = ?1 and status = ?2", scopeId, UploadStatus.OPEN.name)
 }
 
 @ApplicationScoped
