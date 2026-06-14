@@ -4,8 +4,8 @@ import Foundation
 /// scope. The name is sealed under the scope content key; the slug becomes a blinded slug token (AD-26) so
 /// the server enforces per-parent uniqueness without seeing the name. Server holds only structure + ciphertext.
 public enum MemoryTree {
-    struct BlobDTO: Codable { let suiteId, bytes: String }
-    public struct MemoryNode: Codable {
+    struct BlobDTO: Codable, Sendable { let suiteId, bytes: String }
+    public struct MemoryNode: Codable, Sendable {
         public let id: String
         public let parentId: String?
         public let scopeId, type, slugToken: String

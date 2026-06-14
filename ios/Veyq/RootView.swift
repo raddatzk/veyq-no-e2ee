@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Slice 1: connect → login → landed. The real tab bar + MemoryHome arrive in slice 2.
+/// Slice 1 → 2: connect → login → MemoryHome.
 struct RootView: View {
     @StateObject private var app = AppState()
 
@@ -9,7 +9,10 @@ struct RootView: View {
             switch app.phase {
             case .connect: ConnectView()
             case .login: LoginView()
-            case .landed: LandedView()
+            case .landed:
+                if let session = app.session {
+                    MemoryHomeView(apiBase: app.apiBase, session: session)
+                }
             }
         }
         .environmentObject(app)

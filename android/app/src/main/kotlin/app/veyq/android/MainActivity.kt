@@ -12,7 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.veyq.android.ui.ConnectScreen
-import app.veyq.android.ui.LandedScreen
+import app.veyq.android.ui.HomeScreen
 import app.veyq.android.ui.LoginScreen
 import app.veyq.android.ui.VeyqTheme
 import app.veyq.crypto.Login
@@ -45,6 +45,6 @@ private fun AuthFlow() {
     when (phase) {
         Phase.Connect -> ConnectScreen(apiBase) { apiBase = it; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
-        Phase.Landed -> LandedScreen(session!!, apiBase) { session = null; phase = Phase.Login }
+        Phase.Landed -> HomeScreen(apiBase, session!!) { session = null; phase = Phase.Login }
     }
 }

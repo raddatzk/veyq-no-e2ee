@@ -4,8 +4,8 @@ import Foundation
 /// enter (personal + groups) and switch the active context into any of them. Switching fetches no secrets;
 /// it opens the chosen scope with the wrap the client already holds. Content ops reuse ScopeContent.
 public enum SwitchActiveSpace {
-    public struct KemPublicKeyDTO: Codable { public let suiteId, kemPublicKey: String }
-    public struct SpaceEntry: Codable {
+    public struct KemPublicKeyDTO: Codable, Sendable { public let suiteId, kemPublicKey: String }
+    public struct SpaceEntry: Codable, Sendable {
         public let kind: String            // "PERSONAL" | "GROUP"
         public let tenantId: String?
         public let name: String?

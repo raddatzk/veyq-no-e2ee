@@ -33,7 +33,7 @@ public enum Login {
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
     }
-    public struct UserSummaryDTO: Codable { public let id, email, displayName, serverRole: String }
+    public struct UserSummaryDTO: Codable, Sendable { public let id, email, displayName, serverRole: String }
     public struct PersonalScopeGrantDTO: Codable {
         public let scopeId: String
         public let scopePublicKey: KemPublicKeyDTO
@@ -41,7 +41,7 @@ public enum Login {
     }
     struct LoginResponseDTO: Codable { let sessionToken: String; let user: UserSummaryDTO; let keyBag: KeyBagDTO }
 
-    public struct UnlockedSession {
+    public struct UnlockedSession: Sendable {
         public let sessionToken: String
         public let user: UserSummaryDTO
         public let identity: V1.IdentityPrivate

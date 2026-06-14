@@ -11,11 +11,11 @@ public enum Media {
     public static let defaultChunkSize = 4 * 1024 * 1024
 
     struct BlobDTO: Codable { let suiteId, bytes: String }
-    public struct BlobRef: Codable { public let blobId: String; public let totalChunks: Int; public let byteSize: Int64 }
-    public struct BlobTicket: Codable { public let status: String; public let blobId: String?; public let uploadId: String?; public let totalChunks: Int }
-    public struct UploadProgress: Codable { public let uploadId: String; public let totalChunks: Int; public let receivedChunks: [Int]; public let status: String }
-    public struct Derivative: Codable { public let kind: String; public let blob: BlobRef }
-    public struct MediaItem: Codable {
+    public struct BlobRef: Codable, Sendable { public let blobId: String; public let totalChunks: Int; public let byteSize: Int64 }
+    public struct BlobTicket: Codable, Sendable { public let status: String; public let blobId: String?; public let uploadId: String?; public let totalChunks: Int }
+    public struct UploadProgress: Codable, Sendable { public let uploadId: String; public let totalChunks: Int; public let receivedChunks: [Int]; public let status: String }
+    public struct Derivative: Codable, Sendable { public let kind: String; public let blob: BlobRef }
+    public struct MediaItem: Codable, Sendable {
         public let id, scopeId, nodeId, takenAt, mimeType: String
         public let original: BlobRef
         public let derivatives: [Derivative]

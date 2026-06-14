@@ -13,7 +13,7 @@ public enum ScopeContent {
     struct ItemListDTO: Codable { let items: [ItemDTO] }
     struct CreateItemDTO: Codable { let sealedContent: BlobDTO }
 
-    public struct OpenScope {
+    public struct OpenScope: Sendable {
         public let scopeId: String
         let scopePkX, scopePkM: Data
         let scopePriv: V1.IdentityPrivate

@@ -209,7 +209,7 @@ public enum V1 {
         lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
     }
 
-    public struct IdentityPrivate { public let kemX: Data; public let mlkemSeed: Data; public let sign: Data }
+    public struct IdentityPrivate: Sendable { public let kemX: Data; public let mlkemSeed: Data; public let sign: Data }
 
     /// Inverse of serializeIdentityPrivate: read three length-prefixed fields.
     public static func deserializeIdentityPrivate(_ bytes: Data) -> IdentityPrivate {
