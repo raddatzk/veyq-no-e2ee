@@ -10,4 +10,9 @@ import jakarta.ws.rs.core.Response
 class CurateResource(private val handler: CurateHandler) : NodeCurateApi {
     override fun updateNode(authorization: String, scopeId: String, nodeId: String, updateNodeRequest: UpdateNodeRequest): Response =
         Response.ok(handler.updateNode(authorization, scopeId, nodeId, updateNodeRequest)).build()
+
+    override fun deleteNode(authorization: String, scopeId: String, nodeId: String): Response {
+        handler.deleteNode(authorization, scopeId, nodeId)
+        return Response.noContent().build()
+    }
 }

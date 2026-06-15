@@ -5,6 +5,7 @@ import com.veyq.app.generated.model.MemoryNode
 import com.veyq.app.generated.model.NodeType
 import com.veyq.app.generated.model.UpdateNodeRequest
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
@@ -30,6 +31,7 @@ class CurateHandler(
     private val grants: ScopeGrantRepository,
     private val nodes: NodeRepository,
     private val media: MediaRepository,
+    private val purge: ContentPurge,
     private val memberships: MembershipRepository,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
@@ -91,6 +93,31 @@ class CurateHandler(
         }
 
         return toApi(node, scopeId)
+    }
+
+    /**
+     * Delete a node and its whole subtree (descendant nodes + all attached media/journal/tracks/shares).
+     * Any key holder of the scope may delete; the confirm-by-name gate is enforced client-side. Irreversible.
+     */
+    @Transactional
+    fun deleteNode(auth: String?, scopeId: String, nodeId: String) {
+        requireKeyHolder(scopeId, auth)
+        val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
+        if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
+        purge.purgeNodes(collectSubtree(scopeId, nodeId))
+    }
+
+    /** All node ids in the subtree rooted at `rootId` (inclusive), via a single scope read + BFS. */
+    private fun collectSubtree(scopeId: String, rootId: String): Set<String> {
+        val childrenByParent = nodes.listByScopeId(scopeId).groupBy { it.parentId }
+        val result = linkedSetOf(rootId)
+        val stack = ArrayDeque(listOf(rootId))
+        while (stack.isNotEmpty()) {
+            for (child in childrenByParent[stack.removeLast()].orEmpty()) {
+                if (result.add(child.id)) stack.addLast(child.id)
+            }
+        }
+        return result
     }
 
     /** True if `candidate` is `root` itself or one of its descendants (walk up from candidate to the scope root). */

@@ -88,6 +88,23 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+    delete:
+      tags: [NodeCurate]
+      operationId: deleteNode
+      summary: Delete a node (Folder/Memory/Chapter) and everything beneath it.
+      description: >
+        Recursively removes the node, its descendant nodes, and all content hanging off them (media +
+        derivatives, journal, tracks, shares). Any key holder of the scope may delete; the client gates it
+        behind a confirm-by-name dialog. Irreversible.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/journal:
     get:
       tags: [MemoryJournal]

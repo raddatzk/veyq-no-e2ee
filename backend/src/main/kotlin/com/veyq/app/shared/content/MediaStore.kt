@@ -105,9 +105,14 @@ class BlobChunkRepository : PanacheRepositoryBase<BlobChunk, String> {
 @ApplicationScoped
 class MediaRepository : PanacheRepositoryBase<Media, String> {
     fun listByNodeId(nodeId: String): List<Media> = list("nodeId = ?1 order by createdAt", nodeId)
+    fun listByNodeIds(nodeIds: Collection<String>): List<Media> = if (nodeIds.isEmpty()) emptyList() else list("nodeId in ?1", nodeIds)
+    fun listByScopeId(scopeId: String): List<Media> = list("scopeId", scopeId)
+    fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }
 
 @ApplicationScoped
 class MediaDerivativeRepository : PanacheRepositoryBase<MediaDerivative, String> {
     fun listByMediaId(mediaId: String): List<MediaDerivative> = list("mediaId", mediaId)
+    fun deleteByMediaIds(mediaIds: Collection<String>): Long = if (mediaIds.isEmpty()) 0 else delete("mediaId in ?1", mediaIds)
 }

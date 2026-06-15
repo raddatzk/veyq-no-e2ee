@@ -22,4 +22,7 @@ class MemoryJournal {
 }
 
 @ApplicationScoped
-class MemoryJournalRepository : PanacheRepositoryBase<MemoryJournal, String>
+class MemoryJournalRepository : PanacheRepositoryBase<MemoryJournal, String> {
+    fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
+}

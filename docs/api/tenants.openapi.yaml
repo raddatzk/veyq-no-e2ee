@@ -24,6 +24,23 @@ paths:
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenants/{tenantId}:
+    delete:
+      tags: [TenantProvisioning]
+      operationId: deleteTenant
+      summary: Delete a group (tenant) and everything it owns. Tenant Owner only.
+      description: >
+        Cascades the tenant's scope (all nodes + their media/journal/tracks/shares, the content key, items,
+        and grants) plus memberships and invites, then the tenant. Only an active Tenant Owner may delete;
+        the client gates it behind a confirm-by-name dialog. Irreversible.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenants/{tenantId}/owner-invite:
     post:
       tags: [TenantProvisioning]

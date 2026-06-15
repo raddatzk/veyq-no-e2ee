@@ -124,6 +124,25 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/media/{mediaId}:
+    delete:
+      tags: [Media]
+      operationId: deleteMedia
+      summary: Delete a single medium (and its derivatives) from a Memory/Chapter.
+      description: >
+        Removes the media row + its derivative rows and un-pins it as a cover wherever used. Any key holder
+        of the scope may delete; the client gates it behind a confirm dialog. Blob chunks are left for a
+        separate GC pass. Irreversible.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: mediaId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/public/shares/{shareId}/nodes/{nodeId}/media:
     get:
       tags: [PublicShareMedia]

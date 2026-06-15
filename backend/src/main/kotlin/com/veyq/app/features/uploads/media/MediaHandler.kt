@@ -95,6 +95,17 @@ class MediaHandler(
             createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
         )
 
+    /** Remove a single medium and its derivatives; un-pin it as a cover wherever it was used. */
+    @Transactional
+    fun deleteMedia(auth: String?, scopeId: String, nodeId: String, mediaId: String) {
+        requireKeyHolder(scopeId, auth)
+        val item = media.findById(mediaId) ?: throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found")
+        if (item.scopeId != scopeId || item.nodeId != nodeId) throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found here")
+        derivatives.deleteByMediaIds(listOf(mediaId))
+        nodes.clearCoverByMediaIds(listOf(mediaId))
+        media.delete(item)
+    }
+
     private fun blobRef(blobId: String): BlobRef {
         val b = blobs.findById(blobId) ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
         return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)

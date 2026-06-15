@@ -14,4 +14,9 @@ class MediaResource(private val handler: MediaHandler) : MediaApi {
 
     override fun createMedia(authorization: String, scopeId: String, nodeId: String, createMediaRequest: CreateMediaRequest): Response =
         Response.ok(handler.createMedia(authorization, scopeId, nodeId, createMediaRequest)).build()
+
+    override fun deleteMedia(authorization: String, scopeId: String, nodeId: String, mediaId: String): Response {
+        handler.deleteMedia(authorization, scopeId, nodeId, mediaId)
+        return Response.noContent().build()
+    }
 }

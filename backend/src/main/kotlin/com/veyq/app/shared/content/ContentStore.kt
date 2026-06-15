@@ -34,9 +34,11 @@ class ScopeItem {
 @ApplicationScoped
 class ScopeContentKeyRepository : PanacheRepositoryBase<ScopeContentKey, String> {
     fun findByScopeId(scopeId: String): ScopeContentKey? = find("scopeId", scopeId).firstResult()
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }
 
 @ApplicationScoped
 class ScopeItemRepository : PanacheRepositoryBase<ScopeItem, String> {
     fun listByScopeId(scopeId: String): List<ScopeItem> = list("scopeId = ?1 order by createdAt", scopeId)
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }

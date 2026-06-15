@@ -42,4 +42,13 @@ class NodeRepository : PanacheRepositoryBase<Node, String> {
 
     fun lockById(id: String): Node? =
         find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
+
+    fun deleteByIds(ids: Collection<String>): Long = if (ids.isEmpty()) 0 else delete("id in ?1", ids)
+
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
+
+    /** Null out any node's pinned cover that points at one of the given (deleted) media. */
+    fun clearCoverByMediaIds(mediaIds: Collection<String>) {
+        if (mediaIds.isNotEmpty()) update("coverMediaId = null where coverMediaId in ?1", mediaIds)
+    }
 }

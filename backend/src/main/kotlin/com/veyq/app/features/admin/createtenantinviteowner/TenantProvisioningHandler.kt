@@ -11,6 +11,7 @@ import com.veyq.app.generated.model.TenantInviteInfo
 import com.veyq.app.generated.model.TenantInviteMaterial
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
@@ -53,6 +54,7 @@ class TenantProvisioningHandler(
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
+    private val purge: ContentPurge,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -73,6 +75,25 @@ class TenantProvisioningHandler(
         }
         tenants.persist(tenant)
         return tenant.toSummary()
+    }
+
+    /**
+     * Delete a group (tenant) and everything it owns. Tenant Owner only. Cascades the tenant scope (all
+     * nodes + their media/journal/tracks/shares, the content key, items, grants) plus memberships and
+     * invites, then the tenant row. The confirm-by-name gate is enforced client-side. Irreversible.
+     */
+    @Transactional
+    fun deleteTenant(auth: String?, tenantId: String) {
+        val callerId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
+        val tenant = tenants.findById(tenantId) ?: throw notFound("Tenant")
+        val caller = memberships.find(tenantId, callerId)
+        if (caller == null || caller.role != "Owner" || caller.status != "ACTIVE") {
+            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
+        }
+        scopes.findByTenantId(tenantId)?.let { purge.purgeScope(it.id) }
+        memberships.deleteByTenantId(tenantId)
+        invites.deleteByTenantId(tenantId)
+        tenants.delete(tenant)
     }
 
     @Transactional

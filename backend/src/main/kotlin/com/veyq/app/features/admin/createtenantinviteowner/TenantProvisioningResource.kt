@@ -14,6 +14,11 @@ class TenantProvisioningResource(private val handler: TenantProvisioningHandler)
     override fun createTenant(authorization: String, createTenantRequest: CreateTenantRequest): Response =
         Response.ok(handler.createTenant(authorization, createTenantRequest)).build()
 
+    override fun deleteTenant(authorization: String, tenantId: String): Response {
+        handler.deleteTenant(authorization, tenantId)
+        return Response.noContent().build()
+    }
+
     override fun issueOwnerInvite(authorization: String, tenantId: String): Response =
         Response.ok(handler.issueOwnerInvite(authorization, tenantId)).build()
 

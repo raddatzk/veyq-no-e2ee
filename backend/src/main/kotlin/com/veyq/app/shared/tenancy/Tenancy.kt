@@ -67,6 +67,8 @@ class TenantInviteRepository : PanacheRepositoryBase<TenantInvite, String> {
     /** Row-locked invite read for security-sensitive single-use redemption paths. */
     fun findByIdForUpdate(id: String): TenantInvite? =
         find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
+
+    fun deleteByTenantId(tenantId: String): Long = delete("tenantId", tenantId)
 }
 
 @ApplicationScoped
@@ -81,4 +83,6 @@ class MembershipRepository : PanacheRepositoryBase<Membership, String> {
 
     fun listActiveByUserId(userId: String): List<Membership> =
         list("userId = ?1 and status = ?2", userId, "ACTIVE")
+
+    fun deleteByTenantId(tenantId: String): Long = delete("tenantId", tenantId)
 }

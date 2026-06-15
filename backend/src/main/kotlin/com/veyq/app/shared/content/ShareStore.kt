@@ -32,4 +32,6 @@ class Share {
 @ApplicationScoped
 class ShareRepository : PanacheRepositoryBase<Share, String> {
     fun listByNodeId(nodeId: String): List<Share> = list("nodeId = ?1 order by createdAt", nodeId)
+    fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
+    fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }
