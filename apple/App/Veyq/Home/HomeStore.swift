@@ -242,6 +242,41 @@ final class HomeStore: ObservableObject {
         await openLevel()
     }
 
+    /// Open a member deep-link path (`/@reisegruppe/urlaube/italien`): switch into the space, set the folder
+    /// chain as the breadcrumb back-stack, and return the trailing memory to push (so back lands on its folder).
+    func openPath(_ path: String) async -> Entry? {
+        let parsed = HomeRoute.parsePath(path)
+        let target: SwitchActiveSpace.SpaceEntry?
+        switch parsed.kind {
+        case .personal: target = spaces.first { $0.kind == "PERSONAL" }
+        case .tenant: target = spaces.first { $0.kind == "TENANT" }
+        case .group: target = spaces.first { $0.kind == "GROUP" && HomeRoute.slugify(displayName(for: $0)) == parsed.groupSlug }
+        }
+        guard let entry = target else { self.error = "Bereich nicht gefunden."; return nil }
+        await switchSpace(entry) // sets crumbs = [root] and opens the level
+        guard let scope, let contentKey, !parsed.segments.isEmpty else { return nil }
+        do {
+            let chain = try await Browse.resolvePath(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, segments: parsed.segments)
+            var folders = chain
+            var memoryNode: MemoryTree.MemoryNode? = nil
+            if let last = chain.last, last.type == "MEMORY" { memoryNode = last; folders = Array(chain.dropLast()) }
+            crumbs = [Crumb(id: "root", nodeId: nil, name: displayName(for: entry))]
+            for f in folders {
+                let name = (try? MemoryTree.decodeNode(contentKey: contentKey, node: f).name) ?? ""
+                crumbs.append(Crumb(id: f.id, nodeId: f.id, name: name))
+            }
+            await openLevel()
+            if let m = memoryNode {
+                let name = (try? MemoryTree.decodeNode(contentKey: contentKey, node: m).name) ?? ""
+                return Entry(node: m, name: name)
+            }
+            return nil
+        } catch {
+            self.error = "Konnte den Pfad nicht öffnen."
+            return nil
+        }
+    }
+
     /// Create a folder/memory at the current level. Name is sealed; the slug retries on collision.
     func create(type: String, name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

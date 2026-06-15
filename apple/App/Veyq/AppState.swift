@@ -13,6 +13,8 @@ final class AppState: ObservableObject {
     @Published var apiBase: String = UserDefaults.standard.string(forKey: AppState.instanceKey) ?? ""
     @Published var session: Login.UnlockedSession?
     @Published var pendingInvite: InviteLink.Parts?
+    /// A pending member deep link (veyq://open?u=…) path to open once landed (e.g. /@reisegruppe/urlaube/italien).
+    @Published var pendingOpenPath: String?
     /// The instance's public app origin (for assembling invite links); falls back to apiBase if unknown.
     @Published var appBaseUrl: String = ""
 
@@ -26,11 +28,23 @@ final class AppState: ObservableObject {
     /// A veyq://invite deep link (from the mobile browser banner): point at the named instance and jump a
     /// not-signed-in user straight into registration. Ignored when already signed in.
     func handleDeepLink(_ url: URL) {
-        guard session == nil, let dl = InviteLink.parseDeepLink(url.absoluteString) else { return }
-        apiBase = dl.apiBase
-        UserDefaults.standard.set(dl.apiBase, forKey: Self.instanceKey)
-        pendingInvite = dl.parts
-        phase = .register
+        // Invite deep link (only for a not-signed-in user → straight to registration).
+        if session == nil, let dl = InviteLink.parseDeepLink(url.absoluteString) {
+            apiBase = dl.apiBase
+            UserDefaults.standard.set(dl.apiBase, forKey: Self.instanceKey)
+            pendingInvite = dl.parts
+            phase = .register
+            return
+        }
+        // Member "open in app" deep link → open that path once landed (sign in first if needed).
+        if let open = HomeRoute.parseDeepLink(url.absoluteString) {
+            pendingOpenPath = open.path
+            if session == nil {
+                apiBase = open.apiBase
+                UserDefaults.standard.set(open.apiBase, forKey: Self.instanceKey)
+                phase = .login
+            }
+        }
     }
 
     func cancelRegister() {

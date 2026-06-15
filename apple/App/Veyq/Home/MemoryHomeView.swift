@@ -25,6 +25,7 @@ struct MemoryHomeView: View {
     @State private var deleteNodeTarget: HomeStore.Entry?
     @State private var deleteTenantTarget: SwitchActiveSpace.SpaceEntry?
     @State private var inviteTenant: SwitchActiveSpace.SpaceEntry?
+    @State private var deepMemory: HomeStore.Entry?
 
     init(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, appBaseUrl: appBaseUrl, session: session))
@@ -41,7 +42,16 @@ struct MemoryHomeView: View {
             }
         }
         .tint(VeyqStyle.accent)
-        .task { await store.start() }
+        .task { await store.start(); await consumePendingOpen() }
+        .onChange(of: app.pendingOpenPath) { _, _ in Task { await consumePendingOpen() } }
+        .sheet(item: $deepMemory) { entry in
+            if let scope = store.scope, let key = store.contentKey {
+                NavigationStack {
+                    MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: entry.node, name: entry.name)
+                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.close")) { deepMemory = nil } } }
+                }
+            }
+        }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
         .sheet(isPresented: $showJoinGroup) { JoinGroupView(store: store) }
         .alert(createType == "FOLDER" ? T("home.createFolder") : T("home.createMemory"), isPresented: $showCreate) {
@@ -69,6 +79,14 @@ struct MemoryHomeView: View {
             ConfirmDeleteView(name: store.displayName(for: t)) { Task { await store.deleteTenant(t) } }
         }
         .sheet(item: $inviteTenant) { t in InviteMemberView(store: store, space: t) }
+    }
+
+    /// Consume a pending "open in app" deep-link path: navigate the space + folder back-stack, then present
+    /// the trailing memory (if any) so its back/close lands on the right folder.
+    private func consumePendingOpen() async {
+        guard let path = app.pendingOpenPath else { return }
+        app.pendingOpenPath = nil
+        deepMemory = await store.openPath(path)
     }
 
     private var createGroupSheet: some View {
