@@ -59,6 +59,35 @@ public enum Tenant {
         return try await send(apiBase, "/api/tenant-invites/\(inviteId)/claim", token, method: "POST", body: try JSONEncoder().encode(req))
     }
 
+    /// Create a shared group the caller owns: a tenant + a self owner-claim (mints + self-grants the
+    /// scope). Mirrors the web `createGroup`; retries on handle conflicts. The server only sees the handle,
+    /// display name, scope public key and the wrapped grant — never plaintext content.
+    public static func createGroup(apiBase: String, token: String, identityKemPublicKey: Data, displayName: String) async throws -> TenantSummary {
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = slugify(name)
+        for attempt in 0 ..< 25 {
+            let handle = attempt == 0 ? base : "\(base)-\(attempt + 1)"
+            do {
+                let tenant = try await createTenant(apiBase: apiBase, token: token, name: handle, displayName: name, domain: nil)
+                let invite = try await issueOwnerInvite(apiBase: apiBase, token: token, tenantId: tenant.id)
+                _ = try await claimTenantOwnership(apiBase: apiBase, token: token, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, identityKemPublicKey: identityKemPublicKey)
+                return tenant
+            } catch {
+                let msg = "\(error)".lowercased()
+                if !msg.contains("409") && !msg.contains("exists") { throw error }
+            }
+        }
+        throw NSError(domain: "veyq.groups", code: 1, userInfo: [NSLocalizedDescriptionKey: "could not create group (handle conflict)"])
+    }
+
+    private static func slugify(_ name: String) -> String {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789")
+        let folded = name.folding(options: .diacriticInsensitive, locale: nil).lowercased()
+        let mapped = String(folded.map { allowed.contains($0) ? $0 : "-" })
+        let collapsed = mapped.split(separator: "-").joined(separator: "-")
+        return collapsed.isEmpty ? "group" : collapsed
+    }
+
     /// Unwrap a scope grant with the holder's identity key → the scope private bundle.
     static func openScopeGrant(grant: MyScopeGrantDTO, identity: V1.IdentityPrivate, identityKemPublicKey: Data) throws -> V1.IdentityPrivate {
         let pkX = Data(identityKemPublicKey.prefix(32))

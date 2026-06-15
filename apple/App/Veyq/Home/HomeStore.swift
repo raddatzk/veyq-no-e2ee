@@ -69,6 +69,21 @@ final class HomeStore: ObservableObject {
         }
     }
 
+    /// Create a shared group the caller owns, refresh the space list, and switch into it.
+    func createGroup(displayName: String) async -> Bool {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        do {
+            let tenant = try await Tenant.createGroup(apiBase: apiBase, token: session.sessionToken, identityKemPublicKey: session.kemPublicKey, displayName: trimmed)
+            spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
+            if let entry = spaces.first(where: { $0.tenantId == tenant.id }) { await switchSpace(entry) }
+            return true
+        } catch {
+            self.error = T("groups.createFailed")
+            return false
+        }
+    }
+
     func switchSpace(_ entry: SwitchActiveSpace.SpaceEntry) async {
         do {
             let opened = try await SwitchActiveSpace.openSpace(apiBase: apiBase, session: session, entry: entry)

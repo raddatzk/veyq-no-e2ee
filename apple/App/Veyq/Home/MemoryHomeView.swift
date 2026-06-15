@@ -16,6 +16,8 @@ struct MemoryHomeView: View {
     @State private var renameName = ""
     @State private var moveEntry: HomeStore.Entry?
     @State private var showJoinGroup = false
+    @State private var showCreateGroup = false
+    @State private var newGroupName = ""
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -46,6 +48,11 @@ struct MemoryHomeView: View {
             Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $moveEntry) { entry in MovePickerView(store: store, entry: entry) }
+        .alert(T("groups.create"), isPresented: $showCreateGroup) {
+            TextField(T("common.name"), text: $newGroupName)
+            Button(T("common.create")) { let n = newGroupName; newGroupName = ""; Task { _ = await store.createGroup(displayName: n) } }
+            Button(T("common.cancel"), role: .cancel) { newGroupName = "" }
+        }
     }
 
     private var content: some View {
@@ -83,6 +90,7 @@ struct MemoryHomeView: View {
                         Button(space.displayName) { Task { await store.switchSpace(space) } }
                     }
                     Divider()
+                    Button { showCreateGroup = true } label: { Label(T("groups.create"), systemImage: "person.2.badge.gearshape") }
                     Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
                 } label: { Image(systemName: "square.grid.2x2") }
             }
@@ -118,6 +126,9 @@ struct MemoryHomeView: View {
             }
             Section(T("home.groups")) {
                 ForEach(groupSpaces, id: \.scopeId) { spaceRow($0) }
+                Button { showCreateGroup = true } label: {
+                    Label(T("groups.create"), systemImage: "plus.circle").foregroundStyle(VeyqStyle.accent)
+                }
                 Button { showJoinGroup = true } label: {
                     Label(T("groups.join"), systemImage: "person.badge.plus").foregroundStyle(VeyqStyle.accent)
                 }
