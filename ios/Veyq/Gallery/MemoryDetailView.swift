@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 import ImageIO
 import UIKit
+import UniformTypeIdentifiers
 import VeyqCrypto
 
 /// A memory's justified gallery. Loads each media's thumbnail, derives its clamped aspect ratio, and lays
@@ -22,6 +23,9 @@ final class GalleryStore: ObservableObject {
     @Published var journalMarkdown = ""
     @Published var journalSaving = false
     private var journalLoaded = false
+    @Published var tracks: [Track.TrackItem] = []
+    @Published var importing = false
+    private var tracksLoaded = false
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String) {
         self.apiBase = apiBase; self.session = session; self.scopeId = scopeId; self.contentKey = contentKey; self.nodeId = nodeId
@@ -107,6 +111,26 @@ final class GalleryStore: ObservableObject {
         journalSaving = false
     }
 
+    func loadTracks() async {
+        guard !tracksLoaded else { return }
+        if let t = try? await Track.getTracks(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { tracks = t }
+        tracksLoaded = true
+    }
+
+    func importTrack(_ data: Data) async {
+        guard let route = Gpx.parse(data) else { return }
+        importing = true
+        if (try? await Track.createTrack(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, route: route)) != nil {
+            if let t = try? await Track.getTracks(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { tracks = t }
+        }
+        importing = false
+    }
+
+    func deleteTrack(_ id: String) async {
+        try? await Track.deleteTrack(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, trackId: id)
+        tracks.removeAll { $0.id == id }
+    }
+
     static func thumbnail(_ data: Data, maxDim: CGFloat = 400) -> Data? {
         guard let img = UIImage(data: data) else { return nil }
         let scale = min(1, maxDim / max(img.size.width, img.size.height))
@@ -126,6 +150,7 @@ struct MemoryDetailView: View {
     @State private var downloading = false
     @State private var shareItem: ShareItem?
     @State private var tab = 0
+    @State private var showGpxImporter = false
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
         _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
@@ -151,11 +176,23 @@ struct MemoryDetailView: View {
                             guard let lat = t.lat, let lng = t.lng else { return nil }
                             return MemoryMapView.Point(id: t.id, lat: lat, lng: lng)
                         }
-                        if pts.isEmpty {
+                        HStack {
+                            Spacer()
+                            Button(store.importing ? T("track.importing") : T("track.import")) { showGpxImporter = true }
+                                .tint(VeyqStyle.accent).disabled(store.importing)
+                        }
+                        if pts.isEmpty && store.tracks.isEmpty {
                             Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                         } else {
-                            MemoryMapView(points: pts) { id in
+                            MemoryMapView(points: pts, tracks: store.tracks) { id in
                                 if let tile = store.tiles.first(where: { $0.id == id }) { lightbox = tile.image; lightboxMediaId = id }
+                            }
+                        }
+                        ForEach(store.tracks) { tr in
+                            HStack {
+                                Text("🛤 \(tr.name)").font(.system(size: 14)).foregroundStyle(VeyqStyle.text)
+                                Spacer()
+                                Button(T("track.delete")) { let id = tr.id; Task { await store.deleteTrack(id) } }.tint(VeyqStyle.danger)
                             }
                         }
                     } else {
@@ -215,6 +252,15 @@ struct MemoryDetailView: View {
             }
         }
         .task { await store.load() }
+        .onChange(of: tab) { _, t in if t == 2 { Task { await store.loadTracks() } } }
+        .fileImporter(isPresented: $showGpxImporter, allowedContentTypes: [.xml, UTType(filenameExtension: "gpx") ?? .data]) { result in
+            guard case let .success(url) = result else { return }
+            Task {
+                let ok = url.startAccessingSecurityScopedResource()
+                defer { if ok { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url) { await store.importTrack(data) }
+            }
+        }
         .fullScreenCover(item: Binding(get: { lightbox.map { LightboxImage(image: $0) } }, set: { _ in lightbox = nil; lightboxMediaId = nil })) { item in
             ZStack {
                 Color.black.ignoresSafeArea()
