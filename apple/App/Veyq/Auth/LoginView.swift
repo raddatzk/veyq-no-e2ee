@@ -14,6 +14,7 @@ struct LoginView: View {
     @State private var error = ""
     @State private var showImporter = false
     @State private var showScanner = false
+    @State private var showReset = false
 
     var body: some View {
         AuthCard(title: T("login.title"), subtitle: app.apiBase) {
@@ -32,6 +33,8 @@ struct LoginView: View {
                     .buttonStyle(.bordered).tint(VeyqStyle.accent)
                 Button { showScanner = true } label: { Text("📷 \(T("kit.scan"))").frame(maxWidth: .infinity) }
                     .buttonStyle(.bordered).tint(VeyqStyle.accent)
+                Button(T("reset.forgot")) { showReset = true }
+                    .font(.system(size: 13)).foregroundStyle(VeyqStyle.accent)
                 Button(T("login.otherInstance")) { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted)
                 if !error.isEmpty { MessageBox(text: error) }
@@ -47,6 +50,7 @@ struct LoginView: View {
         .fullScreenCover(isPresented: $showScanner) {
             QrScannerScreen(onDecoded: { showScanner = false; applyKit($0) }, onClose: { showScanner = false })
         }
+        .sheet(isPresented: $showReset) { ResetPasswordView(apiBase: app.apiBase, prefillEmail: email) { app.loggedIn($0) } }
     }
 
     /// Pull email + Secret Key out of a scanned QR / imported kit file and pre-fill the form.

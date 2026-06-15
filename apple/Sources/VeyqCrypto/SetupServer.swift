@@ -39,6 +39,12 @@ public enum SetupServer {
         let kek = try V1.kekPasswordSecret(secretKey: secretKey, password: password, salt: salt, params: argon)
         let masterWrap = try V1.symWrap(kek: kek, targetKey: masterKey, context: "master-key", nonce: V1.randomBytes(12))
 
+        // RECOVERY wrap: master key under the Secret Key ALONE. Never returned in the login key bag — released
+        // only via the email-token-gated reset (recovery needs Secret Key AND email). kdfParams carry the
+        // Argon params so the reset re-derives correctly on any platform.
+        let recSalt = V1.randomBytes(16)
+        let recWrap = try V1.symWrap(kek: try V1.kekRecovery(recoveryCode: secretKey, salt: recSalt, params: argon), targetKey: masterKey, context: "master-key", nonce: V1.randomBytes(12))
+
         let authSalt = V1.randomBytes(16)
         let verifier = try V1.kekRecovery(recoveryCode: Data(password.precomposedStringWithCanonicalMapping.utf8), salt: authSalt, params: argon)
 
@@ -53,7 +59,10 @@ public enum SetupServer {
             email: email, displayName: displayName,
             identityPublicKey: IdentityPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(id.pubKemX + id.pubKemM), signPublicKey: b64url(id.pubSign)),
             wrappedIdentityPrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(wrappedPriv)),
-            masterKeyWraps: [MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: salt)))],
+            masterKeyWraps: [
+                MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: b64url(masterWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: salt))),
+                MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: b64url(recWrap), kdfParams: b64url(V1.encodeKdfParams(argon, salt: recSalt))),
+            ],
             authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: b64url(authSalt + verifier)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: b64url(personalGrant))
