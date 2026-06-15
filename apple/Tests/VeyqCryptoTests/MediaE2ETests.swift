@@ -54,10 +54,12 @@ final class MediaE2ETests: XCTestCase {
         let r = try await Media.downloadBlob(apiBase: apiBase, session: a, scopeId: scope.scopeId, contentKey: ck, ref: resumed)
         XCTAssertEqual(r, partial)
 
-        // the gallery lists both media, ordered by takenAt (video first, photo second), with their blob refs
+        // the gallery lists both media in upload order (photo then video; the client sorts by decrypted takenAt)
         let gallery = try await Media.listMedia(apiBase: apiBase, session: a, scopeId: scope.scopeId, nodeId: memory.id)
-        XCTAssertEqual(gallery.map { $0.id }, [m2.id, m1.id])
-        XCTAssertEqual(gallery[1].derivatives[0].kind, "THUMBNAIL")
+        XCTAssertEqual(gallery.map { $0.id }, [m1.id, m2.id])
+        XCTAssertEqual(gallery[0].derivatives[0].kind, "THUMBNAIL")
+        // sealed metadata round-trips: the decrypted capture time matches what we uploaded
+        XCTAssertEqual(try Media.decodeMediaMeta(contentKey: ck, item: gallery[0]).takenAt, "2026-03-15T12:00:00Z")
 
         // anti-reorder still holds: a frame sealed at index 0 must not open at index 1
         let frame0 = try V1.sealFrame(contentKey: ck, index: 0, total: pchunks.count, plaintext: pchunks[0], nonce: V1.randomBytes(12))

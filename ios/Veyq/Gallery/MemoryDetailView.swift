@@ -7,7 +7,7 @@ import VeyqCrypto
 /// the tiles out with the shared justified algorithm. Tapping a tile opens a lightbox.
 @MainActor
 final class GalleryStore: ObservableObject {
-    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String }
+    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double? }
 
     let apiBase: String
     let session: Login.UnlockedSession
@@ -29,12 +29,16 @@ final class GalleryStore: ObservableObject {
     func load() async {
         do {
             let media = try await Media.listMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId)
+            // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
+            let withMeta = media.compactMap { m -> (Media.MediaItem, Media.MediaMeta)? in
+                (try? Media.decodeMediaMeta(contentKey: contentKey, item: m)).map { (m, $0) }
+            }.sorted { $0.1.takenAt < $1.1.takenAt }
             var result: [Tile] = []
-            for m in media {
+            for (m, meta) in withMeta {
                 let ref = m.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? m.original
                 let bytes = try await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)
                 if let img = UIImage(data: bytes) {
-                    result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height), takenAt: m.takenAt))
+                    result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height), takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng))
                 }
             }
             tiles = result
