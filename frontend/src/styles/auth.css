@@ -134,6 +134,19 @@
   color: var(--app-success);
 }
 
+.kit-import {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--app-muted);
+}
+.kit-import input[type='file'] {
+  font: inherit;
+  font-size: 0.82rem;
+}
+
 .kit-secret {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;

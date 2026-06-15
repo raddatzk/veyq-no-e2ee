@@ -4,6 +4,7 @@ import { login } from '../../features/account/login/login'
 import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
 import { deviceUnlockEnabled, deviceUnlockSupported, enableDeviceUnlock, unlockWithDevice } from '../../features/account/deviceUnlock/deviceUnlock'
+import { parseKit } from '../../features/account/emergencyKit/emergencyKit'
 
 const props = defineProps<{ prefill?: { email?: string; secretKey?: string }; embedded?: boolean }>()
 const email = ref(props.prefill?.email ?? '')
@@ -30,6 +31,20 @@ async function submit() {
   } finally {
     busy.value = false
   }
+}
+
+async function importKit(e: Event) {
+  error.value = ''
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  // The payload lives as ASCII in the QR text, the .veyqkit body, or the PDF's Keywords metadata —
+  // reading the file as text surfaces it regardless of container.
+  const kit = parseKit(await file.text())
+  input.value = ''
+  if (!kit) { error.value = t('kit.importFailed'); return }
+  email.value = kit.email
+  secretKey.value = kit.secretKey
 }
 
 async function unlock() {
@@ -79,6 +94,11 @@ async function unlock() {
           {{ busy ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
+      <label class="kit-import">
+        <span>{{ t('kit.import') }}</span>
+        <input type="file" accept=".pdf,.veyqkit,application/pdf,text/plain" @change="importKit" />
+        <span class="field-hint">{{ t('kit.importHint') }}</span>
+      </label>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
     </div>
   </div>

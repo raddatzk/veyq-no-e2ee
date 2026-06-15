@@ -5,6 +5,7 @@ import { t } from '../../i18n/i18n'
 import { getInviteMetadata, type InviteMetadata } from '../../features/account/registerViaInvitation/registerViaInvitation'
 import { acceptMemberInvite, registerViaMemberInvite } from '../../features/admin/inviteMembersRoles/inviteMembers'
 import { login } from '../../features/account/login/login'
+import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
 import type { InviteParts } from '../../features/spaces/invite/inviteLink'
 import LoginPanel from './LoginPanel.vue'
 
@@ -97,7 +98,8 @@ async function proceed() {
           <h2 class="auth-title" style="font-size: 1.1rem">{{ t('setup.kitTitle') }}</h2>
           <p class="auth-sub">{{ t('setup.kitSub') }}</p>
           <div class="kit-secret">{{ kit }}</div>
-          <button class="btn btn-primary" type="button" style="margin-top: 1rem; width: 100%" :disabled="busy" @click="proceed">{{ t('setup.kitProceed') }}</button>
+          <button class="btn btn-ghost" type="button" style="margin-top: 1rem; width: 100%" @click="downloadKitPdf({ instance: session.apiBase, email, secretKey: kit! }, displayName)">{{ t('kit.download') }}</button>
+          <button class="btn btn-primary" type="button" style="margin-top: 0.6rem; width: 100%" :disabled="busy" @click="proceed">{{ t('setup.kitProceed') }}</button>
         </template>
 
         <!-- not signed in: create an account, or sign in to an existing one -->

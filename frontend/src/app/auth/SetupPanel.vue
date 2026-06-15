@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { registerServerOwner } from '../../features/admin/setupServer/setupServer'
 import { t } from '../../i18n/i18n'
 import { session } from '../session'
+import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
 
 const emit = defineEmits<{ done: [email: string, secretKey: string] }>()
 const displayName = ref('')
@@ -59,7 +60,10 @@ async function submit() {
         <h1 class="auth-title">{{ t('setup.kitTitle') }}</h1>
         <p class="auth-sub">{{ t('setup.kitSub') }}</p>
         <div class="kit-secret">{{ kit }}</div>
-        <button class="btn btn-primary" type="button" style="margin-top: 1rem; width: 100%" @click="emit('done', kitEmail, kit!)">
+        <button class="btn btn-ghost" type="button" style="margin-top: 1rem; width: 100%" @click="downloadKitPdf({ instance: session.apiBase, email: kitEmail, secretKey: kit! }, displayName)">
+          {{ t('kit.download') }}
+        </button>
+        <button class="btn btn-primary" type="button" style="margin-top: 0.6rem; width: 100%" @click="emit('done', kitEmail, kit!)">
           {{ t('setup.kitProceed') }}
         </button>
       </template>
