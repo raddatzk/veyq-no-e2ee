@@ -5,7 +5,7 @@ import { i18n, t } from '../../i18n/i18n'
 import { inviteToGroup } from '../../features/spaces/invite/groups'
 import { getTenantTerms, setTenantTerms } from '../../features/memory/share/share'
 import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
-import type { MemberRole } from '../../features/admin/inviteMembersRoles/inviteMembers'
+import { changeMemberRole, listTenantMembers, removeMember, rotateScope, type MemberRole, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
 import type { SpaceEntry } from '../../features/home/home'
 
 const props = defineProps<{ space: SpaceEntry }>()
@@ -16,6 +16,64 @@ const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
 const error = ref('')
+
+// --- Members (owner-only: list, change role, remove, rotate keys) ---
+const members = ref<TenantMember[]>([])
+const membersOpen = ref(false)
+const membersBusy = ref(false)
+const rotated = ref(false)
+const myId = () => session.unlocked?.user.id
+
+async function openMembers() {
+  membersOpen.value = true
+  await reloadMembers()
+}
+async function reloadMembers() {
+  if (!session.unlocked || !props.space.tenantId) return
+  try {
+    members.value = (await listTenantMembers(session.apiBase, session.unlocked.sessionToken, props.space.tenantId)).filter((m) => m.status === 'ACTIVE')
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+async function setMemberRole(m: TenantMember, newRole: MemberRole) {
+  if (!session.unlocked || !props.space.tenantId || m.role === newRole) return
+  membersBusy.value = true
+  try {
+    await changeMemberRole(session.apiBase, session.unlocked.sessionToken, props.space.tenantId, m.userId, newRole)
+    await reloadMembers()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    membersBusy.value = false
+  }
+}
+async function remove(m: TenantMember) {
+  if (!session.unlocked || !props.space.tenantId) return
+  membersBusy.value = true
+  try {
+    await removeMember(session.apiBase, session.unlocked.sessionToken, props.space.tenantId, m.userId)
+    await reloadMembers()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    membersBusy.value = false
+  }
+}
+async function rotate() {
+  if (!session.unlocked || !props.space.tenantId) return
+  membersBusy.value = true
+  error.value = ''
+  try {
+    await rotateScope(session.apiBase, session.unlocked, props.space.tenantId)
+    rotated.value = true
+    setTimeout(() => (rotated.value = false), 2000)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    membersBusy.value = false
+  }
+}
 
 // --- Terms of Service (the group ToS guests must accept on any share) ---
 const termsOpen = ref(false)
@@ -106,6 +164,23 @@ async function copy() {
         <button class="btn btn-primary invite-gen" type="button" :disabled="termsBusy" @click="saveTerms">{{ termsSaved ? t('terms.saved') : t('terms.save') }}</button>
       </template>
       <button v-else class="btn btn-ghost invite-gen" type="button" @click="openTerms">{{ t('terms.edit') }}</button>
+
+      <div class="settings-section">{{ t('members.title') }}</div>
+      <template v-if="membersOpen">
+        <ul class="member-list">
+          <li v-for="m in members" :key="m.userId" class="member-row">
+            <span class="member-name">{{ m.displayName }}<small v-if="m.userId === myId()"> · {{ t('members.you') }}</small></span>
+            <div class="seg member-roles">
+              <button type="button" :class="{ active: m.role === 'Member' }" :disabled="membersBusy || m.userId === myId()" @click="setMemberRole(m, 'Member')">{{ t('invite.member') }}</button>
+              <button type="button" :class="{ active: m.role === 'Owner' }" :disabled="membersBusy || m.userId === myId()" @click="setMemberRole(m, 'Owner')">{{ t('invite.owner') }}</button>
+            </div>
+            <button class="btn btn-ghost track-del" type="button" :disabled="membersBusy || m.userId === myId()" @click="remove(m)">{{ t('members.remove') }}</button>
+          </li>
+        </ul>
+        <p class="invite-hint">{{ t('members.rotateHint') }}</p>
+        <button class="btn btn-ghost invite-gen" type="button" :disabled="membersBusy" @click="rotate">{{ rotated ? t('members.rotated') : t('members.rotate') }}</button>
+      </template>
+      <button v-else class="btn btn-ghost invite-gen" type="button" @click="openMembers">{{ t('members.manage') }}</button>
     </div>
   </div>
 </template>
