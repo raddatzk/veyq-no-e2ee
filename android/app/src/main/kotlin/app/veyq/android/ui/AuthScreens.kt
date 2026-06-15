@@ -33,8 +33,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import app.veyq.crypto.EmergencyKit
 import app.veyq.crypto.Instance
 import app.veyq.crypto.Login
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,6 +110,18 @@ fun PrimaryButton(title: String, busy: Boolean = false, onClick: () -> Unit) {
 }
 
 @Composable
+fun GhostButton(title: String, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(46.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Veyq.Text),
+    ) {
+        Text(title, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
 fun MessageBox(text: String, error: Boolean = true) {
     Text(
         text,
@@ -158,6 +175,18 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val activity = ctx as? androidx.fragment.app.FragmentActivity
 
+    fun applyKit(text: String?) {
+        val kit = text?.let { EmergencyKit.parse(it) }
+        if (kit == null) { error = L10n.t("kit.importFailed"); return }
+        email = kit.email; secretKey = kit.secretKey; error = ""
+    }
+    // Import a kit file (PDF / .veyqkit) → prefill. Read as Latin-1 so the ASCII token survives binary PDF bytes.
+    val pickKit = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) applyKit(ctx.contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.ISO_8859_1) })
+    }
+    // Scan the kit QR with the camera → prefill.
+    val scanKit = rememberLauncherForActivityResult(ScanContract()) { res -> if (res.contents != null) applyKit(res.contents) }
+
     AuthCard(L10n.t("login.title"), apiBase) {
         if (DeviceUnlock.isEnabled(ctx) && activity != null) {
             PrimaryButton("🔓 ${L10n.t("login.unlock")}", busy) {
@@ -198,6 +227,10 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
                     busy = false
                 }
             }
+        }
+        GhostButton("📄 ${L10n.t("kit.import")}") { pickKit.launch("*/*") }
+        GhostButton("📷 ${L10n.t("kit.scan")}") {
+            scanKit.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt(L10n.t("kit.scan")))
         }
         Text(L10n.t("login.otherInstance"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
         if (error.isNotEmpty()) MessageBox(error)
