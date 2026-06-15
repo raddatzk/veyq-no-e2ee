@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.veyq.android.ui.ConnectScreen
 import app.veyq.android.ui.HomeScreen
+import app.veyq.android.ui.L10n
 import app.veyq.android.ui.LoginScreen
 import app.veyq.android.ui.VeyqTheme
 import app.veyq.crypto.Login
@@ -27,6 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("veyq", Context.MODE_PRIVATE)
+        L10n.locale = prefs.getString("veyq.locale", "de") ?: "de"
         setContent {
             var theme by remember { mutableStateOf(prefs.getString("veyq.theme", "system") ?: "system") }
             val dark = when (theme) {
@@ -36,7 +38,11 @@ class MainActivity : ComponentActivity() {
             }
             VeyqTheme(dark) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AuthFlow(theme) { theme = it; prefs.edit().putString("veyq.theme", it).apply() }
+                    AuthFlow(
+                        theme,
+                        onTheme = { theme = it; prefs.edit().putString("veyq.theme", it).apply() },
+                        onLocale = { L10n.locale = it; prefs.edit().putString("veyq.locale", it).apply() },
+                    )
                 }
             }
         }
@@ -46,7 +52,7 @@ class MainActivity : ComponentActivity() {
 private enum class Phase { Connect, Login, Landed }
 
 @Composable
-private fun AuthFlow(theme: String, onTheme: (String) -> Unit) {
+private fun AuthFlow(theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit) {
     var phase by remember { mutableStateOf(Phase.Connect) }
     var apiBase by remember { mutableStateOf("") }
     var session by remember { mutableStateOf<Login.UnlockedSession?>(null) }
@@ -54,6 +60,6 @@ private fun AuthFlow(theme: String, onTheme: (String) -> Unit) {
     when (phase) {
         Phase.Connect -> ConnectScreen(apiBase) { apiBase = it; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
-        Phase.Landed -> HomeScreen(apiBase, session!!, theme, onTheme) { session = null; phase = Phase.Login }
+        Phase.Landed -> HomeScreen(apiBase, session!!, theme, onTheme, onLocale) { session = null; phase = Phase.Login }
     }
 }

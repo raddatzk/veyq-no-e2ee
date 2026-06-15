@@ -125,10 +125,10 @@ fun ConnectScreen(initialUrl: String, onConnected: (String) -> Unit) {
     var setupNeeded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    AuthCard("Mit einer Instanz verbinden", "Gib die Adresse deiner veyq-Instanz ein.") {
-        VeyqField("Instanz-URL", url, { url = it }, keyboard = KeyboardType.Uri)
-        if (setupNeeded) MessageBox("Diese Instanz ist noch nicht eingerichtet — bitte im Web einrichten.", error = false)
-        PrimaryButton("Verbinden", busy) {
+    AuthCard(L10n.t("connect.title"), L10n.t("connect.sub")) {
+        VeyqField(L10n.t("connect.url"), url, { url = it }, keyboard = KeyboardType.Uri)
+        if (setupNeeded) MessageBox(L10n.t("connect.setupNeeded"), error = false)
+        PrimaryButton(L10n.t("connect.connect"), busy) {
             busy = true; error = ""; setupNeeded = false
             scope.launch {
                 try {
@@ -136,7 +136,7 @@ fun ConnectScreen(initialUrl: String, onConnected: (String) -> Unit) {
                     val status = withContext(Dispatchers.IO) { Instance.getSetupStatus(base) }
                     if (status.setupRequired) setupNeeded = true else onConnected(base)
                 } catch (e: Exception) {
-                    error = "Konnte die Instanz nicht erreichen. Prüfe die Adresse."
+                    error = L10n.t("connect.error")
                 } finally {
                     busy = false
                 }
@@ -155,24 +155,24 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    AuthCard("Anmelden", apiBase) {
-        VeyqField("E-Mail", email, { email = it }, keyboard = KeyboardType.Email)
-        VeyqField("Passwort", password, { password = it }, secure = true)
-        VeyqField("Secret Key", secretKey, { secretKey = it }, secure = true, hint = "Aus deinem Emergency Kit.")
-        PrimaryButton("Anmelden", busy) {
+    AuthCard(L10n.t("login.title"), apiBase) {
+        VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
+        VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
+        VeyqField(L10n.t("common.secretKey"), secretKey, { secretKey = it }, secure = true, hint = L10n.t("login.secretHint"))
+        PrimaryButton(L10n.t("login.submit"), busy) {
             busy = true; error = ""
             scope.launch {
                 try {
                     val session = withContext(Dispatchers.IO) { Login.login(apiBase, email, password, secretKey) }
                     onLoggedIn(session)
                 } catch (e: Exception) {
-                    error = "Anmeldung fehlgeschlagen. Prüfe E-Mail, Passwort und Secret Key."
+                    error = L10n.t("login.error")
                 } finally {
                     busy = false
                 }
             }
         }
-        Text("Andere Instanz", fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
+        Text(L10n.t("login.otherInstance"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
         if (error.isNotEmpty()) MessageBox(error)
     }
 }

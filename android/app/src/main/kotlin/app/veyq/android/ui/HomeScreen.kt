@@ -166,7 +166,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onSignOut: () -> Unit) {
+fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, onSignOut: () -> Unit) {
     val controller = remember { HomeController(apiBase, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
@@ -175,7 +175,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     LaunchedEffect(Unit) { controller.start() }
 
     if (settingsOpen) {
-        SettingsScreen(apiBase, session, theme, onTheme, onBack = { settingsOpen = false }, onSignOut = onSignOut)
+        SettingsScreen(apiBase, session, theme, onTheme, onLocale, onBack = { settingsOpen = false }, onSignOut = onSignOut)
         return
     }
 
@@ -217,7 +217,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
             OutlinedTextField(
                 value = controller.searchText,
                 onValueChange = { controller.searchText = it; scope.launch { controller.search() } },
-                placeholder = { Text("Suche einfach überall…", color = Veyq.Muted) },
+                placeholder = { Text(L10n.t("home.search"), color = Veyq.Muted) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
@@ -229,7 +229,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
             )
 
             if (controller.searchText.isNotBlank()) {
-                if (controller.searchHits.isEmpty()) EmptyText("Nichts gefunden.")
+                if (controller.searchHits.isEmpty()) EmptyText(L10n.t("search.nothing"))
                 else controller.searchHits.forEach { hit ->
                     SearchRow(hit) {
                         if (hit.type == "MEMORY") detail = hit
@@ -239,12 +239,12 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
             } else {
                 if (controller.crumbs.size > 1) Breadcrumb(controller.crumbs) { scope.launch { controller.gotoCrumb(it) } }
 
-                SectionHeader("Memories", controller.memories.size)
-                if (controller.memories.isEmpty()) EmptyText("Noch keine Memories hier.")
+                SectionHeader(L10n.t("home.memories"), controller.memories.size)
+                if (controller.memories.isEmpty()) EmptyText(L10n.t("home.noMemories"))
                 else MemoryGrid(controller.memories, controller.covers) { detail = it }
 
-                SectionHeader("Ordner", controller.folders.size)
-                if (controller.folders.isEmpty()) EmptyText("Keine Ordner.")
+                SectionHeader(L10n.t("home.folders"), controller.folders.size)
+                if (controller.folders.isEmpty()) EmptyText(L10n.t("home.noFolders"))
                 else controller.folders.forEach { f -> FolderRow(f) { scope.launch { controller.openFolder(f) } } }
             }
         }
@@ -337,6 +337,6 @@ private fun SearchRow(hit: HomeController.Entry, onOpen: () -> Unit) {
     ) {
         Text(if (hit.type == "FOLDER") "📁" else "🖼️", fontSize = 18.sp)
         Text(hit.name, color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-        Text(if (hit.type == "FOLDER") "Ordner" else "Memory", color = Veyq.Accent, fontSize = 12.sp)
+        Text(if (hit.type == "FOLDER") L10n.t("search.folder") else L10n.t("search.memory"), color = Veyq.Accent, fontSize = 12.sp)
     }
 }

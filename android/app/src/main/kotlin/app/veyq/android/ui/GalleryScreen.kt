@@ -176,10 +176,10 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("${controller.tiles.size} Medien", color = Veyq.Muted, fontSize = 13.sp)
+            Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
             when {
-                controller.loading -> Text("Lädt Galerie…", color = Veyq.Muted, fontSize = 14.sp)
-                controller.tiles.isEmpty() -> Text("Noch keine Medien.", color = Veyq.Muted, fontSize = 14.sp)
+                controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
+                controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
                 else -> Gallery(controller.tiles) { lightbox = it }
             }
         }
@@ -195,10 +195,10 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         AlertDialog(
             onDismissRequest = { showDownload = false },
             containerColor = Veyq.Surface,
-            title = { Text("Herunterladen", color = Veyq.Text) },
-            text = { Text("Originale dieser Memory als ZIP teilen.", color = Veyq.Muted) },
-            confirmButton = { TextButton(onClick = { download(true) }) { Text("Mit Kapiteln", color = Veyq.Accent) } },
-            dismissButton = { TextButton(onClick = { download(false) }) { Text("Nur diese Memory", color = Veyq.Accent) } },
+            title = { Text(L10n.t("download.title"), color = Veyq.Text) },
+            text = { Text(L10n.t("download.text"), color = Veyq.Muted) },
+            confirmButton = { TextButton(onClick = { download(true) }) { Text(L10n.t("download.withChapters"), color = Veyq.Accent) } },
+            dismissButton = { TextButton(onClick = { download(false) }) { Text(L10n.t("download.onlyThis"), color = Veyq.Accent) } },
         )
     }
 }

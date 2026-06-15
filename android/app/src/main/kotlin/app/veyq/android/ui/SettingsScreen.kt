@@ -33,34 +33,34 @@ import app.veyq.crypto.Login
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onBack: () -> Unit, onSignOut: () -> Unit) {
+fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, onBack: () -> Unit, onSignOut: () -> Unit) {
     Scaffold(
         containerColor = Veyq.Bg,
         topBar = {
             TopAppBar(
-                title = { Text("Einstellungen", color = Veyq.Text, fontWeight = FontWeight.Bold) },
+                title = { Text(L10n.t("settings.title"), color = Veyq.Text, fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
                 navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 24.sp) } },
             )
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Sprache und Darstellung")
-            ThemeRow(theme, onTheme)
-            SettingRow("Sprache", "Deutsch")
+            Section(L10n.t("settings.langAppearance"))
+            SelectorRow(L10n.t("settings.appearance"), theme, listOf("system" to L10n.t("settings.system"), "light" to L10n.t("settings.light"), "dark" to L10n.t("settings.dark")), onTheme)
+            SelectorRow(L10n.t("settings.language"), L10n.locale, listOf("de" to "Deutsch", "en" to "English"), onLocale)
 
-            Section("Account")
-            SettingRow("E-Mail", session.email)
+            Section(L10n.t("settings.account"))
+            SettingRow(L10n.t("common.email"), session.email)
 
-            Section("Eingeloggte Instanz")
-            SettingRow("Instanz", apiBase)
+            Section(L10n.t("settings.instance"))
+            SettingRow(L10n.t("settings.instance"), apiBase)
 
             Button(
                 onClick = onSignOut,
                 modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 12.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Veyq.SurfaceMuted, contentColor = Veyq.Danger),
-            ) { Text("Trennen", fontWeight = FontWeight.SemiBold) }
+            ) { Text(L10n.t("settings.disconnect"), fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -71,7 +71,7 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun ThemeRow(theme: String, onTheme: (String) -> Unit) {
+private fun SelectorRow(label: String, current: String, options: List<Pair<String, String>>, onSelect: (String) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -81,18 +81,18 @@ private fun ThemeRow(theme: String, onTheme: (String) -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Darstellung", color = Veyq.Text, fontSize = 15.sp)
+        Text(label, color = Veyq.Text, fontSize = 15.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("system" to "System", "light" to "Hell", "dark" to "Dunkel").forEach { (key, label) ->
-                val active = theme == key
+            options.forEach { (key, optLabel) ->
+                val active = current == key
                 Text(
-                    label,
+                    optLabel,
                     color = if (active) Color.White else Veyq.Muted,
                     fontSize = 13.sp,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (active) Veyq.Accent else Color.Transparent)
-                        .clickable { onTheme(key) }
+                        .clickable { onSelect(key) }
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
