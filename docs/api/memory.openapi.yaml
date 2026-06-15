@@ -128,6 +128,59 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/tracks:
+    get:
+      tags: [MemoryTrack]
+      operationId: listTracks
+      summary: A Memory's GPX tracks — each a sealed route (ciphertext only).
+      description: >
+        Returns the Memory's tracks. Each track's name + point list is sealed client-side under the scope
+        content key; the server stores ciphertext + a timestamp only and never sees the route. Tracks live
+        on a Memory or Chapter (not a Folder).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrackList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [MemoryTrack]
+      operationId: createTrack
+      summary: Add a sealed GPX track to a Memory/Chapter.
+      description: >
+        Stores one track as a sealed blob ({name, points} sealed client-side). The server stays blind to the
+        route; it stores ciphertext + a timestamp only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateTrackRequest' } } }
+      responses:
+        '200': { description: The created track., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrack' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/tracks/{trackId}:
+    delete:
+      tags: [MemoryTrack]
+      operationId: deleteTrack
+      summary: Remove a track from a Memory/Chapter.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: trackId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:
@@ -182,6 +235,26 @@ components:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         updatedAt: { type: string, format: date-time, description: 'When the journal was last written, if ever.' }
     UpdateMemoryJournalRequest:
+      type: object
+      required: [sealedContent]
+      properties:
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    MemoryTrack:
+      type: object
+      required: [id, nodeId, sealedContent, createdAt]
+      properties:
+        id: { type: string }
+        nodeId: { type: string }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        createdAt: { type: string, format: date-time }
+    MemoryTrackList:
+      type: object
+      required: [tracks]
+      properties:
+        tracks:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryTrack' }
+    CreateTrackRequest:
       type: object
       required: [sealedContent]
       properties:
