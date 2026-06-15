@@ -135,6 +135,38 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         }
     }
 
+    /** Valid move targets: the root + every folder not in the node's own subtree. */
+    suspend fun moveDestinations(entry: Entry): List<Pair<String, String>> {
+        val s = scope ?: return emptyList()
+        val key = contentKey ?: return emptyList()
+        val all = withContext(Dispatchers.IO) { runCatching { Browse.listNodes(apiBase, session, s.scopeId) }.getOrDefault(emptyList()) }
+        val root = s.scopeId
+        fun childrenOf(id: String) = all.filter { (if (it.has("parentId") && !it.isNull("parentId")) it.getString("parentId") else root) == id }
+        val banned = mutableSetOf(entry.id)
+        val stack = ArrayDeque(listOf(entry.id))
+        while (stack.isNotEmpty()) {
+            val cur = stack.removeLast()
+            for (c in childrenOf(cur)) if (banned.add(c.getString("id"))) stack.addLast(c.getString("id"))
+        }
+        val dests = mutableListOf("root" to L10n.t("move.toRoot"))
+        for (n in all) if (n.getString("type") == "FOLDER" && n.getString("id") !in banned) {
+            dests.add(n.getString("id") to runCatching { MemoryTree.decodeNodeName(key, n) }.getOrDefault("—"))
+        }
+        return dests
+    }
+
+    suspend fun move(entry: Entry, destId: String) {
+        val s = scope; val key = contentKey
+        if (s == null || key == null) return
+        allNodes = null
+        try {
+            withContext(Dispatchers.IO) { Curate.moveNode(apiBase, session, s.scopeId, key, entry.node, destId) }
+            openLevel()
+        } catch (e: Exception) {
+            error = "Konnte nicht verschieben."
+        }
+    }
+
     suspend fun rename(entry: Entry, name: String) {
         val trimmed = name.trim()
         val s = scope; val key = contentKey
@@ -228,7 +260,10 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     var newName by remember { mutableStateOf("") }
     var renameEntry by remember { mutableStateOf<HomeController.Entry?>(null) }
     var renameName by remember { mutableStateOf("") }
-    val startRename: (HomeController.Entry) -> Unit = { renameEntry = it; renameName = it.name }
+    var actionEntry by remember { mutableStateOf<HomeController.Entry?>(null) }
+    var moveEntry by remember { mutableStateOf<HomeController.Entry?>(null) }
+    var moveDests by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    val startAction: (HomeController.Entry) -> Unit = { actionEntry = it }
     LaunchedEffect(Unit) { controller.start() }
 
     if (settingsOpen) {
@@ -305,11 +340,11 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
 
                 SectionHeader(L10n.t("home.memories"), controller.memories.size)
                 if (controller.memories.isEmpty()) EmptyText(L10n.t("home.noMemories"))
-                else MemoryGrid(controller.memories, controller.covers, onOpen = { detail = it }, onRename = startRename)
+                else MemoryGrid(controller.memories, controller.covers, onOpen = { detail = it }, onRename = startAction)
 
                 SectionHeader(L10n.t("home.folders"), controller.folders.size)
                 if (controller.folders.isEmpty()) EmptyText(L10n.t("home.noFolders"))
-                else controller.folders.forEach { f -> FolderRow(f, onClick = { scope.launch { controller.openFolder(f) } }, onLongClick = { startRename(f) }) }
+                else controller.folders.forEach { f -> FolderRow(f, onClick = { scope.launch { controller.openFolder(f) } }, onLongClick = { startAction(f) }) }
             }
         }
     }
@@ -361,6 +396,50 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
             },
             confirmButton = { TextButton(onClick = { val n = renameName; renameEntry = null; scope.launch { controller.rename(entry, n) } }) { Text(L10n.t("common.rename"), color = Veyq.Accent) } },
             dismissButton = { TextButton(onClick = { renameEntry = null }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    actionEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { actionEntry = null },
+            containerColor = Veyq.Surface,
+            title = { Text(entry.name, color = Veyq.Text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { actionEntry = null; renameEntry = entry; renameName = entry.name }, modifier = Modifier.fillMaxWidth()) {
+                        Text(L10n.t("common.rename"), color = Veyq.Text, modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(onClick = { val e = entry; actionEntry = null; scope.launch { moveDests = controller.moveDestinations(e); moveEntry = e } }, modifier = Modifier.fillMaxWidth()) {
+                        Text(L10n.t("common.move"), color = Veyq.Text, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { actionEntry = null }) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
+        )
+    }
+
+    moveEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { moveEntry = null },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("move.title"), color = Veyq.Text) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    moveDests.forEach { (id, name) ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { val e = entry; moveEntry = null; scope.launch { controller.move(e, id) } }.padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(if (id == "root") "🏠" else "📁", fontSize = 16.sp)
+                            Text(name, color = Veyq.Text, fontSize = 15.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { moveEntry = null }) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
         )
     }
 }

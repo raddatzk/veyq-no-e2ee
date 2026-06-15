@@ -13,6 +13,7 @@ struct MemoryHomeView: View {
     @State private var showRename = false
     @State private var renameEntry: HomeStore.Entry?
     @State private var renameName = ""
+    @State private var moveEntry: HomeStore.Entry?
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -91,10 +92,12 @@ struct MemoryHomeView: View {
             Button(T("common.rename")) { if let e = renameEntry { let n = renameName; Task { await store.rename(e, name: n) } } }
             Button(T("common.cancel"), role: .cancel) {}
         }
+        .sheet(item: $moveEntry) { entry in MovePickerView(store: store, entry: entry) }
     }
 
-    private func renameMenu(_ entry: HomeStore.Entry) -> some View {
+    @ViewBuilder private func cardMenu(_ entry: HomeStore.Entry) -> some View {
         Button(T("common.rename")) { renameEntry = entry; renameName = entry.name; showRename = true }
+        Button(T("common.move")) { moveEntry = entry }
     }
 
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
@@ -171,7 +174,7 @@ struct MemoryHomeView: View {
             .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .buttonStyle(.plain)
-        .contextMenu { renameMenu(m) }
+        .contextMenu { cardMenu(m) }
     }
 
     private func folderRow(_ f: HomeStore.Entry) -> some View {
@@ -188,6 +191,6 @@ struct MemoryHomeView: View {
             .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .buttonStyle(.plain)
-        .contextMenu { renameMenu(f) }
+        .contextMenu { cardMenu(f) }
     }
 }

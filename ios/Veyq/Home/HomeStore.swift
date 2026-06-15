@@ -150,6 +150,33 @@ final class HomeStore: ObservableObject {
         }
     }
 
+    /// Valid move targets: the root + every folder not in the node's own subtree.
+    func moveDestinations(_ node: MemoryTree.MemoryNode) async -> [(id: String, name: String)] {
+        guard let scope, let contentKey else { return [] }
+        guard let all = try? await MemoryTree.listNodes(apiBase: apiBase, session: session, scopeId: scope.scopeId) else { return [] }
+        let root = scope.scopeId
+        func childrenOf(_ id: String) -> [MemoryTree.MemoryNode] { all.filter { ($0.parentId ?? root) == id } }
+        var banned: Set<String> = [node.id]
+        var stack = [node.id]
+        while let cur = stack.popLast() { for c in childrenOf(cur) where !banned.contains(c.id) { banned.insert(c.id); stack.append(c.id) } }
+        var dests: [(id: String, name: String)] = [(id: "root", name: T("move.toRoot"))]
+        for n in all where n.type == "FOLDER" && !banned.contains(n.id) {
+            dests.append((id: n.id, name: (try? MemoryTree.decodeNode(contentKey: contentKey, node: n).name) ?? "—"))
+        }
+        return dests
+    }
+
+    func move(_ entry: Entry, to destId: String) async {
+        guard let scope, let contentKey else { return }
+        allNodes = nil
+        do {
+            _ = try await Curate.moveNode(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, node: entry.node, newParentId: destId)
+            await openLevel()
+        } catch {
+            self.error = "Konnte nicht verschieben."
+        }
+    }
+
     func rename(_ entry: Entry, name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let scope, let contentKey, !trimmed.isEmpty else { return }
