@@ -3,22 +3,43 @@ import { ref } from 'vue'
 import { login } from '../../features/account/login/login'
 import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
+import { deviceUnlockEnabled, deviceUnlockSupported, enableDeviceUnlock, unlockWithDevice } from '../../features/account/deviceUnlock/deviceUnlock'
 
 const props = defineProps<{ prefill?: { email?: string; secretKey?: string }; embedded?: boolean }>()
 const email = ref(props.prefill?.email ?? '')
 const password = ref('')
 const secretKey = ref(props.prefill?.secretKey ?? '')
+const remember = ref(false)
 const busy = ref(false)
 const error = ref('')
 const host = window.location.host
+const canRemember = deviceUnlockSupported()
+const hasDeviceUnlock = ref(deviceUnlockEnabled())
 
 async function submit() {
   error.value = ''
   busy.value = true
   try {
     setUnlocked(await login(session.apiBase, email.value, password.value, secretKey.value))
+    // Set up biometric/passkey unlock for next time (best-effort — a cancelled passkey doesn't block login).
+    if (remember.value && canRemember) {
+      try { await enableDeviceUnlock({ email: email.value, password: password.value, secretKey: secretKey.value }) } catch { /* user cancelled */ }
+    }
   } catch {
     error.value = t('login.failed')
+  } finally {
+    busy.value = false
+  }
+}
+
+async function unlock() {
+  error.value = ''
+  busy.value = true
+  try {
+    const creds = await unlockWithDevice()
+    setUnlocked(await login(session.apiBase, creds.email, creds.password, creds.secretKey))
+  } catch {
+    error.value = t('login.unlockFailed')
   } finally {
     busy.value = false
   }
@@ -33,6 +54,9 @@ async function submit() {
         <h1 class="auth-title">{{ t('login.title') }}</h1>
         <p class="auth-sub">{{ host }}</p>
       </template>
+      <button v-if="hasDeviceUnlock && !props.embedded" class="btn btn-primary auth-unlock" type="button" :disabled="busy" @click="unlock">
+        🔓 {{ t('login.unlock') }}
+      </button>
       <form class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('common.email') }}
@@ -46,6 +70,10 @@ async function submit() {
           {{ t('common.secretKey') }}
           <input v-model="secretKey" type="password" autocomplete="off" required />
           <span class="field-hint">{{ t('login.secretHint') }}</span>
+        </label>
+        <label v-if="canRemember" class="remember-row">
+          <input v-model="remember" type="checkbox" />
+          <span>{{ t('login.remember') }}</span>
         </label>
         <button class="btn btn-primary" type="submit" :disabled="busy">
           {{ busy ? t('login.submitting') : t('login.submit') }}

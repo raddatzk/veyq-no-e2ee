@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { applyTheme, session, setUnlocked } from '../session'
 import { logout } from '../../features/account/login/login'
+import { deviceUnlockEnabled, disableDeviceUnlock } from '../../features/account/deviceUnlock/deviceUnlock'
 import { i18n, setLocale, t } from '../../i18n/i18n'
 
 const emit = defineEmits<{ close: [] }>()
 const host = window.location.host
+const deviceUnlock = ref(deviceUnlockEnabled())
+function forgetDevice() {
+  disableDeviceUnlock()
+  deviceUnlock.value = false
+}
 
 async function signOut() {
   try {
@@ -47,6 +54,11 @@ async function signOut() {
           <small>{{ session.unlocked?.user.email }}</small>
         </span>
       </div>
+
+      <template v-if="deviceUnlock">
+        <div class="settings-section">{{ t('settings.deviceUnlock') }}</div>
+        <button class="btn btn-ghost settings-row" type="button" style="width: 100%; justify-content: flex-start" @click="forgetDevice">{{ t('settings.forgetDevice') }}</button>
+      </template>
 
       <div class="settings-section">{{ t('settings.instance') }}</div>
       <div class="settings-row"><span>{{ host }}</span></div>

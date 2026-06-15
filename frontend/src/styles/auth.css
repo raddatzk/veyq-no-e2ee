@@ -117,6 +117,10 @@
   font-size: 0.85rem;
 }
 
+.auth-unlock { width: 100%; margin-bottom: 0.9rem; }
+.remember-row { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
+.remember-row input { width: auto; }
+
 .auth-msg-error {
   background: var(--app-danger-soft);
   border: 1px solid var(--app-danger-line);
