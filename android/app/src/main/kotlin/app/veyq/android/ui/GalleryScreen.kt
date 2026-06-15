@@ -27,6 +27,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Curate
+import app.veyq.crypto.Journal
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +75,23 @@ class GalleryController(
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
     var uploading by mutableStateOf(false)
+    var journalMarkdown by mutableStateOf("")
+    var journalSaving by mutableStateOf(false)
+    private var journalLoaded = false
+
+    suspend fun loadJournal() {
+        if (journalLoaded) return
+        runCatching { withContext(Dispatchers.IO) { Journal.getJournal(apiBase, session, scopeId, contentKey, nodeId) } }
+            .onSuccess { journalMarkdown = it.markdown }
+        journalLoaded = true
+    }
+
+    suspend fun saveJournal(markdown: String) {
+        journalSaving = true
+        runCatching { withContext(Dispatchers.IO) { Journal.updateJournal(apiBase, session, scopeId, contentKey, nodeId, markdown) } }
+            .onSuccess { journalMarkdown = markdown }
+        journalSaving = false
+    }
 
     suspend fun setCover(mediaId: String) {
         runCatching { withContext(Dispatchers.IO) { Curate.setCover(apiBase, session, scopeId, nodeId, mediaId) } }
@@ -132,6 +152,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
     var showDownload by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load() }
@@ -182,16 +203,24 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
-            when {
-                controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
-                controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
-                else -> {
-                    val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
-                    if (range.isNotEmpty()) Text(range, color = Veyq.Muted, fontSize = 13.sp)
-                    DateBuckets.groupByDay(controller.tiles) { it.takenAt }.forEach { (key, items) ->
-                        Text(DateBuckets.dayLabel(key), color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Gallery(items) { lightboxTile = it }
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
+                TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+            }
+            if (tab == 1) {
+                JournalTab(controller, scope)
+            } else {
+                Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
+                when {
+                    controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
+                    controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
+                    else -> {
+                        val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
+                        if (range.isNotEmpty()) Text(range, color = Veyq.Muted, fontSize = 13.sp)
+                        DateBuckets.groupByDay(controller.tiles) { it.takenAt }.forEach { (key, items) ->
+                            Text(DateBuckets.dayLabel(key), color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Gallery(items) { lightboxTile = it }
+                        }
                     }
                 }
             }
@@ -219,6 +248,132 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             confirmButton = { TextButton(onClick = { download(true) }) { Text(L10n.t("download.withChapters"), color = Veyq.Accent) } },
             dismissButton = { TextButton(onClick = { download(false) }) { Text(L10n.t("download.onlyThis"), color = Veyq.Accent) } },
         )
+    }
+}
+
+private sealed interface MdBlock {
+    data class Heading(val level: Int, val text: String) : MdBlock
+    data class Bullet(val items: List<String>) : MdBlock
+    data class Ordered(val items: List<String>) : MdBlock
+    data class Paragraph(val text: String) : MdBlock
+}
+
+private fun parseMarkdownBlocks(markdown: String): List<MdBlock> {
+    val blocks = mutableListOf<MdBlock>()
+    val paragraph = mutableListOf<String>()
+    val bullets = mutableListOf<String>()
+    val ordered = mutableListOf<String>()
+    fun flushParagraph() { if (paragraph.isNotEmpty()) { blocks.add(MdBlock.Paragraph(paragraph.joinToString("\n"))); paragraph.clear() } }
+    fun flushBullets() { if (bullets.isNotEmpty()) { blocks.add(MdBlock.Bullet(bullets.toList())); bullets.clear() } }
+    fun flushOrdered() { if (ordered.isNotEmpty()) { blocks.add(MdBlock.Ordered(ordered.toList())); ordered.clear() } }
+    val heading = Regex("^(#{1,3})\\s+(.*)$")
+    val bullet = Regex("^[-*]\\s+(.*)$")
+    val number = Regex("^\\d+\\.\\s+(.*)$")
+    for (raw in markdown.replace("\r\n", "\n").split("\n")) {
+        val line = raw.trimEnd()
+        val h = heading.find(line)
+        val b = bullet.find(line)
+        val n = number.find(line)
+        when {
+            line.isBlank() -> { flushParagraph(); flushBullets(); flushOrdered() }
+            h != null -> { flushParagraph(); flushBullets(); flushOrdered(); blocks.add(MdBlock.Heading(h.groupValues[1].length, h.groupValues[2])) }
+            b != null -> { flushParagraph(); flushOrdered(); bullets.add(b.groupValues[1]) }
+            n != null -> { flushParagraph(); flushBullets(); ordered.add(n.groupValues[1]) }
+            else -> { flushBullets(); flushOrdered(); paragraph.add(line) }
+        }
+    }
+    flushParagraph(); flushBullets(); flushOrdered()
+    return blocks
+}
+
+/** Inline bold (**), italic (*) and code (`) → an AnnotatedString. Links render as their text. */
+private fun inlineMd(text: String): androidx.compose.ui.text.AnnotatedString = androidx.compose.ui.text.buildAnnotatedString {
+    var i = 0
+    fun take(marker: String, style: androidx.compose.ui.text.SpanStyle): Boolean {
+        if (!text.startsWith(marker, i)) return false
+        val end = text.indexOf(marker, i + marker.length)
+        if (end < 0) return false
+        pushStyle(style); append(text.substring(i + marker.length, end)); pop()
+        i = end + marker.length
+        return true
+    }
+    while (i < text.length) {
+        when {
+            take("**", androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)) -> {}
+            take("`", androidx.compose.ui.text.SpanStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) -> {}
+            take("*", androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) -> {}
+            else -> { append(text[i]); i++ }
+        }
+    }
+}
+
+@Composable
+private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text,
+        color = if (active) Veyq.Text else Veyq.Muted,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope) {
+    var editing by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { controller.loadJournal() }
+
+    if (editing) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            placeholder = { Text(L10n.t("journal.placeholder"), color = Veyq.Muted) },
+            modifier = Modifier.fillMaxWidth().height(280.dp),
+            shape = RoundedCornerShape(Veyq.Radius),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
+                focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+            ),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { editing = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) }
+            TextButton(onClick = { val md = draft; scope.launch { controller.saveJournal(md); editing = false } }, enabled = !controller.journalSaving) {
+                Text(if (controller.journalSaving) L10n.t("journal.saving") else L10n.t("journal.save"), color = Veyq.Accent)
+            }
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { draft = controller.journalMarkdown; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
+        }
+        if (controller.journalMarkdown.isBlank()) {
+            Text(L10n.t("journal.empty"), color = Veyq.Muted, fontSize = 14.sp)
+        } else {
+            MarkdownText(controller.journalMarkdown)
+        }
+    }
+}
+
+/** Renders a safe Markdown subset (headings, bullet/ordered lists, paragraphs) with inline bold/italic/code. */
+@Composable
+private fun MarkdownText(markdown: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val blocks = remember(markdown) { parseMarkdownBlocks(markdown) }
+        blocks.forEach { block ->
+            when (block) {
+                is MdBlock.Heading -> Text(inlineMd(block.text), color = Veyq.Text, fontWeight = FontWeight.Bold, fontSize = when (block.level) { 1 -> 22.sp; 2 -> 19.sp; else -> 17.sp })
+                is MdBlock.Bullet -> Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    block.items.forEach { Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text("•", color = Veyq.Muted); Text(inlineMd(it), color = Veyq.Text) } }
+                }
+                is MdBlock.Ordered -> Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    block.items.forEachIndexed { i, it -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { Text("${i + 1}.", color = Veyq.Muted); Text(inlineMd(it), color = Veyq.Text) } }
+                }
+                is MdBlock.Paragraph -> Text(inlineMd(block.text), color = Veyq.Text)
+            }
+        }
     }
 }
 
