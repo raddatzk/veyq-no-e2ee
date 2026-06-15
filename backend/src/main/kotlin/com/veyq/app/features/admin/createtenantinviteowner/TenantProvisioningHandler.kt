@@ -13,6 +13,7 @@ import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
@@ -59,6 +60,7 @@ class TenantProvisioningHandler(
     private val purge: ContentPurge,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
+    @param:ConfigProperty(name = "veyq.tenant.deletion-grace", defaultValue = "P30D") private val deletionGrace: Duration,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -80,26 +82,48 @@ class TenantProvisioningHandler(
     }
 
     /**
-     * Delete a group (tenant) and everything it owns. Tenant Owner only. Cascades the tenant scope (all
-     * nodes + their media/journal/tracks/shares, the content key, items, grants) plus memberships and
-     * invites, then the tenant row. The confirm-by-name gate is enforced client-side. Irreversible.
+     * Schedule a tenant for deletion after a grace period. Tenant Owner only. The tenant stays fully usable
+     * until the deadline so members can secure their data; the deadline rides the roster (in-app warning),
+     * the owner can cancel, and an hourly GC hard-purges it once the deadline passes. Confirm-by-name is
+     * enforced client-side. Idempotent (re-scheduling just keeps the existing deadline).
      */
     @Transactional
     fun deleteTenant(auth: String?, tenantId: String) {
+        val tenant = requireTenantOwner(auth, tenantId)
+        if (tenant.scheduledDeletionAt == null) tenant.scheduledDeletionAt = Instant.now().plus(deletionGrace)
+    }
+
+    /** Owner cancels a scheduled deletion before the deadline — the tenant returns to normal. */
+    @Transactional
+    fun cancelTenantDeletion(auth: String?, tenantId: String) {
+        requireTenantOwner(auth, tenantId).scheduledDeletionAt = null
+    }
+
+    /** Hard-purge tenants whose grace period has passed. Called by the scheduler. */
+    @Transactional
+    fun purgeDueTenants(now: Instant) {
+        for (tenant in tenants.listDue(now)) purgeTenant(tenant)
+    }
+
+    /** Cascade the tenant scope + every group scope, plus memberships + invites, then the tenant row. */
+    private fun purgeTenant(tenant: Tenant) {
+        scopes.listByTenantId(tenant.id).forEach { scope ->
+            groupMembers.deleteByScopeId(scope.id) // no-op for the tenant root
+            purge.purgeScope(scope.id)
+        }
+        memberships.deleteByTenantId(tenant.id)
+        invites.deleteByTenantId(tenant.id)
+        tenants.delete(tenant)
+    }
+
+    private fun requireTenantOwner(auth: String?, tenantId: String): Tenant {
         val callerId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
         val tenant = tenants.findById(tenantId) ?: throw notFound("Tenant")
         val caller = memberships.find(tenantId, callerId)
         if (caller == null || caller.role != "Owner" || caller.status != "ACTIVE") {
             throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
         }
-        // purge the tenant-wide scope AND every group scope within the tenant
-        scopes.listByTenantId(tenantId).forEach { scope ->
-            groupMembers.deleteByScopeId(scope.id) // no-op for the tenant root
-            purge.purgeScope(scope.id)
-        }
-        memberships.deleteByTenantId(tenantId)
-        invites.deleteByTenantId(tenantId)
-        tenants.delete(tenant)
+        return tenant
     }
 
     @Transactional

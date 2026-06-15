@@ -28,16 +28,30 @@ paths:
     delete:
       tags: [TenantProvisioning]
       operationId: deleteTenant
-      summary: Delete a group (tenant) and everything it owns. Tenant Owner only.
+      summary: Schedule a tenant for deletion after a grace period. Tenant Owner only.
       description: >
-        Cascades the tenant's scope (all nodes + their media/journal/tracks/shares, the content key, items,
-        and grants) plus memberships and invites, then the tenant. Only an active Tenant Owner may delete;
-        the client gates it behind a confirm-by-name dialog. Irreversible.
+        Schedules the tenant's deletion (it stays fully usable until the deadline so members can secure
+        their data); the deadline rides the space roster as an in-app warning, the owner can cancel, and an
+        hourly GC hard-purges it once the deadline passes (scope + groups + content + memberships + invites).
+        Only an active Tenant Owner may; the client gates it behind a confirm-by-name dialog. Idempotent.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: tenantId, in: path, required: true, schema: { type: string } }
       responses:
-        '204': { description: Deleted. }
+        '204': { description: Scheduled for deletion (or already scheduled). }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/cancel-deletion:
+    post:
+      tags: [TenantProvisioning]
+      operationId: cancelTenantDeletion
+      summary: Cancel a scheduled tenant deletion before the deadline. Tenant Owner only.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Cancelled (the tenant is no longer scheduled for deletion). }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }

@@ -15,6 +15,8 @@ import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.identity.UserRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.Base64
 
 /**
@@ -63,6 +65,7 @@ class MySpacesHandler(
                 name = tenant.name,
                 displayName = tenant.displayName,
                 role = m.role,
+                scheduledDeletionAt = tenant.scheduledDeletionAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
                 scopeId = scope.id,
                 scopePublicKey = scope.toPublicKey(),
             )

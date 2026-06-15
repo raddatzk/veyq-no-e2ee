@@ -25,6 +25,8 @@ class Tenant {
     @Column(name = "terms_version", nullable = false) var termsVersion: Int = 0
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
+    // Non-null once a deletion is scheduled; the tenant stays usable until then, then the GC hard-purges it.
+    @Column(name = "scheduled_deletion_at") var scheduledDeletionAt: Instant? = null
 }
 
 @Entity
@@ -60,6 +62,10 @@ class Membership {
 @ApplicationScoped
 class TenantRepository : PanacheRepositoryBase<Tenant, String> {
     fun findByName(name: String): Tenant? = find("name", name).firstResult()
+
+    /** Tenants whose scheduled deletion deadline has passed — the GC hard-purges these. */
+    fun listDue(now: Instant): List<Tenant> =
+        list("scheduledDeletionAt is not null and scheduledDeletionAt < ?1", now)
 }
 
 @ApplicationScoped

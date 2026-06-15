@@ -33,9 +33,11 @@ import io.quarkus.test.junit.QuarkusTest
 import io.restassured.RestAssured.given
 import jakarta.inject.Inject
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /** uc.delete — recursive cascade delete of a node subtree, a single medium, and a whole group (tenant). */
@@ -54,6 +56,7 @@ class DeleteSliceTest {
     @Inject lateinit var shares: ShareRepository
     @Inject lateinit var tenants: TenantRepository
     @Inject lateinit var memberships: MembershipRepository
+    @Inject lateinit var tenantHandler: com.veyq.app.features.admin.createtenantinviteowner.TenantProvisioningHandler
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
@@ -150,12 +153,24 @@ class DeleteSliceTest {
     }
 
     @Test
-    fun deletesGroupOnlyAsOwnerAndCascadesItsScope() {
-        // a plain member cannot delete the group
+    fun schedulesTenantDeletionOwnerOnlyThenCancelsAndGcPurges() {
+        // a plain member cannot schedule deletion
         given().header("Authorization", outsiderToken).delete("/api/tenants/$tenantId").then().statusCode(403)
 
+        // owner schedules → tenant + scope stay (usable during the grace period), deadline is set
         given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId").then().statusCode(204)
+        QuarkusTransaction.requiringNew().run {
+            assertNotNull(tenants.findById(tenantId)?.scheduledDeletionAt)
+            assertNotNull(scopes.findById(tenantScopeId))
+        }
 
+        // owner cancels → no longer scheduled
+        given().header("Authorization", ownerToken).post("/api/tenants/$tenantId/cancel-deletion").then().statusCode(204)
+        QuarkusTransaction.requiringNew().run { assertNull(tenants.findById(tenantId)?.scheduledDeletionAt) }
+
+        // re-schedule, then the GC (deadline passed) hard-purges the tenant + its scope
+        given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId").then().statusCode(204)
+        tenantHandler.purgeDueTenants(Instant.now().plus(40, ChronoUnit.DAYS))
         QuarkusTransaction.requiringNew().run {
             assertNull(tenants.findById(tenantId))
             assertNull(scopes.findById(tenantScopeId))
