@@ -147,6 +147,30 @@
   font-size: 0.82rem;
 }
 
+.qr-scan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+}
+.qr-scan-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--app-surface);
+  border-radius: var(--app-radius);
+  padding: 1rem;
+}
+.qr-scan-video {
+  width: 100%;
+  border-radius: var(--app-radius-sm);
+  background: #000;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
 .kit-secret {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;

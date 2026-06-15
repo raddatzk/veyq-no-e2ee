@@ -16,6 +16,7 @@
     "@noble/post-quantum": "^0.6.1",
     "@types/leaflet": "^1.9.21",
     "jspdf": "^4.2.1",
+    "jsqr": "^1.4.0",
     "leaflet": "^1.9.4",
     "qrcode": "^1.5.4",
     "vue": "^3.5.35",

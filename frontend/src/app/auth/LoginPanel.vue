@@ -5,6 +5,7 @@ import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
 import { deviceUnlockEnabled, deviceUnlockSupported, enableDeviceUnlock, unlockWithDevice } from '../../features/account/deviceUnlock/deviceUnlock'
 import { parseKit } from '../../features/account/emergencyKit/emergencyKit'
+import QrScanner from './QrScanner.vue'
 
 const props = defineProps<{ prefill?: { email?: string; secretKey?: string }; embedded?: boolean }>()
 const email = ref(props.prefill?.email ?? '')
@@ -16,6 +17,21 @@ const error = ref('')
 const host = window.location.host
 const canRemember = deviceUnlockSupported()
 const hasDeviceUnlock = ref(deviceUnlockEnabled())
+const scanning = ref(false)
+const canScan = !!navigator.mediaDevices?.getUserMedia
+
+function applyKit(text: string) {
+  const kit = parseKit(text)
+  if (!kit) { error.value = t('kit.importFailed'); return false }
+  email.value = kit.email
+  secretKey.value = kit.secretKey
+  return true
+}
+
+function onScanned(text: string) {
+  scanning.value = false
+  applyKit(text)
+}
 
 async function submit() {
   error.value = ''
@@ -40,11 +56,9 @@ async function importKit(e: Event) {
   if (!file) return
   // The payload lives as ASCII in the QR text, the .veyqkit body, or the PDF's Keywords metadata —
   // reading the file as text surfaces it regardless of container.
-  const kit = parseKit(await file.text())
+  const text = await file.text()
   input.value = ''
-  if (!kit) { error.value = t('kit.importFailed'); return }
-  email.value = kit.email
-  secretKey.value = kit.secretKey
+  applyKit(text)
 }
 
 async function unlock() {
@@ -99,7 +113,11 @@ async function unlock() {
         <input type="file" accept=".pdf,.veyqkit,application/pdf,text/plain" @change="importKit" />
         <span class="field-hint">{{ t('kit.importHint') }}</span>
       </label>
+      <button v-if="canScan" class="btn btn-ghost" type="button" style="width: 100%; margin-top: 0.6rem" @click="scanning = true">
+        📷 {{ t('kit.scan') }}
+      </button>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
     </div>
+    <QrScanner v-if="scanning" @decoded="onScanned" @close="scanning = false" />
   </div>
 </template>

@@ -2,8 +2,8 @@
 // (which stays only in the user's head). It's human-readable (printed text), camera-readable (a QR), and
 // machine-readable (an embedded payload), so it can be re-entered, scanned, or imported as a file later.
 // The Secret Key is sensitive — this is the user's recovery secret, so the kit must be stored safely.
-import { jsPDF } from 'jspdf'
-import QRCode from 'qrcode'
+// jspdf + qrcode are heavy and only needed when actually downloading a kit — they're imported lazily
+// inside downloadKitPdf so the parse/import path (the common one) stays cheap.
 
 export type KitData = { instance: string; email: string; secretKey: string }
 
@@ -36,6 +36,7 @@ export function parseKit(text: string): KitData | null {
 
 /** Build + download the Emergency Kit PDF: human text + QR + an embedded payload (in the PDF metadata). */
 export async function downloadKitPdf(data: KitData, displayName: string): Promise<void> {
+  const [{ jsPDF }, QRCode] = await Promise.all([import('jspdf'), import('qrcode').then((m) => m.default)])
   const payload = kitPayload(data)
   const qr = await QRCode.toDataURL(payload, { margin: 1, width: 320 })
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
