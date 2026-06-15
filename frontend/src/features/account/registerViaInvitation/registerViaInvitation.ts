@@ -86,6 +86,11 @@ export async function registerWithScope(
   const kek = v1.kekPasswordSecret(secretKey, password, salt, ARGON)
   const masterWrap = v1.symWrap(kek, masterKey, 'master-key', v1.randomBytes(12))
 
+  // RECOVERY wrap: master key under the Secret Key ALONE — released only via the email-token-gated reset
+  // (recovery = Secret Key AND email access). Never in the login key bag.
+  const recSalt = v1.randomBytes(16)
+  const recWrap = v1.symWrap(v1.kekRecovery(secretKey, recSalt, ARGON), masterKey, 'master-key', v1.randomBytes(12))
+
   // server-side auth verifier: argon2id(password, authSalt); store authSalt || output
   const authSalt = v1.randomBytes(16)
   const verifier = v1.kekRecovery(v1.utf8(password), authSalt, ARGON)
@@ -115,6 +120,7 @@ export async function registerWithScope(
     wrappedIdentityPrivateKey: { suiteId: 'v1', bytes: b64url(wrappedPriv) },
     masterKeyWraps: [
       { unlockMethod: 'PASSWORD', suiteId: 'v1', wrappedKey: b64url(masterWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, salt)) },
+      { unlockMethod: 'RECOVERY', suiteId: 'v1', wrappedKey: b64url(recWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, recSalt)) },
     ],
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },

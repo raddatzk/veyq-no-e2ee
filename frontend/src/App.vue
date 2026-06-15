@@ -6,9 +6,11 @@ import { getSetupStatus } from './features/account/instance/instance'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
 import AcceptInvitePanel from './app/auth/AcceptInvitePanel.vue'
+import ResetPasswordPanel from './app/auth/ResetPasswordPanel.vue'
 import ShareView from './app/share/ShareView.vue'
 import HomeView from './app/home/HomeView.vue'
 import { parseInviteHash, type ParsedInvite } from './features/spaces/invite/inviteLink'
+import { parseResetHash } from './features/account/resetPassword/resetPassword'
 
 // A public share link is `/s/<shareId>#k=<shareKey>` — viewable with no account.
 const sharePath = /^\/s\/([^/]+)$/.exec(window.location.pathname)
@@ -29,6 +31,7 @@ type Phase = 'loading' | 'setup' | 'login' | 'error'
 const phase = ref<Phase>('loading')
 const prefill = ref<{ email?: string; secretKey?: string }>({})
 const invite = ref<ParsedInvite | null>(parseInviteHash(window.location.hash))
+const resetToken = ref<string | null>(parseResetHash(window.location.hash))
 
 onMounted(async () => {
   try {
@@ -48,10 +51,16 @@ function clearInvite() {
   invite.value = null
   history.replaceState(null, '', window.location.pathname + window.location.search)
 }
+
+function clearReset() {
+  resetToken.value = null
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
 </script>
 
 <template>
   <ShareView v-if="share" :share-id="share.shareId" :share-key="share.shareKey" @internal="onShareInternal" />
+  <ResetPasswordPanel v-else-if="resetToken && !session.unlocked" :token="resetToken" @done="clearReset" />
   <AcceptInvitePanel v-else-if="invite" :invite="invite" @done="clearInvite" @dismiss="clearInvite" />
   <HomeView v-else-if="session.unlocked" :open-target="homeTarget" />
   <div v-else-if="phase === 'loading'" class="auth-screen">

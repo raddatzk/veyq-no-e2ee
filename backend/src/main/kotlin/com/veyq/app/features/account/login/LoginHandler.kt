@@ -68,7 +68,10 @@ class LoginHandler(
                 suiteId = identity.wrappedPrivateSuiteId,
                 bytes = b64.encodeToString(identity.wrappedPrivateKey),
             ),
-            masterKeyWraps = keyBlobs.listByUserId(user.id).map(::toWrap),
+            // RECOVERY wraps are deliberately EXCLUDED: they are the Secret-Key-only master-key wrap, released
+            // only via the email-token-gated password reset. Shipping them in the login bag would let anyone
+            // with the Secret Key alone unlock (bypassing the email second factor that gates recovery).
+            masterKeyWraps = keyBlobs.listByUserId(user.id).filter { it.unlockMethod != "RECOVERY" }.map(::toWrap),
         )
 
         return LoginResponse(
