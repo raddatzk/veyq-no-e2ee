@@ -211,6 +211,30 @@ paths:
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/member-invites/email:
+    post:
+      tags: [MemberInvites]
+      operationId: emailMemberInvite
+      summary: Email an already-issued member invite link to an address (Tenant Owner only).
+      description: >
+        Sends the client-assembled invite link to the given email. The link itself is built client-side, so
+        its secret material (the temp private key, or — in passphrase mode — only the passphrase-encrypted
+        temp key) is whatever the client chose to put in it. The server only relays it. Must reference a
+        pending invite of this tenant, and the link must point at this instance's configured app origin.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmailInviteRequest' }
+      responses:
+        '204': { description: Sent. }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenant-invites/{inviteId}:
     get:
       tags: [TenantProvisioning]
@@ -682,6 +706,13 @@ components:
         role: { type: string, enum: [Owner, Member] }
         tempPublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         tempWrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    EmailInviteRequest:
+      type: object
+      required: [email, inviteId, link]
+      properties:
+        email: { type: string }
+        inviteId: { type: string, description: 'A pending member invite of this tenant.' }
+        link: { type: string, description: 'The client-assembled invite URL (must point at this instance''s app origin).' }
     ClaimTenantOwnershipRequest:
       type: object
       required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]
