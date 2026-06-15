@@ -25,6 +25,8 @@ const journalEditing = ref(false)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isContributor = computed(() => ctx.value?.role === 'CONTRIBUTOR')
+const canRead = computed(() => ctx.value?.role !== 'UPLOADER')
+const canUpload = computed(() => ctx.value?.role === 'CONTRIBUTOR' || ctx.value?.role === 'UPLOADER')
 const journalHtml = computed(() => renderMarkdown(journal.value))
 let ro: ResizeObserver | null = null
 
@@ -45,8 +47,11 @@ onMounted(async () => {
     const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey)
     ctx.value = c
     title.value = c.rootName
-    tiles.value = await loadShareTiles(c, c.rootNodeId)
-    journal.value = await getShareJournal(c).catch(() => '')
+    // An UPLOADER is a blind drop-off — it cannot read the gallery or journal (those endpoints 403).
+    if (c.role !== 'UPLOADER') {
+      tiles.value = await loadShareTiles(c, c.rootNodeId)
+      journal.value = await getShareJournal(c).catch(() => '')
+    }
   } catch {
     error.value = t('share.notFound')
   } finally {
@@ -102,17 +107,28 @@ function closeLightbox() {
         <h1 class="detail-title">{{ title || t('share.title') }}</h1>
         <span v-if="dateRange" class="detail-daterange">{{ dateRange }}</span>
       </div>
-      <template v-if="isContributor">
+      <template v-if="canUpload">
         <button class="btn btn-primary" type="button" :disabled="uploading" @click="fileInput?.click()">
           {{ uploading ? t('detail.uploading') : t('share.addPhotos') }}
         </button>
         <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
       </template>
-      <span class="share-badge">{{ isContributor ? t('share.contribute') : t('share.readOnly') }}</span>
+      <span class="share-badge">{{ isContributor ? t('share.contribute') : canRead ? t('share.readOnly') : t('share.uploadOnly') }}</span>
     </header>
 
     <main class="share-content">
       <div v-if="error" class="home-empty">{{ error }}</div>
+
+      <div v-if="!canRead && !error" class="share-dropbox">
+        <div class="share-drop-icon">⬆</div>
+        <p class="share-drop-title">{{ t('share.uploadOnlyTitle') }}</p>
+        <p class="home-empty">{{ t('share.uploadOnlyHint') }}</p>
+        <button class="btn btn-primary" type="button" :disabled="uploading" @click="fileInput?.click()">
+          {{ uploading ? t('detail.uploading') : t('share.addPhotos') }}
+        </button>
+      </div>
+
+      <template v-if="canRead">
       <div ref="galleryEl" class="gallery-buckets">
         <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
           <h2 class="bucket-date">{{ b.label }}</h2>
@@ -147,6 +163,7 @@ function closeLightbox() {
           <div v-else-if="!isContributor" class="home-empty">{{ t('journal.empty') }}</div>
         </template>
       </section>
+      </template>
     </main>
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox">

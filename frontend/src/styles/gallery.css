@@ -39,6 +39,20 @@
   padding: 0.25rem 0.7rem;
 }
 .share-content { padding: 1.5rem; }
+.share-dropbox {
+  max-width: 460px;
+  margin: 3rem auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed var(--app-line);
+  border-radius: var(--app-radius);
+}
+.share-drop-icon { font-size: 2.4rem; color: var(--app-accent); }
+.share-drop-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
 
 .dl-option {
   display: flex;

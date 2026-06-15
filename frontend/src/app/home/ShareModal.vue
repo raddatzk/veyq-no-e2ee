@@ -63,6 +63,7 @@ async function revoke(shareId: string) {
         <div class="seg">
           <button type="button" :class="{ active: role === 'VIEWER' }" @click="role = 'VIEWER'">{{ t('share.roleViewer') }}</button>
           <button type="button" :class="{ active: role === 'CONTRIBUTOR' }" @click="role = 'CONTRIBUTOR'">{{ t('share.roleContributor') }}</button>
+          <button type="button" :class="{ active: role === 'UPLOADER' }" @click="role = 'UPLOADER'">{{ t('share.roleUploader') }}</button>
         </div>
       </label>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>

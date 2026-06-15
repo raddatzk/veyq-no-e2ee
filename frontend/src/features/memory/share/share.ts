@@ -10,7 +10,7 @@ import { chunkBytes, decodeMediaMeta, dedupTokenFor, sealMediaMeta, DEFAULT_CHUN
 import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
 
-export type ShareRole = 'VIEWER' | 'CONTRIBUTOR'
+export type ShareRole = 'VIEWER' | 'CONTRIBUTOR' | 'UPLOADER'
 
 const EMPTY = new Uint8Array(0)
 

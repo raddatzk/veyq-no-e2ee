@@ -51,5 +51,13 @@ run('share e2e', () => {
     const all = await listShareMedia(cCtx, cCtx.rootNodeId)
     expect(all).toHaveLength(2)
     expect(await getShareJournal(cCtx)).toContain('Danke fürs Teilen')
+
+    // (3) UPLOADER — a blind drop-off: can add media, but reads are denied
+    const uShare = await createShare(apiBase, session, active, memory.id, 'UPLOADER')
+    const uKey = new URLSearchParams(uShare.link.slice(uShare.link.indexOf('#') + 1)).get('k')!
+    const uCtx = await resolvePublicShare(apiBase, uShare.shareId, uKey)
+    expect(uCtx.role).toBe('UPLOADER')
+    await uploadShareMedia(uCtx, { bytes: Uint8Array.from({ length: 50 }, (_, i) => i & 0xff), takenAt: '2026-06-01T10:00:00Z', mimeType: 'image/jpeg' })
+    await expect(listShareMedia(uCtx, uCtx.rootNodeId)).rejects.toThrow() // no read rights
   }, 120000)
 })
