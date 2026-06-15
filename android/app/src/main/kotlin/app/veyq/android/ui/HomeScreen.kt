@@ -171,7 +171,13 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<HomeController.Entry?>(null) }
+    var settingsOpen by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { controller.start() }
+
+    if (settingsOpen) {
+        SettingsScreen(apiBase, session, onBack = { settingsOpen = false }, onSignOut = onSignOut)
+        return
+    }
 
     val openMemory = detail
     val activeScope = controller.scope
@@ -200,7 +206,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSignOut) { Text("⏻", color = Veyq.Muted, fontSize = 18.sp) }
+                    IconButton(onClick = { settingsOpen = true }) { Text("⚙", color = Veyq.Muted, fontSize = 20.sp) }
                 },
             )
         },

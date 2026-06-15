@@ -6,6 +6,7 @@ import VeyqCrypto
 struct MemoryHomeView: View {
     @EnvironmentObject var app: AppState
     @StateObject private var store: HomeStore
+    @State private var showSettings = false
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -58,7 +59,7 @@ struct MemoryHomeView: View {
                     } label: { Image(systemName: "square.grid.2x2") }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { app.signOut() } label: { Image(systemName: "rectangle.portrait.and.arrow.right") }
+                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
             }
             .toolbarBackground(VeyqStyle.surface, for: .navigationBar)
@@ -67,6 +68,7 @@ struct MemoryHomeView: View {
         }
         .tint(VeyqStyle.accent)
         .task { await store.start() }
+        .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
     }
 
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
