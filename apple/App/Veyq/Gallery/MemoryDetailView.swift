@@ -166,6 +166,8 @@ struct MemoryDetailView: View {
 
     var body: some View {
         GeometryReader { geo in
+            // Cap the gallery/content to a reading width so iPad/Mac don't render one enormous justified row.
+            let contentWidth = min(geo.size.width, 1024)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
@@ -216,14 +218,14 @@ struct MemoryDetailView: View {
                         ForEach(DateBuckets.groupByDay(store.tiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
-                                gallery(bucket.items, width: geo.size.width - 32)
+                                gallery(bucket.items, width: contentWidth - 32)
                             }
                         }
                     }
                     }
                 }
                 .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .readableWidth()
             }
             .background(VeyqStyle.bg)
         }

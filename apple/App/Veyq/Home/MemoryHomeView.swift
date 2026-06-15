@@ -5,6 +5,7 @@ import VeyqCrypto
 /// breadcrumb. The memory detail + justified gallery arrive in slice 3.
 struct MemoryHomeView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
     @StateObject private var store: HomeStore
     @State private var showSettings = false
     @State private var showCreate = false
@@ -21,67 +22,7 @@ struct MemoryHomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if let error = store.error { MessageBox(text: error) }
-
-                    if !store.searchText.isEmpty {
-                        if store.searchHits.isEmpty {
-                            emptyText(T("search.nothing"))
-                        } else {
-                            ForEach(store.searchHits) { searchRow($0) }
-                        }
-                    } else {
-                        if store.crumbs.count > 1 { breadcrumb }
-
-                        sectionHeader(T("home.memories"), store.memories.count)
-                        if store.memories.isEmpty {
-                            emptyText(T("home.noMemories"))
-                        } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                                ForEach(store.memories) { memoryCard($0) }
-                            }
-                        }
-
-                        sectionHeader(T("home.folders"), store.folders.count)
-                        if store.folders.isEmpty {
-                            emptyText(T("home.noFolders"))
-                        } else {
-                            ForEach(store.folders) { folderRow($0) }
-                        }
-                    }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(VeyqStyle.bg)
-            .navigationTitle(store.crumbs.last?.name ?? "veyq")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        ForEach(store.spaces, id: \.scopeId) { space in
-                            Button(space.displayName) { Task { await store.switchSpace(space) } }
-                        }
-                        Divider()
-                        Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
-                    } label: { Image(systemName: "square.grid.2x2") }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(T("home.createMemory")) { createType = "MEMORY"; newName = ""; showCreate = true }
-                        Button(T("home.createFolder")) { createType = "FOLDER"; newName = ""; showCreate = true }
-                    } label: { Image(systemName: "plus") }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
-                }
-            }
-            .toolbarBackground(VeyqStyle.surface, for: .navigationBar)
-            .searchable(text: $store.searchText, prompt: T("home.search"))
-            .onChange(of: store.searchText) { _, _ in Task { await store.search() } }
-        }
+        NavigationStack { content }
         .tint(VeyqStyle.accent)
         .task { await store.start() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
@@ -97,6 +38,92 @@ struct MemoryHomeView: View {
             Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $moveEntry) { entry in MovePickerView(store: store, entry: entry) }
+    }
+
+    private var content: some View {
+        scroll
+            .toolbar { toolbarContent }
+            .toolbarBackground(VeyqStyle.surface, for: .navigationBar)
+            .searchable(text: $store.searchText, prompt: T("home.search"))
+            .onChange(of: store.searchText) { _, _ in Task { await store.search() } }
+    }
+
+    private var scroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let error = store.error { MessageBox(text: error) }
+                if !store.searchText.isEmpty {
+                    searchResults
+                } else {
+                    browseContent
+                }
+            }
+            .padding(16)
+            .readableWidth()
+        }
+        .background(VeyqStyle.bg)
+        .navigationTitle(store.crumbs.last?.name ?? "veyq")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Menu {
+                ForEach(store.spaces, id: \.scopeId) { space in
+                    Button(space.displayName) { Task { await store.switchSpace(space) } }
+                }
+                Divider()
+                Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
+            } label: { Image(systemName: "square.grid.2x2") }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button(T("home.createMemory")) { createType = "MEMORY"; newName = ""; showCreate = true }
+                Button(T("home.createFolder")) { createType = "FOLDER"; newName = ""; showCreate = true }
+            } label: { Image(systemName: "plus") }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showSettings = true } label: { Image(systemName: "gearshape") }
+        }
+    }
+
+    @ViewBuilder private var searchResults: some View {
+        if store.searchHits.isEmpty {
+            emptyText(T("search.nothing"))
+        } else {
+            ForEach(store.searchHits) { searchRow($0) }
+        }
+    }
+
+    @ViewBuilder private var browseContent: some View {
+        if store.crumbs.count > 1 { breadcrumb }
+        sectionHeader(T("home.memories"), store.memories.count)
+        memoriesSection
+        sectionHeader(T("home.folders"), store.folders.count)
+        foldersSection
+    }
+
+    @ViewBuilder private var memoriesSection: some View {
+        if store.memories.isEmpty {
+            emptyText(T("home.noMemories"))
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 168), spacing: 12)], spacing: 12) {
+                ForEach(store.memories) { memoryCard($0) }
+            }
+        }
+    }
+
+    @ViewBuilder private var foldersSection: some View {
+        if store.folders.isEmpty {
+            emptyText(T("home.noFolders"))
+        } else if hSize == .regular {
+            // On iPad/Mac, lay folders out in columns instead of full-width rows.
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
+                ForEach(store.folders) { folderRow($0) }
+            }
+        } else {
+            ForEach(store.folders) { folderRow($0) }
+        }
     }
 
     @ViewBuilder private func cardMenu(_ entry: HomeStore.Entry) -> some View {
