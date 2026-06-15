@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { session, setUnlocked } from '../session'
-import { logout } from '../../features/account/login/login'
+import { session } from '../session'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import type { SearchHit } from '../../features/search/search'
 import MemoryDetailView from './MemoryDetailView.vue'
 import SearchOverlay from './SearchOverlay.vue'
+import SettingsOverlay from './SettingsOverlay.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -17,6 +17,7 @@ const covers = ref<Record<string, string | null>>({})
 const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
 const searchOpen = ref(false)
+const settingsOpen = ref(false)
 
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -87,11 +88,6 @@ function spaceSub(s: SpaceEntry): string {
   return s.kind === 'PERSONAL' ? 'Persönlich' : (s.role ?? 'Gruppe')
 }
 
-async function signOut() {
-  try { await logout(apiBase, session.unlocked!.sessionToken) } catch { /* already gone */ }
-  setUnlocked(null)
-}
-
 const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
 const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
 </script>
@@ -116,11 +112,13 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       </template>
 
       <div class="home-spacer" />
-      <button class="space-row" @click="signOut">
+      <button class="space-row" @click="settingsOpen = true">
         <span class="space-avatar">{{ (session.unlocked?.user.displayName || '?').charAt(0).toUpperCase() }}</span>
-        <span class="space-meta"><div class="space-name">{{ session.unlocked?.user.displayName }}</div><div class="space-sub">Abmelden</div></span>
+        <span class="space-meta"><div class="space-name">{{ session.unlocked?.user.displayName }}</div><div class="space-sub">Einstellungen</div></span>
       </button>
     </aside>
+
+    <SettingsOverlay v-if="settingsOpen" @close="settingsOpen = false" />
 
     <header class="home-topbar">
       <nav class="crumbs">

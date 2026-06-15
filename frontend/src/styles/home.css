@@ -198,3 +198,31 @@
 .search-hit-name { font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-hit-type { font-size: 0.78rem; color: var(--app-accent); font-weight: 600; }
 .search-empty { color: var(--app-muted); padding: 0.8rem 0.6rem; font-size: 0.9rem; }
+
+.settings-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: grid; place-items: center; z-index: 70; }
+.settings-panel {
+  width: min(440px, 92vw);
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-md);
+  padding: 1.2rem;
+}
+.settings-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.settings-title { font-size: 1.2rem; font-weight: 700; margin: 0; }
+.settings-section { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--app-muted); margin: 1rem 0 0.4rem; }
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+}
+.settings-account { display: flex; flex-direction: column; }
+.settings-account small { color: var(--app-muted); }
+.seg { display: inline-flex; border: 1px solid var(--app-line); border-radius: 999px; overflow: hidden; }
+.seg button { border: none; background: transparent; color: var(--app-muted); padding: 0.35rem 0.8rem; cursor: pointer; font: inherit; }
+.seg button.active { background: var(--app-accent); color: var(--app-on-strong); }
+.settings-signout { width: 100%; margin-top: 1.2rem; color: var(--app-danger); border-color: var(--app-danger-line); }
