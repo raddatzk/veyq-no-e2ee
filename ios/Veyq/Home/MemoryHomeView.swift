@@ -14,6 +14,7 @@ struct MemoryHomeView: View {
     @State private var renameEntry: HomeStore.Entry?
     @State private var renameName = ""
     @State private var moveEntry: HomeStore.Entry?
+    @State private var showJoinGroup = false
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -63,6 +64,8 @@ struct MemoryHomeView: View {
                         ForEach(store.spaces, id: \.scopeId) { space in
                             Button(space.displayName) { Task { await store.switchSpace(space) } }
                         }
+                        Divider()
+                        Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
                     } label: { Image(systemName: "square.grid.2x2") }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -82,6 +85,7 @@ struct MemoryHomeView: View {
         .tint(VeyqStyle.accent)
         .task { await store.start() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
+        .sheet(isPresented: $showJoinGroup) { JoinGroupView(store: store) }
         .alert(createType == "FOLDER" ? T("home.createFolder") : T("home.createMemory"), isPresented: $showCreate) {
             TextField(T("common.name"), text: $newName)
             Button(T("common.create")) { let n = newName; Task { await store.create(type: createType, name: n) } }

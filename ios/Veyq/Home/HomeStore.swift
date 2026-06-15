@@ -51,6 +51,24 @@ final class HomeStore: ObservableObject {
         }
     }
 
+    /// Look up an invite's tenant + role for a confirmation preview (no secret needed — public metadata).
+    func inviteInfo(_ inviteId: String) async -> (name: String, role: String)? {
+        guard let meta = try? await RegisterViaInvitation.getInviteMetadata(apiBase: apiBase, inviteId: inviteId) else { return nil }
+        return (meta.tenant.displayName, meta.role)
+    }
+
+    /// Accept an invite onto this (logged-in) account, then refresh the space list so the group appears.
+    func joinGroup(_ parts: InviteLink.Parts) async -> Bool {
+        do {
+            _ = try await InviteMembers.acceptMemberInvite(apiBase: apiBase, session: session, inviteId: parts.inviteId, bootstrapSecret: parts.bootstrapSecret, tempPrivateKeyB64: parts.tempPrivateKey)
+            if let refreshed = try? await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session) { spaces = refreshed }
+            return true
+        } catch {
+            self.error = T("accept.failed")
+            return false
+        }
+    }
+
     func switchSpace(_ entry: SwitchActiveSpace.SpaceEntry) async {
         do {
             let opened = try await SwitchActiveSpace.openSpace(apiBase: apiBase, session: session, entry: entry)
