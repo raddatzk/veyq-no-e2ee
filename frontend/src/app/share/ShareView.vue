@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import type { GalleryTile } from '../../features/gallery/gallery'
-import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, uploadShareMedia, type ShareContext } from '../../features/memory/share/share'
+import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext } from '../../features/memory/share/share'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { listMySpaces } from '../../features/spaces/switchActiveSpace/switchActiveSpace'
@@ -23,6 +23,9 @@ const galleryEl = ref<HTMLElement | null>(null)
 const lightbox = ref<string | null>(null)
 const journal = ref('')
 const uploading = ref(false)
+const needPassword = ref(false)
+const passwordInput = ref('')
+const passwordWrong = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isContributor = computed(() => ctx.value?.role === 'CONTRIBUTOR')
 const canRead = computed(() => ctx.value?.role !== 'UPLOADER')
@@ -56,20 +59,42 @@ onMounted(async () => {
         }
       }
     }
-    const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey)
+  } catch {
+    error.value = t('share.notFound')
+    loading.value = false
+    return
+  }
+  await load()
+})
+
+async function load(password?: string) {
+  loading.value = true
+  try {
+    const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey, password)
     ctx.value = c
     title.value = c.rootName
+    needPassword.value = false
     // An UPLOADER is a blind drop-off — it cannot read the gallery or journal (those endpoints 403).
     if (c.role !== 'UPLOADER') {
       tiles.value = await loadShareTiles(c, c.rootNodeId)
       journal.value = await getShareJournal(c).catch(() => '')
+      await nextTick()
+      if (galleryEl.value && ro) ro.observe(galleryEl.value) // the gallery only renders after ctx loads
     }
-  } catch {
-    error.value = t('share.notFound')
+  } catch (e) {
+    if (e instanceof SharePasswordRequired) {
+      needPassword.value = true
+      passwordWrong.value = e.wrong
+    } else {
+      error.value = t('share.notFound')
+    }
   } finally {
     loading.value = false
   }
-})
+}
+function submitPassword() {
+  load(passwordInput.value)
+}
 
 async function onFilesPicked(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
@@ -121,7 +146,17 @@ function closeLightbox() {
     <main class="share-content">
       <div v-if="error" class="home-empty">{{ error }}</div>
 
-      <div v-if="!canRead && !error" class="share-dropbox">
+      <div v-if="needPassword" class="share-dropbox">
+        <div class="share-drop-icon">🔒</div>
+        <p class="share-drop-title">{{ t('share.passwordTitle') }}</p>
+        <div v-if="passwordWrong" class="auth-msg auth-msg-error">{{ t('share.passwordWrong') }}</div>
+        <form class="veyq-form" @submit.prevent="submitPassword">
+          <input v-model="passwordInput" type="password" autocomplete="off" autofocus />
+          <button class="btn btn-primary" type="submit" :disabled="loading">{{ t('share.passwordSubmit') }}</button>
+        </form>
+      </div>
+
+      <div v-if="ctx && !canRead && !error" class="share-dropbox">
         <div class="share-drop-icon">⬆</div>
         <p class="share-drop-title">{{ t('share.uploadOnlyTitle') }}</p>
         <p class="home-empty">{{ t('share.uploadOnlyHint') }}</p>
@@ -130,7 +165,9 @@ function closeLightbox() {
         </button>
       </div>
 
-      <template v-if="canRead">
+      <div v-if="loading && !ctx && !needPassword" class="home-empty">{{ t('detail.loadingGallery') }}</div>
+
+      <template v-if="ctx && canRead">
       <div ref="galleryEl" class="gallery-buckets">
         <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
           <h2 class="bucket-date">{{ b.label }}</h2>

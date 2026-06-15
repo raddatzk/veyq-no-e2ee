@@ -26,23 +26,37 @@ function fromB64url(s: string): Uint8Array {
   return out
 }
 
-export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; createdAt: string }
+export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; passwordProtected: boolean; expiresAt?: string; label: string; createdAt: string }
+export type CreateShareOptions = { role?: ShareRole; password?: string; expiresAt?: string; label?: string; origin?: string }
+
+/** Thrown by resolvePublicShare when the share needs a password the caller didn't supply (or got wrong). */
+export class SharePasswordRequired extends Error {
+  constructor(public wrong: boolean) { super(wrong ? 'wrong share password' : 'share password required') }
+}
 
 // ---- owner side (authenticated) -------------------------------------------------------------------------
 
 /** Create a share for a memory and return the public link (the share key lives in the fragment). */
-export async function createShare(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, role: ShareRole = 'VIEWER', origin?: string): Promise<{ shareId: string; link: string }> {
+export async function createShare(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, opts: CreateShareOptions = {}): Promise<{ shareId: string; link: string }> {
   const shareKey = v1.randomBytes(32)
+  // A password folds into the unwrap key (Argon2id); only the salt goes to the server.
+  let passwordSalt: { suiteId: string; bytes: string } | undefined
+  let wrapKey = shareKey
+  if (opts.password) {
+    const salt = v1.randomBytes(16)
+    wrapKey = v1.shareWrapKey(shareKey, opts.password, salt)
+    passwordSalt = { suiteId: 'v1', bytes: b64url(salt) }
+  }
   const nonce = v1.randomBytes(12)
-  const wrapped = v1.concat(nonce, v1.aeadSeal(shareKey, nonce, active.contentKey, EMPTY))
+  const wrapped = v1.concat(nonce, v1.aeadSeal(wrapKey, nonce, active.contentKey, EMPTY))
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
-    body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role }),
+    body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role: opts.role ?? 'VIEWER', passwordSalt, expiresAt: opts.expiresAt, label: opts.label ?? '' }),
   })
   if (!res.ok) throw new Error(`create share failed: ${res.status} ${await res.text()}`)
   const { shareId } = await res.json()
-  const base = origin ?? (typeof window !== 'undefined' ? window.location.origin : '')
+  const base = opts.origin ?? (typeof window !== 'undefined' ? window.location.origin : '')
   return { shareId, link: `${base}/s/${shareId}#k=${b64url(shareKey)}` }
 }
 
@@ -66,14 +80,26 @@ export async function revokeShare(apiBase: string, session: UnlockedSession, act
 
 export type ShareContext = { apiBase: string; shareId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole }
 
-/** Resolve a public share: unwrap the content key with the fragment share key and decode the root title. */
-export async function resolvePublicShare(apiBase: string, shareId: string, shareKeyB64: string): Promise<ShareContext> {
+/** Resolve a public share: unwrap the content key with the fragment share key (+ password if protected). */
+export async function resolvePublicShare(apiBase: string, shareId: string, shareKeyB64: string, password?: string): Promise<ShareContext> {
   const res = await fetch(`${apiBase}/api/public/shares/${shareId}`)
   if (!res.ok) throw new Error(`resolve share failed: ${res.status} ${await res.text()}`)
   const body = await res.json()
-  const shareKey = fromB64url(shareKeyB64)
+  const fragKey = fromB64url(shareKeyB64)
+  // Password-protected: fold Argon2id(password, salt) into the unwrap key. No password → prompt for one.
+  let wrapKey = fragKey
+  if (body.passwordProtected) {
+    if (!password) throw new SharePasswordRequired(false)
+    wrapKey = v1.shareWrapKey(fragKey, password, fromB64url(body.passwordSalt.bytes))
+  }
   const wrapped = fromB64url(body.wrappedContentKey.bytes)
-  const contentKey = v1.aeadOpen(shareKey, wrapped.slice(0, 12), wrapped.slice(12), EMPTY)
+  let contentKey: Uint8Array
+  try {
+    contentKey = v1.aeadOpen(wrapKey, wrapped.slice(0, 12), wrapped.slice(12), EMPTY)
+  } catch {
+    if (body.passwordProtected) throw new SharePasswordRequired(true) // AEAD failure = wrong password
+    throw new Error('could not open share')
+  }
   const rootName = decodeNode(contentKey, body.root as MemoryNode).name
   return { apiBase, shareId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role }
 }

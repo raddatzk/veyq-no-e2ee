@@ -10,10 +10,19 @@ const emit = defineEmits<{ close: [] }>()
 
 const shares = ref<ShareSummary[]>([])
 const role = ref<ShareRole>('VIEWER')
+const password = ref('')
+const expiry = ref<'never' | '1d' | '7d' | '30d'>('never')
+const label = ref('')
 const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
 const error = ref('')
+
+const EXPIRY_DAYS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 }
+function expiresAtIso(): string | undefined {
+  const days = EXPIRY_DAYS[expiry.value]
+  return days ? new Date(Date.now() + days * 86400_000).toISOString() : undefined
+}
 
 onMounted(async () => {
   try {
@@ -27,7 +36,12 @@ async function create() {
   busy.value = true
   error.value = ''
   try {
-    const res = await createShare(session.apiBase, session.unlocked!, props.active, props.memory.id, role.value)
+    const res = await createShare(session.apiBase, session.unlocked!, props.active, props.memory.id, {
+      role: role.value,
+      password: password.value.trim() || undefined,
+      expiresAt: expiresAtIso(),
+      label: label.value.trim() || undefined,
+    })
     link.value = res.link
     shares.value = await listShares(session.apiBase, session.unlocked!, props.active, props.memory.id)
   } catch (e) {
@@ -58,14 +72,27 @@ async function revoke(shareId: string) {
       </div>
 
       <p class="invite-hint">{{ t('share.hint') }}</p>
-      <label v-if="!link" class="invite-role">
-        {{ t('invite.role') }}
-        <div class="seg">
-          <button type="button" :class="{ active: role === 'VIEWER' }" @click="role = 'VIEWER'">{{ t('share.roleViewer') }}</button>
-          <button type="button" :class="{ active: role === 'CONTRIBUTOR' }" @click="role = 'CONTRIBUTOR'">{{ t('share.roleContributor') }}</button>
-          <button type="button" :class="{ active: role === 'UPLOADER' }" @click="role = 'UPLOADER'">{{ t('share.roleUploader') }}</button>
-        </div>
-      </label>
+      <template v-if="!link">
+        <label class="invite-role">
+          {{ t('invite.role') }}
+          <div class="seg">
+            <button type="button" :class="{ active: role === 'VIEWER' }" @click="role = 'VIEWER'">{{ t('share.roleViewer') }}</button>
+            <button type="button" :class="{ active: role === 'CONTRIBUTOR' }" @click="role = 'CONTRIBUTOR'">{{ t('share.roleContributor') }}</button>
+            <button type="button" :class="{ active: role === 'UPLOADER' }" @click="role = 'UPLOADER'">{{ t('share.roleUploader') }}</button>
+          </div>
+        </label>
+        <label class="invite-role">
+          {{ t('share.expiry') }}
+          <div class="seg">
+            <button type="button" :class="{ active: expiry === 'never' }" @click="expiry = 'never'">{{ t('share.expNever') }}</button>
+            <button type="button" :class="{ active: expiry === '1d' }" @click="expiry = '1d'">{{ t('share.exp1d') }}</button>
+            <button type="button" :class="{ active: expiry === '7d' }" @click="expiry = '7d'">{{ t('share.exp7d') }}</button>
+            <button type="button" :class="{ active: expiry === '30d' }" @click="expiry = '30d'">{{ t('share.exp30d') }}</button>
+          </div>
+        </label>
+        <input class="share-field" v-model="label" type="text" :placeholder="t('share.labelPlaceholder')" />
+        <input class="share-field" v-model="password" type="password" autocomplete="new-password" :placeholder="t('share.passwordPlaceholder')" />
+      </template>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
 
       <template v-if="link">
@@ -80,7 +107,7 @@ async function revoke(shareId: string) {
         <div class="settings-section">{{ t('share.existing') }}</div>
         <ul class="track-list">
           <li v-for="s in shares" :key="s.shareId" class="track-row">
-            <span class="track-name">🔗 {{ s.shareId.slice(0, 10) }}…</span>
+            <span class="track-name">{{ s.passwordProtected ? '🔒' : '🔗' }} {{ s.label || s.shareId.slice(0, 8) + '…' }}<small v-if="s.expiresAt" class="share-exp"> · {{ t('share.until') }} {{ new Date(s.expiresAt).toLocaleDateString() }}</small></span>
             <button class="btn btn-ghost track-del" type="button" @click="revoke(s.shareId)">{{ t('share.revoke') }}</button>
           </li>
         </ul>

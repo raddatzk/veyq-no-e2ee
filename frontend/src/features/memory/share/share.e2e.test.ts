@@ -12,7 +12,7 @@ import { createNode } from '../createTree/memoryTree'
 import { uploadMedia } from '../../uploads/media/media'
 import { updateJournal } from '../journal/journal'
 import { listMySpaces } from '../../spaces/switchActiveSpace/switchActiveSpace'
-import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, uploadShareMedia } from './share'
+import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, SharePasswordRequired, uploadShareMedia } from './share'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_SEED === '1' ? describe : describe.skip
@@ -31,7 +31,7 @@ run('share e2e', () => {
     await uploadMedia(apiBase, session, scope.scopeId, ck, memory.id, { bytes: photo, takenAt: '2026-04-01T09:00:00Z', mimeType: 'image/jpeg' })
 
     // (1) VIEWER — a guest decrypts the original entirely client-side, no auth anywhere
-    const vShare = await createShare(apiBase, session, active, memory.id, 'VIEWER')
+    const vShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER' })
     const vKey = new URLSearchParams(vShare.link.slice(vShare.link.indexOf('#') + 1)).get('k')!
     expect(vShare.link).toContain(`/s/${vShare.shareId}#k=`)
     const vCtx = await resolvePublicShare(apiBase, vShare.shareId, vKey)
@@ -45,7 +45,7 @@ run('share e2e', () => {
     expect((await listMySpaces(apiBase, session)).some((s) => s.scopeId === meta.scopeId)).toBe(true)
 
     // (2) CONTRIBUTOR — a guest adds a photo + writes the journal, sealed under the fragment content key
-    const cShare = await createShare(apiBase, session, active, memory.id, 'CONTRIBUTOR')
+    const cShare = await createShare(apiBase, session, active, memory.id, { role: 'CONTRIBUTOR' })
     const cKey = new URLSearchParams(cShare.link.slice(cShare.link.indexOf('#') + 1)).get('k')!
     const cCtx = await resolvePublicShare(apiBase, cShare.shareId, cKey)
     expect(cCtx.role).toBe('CONTRIBUTOR')
@@ -58,11 +58,24 @@ run('share e2e', () => {
     expect(await getShareJournal(cCtx)).toContain('Danke fürs Mitmachen')
 
     // (3) UPLOADER — a blind drop-off: can add media, but reads are denied
-    const uShare = await createShare(apiBase, session, active, memory.id, 'UPLOADER')
+    const uShare = await createShare(apiBase, session, active, memory.id, { role: 'UPLOADER' })
     const uKey = new URLSearchParams(uShare.link.slice(uShare.link.indexOf('#') + 1)).get('k')!
     const uCtx = await resolvePublicShare(apiBase, uShare.shareId, uKey)
     expect(uCtx.role).toBe('UPLOADER')
     await uploadShareMedia(uCtx, { bytes: Uint8Array.from({ length: 50 }, (_, i) => i & 0xff), takenAt: '2026-06-01T10:00:00Z', mimeType: 'image/jpeg' })
     await expect(listShareMedia(uCtx, uCtx.rootNodeId)).rejects.toThrow() // no read rights
+
+    // (4) PASSWORD — the link alone can't decrypt; the right password unwraps, the wrong one fails
+    const pShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', password: 'hunter2', label: 'For grandma' })
+    const pKey = new URLSearchParams(pShare.link.slice(pShare.link.indexOf('#') + 1)).get('k')!
+    await expect(resolvePublicShare(apiBase, pShare.shareId, pKey)).rejects.toBeInstanceOf(SharePasswordRequired)
+    await expect(resolvePublicShare(apiBase, pShare.shareId, pKey, 'wrong')).rejects.toMatchObject({ wrong: true })
+    const pCtx = await resolvePublicShare(apiBase, pShare.shareId, pKey, 'hunter2')
+    expect(pCtx.rootName).toBe('Italien 2026')
+
+    // (5) EXPIRY — an already-expired link is denied
+    const eShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', expiresAt: new Date(Date.now() - 1000).toISOString() })
+    const eKey = new URLSearchParams(eShare.link.slice(eShare.link.indexOf('#') + 1)).get('k')!
+    await expect(resolvePublicShare(apiBase, eShare.shareId, eKey)).rejects.toThrow()
   }, 120000)
 })

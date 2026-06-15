@@ -93,6 +93,8 @@
 .invite-link-row { display: flex; gap: 0.5rem; }
 .invite-link { flex: 1; min-width: 0; padding: 0.5rem 0.6rem; font: inherit; font-size: 0.82rem; color: var(--app-text); background: var(--app-control-bg); border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); }
 .invite-gen { width: 100%; margin-top: 0.6rem; }
+.share-field { width: 100%; margin-top: 0.6rem; padding: 0.55rem 0.7rem; font: inherit; color: var(--app-text); background: var(--app-control-bg); border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); }
+.share-exp { color: var(--app-muted); font-weight: 400; }
 
 .home-spacer { flex: 1; }
 
