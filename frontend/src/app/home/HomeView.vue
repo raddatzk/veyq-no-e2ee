@@ -4,9 +4,11 @@ import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import type { SearchHit } from '../../features/search/search'
+import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import MemoryDetailView from './MemoryDetailView.vue'
 import SearchOverlay from './SearchOverlay.vue'
 import SettingsOverlay from './SettingsOverlay.vue'
+import CreateModal from './CreateModal.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -19,6 +21,13 @@ const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
 const searchOpen = ref(false)
 const settingsOpen = ref(false)
+const createType = ref<NodeType | null>(null)
+
+const currentParentId = () => (crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined)
+async function onCreated() {
+  createType.value = null
+  await openLevel()
+}
 
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -139,23 +148,33 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <div v-if="error" class="home-empty">{{ error }}</div>
 
         <div class="content-head"><span class="content-title">{{ t('home.memories') }}</span><span class="content-count">{{ memories.length }}</span></div>
-        <div v-if="memories.length" class="card-grid">
+        <div class="card-grid">
           <button v-for="m in memories" :key="m.node.id" class="memory-card" @click="selectedMemory = m">
             <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
-            <div v-else class="memory-cover placeholder">{{ covers[m.node.id] === null ? 'Kein Cover' : '…' }}</div>
+            <div v-else class="memory-cover placeholder">…</div>
             <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
           </button>
+          <button class="create-card" @click="createType = 'MEMORY'"><span class="create-plus">＋</span>{{ t('home.createMemory') }}</button>
         </div>
-        <div v-else class="home-empty">{{ t('home.noMemories') }}</div>
 
         <div class="content-head"><span class="content-title">{{ t('home.folders') }}</span><span class="content-count">{{ folders.length }}</span></div>
-        <div v-if="folders.length" class="card-grid">
+        <div class="card-grid">
           <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
             <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
           </button>
+          <button class="create-card create-card-row" @click="createType = 'FOLDER'"><span class="create-plus">＋</span>{{ t('home.createFolder') }}</button>
         </div>
-        <div v-else class="home-empty">{{ t('home.noFolders') }}</div>
       </template>
     </main>
+
+    <CreateModal
+      v-if="createType && active"
+      :active="active"
+      :type="createType"
+      :parent-id="currentParentId()"
+      :order-index="folders.length + memories.length"
+      @close="createType = null"
+      @created="onCreated"
+    />
   </div>
 </template>
