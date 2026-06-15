@@ -62,6 +62,10 @@ object RegisterViaInvitation {
         val kek = V1.kekPasswordSecret(secretKey, password, salt, argon)
         val masterWrap = V1.symWrap(kek, masterKey, "master-key", V1.randomBytes(12))
 
+        // RECOVERY wrap: master key under the Secret Key ALONE — released only via the email-token-gated reset.
+        val recSalt = V1.randomBytes(16)
+        val recWrap = V1.symWrap(V1.kekRecovery(secretKey, recSalt, argon), masterKey, "master-key", V1.randomBytes(12))
+
         val authSalt = V1.randomBytes(16)
         val verifier = V1.kekRecovery(
             Normalizer.normalize(password, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), authSalt, argon,
@@ -81,7 +85,8 @@ object RegisterViaInvitation {
         val json = """{"bootstrapSecret":"$bootstrapSecret","email":"$email","displayName":"$displayName",""" +
             """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
-            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"}],""" +
+            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +
+            """{"unlockMethod":"RECOVERY","suiteId":"v1","wrappedKey":"${b64url(recWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, recSalt))}"}],""" +
             """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
             """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
             """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +

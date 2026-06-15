@@ -35,9 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import app.veyq.crypto.EmergencyKit
 import app.veyq.crypto.Instance
 import app.veyq.crypto.Login
+import app.veyq.crypto.ResetPassword
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Dispatchers
@@ -171,9 +173,15 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
     var remember0 by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var forgot by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val activity = ctx as? androidx.fragment.app.FragmentActivity
+
+    if (forgot) {
+        ResetPasswordScreen(apiBase, email, onBack = { forgot = false }, onLoggedIn = onLoggedIn)
+        return
+    }
 
     fun applyKit(text: String?) {
         val kit = text?.let { EmergencyKit.parse(it) }
@@ -232,7 +240,63 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
         GhostButton("📷 ${L10n.t("kit.scan")}") {
             scanKit.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt(L10n.t("kit.scan")))
         }
-        Text(L10n.t("login.otherInstance"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
+        Text(L10n.t("reset.forgot"), fontSize = 13.sp, color = Veyq.Accent, modifier = Modifier.fillMaxWidth().clickable { forgot = true; error = "" })
+        Text(L10n.t("login.otherInstance"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth().clickable { onChangeInstance() })
+        if (error.isNotEmpty()) MessageBox(error)
+    }
+}
+
+/**
+ * Forgot-password recovery: request a reset email, then paste the link from it and enter the Secret Key +
+ * a new password. Recovery needs the Secret Key (crypto factor) AND email access (the link is the email
+ * factor). On success the user is signed in with the new password.
+ */
+@Composable
+fun ResetPasswordScreen(apiBase: String, prefillEmail: String, onBack: () -> Unit, onLoggedIn: (Login.UnlockedSession) -> Unit) {
+    var email by remember { mutableStateOf(prefillEmail) }
+    var sent by remember { mutableStateOf(false) }
+    var link by remember { mutableStateOf("") }
+    var secretKey by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+
+    AuthCard(L10n.t("reset.title"), apiBase) {
+        Text(L10n.t("reset.requestHint"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
+        VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
+        if (sent) Text(L10n.t("reset.sent"), fontSize = 13.sp, color = Veyq.Accent, modifier = Modifier.fillMaxWidth())
+        PrimaryButton(if (sent) L10n.t("reset.sendAgain") else L10n.t("reset.sendLink"), busy) {
+            busy = true; error = ""
+            scope.launch {
+                try { withContext(Dispatchers.IO) { ResetPassword.requestReset(apiBase, email) }; sent = true }
+                catch (e: Exception) { error = L10n.t("reset.requestFailed") }
+                finally { busy = false }
+            }
+        }
+        androidx.compose.material3.HorizontalDivider(color = Veyq.Line, modifier = Modifier.padding(vertical = 4.dp))
+        Text(L10n.t("reset.confirmHint"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
+        VeyqField(L10n.t("reset.pasteLink"), link, { link = it })
+        VeyqField(L10n.t("common.secretKey"), secretKey, { secretKey = it }, secure = true, hint = L10n.t("login.secretHint"))
+        VeyqField(L10n.t("reset.newPassword"), newPassword, { newPassword = it }, secure = true)
+        PrimaryButton(L10n.t("reset.setPassword"), busy) {
+            val token = ResetPassword.parseToken(link)
+            if (token == null || secretKey.isBlank() || newPassword.isBlank()) { error = L10n.t("reset.failed"); return@PrimaryButton }
+            busy = true; error = ""
+            scope.launch {
+                try {
+                    val addr = withContext(Dispatchers.IO) { ResetPassword.confirmReset(apiBase, token, secretKey, newPassword) }
+                    val session = withContext(Dispatchers.IO) { Login.login(apiBase, addr, newPassword, secretKey) }
+                    onLoggedIn(session)
+                } catch (e: Exception) {
+                    error = L10n.t("reset.failed")
+                } finally {
+                    busy = false
+                }
+            }
+        }
+        GhostButton(L10n.t("reset.backToLogin")) { onBack() }
         if (error.isNotEmpty()) MessageBox(error)
     }
 }
