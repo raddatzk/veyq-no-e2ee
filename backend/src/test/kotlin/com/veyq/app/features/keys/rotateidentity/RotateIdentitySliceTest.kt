@@ -47,7 +47,7 @@ class RotateIdentitySliceTest {
                     kemPublicKey = "oldkem".toByteArray(); signPublicKey = "oldsign".toByteArray()
                     wrappedPrivateKey = "oldpriv".toByteArray(); wrappedPrivateSuiteId = "v1"; createdAt = now
                 })
-                tenants.persist(Tenant().apply { id = "ri-tenant"; name = "ri-acme"; displayName = "RiAcme"; status = "ACTIVE"; createdBy = "ri-user"; createdAt = now })
+                tenants.persist(Tenant().apply { id = "ri-tenant"; name = "ri-acme"; domain = "ri-acme.test"; displayName = "RiAcme"; status = "ACTIVE"; createdBy = "ri-user"; createdAt = now })
                 scopes.persist(Scope().apply { id = "ri-personal"; ownerUserId = "ri-user"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "ppub".toByteArray(); createdAt = now })
                 scopes.persist(Scope().apply { id = "ri-tscope"; tenantId = "ri-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "tpub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-pg"; scopeId = "ri-personal"; userId = "ri-user"; suiteId = "v1"; wrappedPrivateKey = "pg".toByteArray(); createdAt = now })

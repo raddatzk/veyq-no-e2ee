@@ -19,7 +19,7 @@ class Tenant {
     @Id var id: String = ""
     @Column(nullable = false, unique = true) var name: String = ""
     @Column(name = "display_name", nullable = false) var displayName: String = ""
-    @Column var domain: String? = null
+    @Column(nullable = false, unique = true) var domain: String = ""
     @Column(nullable = false) var status: String = TenantStatus.PENDING.name
     @Column(name = "terms_markdown", columnDefinition = "text") var termsMarkdown: String? = null
     @Column(name = "terms_version", nullable = false) var termsVersion: Int = 0
@@ -62,6 +62,7 @@ class Membership {
 @ApplicationScoped
 class TenantRepository : PanacheRepositoryBase<Tenant, String> {
     fun findByName(name: String): Tenant? = find("name", name).firstResult()
+    fun findByDomain(domain: String): Tenant? = find("domain", domain).firstResult()
 
     /** Tenants whose scheduled deletion deadline has passed — the GC hard-purges these. */
     fun listDue(now: Instant): List<Tenant> =

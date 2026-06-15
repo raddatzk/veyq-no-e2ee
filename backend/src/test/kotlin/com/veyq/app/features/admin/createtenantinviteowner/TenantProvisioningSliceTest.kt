@@ -45,9 +45,9 @@ class TenantProvisioningSliceTest {
 
     @Test
     fun provisionInviteAndClaim() {
-        // 1. only a Server Owner can create a tenant shell
+        // 1. only a Server Owner can create a tenant shell (valid body so it reaches the auth check)
         given().header("Authorization", memberToken).contentType(ContentType.JSON)
-            .body("""{"name":"acme","displayName":"Acme"}""")
+            .body("""{"name":"acme","displayName":"Acme","domain":"acme.example"}""")
             .post("/api/tenants").then().statusCode(403)
 
         val tenantId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
@@ -56,6 +56,11 @@ class TenantProvisioningSliceTest {
             .body("status", `is`("PENDING"))
             .body("name", `is`("acme"))
             .extract().path<String>("id")
+
+        // the domain is unique: a different tenant name but the same domain is rejected
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"name":"acme2","displayName":"Acme2","domain":"acme.example"}""")
+            .post("/api/tenants").then().statusCode(409).body("code", `is`("DOMAIN_TAKEN"))
 
         // 2. issue an owner invite (bootstrap secret shown once)
         val invite = given().header("Authorization", ownerToken)
@@ -101,9 +106,9 @@ class TenantProvisioningSliceTest {
             .post("/api/tenant-invites/${invite2.path<String>("inviteId")}/claim").then().statusCode(409)
             .body("code", `is`("TENANT_ALREADY_CLAIMED"))
 
-        // 8. a bogus session does not resolve
+        // 8. a bogus session does not resolve (valid body so it reaches the auth check)
         given().header("Authorization", "Bearer nope").contentType(ContentType.JSON)
-            .body("""{"name":"other","displayName":"Other"}""")
+            .body("""{"name":"other","displayName":"Other","domain":"other.example"}""")
             .post("/api/tenants").then().statusCode(401)
     }
 

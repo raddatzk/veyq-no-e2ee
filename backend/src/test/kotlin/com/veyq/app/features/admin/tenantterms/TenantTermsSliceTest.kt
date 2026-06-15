@@ -51,7 +51,7 @@ class TenantTermsSliceTest {
             if (users.findByEmail("tt-owner@example.com") != null) return@run
             users.persist(User().apply { id = "tt-owner"; email = "tt-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "tt-member"; email = "tt-member@example.com"; displayName = "M"; serverRole = ServerRole.ServerMember; createdAt = now })
-            tenants.persist(Tenant().apply { id = tenantId; name = "tt-acme"; displayName = "Acme"; status = "ACTIVE"; createdBy = "tt-owner"; createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "tt-acme"; domain = "tt-acme.test"; displayName = "Acme"; status = "ACTIVE"; createdBy = "tt-owner"; createdAt = now })
             memberships.persist(Membership().apply { id = "tt-m-o"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
             memberships.persist(Membership().apply { id = "tt-m-m"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
             scopes.persist(Scope().apply { id = scopeId; tenantId = this@TenantTermsSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })

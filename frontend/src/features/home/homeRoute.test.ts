@@ -4,8 +4,9 @@ import type { SpaceEntry } from '../spaces/switchActiveSpace/switchActiveSpace'
 
 const kp = { suiteId: 'v1', kemPublicKey: 'x' }
 const personal: SpaceEntry = { kind: 'PERSONAL', displayName: 'Me', scopeId: 'sp', scopePublicKey: kp }
-const tenant: SpaceEntry = { kind: 'TENANT', displayName: 'Acme', tenantId: 't', scopeId: 'st', scopePublicKey: kp }
-const group: SpaceEntry = { kind: 'GROUP', displayName: 'Reise Gruppe', tenantId: 't', scopeId: 'sg', scopePublicKey: kp }
+const tenant: SpaceEntry = { kind: 'TENANT', displayName: 'Acme', tenantId: 't', domain: 'acme.veyq.app', scopeId: 'st', scopePublicKey: kp }
+const tenant2: SpaceEntry = { kind: 'TENANT', displayName: 'Globex', tenantId: 't2', domain: 'globex.veyq.app', scopeId: 'st2', scopePublicKey: kp }
+const group: SpaceEntry = { kind: 'GROUP', displayName: 'Reise Gruppe', tenantId: 't', domain: 'acme.veyq.app', scopeId: 'sg', scopePublicKey: kp }
 
 describe('homeRoute', () => {
   it('builds tenant paths with no prefix', () => {
@@ -31,8 +32,17 @@ describe('homeRoute', () => {
     for (const entry of spaces) {
       const path = buildHomePath(entry, ['a', 'b'])
       const route = parseHomePath(path)!
-      expect(matchSpace(spaces, route)?.scopeId).toBe(entry.scopeId)
+      expect(matchSpace(spaces, route, 'acme.veyq.app')?.scopeId).toBe(entry.scopeId)
       expect(route.segments).toEqual(['a', 'b'])
     }
+  })
+
+  it('resolves the prefix-less tenant by host (multiple tenants)', () => {
+    const spaces = [personal, tenant, tenant2]
+    const route = parseHomePath('/urlaube')!
+    expect(matchSpace(spaces, route, 'globex.veyq.app')?.scopeId).toBe('st2')
+    expect(matchSpace(spaces, route, 'acme.veyq.app')?.scopeId).toBe('st')
+    // unknown host → falls back to the first tenant
+    expect(matchSpace(spaces, route, 'localhost:5173')?.scopeId).toBe('st')
   })
 })

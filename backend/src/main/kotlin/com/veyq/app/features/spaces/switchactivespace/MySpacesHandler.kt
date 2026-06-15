@@ -64,6 +64,7 @@ class MySpacesHandler(
                 tenantId = tenant.id,
                 name = tenant.name,
                 displayName = tenant.displayName,
+                domain = tenant.domain,
                 role = m.role,
                 scheduledDeletionAt = tenant.scheduledDeletionAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
                 scopeId = scope.id,
@@ -79,6 +80,8 @@ class MySpacesHandler(
             entries += SpaceEntry(
                 kind = SpaceEntry.Kind.GROUP,
                 tenantId = scope.tenantId,
+                // the group's tenant domain — so a cross-host tenant switch can navigate to the right host
+                domain = scope.tenantId?.let { tenants.findById(it)?.domain },
                 role = gm.role,
                 sealedName = Blob(suiteId = scope.nameSuiteId ?: scope.suiteId, bytes = enc.encodeToString(scope.sealedName ?: ByteArray(0))),
                 scopeId = scope.id,

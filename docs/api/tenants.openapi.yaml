@@ -529,11 +529,11 @@ components:
         termsMarkdown: { type: string, description: 'Markdown ToS; empty/omitted clears it.' }
     CreateTenantRequest:
       type: object
-      required: [name, displayName]
+      required: [name, displayName, domain]
       properties:
         name: { type: string, description: Unique slug-like tenant name. }
         displayName: { type: string }
-        domain: { type: string }
+        domain: { type: string, description: 'Required + unique: the host that resolves to this tenant (e.g. acme.veyq.app).' }
     TenantSummary:
       type: object
       required: [id, name, displayName, status]

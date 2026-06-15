@@ -54,7 +54,7 @@ class AcceptMemberInviteSliceTest {
                     wrappedPrivateKey = "priv".toByteArray(); wrappedPrivateSuiteId = "v1"; createdAt = now
                 })
                 tenants.persist(Tenant().apply {
-                    id = "acc-tenant"; name = "acc-acme"; displayName = "AccAcme"; status = "ACTIVE"
+                    id = "acc-tenant"; name = "acc-acme"; displayName = "AccAcme"; domain = "acc-acme.test"; status = "ACTIVE"
                     createdBy = "acc-user"; createdAt = now
                 })
                 scopes.persist(Scope().apply {

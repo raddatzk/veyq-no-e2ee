@@ -43,7 +43,7 @@ class RegisterViaInvitationSliceTest {
     fun registersNewOwnerAndActivatesTenant() {
         // a Server Owner provisions a tenant shell + owner invite
         val tenantId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"name":"reg-acme","displayName":"Acme"}""")
+            .body("""{"name":"reg-acme","displayName":"Acme","domain":"reg-acme.test"}""")
             .post("/api/tenants").then().statusCode(200)
             .extract().path<String>("id")
         val invite = given().header("Authorization", ownerToken)
@@ -92,7 +92,7 @@ class RegisterViaInvitationSliceTest {
     @Test
     fun rejectsDuplicateEmail() {
         val tenantId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"name":"reg-globex","displayName":"Globex"}""")
+            .body("""{"name":"reg-globex","displayName":"Globex","domain":"reg-globex.test"}""")
             .post("/api/tenants").then().statusCode(200).extract().path<String>("id")
         val invite = given().header("Authorization", ownerToken)
             .post("/api/tenants/$tenantId/owner-invite").then().statusCode(200).extract()

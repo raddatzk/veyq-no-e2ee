@@ -45,7 +45,7 @@ class ScopeContentSliceTest {
                 users.persist(User().apply { id = "ci-owner"; email = "ci-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
                 users.persist(User().apply { id = "ci-outsider"; email = "ci-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
                 users.persist(User().apply { id = "ci-ghost"; email = "ci-ghost@example.com"; displayName = "Ghost"; serverRole = ServerRole.ServerMember; createdAt = now })
-                tenants.persist(Tenant().apply { id = "ci-tenant"; name = "ci-acme"; displayName = "CiAcme"; status = "ACTIVE"; createdBy = "ci-owner"; createdAt = now })
+                tenants.persist(Tenant().apply { id = "ci-tenant"; name = "ci-acme"; domain = "ci-acme.test"; displayName = "CiAcme"; status = "ACTIVE"; createdBy = "ci-owner"; createdAt = now })
                 scopes.persist(Scope().apply { id = scopeId; tenantId = "ci-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "pub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ci-grant"; this.scopeId = this@ScopeContentSliceTest.scopeId; userId = "ci-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 memberships.persist(Membership().apply { id = "ci-m"; tenantId = "ci-tenant"; userId = "ci-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })

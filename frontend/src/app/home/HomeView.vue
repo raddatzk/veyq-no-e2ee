@@ -166,7 +166,7 @@ function syncUrl(push: boolean) {
 /** Re-derive the whole view from the URL path (initial load + browser back/forward). No history push. */
 async function restoreFromUrl() {
   const route = parseHomePath(window.location.pathname)
-  const target = (route ? matchSpace(spaces.value, route) : undefined)
+  const target = (route ? matchSpace(spaces.value, route, window.location.host) : undefined)
     ?? spaces.value.find((s) => s.kind === 'PERSONAL') ?? spaces.value[0]
   if (!target) return
   if (active.value?.entry.scopeId !== target.scopeId) active.value = await enterSpace(apiBase, session.unlocked!, target)
@@ -194,6 +194,13 @@ async function onSearchSelect(hit: SearchHit) {
 }
 
 async function switchSpace(entry: SpaceEntry, push = true) {
+  // A tenant/group lives on its tenant's domain (the host resolves the tenant). Switching to one on a
+  // DIFFERENT host is a cross-origin navigation to that domain. Skipped in local dev (fake .test domains).
+  const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  if (!isDev && entry.domain && entry.domain !== location.host) {
+    location.assign(`${location.protocol}//${entry.domain}${buildHomePath(entry, [])}`)
+    return
+  }
   error.value = ''
   try {
     active.value = await enterSpace(apiBase, session.unlocked!, entry)

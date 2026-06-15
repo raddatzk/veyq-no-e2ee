@@ -94,7 +94,7 @@ class DeleteSliceTest {
             derivatives.persist(MediaDerivative().apply { id = "derx"; mediaId = "medx"; kind = "THUMBNAIL"; blobId = "b" })
 
             // --- a group (tenant) with its own scope + a node, an Owner and a plain Member
-            tenants.persist(Tenant().apply { id = tenantId; name = "del-grp"; displayName = "G"; status = "ACTIVE"; termsVersion = 0; createdBy = "del-owner"; createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "del-grp"; domain = "del-grp.test"; displayName = "G"; status = "ACTIVE"; termsVersion = 0; createdBy = "del-owner"; createdAt = now })
             memberships.persist(Membership().apply { id = "mb-o"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
             memberships.persist(Membership().apply { id = "mb-m"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-out"; role = "Member"; status = "ACTIVE"; createdAt = now })
             scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@DeleteSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })

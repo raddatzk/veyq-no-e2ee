@@ -36,9 +36,14 @@ export function parseHomePath(pathname: string): HomeRoute | null {
   return { kind: 'TENANT', segments: raw }
 }
 
-/** Resolve a parsed route to the matching space in the roster (group by its name slug; tenant = the first). */
-export function matchSpace(spaces: SpaceEntry[], route: HomeRoute): SpaceEntry | undefined {
+/**
+ * Resolve a parsed route to the matching space in the roster. The prefix-less TENANT path is resolved by the
+ * current host (tenant = its domain), so the right tenant is picked even when the user belongs to several;
+ * falls back to the first tenant (single-tenant / no-domain dev). Group = by its name slug.
+ */
+export function matchSpace(spaces: SpaceEntry[], route: HomeRoute, host?: string): SpaceEntry | undefined {
   if (route.kind === 'PERSONAL') return spaces.find((s) => s.kind === 'PERSONAL')
   if (route.kind === 'GROUP') return spaces.find((s) => s.kind === 'GROUP' && slugify(s.displayName || '') === route.groupSlug)
-  return spaces.find((s) => s.kind === 'TENANT')
+  return spaces.find((s) => s.kind === 'TENANT' && host !== undefined && s.domain === host)
+    ?? spaces.find((s) => s.kind === 'TENANT')
 }

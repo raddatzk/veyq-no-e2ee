@@ -73,8 +73,12 @@ class TenantProvisioningHandler(
         if (tenants.findByName(req.name) != null) {
             throw ApiException(409, "TENANT_EXISTS", "A tenant with that name already exists")
         }
+        // A tenant is domain-scoped: the host resolves the tenant, so the domain is required + unique.
+        val domain = req.domain.trim().lowercase()
+        if (domain.isEmpty()) throw ApiException(400, "DOMAIN_REQUIRED", "A tenant domain is required")
+        if (tenants.findByDomain(domain) != null) throw ApiException(409, "DOMAIN_TAKEN", "That domain is already in use")
         val tenant = Tenant().apply {
-            id = newId(); name = req.name; displayName = req.displayName; domain = req.domain
+            id = newId(); name = req.name; displayName = req.displayName; this.domain = domain
             status = TenantStatus.PENDING.name; createdBy = owner.id; createdAt = Instant.now()
         }
         tenants.persist(tenant)

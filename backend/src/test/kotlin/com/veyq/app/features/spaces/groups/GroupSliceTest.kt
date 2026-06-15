@@ -60,7 +60,7 @@ class GroupSliceTest {
             users.persist(User().apply { id = "gsl-owner"; email = "gsl-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "gsl-out"; email = "gsl-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "gsl-member"; email = "gsl-member@example.com"; displayName = "M"; serverRole = ServerRole.ServerMember; createdAt = now })
-            tenants.persist(Tenant().apply { id = tenantId; name = "gsl-t"; displayName = "T"; status = "ACTIVE"; termsVersion = 0; createdBy = "gsl-owner"; createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "gsl-t"; domain = "gsl-t.test"; displayName = "T"; status = "ACTIVE"; termsVersion = 0; createdBy = "gsl-owner"; createdAt = now })
             memberships.persist(Membership().apply { id = "gsl-mb"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
             memberships.persist(Membership().apply { id = "gsl-mb2"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
             scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@GroupSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })

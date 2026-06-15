@@ -45,10 +45,10 @@ class MyGroupsSliceTest {
             // a user who is an active member but holds NO grant (removed-but-not-rotated) — must not see the group
             users.persist(User().apply { id = "grp-ghost"; email = "grp-ghost@example.com"; displayName = "Ghost"; serverRole = ServerRole.ServerMember; createdAt = now })
 
-            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; displayName = "Acme Group"; status = "ACTIVE"; createdBy = "grp-owner"; createdAt = now })
+            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; domain = "grp-acme.test"; displayName = "Acme Group"; status = "ACTIVE"; createdBy = "grp-owner"; createdAt = now })
             scopes.persist(Scope().apply { id = "grp-scope"; tenantId = "grp-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "grp-pub".toByteArray(); createdAt = now })
             // a second tenant the owner is NOT a member of — must not leak into the owner's roster
-            tenants.persist(Tenant().apply { id = "grp-other"; name = "grp-other"; displayName = "Other"; status = "ACTIVE"; createdBy = "grp-member"; createdAt = now })
+            tenants.persist(Tenant().apply { id = "grp-other"; name = "grp-other"; domain = "grp-other.test"; displayName = "Other"; status = "ACTIVE"; createdBy = "grp-member"; createdAt = now })
             scopes.persist(Scope().apply { id = "grp-other-scope"; tenantId = "grp-other"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "oth-pub".toByteArray(); createdAt = now })
 
             grants.persist(ScopeGrant().apply { id = "grp-g-owner"; scopeId = "grp-scope"; userId = "grp-owner"; suiteId = "v1"; wrappedPrivateKey = "o".toByteArray(); createdAt = now })

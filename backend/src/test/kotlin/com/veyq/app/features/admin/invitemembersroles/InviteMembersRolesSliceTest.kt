@@ -74,7 +74,7 @@ class InviteMembersRolesSliceTest {
 
             if (tenants.findById(tenantId) == null) {
                 tenants.persist(Tenant().apply {
-                    id = tenantId; name = "im-acme"; displayName = "Acme"; status = "ACTIVE"
+                    id = tenantId; name = "im-acme"; displayName = "Acme"; domain = "im-acme.test"; status = "ACTIVE"
                     createdBy = "im-owner"; createdAt = now
                 })
                 scopes.persist(Scope().apply {
@@ -98,7 +98,7 @@ class InviteMembersRolesSliceTest {
 
                 // dedicated rotation tenant: stable active members {im-owner Owner, im-member Member}
                 tenants.persist(Tenant().apply {
-                    id = rotTenantId; name = "im-rot-acme"; displayName = "RotAcme"; status = "ACTIVE"
+                    id = rotTenantId; name = "im-rot-acme"; displayName = "RotAcme"; domain = "im-rot-acme.test"; status = "ACTIVE"
                     createdBy = "im-owner"; createdAt = now
                 })
                 scopes.persist(Scope().apply {
@@ -131,7 +131,7 @@ class InviteMembersRolesSliceTest {
 
                 // dedicated role-change tenant: one Owner + one Member, no grants (role ≠ access)
                 tenants.persist(Tenant().apply {
-                    id = roleTenantId; name = "im-role-acme"; displayName = "RoleAcme"; status = "ACTIVE"
+                    id = roleTenantId; name = "im-role-acme"; displayName = "RoleAcme"; domain = "im-role-acme.test"; status = "ACTIVE"
                     createdBy = "im-owner"; createdAt = now
                 })
                 memberships.persist(Membership().apply {

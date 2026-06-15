@@ -41,13 +41,17 @@ function slugify(name: string): string {
   return name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'group'
 }
 
-/** Create a shared group the caller owns: a tenant + a self owner-claim (mints + self-grants the scope). */
-export async function createGroup(apiBase: string, session: UnlockedSession, displayName: string): Promise<TenantSummary> {
+/**
+ * Create a shared group the caller owns: a tenant + a self owner-claim (mints + self-grants the scope).
+ * A tenant is domain-scoped (the host resolves it), so a domain is required; tests may omit it (derived
+ * from the unique handle) but the UI always supplies one.
+ */
+export async function createGroup(apiBase: string, session: UnlockedSession, displayName: string, domain?: string): Promise<TenantSummary> {
   const base = slugify(displayName)
   for (let attempt = 0; attempt < 25; attempt++) {
     const handle = attempt === 0 ? base : `${base}-${attempt + 1}`
     try {
-      const tenant = await createTenant(apiBase, session.sessionToken, handle, displayName.trim())
+      const tenant = await createTenant(apiBase, session.sessionToken, handle, displayName.trim(), domain ?? `${handle}.test`)
       const invite = await issueOwnerInvite(apiBase, session.sessionToken, tenant.id)
       await claimTenantOwnership(apiBase, session.sessionToken, invite.inviteId, invite.bootstrapSecret, session.identityPublicKey.kemPublicKey)
       return tenant

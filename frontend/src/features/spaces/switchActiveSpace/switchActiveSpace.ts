@@ -8,6 +8,8 @@ export type SpaceEntry = {
   kind: 'PERSONAL' | 'TENANT' | 'GROUP'
   tenantId?: string
   name?: string
+  // TENANT/GROUP — the tenant's domain (the host that resolves to it); used for routing + cross-host switch.
+  domain?: string
   displayName: string
   role?: string
   // GROUP only — the group name sealed under its content key (the client decrypts it into displayName).

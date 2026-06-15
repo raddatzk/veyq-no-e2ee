@@ -73,6 +73,7 @@ components:
         kind: { type: string, enum: [PERSONAL, TENANT, GROUP] }
         tenantId: { type: string, description: 'TENANT/GROUP — the backing tenant.' }
         name: { type: string, description: 'TENANT — the tenant name (slug).' }
+        domain: { type: string, description: 'TENANT/GROUP — the tenant''s domain (the host that resolves to it). The client routes/switches by it.' }
         displayName: { type: string, description: 'PERSONAL: the user''s display name; TENANT: the tenant display name; GROUP: empty (use sealedName).' }
         role: { type: string, description: 'TENANT: tenant role; GROUP: group role; absent for PERSONAL.' }
         sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'GROUP only — the group name sealed under its content key.' }
