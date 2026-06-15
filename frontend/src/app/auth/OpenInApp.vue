@@ -4,9 +4,9 @@
 // and the Emergency Kit save flow). On iOS we additionally emit Apple's Smart App Banner meta tag.
 import { onMounted, ref } from 'vue'
 import { t } from '../../i18n/i18n'
-import { buildInviteDeepLink, type InviteParts } from '../../features/spaces/invite/inviteLink'
+import { buildInviteDeepLink, type ParsedInvite } from '../../features/spaces/invite/inviteLink'
 
-const props = defineProps<{ invite: InviteParts }>()
+const props = defineProps<{ invite: ParsedInvite }>()
 
 const ua = navigator.userAgent
 const isAndroid = /Android/i.test(ua)

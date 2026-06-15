@@ -4,14 +4,26 @@ import { session, setUnlocked } from '../session'
 import { t } from '../../i18n/i18n'
 import { getInviteMetadata, type InviteMetadata } from '../../features/account/registerViaInvitation/registerViaInvitation'
 import { acceptMemberInvite, registerViaMemberInvite } from '../../features/admin/inviteMembersRoles/inviteMembers'
+import { unprotectTempKey } from '../../features/spaces/invite/groups'
 import { login } from '../../features/account/login/login'
 import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
-import type { InviteParts } from '../../features/spaces/invite/inviteLink'
+import { isProtectedInvite, type ParsedInvite } from '../../features/spaces/invite/inviteLink'
 import LoginPanel from './LoginPanel.vue'
 import OpenInApp from './OpenInApp.vue'
 
-const props = defineProps<{ invite: InviteParts }>()
+const props = defineProps<{ invite: ParsedInvite }>()
 const emit = defineEmits<{ done: [tenantId: string]; dismiss: [] }>()
+
+// Passphrase-protected invites carry the temp key encrypted (`ek`/`ps`); the recipient supplies the
+// passphrase (shared out of band) to resolve it. Pragmatic invites carry it in the clear.
+const needsPassphrase = isProtectedInvite(props.invite)
+const passphrase = ref('')
+
+/** Resolve the temp private key for the accept/register calls; throws on a wrong passphrase. */
+function tempKey(): string {
+  if (!isProtectedInvite(props.invite)) return props.invite.tempPrivateKey
+  return unprotectTempKey(props.invite, passphrase.value)
+}
 
 const meta = ref<InviteMetadata | null>(null)
 const error = ref('')
@@ -39,10 +51,10 @@ async function join() {
   busy.value = true
   error.value = ''
   try {
-    await acceptMemberInvite(session.apiBase, session.unlocked, props.invite.inviteId, props.invite.bootstrapSecret, props.invite.tempPrivateKey)
+    await acceptMemberInvite(session.apiBase, session.unlocked, props.invite.inviteId, props.invite.bootstrapSecret, tempKey())
     emit('done', meta.value.tenant.id)
   } catch {
-    error.value = t('accept.failed')
+    error.value = needsPassphrase ? t('accept.wrongPassphrase') : t('accept.failed')
   } finally {
     busy.value = false
   }
@@ -53,10 +65,10 @@ async function register() {
   busy.value = true
   error.value = ''
   try {
-    const res = await registerViaMemberInvite(session.apiBase, props.invite.inviteId, props.invite.bootstrapSecret, props.invite.tempPrivateKey, email.value, displayName.value, password.value)
+    const res = await registerViaMemberInvite(session.apiBase, props.invite.inviteId, props.invite.bootstrapSecret, tempKey(), email.value, displayName.value, password.value)
     kit.value = res.emergencyKit.secretKey
   } catch {
-    error.value = t('accept.registerFailed')
+    error.value = needsPassphrase ? t('accept.wrongPassphrase') : t('accept.registerFailed')
   } finally {
     busy.value = false
   }
@@ -85,6 +97,12 @@ async function proceed() {
       <template v-if="meta">
         <p class="auth-sub">{{ t('accept.joinAs', { name: meta.tenant.displayName, role: roleLabel(meta.role) }) }}</p>
         <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
+
+        <!-- passphrase-protected invite: the temp key is encrypted; the recipient enters the out-of-band passphrase -->
+        <label v-if="needsPassphrase" class="veyq-form" style="display: block; margin-bottom: 0.4rem">
+          {{ t('accept.passphrase') }}
+          <input v-model="passphrase" type="password" autocomplete="off" :placeholder="t('accept.passphraseHint')" />
+        </label>
 
         <!-- already signed in -->
         <template v-if="session.unlocked">

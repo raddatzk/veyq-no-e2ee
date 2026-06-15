@@ -8,12 +8,12 @@ import { login } from '../../account/login/login'
 import { registerViaMemberInvite, acceptMemberInvite } from '../../admin/inviteMembersRoles/inviteMembers'
 import { openTenantScope, getOrCreateContentKey, writeItem, readItems } from '../../content/scopeContent'
 import { listMySpaces } from '../switchActiveSpace/switchActiveSpace'
-import { createGroup, inviteToGroup } from './groups'
-import { parseInviteHash } from './inviteLink'
+import { createGroup, inviteToGroup, emailInviteToGroup, unprotectTempKey } from './groups'
+import { parseInviteHash, isProtectedInvite, type InviteParts } from './inviteLink'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_SEED === '1' ? describe : describe.skip
-const frag = (link: string) => parseInviteHash(link.slice(link.indexOf('#')))!
+const frag = (link: string) => parseInviteHash(link.slice(link.indexOf('#'))) as InviteParts
 
 run('group invite e2e', () => {
   it('owner creates a group + link; an existing user joins via the link', async () => {
@@ -44,5 +44,24 @@ run('group invite e2e', () => {
     const bScope = await openTenantScope(apiBase, b, g2.id)
     const bCk = await getOrCreateContentKey(apiBase, b, bScope)
     expect(await readItems(apiBase, b, bScope, bCk)).toContain('hello from owner')
+
+    // passphrase-protected invite (operator-blind): owner mints a 3rd group + a protected link; a brand-new
+    // user resolves the temp key with the out-of-band passphrase, then registers + joins.
+    const g3 = await createGroup(apiBase, a, 'Group Three')
+    const invitePass = 'shared out of band'
+    const protLink = await inviteToGroup(apiBase, a, g3.id, 'Member', 'https://veyq.app', invitePass)
+    const parsed = parseInviteHash(protLink.slice(protLink.indexOf('#')))!
+    expect(isProtectedInvite(parsed)).toBe(true)
+    if (!isProtectedInvite(parsed)) throw new Error('expected protected invite')
+    const tempKey = unprotectTempKey(parsed, invitePass)
+    const cPass = 'carols own password'
+    const cReg = await registerViaMemberInvite(apiBase, parsed.inviteId, parsed.bootstrapSecret, tempKey, 'c@veyq.app', 'C', cPass)
+    const c = await login(apiBase, 'c@veyq.app', cPass, cReg.emergencyKit.secretKey)
+    expect((await listMySpaces(apiBase, c)).map((s) => s.tenantId)).toContain(g3.id)
+
+    // email relay (mailer mock): both modes return 204 when the link targets this instance's app origin.
+    const appOrigin = process.env.VEYQ_APP_BASE ?? 'http://localhost:5173'
+    await emailInviteToGroup(apiBase, a, g3.id, 'Member', 'pragmatic@veyq.app', appOrigin)
+    await emailInviteToGroup(apiBase, a, g3.id, 'Member', 'protected@veyq.app', appOrigin, 'another out-of-band secret')
   }, 120000)
 })

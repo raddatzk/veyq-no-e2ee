@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { session } from '../session'
 import { i18n, t } from '../../i18n/i18n'
-import { inviteToGroup } from '../../features/spaces/invite/groups'
+import { inviteToGroup, emailInviteToGroup } from '../../features/spaces/invite/groups'
 import { getTenantTerms, setTenantTerms } from '../../features/memory/share/share'
 import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
 import { changeMemberRole, listTenantMembers, removeMember, rotateScope, type MemberRole, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
@@ -39,6 +39,14 @@ const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
 const error = ref('')
+
+// Protection mode: 'link' = the temp key rides the link in the clear (pragmatic); 'passphrase' = it's
+// encrypted under a passphrase shared out of band (operator-blind, even against the email relay).
+const protection = ref<'link' | 'passphrase'>('link')
+const passphrase = ref('')
+const inviteEmail = ref('')
+const emailSent = ref(false)
+const pass = () => (protection.value === 'passphrase' ? passphrase.value : undefined)
 
 // --- Members (owner-only: list, change role, remove, rotate keys) ---
 const members = ref<TenantMember[]>([])
@@ -131,10 +139,29 @@ async function saveTerms() {
 
 async function generate() {
   if (!session.unlocked || !props.space.tenantId) return
+  if (protection.value === 'passphrase' && !passphrase.value.trim()) { error.value = t('invite.passphraseRequired'); return }
   busy.value = true
   error.value = ''
   try {
-    link.value = await inviteToGroup(session.apiBase, session.unlocked, props.space.tenantId, role.value, window.location.origin)
+    link.value = await inviteToGroup(session.apiBase, session.unlocked, props.space.tenantId, role.value, window.location.origin, pass())
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    busy.value = false
+  }
+}
+
+async function sendEmail() {
+  if (!session.unlocked || !props.space.tenantId) return
+  if (protection.value === 'passphrase' && !passphrase.value.trim()) { error.value = t('invite.passphraseRequired'); return }
+  busy.value = true
+  error.value = ''
+  emailSent.value = false
+  try {
+    await emailInviteToGroup(session.apiBase, session.unlocked, props.space.tenantId, role.value, inviteEmail.value, window.location.origin, pass())
+    emailSent.value = true
+    inviteEmail.value = ''
+    setTimeout(() => (emailSent.value = false), 2500)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -166,6 +193,18 @@ async function copy() {
         </div>
       </label>
 
+      <label class="invite-role">
+        {{ t('invite.protection') }}
+        <div class="seg">
+          <button type="button" :class="{ active: protection === 'link' }" @click="protection = 'link'">{{ t('invite.protLink') }}</button>
+          <button type="button" :class="{ active: protection === 'passphrase' }" @click="protection = 'passphrase'">{{ t('invite.protPassphrase') }}</button>
+        </div>
+      </label>
+      <template v-if="protection === 'passphrase'">
+        <input class="invite-link" style="margin-bottom: 0.4rem" v-model="passphrase" type="text" :placeholder="t('invite.passphrasePlaceholder')" />
+        <p class="invite-hint">{{ t('invite.passphraseOob') }}</p>
+      </template>
+
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
 
       <template v-if="link">
@@ -176,6 +215,12 @@ async function copy() {
         </div>
       </template>
       <button v-else class="btn btn-primary invite-gen" type="button" :disabled="busy" @click="generate">{{ t('invite.generate') }}</button>
+
+      <p class="invite-hint">{{ t('invite.emailHint') }}</p>
+      <div class="invite-link-row">
+        <input class="invite-link" v-model="inviteEmail" type="email" autocomplete="off" :placeholder="t('invite.emailPlaceholder')" />
+        <button class="btn btn-primary" type="button" :disabled="busy || !inviteEmail.trim()" @click="sendEmail">{{ emailSent ? t('invite.emailSent') : t('invite.emailSend') }}</button>
+      </div>
 
       <div class="settings-section">{{ t('terms.title') }}</div>
       <template v-if="termsOpen">

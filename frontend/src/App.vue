@@ -8,7 +8,7 @@ import LoginPanel from './app/auth/LoginPanel.vue'
 import AcceptInvitePanel from './app/auth/AcceptInvitePanel.vue'
 import ShareView from './app/share/ShareView.vue'
 import HomeView from './app/home/HomeView.vue'
-import { parseInviteHash, type InviteParts } from './features/spaces/invite/inviteLink'
+import { parseInviteHash, type ParsedInvite } from './features/spaces/invite/inviteLink'
 
 // A public share link is `/s/<shareId>#k=<shareKey>` — viewable with no account.
 const sharePath = /^\/s\/([^/]+)$/.exec(window.location.pathname)
@@ -28,7 +28,7 @@ applyTheme(session.theme)
 type Phase = 'loading' | 'setup' | 'login' | 'error'
 const phase = ref<Phase>('loading')
 const prefill = ref<{ email?: string; secretKey?: string }>({})
-const invite = ref<InviteParts | null>(parseInviteHash(window.location.hash))
+const invite = ref<ParsedInvite | null>(parseInviteHash(window.location.hash))
 
 onMounted(async () => {
   try {

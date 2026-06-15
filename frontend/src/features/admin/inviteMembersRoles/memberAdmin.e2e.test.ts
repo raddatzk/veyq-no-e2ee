@@ -7,11 +7,11 @@ import { registerServerOwner } from '../setupServer/setupServer'
 import { login } from '../../account/login/login'
 import { registerViaMemberInvite, listTenantMembers, changeMemberRole, removeMember, rotateScope } from './inviteMembers'
 import { createGroup, inviteToGroup } from '../../spaces/invite/groups'
-import { parseInviteHash } from '../../spaces/invite/inviteLink'
+import { parseInviteHash, type InviteParts } from '../../spaces/invite/inviteLink'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_SEED === '1' ? describe : describe.skip
-const frag = (link: string) => parseInviteHash(link.slice(link.indexOf('#')))!
+const frag = (link: string) => parseInviteHash(link.slice(link.indexOf('#'))) as InviteParts
 
 run('member admin e2e', () => {
   it('owner lists, re-roles, removes a member, and rotates the scope', async () => {
