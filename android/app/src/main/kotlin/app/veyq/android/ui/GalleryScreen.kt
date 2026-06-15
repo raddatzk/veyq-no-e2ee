@@ -57,6 +57,7 @@ import app.veyq.crypto.Curate
 import app.veyq.crypto.Journal
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
+import app.veyq.crypto.Share
 import app.veyq.crypto.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -120,6 +121,10 @@ class GalleryController(
     suspend fun setCover(mediaId: String) {
         runCatching { withContext(Dispatchers.IO) { Curate.setCover(apiBase, session, scopeId, nodeId, mediaId) } }
     }
+
+    /** Mint a read-only public share link for this memory (origin = the instance serving the web viewer). */
+    suspend fun createShareLink(): String? =
+        runCatching { withContext(Dispatchers.IO) { Share.createShare(apiBase, session, scopeId, contentKey, nodeId, apiBase) } }.getOrNull()
 
     suspend fun upload(items: List<ByteArray>) {
         uploading = true
@@ -244,6 +249,15 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
                 navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 24.sp) } },
                 actions = {
+                    IconButton(onClick = {
+                        scope.launch {
+                            val link = controller.createShareLink()
+                            if (link != null) {
+                                val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, link) }
+                                context.startActivity(Intent.createChooser(send, L10n.t("share.share")))
+                            }
+                        }
+                    }) { Text("↗", color = Veyq.Accent, fontSize = 20.sp) }
                     IconButton(onClick = { showDownload = true }, enabled = !downloading && controller.tiles.isNotEmpty()) {
                         Text(if (downloading) "…" else "⬇", color = Veyq.Text, fontSize = 20.sp)
                     }

@@ -95,6 +95,12 @@ final class GalleryStore: ObservableObject {
         _ = try? await Curate.setCover(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, coverMediaId: mediaId)
     }
 
+    /// Mint a read-only public share link for this memory (origin = the instance that serves the web viewer).
+    func createShareLink() async -> URL? {
+        guard let link = try? await Share.createShare(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, origin: apiBase) else { return nil }
+        return URL(string: link)
+    }
+
     func loadJournal() async {
         guard !journalLoaded else { return }
         if let content = try? await Journal.getJournal(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) {
@@ -223,6 +229,9 @@ struct MemoryDetailView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { if let url = await store.createShareLink() { shareItem = ShareItem(url: url) } } } label: { Image(systemName: "person.crop.circle.badge.plus") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showDownload = true } label: { Image(systemName: downloading ? "ellipsis" : "square.and.arrow.down") }
                     .disabled(downloading || store.tiles.isEmpty)
