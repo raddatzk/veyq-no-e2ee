@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @StateObject private var app = AppState()
     @AppStorage("veyq.theme") private var theme = "system"
+    @AppStorage("veyq.locale") private var locale = "de"
 
     var body: some View {
         Group {
@@ -18,6 +19,7 @@ struct RootView: View {
         }
         .environmentObject(app)
         .preferredColorScheme(themeScheme(theme))
+        .id(locale) // rebuild the tree so every T(...) re-resolves on language change
     }
 }
 

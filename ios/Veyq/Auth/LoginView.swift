@@ -12,13 +12,13 @@ struct LoginView: View {
     @State private var error = ""
 
     var body: some View {
-        AuthCard(title: "Anmelden", subtitle: app.apiBase) {
+        AuthCard(title: T("login.title"), subtitle: app.apiBase) {
             VStack(spacing: 14) {
-                VeyqField(label: "E-Mail", text: $email, keyboard: .emailAddress)
-                VeyqField(label: "Passwort", text: $password, secure: true)
-                VeyqField(label: "Secret Key", text: $secretKey, secure: true, hint: "Aus deinem Emergency Kit.")
-                PrimaryButton(title: "Anmelden", busy: busy) { submit() }
-                Button("Andere Instanz") { app.changeInstance() }
+                VeyqField(label: T("common.email"), text: $email, keyboard: .emailAddress)
+                VeyqField(label: T("common.password"), text: $password, secure: true)
+                VeyqField(label: T("common.secretKey"), text: $secretKey, secure: true, hint: T("login.secretHint"))
+                PrimaryButton(title: T("login.submit"), busy: busy) { submit() }
+                Button(T("login.otherInstance")) { app.changeInstance() }
                     .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted)
                 if !error.isEmpty { MessageBox(text: error) }
             }
@@ -33,7 +33,7 @@ struct LoginView: View {
                 let session = try await Login.login(apiBase: app.apiBase, email: email, password: password, secretKeyB64: secretKey)
                 app.loggedIn(session)
             } catch {
-                self.error = "Anmeldung fehlgeschlagen. Prüfe E-Mail, Passwort und Secret Key."
+                self.error = T("login.error")
             }
         }
     }

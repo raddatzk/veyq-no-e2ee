@@ -20,25 +20,25 @@ struct MemoryHomeView: View {
 
                     if !store.searchText.isEmpty {
                         if store.searchHits.isEmpty {
-                            emptyText("Nichts gefunden.")
+                            emptyText(T("search.nothing"))
                         } else {
                             ForEach(store.searchHits) { searchRow($0) }
                         }
                     } else {
                         if store.crumbs.count > 1 { breadcrumb }
 
-                        sectionHeader("Memories", store.memories.count)
+                        sectionHeader(T("home.memories"), store.memories.count)
                         if store.memories.isEmpty {
-                            emptyText("Noch keine Memories hier.")
+                            emptyText(T("home.noMemories"))
                         } else {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                                 ForEach(store.memories) { memoryCard($0) }
                             }
                         }
 
-                        sectionHeader("Ordner", store.folders.count)
+                        sectionHeader(T("home.folders"), store.folders.count)
                         if store.folders.isEmpty {
-                            emptyText("Keine Ordner.")
+                            emptyText(T("home.noFolders"))
                         } else {
                             ForEach(store.folders) { folderRow($0) }
                         }
@@ -63,7 +63,7 @@ struct MemoryHomeView: View {
                 }
             }
             .toolbarBackground(VeyqStyle.surface, for: .navigationBar)
-            .searchable(text: $store.searchText, prompt: "Suchen")
+            .searchable(text: $store.searchText, prompt: T("home.search"))
             .onChange(of: store.searchText) { _, _ in Task { await store.search() } }
         }
         .tint(VeyqStyle.accent)
@@ -75,13 +75,13 @@ struct MemoryHomeView: View {
         if hit.node.type == "MEMORY", let scope = store.scope, let key = store.contentKey {
             NavigationLink {
                 MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: hit.node, name: hit.name)
-            } label: { searchRowLabel(hit, icon: "photo", type: "Memory") }
+            } label: { searchRowLabel(hit, icon: "photo", type: T("search.memory")) }
             .buttonStyle(.plain)
         } else {
             Button {
                 store.searchText = ""
                 Task { await store.openFolder(hit) }
-            } label: { searchRowLabel(hit, icon: "folder.fill", type: "Ordner") }
+            } label: { searchRowLabel(hit, icon: "folder.fill", type: T("search.folder")) }
             .buttonStyle(.plain)
         }
     }

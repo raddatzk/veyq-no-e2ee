@@ -11,13 +11,13 @@ struct ConnectView: View {
     @State private var setupNeeded = false
 
     var body: some View {
-        AuthCard(title: "Mit einer Instanz verbinden", subtitle: "Gib die Adresse deiner veyq-Instanz ein.") {
+        AuthCard(title: T("connect.title"), subtitle: T("connect.sub")) {
             VStack(spacing: 14) {
-                VeyqField(label: "Instanz-URL", text: $url, placeholder: "https://memories.example.com", keyboard: .URL)
+                VeyqField(label: T("connect.url"), text: $url, placeholder: "https://memories.example.com", keyboard: .URL)
                 if setupNeeded {
-                    MessageBox(text: "Diese Instanz ist noch nicht eingerichtet — bitte im Web einrichten.", error: false)
+                    MessageBox(text: T("connect.setupNeeded"), error: false)
                 }
-                PrimaryButton(title: "Verbinden", busy: busy) { connect() }
+                PrimaryButton(title: T("connect.connect"), busy: busy) { connect() }
                 if !error.isEmpty { MessageBox(text: error) }
             }
         }
@@ -33,7 +33,7 @@ struct ConnectView: View {
                 let status = try await Instance.getSetupStatus(apiBase: base)
                 if status.setupRequired { setupNeeded = true } else { app.connected(apiBase: base) }
             } catch {
-                self.error = "Konnte die Instanz nicht erreichen. Prüfe die Adresse."
+                self.error = T("connect.error")
             }
         }
     }

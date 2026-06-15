@@ -82,11 +82,11 @@ struct MemoryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
-                    Text("\(store.tiles.count) Medien").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                    Text("\(store.tiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
                     if store.loading {
-                        Text("Lädt Galerie…").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                     } else if store.tiles.isEmpty {
-                        Text("Noch keine Medien.").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                     } else {
                         gallery(width: geo.size.width - 32)
                     }
@@ -105,15 +105,15 @@ struct MemoryDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
-                    Text(store.uploading ? "Lädt…" : "Hochladen").foregroundStyle(VeyqStyle.accent)
+                    Text(store.uploading ? T("detail.uploading") : T("detail.upload")).foregroundStyle(VeyqStyle.accent)
                 }
                 .disabled(store.uploading)
             }
         }
-        .confirmationDialog("Herunterladen", isPresented: $showDownload, titleVisibility: .visible) {
-            Button("Nur diese Memory") { startDownload(false) }
-            Button("Mit Kapiteln") { startDownload(true) }
-            Button("Abbrechen", role: .cancel) {}
+        .confirmationDialog(T("download.title"), isPresented: $showDownload, titleVisibility: .visible) {
+            Button(T("download.onlyThis")) { startDownload(false) }
+            Button(T("download.withChapters")) { startDownload(true) }
+            Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $shareItem) { item in ActivityView(url: item.url) }
         .onChange(of: pickerItems) { _, items in

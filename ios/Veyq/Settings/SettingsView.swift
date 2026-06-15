@@ -6,19 +6,23 @@ struct SettingsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @AppStorage("veyq.theme") private var theme = "system"
+    @AppStorage("veyq.locale") private var locale = "de"
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Sprache und Darstellung") {
-                    Picker("Darstellung", selection: $theme) {
-                        Text("System").tag("system")
-                        Text("Hell").tag("light")
-                        Text("Dunkel").tag("dark")
+                Section(T("settings.langAppearance")) {
+                    Picker(T("settings.appearance"), selection: $theme) {
+                        Text(T("settings.system")).tag("system")
+                        Text(T("settings.light")).tag("light")
+                        Text(T("settings.dark")).tag("dark")
                     }
-                    settingRow("Sprache", value: "Deutsch")
+                    Picker(T("settings.language"), selection: $locale) {
+                        Text("Deutsch").tag("de")
+                        Text("English").tag("en")
+                    }
                 }
-                Section("Account") {
+                Section(T("settings.account")) {
                     if let user = app.session?.user {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.displayName).foregroundStyle(VeyqStyle.text)
@@ -26,27 +30,19 @@ struct SettingsView: View {
                         }
                     }
                 }
-                Section("Eingeloggte Instanz") {
+                Section(T("settings.instance")) {
                     Text(app.apiBase).foregroundStyle(VeyqStyle.text)
                 }
                 Section {
-                    Button("Trennen", role: .destructive) { app.signOut(); dismiss() }
+                    Button(T("settings.disconnect"), role: .destructive) { app.signOut(); dismiss() }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(VeyqStyle.bg)
-            .navigationTitle("Einstellungen")
+            .navigationTitle(T("settings.title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.done")) { dismiss() } } }
         }
         .tint(VeyqStyle.accent)
-    }
-
-    private func settingRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(VeyqStyle.text)
-            Spacer()
-            Text(value).foregroundStyle(VeyqStyle.muted)
-        }
     }
 }
