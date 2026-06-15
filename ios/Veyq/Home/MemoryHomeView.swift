@@ -16,22 +16,31 @@ struct MemoryHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let error = store.error { MessageBox(text: error) }
-                    if store.crumbs.count > 1 { breadcrumb }
 
-                    sectionHeader("Memories", store.memories.count)
-                    if store.memories.isEmpty {
-                        emptyText("Noch keine Memories hier.")
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-                            ForEach(store.memories) { memoryCard($0) }
+                    if !store.searchText.isEmpty {
+                        if store.searchHits.isEmpty {
+                            emptyText("Nichts gefunden.")
+                        } else {
+                            ForEach(store.searchHits) { searchRow($0) }
                         }
-                    }
-
-                    sectionHeader("Ordner", store.folders.count)
-                    if store.folders.isEmpty {
-                        emptyText("Keine Ordner.")
                     } else {
-                        ForEach(store.folders) { folderRow($0) }
+                        if store.crumbs.count > 1 { breadcrumb }
+
+                        sectionHeader("Memories", store.memories.count)
+                        if store.memories.isEmpty {
+                            emptyText("Noch keine Memories hier.")
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                                ForEach(store.memories) { memoryCard($0) }
+                            }
+                        }
+
+                        sectionHeader("Ordner", store.folders.count)
+                        if store.folders.isEmpty {
+                            emptyText("Keine Ordner.")
+                        } else {
+                            ForEach(store.folders) { folderRow($0) }
+                        }
                     }
                 }
                 .padding(16)
@@ -53,9 +62,39 @@ struct MemoryHomeView: View {
                 }
             }
             .toolbarBackground(VeyqStyle.surface, for: .navigationBar)
+            .searchable(text: $store.searchText, prompt: "Suchen")
+            .onChange(of: store.searchText) { _, _ in Task { await store.search() } }
         }
         .tint(VeyqStyle.accent)
         .task { await store.start() }
+    }
+
+    @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
+        if hit.node.type == "MEMORY", let scope = store.scope, let key = store.contentKey {
+            NavigationLink {
+                MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: scope.scopeId, contentKey: key, node: hit.node, name: hit.name)
+            } label: { searchRowLabel(hit, icon: "photo", type: "Memory") }
+            .buttonStyle(.plain)
+        } else {
+            Button {
+                store.searchText = ""
+                Task { await store.openFolder(hit) }
+            } label: { searchRowLabel(hit, icon: "folder.fill", type: "Ordner") }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func searchRowLabel(_ hit: HomeStore.Entry, icon: String, type: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).foregroundStyle(VeyqStyle.accent)
+            Text(hit.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(VeyqStyle.text)
+            Spacer()
+            Text(type).font(.caption).foregroundStyle(VeyqStyle.accent)
+        }
+        .padding(12)
+        .background(VeyqStyle.surface)
+        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
     }
 
     private var breadcrumb: some View {

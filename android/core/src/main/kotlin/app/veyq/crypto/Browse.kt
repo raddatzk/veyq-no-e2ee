@@ -27,6 +27,16 @@ object Browse {
         return (0 until arr.length()).map { arr.getJSONObject(it) }
     }
 
+    /** The whole node graph of a scope (GET /nodes, no parent filter) — drives client-side search. */
+    fun listNodes(apiBase: String, session: Login.UnlockedSession, scopeId: String): List<JSONObject> {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
+            .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()} ${resp.body()}")
+        val arr = JSONObject(resp.body()).getJSONArray("nodes")
+        return (0 until arr.length()).map { arr.getJSONObject(it) }
+    }
+
     /**
      * Resolve a clean slug path to the chain of nodes, one per segment, by matching each slug to a child's
      * per-parent slug token. Throws if a segment doesn't exist. Each node carries its own type.

@@ -28,9 +28,12 @@ final class HomeStore: ObservableObject {
     @Published var covers: [String: UIImage] = [:]
     @Published var crumbs: [Crumb] = []
     @Published var error: String?
+    @Published var searchText = ""
+    @Published var searchHits: [Entry] = []
 
     private(set) var scope: ScopeContent.OpenScope?
     private(set) var contentKey: Data?
+    private var allNodes: [MemoryTree.MemoryNode]?
 
     init(apiBase: String, session: Login.UnlockedSession) {
         self.apiBase = apiBase
@@ -55,6 +58,7 @@ final class HomeStore: ObservableObject {
             scope = opened
             contentKey = key
             activeScopeId = entry.scopeId
+            allNodes = nil
             crumbs = [Crumb(id: "root", nodeId: nil, name: entry.displayName)]
             await openLevel()
         } catch {
@@ -65,6 +69,19 @@ final class HomeStore: ObservableObject {
     func openFolder(_ entry: Entry) async {
         crumbs.append(Crumb(id: entry.node.id, nodeId: entry.node.id, name: entry.name))
         await openLevel()
+    }
+
+    /// Client-side search over the active space's decrypted node names (loads the graph once, caches it).
+    func search() async {
+        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty, let scope, let contentKey else { searchHits = []; return }
+        if allNodes == nil {
+            allNodes = try? await MemoryTree.listNodes(apiBase: apiBase, session: session, scopeId: scope.scopeId)
+        }
+        searchHits = (allNodes ?? []).compactMap { node in
+            let name = (try? MemoryTree.decodeNode(contentKey: contentKey, node: node).name) ?? ""
+            return name.lowercased().contains(q) ? Entry(node: node, name: name) : nil
+        }
     }
 
     func gotoCrumb(_ crumb: Crumb) async {

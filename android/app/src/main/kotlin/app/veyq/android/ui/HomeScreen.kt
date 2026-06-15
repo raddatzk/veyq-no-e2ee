@@ -19,6 +19,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -65,11 +67,14 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     var covers by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
     var crumbs by mutableStateOf<List<Crumb>>(emptyList())
     var error by mutableStateOf<String?>(null)
+    var searchText by mutableStateOf("")
+    var searchHits by mutableStateOf<List<Entry>>(emptyList())
 
     var scope: ScopeContent.OpenScope? = null
         private set
     var contentKey: ByteArray? = null
         private set
+    private var allNodes: List<JSONObject>? = null
 
     suspend fun start() {
         try {
@@ -87,6 +92,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
             val opened = withContext(Dispatchers.IO) { SwitchActiveSpace.openSpace(apiBase, session, entry) }
             val key = withContext(Dispatchers.IO) { ScopeContent.getOrCreateContentKey(apiBase, session, opened) }
             scope = opened; contentKey = key; activeScopeId = entry.getString("scopeId")
+            allNodes = null
             crumbs = listOf(Crumb(null, entry.getString("displayName")))
             openLevel()
         } catch (e: Exception) {
@@ -103,6 +109,20 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         if (index >= crumbs.size - 1) return
         crumbs = crumbs.take(index + 1)
         openLevel()
+    }
+
+    /** Client-side search over the active space's decrypted node names (graph loaded once, cached). */
+    suspend fun search() {
+        val q = searchText.trim().lowercase()
+        val s = scope; val key = contentKey
+        if (q.isEmpty() || s == null || key == null) { searchHits = emptyList(); return }
+        if (allNodes == null) {
+            allNodes = withContext(Dispatchers.IO) { runCatching { Browse.listNodes(apiBase, session, s.scopeId) }.getOrDefault(emptyList()) }
+        }
+        searchHits = (allNodes ?: emptyList()).mapNotNull { n ->
+            val name = runCatching { MemoryTree.decodeNodeName(key, n) }.getOrDefault("")
+            if (name.lowercase().contains(q)) Entry(n.getString("id"), n.getString("type"), name) else null
+        }
     }
 
     private suspend fun openLevel() {
@@ -187,15 +207,40 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             controller.error?.let { MessageBox(it) }
-            if (controller.crumbs.size > 1) Breadcrumb(controller.crumbs) { scope.launch { controller.gotoCrumb(it) } }
 
-            SectionHeader("Memories", controller.memories.size)
-            if (controller.memories.isEmpty()) EmptyText("Noch keine Memories hier.")
-            else MemoryGrid(controller.memories, controller.covers) { detail = it }
+            OutlinedTextField(
+                value = controller.searchText,
+                onValueChange = { controller.searchText = it; scope.launch { controller.search() } },
+                placeholder = { Text("Suche einfach überall…", color = Veyq.Muted) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+                    focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                    focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                ),
+            )
 
-            SectionHeader("Ordner", controller.folders.size)
-            if (controller.folders.isEmpty()) EmptyText("Keine Ordner.")
-            else controller.folders.forEach { f -> FolderRow(f) { scope.launch { controller.openFolder(f) } } }
+            if (controller.searchText.isNotBlank()) {
+                if (controller.searchHits.isEmpty()) EmptyText("Nichts gefunden.")
+                else controller.searchHits.forEach { hit ->
+                    SearchRow(hit) {
+                        if (hit.type == "MEMORY") detail = hit
+                        else { controller.searchText = ""; scope.launch { controller.openFolder(hit) } }
+                    }
+                }
+            } else {
+                if (controller.crumbs.size > 1) Breadcrumb(controller.crumbs) { scope.launch { controller.gotoCrumb(it) } }
+
+                SectionHeader("Memories", controller.memories.size)
+                if (controller.memories.isEmpty()) EmptyText("Noch keine Memories hier.")
+                else MemoryGrid(controller.memories, controller.covers) { detail = it }
+
+                SectionHeader("Ordner", controller.folders.size)
+                if (controller.folders.isEmpty()) EmptyText("Keine Ordner.")
+                else controller.folders.forEach { f -> FolderRow(f) { scope.launch { controller.openFolder(f) } } }
+            }
         }
     }
 }
@@ -269,5 +314,23 @@ private fun FolderRow(f: HomeController.Entry, onClick: () -> Unit) {
     ) {
         Text("📁", fontSize = 18.sp)
         Text(f.name, color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun SearchRow(hit: HomeController.Entry, onOpen: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
+            .clickable(onClick = onOpen)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(if (hit.type == "FOLDER") "📁" else "🖼️", fontSize = 18.sp)
+        Text(hit.name, color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+        Text(if (hit.type == "FOLDER") "Ordner" else "Memory", color = Veyq.Accent, fontSize = 12.sp)
     }
 }
