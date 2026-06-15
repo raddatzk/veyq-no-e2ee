@@ -97,7 +97,7 @@ paths:
     get:
       tags: [Media]
       operationId: listMedia
-      summary: A Memory's media (original + typed derivatives), ordered by takenAt.
+      summary: A Memory's media (original + typed derivatives), in upload order.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
@@ -187,22 +187,22 @@ components:
         blob: { $ref: '#/components/schemas/BlobRef' }
     CreateMediaRequest:
       type: object
-      required: [originalBlobId, takenAt, mimeType]
+      required: [originalBlobId, sealedMeta, mimeType]
       properties:
         originalBlobId: { type: string }
-        takenAt: { type: string, format: date-time }
+        sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         mimeType: { type: string }
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeInput' }
     MediaItem:
       type: object
-      required: [id, scopeId, nodeId, takenAt, mimeType, original, derivatives, createdAt]
+      required: [id, scopeId, nodeId, sealedMeta, mimeType, original, derivatives, createdAt]
       properties:
         id: { type: string }
         scopeId: { type: string }
         nodeId: { type: string }
-        takenAt: { type: string, format: date-time }
+        sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         mimeType: { type: string }
         original: { $ref: '#/components/schemas/BlobRef' }
         derivatives:

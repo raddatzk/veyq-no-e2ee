@@ -14,6 +14,7 @@ import com.veyq.app.shared.content.MediaDerivative
 import com.veyq.app.shared.content.MediaDerivativeRepository
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
+import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
@@ -23,12 +24,13 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Base64
 import java.util.UUID
 
 /**
  * uc.uploads (media attachment) — hang a stored content blob on a Memory/Chapter, with typed client-generated
- * derivatives (thumbnail/preview, themselves blobs). The gallery lists all media uniformly (ordered by
- * takenAt); inline vs. chunked no longer exists — every medium is one blob (1 chunk or many).
+ * derivatives (thumbnail/preview, themselves blobs). The gallery lists all media uniformly (in upload order;
+ * the client sorts by decrypted takenAt); inline vs. chunked no longer exists — every medium is one blob.
  */
 @ApplicationScoped
 class MediaHandler(
@@ -40,7 +42,10 @@ class MediaHandler(
     private val derivatives: MediaDerivativeRepository,
     private val memberships: MembershipRepository,
     private val sessions: SessionService,
+    private val suites: CryptoSuiteRegistry,
 ) {
+    private val enc = Base64.getUrlEncoder().withoutPadding()
+    private val dec = Base64.getUrlDecoder()
     @Transactional
     fun listMedia(auth: String?, scopeId: String, nodeId: String): MediaList {
         requireKeyHolder(scopeId, auth)
@@ -53,10 +58,13 @@ class MediaHandler(
         requireKeyHolder(scopeId, auth)
         requireMemoryNode(scopeId, nodeId)
         requireBlob(scopeId, req.originalBlobId)
+        if (!suites.isKnown(req.sealedMeta.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
 
         val item = Media().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
-            originalBlobId = req.originalBlobId; takenAt = req.takenAt.toInstant(); mimeType = req.mimeType; createdAt = Instant.now()
+            originalBlobId = req.originalBlobId
+            sealedMeta = dec.decode(req.sealedMeta.bytes); suiteId = req.sealedMeta.suiteId
+            mimeType = req.mimeType; createdAt = Instant.now()
         }
         media.persist(item)
         req.derivatives.orEmpty().forEach { d ->
@@ -72,7 +80,7 @@ class MediaHandler(
     private fun toApi(m: Media): MediaItem =
         MediaItem(
             id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
-            takenAt = OffsetDateTime.ofInstant(m.takenAt, ZoneOffset.UTC),
+            sealedMeta = com.veyq.app.generated.model.Blob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
             mimeType = m.mimeType,
             original = blobRef(m.originalBlobId),
             derivatives = derivatives.listByMediaId(m.id).map {

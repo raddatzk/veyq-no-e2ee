@@ -58,7 +58,10 @@ class Media {
     @Column(name = "scope_id", nullable = false) var scopeId: String = ""
     @Column(name = "node_id", nullable = false) var nodeId: String = ""
     @Column(name = "original_blob_id", nullable = false) var originalBlobId: String = ""
-    @Column(name = "taken_at", nullable = false) var takenAt: Instant = Instant.EPOCH
+    // Per-media sensitive metadata ({takenAt, lat?, lng?}) sealed under the scope content key — the server
+    // is blind to capture time and location. mime_type stays plaintext (needed for content typing).
+    @Column(name = "sealed_meta", nullable = false) var sealedMeta: ByteArray = ByteArray(0)
+    @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "mime_type", nullable = false) var mimeType: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
@@ -101,7 +104,7 @@ class BlobChunkRepository : PanacheRepositoryBase<BlobChunk, String> {
 
 @ApplicationScoped
 class MediaRepository : PanacheRepositoryBase<Media, String> {
-    fun listByNodeId(nodeId: String): List<Media> = list("nodeId = ?1 order by takenAt, createdAt", nodeId)
+    fun listByNodeId(nodeId: String): List<Media> = list("nodeId = ?1 order by createdAt", nodeId)
 }
 
 @ApplicationScoped

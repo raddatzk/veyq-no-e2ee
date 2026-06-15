@@ -62,8 +62,8 @@ class CurateSliceTest {
             // a media on mm and one on cc (for the cover checks)
             blobs.persist(Blob().apply { id = "b1"; this.scopeId = this@CurateSliceTest.scopeId; dedupToken = "d1"; totalChunks = 1; byteSize = 9; suiteId = "v1"; createdAt = now })
             blobs.persist(Blob().apply { id = "b2"; this.scopeId = this@CurateSliceTest.scopeId; dedupToken = "d2"; totalChunks = 1; byteSize = 9; suiteId = "v1"; createdAt = now })
-            medias.persist(Media().apply { id = "med1"; this.scopeId = this@CurateSliceTest.scopeId; nodeId = "mm"; originalBlobId = "b1"; takenAt = now; mimeType = "image/png"; createdAt = now })
-            medias.persist(Media().apply { id = "med2"; this.scopeId = this@CurateSliceTest.scopeId; nodeId = "cc"; originalBlobId = "b2"; takenAt = now; mimeType = "image/png"; createdAt = now })
+            medias.persist(Media().apply { id = "med1"; this.scopeId = this@CurateSliceTest.scopeId; nodeId = "mm"; originalBlobId = "b1"; sealedMeta = "m".toByteArray(); suiteId = "v1"; mimeType = "image/png"; createdAt = now })
+            medias.persist(Media().apply { id = "med2"; this.scopeId = this@CurateSliceTest.scopeId; nodeId = "cc"; originalBlobId = "b2"; sealedMeta = "m".toByteArray(); suiteId = "v1"; mimeType = "image/png"; createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("cur-owner")}"
         outsiderToken = "Bearer ${sessions.issue("cur-out")}"

@@ -55,35 +55,40 @@ class MediaSliceTest {
         outsiderToken = "Bearer ${sessions.issue("me-outsider")}"
     }
 
-    private fun mediaBody(takenAt: String, orig: String = "me-orig", withThumb: Boolean = true): String {
+    private fun mediaBody(orig: String = "me-orig", withThumb: Boolean = true, suite: String = "v1"): String {
         val derivs = if (withThumb) ""","derivatives":[{"kind":"THUMBNAIL","blobId":"me-thumb"}]""" else ""
-        return """{"originalBlobId":"$orig","takenAt":"$takenAt","mimeType":"image/jpeg"$derivs}"""
+        // sealedMeta is opaque ciphertext to the server ({takenAt, lat?, lng?} sealed client-side).
+        return """{"originalBlobId":"$orig","sealedMeta":{"suiteId":"$suite","bytes":"bWV0YQ"},"mimeType":"image/jpeg"$derivs}"""
     }
 
     @Test
     fun attachesBlobsAsMediaWithDerivativesAndLists() {
         // only a key-holder may attach; media live in a Memory/Chapter, not a Folder; the blob must exist
-        given().header("Authorization", outsiderToken).contentType(ContentType.JSON).body(mediaBody("2026-01-01T10:00:00Z"))
+        given().header("Authorization", outsiderToken).contentType(ContentType.JSON).body(mediaBody())
             .post("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(403)
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody("2026-01-01T10:00:00Z"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody())
             .post("/api/scopes/$scopeId/nodes/me-folder/media").then().statusCode(400).body("code", `is`("NOT_A_MEMORY"))
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody("2026-01-01T10:00:00Z", orig = "ghost"))
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody(orig = "ghost"))
             .post("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(404).body("code", `is`("BLOB_NOT_FOUND"))
+        // an unknown crypto suite on the sealed metadata is rejected
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody(suite = "v999"))
+            .post("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(400).body("code", `is`("UNKNOWN_SUITE"))
 
-        // attach the photo (with a thumbnail derivative); the response references both blobs
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody("2026-03-15T12:00:00Z"))
+        // attach the photo (with a thumbnail derivative); the response references both blobs + the sealed meta
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody())
             .post("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(200)
             .body("original.blobId", `is`("me-orig")).body("original.totalChunks", `is`(3))
+            .body("sealedMeta.suiteId", `is`("v1")).body("sealedMeta.bytes", `is`("bWV0YQ"))
             .body("derivatives[0].kind", `is`("THUMBNAIL")).body("derivatives[0].blob.blobId", `is`("me-thumb"))
-        // a second photo without a thumbnail, earlier takenAt
-        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody("2026-01-01T08:00:00Z", withThumb = false))
+        // a second photo without a thumbnail
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(mediaBody(withThumb = false))
             .post("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(200)
 
-        // the gallery lists both, ordered by takenAt, each with its blob refs (chunked or not — uniform)
+        // the gallery lists both in upload order (the client sorts by decrypted takenAt), with their blob refs
         given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes/me-mem/media").then().statusCode(200)
             .body("media.size()", `is`(2))
-            .body("media[0].derivatives.size()", `is`(0))
-            .body("media[1].original.blobId", `is`("me-orig"))
-            .body("media[1].derivatives[0].kind", `is`("THUMBNAIL"))
+            .body("media[0].original.blobId", `is`("me-orig"))
+            .body("media[0].derivatives[0].kind", `is`("THUMBNAIL"))
+            .body("media[1].derivatives.size()", `is`(0))
     }
 }
