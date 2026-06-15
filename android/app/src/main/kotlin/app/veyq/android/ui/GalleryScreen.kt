@@ -122,9 +122,9 @@ class GalleryController(
         runCatching { withContext(Dispatchers.IO) { Curate.setCover(apiBase, session, scopeId, nodeId, mediaId) } }
     }
 
-    /** Mint a read-only public share link for this memory (origin = the instance serving the web viewer). */
-    suspend fun createShareLink(): String? =
-        runCatching { withContext(Dispatchers.IO) { Share.createShare(apiBase, session, scopeId, contentKey, nodeId, apiBase) } }.getOrNull()
+    /** Mint a public share link for this memory (origin = the instance serving the web viewer). */
+    suspend fun createShareLink(role: String): String? =
+        runCatching { withContext(Dispatchers.IO) { Share.createShare(apiBase, session, scopeId, contentKey, nodeId, role, apiBase) } }.getOrNull()
 
     suspend fun upload(items: List<ByteArray>) {
         uploading = true
@@ -202,6 +202,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
     var showDownload by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
+    var showShareRole by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -249,15 +250,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
                 navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 24.sp) } },
                 actions = {
-                    IconButton(onClick = {
-                        scope.launch {
-                            val link = controller.createShareLink()
-                            if (link != null) {
-                                val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, link) }
-                                context.startActivity(Intent.createChooser(send, L10n.t("share.share")))
-                            }
-                        }
-                    }) { Text("↗", color = Veyq.Accent, fontSize = 20.sp) }
+                    IconButton(onClick = { showShareRole = true }) { Text("↗", color = Veyq.Accent, fontSize = 20.sp) }
                     IconButton(onClick = { showDownload = true }, enabled = !downloading && controller.tiles.isNotEmpty()) {
                         Text(if (downloading) "…" else "⬇", color = Veyq.Text, fontSize = 20.sp)
                     }
@@ -320,6 +313,27 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 }
             }
         }
+    }
+
+    if (showShareRole) {
+        fun share(role: String) {
+            showShareRole = false
+            scope.launch {
+                val link = controller.createShareLink(role)
+                if (link != null) {
+                    val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, link) }
+                    context.startActivity(Intent.createChooser(send, L10n.t("share.share")))
+                }
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showShareRole = false },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("share.share"), color = Veyq.Text) },
+            text = { Text(L10n.t("share.hint"), color = Veyq.Muted) },
+            confirmButton = { TextButton(onClick = { share("CONTRIBUTOR") }) { Text(L10n.t("share.roleContributor"), color = Veyq.Accent) } },
+            dismissButton = { TextButton(onClick = { share("VIEWER") }) { Text(L10n.t("share.roleViewer"), color = Veyq.Accent) } },
+        )
     }
 
     if (showDownload) {

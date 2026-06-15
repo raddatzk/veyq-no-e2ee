@@ -17,12 +17,12 @@ object Share {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val EMPTY = ByteArray(0)
 
-    /** Create a share and return the public link (origin = the instance base URL serving the web viewer). */
-    fun createShare(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, origin: String): String {
+    /** Create a share (role "VIEWER" or "CONTRIBUTOR") and return the public link (origin = the instance). */
+    fun createShare(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, role: String, origin: String): String {
         val shareKey = V1.randomBytes(32)
         val nonce = V1.randomBytes(12)
         val wrapped = nonce + V1.aeadSeal(shareKey, nonce, contentKey, EMPTY)
-        val payload = JSONObject().put("wrappedContentKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(wrapped))).toString()
+        val payload = JSONObject().put("wrappedContentKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(wrapped))).put("role", role).toString()
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/shares"))
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(payload)).build()

@@ -95,9 +95,9 @@ final class GalleryStore: ObservableObject {
         _ = try? await Curate.setCover(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, coverMediaId: mediaId)
     }
 
-    /// Mint a read-only public share link for this memory (origin = the instance that serves the web viewer).
-    func createShareLink() async -> URL? {
-        guard let link = try? await Share.createShare(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, origin: apiBase) else { return nil }
+    /// Mint a public share link for this memory (origin = the instance that serves the web viewer).
+    func createShareLink(role: String) async -> URL? {
+        guard let link = try? await Share.createShare(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, role: role, origin: apiBase) else { return nil }
         return URL(string: link)
     }
 
@@ -157,6 +157,7 @@ struct MemoryDetailView: View {
     @State private var shareItem: ShareItem?
     @State private var tab = 0
     @State private var showGpxImporter = false
+    @State private var showShareRole = false
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
         _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
@@ -230,7 +231,7 @@ struct MemoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { Task { if let url = await store.createShareLink() { shareItem = ShareItem(url: url) } } } label: { Image(systemName: "person.crop.circle.badge.plus") }
+                Button { showShareRole = true } label: { Image(systemName: "person.crop.circle.badge.plus") }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showDownload = true } label: { Image(systemName: downloading ? "ellipsis" : "square.and.arrow.down") }
@@ -246,6 +247,11 @@ struct MemoryDetailView: View {
         .confirmationDialog(T("download.title"), isPresented: $showDownload, titleVisibility: .visible) {
             Button(T("download.onlyThis")) { startDownload(false) }
             Button(T("download.withChapters")) { startDownload(true) }
+            Button(T("common.cancel"), role: .cancel) {}
+        }
+        .confirmationDialog(T("share.share"), isPresented: $showShareRole, titleVisibility: .visible) {
+            Button(T("share.roleViewer")) { Task { if let url = await store.createShareLink(role: "VIEWER") { shareItem = ShareItem(url: url) } } }
+            Button(T("share.roleContributor")) { Task { if let url = await store.createShareLink(role: "CONTRIBUTOR") { shareItem = ShareItem(url: url) } } }
             Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $shareItem) { item in ActivityView(url: item.url) }
