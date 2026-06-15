@@ -5,13 +5,15 @@ on:
     branches:
       - main
     paths:
-      - "ios/**"
+      - "apple/App/**"
+      - "apple/Sources/**"
+      - "apple/Package.swift"
       - "scripts/ios-testflight-distribute.rb"
       - ".github/workflows/ios-testflight.yml"
   workflow_dispatch:
     inputs:
       marketing_version:
-        description: "Optional full CFBundleShortVersionString override. Defaults to ios/VERSION."
+        description: "Optional full CFBundleShortVersionString override. Defaults to apple/App/VERSION."
         required: false
         default: ""
       upload:
@@ -43,7 +45,7 @@ jobs:
     env:
       MARKETING_VERSION_OVERRIDE: ${{ inputs.marketing_version || '' }}
       CURRENT_PROJECT_VERSION: ${{ github.run_number }}
-      PROJECT_PATH: ios/Veyq.xcodeproj
+      PROJECT_PATH: apple/App/Veyq.xcodeproj
       SCHEME: Veyq
       ARCHIVE_PATH: build/ios/Veyq.xcarchive
       EXPORT_PATH: build/ios/export
@@ -54,9 +56,9 @@ jobs:
       - name: Resolve app version
         run: |
           set -euo pipefail
-          app_major="$(tr -d '[:space:]' < ios/VERSION)"
+          app_major="$(tr -d '[:space:]' < apple/App/VERSION)"
           if [[ ! "$app_major" =~ ^[0-9]+$ ]]; then
-            echo "ios/VERSION must contain a numeric app major version, got: $app_major" >&2
+            echo "apple/App/VERSION must contain a numeric app major version, got: $app_major" >&2
             exit 1
           fi
           if [[ -n "$MARKETING_VERSION_OVERRIDE" ]]; then
@@ -77,6 +79,14 @@ jobs:
           set -euo pipefail
           sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
+
+      # The Xcode project is generated from apple/App/project.yml (it is gitignored, not committed),
+      # so it must be materialised before any xcodebuild step can see PROJECT_PATH.
+      - name: Generate Xcode project
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          (cd apple/App && xcodegen generate)
 
       - name: Select iOS simulator
         run: |

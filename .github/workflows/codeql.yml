@@ -71,7 +71,7 @@ jobs:
               - '**/Gemfile'
             swift:
               - '.github/workflows/codeql.yml'
-              - 'ios/**'
+              - 'apple/**'
 
       # The weekly scheduled run always analyzes everything so alerts stay
       # current even for code that has not changed recently.

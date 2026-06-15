@@ -1,6 +1,6 @@
 # veyq iOS UI Styleguide
 
-This guide complements the web-focused [Memory UI Styleguide](memory-ui-styleguide.md) for native iOS work. It is implementation guidance for the SwiftUI app under `ios/`, not a replacement for Apple's platform conventions or the shared veyq product vocabulary.
+This guide complements the web-focused [Memory UI Styleguide](memory-ui-styleguide.md) for native iOS work. It is implementation guidance for the SwiftUI app under `apple/App/`, not a replacement for Apple's platform conventions or the shared veyq product vocabulary.
 
 veyq on iOS should feel like a native, private Memory archive. It should preserve the emotional, curated direction of the web UI without copying browser layouts into SwiftUI.
 
@@ -14,7 +14,7 @@ Use Swift and SwiftUI, as decided in [ADR 0015](../adr/0015-native-mobile-apps.m
 - `ScrollView` and adaptive grids for Memory, media and contextual content.
 - `sheet`, `confirmationDialog` and `alert` for focused modal tasks.
 
-The iOS app lives in `ios/` as a native Xcode project. Keep V1 native: do not replace it with a shared UI framework, web wrapper or cross-platform runtime.
+The iOS app lives in `apple/App/` as a native Xcode project. Keep V1 native: do not replace it with a shared UI framework, web wrapper or cross-platform runtime.
 
 Use `Memory` language for rich content objects. Folder wording is acceptable only for organizational navigation. Do not introduce Album or Explorer naming, routes, models or UI flows.
 
@@ -43,7 +43,7 @@ Define iOS colors with light and dark appearances. Prefer semantic names such as
 
 Use system backgrounds and materials where they support native readability. Avoid decorative one-note palettes, heavy gradients and generic cloud-drive styling.
 
-The SwiftUI source of truth for code-level style tokens is `ios/Veyq/VeyqStyle.swift`. Keep it small and semantic:
+The SwiftUI source of truth for code-level style tokens is `apple/App/Veyq/VeyqStyle.swift`. Keep it small and semantic:
 
 - Add shared tokens there only when at least two iOS surfaces need the same role.
 - Prefer SwiftUI system roles such as `.primary`, `.secondary`, `.background`, `.regularMaterial` and platform button roles before creating a custom token.
@@ -147,7 +147,7 @@ Do not infer feature availability from server version strings alone. If a needed
 
 iOS targets track the current SDK closely. Keep the app warning-clean for the active deployment target instead of suppressing SDK warnings. Scene-bound UI APIs must use scene-aware initializers; authentication presentation anchors should come from an existing `UIWindow` or from `ASPresentationAnchor(windowScene:)`, never from deprecated frame/default window initializers.
 
-When style guidance changes, update documentation and implementation together when practical. At minimum, do not leave the guide describing tokens, surfaces or workflows that no longer exist in `ios/`.
+When style guidance changes, update documentation and implementation together when practical. At minimum, do not leave the guide describing tokens, surfaces or workflows that no longer exist in `apple/App/`.
 
 ## Privacy And Sharing
 
@@ -164,7 +164,7 @@ Native sessions are separate from browser cookies. Store iOS native session secr
 
 Before finishing iOS-facing product or implementation work:
 
-- Checked this guide, [Native Mobile Apps](mobile-apps.md), [ADR 0015](../adr/0015-native-mobile-apps.md) and the current SwiftUI files under `ios/`.
+- Checked this guide, [Native Mobile Apps](mobile-apps.md), [ADR 0015](../adr/0015-native-mobile-apps.md) and the current SwiftUI files under `apple/App/`.
 - Used SwiftUI-native primitives rather than web layout copies.
 - Preserved Memory terminology and kept folders organizational.
 - Mapped colors from semantic web roles and handled light/dark appearances.

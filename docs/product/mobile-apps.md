@@ -48,7 +48,7 @@ The V1 apps use native platform UI:
 - iOS: Swift and SwiftUI.
 - Android: Kotlin and Jetpack Compose.
 
-The iOS app lives under `ios/` as a native SwiftUI Xcode project. It should follow the iOS-specific product and interaction guidance in [veyq iOS UI Styleguide](ios-ui-styleguide.md), using the existing [Memory UI Styleguide](memory-ui-styleguide.md) as the shared product and color-role baseline.
+The iOS app lives under `apple/App/` as a native SwiftUI Xcode project. It should follow the iOS-specific product and interaction guidance in [veyq iOS UI Styleguide](ios-ui-styleguide.md), using the existing [Memory UI Styleguide](memory-ui-styleguide.md) as the shared product and color-role baseline.
 
 App-store versions are independent from backend `major.build` versions. A current app can support multiple maintained server major lines when capabilities and API adapters allow it. The app follows its own major-plus-build release line. When support for a server capability that has been removed from the server for at least one year is dropped from the app, increment the app major version.
 

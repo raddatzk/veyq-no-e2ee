@@ -204,13 +204,13 @@ load/k6/users.local.json
 !load/k6/users.local.example.json
 
 ### Xcode ###
-ios/**/xcuserdata/
-ios/**/DerivedData/
-ios/build/
+apple/App/**/xcuserdata/
+apple/App/**/DerivedData/
+apple/App/build/
 *.xcuserstate
-# Greenfield iOS project is generated from ios/project.yml via `xcodegen generate`.
-ios/*.xcodeproj/
-ios/Veyq/Info.plist
+# Greenfield Apple app project is generated from apple/App/project.yml via `xcodegen generate`.
+apple/App/*.xcodeproj/
+apple/App/Veyq/Info.plist
 
 ### Windows ###
 # Windows thumbnail cache files
