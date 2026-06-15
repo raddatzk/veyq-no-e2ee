@@ -5,12 +5,17 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("veyq.theme") private var theme = "system"
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Sprache und Darstellung") {
-                    settingRow("Darstellung", value: "Dunkel")
+                    Picker("Darstellung", selection: $theme) {
+                        Text("System").tag("system")
+                        Text("Hell").tag("light")
+                        Text("Dunkel").tag("dark")
+                    }
                     settingRow("Sprache", value: "Deutsch")
                 }
                 Section("Account") {

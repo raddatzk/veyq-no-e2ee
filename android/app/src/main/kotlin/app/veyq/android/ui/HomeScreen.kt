@@ -166,7 +166,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () -> Unit) {
+fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onSignOut: () -> Unit) {
     val controller = remember { HomeController(apiBase, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
@@ -175,7 +175,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, onSignOut: () ->
     LaunchedEffect(Unit) { controller.start() }
 
     if (settingsOpen) {
-        SettingsScreen(apiBase, session, onBack = { settingsOpen = false }, onSignOut = onSignOut)
+        SettingsScreen(apiBase, session, theme, onTheme, onBack = { settingsOpen = false }, onSignOut = onSignOut)
         return
     }
 

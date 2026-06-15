@@ -2,6 +2,7 @@ package app.veyq.android.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,7 +33,7 @@ import app.veyq.crypto.Login
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, onBack: () -> Unit, onSignOut: () -> Unit) {
+fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onBack: () -> Unit, onSignOut: () -> Unit) {
     Scaffold(
         containerColor = Veyq.Bg,
         topBar = {
@@ -43,7 +46,7 @@ fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, onBack: () -
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Section("Sprache und Darstellung")
-            SettingRow("Darstellung", "Dunkel")
+            ThemeRow(theme, onTheme)
             SettingRow("Sprache", "Deutsch")
 
             Section("Account")
@@ -65,6 +68,36 @@ fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, onBack: () -
 @Composable
 private fun Section(title: String) {
     Text(title.uppercase(), color = Veyq.Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+}
+
+@Composable
+private fun ThemeRow(theme: String, onTheme: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
+            .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Darstellung", color = Veyq.Text, fontSize = 15.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("system" to "System", "light" to "Hell", "dark" to "Dunkel").forEach { (key, label) ->
+                val active = theme == key
+                Text(
+                    label,
+                    color = if (active) Color.White else Veyq.Muted,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (active) Veyq.Accent else Color.Transparent)
+                        .clickable { onTheme(key) }
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
+    }
 }
 
 @Composable

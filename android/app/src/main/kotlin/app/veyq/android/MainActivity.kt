@@ -1,8 +1,10 @@
 package app.veyq.android
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -24,10 +26,17 @@ import app.veyq.crypto.Login
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = getSharedPreferences("veyq", Context.MODE_PRIVATE)
         setContent {
-            VeyqTheme {
+            var theme by remember { mutableStateOf(prefs.getString("veyq.theme", "system") ?: "system") }
+            val dark = when (theme) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+            VeyqTheme(dark) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AuthFlow()
+                    AuthFlow(theme) { theme = it; prefs.edit().putString("veyq.theme", it).apply() }
                 }
             }
         }
@@ -37,7 +46,7 @@ class MainActivity : ComponentActivity() {
 private enum class Phase { Connect, Login, Landed }
 
 @Composable
-private fun AuthFlow() {
+private fun AuthFlow(theme: String, onTheme: (String) -> Unit) {
     var phase by remember { mutableStateOf(Phase.Connect) }
     var apiBase by remember { mutableStateOf("") }
     var session by remember { mutableStateOf<Login.UnlockedSession?>(null) }
@@ -45,6 +54,6 @@ private fun AuthFlow() {
     when (phase) {
         Phase.Connect -> ConnectScreen(apiBase) { apiBase = it; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
-        Phase.Landed -> HomeScreen(apiBase, session!!) { session = null; phase = Phase.Login }
+        Phase.Landed -> HomeScreen(apiBase, session!!, theme, onTheme) { session = null; phase = Phase.Login }
     }
 }

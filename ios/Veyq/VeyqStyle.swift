@@ -1,15 +1,17 @@
 import SwiftUI
 
-/// veyq design tokens (dark) — mirrors the web CSS variables so all platforms share one look.
+/// veyq design tokens — mirrors the web CSS variables (light + dark) so all platforms share one look. The
+/// colors are adaptive: they follow the active color scheme, which the theme preference drives via
+/// `.preferredColorScheme` at the root.
 enum VeyqStyle {
-    static let bg = Color(hex: 0x101418)
-    static let surface = Color(hex: 0x171C22)
-    static let surfaceMuted = Color(hex: 0x20262E)
-    static let text = Color(hex: 0xEEF3F8)
-    static let muted = Color(hex: 0x9AA7B5)
-    static let line = Color(hex: 0x333D49)
-    static let accent = Color(hex: 0x9B8CFF)
-    static let danger = Color(hex: 0xF87171)
+    static let bg = Color(light: 0xF7F8FB, dark: 0x101418)
+    static let surface = Color(light: 0xFFFFFF, dark: 0x171C22)
+    static let surfaceMuted = Color(light: 0xF4F6FB, dark: 0x20262E)
+    static let text = Color(light: 0x111827, dark: 0xEEF3F8)
+    static let muted = Color(light: 0x667085, dark: 0x9AA7B5)
+    static let line = Color(light: 0xDCE2EC, dark: 0x333D49)
+    static let accent = Color(light: 0x5B4DF5, dark: 0x9B8CFF)
+    static let danger = Color(light: 0xB42318, dark: 0xF87171)
     static let radius: CGFloat = 12
     static let radiusSm: CGFloat = 10
 }
@@ -22,6 +24,22 @@ extension Color {
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255,
             opacity: 1,
+        )
+    }
+
+    /// An adaptive color that resolves to `light` or `dark` based on the active interface style.
+    init(light: UInt, dark: UInt) {
+        self.init(UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light) })
+    }
+}
+
+private extension UIColor {
+    convenience init(hex: UInt) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1,
         )
     }
 }
