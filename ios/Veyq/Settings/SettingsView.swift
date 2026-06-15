@@ -30,6 +30,11 @@ struct SettingsView: View {
                         }
                     }
                 }
+                if DeviceUnlock.isEnabled {
+                    Section(T("settings.deviceUnlock")) {
+                        Button(T("settings.forgetDevice"), role: .destructive) { DeviceUnlock.forget() }
+                    }
+                }
                 Section(T("settings.instance")) {
                     Text(app.apiBase).foregroundStyle(VeyqStyle.text)
                 }
