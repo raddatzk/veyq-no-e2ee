@@ -64,6 +64,7 @@ class ShareHandler(
             passwordSalt = req.passwordSalt?.let { dec.decode(it.bytes) }
             expiresAt = req.expiresAt?.toInstant()
             label = (req.label ?: "").take(120)
+            noticeMarkdown = req.noticeMarkdown?.trim()?.take(20_000)?.ifEmpty { null }
             createdBy = userId; createdAt = Instant.now()
         }
         shares.persist(share)

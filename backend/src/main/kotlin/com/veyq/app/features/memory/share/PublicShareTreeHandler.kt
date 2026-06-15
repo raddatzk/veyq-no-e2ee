@@ -4,12 +4,15 @@ import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.MemoryJournal
 import com.veyq.app.generated.model.MemoryNodeList
 import com.veyq.app.generated.model.PublicShare
+import com.veyq.app.generated.model.ShareNotice
 import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.features.memory.journal.JournalHandler
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.Share
 import com.veyq.app.shared.content.ShareRepository
+import com.veyq.app.shared.keymgmt.ScopeRepository
+import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
@@ -24,8 +27,22 @@ class PublicShareTreeHandler(
     private val shares: ShareRepository,
     private val nodes: NodeRepository,
     private val journals: JournalHandler,
+    private val scopes: ScopeRepository,
+    private val tenants: TenantRepository,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
+
+    /** Consent notices a guest must accept: the tenant ToS (group memories) + this share's extra notice. */
+    private fun notices(share: Share): List<ShareNotice> {
+        val out = mutableListOf<ShareNotice>()
+        val tenantId = scopes.findById(share.scopeId)?.tenantId
+        if (tenantId != null) {
+            val tenant = tenants.findById(tenantId)
+            if (tenant?.termsMarkdown != null) out.add(ShareNotice(scope = ShareNotice.Scope.TENANT, version = tenant.termsVersion, markdown = tenant.termsMarkdown!!))
+        }
+        share.noticeMarkdown?.let { out.add(ShareNotice(scope = ShareNotice.Scope.SHARE, version = 1, markdown = it)) }
+        return out
+    }
 
     @Transactional
     fun getPublicShare(shareId: String): PublicShare {
@@ -38,6 +55,7 @@ class PublicShareTreeHandler(
             role = ShareRole.valueOf(share.role),
             passwordProtected = share.passwordSalt != null,
             passwordSalt = share.passwordSalt?.let { Blob(suiteId = "v1", bytes = enc.encodeToString(it)) },
+            notices = notices(share),
             wrappedContentKey = Blob(suiteId = share.suiteId, bytes = enc.encodeToString(share.wrappedContentKey)),
             root = ShareHandler.nodeToApi(root, share.scopeId, enc),
         )

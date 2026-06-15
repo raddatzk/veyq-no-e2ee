@@ -21,6 +21,8 @@ class Tenant {
     @Column(name = "display_name", nullable = false) var displayName: String = ""
     @Column var domain: String? = null
     @Column(nullable = false) var status: String = TenantStatus.PENDING.name
+    @Column(name = "terms_markdown", columnDefinition = "text") var termsMarkdown: String? = null
+    @Column(name = "terms_version", nullable = false) var termsVersion: Int = 0
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }

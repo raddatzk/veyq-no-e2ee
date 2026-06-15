@@ -24,6 +24,7 @@ class Share {
     @Column(name = "password_salt") var passwordSalt: ByteArray? = null
     @Column(name = "expires_at") var expiresAt: Instant? = null
     @Column(nullable = false) var label: String = ""
+    @Column(name = "notice_markdown", columnDefinition = "text") var noticeMarkdown: String? = null
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }

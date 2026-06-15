@@ -306,8 +306,49 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenants/{tenantId}/terms:
+    get:
+      tags: [TenantTerms]
+      operationId: getTenantTerms
+      summary: The tenant's Terms of Service (guests must accept these on any share of its memories).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The terms., content: { application/json: { schema: { $ref: '#/components/schemas/TenantTerms' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    put:
+      tags: [TenantTerms]
+      operationId: setTenantTerms
+      summary: Set the tenant's Terms of Service (Owner only). Bumps the version so guests re-accept.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTenantTermsRequest' }
+      responses:
+        '200': { description: The updated terms., content: { application/json: { schema: { $ref: '#/components/schemas/TenantTerms' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
+    TenantTerms:
+      type: object
+      required: [tenantId, version]
+      properties:
+        tenantId: { type: string }
+        termsMarkdown: { type: string }
+        version: { type: integer }
+    UpdateTenantTermsRequest:
+      type: object
+      properties:
+        termsMarkdown: { type: string, description: 'Markdown ToS; empty/omitted clears it.' }
     CreateTenantRequest:
       type: object
       required: [name, displayName]

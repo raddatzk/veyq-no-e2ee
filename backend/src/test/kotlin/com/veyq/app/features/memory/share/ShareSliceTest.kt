@@ -152,13 +152,16 @@ class ShareSliceTest {
 
     @Test
     fun passwordExpiryAndLabel() {
-        // a password-protected, labelled share: the salt rides public resolve; the label is owner-only
+        // a password-protected, labelled share with a per-share notice (guests must accept it)
         val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"passwordSalt":{"suiteId":"v1","bytes":"c2FsdA"},"label":"For grandma"}""")
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"passwordSalt":{"suiteId":"v1","bytes":"c2FsdA"},"label":"For grandma","noticeMarkdown":"## Bitte nur privat teilen"}""")
             .post("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200)
             .body("passwordProtected", `is`(true)).body("label", `is`("For grandma")).extract().path<String>("shareId")
         given().get("/api/public/shares/$shareId").then().statusCode(200)
             .body("passwordProtected", `is`(true)).body("passwordSalt.bytes", `is`("c2FsdA"))
+            // the per-share notice rides the public resolve as a SHARE-scoped notice for the accept gate
+            .body("notices.size()", `is`(1)).body("notices[0].scope", `is`("SHARE"))
+            .body("notices[0].markdown", `is`("## Bitte nur privat teilen"))
 
         // an already-expired share denies all public access (owner can still list it)
         val expired = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
