@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { session } from '../session'
-import { t } from '../../i18n/i18n'
+import { i18n, t } from '../../i18n/i18n'
 import { inviteToGroup } from '../../features/spaces/invite/groups'
+import { getTenantTerms, setTenantTerms } from '../../features/memory/share/share'
+import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
 import type { MemberRole } from '../../features/admin/inviteMembersRoles/inviteMembers'
 import type { SpaceEntry } from '../../features/home/home'
 
@@ -14,6 +16,37 @@ const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
 const error = ref('')
+
+// --- Terms of Service (the group ToS guests must accept on any share) ---
+const termsOpen = ref(false)
+const terms = ref('')
+const termsBusy = ref(false)
+const termsSaved = ref(false)
+const loc = () => (i18n.locale === 'en' ? 'en' : 'de')
+
+async function openTerms() {
+  termsOpen.value = true
+  if (!session.unlocked || !props.space.tenantId) return
+  try {
+    terms.value = (await getTenantTerms(session.apiBase, session.unlocked, props.space.tenantId)).termsMarkdown ?? ''
+  } catch { /* none yet */ }
+}
+function addClause(markdown: string) {
+  terms.value = terms.value.trim() ? `${terms.value.trim()}\n\n${markdown}` : markdown
+}
+async function saveTerms() {
+  if (!session.unlocked || !props.space.tenantId) return
+  termsBusy.value = true
+  try {
+    await setTenantTerms(session.apiBase, session.unlocked, props.space.tenantId, terms.value)
+    termsSaved.value = true
+    setTimeout(() => (termsSaved.value = false), 1500)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    termsBusy.value = false
+  }
+}
 
 async function generate() {
   if (!session.unlocked || !props.space.tenantId) return
@@ -62,6 +95,17 @@ async function copy() {
         </div>
       </template>
       <button v-else class="btn btn-primary invite-gen" type="button" :disabled="busy" @click="generate">{{ t('invite.generate') }}</button>
+
+      <div class="settings-section">{{ t('terms.title') }}</div>
+      <template v-if="termsOpen">
+        <p class="invite-hint">{{ t('terms.hint') }}</p>
+        <div class="terms-clauses">
+          <button v-for="c in TERMS_CLAUSES" :key="c.id" type="button" class="terms-clause" @click="addClause(c.markdown[loc()])">+ {{ c.label[loc()] }}</button>
+        </div>
+        <textarea class="share-field terms-editor" v-model="terms" :placeholder="t('terms.placeholder')"></textarea>
+        <button class="btn btn-primary invite-gen" type="button" :disabled="termsBusy" @click="saveTerms">{{ termsSaved ? t('terms.saved') : t('terms.save') }}</button>
+      </template>
+      <button v-else class="btn btn-ghost invite-gen" type="button" @click="openTerms">{{ t('terms.edit') }}</button>
     </div>
   </div>
 </template>

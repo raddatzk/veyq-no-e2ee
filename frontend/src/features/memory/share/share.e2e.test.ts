@@ -77,5 +77,12 @@ run('share e2e', () => {
     const eShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', expiresAt: new Date(Date.now() - 1000).toISOString() })
     const eKey = new URLSearchParams(eShare.link.slice(eShare.link.indexOf('#') + 1)).get('k')!
     await expect(resolvePublicShare(apiBase, eShare.shareId, eKey)).rejects.toThrow()
+
+    // (6) NOTICE — a per-share notice rides the resolve (the viewer gates content behind accepting it)
+    const nShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', noticeMarkdown: '## Bitte nur privat teilen' })
+    const nKey = new URLSearchParams(nShare.link.slice(nShare.link.indexOf('#') + 1)).get('k')!
+    const nCtx = await resolvePublicShare(apiBase, nShare.shareId, nKey)
+    expect(nCtx.notices).toHaveLength(1)
+    expect(nCtx.notices[0]).toMatchObject({ scope: 'SHARE', markdown: '## Bitte nur privat teilen' })
   }, 120000)
 })

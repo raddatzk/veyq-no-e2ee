@@ -11,6 +11,7 @@ import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
 
 export type ShareRole = 'VIEWER' | 'CONTRIBUTOR' | 'UPLOADER'
+export type ShareNotice = { scope: 'TENANT' | 'SHARE'; version: number; markdown: string }
 
 const EMPTY = new Uint8Array(0)
 
@@ -27,7 +28,7 @@ function fromB64url(s: string): Uint8Array {
 }
 
 export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; passwordProtected: boolean; expiresAt?: string; label: string; createdAt: string }
-export type CreateShareOptions = { role?: ShareRole; password?: string; expiresAt?: string; label?: string; origin?: string }
+export type CreateShareOptions = { role?: ShareRole; password?: string; expiresAt?: string; label?: string; noticeMarkdown?: string; origin?: string }
 
 /** Thrown by resolvePublicShare when the share needs a password the caller didn't supply (or got wrong). */
 export class SharePasswordRequired extends Error {
@@ -52,7 +53,7 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
-    body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role: opts.role ?? 'VIEWER', passwordSalt, expiresAt: opts.expiresAt, label: opts.label ?? '' }),
+    body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role: opts.role ?? 'VIEWER', passwordSalt, expiresAt: opts.expiresAt, label: opts.label ?? '', noticeMarkdown: opts.noticeMarkdown }),
   })
   if (!res.ok) throw new Error(`create share failed: ${res.status} ${await res.text()}`)
   const { shareId } = await res.json()
@@ -78,7 +79,29 @@ export async function revokeShare(apiBase: string, session: UnlockedSession, act
 
 // ---- guest side (no auth) -------------------------------------------------------------------------------
 
-export type ShareContext = { apiBase: string; shareId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole }
+export type ShareContext = { apiBase: string; shareId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole; notices: ShareNotice[] }
+
+// ---- tenant Terms of Service (owner) --------------------------------------------------------------------
+
+export type TenantTerms = { tenantId: string; termsMarkdown?: string; version: number }
+
+/** Read a tenant's ToS (Owner only). */
+export async function getTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string): Promise<TenantTerms> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/terms`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
+  if (!res.ok) throw new Error(`get terms failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Set a tenant's ToS (Owner only); bumps the version so guests re-accept. */
+export async function setTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string, termsMarkdown: string): Promise<TenantTerms> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/terms`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify({ termsMarkdown }),
+  })
+  if (!res.ok) throw new Error(`set terms failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
 
 /** Resolve a public share: unwrap the content key with the fragment share key (+ password if protected). */
 export async function resolvePublicShare(apiBase: string, shareId: string, shareKeyB64: string, password?: string): Promise<ShareContext> {
@@ -101,7 +124,7 @@ export async function resolvePublicShare(apiBase: string, shareId: string, share
     throw new Error('could not open share')
   }
   const rootName = decodeNode(contentKey, body.root as MemoryNode).name
-  return { apiBase, shareId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role }
+  return { apiBase, shareId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
 }
 
 /** The shared subtree's nodes (ciphertext). */

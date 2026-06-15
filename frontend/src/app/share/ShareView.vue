@@ -5,7 +5,7 @@ import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import type { GalleryTile } from '../../features/gallery/gallery'
-import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext } from '../../features/memory/share/share'
+import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { listMySpaces } from '../../features/spaces/switchActiveSpace/switchActiveSpace'
@@ -26,6 +26,8 @@ const uploading = ref(false)
 const needPassword = ref(false)
 const passwordInput = ref('')
 const passwordWrong = ref(false)
+const pendingNotices = ref<ShareNotice[]>([])
+const noticeKey = (shareId: string, n: ShareNotice) => `veyq.share.accept.${shareId}.${n.scope}.${n.version}`
 const fileInput = ref<HTMLInputElement | null>(null)
 const isContributor = computed(() => ctx.value?.role === 'CONTRIBUTOR')
 const canRead = computed(() => ctx.value?.role !== 'UPLOADER')
@@ -74,13 +76,10 @@ async function load(password?: string) {
     ctx.value = c
     title.value = c.rootName
     needPassword.value = false
-    // An UPLOADER is a blind drop-off — it cannot read the gallery or journal (those endpoints 403).
-    if (c.role !== 'UPLOADER') {
-      tiles.value = await loadShareTiles(c, c.rootNodeId)
-      journal.value = await getShareJournal(c).catch(() => '')
-      await nextTick()
-      if (galleryEl.value && ro) ro.observe(galleryEl.value) // the gallery only renders after ctx loads
-    }
+    // Consent gate: present any not-yet-accepted notices and block content until the guest clicks Accept.
+    pendingNotices.value = c.notices.filter((n) => localStorage.getItem(noticeKey(c.shareId, n)) !== 'true')
+    if (pendingNotices.value.length) { loading.value = false; return }
+    await loadContent()
   } catch (e) {
     if (e instanceof SharePasswordRequired) {
       needPassword.value = true
@@ -95,6 +94,27 @@ async function load(password?: string) {
 function submitPassword() {
   load(passwordInput.value)
 }
+async function acceptNotices() {
+  const c = ctx.value
+  if (!c) return
+  c.notices.forEach((n) => localStorage.setItem(noticeKey(c.shareId, n), 'true'))
+  pendingNotices.value = []
+  loading.value = true
+  await loadContent()
+  loading.value = false
+}
+async function loadContent() {
+  const c = ctx.value
+  if (!c) return
+  // An UPLOADER is a blind drop-off — it cannot read the gallery or journal (those endpoints 403).
+  if (c.role !== 'UPLOADER') {
+    tiles.value = await loadShareTiles(c, c.rootNodeId)
+    journal.value = await getShareJournal(c).catch(() => '')
+    await nextTick()
+    if (galleryEl.value && ro) ro.observe(galleryEl.value) // the gallery only renders after content loads
+  }
+}
+const noticesHtml = computed(() => pendingNotices.value.map((n) => renderMarkdown(n.markdown)).join('<hr class="notice-sep">'))
 
 async function onFilesPicked(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
@@ -156,7 +176,13 @@ function closeLightbox() {
         </form>
       </div>
 
-      <div v-if="ctx && !canRead && !error" class="share-dropbox">
+      <section v-if="pendingNotices.length && !error" class="share-notice">
+        <h2 class="bucket-date">{{ t('share.termsTitle') }}</h2>
+        <div class="journal-body share-notice-body" v-html="noticesHtml"></div>
+        <button class="btn btn-primary share-accept" type="button" :disabled="loading" @click="acceptNotices">{{ t('share.accept') }}</button>
+      </section>
+
+      <div v-if="ctx && !pendingNotices.length && !canRead && !error" class="share-dropbox">
         <div class="share-drop-icon">⬆</div>
         <p class="share-drop-title">{{ t('share.uploadOnlyTitle') }}</p>
         <p class="home-empty">{{ t('share.uploadOnlyHint') }}</p>
@@ -167,7 +193,7 @@ function closeLightbox() {
 
       <div v-if="loading && !ctx && !needPassword" class="home-empty">{{ t('detail.loadingGallery') }}</div>
 
-      <template v-if="ctx && canRead">
+      <template v-if="ctx && !pendingNotices.length && canRead">
       <div ref="galleryEl" class="gallery-buckets">
         <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
           <h2 class="bucket-date">{{ b.label }}</h2>

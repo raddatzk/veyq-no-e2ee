@@ -13,6 +13,7 @@ const role = ref<ShareRole>('VIEWER')
 const password = ref('')
 const expiry = ref<'never' | '1d' | '7d' | '30d'>('never')
 const label = ref('')
+const notice = ref('')
 const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
@@ -41,6 +42,7 @@ async function create() {
       password: password.value.trim() || undefined,
       expiresAt: expiresAtIso(),
       label: label.value.trim() || undefined,
+      noticeMarkdown: notice.value.trim() || undefined,
     })
     link.value = res.link
     shares.value = await listShares(session.apiBase, session.unlocked!, props.active, props.memory.id)
@@ -92,6 +94,7 @@ async function revoke(shareId: string) {
         </label>
         <input class="share-field" v-model="label" type="text" :placeholder="t('share.labelPlaceholder')" />
         <input class="share-field" v-model="password" type="password" autocomplete="new-password" :placeholder="t('share.passwordPlaceholder')" />
+        <textarea class="share-field share-notice-input" v-model="notice" :placeholder="t('share.noticePlaceholder')"></textarea>
       </template>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
 

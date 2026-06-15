@@ -53,6 +53,10 @@
 }
 .share-drop-icon { font-size: 2.4rem; color: var(--app-accent); }
 .share-drop-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.share-notice { max-width: 680px; margin: 1.5rem auto; }
+.share-notice-body { border: 1px solid var(--app-line); border-radius: var(--app-radius); padding: 1.1rem 1.3rem; max-height: 55vh; overflow-y: auto; }
+.share-notice-body .notice-sep { border: none; border-top: 1px solid var(--app-line); margin: 1.1rem 0; }
+.share-accept { margin-top: 1rem; }
 
 .dl-option {
   display: flex;
