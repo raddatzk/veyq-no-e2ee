@@ -56,3 +56,64 @@ export async function createGroupSpace(apiBase: string, session: UnlockedSession
   if (!res.ok) throw new Error(`create group failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
+
+export type GroupRole = 'GroupOwner' | 'GroupMember'
+
+/** List a group's members (any group member may). */
+export async function listGroupMembers(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<GroupMember[]> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members`, { headers: auth(session.sessionToken) })
+  if (!res.ok) throw new Error(`list group members failed: ${res.status} ${await res.text()}`)
+  return (await res.json()).members
+}
+
+/**
+ * Add a tenant member to a group (GroupOwner only). Unwraps the caller's OWN group scope grant to the raw
+ * scope private bytes, then re-wraps them to the target's identity — the server never sees the scope key.
+ */
+export async function addGroupMember(
+  apiBase: string,
+  session: UnlockedSession,
+  tenantId: string,
+  scopeId: string,
+  target: { userId: string; kemPublicKeyB64: string },
+  role: GroupRole = 'GroupMember',
+): Promise<GroupMember> {
+  const gRes = await fetch(`${apiBase}/api/scopes/${scopeId}/grants/me`, { headers: auth(session.sessionToken) })
+  if (!gRes.ok) throw new Error(`group grant failed: ${gRes.status} ${await gRes.text()}`)
+  const g = await gRes.json()
+  const myKem = fromB64url(session.identityPublicKey.kemPublicKey)
+  const scopePrivBytes = v1.asymUnwrap(v1.hybridSecret(session.identity), { x: myKem.slice(0, 32), m: myKem.slice(32) }, fromB64url(g.wrappedScopePrivateKey.bytes), 'scope-grant')
+  const tKem = fromB64url(target.kemPublicKeyB64)
+  const wrapped = v1.asymWrap({ x: tKem.slice(0, 32), m: tKem.slice(32) }, scopePrivBytes, 'scope-grant', { nonce: v1.randomBytes(12) })
+
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+    body: JSON.stringify({ userId: target.userId, wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role }),
+  })
+  if (!res.ok) throw new Error(`add group member failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Change a group member's role (GroupOwner only; the server refuses to demote the last GroupOwner). */
+export async function setGroupMemberRole(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string, userId: string, role: GroupRole): Promise<GroupMember> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members/${userId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
+    body: JSON.stringify({ role }),
+  })
+  if (!res.ok) throw new Error(`set group role failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+/** Remove a member from a group (GroupOwner only; the server refuses to remove the last GroupOwner). */
+export async function removeGroupMember(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string, userId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members/${userId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
+  if (!res.ok) throw new Error(`remove group member failed: ${res.status} ${await res.text()}`)
+}
+
+/** Delete a group entirely (GroupOwner only). */
+export async function deleteGroup(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
+  if (!res.ok) throw new Error(`delete group failed: ${res.status} ${await res.text()}`)
+}

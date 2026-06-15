@@ -14,6 +14,7 @@ import RenameModal from './RenameModal.vue'
 import MovePicker from './MovePicker.vue'
 import CreateGroupModal from './CreateGroupModal.vue'
 import CreateGroupSpaceModal from './CreateGroupSpaceModal.vue'
+import GroupMembersModal from './GroupMembersModal.vue'
 import InviteModal from './InviteModal.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
@@ -36,6 +37,7 @@ const dragged = ref<{ entry: LevelEntry; section: 'M' | 'F' } | null>(null)
 const createGroupOpen = ref(false)
 const createGroupSpaceOpen = ref(false)
 const inviteTarget = ref<SpaceEntry | null>(null)
+const manageGroup = ref<SpaceEntry | null>(null)
 
 async function onGroupSpaceCreated() {
   createGroupSpaceOpen.value = false
@@ -189,10 +191,13 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       </button>
 
       <div class="home-section">{{ t('home.groups') }}</div>
-      <button v-for="s in groupSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
-        <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
-        <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
-      </button>
+      <div v-for="s in groupSpaces()" :key="s.scopeId" class="space-row-wrap">
+        <button class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
+          <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
+          <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
+        </button>
+        <button v-if="s.role === 'GroupOwner'" class="space-invite" :title="t('groups.members')" @click.stop="manageGroup = s">⚙</button>
+      </div>
       <button v-if="tenantSpaces().length" class="space-row space-create" @click="createGroupSpaceOpen = true">
         <span class="space-avatar space-avatar-ghost">＋</span>
         <span class="space-meta"><div class="space-name">{{ t('groups.create') }}</div></span>
@@ -277,6 +282,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <MovePicker v-if="moveTarget && active" :active="active" :entry="moveTarget" @close="moveTarget = null" @moved="onMoved" />
     <CreateGroupModal v-if="createGroupOpen" @close="createGroupOpen = false" @created="onGroupCreated" />
     <CreateGroupSpaceModal v-if="createGroupSpaceOpen" :tenants="tenantSpaces()" @close="createGroupSpaceOpen = false" @created="onGroupSpaceCreated" />
+    <GroupMembersModal v-if="manageGroup" :space="manageGroup" @close="manageGroup = null" />
     <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" />
 
     <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
