@@ -11,6 +11,7 @@ let L10nStrings: [String: [String: String]] = [
     "de": [
         "common.email": "E-Mail", "common.password": "Passwort", "common.secretKey": "Secret Key",
         "common.cancel": "Abbrechen", "common.done": "Fertig", "common.name": "Name", "common.create": "Erstellen",
+        "common.rename": "Umbenennen", "common.close": "Schließen", "cover.setAsCover": "Als Cover",
         "home.createMemory": "Memory erstellen", "home.createFolder": "Ordner erstellen",
         "connect.title": "Mit einer Instanz verbinden", "connect.sub": "Gib die Adresse deiner veyq-Instanz ein.",
         "connect.url": "Instanz-URL", "connect.connect": "Verbinden",
@@ -32,6 +33,7 @@ let L10nStrings: [String: [String: String]] = [
     "en": [
         "common.email": "Email", "common.password": "Password", "common.secretKey": "Secret Key",
         "common.cancel": "Cancel", "common.done": "Done", "common.name": "Name", "common.create": "Create",
+        "common.rename": "Rename", "common.close": "Close", "cover.setAsCover": "Set as cover",
         "home.createMemory": "Create memory", "home.createFolder": "Create folder",
         "connect.title": "Connect to an instance", "connect.sub": "Enter your veyq instance address.",
         "connect.url": "Instance URL", "connect.connect": "Connect",

@@ -11,6 +11,7 @@ public enum MemoryTree {
         public let scopeId, type, slugToken: String
         public let orderIndex: Int
         let sealedContent: BlobDTO
+        public let coverMediaId: String?
         public let createdAt: String
     }
     struct NodeListDTO: Codable { let nodes: [MemoryNode] }

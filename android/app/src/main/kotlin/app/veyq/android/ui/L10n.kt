@@ -17,6 +17,7 @@ object L10n {
         "de" to mapOf(
             "common.email" to "E-Mail", "common.password" to "Passwort", "common.secretKey" to "Secret Key",
             "common.name" to "Name", "common.create" to "Erstellen", "common.cancel" to "Abbrechen",
+            "common.rename" to "Umbenennen", "common.close" to "Schließen", "cover.setAsCover" to "Als Cover",
             "home.createMemory" to "Memory erstellen", "home.createFolder" to "Ordner erstellen",
             "connect.title" to "Mit einer Instanz verbinden", "connect.sub" to "Gib die Adresse deiner veyq-Instanz ein.",
             "connect.url" to "Instanz-URL", "connect.connect" to "Verbinden",
@@ -38,6 +39,7 @@ object L10n {
         "en" to mapOf(
             "common.email" to "Email", "common.password" to "Password", "common.secretKey" to "Secret Key",
             "common.name" to "Name", "common.create" to "Create", "common.cancel" to "Cancel",
+            "common.rename" to "Rename", "common.close" to "Close", "cover.setAsCover" to "Set as cover",
             "home.createMemory" to "Create memory", "home.createFolder" to "Create folder",
             "connect.title" to "Connect to an instance", "connect.sub" to "Enter your veyq instance address.",
             "connect.url" to "Instance URL", "connect.connect" to "Connect",

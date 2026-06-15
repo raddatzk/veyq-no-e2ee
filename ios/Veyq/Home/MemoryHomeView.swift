@@ -10,6 +10,9 @@ struct MemoryHomeView: View {
     @State private var showCreate = false
     @State private var createType = "MEMORY"
     @State private var newName = ""
+    @State private var showRename = false
+    @State private var renameEntry: HomeStore.Entry?
+    @State private var renameName = ""
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -83,6 +86,15 @@ struct MemoryHomeView: View {
             Button(T("common.create")) { let n = newName; Task { await store.create(type: createType, name: n) } }
             Button(T("common.cancel"), role: .cancel) {}
         }
+        .alert(T("common.rename"), isPresented: $showRename) {
+            TextField(T("common.name"), text: $renameName)
+            Button(T("common.rename")) { if let e = renameEntry { let n = renameName; Task { await store.rename(e, name: n) } } }
+            Button(T("common.cancel"), role: .cancel) {}
+        }
+    }
+
+    private func renameMenu(_ entry: HomeStore.Entry) -> some View {
+        Button(T("common.rename")) { renameEntry = entry; renameName = entry.name; showRename = true }
     }
 
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
@@ -159,6 +171,7 @@ struct MemoryHomeView: View {
             .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .buttonStyle(.plain)
+        .contextMenu { renameMenu(m) }
     }
 
     private func folderRow(_ f: HomeStore.Entry) -> some View {
@@ -175,5 +188,6 @@ struct MemoryHomeView: View {
             .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .buttonStyle(.plain)
+        .contextMenu { renameMenu(f) }
     }
 }

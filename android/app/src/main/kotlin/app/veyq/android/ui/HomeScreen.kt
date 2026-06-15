@@ -1,9 +1,11 @@
 package app.veyq.android.ui
 
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +49,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import app.veyq.crypto.Browse
+import app.veyq.crypto.Curate
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import app.veyq.crypto.MemoryTree
@@ -59,7 +62,11 @@ import org.json.JSONObject
 
 /** MemoryHome state holder. Blocking core calls run on IO; Compose state is updated on the caller's (main). */
 class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
-    data class Entry(val id: String, val type: String, val name: String)
+    data class Entry(val node: JSONObject, val name: String) {
+        val id: String get() = node.getString("id")
+        val type: String get() = node.getString("type")
+        val coverMediaId: String? get() = if (node.has("coverMediaId") && !node.isNull("coverMediaId")) node.getString("coverMediaId") else null
+    }
     data class Crumb(val nodeId: String?, val name: String)
 
     var spaces by mutableStateOf<List<JSONObject>>(emptyList())
@@ -128,6 +135,19 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         }
     }
 
+    suspend fun rename(entry: Entry, name: String) {
+        val trimmed = name.trim()
+        val s = scope; val key = contentKey
+        if (trimmed.isEmpty() || s == null || key == null) return
+        allNodes = null
+        try {
+            withContext(Dispatchers.IO) { Curate.renameNode(apiBase, session, s.scopeId, key, entry.node, trimmed) }
+            openLevel()
+        } catch (e: Exception) {
+            error = "Konnte nicht umbenennen."
+        }
+    }
+
     private fun slugify(name: String): String {
         val allowed = (('a'..'z') + ('0'..'9')).toSet()
         val folded = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFKD).replace("\\p{M}".toRegex(), "").lowercase()
@@ -151,7 +171,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         }
         searchHits = (allNodes ?: emptyList()).mapNotNull { n ->
             val name = runCatching { MemoryTree.decodeNodeName(key, n) }.getOrDefault("")
-            if (name.lowercase().contains(q)) Entry(n.getString("id"), n.getString("type"), name) else null
+            if (name.lowercase().contains(q)) Entry(n, name) else null
         }
     }
 
@@ -163,7 +183,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
             val nodes = withContext(Dispatchers.IO) { Browse.listChildren(apiBase, session, s.scopeId, parentId) }
             val entries = nodes.map { n ->
                 val name = runCatching { MemoryTree.decodeNodeName(key, n) }.getOrDefault("—")
-                Entry(n.getString("id"), n.getString("type"), name)
+                Entry(n, name)
             }
             folders = entries.filter { it.type == "FOLDER" }
             memories = entries.filter { it.type == "MEMORY" }
@@ -177,7 +197,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     private suspend fun loadCover(m: Entry, scopeId: String, key: ByteArray) {
         try {
             val media = withContext(Dispatchers.IO) { Media.listMedia(apiBase, session, scopeId, m.id) }
-            val first = media.firstOrNull() ?: return
+            val first = (m.coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } } ?: media.firstOrNull()) ?: return
             val derivs = first.getJSONArray("derivatives")
             var blob: JSONObject? = first.getJSONObject("original")
             for (i in 0 until derivs.length()) {
@@ -206,6 +226,9 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     var createType by remember { mutableStateOf("MEMORY") }
     var showNameDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
+    var renameEntry by remember { mutableStateOf<HomeController.Entry?>(null) }
+    var renameName by remember { mutableStateOf("") }
+    val startRename: (HomeController.Entry) -> Unit = { renameEntry = it; renameName = it.name }
     LaunchedEffect(Unit) { controller.start() }
 
     if (settingsOpen) {
@@ -282,11 +305,11 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
 
                 SectionHeader(L10n.t("home.memories"), controller.memories.size)
                 if (controller.memories.isEmpty()) EmptyText(L10n.t("home.noMemories"))
-                else MemoryGrid(controller.memories, controller.covers) { detail = it }
+                else MemoryGrid(controller.memories, controller.covers, onOpen = { detail = it }, onRename = startRename)
 
                 SectionHeader(L10n.t("home.folders"), controller.folders.size)
                 if (controller.folders.isEmpty()) EmptyText(L10n.t("home.noFolders"))
-                else controller.folders.forEach { f -> FolderRow(f) { scope.launch { controller.openFolder(f) } } }
+                else controller.folders.forEach { f -> FolderRow(f, onClick = { scope.launch { controller.openFolder(f) } }, onLongClick = { startRename(f) }) }
             }
         }
     }
@@ -315,6 +338,29 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                 }
             },
             dismissButton = { TextButton(onClick = { showNameDialog = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    renameEntry?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { renameEntry = null },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("common.rename"), color = Veyq.Text) },
+            text = {
+                OutlinedTextField(
+                    value = renameName,
+                    onValueChange = { renameName = it },
+                    singleLine = true,
+                    placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+                        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                    ),
+                )
+            },
+            confirmButton = { TextButton(onClick = { val n = renameName; renameEntry = null; scope.launch { controller.rename(entry, n) } }) { Text(L10n.t("common.rename"), color = Veyq.Accent) } },
+            dismissButton = { TextButton(onClick = { renameEntry = null }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
 }
@@ -348,24 +394,25 @@ private fun SectionHeader(title: String, count: Int) {
 private fun EmptyText(text: String) = Text(text, fontSize = 14.sp, color = Veyq.Muted)
 
 @Composable
-private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, onOpen: (HomeController.Entry) -> Unit) {
+private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, onOpen: (HomeController.Entry) -> Unit, onRename: (HomeController.Entry) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         memories.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { m -> Box(Modifier.weight(1f)) { MemoryCard(m, covers[m.id], onOpen) } }
+                row.forEach { m -> Box(Modifier.weight(1f)) { MemoryCard(m, covers[m.id], onOpen, onRename) } }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MemoryCard(m: HomeController.Entry, cover: ImageBitmap?, onOpen: (HomeController.Entry) -> Unit) {
+private fun MemoryCard(m: HomeController.Entry, cover: ImageBitmap?, onOpen: (HomeController.Entry) -> Unit, onRename: (HomeController.Entry) -> Unit) {
     Column(
         Modifier
             .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
             .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
-            .clickable { onOpen(m) },
+            .combinedClickable(onClick = { onOpen(m) }, onLongClick = { onRename(m) }),
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f).background(Veyq.SurfaceMuted), contentAlignment = Alignment.Center) {
             if (cover != null) Image(cover, null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -374,14 +421,15 @@ private fun MemoryCard(m: HomeController.Entry, cover: ImageBitmap?, onOpen: (Ho
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FolderRow(f: HomeController.Entry, onClick: () -> Unit) {
+private fun FolderRow(f: HomeController.Entry, onClick: () -> Unit, onLongClick: () -> Unit = {}) {
     Row(
         Modifier
             .fillMaxWidth()
             .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius))
             .background(Veyq.Surface, RoundedCornerShape(Veyq.Radius))
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

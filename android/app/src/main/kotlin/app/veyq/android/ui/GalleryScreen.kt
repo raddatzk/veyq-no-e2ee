@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.veyq.crypto.Curate
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,10 @@ class GalleryController(
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
     var uploading by mutableStateOf(false)
+
+    suspend fun setCover(mediaId: String) {
+        runCatching { withContext(Dispatchers.IO) { Curate.setCover(apiBase, session, scopeId, nodeId, mediaId) } }
+    }
 
     suspend fun upload(items: List<ByteArray>) {
         uploading = true
@@ -123,7 +129,7 @@ class GalleryController(
 @Composable
 fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
     val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
-    var lightbox by remember { mutableStateOf<ImageBitmap?>(null) }
+    var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
     var showDownload by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -180,14 +186,20 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             when {
                 controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
                 controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
-                else -> Gallery(controller.tiles) { lightbox = it }
+                else -> Gallery(controller.tiles) { lightboxTile = it }
             }
         }
     }
 
-    lightbox?.let { img ->
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).clickable { lightbox = null }, contentAlignment = Alignment.Center) {
-            Image(img, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+    lightboxTile?.let { tile ->
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Image(tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = { val id = tile.id; lightboxTile = null; scope.launch { controller.setCover(id) } }) { Text(L10n.t("cover.setAsCover"), color = Veyq.Accent) }
+                    TextButton(onClick = { lightboxTile = null }) { Text(L10n.t("common.close"), color = Color.White) }
+                }
+            }
         }
     }
 
@@ -204,7 +216,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
 }
 
 @Composable
-private fun Gallery(tiles: List<GalleryController.Tile>, onTap: (ImageBitmap) -> Unit) {
+private fun Gallery(tiles: List<GalleryController.Tile>, onTap: (GalleryController.Tile) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val (laid, height) = JustifiedLayout.calculate(
             tiles.map { JustifiedLayout.Source(it.id, it.aspectRatio) },
@@ -220,7 +232,7 @@ private fun Gallery(tiles: List<GalleryController.Tile>, onTap: (ImageBitmap) ->
                             .offset(t.left.dp, t.top.dp)
                             .size(t.width.dp, t.height.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { onTap(tile.image) },
+                            .clickable { onTap(tile) },
                         contentScale = ContentScale.Crop,
                     )
                 }

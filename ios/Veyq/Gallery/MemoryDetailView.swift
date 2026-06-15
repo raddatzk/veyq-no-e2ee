@@ -54,6 +54,10 @@ final class GalleryStore: ObservableObject {
         uploading = false
     }
 
+    func setCover(_ mediaId: String) async {
+        _ = try? await Curate.setCover(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, coverMediaId: mediaId)
+    }
+
     static func thumbnail(_ data: Data, maxDim: CGFloat = 400) -> Data? {
         guard let img = UIImage(data: data) else { return nil }
         let scale = min(1, maxDim / max(img.size.width, img.size.height))
@@ -67,6 +71,7 @@ struct MemoryDetailView: View {
     @StateObject private var store: GalleryStore
     let name: String
     @State private var lightbox: UIImage?
+    @State private var lightboxMediaId: String?
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showDownload = false
     @State private var downloading = false
@@ -128,12 +133,22 @@ struct MemoryDetailView: View {
             }
         }
         .task { await store.load() }
-        .fullScreenCover(item: Binding(get: { lightbox.map { LightboxImage(image: $0) } }, set: { _ in lightbox = nil })) { item in
+        .fullScreenCover(item: Binding(get: { lightbox.map { LightboxImage(image: $0) } }, set: { _ in lightbox = nil; lightboxMediaId = nil })) { item in
             ZStack {
                 Color.black.ignoresSafeArea()
-                Image(uiImage: item.image).resizable().scaledToFit()
+                VStack(spacing: 16) {
+                    Image(uiImage: item.image).resizable().scaledToFit()
+                    HStack(spacing: 12) {
+                        Button(T("cover.setAsCover")) {
+                            if let id = lightboxMediaId { Task { await store.setCover(id) } }
+                            lightbox = nil; lightboxMediaId = nil
+                        }
+                        .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
+                        Button(T("common.close")) { lightbox = nil; lightboxMediaId = nil }.tint(.white)
+                    }
+                }
+                .padding()
             }
-            .onTapGesture { lightbox = nil }
         }
     }
 
@@ -157,7 +172,7 @@ struct MemoryDetailView: View {
                         .frame(width: t.width, height: t.height).clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .offset(x: t.left, y: t.top)
-                        .onTapGesture { lightbox = tile.image }
+                        .onTapGesture { lightbox = tile.image; lightboxMediaId = tile.id }
                 }
             }
         }

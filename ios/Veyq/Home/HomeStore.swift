@@ -140,12 +140,25 @@ final class HomeStore: ObservableObject {
     private func loadCover(_ m: Entry, scope: ScopeContent.OpenScope, contentKey: Data) async {
         do {
             let media = try await Media.listMedia(apiBase: apiBase, session: session, scopeId: scope.scopeId, nodeId: m.node.id)
-            guard let first = media.first else { return }
-            let ref = first.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? first.original
+            let chosen = (m.node.coverMediaId.flatMap { cid in media.first { $0.id == cid } }) ?? media.first
+            guard let item = chosen else { return }
+            let ref = item.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? item.original
             let bytes = try await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, ref: ref)
             if let img = UIImage(data: bytes) { covers[m.node.id] = img }
         } catch {
             // no cover — leave the placeholder
+        }
+    }
+
+    func rename(_ entry: Entry, name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let scope, let contentKey, !trimmed.isEmpty else { return }
+        allNodes = nil
+        do {
+            _ = try await Curate.renameNode(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, node: entry.node, newName: trimmed)
+            await openLevel()
+        } catch {
+            self.error = "Konnte nicht umbenennen."
         }
     }
 }
