@@ -67,7 +67,7 @@ class GalleryController(
     private val contentKey: ByteArray,
     private val nodeId: String,
 ) {
-    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float)
+    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String)
 
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
@@ -115,7 +115,7 @@ class GalleryController(
                 val ref = Media.BlobRef(blob.getString("blobId"), blob.getInt("totalChunks"), blob.getLong("byteSize"))
                 val bytes = withContext(Dispatchers.IO) { Media.downloadBlob(apiBase, session, scopeId, contentKey, ref) }
                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
-                result.add(Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat())))
+                result.add(Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()), m.getString("takenAt")))
             }
             tiles = result
         } catch (e: Exception) {
@@ -186,7 +186,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             when {
                 controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
                 controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
-                else -> Gallery(controller.tiles) { lightboxTile = it }
+                else -> {
+                    val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
+                    if (range.isNotEmpty()) Text(range, color = Veyq.Muted, fontSize = 13.sp)
+                    DateBuckets.groupByDay(controller.tiles) { it.takenAt }.forEach { (key, items) ->
+                        Text(DateBuckets.dayLabel(key), color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Gallery(items) { lightboxTile = it }
+                    }
+                }
             }
         }
     }

@@ -38,6 +38,21 @@
 .dl-text { display: flex; flex-direction: column; }
 .dl-text small { color: var(--app-muted); }
 
+.detail-daterange {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+  margin: -0.6rem 0 1.1rem;
+}
+
+.gallery-buckets { width: 100%; }
+.gallery-bucket { margin-bottom: 1.6rem; }
+.bucket-date {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--app-text);
+  margin: 0 0 0.6rem;
+}
+
 .gallery {
   position: relative;
   width: 100%;

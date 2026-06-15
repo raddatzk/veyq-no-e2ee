@@ -7,7 +7,7 @@ import VeyqCrypto
 /// the tiles out with the shared justified algorithm. Tapping a tile opens a lightbox.
 @MainActor
 final class GalleryStore: ObservableObject {
-    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat }
+    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String }
 
     let apiBase: String
     let session: Login.UnlockedSession
@@ -31,7 +31,7 @@ final class GalleryStore: ObservableObject {
                 let ref = m.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? m.original
                 let bytes = try await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)
                 if let img = UIImage(data: bytes) {
-                    result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height)))
+                    result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height), takenAt: m.takenAt))
                 }
             }
             tiles = result
@@ -93,7 +93,16 @@ struct MemoryDetailView: View {
                     } else if store.tiles.isEmpty {
                         Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                     } else {
-                        gallery(width: geo.size.width - 32)
+                        let range = DateBuckets.dateRange(store.tiles) { $0.takenAt }
+                        if !range.isEmpty {
+                            Text(range).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        }
+                        ForEach(DateBuckets.groupByDay(store.tiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
+                                gallery(bucket.items, width: geo.size.width - 32)
+                            }
+                        }
                     }
                 }
                 .padding(16)
@@ -162,11 +171,11 @@ struct MemoryDetailView: View {
         }
     }
 
-    private func gallery(width: CGFloat) -> some View {
-        let layout = JustifiedLayout.calculate(store.tiles.map { JustifiedLayout.Source(id: $0.id, aspectRatio: $0.aspectRatio) }, containerWidth: width, targetHeight: 160, gap: 6)
+    private func gallery(_ items: [GalleryStore.Tile], width: CGFloat) -> some View {
+        let layout = JustifiedLayout.calculate(items.map { JustifiedLayout.Source(id: $0.id, aspectRatio: $0.aspectRatio) }, containerWidth: width, targetHeight: 160, gap: 6)
         return ZStack(alignment: .topLeading) {
             ForEach(layout.tiles) { t in
-                if let tile = store.tiles.first(where: { $0.id == t.id }) {
+                if let tile = items.first(where: { $0.id == t.id }) {
                     Image(uiImage: tile.image)
                         .resizable().scaledToFill()
                         .frame(width: t.width, height: t.height).clipped()

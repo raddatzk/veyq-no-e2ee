@@ -6,7 +6,7 @@ import type { ActiveSpace } from '../home/home'
 import { downloadBlob, listMedia, type BlobRef } from '../uploads/media/media'
 import { galleryDisplayAspectRatio } from './justifiedLayout'
 
-export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; original: BlobRef }
+export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; original: BlobRef }
 
 function imageAspectRatio(url: string): Promise<number> {
   return new Promise((resolve) => {
@@ -25,7 +25,7 @@ export async function loadGalleryTiles(apiBase: string, session: UnlockedSession
     const ref = m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original
     const bytes = await downloadBlob(apiBase, session, active.scope.scopeId, active.contentKey, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    tiles.push({ id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, original: m.original })
+    tiles.push({ id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: m.takenAt, original: m.original })
   }
   return tiles
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
-import { t } from '../../i18n/i18n'
+import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
+import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
@@ -24,14 +25,20 @@ const uploading = ref(false)
 const downloadOpen = ref(false)
 let ro: ResizeObserver | null = null
 
-const layout = computed(() =>
-  calculateJustifiedLayout({
-    items: tiles.value.map((t) => ({ id: t.id, aspectRatio: t.aspectRatio })),
-    containerWidth: containerWidth.value,
-    targetHeight: 220,
-    gap: 6,
-  }),
+// Group the (takenAt-ordered) tiles into day buckets, each with its own justified layout — a dated timeline.
+const buckets = computed(() =>
+  groupByDay(tiles.value).map((b) => ({
+    key: b.key,
+    label: formatDayLabel(b.key, i18n.locale),
+    layout: calculateJustifiedLayout({
+      items: b.items.map((t) => ({ id: t.id, aspectRatio: t.aspectRatio })),
+      containerWidth: containerWidth.value,
+      targetHeight: 220,
+      gap: 6,
+    }),
+  })),
 )
+const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
 const tileById = computed(() => Object.fromEntries(tiles.value.map((t) => [t.id, t])))
 
 onMounted(async () => {
@@ -99,19 +106,25 @@ async function setAsCover() {
       </button>
       <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
     </div>
+    <div v-if="dateRange" class="detail-daterange">{{ dateRange }}</div>
 
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
 
-    <div ref="galleryEl" class="gallery" :style="{ height: layout.height + 'px' }">
-      <button
-        v-for="tile in layout.tiles"
-        :key="tile.id"
-        class="gallery-tile"
-        :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
-        @click="openLightbox(tileById[tile.id])"
-      >
-        <img :src="tileById[tile.id].url" alt="" />
-      </button>
+    <div ref="galleryEl" class="gallery-buckets">
+      <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
+        <h2 class="bucket-date">{{ b.label }}</h2>
+        <div class="gallery" :style="{ height: b.layout.height + 'px' }">
+          <button
+            v-for="tile in b.layout.tiles"
+            :key="tile.id"
+            class="gallery-tile"
+            :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
+            @click="openLightbox(tileById[tile.id])"
+          >
+            <img :src="tileById[tile.id].url" alt="" />
+          </button>
+        </div>
+      </section>
     </div>
 
     <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
