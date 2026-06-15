@@ -5,15 +5,18 @@ import { t } from './i18n/i18n'
 import { getSetupStatus } from './features/account/instance/instance'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
+import AcceptInvitePanel from './app/auth/AcceptInvitePanel.vue'
 import HomeView from './app/home/HomeView.vue'
+import { parseInviteHash, type InviteParts } from './features/spaces/invite/inviteLink'
 
 // Slice 1 (web): same-origin instance → on boot check setup status → setup (first run) or login →
-// landed. The real MemoryHome is slice 2.
+// landed. An invite link (#invite=…&s=…&k=…) shows the accept flow instead.
 applyTheme(session.theme)
 
 type Phase = 'loading' | 'setup' | 'login' | 'error'
 const phase = ref<Phase>('loading')
 const prefill = ref<{ email?: string; secretKey?: string }>({})
+const invite = ref<InviteParts | null>(parseInviteHash(window.location.hash))
 
 onMounted(async () => {
   try {
@@ -28,10 +31,16 @@ function onSetupDone(email: string, secretKey: string) {
   prefill.value = { email, secretKey }
   phase.value = 'login'
 }
+
+function clearInvite() {
+  invite.value = null
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
 </script>
 
 <template>
-  <HomeView v-if="session.unlocked" />
+  <AcceptInvitePanel v-if="invite" :invite="invite" @done="clearInvite" @dismiss="clearInvite" />
+  <HomeView v-else-if="session.unlocked" />
   <div v-else-if="phase === 'loading'" class="auth-screen">
     <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">{{ t('app.loading') }}</p></div>
   </div>

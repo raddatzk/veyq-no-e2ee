@@ -4,7 +4,7 @@ import { login } from '../../features/account/login/login'
 import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
 
-const props = defineProps<{ prefill?: { email?: string; secretKey?: string } }>()
+const props = defineProps<{ prefill?: { email?: string; secretKey?: string }; embedded?: boolean }>()
 const email = ref(props.prefill?.email ?? '')
 const password = ref('')
 const secretKey = ref(props.prefill?.secretKey ?? '')
@@ -26,11 +26,13 @@ async function submit() {
 </script>
 
 <template>
-  <div class="auth-screen">
-    <div class="auth-card">
-      <p class="auth-wordmark">veyq</p>
-      <h1 class="auth-title">{{ t('login.title') }}</h1>
-      <p class="auth-sub">{{ host }}</p>
+  <div :class="props.embedded ? '' : 'auth-screen'">
+    <div :class="props.embedded ? '' : 'auth-card'">
+      <template v-if="!props.embedded">
+        <p class="auth-wordmark">veyq</p>
+        <h1 class="auth-title">{{ t('login.title') }}</h1>
+        <p class="auth-sub">{{ host }}</p>
+      </template>
       <form class="veyq-form" @submit.prevent="submit">
         <label>
           {{ t('common.email') }}

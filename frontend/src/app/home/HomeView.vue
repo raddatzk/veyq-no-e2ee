@@ -12,6 +12,8 @@ import SettingsOverlay from './SettingsOverlay.vue'
 import CreateModal from './CreateModal.vue'
 import RenameModal from './RenameModal.vue'
 import MovePicker from './MovePicker.vue'
+import CreateGroupModal from './CreateGroupModal.vue'
+import InviteModal from './InviteModal.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -29,6 +31,18 @@ const renameTarget = ref<LevelEntry | null>(null)
 const menuTarget = ref<LevelEntry | null>(null)
 const moveTarget = ref<LevelEntry | null>(null)
 const dragged = ref<{ entry: LevelEntry; section: 'M' | 'F' } | null>(null)
+const createGroupOpen = ref(false)
+const inviteTarget = ref<SpaceEntry | null>(null)
+
+async function reloadSpaces(selectTenantId?: string) {
+  spaces.value = await loadSpaces(apiBase, session.unlocked!)
+  const target = selectTenantId ? spaces.value.find((s) => s.tenantId === selectTenantId) : undefined
+  if (target) await switchSpace(target)
+}
+async function onGroupCreated(tenantId: string) {
+  createGroupOpen.value = false
+  await reloadSpaces(tenantId)
+}
 
 const currentParentId = () => (crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined)
 async function onCreated() {
@@ -145,13 +159,18 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
       </button>
 
-      <template v-if="groupSpaces().length">
-        <div class="home-section">{{ t('home.groups') }}</div>
-        <button v-for="s in groupSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
+      <div class="home-section">{{ t('home.groups') }}</div>
+      <div v-for="s in groupSpaces()" :key="s.scopeId" class="space-row-wrap">
+        <button class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
           <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
           <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
         </button>
-      </template>
+        <button v-if="s.role === 'Owner'" class="space-invite" :title="t('groups.invite')" @click.stop="inviteTarget = s">＋</button>
+      </div>
+      <button class="space-row space-create" @click="createGroupOpen = true">
+        <span class="space-avatar space-avatar-ghost">＋</span>
+        <span class="space-meta"><div class="space-name">{{ t('groups.create') }}</div></span>
+      </button>
 
       <div class="home-spacer" />
       <button class="space-row" @click="settingsOpen = true">
@@ -230,6 +249,8 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     />
     <RenameModal v-if="renameTarget && active" :active="active" :entry="renameTarget" @close="renameTarget = null" @renamed="onRenamed" />
     <MovePicker v-if="moveTarget && active" :active="active" :entry="moveTarget" @close="moveTarget = null" @moved="onMoved" />
+    <CreateGroupModal v-if="createGroupOpen" @close="createGroupOpen = false" @created="onGroupCreated" />
+    <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" />
 
     <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
       <div class="settings-panel action-sheet">
