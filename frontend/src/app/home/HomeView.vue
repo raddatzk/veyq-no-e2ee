@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { enterSpace, loadCover, loadLevel, loadMemoryById, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
-import { deleteNode, reorderNode } from '../../features/memory/curate/curate'
+import { ancestorChain, enterSpace, loadCover, loadLevel, loadSpaces, resolveRoute, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import { buildHomePath, matchSpace, parseHomePath } from '../../features/home/homeRoute'
+import { deleteNode, reorderNode, slugify } from '../../features/memory/curate/curate'
 import { cancelTenantDeletion } from '../../features/spaces/invite/groups'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -24,7 +25,7 @@ const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | n
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
 const active = ref<ActiveSpace | null>(null)
-const crumbs = ref<{ id?: string; name: string }[]>([])
+const crumbs = ref<{ id?: string; name: string; slug?: string }[]>([])
 const folders = ref<LevelEntry[]>([])
 const memories = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string | null>>({})
@@ -124,39 +125,81 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('popstate', onPopState)
   try {
     spaces.value = await loadSpaces(apiBase, session.unlocked!)
-    // Deep-link from a share link the member already holds: open that space + memory directly.
+    // Deep-link from a share link the member already holds: open that space + memory with its folder back-stack.
     const target = props.openTarget ? spaces.value.find((s) => s.scopeId === props.openTarget!.scopeId) : undefined
     if (target && props.openTarget) {
-      await switchSpace(target)
-      selectedMemory.value = await loadMemoryById(apiBase, session.unlocked!, active.value!, props.openTarget.nodeId)
+      active.value = await enterSpace(apiBase, session.unlocked!, target)
+      const chain = await ancestorChain(apiBase, session.unlocked!, active.value, props.openTarget.nodeId)
+      const memory = chain[chain.length - 1] ?? null
+      crumbs.value = [{ name: target.displayName }, ...chain.slice(0, -1).map(toCrumb)]
+      await openLevel()
+      selectedMemory.value = memory
+      syncUrl(false)
       return
     }
-    const personal = spaces.value.find((s) => s.kind === 'PERSONAL') ?? spaces.value[0]
-    if (personal) await switchSpace(personal)
+    // Otherwise restore the location from the path URL (a member-shared deep link), or land on personal.
+    await restoreFromUrl()
   } catch (e) {
     error.value = (e as Error).message
   }
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('popstate', onPopState)
+})
+
+const toCrumb = (f: LevelEntry) => ({ id: f.node.id, name: f.name, slug: f.slug })
+
+/** Write the current location into the URL: <space prefix>/<folder slugs>/<memory slug>. */
+function syncUrl(push: boolean) {
+  if (!active.value) return
+  const folderSlugs = crumbs.value.slice(1).map((c) => c.slug ?? '').filter(Boolean)
+  const path = buildHomePath(active.value.entry, folderSlugs, selectedMemory.value?.slug)
+  if (path === window.location.pathname) return
+  if (push) history.pushState({}, '', path)
+  else history.replaceState({}, '', path)
+}
+
+/** Re-derive the whole view from the URL path (initial load + browser back/forward). No history push. */
+async function restoreFromUrl() {
+  const route = parseHomePath(window.location.pathname)
+  const target = (route ? matchSpace(spaces.value, route) : undefined)
+    ?? spaces.value.find((s) => s.kind === 'PERSONAL') ?? spaces.value[0]
+  if (!target) return
+  if (active.value?.entry.scopeId !== target.scopeId) active.value = await enterSpace(apiBase, session.unlocked!, target)
+  const { folders: fldrs, memory } = await resolveRoute(apiBase, session.unlocked!, active.value!, route?.segments ?? [])
+  crumbs.value = [{ name: target.displayName }, ...fldrs.map(toCrumb)]
+  await openLevel()
+  selectedMemory.value = memory
+  syncUrl(false)
+}
+
+function onPopState() {
+  restoreFromUrl().catch((e) => { error.value = (e as Error).message })
+}
 
 async function onSearchSelect(hit: SearchHit) {
   searchOpen.value = false
   if (hit.type === 'FOLDER') {
-    crumbs.value = [crumbs.value[0], { id: hit.id, name: hit.name }]
+    crumbs.value = [crumbs.value[0], { id: hit.id, name: hit.name, slug: slugify(hit.name) }]
     await openLevel()
+    syncUrl(true)
   } else {
-    selectedMemory.value = { node: hit.node, name: hit.name }
+    selectedMemory.value = { node: hit.node, name: hit.name, slug: slugify(hit.name) }
+    syncUrl(true)
   }
 }
 
-async function switchSpace(entry: SpaceEntry) {
+async function switchSpace(entry: SpaceEntry, push = true) {
   error.value = ''
   try {
     active.value = await enterSpace(apiBase, session.unlocked!, entry)
     crumbs.value = [{ name: entry.displayName }]
     await openLevel()
+    syncUrl(push)
   } catch (e) {
     error.value = (e as Error).message
   }
@@ -177,15 +220,34 @@ async function openLevel() {
 }
 
 async function openFolder(entry: LevelEntry) {
-  crumbs.value.push({ id: entry.node.id, name: entry.name })
+  crumbs.value.push(toCrumb(entry))
   await openLevel()
+  syncUrl(true)
 }
 
 async function gotoCrumb(i: number) {
   if (i === crumbs.value.length - 1) return
   crumbs.value = crumbs.value.slice(0, i + 1)
   await openLevel()
+  syncUrl(true)
 }
+
+/** Open a memory (its slug joins the URL) / go back to the folder (drop it from the URL). */
+function openMemory(m: LevelEntry) {
+  selectedMemory.value = m
+  syncUrl(true)
+}
+function closeMemory() {
+  selectedMemory.value = null
+  syncUrl(false)
+}
+
+/** The current location as a member-shareable path (for the "open in app" deep link). */
+const currentPath = computed(() => {
+  if (!active.value) return '/'
+  const folderSlugs = crumbs.value.slice(1).map((c) => c.slug ?? '').filter(Boolean)
+  return buildHomePath(active.value.entry, folderSlugs, selectedMemory.value?.slug)
+})
 
 function spaceSub(s: SpaceEntry): string {
   return s.kind === 'PERSONAL' ? t('home.personal') : (s.role ?? t('home.group'))
@@ -266,12 +328,12 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
     <main class="home-content">
-      <OpenInApp persist-key="home" />
+      <OpenInApp persist-key="home" :path="currentPath" />
       <div v-if="active?.entry.scheduledDeletionAt" class="deletion-banner">
         <span class="deletion-banner-text">{{ t('delete.scheduledBanner', { date: new Date(active.entry.scheduledDeletionAt).toLocaleDateString() }) }}</span>
         <button v-if="active.entry.role === 'Owner'" class="btn btn-ghost deletion-banner-cancel" type="button" @click="cancelDeletion">{{ t('delete.cancelDeletion') }}</button>
       </div>
-      <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="selectedMemory = null" />
+      <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="closeMemory" />
       <template v-else>
         <div v-if="error" class="home-empty">{{ error }}</div>
 
@@ -282,7 +344,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
             :key="m.node.id"
             class="memory-card"
             draggable="true"
-            @click="selectedMemory = m"
+            @click="openMemory(m)"
             @dragstart="onDragStart(m, 'M')"
             @dragover.prevent
             @drop="onReorderDrop(m, 'M')"

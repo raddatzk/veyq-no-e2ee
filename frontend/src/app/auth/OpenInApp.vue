@@ -2,11 +2,11 @@
 // A dismissible "open in the native app" banner shown in a mobile browser. With an `invite`, it deep-links
 // straight into the invite flow (registration is nicer in-app); without one, it's the general nudge for a
 // signed-in user to switch to the app (`veyq://open`). On iOS we also emit Apple's Smart App Banner meta tag.
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { t } from '../../i18n/i18n'
 import { buildInviteDeepLink, type ParsedInvite } from '../../features/spaces/invite/inviteLink'
 
-const props = defineProps<{ invite?: ParsedInvite; persistKey?: string }>()
+const props = defineProps<{ invite?: ParsedInvite; persistKey?: string; path?: string }>()
 
 const ua = navigator.userAgent
 const isAndroid = /Android/i.test(ua)
@@ -16,7 +16,13 @@ const isIOS = /iPhone|iPad|iPod/i.test(ua)
 const dismissed = props.persistKey ? !!localStorage.getItem(`veyq.dismiss.${props.persistKey}`) : false
 const show = ref((isAndroid || isIOS) && !dismissed)
 const origin = window.location.origin.replace(/\/$/, '')
-const deepLink = props.invite ? buildInviteDeepLink(origin, props.invite) : `veyq://open#api=${origin}`
+// The generic deep link carries the current in-app path (`u`) so the app opens the exact memory/folder; it
+// updates reactively as the user navigates. The instance origin rides in `api` (the app faces many instances).
+const deepLink = computed(() =>
+  props.invite
+    ? buildInviteDeepLink(origin, props.invite)
+    : `veyq://open?u=${encodeURIComponent(props.path ?? '/')}&api=${encodeURIComponent(origin)}`,
+)
 const label = props.invite ? t('invite.openInApp') : t('app.openInApp')
 
 function dismiss() {
@@ -30,7 +36,7 @@ onMounted(() => {
   if (isIOS && !document.querySelector('meta[name="apple-itunes-app"]')) {
     const m = document.createElement('meta')
     m.name = 'apple-itunes-app'
-    m.content = `app-id=000000000, app-argument=${deepLink}`
+    m.content = `app-id=000000000, app-argument=${deepLink.value}`
     document.head.appendChild(m)
   }
 })
