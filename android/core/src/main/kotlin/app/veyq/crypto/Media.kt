@@ -24,8 +24,31 @@ object Media {
     // 4 MiB plaintext frames: small files stay one frame, large ones chunk transparently.
     const val DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024
 
+    private val EMPTY = ByteArray(0)
+
     data class BlobRef(val blobId: String, val totalChunks: Int, val byteSize: Long)
     data class BlobTicket(val status: String, val blobId: String?, val uploadId: String?, val totalChunks: Int)
+
+    /** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
+    data class MediaMeta(val takenAt: String, val lat: Double?, val lng: Double?)
+
+    /** Seal {takenAt, lat?, lng?} into a sealedMeta blob (nonce || AEAD) for the create request. */
+    fun sealMediaMeta(contentKey: ByteArray, takenAt: String, lat: Double?, lng: Double?): JSONObject {
+        val meta = JSONObject().put("takenAt", takenAt)
+        if (lat != null) meta.put("lat", lat)
+        if (lng != null) meta.put("lng", lng)
+        val nonce = V1.randomBytes(12)
+        val sealed = nonce + V1.aeadSeal(contentKey, nonce, meta.toString().toByteArray(Charsets.UTF_8), EMPTY)
+        return JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(sealed))
+    }
+
+    /** Decrypt a media item's sealedMeta back to {takenAt, lat?, lng?}. */
+    fun decodeMediaMeta(contentKey: ByteArray, media: JSONObject): MediaMeta {
+        val sealed = dec.decode(media.getJSONObject("sealedMeta").getString("bytes"))
+        val pt = V1.aeadOpen(contentKey, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), EMPTY)
+        val obj = JSONObject(String(pt, Charsets.UTF_8))
+        return MediaMeta(obj.getString("takenAt"), if (obj.has("lat")) obj.getDouble("lat") else null, if (obj.has("lng")) obj.getDouble("lng") else null)
+    }
 
     private fun send(uri: String, token: String, method: String, body: String? = null): HttpResponse<String> {
         var b = HttpRequest.newBuilder(URI.create(uri)).header("Authorization", "Bearer $token")
@@ -112,10 +135,10 @@ object Media {
 
     // ---- media layer (attach blobs to a Memory) ---------------------------------------------------------
 
-    /** Attach a stored blob (+ derivatives) to a Memory/Chapter node. */
-    fun createMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, originalBlobId: String, takenAt: String, mimeType: String, derivatives: List<Pair<String, String>> = emptyList()): JSONObject {
+    /** Attach a stored blob (+ derivatives) to a Memory/Chapter node. The metadata is pre-sealed by the caller. */
+    fun createMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, originalBlobId: String, sealedMeta: JSONObject, mimeType: String, derivatives: List<Pair<String, String>> = emptyList()): JSONObject {
         val derivJson = JSONArray().apply { derivatives.forEach { put(JSONObject().put("kind", it.first).put("blobId", it.second)) } }
-        val json = JSONObject().put("originalBlobId", originalBlobId).put("takenAt", takenAt).put("mimeType", mimeType).put("derivatives", derivJson).toString()
+        val json = JSONObject().put("originalBlobId", originalBlobId).put("sealedMeta", sealedMeta).put("mimeType", mimeType).put("derivatives", derivJson).toString()
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "POST", json)
         if (resp.statusCode() != 200) throw RuntimeException("create media failed: ${resp.statusCode()} ${resp.body()}")
         return JSONObject(resp.body())
@@ -126,17 +149,18 @@ object Media {
      * client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
      * typed derivative — no special API.
      */
-    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, takenAt: String, mimeType: String, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
+    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
         val original = uploadBlob(apiBase, session, scopeId, contentKey, bytes, chunkSize)
         val derivatives = mutableListOf<Pair<String, String>>()
         if (thumb != null) {
             val t = uploadBlob(apiBase, session, scopeId, contentKey, thumb, chunkSize)
             derivatives.add("THUMBNAIL" to t.blobId)
         }
-        return createMedia(apiBase, session, scopeId, nodeId, original.blobId, takenAt, mimeType, derivatives)
+        val sealedMeta = sealMediaMeta(contentKey, takenAt, lat, lng)
+        return createMedia(apiBase, session, scopeId, nodeId, original.blobId, sealedMeta, mimeType, derivatives)
     }
 
-    /** List a Memory's media, ordered by takenAt (gallery order). */
+    /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
     fun listMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String): List<JSONObject> {
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "GET")
         if (resp.statusCode() != 200) throw RuntimeException("list media failed: ${resp.statusCode()} ${resp.body()}")

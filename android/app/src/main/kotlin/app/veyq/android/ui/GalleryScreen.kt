@@ -70,7 +70,7 @@ class GalleryController(
     private val contentKey: ByteArray,
     private val nodeId: String,
 ) {
-    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String)
+    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?)
 
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
@@ -125,8 +125,11 @@ class GalleryController(
     suspend fun load() {
         try {
             val media = withContext(Dispatchers.IO) { Media.listMedia(apiBase, session, scopeId, nodeId) }
+            // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
+            val withMeta = media.mapNotNull { m -> runCatching { m to Media.decodeMediaMeta(contentKey, m) }.getOrNull() }
+                .sortedBy { it.second.takenAt }
             val result = mutableListOf<Tile>()
-            for (m in media) {
+            for ((m, meta) in withMeta) {
                 val derivs = m.getJSONArray("derivatives")
                 var blob: JSONObject = m.getJSONObject("original")
                 for (i in 0 until derivs.length()) {
@@ -135,7 +138,7 @@ class GalleryController(
                 val ref = Media.BlobRef(blob.getString("blobId"), blob.getInt("totalChunks"), blob.getLong("byteSize"))
                 val bytes = withContext(Dispatchers.IO) { Media.downloadBlob(apiBase, session, scopeId, contentKey, ref) }
                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
-                result.add(Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()), m.getString("takenAt")))
+                result.add(Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()), meta.takenAt, meta.lat, meta.lng))
             }
             tiles = result
         } catch (e: Exception) {

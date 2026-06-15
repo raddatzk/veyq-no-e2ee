@@ -35,7 +35,7 @@ class MediaE2ETest {
         // a large "video" split into many frames — same call, chunked transparently
         val chunkSize = 10
         val video = ByteArray(35) { ((it * 7 + 3) and 0xff).toByte() }
-        val m2 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, video, null, "2026-01-01T08:00:00Z", "video/mp4", chunkSize)
+        val m2 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, video, null, "2026-01-01T08:00:00Z", "video/mp4", chunkSize = chunkSize)
         assertEquals(4, m2.getJSONObject("original").getInt("totalChunks"))
         assertEquals(0, m2.getJSONArray("derivatives").length())
 
@@ -61,10 +61,12 @@ class MediaE2ETest {
         val resumed = Media.uploadBlob(apiBase, a, scope.scopeId, ck, partial, chunkSize)
         assertContentEquals(partial, Media.downloadBlob(apiBase, a, scope.scopeId, ck, resumed))
 
-        // the gallery lists both media, ordered by takenAt (video first, photo second), with their blob refs
+        // the gallery lists both media in upload order (photo then video; the client sorts by decrypted takenAt)
         val gallery = Media.listMedia(apiBase, a, scope.scopeId, memId)
-        assertEquals(listOf(m2.getString("id"), m1.getString("id")), gallery.map { it.getString("id") })
-        assertEquals("THUMBNAIL", gallery[1].getJSONArray("derivatives").getJSONObject(0).getString("kind"))
+        assertEquals(listOf(m1.getString("id"), m2.getString("id")), gallery.map { it.getString("id") })
+        assertEquals("THUMBNAIL", gallery[0].getJSONArray("derivatives").getJSONObject(0).getString("kind"))
+        // sealed metadata round-trips: the decrypted capture time matches what we uploaded
+        assertEquals("2026-03-15T12:00:00Z", Media.decodeMediaMeta(ck, gallery[0]).takenAt)
 
         // anti-reorder still holds: a frame sealed at index 0 must not open at index 1
         val frame0 = V1.sealFrame(ck, 0, pchunks.size, pchunks[0], V1.randomBytes(12))
