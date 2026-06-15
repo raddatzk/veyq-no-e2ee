@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import ImageIO
 import UIKit
 import VeyqCrypto
 
@@ -52,13 +53,38 @@ final class GalleryStore: ObservableObject {
         uploading = true
         let iso = ISO8601DateFormatter()
         for data in datas {
+            let exif = Self.exifGps(data)
             _ = try? await Media.uploadMedia(
                 apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId,
-                bytes: data, thumb: Self.thumbnail(data), takenAt: iso.string(from: Date()), mimeType: "image/jpeg",
+                bytes: data, thumb: Self.thumbnail(data), takenAt: exif.takenAt ?? iso.string(from: Date()),
+                mimeType: "image/jpeg", lat: exif.lat, lng: exif.lng,
             )
         }
         await load()
         uploading = false
+    }
+
+    /// Pull GPS location + capture time from a JPEG's EXIF via ImageIO (sealed client-side as sealedMeta —
+    /// the server never sees either). Returns nils when absent.
+    static func exifGps(_ data: Data) -> (lat: Double?, lng: Double?, takenAt: String?) {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
+        else { return (nil, nil, nil) }
+        var lat: Double?, lng: Double?
+        if let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any],
+           let rawLat = gps[kCGImagePropertyGPSLatitude] as? Double,
+           let rawLng = gps[kCGImagePropertyGPSLongitude] as? Double {
+            lat = (gps[kCGImagePropertyGPSLatitudeRef] as? String) == "S" ? -rawLat : rawLat
+            lng = (gps[kCGImagePropertyGPSLongitudeRef] as? String) == "W" ? -rawLng : rawLng
+        }
+        var takenAt: String?
+        if let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any],
+           let s = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+            // EXIF "yyyy:MM:dd HH:mm:ss" → ISO 8601
+            let parser = DateFormatter(); parser.dateFormat = "yyyy:MM:dd HH:mm:ss"; parser.locale = Locale(identifier: "en_US_POSIX")
+            if let date = parser.date(from: s) { takenAt = ISO8601DateFormatter().string(from: date) }
+        }
+        return (lat, lng, takenAt)
     }
 
     func setCover(_ mediaId: String) async {
@@ -114,11 +140,24 @@ struct MemoryDetailView: View {
                     Picker("", selection: $tab) {
                         Text(T("detail.gallery")).tag(0)
                         Text(T("detail.journal")).tag(1)
+                        Text(T("detail.map")).tag(2)
                     }
                     .pickerStyle(.segmented)
 
                     if tab == 1 {
                         JournalView(store: store)
+                    } else if tab == 2 {
+                        let pts = store.tiles.compactMap { t -> MemoryMapView.Point? in
+                            guard let lat = t.lat, let lng = t.lng else { return nil }
+                            return MemoryMapView.Point(id: t.id, lat: lat, lng: lng)
+                        }
+                        if pts.isEmpty {
+                            Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        } else {
+                            MemoryMapView(points: pts) { id in
+                                if let tile = store.tiles.first(where: { $0.id == id }) { lightbox = tile.image; lightboxMediaId = id }
+                            }
+                        }
                     } else {
                     Text("\(store.tiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
                     if store.loading {
