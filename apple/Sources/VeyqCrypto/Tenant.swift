@@ -30,8 +30,10 @@ public enum Tenant {
     }
 
     public static func createTenant(apiBase: String, token: String, name: String, displayName: String, domain: String?) async throws -> TenantSummary {
-        var body: [String: String] = ["name": name, "displayName": displayName]
-        if let domain { body["domain"] = domain }
+        // A tenant is domain-scoped (domain required + unique). The UI passes a real domain; tests/owner-claim
+        // omit it → derive a unique one from the (unique) handle so the request still validates.
+        let dom = (domain?.isEmpty == false) ? domain! : "\(name).local"
+        let body: [String: String] = ["name": name, "displayName": displayName, "domain": dom]
         return try await send(apiBase, "/api/tenants", token, method: "POST", body: try JSONEncoder().encode(body))
     }
 
@@ -62,13 +64,13 @@ public enum Tenant {
     /// Create a shared group the caller owns: a tenant + a self owner-claim (mints + self-grants the
     /// scope). Mirrors the web `createGroup`; retries on handle conflicts. The server only sees the handle,
     /// display name, scope public key and the wrapped grant — never plaintext content.
-    public static func createGroup(apiBase: String, token: String, identityKemPublicKey: Data, displayName: String) async throws -> TenantSummary {
+    public static func createGroup(apiBase: String, token: String, identityKemPublicKey: Data, displayName: String, domain: String? = nil) async throws -> TenantSummary {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = slugify(name)
         for attempt in 0 ..< 25 {
             let handle = attempt == 0 ? base : "\(base)-\(attempt + 1)"
             do {
-                let tenant = try await createTenant(apiBase: apiBase, token: token, name: handle, displayName: name, domain: nil)
+                let tenant = try await createTenant(apiBase: apiBase, token: token, name: handle, displayName: name, domain: domain)
                 let invite = try await issueOwnerInvite(apiBase: apiBase, token: token, tenantId: tenant.id)
                 _ = try await claimTenantOwnership(apiBase: apiBase, token: token, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, identityKemPublicKey: identityKemPublicKey)
                 return tenant

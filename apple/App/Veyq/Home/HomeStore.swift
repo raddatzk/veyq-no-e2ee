@@ -150,12 +150,13 @@ final class HomeStore: ObservableObject {
         }
     }
 
-    /// Create a shared group the caller owns, refresh the space list, and switch into it.
-    func createGroup(displayName: String) async -> Bool {
+    /// Create a tenant the caller owns (domain-scoped), refresh the space list, and switch into it.
+    func createGroup(displayName: String, domain: String) async -> Bool {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
+        let dom = domain.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty, !dom.isEmpty else { return false }
         do {
-            let tenant = try await Tenant.createGroup(apiBase: apiBase, token: session.sessionToken, identityKemPublicKey: session.kemPublicKey, displayName: trimmed)
+            let tenant = try await Tenant.createGroup(apiBase: apiBase, token: session.sessionToken, identityKemPublicKey: session.kemPublicKey, displayName: trimmed, domain: dom)
             spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
             if let entry = spaces.first(where: { $0.kind == "TENANT" && $0.tenantId == tenant.id }) { await switchSpace(entry) }
             return true
@@ -246,10 +247,11 @@ final class HomeStore: ObservableObject {
     /// chain as the breadcrumb back-stack, and return the trailing memory to push (so back lands on its folder).
     func openPath(_ path: String) async -> Entry? {
         let parsed = HomeRoute.parsePath(path)
+        let host = URL(string: apiBase)?.host  // the instance host resolves the prefix-less tenant
         let target: SwitchActiveSpace.SpaceEntry?
         switch parsed.kind {
         case .personal: target = spaces.first { $0.kind == "PERSONAL" }
-        case .tenant: target = spaces.first { $0.kind == "TENANT" }
+        case .tenant: target = spaces.first { $0.kind == "TENANT" && $0.domain == host } ?? spaces.first { $0.kind == "TENANT" }
         case .group: target = spaces.first { $0.kind == "GROUP" && HomeRoute.slugify(displayName(for: $0)) == parsed.groupSlug }
         }
         guard let entry = target else { self.error = "Bereich nicht gefunden."; return nil }

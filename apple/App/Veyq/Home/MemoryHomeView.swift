@@ -18,6 +18,7 @@ struct MemoryHomeView: View {
     @State private var showJoinGroup = false
     @State private var showCreateTenant = false
     @State private var newTenantName = ""
+    @State private var newTenantDomain = ""
     @State private var showCreateGroup = false
     @State private var newGroupName = ""
     @State private var newGroupTenant = ""
@@ -67,9 +68,10 @@ struct MemoryHomeView: View {
         .sheet(item: $moveEntry) { entry in MovePickerView(store: store, entry: entry) }
         .alert(T("tenants.create"), isPresented: $showCreateTenant) {
             TextField(T("common.name"), text: $newTenantName)
-            Button(T("common.create")) { let n = newTenantName; newTenantName = ""; Task { _ = await store.createGroup(displayName: n) } }
-            Button(T("common.cancel"), role: .cancel) { newTenantName = "" }
-        }
+            TextField(T("tenants.domain"), text: $newTenantDomain).textInputAutocapitalization(.never).autocorrectionDisabled()
+            Button(T("common.create")) { let n = newTenantName; let d = newTenantDomain; newTenantName = ""; newTenantDomain = ""; Task { _ = await store.createGroup(displayName: n, domain: d) } }
+            Button(T("common.cancel"), role: .cancel) { newTenantName = ""; newTenantDomain = "" }
+        } message: { Text(T("tenants.domainHint")) }
         .sheet(isPresented: $showCreateGroup) { createGroupSheet }
         .sheet(item: $manageGroup) { g in GroupMembersView(store: store, space: g, onDeleted: {}) }
         .sheet(item: $deleteNodeTarget) { entry in

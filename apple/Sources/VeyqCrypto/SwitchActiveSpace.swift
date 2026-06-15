@@ -11,6 +11,7 @@ public enum SwitchActiveSpace {
         public let kind: String            // "PERSONAL" | "TENANT" | "GROUP"
         public let tenantId: String?
         public let name: String?
+        public let domain: String?  // TENANT/GROUP — the tenant's domain (host resolves the tenant)
         public let displayName: String?
         public let role: String?
         public let sealedName: BlobDTO?    // GROUP only — the name sealed under the group content key
