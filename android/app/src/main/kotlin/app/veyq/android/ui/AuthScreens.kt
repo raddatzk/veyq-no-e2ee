@@ -237,6 +237,87 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
     }
 }
 
+/**
+ * Brand-new invitee registering on mobile (reached via the veyq:// deep link from the browser banner):
+ * create the account from the invite, show + share the Emergency Kit, then sign in and land in the group.
+ */
+@Composable
+fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Unit, onRegistered: (Login.UnlockedSession) -> Unit) {
+    var tenantName by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("Member") }
+    var displayName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var kit by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+
+    androidx.compose.runtime.LaunchedEffect(parts.inviteId) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val m = app.veyq.crypto.RegisterViaInvitation.getInviteMetadata(apiBase, parts.inviteId)
+                m.getJSONObject("tenant").getString("displayName") to m.getString("role")
+            }
+        }.onSuccess { tenantName = it.first; role = it.second }
+            .onFailure { error = L10n.t("accept.failed") }
+    }
+
+    val roleLabel = if (role == "Owner") L10n.t("invite.owner") else L10n.t("invite.member")
+    AuthCard(L10n.t("accept.createAccount"), if (tenantName.isNotEmpty()) String.format(L10n.t("accept.joinAs"), tenantName, roleLabel) else apiBase) {
+        val secret = kit
+        if (secret == null) {
+            VeyqField(L10n.t("setup.displayName"), displayName, { displayName = it })
+            VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
+            VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
+            PrimaryButton(L10n.t("accept.register"), busy) {
+                busy = true; error = ""
+                scope.launch {
+                    try {
+                        val res = withContext(Dispatchers.IO) {
+                            if (role == "Owner")
+                                app.veyq.crypto.RegisterViaInvitation.registerViaInvitation(apiBase, parts.inviteId, parts.bootstrapSecret, email, displayName, password)
+                            else
+                                app.veyq.crypto.InviteMembers.registerViaMemberInvite(apiBase, parts.inviteId, parts.bootstrapSecret, parts.tempPrivateKey, email, displayName, password)
+                        }
+                        kit = res.emergencyKit.secretKey
+                    } catch (e: Exception) {
+                        error = L10n.t("accept.registerFailed")
+                    } finally {
+                        busy = false
+                    }
+                }
+            }
+            GhostButton(L10n.t("common.cancel")) { onCancel() }
+        } else {
+            Text(L10n.t("setup.kitTitle"), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Veyq.Text)
+            Text(L10n.t("setup.kitSub"), fontSize = 13.sp, color = Veyq.Muted)
+            Text(secret, fontSize = 13.sp, color = Veyq.Text, modifier = Modifier
+                .fillMaxWidth()
+                .background(Veyq.SurfaceMuted, RoundedCornerShape(10.dp))
+                .padding(10.dp))
+            GhostButton("📄 ${L10n.t("kit.download")}") {
+                EmergencyKitPdf.shareKit(ctx, EmergencyKit.KitData(apiBase, email, secret), displayName)
+            }
+            PrimaryButton(L10n.t("setup.kitProceed"), busy) {
+                busy = true; error = ""
+                scope.launch {
+                    try {
+                        val session = withContext(Dispatchers.IO) { Login.login(apiBase, email, password, secret) }
+                        onRegistered(session)
+                    } catch (e: Exception) {
+                        error = L10n.t("login.error")
+                    } finally {
+                        busy = false
+                    }
+                }
+            }
+        }
+        if (error.isNotEmpty()) MessageBox(error)
+    }
+}
+
 @Composable
 fun LandedScreen(session: Login.UnlockedSession, apiBase: String, onSignOut: () -> Unit) {
     val scope = rememberCoroutineScope()
