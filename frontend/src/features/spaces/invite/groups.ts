@@ -34,3 +34,9 @@ export async function inviteToGroup(apiBase: string, session: UnlockedSession, t
   const invite = await issueMemberInvite(apiBase, session, tenantId, role)
   return buildInviteLink(origin, { inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, tempPrivateKey: invite.tempPrivateKey })
 }
+
+/** Delete a tenant (workspace) and everything it owns — its scope, all groups, members, invites. Owner only. */
+export async function deleteTenant(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}`, { method: 'DELETE', headers: { authorization: `Bearer ${session.sessionToken}` } })
+  if (!res.ok) throw new Error(`delete tenant failed: ${res.status} ${await res.text()}`)
+}

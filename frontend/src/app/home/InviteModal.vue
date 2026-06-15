@@ -6,10 +6,23 @@ import { inviteToGroup } from '../../features/spaces/invite/groups'
 import { getTenantTerms, setTenantTerms } from '../../features/memory/share/share'
 import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
 import { changeMemberRole, listTenantMembers, removeMember, rotateScope, type MemberRole, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
+import { deleteTenant } from '../../features/spaces/invite/groups'
+import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import type { SpaceEntry } from '../../features/home/home'
 
 const props = defineProps<{ space: SpaceEntry }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; deleted: [] }>()
+const confirmDelete = ref(false)
+
+async function doDeleteTenant() {
+  if (!session.unlocked || !props.space.tenantId) return
+  try {
+    await deleteTenant(session.apiBase, session.unlocked, props.space.tenantId)
+    emit('deleted')
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
 
 const role = ref<MemberRole>('Member')
 const link = ref('')
@@ -181,6 +194,9 @@ async function copy() {
         <button class="btn btn-ghost invite-gen" type="button" :disabled="membersBusy" @click="rotate">{{ rotated ? t('members.rotated') : t('members.rotate') }}</button>
       </template>
       <button v-else class="btn btn-ghost invite-gen" type="button" @click="openMembers">{{ t('members.manage') }}</button>
+
+      <button class="btn btn-ghost invite-gen" type="button" style="color: var(--app-danger)" @click="confirmDelete = true">{{ t('delete.tenant') }}</button>
     </div>
+    <ConfirmDeleteModal v-if="confirmDelete" :name="space.displayName" @close="confirmDelete = false" @confirm="doDeleteTenant" />
   </div>
 </template>

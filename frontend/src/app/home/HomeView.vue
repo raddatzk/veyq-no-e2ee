@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { enterSpace, loadCover, loadLevel, loadMemoryById, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
-import { reorderNode } from '../../features/memory/curate/curate'
+import { deleteNode, reorderNode } from '../../features/memory/curate/curate'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import MemoryDetailView from './MemoryDetailView.vue'
@@ -15,6 +15,7 @@ import MovePicker from './MovePicker.vue'
 import CreateGroupModal from './CreateGroupModal.vue'
 import CreateGroupSpaceModal from './CreateGroupSpaceModal.vue'
 import GroupMembersModal from './GroupMembersModal.vue'
+import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import InviteModal from './InviteModal.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
@@ -33,7 +34,19 @@ const createType = ref<NodeType | null>(null)
 const renameTarget = ref<LevelEntry | null>(null)
 const menuTarget = ref<LevelEntry | null>(null)
 const moveTarget = ref<LevelEntry | null>(null)
+const deleteNodeTarget = ref<LevelEntry | null>(null)
 const dragged = ref<{ entry: LevelEntry; section: 'M' | 'F' } | null>(null)
+
+async function confirmDeleteNode() {
+  if (!deleteNodeTarget.value || !active.value || !session.unlocked) return
+  try {
+    await deleteNode(apiBase, session.unlocked, active.value, deleteNodeTarget.value.node.id)
+    deleteNodeTarget.value = null
+    await openLevel()
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
 const createGroupOpen = ref(false)
 const createGroupSpaceOpen = ref(false)
 const inviteTarget = ref<SpaceEntry | null>(null)
@@ -41,6 +54,20 @@ const manageGroup = ref<SpaceEntry | null>(null)
 
 async function onGroupSpaceCreated() {
   createGroupSpaceOpen.value = false
+  await reloadSpaces()
+}
+
+async function onGroupDeleted() {
+  const wasActive = active.value?.entry.scopeId === manageGroup.value?.scopeId
+  manageGroup.value = null
+  if (wasActive) active.value = null
+  await reloadSpaces()
+}
+
+async function onTenantDeleted() {
+  const tid = inviteTarget.value?.tenantId
+  inviteTarget.value = null
+  if (active.value?.entry.tenantId === tid) active.value = null
   await reloadSpaces()
 }
 
@@ -282,15 +309,18 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <MovePicker v-if="moveTarget && active" :active="active" :entry="moveTarget" @close="moveTarget = null" @moved="onMoved" />
     <CreateGroupModal v-if="createGroupOpen" @close="createGroupOpen = false" @created="onGroupCreated" />
     <CreateGroupSpaceModal v-if="createGroupSpaceOpen" :tenants="tenantSpaces()" @close="createGroupSpaceOpen = false" @created="onGroupSpaceCreated" />
-    <GroupMembersModal v-if="manageGroup" :space="manageGroup" @close="manageGroup = null" />
-    <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" />
+    <GroupMembersModal v-if="manageGroup" :space="manageGroup" @close="manageGroup = null" @deleted="onGroupDeleted" />
+    <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" @deleted="onTenantDeleted" />
 
     <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
       <div class="settings-panel action-sheet">
         <div class="settings-head"><h2 class="settings-title">{{ menuTarget.name }}</h2></div>
         <button class="btn btn-ghost action-row" type="button" @click="renameTarget = menuTarget; menuTarget = null">{{ t('common.rename') }}</button>
         <button class="btn btn-ghost action-row" type="button" @click="moveTarget = menuTarget; menuTarget = null">{{ t('common.move') }}</button>
+        <button class="btn btn-ghost action-row" type="button" style="color: var(--app-danger)" @click="deleteNodeTarget = menuTarget; menuTarget = null">{{ t('common.delete') }}</button>
       </div>
     </div>
+
+    <ConfirmDeleteModal v-if="deleteNodeTarget" :name="deleteNodeTarget.name" @close="deleteNodeTarget = null" @confirm="confirmDeleteNode" />
   </div>
 </template>

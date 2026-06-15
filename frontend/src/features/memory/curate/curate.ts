@@ -105,3 +105,12 @@ export function setCover(apiBase: string, session: UnlockedSession, active: Acti
 export function reorderNode(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, orderIndex: number): Promise<MemoryNode> {
   return patchNode(apiBase, session, active.scope.scopeId, nodeId, { orderIndex })
 }
+
+/** Delete a node (folder or memory) and everything beneath it — recursive cascade on the server. */
+export async function deleteNode(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${session.sessionToken}` },
+  })
+  if (!res.ok) throw new Error(`delete node failed: ${res.status} ${await res.text()}`)
+}

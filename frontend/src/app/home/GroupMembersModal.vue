@@ -3,11 +3,23 @@ import { onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { listTenantMembers, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
-import { addGroupMember, listGroupMembers, removeGroupMember, setGroupMemberRole, type GroupMember, type GroupRole } from '../../features/spaces/groups/groupSpaces'
+import { addGroupMember, deleteGroup, listGroupMembers, removeGroupMember, setGroupMemberRole, type GroupMember, type GroupRole } from '../../features/spaces/groups/groupSpaces'
+import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import type { SpaceEntry } from '../../features/home/home'
 
 const props = defineProps<{ space: SpaceEntry }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; deleted: [] }>()
+const confirmDelete = ref(false)
+
+async function doDeleteGroup() {
+  if (!session.unlocked || !props.space.tenantId) return
+  try {
+    await deleteGroup(session.apiBase, session.unlocked, props.space.tenantId, props.space.scopeId)
+    emit('deleted')
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
 
 const members = ref<GroupMember[]>([])
 const candidates = ref<TenantMember[]>([])
@@ -105,6 +117,9 @@ async function remove(m: GroupMember) {
       </form>
 
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
+
+      <button class="btn btn-ghost" type="button" style="color: var(--app-danger); margin-top: 0.5rem" @click="confirmDelete = true">{{ t('delete.group') }}</button>
     </div>
+    <ConfirmDeleteModal v-if="confirmDelete" :name="space.displayName" @close="confirmDelete = false" @confirm="doDeleteGroup" />
   </div>
 </template>

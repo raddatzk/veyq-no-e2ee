@@ -5,8 +5,11 @@ import { login } from '../../account/login/login'
 import { createTenant, issueOwnerInvite, claimTenantOwnership } from '../../admin/createTenantInviteOwner/tenant'
 import { issueMemberInvite, registerViaMemberInvite } from '../../admin/inviteMembersRoles/inviteMembers'
 import { getOrCreateContentKey, writeItem, readItems } from '../../content/scopeContent'
+import { createChild, deleteNode } from '../../memory/curate/curate'
+import { listChildren } from '../../memory/browse/browse'
+import { deleteTenant } from '../invite/groups'
 import { listMySpaces, openSpace } from '../switchActiveSpace/switchActiveSpace'
-import { addGroupMember, createGroupSpace, listGroupMembers, openSealedName, setGroupMemberRole } from './groupSpaces'
+import { addGroupMember, createGroupSpace, deleteGroup, listGroupMembers, openSealedName, setGroupMemberRole } from './groupSpaces'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -55,5 +58,22 @@ suite('groups E2E (web -> live backend)', () => {
     expect((await listGroupMembers(apiBase, owner, tenant.id, group.scopeId)).length).toBe(2)
     const promoted = await setGroupMemberRole(apiBase, owner, tenant.id, group.scopeId, bob.user.id, 'GroupOwner')
     expect(promoted.role).toBe('GroupOwner')
+
+    // delete a node in the group (recursive cascade) → it's gone from the level
+    const active = { entry: groupEntry, scope: oScope, contentKey: oCk }
+    const folder = await createChild(apiBase, owner, active, 'FOLDER', 'Trip', 0)
+    expect((await listChildren(apiBase, owner, group.scopeId)).some((n) => n.id === folder.id)).toBe(true)
+    await deleteNode(apiBase, owner, active, folder.id)
+    expect((await listChildren(apiBase, owner, group.scopeId)).some((n) => n.id === folder.id)).toBe(false)
+
+    // delete the group → gone from the roster
+    await deleteGroup(apiBase, owner, tenant.id, group.scopeId)
+    expect((await listMySpaces(apiBase, owner)).some((s) => s.scopeId === group.scopeId)).toBe(false)
+
+    // delete the tenant → its TENANT space is gone; the personal space remains
+    await deleteTenant(apiBase, owner, tenant.id)
+    const after = await listMySpaces(apiBase, owner)
+    expect(after.some((s) => s.kind === 'TENANT')).toBe(false)
+    expect(after.some((s) => s.kind === 'PERSONAL')).toBe(true)
   })
 })

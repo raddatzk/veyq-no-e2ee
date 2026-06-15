@@ -8,6 +8,7 @@ import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
+import { deleteMedia } from '../../features/uploads/media/media'
 import { getJournal, updateJournal } from '../../features/memory/journal/journal'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { createTrack, deleteTrack, getTracks, type Track } from '../../features/memory/track/track'
@@ -164,6 +165,20 @@ function closeLightbox() {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
   lightbox.value = null
   lightboxTile.value = null
+  mediaDelArm.value = false
+}
+const mediaDelArm = ref(false)
+async function deleteThisMedia() {
+  if (!lightboxTile.value) return
+  const id = lightboxTile.value.id
+  try {
+    await deleteMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, id)
+    closeLightbox()
+    tiles.value.forEach((t) => t.id === id && URL.revokeObjectURL(t.url))
+    tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
+  } catch (e) {
+    error.value = (e as Error).message
+  }
 }
 async function setAsCover() {
   if (!lightboxTile.value) return
@@ -260,6 +275,8 @@ async function setAsCover() {
       <img :src="lightbox" alt="" @click.stop />
       <div class="lightbox-actions" @click.stop>
         <button class="btn btn-primary" type="button" @click="setAsCover">{{ t('cover.setAsCover') }}</button>
+        <button v-if="!mediaDelArm" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="mediaDelArm = true">{{ t('common.delete') }}</button>
+        <button v-else class="btn btn-danger" type="button" @click="deleteThisMedia">{{ t('delete.confirm') }}</button>
         <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>
       </div>
     </div>

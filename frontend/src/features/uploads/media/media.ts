@@ -147,6 +147,12 @@ export async function createMedia(apiBase: string, session: UnlockedSession, sco
   return res.json()
 }
 
+/** Delete a single medium (and its derivatives) from a memory. */
+export async function deleteMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, { method: 'DELETE', headers: auth(session) })
+  if (!res.ok) throw new Error(`delete media failed: ${res.status} ${await res.text()}`)
+}
+
 /**
  * The full client flow: upload the original bytes (chunked + deduped transparently) and any client-generated
  * thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a typed derivative —
