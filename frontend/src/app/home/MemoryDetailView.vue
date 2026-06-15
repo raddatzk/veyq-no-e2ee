@@ -8,6 +8,8 @@ import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
+import { getJournal, updateJournal } from '../../features/memory/journal/journal'
+import { renderMarkdown } from '../../features/memory/journal/markdown'
 import DownloadModal from './DownloadModal.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
@@ -23,6 +25,12 @@ const lightboxTile = ref<GalleryTile | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const downloadOpen = ref(false)
+const tab = ref<'gallery' | 'journal'>('gallery')
+const journalMarkdown = ref('')
+const journalDraft = ref('')
+const journalEditing = ref(false)
+const journalSaving = ref(false)
+const journalLoaded = ref(false)
 let ro: ResizeObserver | null = null
 
 // Group the (takenAt-ordered) tiles into day buckets, each with its own justified layout — a dated timeline.
@@ -40,6 +48,30 @@ const buckets = computed(() =>
 )
 const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
 const tileById = computed(() => Object.fromEntries(tiles.value.map((t) => [t.id, t])))
+const journalHtml = computed(() => renderMarkdown(journalMarkdown.value))
+
+async function openJournal() {
+  tab.value = 'journal'
+  if (journalLoaded.value) return
+  try {
+    journalMarkdown.value = (await getJournal(session.apiBase, session.unlocked!, props.active, props.memory.id)).markdown
+  } finally {
+    journalLoaded.value = true
+  }
+}
+function startEditJournal() {
+  journalDraft.value = journalMarkdown.value
+  journalEditing.value = true
+}
+async function saveJournal() {
+  journalSaving.value = true
+  try {
+    journalMarkdown.value = (await updateJournal(session.apiBase, session.unlocked!, props.active, props.memory.id, journalDraft.value)).markdown
+    journalEditing.value = false
+  } finally {
+    journalSaving.value = false
+  }
+}
 
 onMounted(async () => {
   ro = new ResizeObserver((entries) => { containerWidth.value = entries[0].contentRect.width })
@@ -100,17 +132,42 @@ async function setAsCover() {
       <button class="crumb" @click="emit('back')">{{ t('common.back') }}</button>
       <h1 class="detail-title">{{ name }}</h1>
       <span class="content-count">{{ t('detail.mediaCount', { n: tiles.length }) }}</span>
-      <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">{{ t('detail.download') }}</button>
-      <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
-        {{ uploading ? t('detail.uploading') : t('detail.upload') }}
-      </button>
+      <template v-if="tab === 'gallery'">
+        <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">{{ t('detail.download') }}</button>
+        <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
+          {{ uploading ? t('detail.uploading') : t('detail.upload') }}
+        </button>
+      </template>
       <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
     </div>
-    <div v-if="dateRange" class="detail-daterange">{{ dateRange }}</div>
+
+    <div class="detail-tabs">
+      <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">{{ t('detail.gallery') }}</button>
+      <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openJournal">{{ t('detail.journal') }}</button>
+    </div>
 
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
 
-    <div ref="galleryEl" class="gallery-buckets">
+    <section v-if="tab === 'journal'" class="journal">
+      <template v-if="journalEditing">
+        <textarea v-model="journalDraft" class="journal-editor" :placeholder="t('journal.placeholder')"></textarea>
+        <div class="journal-actions">
+          <button class="btn btn-ghost" type="button" :disabled="journalSaving" @click="journalEditing = false">{{ t('common.cancel') }}</button>
+          <button class="btn btn-primary" type="button" :disabled="journalSaving" @click="saveJournal">{{ journalSaving ? t('journal.saving') : t('journal.save') }}</button>
+        </div>
+      </template>
+      <template v-else>
+        <div class="journal-bar">
+          <button class="btn btn-ghost" type="button" @click="startEditJournal">{{ t('journal.edit') }}</button>
+        </div>
+        <div v-if="journalMarkdown.trim()" class="journal-body" v-html="journalHtml"></div>
+        <div v-else class="home-empty">{{ t('journal.empty') }}</div>
+      </template>
+    </section>
+
+    <div v-if="tab === 'gallery' && dateRange" class="detail-daterange">{{ dateRange }}</div>
+
+    <div v-show="tab === 'gallery'" ref="galleryEl" class="gallery-buckets">
       <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
         <h2 class="bucket-date">{{ b.label }}</h2>
         <div class="gallery" :style="{ height: b.layout.height + 'px' }">
@@ -127,8 +184,10 @@ async function setAsCover() {
       </section>
     </div>
 
-    <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
-    <div v-else-if="!tiles.length" class="home-empty">{{ t('detail.noMedia') }}</div>
+    <template v-if="tab === 'gallery'">
+      <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
+      <div v-else-if="!tiles.length" class="home-empty">{{ t('detail.noMedia') }}</div>
+    </template>
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox">
       <img :src="lightbox" alt="" @click.stop />
