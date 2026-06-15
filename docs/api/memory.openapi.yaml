@@ -360,7 +360,7 @@ components:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ShareRole:
       type: string
-      enum: [VIEWER, CONTRIBUTOR]
+      enum: [VIEWER, CONTRIBUTOR, UPLOADER]
     CreateShareRequest:
       type: object
       required: [wrappedContentKey]

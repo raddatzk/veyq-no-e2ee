@@ -8,7 +8,6 @@ import com.veyq.app.generated.model.CompleteBlobResponse
 import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.MediaItem
 import com.veyq.app.generated.model.PutChunkRequest
-import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.StartBlobRequest
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.NodeRepository
@@ -30,28 +29,28 @@ class PublicShareContributeHandler(
     private val media: MediaHandler,
 ) {
     fun startShareBlob(shareId: String, req: StartBlobRequest): BlobTicket =
-        contributor(shareId).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
+        uploader(shareId).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
 
     fun putShareChunk(shareId: String, uploadId: String, index: Int, req: PutChunkRequest) =
-        blobUploads.putBlobChunkAs(contributor(shareId).scopeId, uploadId, index, req)
+        blobUploads.putBlobChunkAs(uploader(shareId).scopeId, uploadId, index, req)
 
     fun getShareUpload(shareId: String, uploadId: String): BlobUploadProgress =
-        blobUploads.getBlobUploadAs(contributor(shareId).scopeId, uploadId)
+        blobUploads.getBlobUploadAs(uploader(shareId).scopeId, uploadId)
 
     fun completeShareBlob(shareId: String, uploadId: String): CompleteBlobResponse =
-        blobUploads.completeBlobUploadAs(contributor(shareId).scopeId, uploadId)
+        blobUploads.completeBlobUploadAs(uploader(shareId).scopeId, uploadId)
 
     fun createShareMedia(shareId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
-        val share = contributor(shareId)
+        val share = uploader(shareId)
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
         return media.createMediaAs(share.scopeId, nodeId, req)
     }
 
-    /** Resolve a share and require it to be a CONTRIBUTOR (write) share. */
-    private fun contributor(shareId: String): Share {
+    /** Resolve a share and require an upload permission (CONTRIBUTOR or the blind-drop UPLOADER). */
+    private fun uploader(shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
-        if (share.role != ShareRole.CONTRIBUTOR.value) throw ApiException(403, "SHARE_READ_ONLY", "This share is read-only")
+        if (!ShareHandler.canUpload(share.role)) throw ApiException(403, "SHARE_READ_ONLY", "This share cannot upload")
         return share
     }
 }

@@ -95,6 +95,12 @@ class ShareHandler(
     }
 
     companion object {
+        // Share-role permissions. VIEWER reads; CONTRIBUTOR reads + writes; UPLOADER is a blind drop-off —
+        // it may add media but cannot read the gallery/journal or write the journal.
+        fun canRead(role: String) = role == ShareRole.VIEWER.value || role == ShareRole.CONTRIBUTOR.value
+        fun canUpload(role: String) = role == ShareRole.CONTRIBUTOR.value || role == ShareRole.UPLOADER.value
+        fun canWriteJournal(role: String) = role == ShareRole.CONTRIBUTOR.value
+
         /** The shared node's subtree = the root id + every descendant (BFS over the scope's nodes). */
         fun subtreeIds(all: List<Node>, rootId: String): Set<String> {
             val childrenOf = all.groupBy { it.parentId }
