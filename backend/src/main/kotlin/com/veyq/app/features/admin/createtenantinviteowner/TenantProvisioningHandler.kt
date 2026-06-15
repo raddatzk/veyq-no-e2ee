@@ -21,6 +21,7 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
@@ -54,6 +55,7 @@ class TenantProvisioningHandler(
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
+    private val groupMembers: GroupMembershipRepository,
     private val purge: ContentPurge,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
@@ -90,7 +92,11 @@ class TenantProvisioningHandler(
         if (caller == null || caller.role != "Owner" || caller.status != "ACTIVE") {
             throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
         }
-        scopes.findByTenantId(tenantId)?.let { purge.purgeScope(it.id) }
+        // purge the tenant-wide scope AND every group scope within the tenant
+        scopes.listByTenantId(tenantId).forEach { scope ->
+            groupMembers.deleteByScopeId(scope.id) // no-op for the tenant root
+            purge.purgeScope(scope.id)
+        }
         memberships.deleteByTenantId(tenantId)
         invites.deleteByTenantId(tenantId)
         tenants.delete(tenant)

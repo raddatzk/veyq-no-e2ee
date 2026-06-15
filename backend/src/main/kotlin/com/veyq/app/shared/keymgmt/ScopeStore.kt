@@ -21,6 +21,9 @@ class Scope {
     @Column(nullable = false) var kind: String = ""
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "kem_public_key", nullable = false) var kemPublicKey: ByteArray = ByteArray(0)
+    // GROUP_ROOT only: the group name sealed under the group content key (operator-blind). Null otherwise.
+    @Column(name = "sealed_name") var sealedName: ByteArray? = null
+    @Column(name = "name_suite_id") var nameSuiteId: String? = null
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 
@@ -37,7 +40,14 @@ class ScopeGrant {
 
 @ApplicationScoped
 class ScopeRepository : PanacheRepositoryBase<Scope, String> {
-    fun findByTenantId(tenantId: String): Scope? = find("tenantId", tenantId).firstResult()
+    /** The tenant-wide space. A tenant has exactly one TENANT_ROOT (groups also carry the tenant id). */
+    fun findByTenantId(tenantId: String): Scope? = find("tenantId = ?1 and kind = ?2", tenantId, "TENANT_ROOT").firstResult()
+
+    /** Every scope under a tenant — its TENANT_ROOT plus all GROUP_ROOT scopes (used by tenant delete). */
+    fun listByTenantId(tenantId: String): List<Scope> = list("tenantId", tenantId)
+
+    fun listGroupsByTenantId(tenantId: String): List<Scope> =
+        list("tenantId = ?1 and kind = ?2", tenantId, "GROUP_ROOT")
     fun findPersonalByOwnerUserId(userId: String): Scope? =
         find("ownerUserId = ?1 and kind = ?2", userId, "PERSONAL_ROOT").firstResult()
 

@@ -65,9 +65,9 @@ class MySpacesSliceTest {
             .body("spaces.size()", `is`(2))
             .body("spaces.find { it.kind == 'PERSONAL' }.displayName", `is`("Multi User"))
             .body("spaces.find { it.kind == 'PERSONAL' }.scopeId", `is`("sp-personal"))
-            .body("spaces.find { it.kind == 'GROUP' }.role", `is`("Owner"))
-            .body("spaces.find { it.kind == 'GROUP' }.displayName", `is`("Acme Group"))
-            .body("spaces.find { it.kind == 'GROUP' }.tenantId", `is`("sp-tenant"))
+            .body("spaces.find { it.kind == 'TENANT' }.role", `is`("Owner"))
+            .body("spaces.find { it.kind == 'TENANT' }.displayName", `is`("Acme Group"))
+            .body("spaces.find { it.kind == 'TENANT' }.tenantId", `is`("sp-tenant"))
 
         // the solo user sees only their personal space — the group membership without a grant is filtered out
         given().header("Authorization", soloToken).get("/api/me/spaces").then().statusCode(200)

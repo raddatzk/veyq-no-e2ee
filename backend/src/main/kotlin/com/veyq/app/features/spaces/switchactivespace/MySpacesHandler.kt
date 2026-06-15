@@ -1,5 +1,6 @@
 package com.veyq.app.features.spaces.switchactivespace
 
+import com.veyq.app.generated.model.Blob
 import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.MySpaceList
 import com.veyq.app.generated.model.SpaceEntry
@@ -8,6 +9,7 @@ import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import com.veyq.app.shared.identity.UserRepository
@@ -27,6 +29,7 @@ class MySpacesHandler(
     private val tenants: TenantRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
+    private val groupMembers: GroupMembershipRepository,
     private val sessions: SessionService,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -49,17 +52,32 @@ class MySpacesHandler(
             }
         }
 
-        // group spaces — active membership + holds the tenant-root scope grant
+        // tenant spaces — the tenant-wide space for every tenant the caller is an active member of (+ holds the grant)
         memberships.listActiveByUserId(userId).forEach { m ->
             val tenant = tenants.findById(m.tenantId) ?: return@forEach
             val scope = scopes.findByTenantId(m.tenantId) ?: return@forEach
             grants.find(scope.id, userId) ?: return@forEach
             entries += SpaceEntry(
-                kind = SpaceEntry.Kind.GROUP,
+                kind = SpaceEntry.Kind.TENANT,
                 tenantId = tenant.id,
                 name = tenant.name,
                 displayName = tenant.displayName,
                 role = m.role,
+                scopeId = scope.id,
+                scopePublicKey = scope.toPublicKey(),
+            )
+        }
+
+        // group spaces — every GROUP_ROOT scope the caller is a member of and holds the grant for. The name
+        // is sealed under the group content key, so it ships as ciphertext (the client decrypts it).
+        groupMembers.listByUserId(userId).forEach { gm ->
+            val scope = scopes.findById(gm.scopeId) ?: return@forEach
+            grants.find(scope.id, userId) ?: return@forEach
+            entries += SpaceEntry(
+                kind = SpaceEntry.Kind.GROUP,
+                tenantId = scope.tenantId,
+                role = gm.role,
+                sealedName = Blob(suiteId = scope.nameSuiteId ?: scope.suiteId, bytes = enc.encodeToString(scope.sealedName ?: ByteArray(0))),
                 scopeId = scope.id,
                 scopePublicKey = scope.toPublicKey(),
             )

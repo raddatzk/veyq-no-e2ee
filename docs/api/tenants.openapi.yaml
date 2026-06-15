@@ -41,6 +41,40 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/groups:
+    get:
+      tags: [Groups]
+      operationId: listGroups
+      summary: List the groups in this tenant the caller can enter (holds the group scope grant).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The caller's groups in this tenant., content: { application/json: { schema: { $ref: '#/components/schemas/GroupList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [Groups]
+      operationId: createGroup
+      summary: Create a group (a sub-space within a tenant). Any active tenant member may; they become GroupOwner.
+      description: >
+        Mints a GROUP_ROOT scope inside the tenant. The caller supplies the scope public key, the scope
+        private key wrapped to their own identity (self-grant), the content key wrapped to the scope public
+        key, and the group name sealed under that content key (operator-blind). The creator becomes the
+        first GroupOwner. The server stays blind to the group name and content.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateGroupRequest' } } }
+      responses:
+        '200': { description: The created group., content: { application/json: { schema: { $ref: '#/components/schemas/GroupSummary' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/tenants/{tenantId}/owner-invite:
     post:
       tags: [TenantProvisioning]
@@ -382,6 +416,28 @@ components:
         displayName: { type: string }
         domain: { type: string }
         status: { type: string, enum: [PENDING, ACTIVE] }
+    CreateGroupRequest:
+      type: object
+      required: [scopePublicKey, wrappedScopePrivateKey, contentKey, sealedName]
+      properties:
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group scope private key wrapped to the creator''s identity (self-grant).' }
+        contentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Content key wrapped to the group scope public key.' }
+        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group name sealed under the content key (operator-blind).' }
+    GroupSummary:
+      type: object
+      required: [scopeId, tenantId, role, scopePublicKey, sealedName]
+      properties:
+        scopeId: { type: string }
+        tenantId: { type: string }
+        role: { type: string, description: 'The caller''s group role (GroupOwner | GroupMember).' }
+        scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
+        sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    GroupList:
+      type: object
+      required: [groups]
+      properties:
+        groups: { type: array, items: { $ref: '#/components/schemas/GroupSummary' } }
     OwnerInvite:
       type: object
       required: [inviteId, bootstrapSecret, expiresAt]
