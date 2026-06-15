@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -105,6 +107,34 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         openLevel()
     }
 
+    /** Create a folder/memory at the current level. Name is sealed; the slug retries on collision. */
+    suspend fun create(type: String, name: String) {
+        val trimmed = name.trim()
+        val s = scope; val key = contentKey
+        if (trimmed.isEmpty() || s == null || key == null) return
+        allNodes = null
+        val parentId = crumbs.lastOrNull()?.nodeId
+        val orderIndex = folders.size + memories.size
+        val base = slugify(trimmed)
+        for (attempt in 0 until 25) {
+            val slug = if (attempt == 0) base else "$base-${attempt + 1}"
+            try {
+                withContext(Dispatchers.IO) { MemoryTree.createNode(apiBase, session, s.scopeId, key, type, trimmed, slug, orderIndex, parentId) }
+                openLevel()
+                return
+            } catch (e: Exception) {
+                if (e.message?.contains("SLUG_EXISTS") != true && e.message?.contains("409") != true) { error = "Konnte nicht anlegen."; return }
+            }
+        }
+    }
+
+    private fun slugify(name: String): String {
+        val allowed = (('a'..'z') + ('0'..'9')).toSet()
+        val folded = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFKD).replace("\\p{M}".toRegex(), "").lowercase()
+        val mapped = folded.map { if (it in allowed) it else '-' }.joinToString("")
+        return mapped.split("-").filter { it.isNotEmpty() }.joinToString("-").ifEmpty { "item" }
+    }
+
     suspend fun gotoCrumb(index: Int) {
         if (index >= crumbs.size - 1) return
         crumbs = crumbs.take(index + 1)
@@ -172,6 +202,10 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     var menuOpen by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<HomeController.Entry?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var createMenuOpen by remember { mutableStateOf(false) }
+    var createType by remember { mutableStateOf("MEMORY") }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { controller.start() }
 
     if (settingsOpen) {
@@ -206,6 +240,13 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                     }
                 },
                 actions = {
+                    Box {
+                        IconButton(onClick = { createMenuOpen = true }) { Text("＋", color = Veyq.Accent, fontSize = 22.sp) }
+                        DropdownMenu(expanded = createMenuOpen, onDismissRequest = { createMenuOpen = false }) {
+                            DropdownMenuItem(text = { Text(L10n.t("home.createMemory")) }, onClick = { createMenuOpen = false; createType = "MEMORY"; newName = ""; showNameDialog = true })
+                            DropdownMenuItem(text = { Text(L10n.t("home.createFolder")) }, onClick = { createMenuOpen = false; createType = "FOLDER"; newName = ""; showNameDialog = true })
+                        }
+                    }
                     IconButton(onClick = { settingsOpen = true }) { Text("⚙", color = Veyq.Muted, fontSize = 20.sp) }
                 },
             )
@@ -248,6 +289,33 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                 else controller.folders.forEach { f -> FolderRow(f) { scope.launch { controller.openFolder(f) } } }
             }
         }
+    }
+
+    if (showNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            containerColor = Veyq.Surface,
+            title = { Text(if (createType == "FOLDER") L10n.t("home.createFolder") else L10n.t("home.createMemory"), color = Veyq.Text) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true,
+                    placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+                        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { val n = newName; showNameDialog = false; scope.launch { controller.create(createType, n) } }) {
+                    Text(L10n.t("common.create"), color = Veyq.Accent)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showNameDialog = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
     }
 }
 

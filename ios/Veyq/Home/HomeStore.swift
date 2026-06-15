@@ -71,6 +71,37 @@ final class HomeStore: ObservableObject {
         await openLevel()
     }
 
+    /// Create a folder/memory at the current level. Name is sealed; the slug retries on collision.
+    func create(type: String, name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let scope, let contentKey, !trimmed.isEmpty else { return }
+        allNodes = nil
+        let parentId = crumbs.last?.nodeId
+        let orderIndex = folders.count + memories.count
+        let base = slugify(trimmed)
+        for attempt in 0 ..< 25 {
+            let slug = attempt == 0 ? base : "\(base)-\(attempt + 1)"
+            do {
+                _ = try await MemoryTree.createNode(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, type: type, name: trimmed, slug: slug, orderIndex: orderIndex, parentId: parentId)
+                await openLevel()
+                return
+            } catch {
+                if !"\(error)".contains("SLUG_EXISTS") && !"\(error)".contains("409") {
+                    self.error = "Konnte nicht anlegen."
+                    return
+                }
+            }
+        }
+    }
+
+    private func slugify(_ name: String) -> String {
+        let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789")
+        let folded = name.folding(options: .diacriticInsensitive, locale: nil).lowercased()
+        let mapped = String(folded.map { allowed.contains($0) ? $0 : "-" })
+        let collapsed = mapped.split(separator: "-").joined(separator: "-")
+        return collapsed.isEmpty ? "item" : collapsed
+    }
+
     /// Client-side search over the active space's decrypted node names (loads the graph once, caches it).
     func search() async {
         let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()

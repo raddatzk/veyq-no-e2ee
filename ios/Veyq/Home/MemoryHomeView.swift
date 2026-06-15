@@ -7,6 +7,9 @@ struct MemoryHomeView: View {
     @EnvironmentObject var app: AppState
     @StateObject private var store: HomeStore
     @State private var showSettings = false
+    @State private var showCreate = false
+    @State private var createType = "MEMORY"
+    @State private var newName = ""
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -59,6 +62,12 @@ struct MemoryHomeView: View {
                     } label: { Image(systemName: "square.grid.2x2") }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button(T("home.createMemory")) { createType = "MEMORY"; newName = ""; showCreate = true }
+                        Button(T("home.createFolder")) { createType = "FOLDER"; newName = ""; showCreate = true }
+                    } label: { Image(systemName: "plus") }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
             }
@@ -69,6 +78,11 @@ struct MemoryHomeView: View {
         .tint(VeyqStyle.accent)
         .task { await store.start() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
+        .alert(createType == "FOLDER" ? T("home.createFolder") : T("home.createMemory"), isPresented: $showCreate) {
+            TextField(T("common.name"), text: $newName)
+            Button(T("common.create")) { let n = newName; Task { await store.create(type: createType, name: n) } }
+            Button(T("common.cancel"), role: .cancel) {}
+        }
     }
 
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {
