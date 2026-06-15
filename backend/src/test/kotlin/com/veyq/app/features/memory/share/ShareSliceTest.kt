@@ -165,12 +165,15 @@ class ShareSliceTest {
 
         // an already-expired share denies all public access (owner can still list it)
         val expired = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
-            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"expiresAt":"2000-01-01T00:00:00Z"}""")
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"expiresAt":"2000-01-01T00:00:00Z","label":"old"}""")
             .post("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200).extract().path<String>("shareId")
         given().get("/api/public/shares/$expired").then().statusCode(404).body("code", `is`("SHARE_EXPIRED"))
-        given().get("/api/public/shares/$expired/nodes/shr-mem/media").then().statusCode(404)
-        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200)
-            .body("shares.expiresAt", org.hamcrest.Matchers.hasItem("2000-01-01T00:00:00Z"))
+
+        // edit: deactivate the expiry + rename the label → the link works again, no expiry
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"label":"renewed"}""")
+            .patch("/api/scopes/$scopeId/nodes/shr-mem/shares/$expired").then().statusCode(200)
+            .body("label", `is`("renewed")).body("expiresAt", org.hamcrest.Matchers.nullValue())
+        given().get("/api/public/shares/$expired").then().statusCode(200)
     }
 
     @Test

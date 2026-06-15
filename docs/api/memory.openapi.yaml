@@ -217,6 +217,26 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/shares/{shareId}:
+    patch:
+      tags: [MemoryShare]
+      operationId: updateShare
+      summary: Edit a link's expiry, label and notice (the password can't change — re-issue the link for that).
+      description: >
+        Replaces the editable, server-side fields of a share. Omitting expiresAt deactivates the expiry;
+        an empty label/notice clears it. The wrapped content key, role and password are immutable.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateShareRequest' } } }
+      responses:
+        '200': { description: The updated share., content: { application/json: { schema: { $ref: '#/components/schemas/ShareSummary' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
     delete:
       tags: [MemoryShare]
       operationId: revokeShare
@@ -358,6 +378,12 @@ components:
         expiresAt: { type: string, format: date-time, description: 'When the link stops working (omit for never).' }
         label: { type: string, description: 'An owner-facing label for the link (not shown to guests).' }
         noticeMarkdown: { type: string, description: 'Extra terms a guest must accept for THIS share (markdown).' }
+    UpdateShareRequest:
+      type: object
+      properties:
+        expiresAt: { type: string, format: date-time, description: 'New expiry; omit to deactivate it.' }
+        label: { type: string }
+        noticeMarkdown: { type: string }
     ShareSummary:
       type: object
       required: [shareId, nodeId, role, passwordProtected, label, createdAt]
@@ -368,6 +394,7 @@ components:
         passwordProtected: { type: boolean }
         expiresAt: { type: string, format: date-time }
         label: { type: string }
+        noticeMarkdown: { type: string }
         createdAt: { type: string, format: date-time }
     ShareList:
       type: object

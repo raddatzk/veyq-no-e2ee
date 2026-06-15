@@ -72,11 +72,26 @@ class ShareHandler(
     }
 
     @Transactional
+    fun updateShare(auth: String?, scopeId: String, nodeId: String, shareId: String, req: com.veyq.app.generated.model.UpdateShareRequest): ShareSummary {
+        requireKeyHolder(scopeId, auth)
+        val share = ownShare(scopeId, nodeId, shareId)
+        // Editable server-side fields only — the wrapped key, role and password are immutable.
+        share.expiresAt = req.expiresAt?.toInstant() // omit = deactivate expiry
+        share.label = (req.label ?: "").take(120)
+        share.noticeMarkdown = req.noticeMarkdown?.trim()?.take(20_000)?.ifEmpty { null }
+        return toSummary(share)
+    }
+
+    @Transactional
     fun revokeShare(auth: String?, scopeId: String, nodeId: String, shareId: String) {
         requireKeyHolder(scopeId, auth)
+        shares.delete(ownShare(scopeId, nodeId, shareId))
+    }
+
+    private fun ownShare(scopeId: String, nodeId: String, shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
         if (share.scopeId != scopeId || share.nodeId != nodeId) throw ApiException(404, "SHARE_NOT_FOUND", "Share not found here")
-        shares.delete(share)
+        return share
     }
 
     private fun requireShareNode(scopeId: String, nodeId: String) {
@@ -91,6 +106,7 @@ class ShareHandler(
             passwordProtected = s.passwordSalt != null,
             expiresAt = s.expiresAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
             label = s.label,
+            noticeMarkdown = s.noticeMarkdown,
             createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC),
         )
 

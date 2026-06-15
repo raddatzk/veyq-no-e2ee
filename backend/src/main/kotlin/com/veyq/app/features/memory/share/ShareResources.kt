@@ -20,6 +20,9 @@ class ShareResource(private val handler: ShareHandler) : MemoryShareApi {
     override fun createShare(authorization: String, scopeId: String, nodeId: String, createShareRequest: CreateShareRequest): Response =
         Response.ok(handler.createShare(authorization, scopeId, nodeId, createShareRequest)).build()
 
+    override fun updateShare(authorization: String, scopeId: String, nodeId: String, shareId: String, updateShareRequest: com.veyq.app.generated.model.UpdateShareRequest): Response =
+        Response.ok(handler.updateShare(authorization, scopeId, nodeId, shareId, updateShareRequest)).build()
+
     override fun revokeShare(authorization: String, scopeId: String, nodeId: String, shareId: String): Response {
         handler.revokeShare(authorization, scopeId, nodeId, shareId)
         return Response.noContent().build()
