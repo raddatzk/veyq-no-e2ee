@@ -22,7 +22,15 @@ struct MemoryHomeView: View {
     }
 
     var body: some View {
-        NavigationStack { content }
+        Group {
+            // Wide (iPad/Mac): the web layout — a persistent Spaces sidebar + content pane. Narrow
+            // (iPhone / split window): the compact iOS stack, with spaces in the toolbar. Same store.
+            if hSize == .regular {
+                regularLayout
+            } else {
+                NavigationStack { content }
+            }
+        }
         .tint(VeyqStyle.accent)
         .task { await store.start() }
         .sheet(isPresented: $showSettings) { SettingsView().environmentObject(app) }
@@ -67,14 +75,17 @@ struct MemoryHomeView: View {
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Menu {
-                ForEach(store.spaces, id: \.scopeId) { space in
-                    Button(space.displayName) { Task { await store.switchSpace(space) } }
-                }
-                Divider()
-                Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
-            } label: { Image(systemName: "square.grid.2x2") }
+        // Spaces + settings live in the sidebar on regular width, so only show them in the toolbar on compact.
+        if hSize != .regular {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    ForEach(store.spaces, id: \.scopeId) { space in
+                        Button(space.displayName) { Task { await store.switchSpace(space) } }
+                    }
+                    Divider()
+                    Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
+                } label: { Image(systemName: "square.grid.2x2") }
+            }
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
@@ -82,9 +93,71 @@ struct MemoryHomeView: View {
                 Button(T("home.createFolder")) { createType = "FOLDER"; newName = ""; showCreate = true }
             } label: { Image(systemName: "plus") }
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { showSettings = true } label: { Image(systemName: "gearshape") }
+        if hSize != .regular {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showSettings = true } label: { Image(systemName: "gearshape") }
+            }
         }
+    }
+
+    // MARK: - Regular-width (iPad/Mac) web-style layout
+
+    private var regularLayout: some View {
+        NavigationSplitView {
+            sidebar.navigationSplitViewColumnWidth(min: 220, ideal: 264, max: 320)
+        } detail: {
+            NavigationStack { content }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    private var sidebar: some View {
+        List {
+            Section(T("home.spaces")) {
+                ForEach(personalSpaces, id: \.scopeId) { spaceRow($0) }
+            }
+            Section(T("home.groups")) {
+                ForEach(groupSpaces, id: \.scopeId) { spaceRow($0) }
+                Button { showJoinGroup = true } label: {
+                    Label(T("groups.join"), systemImage: "person.badge.plus").foregroundStyle(VeyqStyle.accent)
+                }
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("veyq")
+        .safeAreaInset(edge: .bottom) {
+            Button { showSettings = true } label: {
+                Label(T("home.settings"), systemImage: "gearshape")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+            }
+            .tint(VeyqStyle.text)
+            .background(VeyqStyle.surface)
+        }
+    }
+
+    private var personalSpaces: [SwitchActiveSpace.SpaceEntry] { store.spaces.filter { $0.kind == "PERSONAL" } }
+    private var groupSpaces: [SwitchActiveSpace.SpaceEntry] { store.spaces.filter { $0.kind == "GROUP" } }
+
+    private func spaceSub(_ s: SwitchActiveSpace.SpaceEntry) -> String {
+        s.kind == "PERSONAL" ? T("home.personal") : (s.role ?? T("home.group"))
+    }
+
+    private func spaceRow(_ s: SwitchActiveSpace.SpaceEntry) -> some View {
+        Button { Task { await store.switchSpace(s) } } label: {
+            HStack(spacing: 10) {
+                Text(String(s.displayName.prefix(1)).uppercased())
+                    .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(VeyqStyle.accent, in: RoundedRectangle(cornerRadius: 7))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(s.displayName).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
+                    Text(spaceSub(s)).font(.system(size: 11)).foregroundStyle(VeyqStyle.muted)
+                }
+            }
+        }
+        .listRowBackground(store.activeScopeId == s.scopeId ? VeyqStyle.accent.opacity(0.15) : Color.clear)
     }
 
     @ViewBuilder private var searchResults: some View {
