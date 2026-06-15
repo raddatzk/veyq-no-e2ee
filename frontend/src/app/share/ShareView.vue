@@ -5,7 +5,9 @@ import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import type { GalleryTile } from '../../features/gallery/gallery'
-import { loadShareOriginal, loadShareTiles, resolvePublicShare, type ShareContext } from '../../features/memory/share/share'
+import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, updateShareJournal, uploadShareMedia, type ShareContext } from '../../features/memory/share/share'
+import { renderMarkdown } from '../../features/memory/journal/markdown'
+import { fileToNewMedia } from '../../features/uploads/clientMedia'
 
 const props = defineProps<{ shareId: string; shareKey: string }>()
 
@@ -17,6 +19,13 @@ const error = ref('')
 const containerWidth = ref(0)
 const galleryEl = ref<HTMLElement | null>(null)
 const lightbox = ref<string | null>(null)
+const journal = ref('')
+const journalDraft = ref('')
+const journalEditing = ref(false)
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const isContributor = computed(() => ctx.value?.role === 'CONTRIBUTOR')
+const journalHtml = computed(() => renderMarkdown(journal.value))
 let ro: ResizeObserver | null = null
 
 const buckets = computed(() =>
@@ -37,12 +46,37 @@ onMounted(async () => {
     ctx.value = c
     title.value = c.rootName
     tiles.value = await loadShareTiles(c, c.rootNodeId)
+    journal.value = await getShareJournal(c).catch(() => '')
   } catch {
     error.value = t('share.notFound')
   } finally {
     loading.value = false
   }
 })
+
+async function onFilesPicked(event: Event) {
+  const files = Array.from((event.target as HTMLInputElement).files ?? [])
+  if (!files.length || !ctx.value) return
+  uploading.value = true
+  try {
+    for (const file of files) await uploadShareMedia(ctx.value, await fileToNewMedia(file))
+    tiles.value.forEach((tt) => URL.revokeObjectURL(tt.url))
+    tiles.value = await loadShareTiles(ctx.value, ctx.value.rootNodeId)
+  } finally {
+    uploading.value = false
+    if (fileInput.value) fileInput.value.value = ''
+  }
+}
+function startEditJournal() {
+  journalDraft.value = journal.value
+  journalEditing.value = true
+}
+async function saveJournal() {
+  if (!ctx.value) return
+  await updateShareJournal(ctx.value, journalDraft.value)
+  journal.value = journalDraft.value
+  journalEditing.value = false
+}
 
 onBeforeUnmount(() => {
   ro?.disconnect()
@@ -68,7 +102,13 @@ function closeLightbox() {
         <h1 class="detail-title">{{ title || t('share.title') }}</h1>
         <span v-if="dateRange" class="detail-daterange">{{ dateRange }}</span>
       </div>
-      <span class="share-badge">{{ t('share.readOnly') }}</span>
+      <template v-if="isContributor">
+        <button class="btn btn-primary" type="button" :disabled="uploading" @click="fileInput?.click()">
+          {{ uploading ? t('detail.uploading') : t('share.addPhotos') }}
+        </button>
+        <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
+      </template>
+      <span class="share-badge">{{ isContributor ? t('share.contribute') : t('share.readOnly') }}</span>
     </header>
 
     <main class="share-content">
@@ -91,6 +131,22 @@ function closeLightbox() {
       </div>
       <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
       <div v-else-if="!tiles.length && !error" class="home-empty">{{ t('detail.noMedia') }}</div>
+
+      <section v-if="journal || journalEditing || isContributor" class="share-journal journal">
+        <div class="bucket-date">{{ t('detail.journal') }}</div>
+        <template v-if="journalEditing">
+          <textarea v-model="journalDraft" class="journal-editor" :placeholder="t('journal.placeholder')"></textarea>
+          <div class="journal-actions">
+            <button class="btn btn-ghost" type="button" @click="journalEditing = false">{{ t('common.cancel') }}</button>
+            <button class="btn btn-primary" type="button" @click="saveJournal">{{ t('journal.save') }}</button>
+          </div>
+        </template>
+        <template v-else>
+          <div v-if="isContributor" class="journal-bar"><button class="btn btn-ghost" type="button" @click="startEditJournal">{{ t('journal.edit') }}</button></div>
+          <div v-if="journal.trim()" class="journal-body" v-html="journalHtml"></div>
+          <div v-else-if="!isContributor" class="home-empty">{{ t('journal.empty') }}</div>
+        </template>
+      </section>
     </main>
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox">

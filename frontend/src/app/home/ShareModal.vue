@@ -2,13 +2,14 @@
 import { onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { createShare, listShares, revokeShare, type ShareSummary } from '../../features/memory/share/share'
+import { createShare, listShares, revokeShare, type ShareRole, type ShareSummary } from '../../features/memory/share/share'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const shares = ref<ShareSummary[]>([])
+const role = ref<ShareRole>('VIEWER')
 const link = ref('')
 const busy = ref(false)
 const copied = ref(false)
@@ -26,7 +27,7 @@ async function create() {
   busy.value = true
   error.value = ''
   try {
-    const res = await createShare(session.apiBase, session.unlocked!, props.active, props.memory.id)
+    const res = await createShare(session.apiBase, session.unlocked!, props.active, props.memory.id, role.value)
     link.value = res.link
     shares.value = await listShares(session.apiBase, session.unlocked!, props.active, props.memory.id)
   } catch (e) {
@@ -57,6 +58,13 @@ async function revoke(shareId: string) {
       </div>
 
       <p class="invite-hint">{{ t('share.hint') }}</p>
+      <label v-if="!link" class="invite-role">
+        {{ t('invite.role') }}
+        <div class="seg">
+          <button type="button" :class="{ active: role === 'VIEWER' }" @click="role = 'VIEWER'">{{ t('share.roleViewer') }}</button>
+          <button type="button" :class="{ active: role === 'CONTRIBUTOR' }" @click="role = 'CONTRIBUTOR'">{{ t('share.roleContributor') }}</button>
+        </div>
+      </label>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>
 
       <template v-if="link">
