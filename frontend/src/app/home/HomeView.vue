@@ -9,6 +9,7 @@ import MemoryDetailView from './MemoryDetailView.vue'
 import SearchOverlay from './SearchOverlay.vue'
 import SettingsOverlay from './SettingsOverlay.vue'
 import CreateModal from './CreateModal.vue'
+import RenameModal from './RenameModal.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -22,10 +23,15 @@ const selectedMemory = ref<LevelEntry | null>(null)
 const searchOpen = ref(false)
 const settingsOpen = ref(false)
 const createType = ref<NodeType | null>(null)
+const renameTarget = ref<LevelEntry | null>(null)
 
 const currentParentId = () => (crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined)
 async function onCreated() {
   createType.value = null
+  await openLevel()
+}
+async function onRenamed() {
+  renameTarget.value = null
   await openLevel()
 }
 
@@ -77,7 +83,7 @@ async function openLevel() {
   memories.value = entries.filter((e) => e.node.type === 'MEMORY')
   covers.value = {}
   for (const m of memories.value) {
-    loadCover(apiBase, session.unlocked!, active.value!, m.node.id)
+    loadCover(apiBase, session.unlocked!, active.value!, m.node)
       .then((url) => { covers.value[m.node.id] = url })
       .catch(() => {})
   }
@@ -153,6 +159,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
             <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
             <div v-else class="memory-cover placeholder">…</div>
             <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
+            <span class="card-more" :title="t('common.rename')" @click.stop="renameTarget = m">⋯</span>
           </button>
           <button class="create-card" @click="createType = 'MEMORY'"><span class="create-plus">＋</span>{{ t('home.createMemory') }}</button>
         </div>
@@ -161,6 +168,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <div class="card-grid">
           <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
             <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
+            <span class="card-more" :title="t('common.rename')" @click.stop="renameTarget = f">⋯</span>
           </button>
           <button class="create-card create-card-row" @click="createType = 'FOLDER'"><span class="create-plus">＋</span>{{ t('home.createFolder') }}</button>
         </div>
@@ -176,5 +184,6 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       @close="createType = null"
       @created="onCreated"
     />
+    <RenameModal v-if="renameTarget && active" :active="active" :entry="renameTarget" @close="renameTarget = null" @renamed="onRenamed" />
   </div>
 </template>

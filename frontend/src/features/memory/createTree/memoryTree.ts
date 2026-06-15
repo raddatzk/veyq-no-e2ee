@@ -25,6 +25,7 @@ export type MemoryNode = {
   slugToken: string
   orderIndex: number
   sealedContent: { suiteId: string; bytes: string }
+  coverMediaId?: string | null
   createdAt: string
 }
 

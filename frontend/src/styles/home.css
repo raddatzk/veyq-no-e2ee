@@ -112,6 +112,7 @@
 }
 
 .memory-card {
+  position: relative;
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
   background: var(--app-surface);
@@ -122,6 +123,26 @@
   color: inherit;
   font: inherit;
 }
+
+.card-more {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.memory-card:hover .card-more,
+.folder-card:hover .card-more { opacity: 1; }
+.card-more:hover { background: rgba(0, 0, 0, 0.7); }
 .memory-card:hover { box-shadow: var(--app-shadow-md); }
 .memory-cover { aspect-ratio: 4 / 3; background: var(--app-surface-muted); display: block; width: 100%; object-fit: cover; }
 .memory-cover.placeholder { display: grid; place-items: center; color: var(--app-muted); font-size: 0.8rem; }
@@ -129,6 +150,7 @@
 .memory-name { font-weight: 600; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .folder-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.7rem;

@@ -6,6 +6,7 @@ import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout
 import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
+import { setCover } from '../../features/memory/curate/curate'
 import DownloadModal from './DownloadModal.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
@@ -17,6 +18,7 @@ const loading = ref(true)
 const containerWidth = ref(0)
 const galleryEl = ref<HTMLElement | null>(null)
 const lightbox = ref<string | null>(null)
+const lightboxTile = ref<GalleryTile | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const downloadOpen = ref(false)
@@ -70,11 +72,18 @@ async function onFilesPicked(event: Event) {
 }
 
 async function openLightbox(tile: GalleryTile) {
+  lightboxTile.value = tile
   lightbox.value = await loadOriginal(session.apiBase, session.unlocked!, props.active, tile)
 }
 function closeLightbox() {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
   lightbox.value = null
+  lightboxTile.value = null
+}
+async function setAsCover() {
+  if (!lightboxTile.value) return
+  await setCover(session.apiBase, session.unlocked!, props.active, props.memory.id, lightboxTile.value.id)
+  closeLightbox()
 }
 </script>
 
@@ -108,6 +117,12 @@ function closeLightbox() {
     <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
     <div v-else-if="!tiles.length" class="home-empty">{{ t('detail.noMedia') }}</div>
 
-    <div v-if="lightbox" class="lightbox" @click="closeLightbox"><img :src="lightbox" alt="" /></div>
+    <div v-if="lightbox" class="lightbox" @click="closeLightbox">
+      <img :src="lightbox" alt="" @click.stop />
+      <div class="lightbox-actions" @click.stop>
+        <button class="btn btn-primary" type="button" @click="setAsCover">{{ t('cover.setAsCover') }}</button>
+        <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>
+      </div>
+    </div>
   </div>
 </template>

@@ -31,12 +31,12 @@ export async function loadLevel(apiBase: string, session: UnlockedSession, activ
   return nodes.map((node) => ({ node, name: decodeNode(active.contentKey, node).name }))
 }
 
-/** A memory's cover: its first media's thumbnail (or original), decrypted to an object URL. Null if empty. */
-export async function loadCover(apiBase: string, session: UnlockedSession, active: ActiveSpace, memoryNodeId: string): Promise<string | null> {
-  const media = await listMedia(apiBase, session, active.scope.scopeId, memoryNodeId)
+/** A memory's cover: the pinned cover media (or the first media) thumbnail, decrypted to an object URL. */
+export async function loadCover(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode): Promise<string | null> {
+  const media = await listMedia(apiBase, session, active.scope.scopeId, node.id)
   if (!media.length) return null
-  const first = media[0]
-  const ref = first.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? first.original
+  const chosen = (node.coverMediaId ? media.find((m) => m.id === node.coverMediaId) : undefined) ?? media[0]
+  const ref = chosen.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? chosen.original
   const bytes = await downloadBlob(apiBase, session, active.scope.scopeId, active.contentKey, ref)
-  return URL.createObjectURL(new Blob([bytes as BlobPart], { type: first.mimeType }))
+  return URL.createObjectURL(new Blob([bytes as BlobPart], { type: chosen.mimeType }))
 }
