@@ -21,6 +21,9 @@ struct MemoryHomeView: View {
     @State private var showCreateGroup = false
     @State private var newGroupName = ""
     @State private var newGroupTenant = ""
+    @State private var manageGroup: SwitchActiveSpace.SpaceEntry?
+    @State private var deleteNodeTarget: HomeStore.Entry?
+    @State private var deleteTenantTarget: SwitchActiveSpace.SpaceEntry?
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -57,6 +60,13 @@ struct MemoryHomeView: View {
             Button(T("common.cancel"), role: .cancel) { newTenantName = "" }
         }
         .sheet(isPresented: $showCreateGroup) { createGroupSheet }
+        .sheet(item: $manageGroup) { g in GroupMembersView(store: store, space: g, onDeleted: {}) }
+        .sheet(item: $deleteNodeTarget) { entry in
+            ConfirmDeleteView(name: entry.name) { Task { await store.deleteNode(entry.node.id) } }
+        }
+        .sheet(item: $deleteTenantTarget) { t in
+            ConfirmDeleteView(name: store.displayName(for: t)) { Task { await store.deleteTenant(t) } }
+        }
     }
 
     private var createGroupSheet: some View {
@@ -208,6 +218,14 @@ struct MemoryHomeView: View {
             }
         }
         .listRowBackground(store.activeScopeId == s.scopeId ? VeyqStyle.accent.opacity(0.15) : Color.clear)
+        .contextMenu {
+            if s.kind == "GROUP" && s.role == "GroupOwner" {
+                Button { manageGroup = s } label: { Label(T("groups.members"), systemImage: "person.2") }
+            }
+            if s.kind == "TENANT" && s.role == "Owner" {
+                Button(role: .destructive) { deleteTenantTarget = s } label: { Label(T("delete.tenant"), systemImage: "trash") }
+            }
+        }
     }
 
     @ViewBuilder private var searchResults: some View {
@@ -252,6 +270,7 @@ struct MemoryHomeView: View {
     @ViewBuilder private func cardMenu(_ entry: HomeStore.Entry) -> some View {
         Button(T("common.rename")) { renameEntry = entry; renameName = entry.name; showRename = true }
         Button(T("common.move")) { moveEntry = entry }
+        Button(T("common.delete"), role: .destructive) { deleteNodeTarget = entry }
     }
 
     @ViewBuilder private func searchRow(_ hit: HomeStore.Entry) -> some View {

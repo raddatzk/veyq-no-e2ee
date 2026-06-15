@@ -120,6 +120,47 @@ final class HomeStore: ObservableObject {
         }
     }
 
+    func refreshSpaces() async {
+        if let s = try? await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session) {
+            spaces = s; groupNames = [:]; await resolveGroupNames()
+        }
+    }
+
+    /// After a space (group/tenant) is deleted: drop it if active, refresh the roster, and land somewhere.
+    func afterSpaceDeleted(scopeId: String) async {
+        let wasActive = activeScopeId == scopeId
+        await refreshSpaces()
+        if wasActive {
+            scope = nil; contentKey = nil; activeScopeId = nil; folders = []; memories = []
+            if let first = spaces.first(where: { $0.kind == "PERSONAL" }) ?? spaces.first { await switchSpace(first) }
+        }
+    }
+
+    func deleteNode(_ nodeId: String) async {
+        guard let scope else { return }
+        do {
+            try await Groups.deleteNode(apiBase: apiBase, session: session, scopeId: scope.scopeId, nodeId: nodeId)
+            allNodes = nil
+            await openLevel()
+        } catch { self.error = "Konnte nicht löschen." }
+    }
+
+    func deleteGroup(_ entry: SwitchActiveSpace.SpaceEntry) async {
+        guard let tid = entry.tenantId else { return }
+        do {
+            try await Groups.deleteGroup(apiBase: apiBase, session: session, tenantId: tid, scopeId: entry.scopeId)
+            await afterSpaceDeleted(scopeId: entry.scopeId)
+        } catch { self.error = "Konnte Gruppe nicht löschen." }
+    }
+
+    func deleteTenant(_ entry: SwitchActiveSpace.SpaceEntry) async {
+        guard let tid = entry.tenantId else { return }
+        do {
+            try await Groups.deleteTenant(apiBase: apiBase, session: session, tenantId: tid)
+            await afterSpaceDeleted(scopeId: entry.scopeId)
+        } catch { self.error = "Konnte Tenant nicht löschen." }
+    }
+
     func switchSpace(_ entry: SwitchActiveSpace.SpaceEntry) async {
         do {
             let opened = try await SwitchActiveSpace.openSpace(apiBase: apiBase, session: session, entry: entry)

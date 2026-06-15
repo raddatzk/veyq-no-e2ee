@@ -95,6 +95,11 @@ final class GalleryStore: ObservableObject {
         _ = try? await Curate.setCover(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, coverMediaId: mediaId)
     }
 
+    func deleteMedia(_ mediaId: String) async {
+        try? await Groups.deleteMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, mediaId: mediaId)
+        await load()
+    }
+
     /// Mint a public share link for this memory (origin = the instance that serves the web viewer).
     func createShareLink(role: String) async -> URL? {
         guard let link = try? await Share.createShare(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, role: role, origin: apiBase) else { return nil }
@@ -151,6 +156,7 @@ struct MemoryDetailView: View {
     let name: String
     @State private var lightbox: UIImage?
     @State private var lightboxMediaId: String?
+    @State private var mediaDelArm = false
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showDownload = false
     @State private var downloading = false
@@ -290,7 +296,15 @@ struct MemoryDetailView: View {
                             lightbox = nil; lightboxMediaId = nil
                         }
                         .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
-                        Button(T("common.close")) { lightbox = nil; lightboxMediaId = nil }.tint(.white)
+                        if !mediaDelArm {
+                            Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
+                        } else {
+                            Button(T("delete.confirm")) {
+                                if let id = lightboxMediaId { Task { await store.deleteMedia(id) } }
+                                lightbox = nil; lightboxMediaId = nil; mediaDelArm = false
+                            }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
+                        }
+                        Button(T("common.close")) { lightbox = nil; lightboxMediaId = nil; mediaDelArm = false }.tint(.white)
                     }
                 }
                 .padding()

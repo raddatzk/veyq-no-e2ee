@@ -6,7 +6,8 @@ import Foundation
 public enum SwitchActiveSpace {
     public struct KemPublicKeyDTO: Codable, Sendable { public let suiteId, kemPublicKey: String }
     public struct BlobDTO: Codable, Sendable { public let suiteId, bytes: String }
-    public struct SpaceEntry: Codable, Sendable {
+    public struct SpaceEntry: Codable, Sendable, Identifiable {
+        public var id: String { scopeId }
         public let kind: String            // "PERSONAL" | "TENANT" | "GROUP"
         public let tenantId: String?
         public let name: String?
