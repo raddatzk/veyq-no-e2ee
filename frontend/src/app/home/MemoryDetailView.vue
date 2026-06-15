@@ -5,6 +5,7 @@ import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout
 import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
+import DownloadModal from './DownloadModal.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
@@ -17,6 +18,7 @@ const galleryEl = ref<HTMLElement | null>(null)
 const lightbox = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
+const downloadOpen = ref(false)
 let ro: ResizeObserver | null = null
 
 const layout = computed(() =>
@@ -81,11 +83,14 @@ function closeLightbox() {
       <button class="crumb" @click="emit('back')">← Zurück</button>
       <h1 class="detail-title">{{ name }}</h1>
       <span class="content-count">{{ tiles.length }} Medien</span>
+      <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">Herunterladen</button>
       <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
         {{ uploading ? 'Lädt hoch…' : 'Hochladen' }}
       </button>
       <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
     </div>
+
+    <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
 
     <div ref="galleryEl" class="gallery" :style="{ height: layout.height + 'px' }">
       <button
