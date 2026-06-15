@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import app.veyq.crypto.Browse
 import app.veyq.crypto.Curate
+import app.veyq.crypto.Groups
 import app.veyq.crypto.InviteMembers
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
@@ -58,6 +59,7 @@ import app.veyq.crypto.MemoryTree
 import app.veyq.crypto.RegisterViaInvitation
 import app.veyq.crypto.ScopeContent
 import app.veyq.crypto.SwitchActiveSpace
+import app.veyq.crypto.Tenant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -81,6 +83,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     var error by mutableStateOf<String?>(null)
     var searchText by mutableStateOf("")
     var searchHits by mutableStateOf<List<Entry>>(emptyList())
+    var groupNames by mutableStateOf<Map<String, String>>(emptyMap()) // groupScopeId → decrypted name
 
     var scope: ScopeContent.OpenScope? = null
         private set
@@ -90,13 +93,78 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
 
     suspend fun start() {
         try {
-            val arr = withContext(Dispatchers.IO) { SwitchActiveSpace.listMySpaces(apiBase, session) }
-            spaces = (0 until arr.length()).map { arr.getJSONObject(it) }
+            reloadSpaces()
             val personal = spaces.firstOrNull { it.getString("kind") == "PERSONAL" } ?: spaces.firstOrNull()
             if (personal != null) switchSpace(personal)
         } catch (e: Exception) {
             error = "Konnte Bereiche nicht laden."
         }
+    }
+
+    private suspend fun reloadSpaces() {
+        val arr = withContext(Dispatchers.IO) { SwitchActiveSpace.listMySpaces(apiBase, session) }
+        spaces = (0 until arr.length()).map { arr.getJSONObject(it) }
+        groupNames = emptyMap()
+        resolveGroupNames()
+    }
+
+    /** Decrypt the sealed name of each group so the switcher can show it (opens the group scope + content key). */
+    private suspend fun resolveGroupNames() {
+        val resolved = groupNames.toMutableMap()
+        for (s in spaces) {
+            if (s.getString("kind") != "GROUP" || resolved.containsKey(s.getString("scopeId")) || !s.has("sealedName")) continue
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val opened = SwitchActiveSpace.openSpace(apiBase, session, s)
+                    val ck = ScopeContent.getOrCreateContentKey(apiBase, session, opened)
+                    Groups.openSealedName(ck, s.getJSONObject("sealedName").getString("bytes"))
+                }
+            }.onSuccess { resolved[s.getString("scopeId")] = it }
+        }
+        groupNames = resolved
+    }
+
+    /** The label to show for a space: its plaintext name, or the decrypted group name, else a lock. */
+    fun displayName(entry: JSONObject): String {
+        val dn = entry.optString("displayName")
+        if (dn.isNotEmpty()) return dn
+        return groupNames[entry.getString("scopeId")] ?: "🔒"
+    }
+
+    /** Create a tenant (workspace) the caller owns: tenant + self owner-claim (retries on handle conflict). */
+    suspend fun createTenant(name: String): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return false
+        return try {
+            val tenant = withContext(Dispatchers.IO) {
+                val base = slugify(trimmed)
+                var made: JSONObject? = null
+                for (attempt in 0 until 25) {
+                    val handle = if (attempt == 0) base else "$base-${attempt + 1}"
+                    try { made = Tenant.createTenant(apiBase, session.sessionToken, handle, trimmed, null); break }
+                    catch (e: Exception) { if (!"${e.message}".contains("409") && !"${e.message}".lowercase().contains("exists")) throw e }
+                }
+                val t = made ?: throw RuntimeException("could not create tenant (handle conflict)")
+                val inv = Tenant.issueOwnerInvite(apiBase, session.sessionToken, t.getString("id"))
+                Tenant.claimTenantOwnership(apiBase, session.sessionToken, inv.getString("inviteId"), inv.getString("bootstrapSecret"), session.kemPublicKey)
+                t
+            }
+            reloadSpaces()
+            spaces.firstOrNull { it.getString("kind") == "TENANT" && it.optString("tenantId") == tenant.getString("id") }?.let { switchSpace(it) }
+            true
+        } catch (e: Exception) { error = L10n.t("groups.createFailed"); false }
+    }
+
+    /** Create a group within a tenant (the caller becomes its GroupOwner). */
+    suspend fun createGroupSpace(tenantId: String, name: String): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return false
+        return try {
+            val group = withContext(Dispatchers.IO) { Groups.createGroup(apiBase, session, tenantId, trimmed) }
+            reloadSpaces()
+            spaces.firstOrNull { it.getString("scopeId") == group.getString("scopeId") }?.let { switchSpace(it) }
+            true
+        } catch (e: Exception) { error = L10n.t("groups.createFailed"); false }
     }
 
     /** Look up an invite's tenant + role for a confirmation preview (public metadata; no secret needed). */
@@ -110,8 +178,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     /** Accept an invite onto this (logged-in) account, then refresh the space list so the group appears. */
     suspend fun joinGroup(parts: InviteLink.Parts): Boolean = try {
         withContext(Dispatchers.IO) { InviteMembers.acceptMemberInvite(apiBase, session, parts.inviteId, parts.bootstrapSecret, parts.tempPrivateKey) }
-        val arr = withContext(Dispatchers.IO) { SwitchActiveSpace.listMySpaces(apiBase, session) }
-        spaces = (0 until arr.length()).map { arr.getJSONObject(it) }
+        reloadSpaces()
         true
     } catch (e: Exception) {
         error = L10n.t("accept.failed")
@@ -124,7 +191,7 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
             val key = withContext(Dispatchers.IO) { ScopeContent.getOrCreateContentKey(apiBase, session, opened) }
             scope = opened; contentKey = key; activeScopeId = entry.getString("scopeId")
             allNodes = null
-            crumbs = listOf(Crumb(null, entry.getString("displayName")))
+            crumbs = listOf(Crumb(null, displayName(entry)))
             openLevel()
         } catch (e: Exception) {
             error = "Konnte den Bereich nicht öffnen."
@@ -275,6 +342,10 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var joinOpen by remember { mutableStateOf(false) }
+    var createTenantOpen by remember { mutableStateOf(false) }
+    var createGroupOpen by remember { mutableStateOf(false) }
+    var newSpaceName by remember { mutableStateOf("") }
+    var newGroupTenant by remember { mutableStateOf("") }
     var joinLink by remember { mutableStateOf("") }
     var joinInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
@@ -316,11 +387,19 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                         IconButton(onClick = { menuOpen = true }) { Text("▦", color = Veyq.Text, fontSize = 18.sp) }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             controller.spaces.forEach { s ->
-                                DropdownMenuItem(text = { Text(s.getString("displayName")) }, onClick = {
+                                DropdownMenuItem(text = { Text(controller.displayName(s)) }, onClick = {
                                     menuOpen = false; scope.launch { controller.switchSpace(s) }
                                 })
                             }
                             HorizontalDivider()
+                            DropdownMenuItem(text = { Text(L10n.t("tenants.create")) }, onClick = { menuOpen = false; newSpaceName = ""; createTenantOpen = true })
+                            if (controller.spaces.any { it.getString("kind") == "TENANT" }) {
+                                DropdownMenuItem(text = { Text(L10n.t("groups.create")) }, onClick = {
+                                    menuOpen = false; newSpaceName = ""
+                                    newGroupTenant = controller.spaces.firstOrNull { it.getString("kind") == "TENANT" }?.optString("tenantId") ?: ""
+                                    createGroupOpen = true
+                                })
+                            }
                             DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinOpen = true })
                         }
                     }
@@ -401,6 +480,59 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                 }
             },
             dismissButton = { TextButton(onClick = { showNameDialog = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    if (createTenantOpen) {
+        AlertDialog(
+            onDismissRequest = { createTenantOpen = false },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("tenants.create"), color = Veyq.Text) },
+            text = {
+                OutlinedTextField(
+                    value = newSpaceName, onValueChange = { newSpaceName = it }, singleLine = true,
+                    placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text),
+                )
+            },
+            confirmButton = { TextButton(onClick = { val n = newSpaceName; createTenantOpen = false; scope.launch { controller.createTenant(n) } }) { Text(L10n.t("common.create"), color = Veyq.Accent) } },
+            dismissButton = { TextButton(onClick = { createTenantOpen = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    if (createGroupOpen) {
+        val tenants = controller.spaces.filter { it.getString("kind") == "TENANT" }
+        AlertDialog(
+            onDismissRequest = { createGroupOpen = false },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("groups.createTitle"), color = Veyq.Text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (tenants.size > 1) {
+                        Text(L10n.t("groups.inTenant"), color = Veyq.Muted, fontSize = 12.sp)
+                        tenants.forEach { tn ->
+                            val tid = tn.optString("tenantId")
+                            TextButton(onClick = { newGroupTenant = tid }) {
+                                Text((if (newGroupTenant == tid) "✓ " else "") + controller.displayName(tn), color = if (newGroupTenant == tid) Veyq.Accent else Veyq.Text)
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = newSpaceName, onValueChange = { newSpaceName = it }, singleLine = true,
+                        placeholder = { Text(L10n.t("groups.name"), color = Veyq.Muted) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val n = newSpaceName
+                    val tid = newGroupTenant.ifEmpty { tenants.firstOrNull()?.optString("tenantId") ?: "" }
+                    createGroupOpen = false
+                    if (tid.isNotEmpty()) scope.launch { controller.createGroupSpace(tid, n) }
+                }) { Text(L10n.t("common.create"), color = Veyq.Accent) }
+            },
+            dismissButton = { TextButton(onClick = { createGroupOpen = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
 
