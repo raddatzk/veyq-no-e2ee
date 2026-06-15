@@ -57,6 +57,7 @@ import app.veyq.crypto.Curate
 import app.veyq.crypto.Journal
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
+import app.veyq.crypto.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,6 +80,28 @@ class GalleryController(
     var journalMarkdown by mutableStateOf("")
     var journalSaving by mutableStateOf(false)
     private var journalLoaded = false
+    var tracks by mutableStateOf<List<Track.TrackItem>>(emptyList())
+    var importing by mutableStateOf(false)
+    private var tracksLoaded = false
+
+    suspend fun loadTracks() {
+        if (tracksLoaded) return
+        runCatching { withContext(Dispatchers.IO) { Track.getTracks(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { tracks = it }
+        tracksLoaded = true
+    }
+
+    suspend fun importTrack(data: ByteArray) {
+        val route = Gpx.parse(data) ?: return
+        importing = true
+        runCatching { withContext(Dispatchers.IO) { Track.createTrack(apiBase, session, scopeId, contentKey, nodeId, route.first, route.second) } }
+            .onSuccess { runCatching { withContext(Dispatchers.IO) { Track.getTracks(apiBase, session, scopeId, contentKey, nodeId) } }.onSuccess { tracks = it } }
+        importing = false
+    }
+
+    suspend fun deleteTrack(id: String) {
+        runCatching { withContext(Dispatchers.IO) { Track.deleteTrack(apiBase, session, scopeId, nodeId, id) } }
+        tracks = tracks.filterNot { it.id == id }
+    }
 
     suspend fun loadJournal() {
         if (journalLoaded) return
@@ -206,6 +229,13 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         }
     }
 
+    val gpxPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val data = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }
+            if (data != null) controller.importTrack(data)
+        }
+    }
+
     Scaffold(
         containerColor = Veyq.Bg,
         topBar = {
@@ -233,9 +263,21 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             if (tab == 1) {
                 JournalTab(controller, scope)
             } else if (tab == 2) {
+                LaunchedEffect(Unit) { controller.loadTracks() }
                 val points = controller.tiles.mapNotNull { t -> if (t.lat != null && t.lng != null) Triple(t.id, t.lat, t.lng) else null }
-                if (points.isEmpty()) Text(L10n.t("map.empty"), color = Veyq.Muted, fontSize = 14.sp)
-                else MemoryMap(points) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { gpxPicker.launch(arrayOf("application/gpx+xml", "application/xml", "text/xml", "*/*")) }, enabled = !controller.importing) {
+                        Text(if (controller.importing) L10n.t("track.importing") else L10n.t("track.import"), color = Veyq.Accent)
+                    }
+                }
+                if (points.isEmpty() && controller.tracks.isEmpty()) Text(L10n.t("map.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                else MemoryMap(points, controller.tracks) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
+                controller.tracks.forEach { tr ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("🛤 ${tr.name}", color = Veyq.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { val id = tr.id; scope.launch { controller.deleteTrack(id) } }) { Text(L10n.t("track.delete"), color = Color(0xFFF87171)) }
+                    }
+                }
             } else {
                 Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
                 when {
@@ -334,9 +376,9 @@ private fun inlineMd(text: String): androidx.compose.ui.text.AnnotatedString = a
     }
 }
 
-/** An osmdroid (OpenStreetMap) map with a marker per geotagged medium; tapping a marker opens it. */
+/** An osmdroid (OpenStreetMap) map with a marker per geotagged medium and a polyline per GPX track. */
 @Composable
-private fun MemoryMap(points: List<Triple<String, Double, Double>>, onSelect: (String) -> Unit) {
+private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List<Track.TrackItem>, onSelect: (String) -> Unit) {
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(Veyq.Radius)),
         factory = { ctx ->
@@ -345,14 +387,25 @@ private fun MemoryMap(points: List<Triple<String, Double, Double>>, onSelect: (S
             org.osmdroid.views.MapView(ctx).apply {
                 setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
+                val geo = mutableListOf<org.osmdroid.util.GeoPoint>()
+                tracks.forEach { t ->
+                    val line = t.points.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
+                    if (line.size > 1) {
+                        val poly = org.osmdroid.views.overlay.Polyline().apply {
+                            setPoints(line); title = t.name; outlinePaint.color = 0xFF9B8CFF.toInt(); outlinePaint.strokeWidth = 8f
+                        }
+                        overlays.add(poly)
+                    }
+                    geo.addAll(line)
+                }
                 points.forEach { (id, lat, lng) ->
                     val marker = org.osmdroid.views.overlay.Marker(this)
                     marker.position = org.osmdroid.util.GeoPoint(lat, lng)
                     marker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
                     marker.setOnMarkerClickListener { _, _ -> onSelect(id); true }
                     overlays.add(marker)
+                    geo.add(org.osmdroid.util.GeoPoint(lat, lng))
                 }
-                val geo = points.map { org.osmdroid.util.GeoPoint(it.second, it.third) }
                 if (geo.size == 1) {
                     controller.setCenter(geo[0]); controller.setZoom(13.0)
                 } else if (geo.size > 1) {
