@@ -16,12 +16,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Deep link: invite links opened from a mobile browser banner land here as veyq://invite. -->
+            <!-- Deep links from the mobile-browser banner: veyq://invite (invite flow) and veyq://open
+                 (the general "open in app" nudge — just launches the app; no special handling). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="veyq" android:host="invite" />
+                <data android:scheme="veyq" android:host="open" />
             </intent-filter>
         </activity>
 

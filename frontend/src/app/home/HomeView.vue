@@ -18,6 +18,7 @@ import CreateGroupSpaceModal from './CreateGroupSpaceModal.vue'
 import GroupMembersModal from './GroupMembersModal.vue'
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import InviteModal from './InviteModal.vue'
+import OpenInApp from '../auth/OpenInApp.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
@@ -265,6 +266,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
     <main class="home-content">
+      <OpenInApp persist-key="home" />
       <div v-if="active?.entry.scheduledDeletionAt" class="deletion-banner">
         <span class="deletion-banner-text">{{ t('delete.scheduledBanner', { date: new Date(active.entry.scheduledDeletionAt).toLocaleDateString() }) }}</span>
         <button v-if="active.entry.role === 'Owner'" class="btn btn-ghost deletion-banner-cancel" type="button" @click="cancelDeletion">{{ t('delete.cancelDeletion') }}</button>
