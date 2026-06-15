@@ -33,7 +33,7 @@ class SwitchActiveSpaceE2ETest {
         // the switcher lists both spaces: the personal one + the group just claimed
         val spaces = SwitchActiveSpace.listMySpaces(apiBase, a)
         val personal = firstOfKind(spaces, "PERSONAL")
-        val group = firstOfKind(spaces, "GROUP")
+        val group = firstOfKind(spaces, "TENANT")
         assertEquals("Admin", personal?.getString("displayName"))
         assertEquals("Owner", group?.getString("role"))
         assertEquals(t1Id, group?.getString("tenantId"))

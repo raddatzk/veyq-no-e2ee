@@ -54,6 +54,16 @@ object ScopeContent {
         return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), scopePriv)
     }
 
+    /** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope — no tenant path). */
+    fun openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String): OpenScope {
+        val (code, body) = req(apiBase, "/api/scopes/$scopeId/grants/me", session.sessionToken)
+        if (code != 200) throw RuntimeException("scope grant failed: $code $body")
+        val g = JSONObject(body)
+        val scopePriv = Tenant.openScopeGrant(g, session.identity, session.kemPublicKey)
+        val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
+        return OpenScope(g.getString("scopeId"), scopeKem.copyOfRange(0, 32), scopeKem.copyOfRange(32, scopeKem.size), scopePriv)
+    }
+
     /** Get the scope's content key, provisioning one (wrapped to the scope) on first use. */
     fun getOrCreateContentKey(apiBase: String, session: Login.UnlockedSession, scope: OpenScope): ByteArray {
         val path = "/api/scopes/${scope.scopeId}/content-key"

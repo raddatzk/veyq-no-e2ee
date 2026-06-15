@@ -25,9 +25,10 @@ object SwitchActiveSpace {
     }
 
     /** Switch into a space: open its scope with the already-held wrap (no secrets fetched). */
-    fun openSpace(apiBase: String, session: Login.UnlockedSession, entry: JSONObject): ScopeContent.OpenScope {
-        if (entry.getString("kind") == "PERSONAL") return ScopeContent.openPersonalScope(apiBase, session)
-        val tenantId = entry.optString("tenantId").ifEmpty { throw RuntimeException("group space entry is missing its tenantId") }
-        return ScopeContent.openTenantScope(apiBase, session, tenantId)
+    fun openSpace(apiBase: String, session: Login.UnlockedSession, entry: JSONObject): ScopeContent.OpenScope = when (entry.getString("kind")) {
+        "PERSONAL" -> ScopeContent.openPersonalScope(apiBase, session)
+        // A group is opened by scope id (no tenant-keyed grant path); a tenant-wide space by its tenant id.
+        "GROUP" -> ScopeContent.openScopeById(apiBase, session, entry.getString("scopeId"))
+        else -> ScopeContent.openTenantScope(apiBase, session, entry.optString("tenantId").ifEmpty { throw RuntimeException("tenant space entry is missing its tenantId") })
     }
 }
