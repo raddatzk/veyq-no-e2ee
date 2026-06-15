@@ -11,6 +11,7 @@ import { setCover } from '../../features/memory/curate/curate'
 import { getJournal, updateJournal } from '../../features/memory/journal/journal'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import DownloadModal from './DownloadModal.vue'
+import MemoryMap from './MemoryMap.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
@@ -25,7 +26,7 @@ const lightboxTile = ref<GalleryTile | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const downloadOpen = ref(false)
-const tab = ref<'gallery' | 'journal'>('gallery')
+const tab = ref<'gallery' | 'journal' | 'map'>('gallery')
 const journalMarkdown = ref('')
 const journalDraft = ref('')
 const journalEditing = ref(false)
@@ -49,6 +50,13 @@ const buckets = computed(() =>
 const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
 const tileById = computed(() => Object.fromEntries(tiles.value.map((t) => [t.id, t])))
 const journalHtml = computed(() => renderMarkdown(journalMarkdown.value))
+const geoPoints = computed(() =>
+  tiles.value.filter((t) => t.lat != null && t.lng != null).map((t) => ({ id: t.id, lat: t.lat!, lng: t.lng! })),
+)
+function openMapPin(id: string) {
+  const tile = tileById.value[id]
+  if (tile) openLightbox(tile)
+}
 
 async function openJournal() {
   tab.value = 'journal'
@@ -144,6 +152,7 @@ async function setAsCover() {
     <div class="detail-tabs">
       <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">{{ t('detail.gallery') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openJournal">{{ t('detail.journal') }}</button>
+      <button class="detail-tab" :class="{ active: tab === 'map' }" @click="tab = 'map'">{{ t('detail.map') }}</button>
     </div>
 
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
@@ -163,6 +172,11 @@ async function setAsCover() {
         <div v-if="journalMarkdown.trim()" class="journal-body" v-html="journalHtml"></div>
         <div v-else class="home-empty">{{ t('journal.empty') }}</div>
       </template>
+    </section>
+
+    <section v-if="tab === 'map'" class="memory-map-wrap">
+      <MemoryMap v-if="geoPoints.length" :points="geoPoints" @select="openMapPin" />
+      <div v-else class="home-empty">{{ t('map.empty') }}</div>
     </section>
 
     <div v-if="tab === 'gallery' && dateRange" class="detail-daterange">{{ dateRange }}</div>

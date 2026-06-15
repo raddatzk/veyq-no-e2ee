@@ -2,6 +2,7 @@
 // via canvas). The thumbnail is what the gallery grid loads, so generating it here keeps the server blind
 // to full-resolution bytes until a lightbox actually needs them. Videos upload without a thumbnail for now.
 import type { NewMedia } from './media/media'
+import { readExifGps } from './exifGps'
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -32,14 +33,18 @@ async function makeThumbnail(bytes: Uint8Array, mimeType: string, maxDim = 400):
   }
 }
 
-/** Read a picked file into bytes + an optional thumbnail, ready for uploadMedia. */
+/** Read a picked file into bytes + an optional thumbnail, ready for uploadMedia. Pulls GPS + capture time
+ *  from EXIF when present (sealed client-side as sealedMeta) — the server never sees either. */
 export async function fileToNewMedia(file: File): Promise<NewMedia> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   const mimeType = file.type || 'application/octet-stream'
+  const exif = mimeType === 'image/jpeg' ? readExifGps(bytes) : {}
   return {
     bytes,
     thumb: await makeThumbnail(bytes, mimeType),
-    takenAt: new Date(file.lastModified || Date.now()).toISOString(),
+    takenAt: exif.takenAt ?? new Date(file.lastModified || Date.now()).toISOString(),
     mimeType,
+    lat: exif.lat,
+    lng: exif.lng,
   }
 }

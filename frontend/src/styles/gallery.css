@@ -94,6 +94,16 @@
   border-radius: 5px;
 }
 
+.memory-map-wrap { width: 100%; }
+.memory-map {
+  width: 100%;
+  height: min(60vh, 520px);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  overflow: hidden;
+  z-index: 0;
+}
+
 .gallery-buckets { width: 100%; }
 .gallery-bucket { margin-bottom: 1.6rem; }
 .bucket-date {
