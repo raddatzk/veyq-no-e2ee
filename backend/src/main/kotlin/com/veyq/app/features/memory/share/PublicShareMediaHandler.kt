@@ -38,9 +38,15 @@ class PublicShareMediaHandler(
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
+    private fun shareOr404(shareId: String): com.veyq.app.shared.content.Share {
+        val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+        if (ShareHandler.isExpired(share)) throw ApiException(404, "SHARE_EXPIRED", "This share has expired")
+        return share
+    }
+
     @Transactional
     fun listShareMedia(shareId: String, nodeId: String): MediaList {
-        val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+        val share = shareOr404(shareId)
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
@@ -49,7 +55,7 @@ class PublicShareMediaHandler(
 
     @Transactional
     fun getShareChunk(shareId: String, blobId: String, index: Int): ChunkResponse {
-        val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+        val share = shareOr404(shareId)
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         // The guest may only fetch blobs that back a medium (or its derivatives) in the shared subtree.

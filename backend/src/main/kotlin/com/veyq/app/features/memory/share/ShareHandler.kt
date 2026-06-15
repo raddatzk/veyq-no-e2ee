@@ -60,7 +60,11 @@ class ShareHandler(
         val share = Share().apply {
             id = enc.encodeToString(bytes); this.scopeId = scopeId; this.nodeId = nodeId
             suiteId = req.wrappedContentKey.suiteId; wrappedContentKey = dec.decode(req.wrappedContentKey.bytes)
-            role = (req.role ?: ShareRole.VIEWER).value; createdBy = userId; createdAt = Instant.now()
+            role = (req.role ?: ShareRole.VIEWER).value
+            passwordSalt = req.passwordSalt?.let { dec.decode(it.bytes) }
+            expiresAt = req.expiresAt?.toInstant()
+            label = (req.label ?: "").take(120)
+            createdBy = userId; createdAt = Instant.now()
         }
         shares.persist(share)
         return toSummary(share)
@@ -81,7 +85,13 @@ class ShareHandler(
     }
 
     private fun toSummary(s: Share): ShareSummary =
-        ShareSummary(shareId = s.id, nodeId = s.nodeId, role = ShareRole.valueOf(s.role), createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC))
+        ShareSummary(
+            shareId = s.id, nodeId = s.nodeId, role = ShareRole.valueOf(s.role),
+            passwordProtected = s.passwordSalt != null,
+            expiresAt = s.expiresAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
+            label = s.label,
+            createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC),
+        )
 
     private fun requireKeyHolder(scopeId: String, auth: String?): String {
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
@@ -99,6 +109,7 @@ class ShareHandler(
         // it may add media but cannot read the gallery/journal or write the journal.
         fun canRead(role: String) = role == ShareRole.VIEWER.value || role == ShareRole.CONTRIBUTOR.value
         fun canUpload(role: String) = role == ShareRole.CONTRIBUTOR.value || role == ShareRole.UPLOADER.value
+        fun isExpired(share: Share) = share.expiresAt?.isBefore(Instant.now()) == true
 
         /** The shared node's subtree = the root id + every descendant (BFS over the scope's nodes). */
         fun subtreeIds(all: List<Node>, rootId: String): Set<String> {

@@ -36,6 +36,8 @@ class PublicShareTreeHandler(
             scopeId = share.scopeId,
             rootNodeId = share.nodeId,
             role = ShareRole.valueOf(share.role),
+            passwordProtected = share.passwordSalt != null,
+            passwordSalt = share.passwordSalt?.let { Blob(suiteId = "v1", bytes = enc.encodeToString(it)) },
             wrappedContentKey = Blob(suiteId = share.suiteId, bytes = enc.encodeToString(share.wrappedContentKey)),
             root = ShareHandler.nodeToApi(root, share.scopeId, enc),
         )
@@ -59,8 +61,11 @@ class PublicShareTreeHandler(
         return journals.getJournalAs(share.scopeId, nodeId)
     }
 
-    private fun shareOr404(shareId: String): Share =
-        shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+    private fun shareOr404(shareId: String): Share {
+        val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+        if (ShareHandler.isExpired(share)) throw ApiException(404, "SHARE_EXPIRED", "This share has expired")
+        return share
+    }
 
     private fun requireSubtree(share: Share, nodeId: String) {
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)

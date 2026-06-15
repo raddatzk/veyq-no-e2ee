@@ -47,9 +47,10 @@ class PublicShareContributeHandler(
         return media.createMediaAs(share.scopeId, nodeId, req)
     }
 
-    /** Resolve a share and require an upload permission (CONTRIBUTOR or the blind-drop UPLOADER). */
+    /** Resolve a non-expired share and require an upload permission (CONTRIBUTOR or the blind-drop UPLOADER). */
     private fun uploader(shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
+        if (ShareHandler.isExpired(share)) throw ApiException(404, "SHARE_EXPIRED", "This share has expired")
         if (!ShareHandler.canUpload(share.role)) throw ApiException(403, "SHARE_READ_ONLY", "This share cannot upload")
         return share
     }

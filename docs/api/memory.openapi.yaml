@@ -354,13 +354,19 @@ components:
       properties:
         wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         role: { $ref: '#/components/schemas/ShareRole' }
+        passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        expiresAt: { type: string, format: date-time, description: 'When the link stops working (omit for never).' }
+        label: { type: string, description: 'An owner-facing label for the link (not shown to guests).' }
     ShareSummary:
       type: object
-      required: [shareId, nodeId, role, createdAt]
+      required: [shareId, nodeId, role, passwordProtected, label, createdAt]
       properties:
         shareId: { type: string }
         nodeId: { type: string }
         role: { $ref: '#/components/schemas/ShareRole' }
+        passwordProtected: { type: boolean }
+        expiresAt: { type: string, format: date-time }
+        label: { type: string }
         createdAt: { type: string, format: date-time }
     ShareList:
       type: object
@@ -371,11 +377,13 @@ components:
           items: { $ref: '#/components/schemas/ShareSummary' }
     PublicShare:
       type: object
-      required: [shareId, scopeId, rootNodeId, role, wrappedContentKey, root]
+      required: [shareId, scopeId, rootNodeId, role, passwordProtected, wrappedContentKey, root]
       properties:
         shareId: { type: string }
         scopeId: { type: string }
         rootNodeId: { type: string }
         role: { $ref: '#/components/schemas/ShareRole' }
+        passwordProtected: { type: boolean }
+        passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         root: { $ref: '#/components/schemas/MemoryNode' }

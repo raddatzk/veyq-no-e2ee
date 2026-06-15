@@ -21,6 +21,9 @@ class Share {
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "wrapped_content_key", nullable = false) var wrappedContentKey: ByteArray = ByteArray(0)
     @Column(nullable = false) var role: String = "VIEWER"
+    @Column(name = "password_salt") var passwordSalt: ByteArray? = null
+    @Column(name = "expires_at") var expiresAt: Instant? = null
+    @Column(nullable = false) var label: String = ""
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }

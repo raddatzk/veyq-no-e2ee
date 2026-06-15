@@ -151,6 +151,26 @@ class ShareSliceTest {
     }
 
     @Test
+    fun passwordExpiryAndLabel() {
+        // a password-protected, labelled share: the salt rides public resolve; the label is owner-only
+        val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"passwordSalt":{"suiteId":"v1","bytes":"c2FsdA"},"label":"For grandma"}""")
+            .post("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200)
+            .body("passwordProtected", `is`(true)).body("label", `is`("For grandma")).extract().path<String>("shareId")
+        given().get("/api/public/shares/$shareId").then().statusCode(200)
+            .body("passwordProtected", `is`(true)).body("passwordSalt.bytes", `is`("c2FsdA"))
+
+        // an already-expired share denies all public access (owner can still list it)
+        val expired = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"expiresAt":"2000-01-01T00:00:00Z"}""")
+            .post("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200).extract().path<String>("shareId")
+        given().get("/api/public/shares/$expired").then().statusCode(404).body("code", `is`("SHARE_EXPIRED"))
+        given().get("/api/public/shares/$expired/nodes/shr-mem/media").then().statusCode(404)
+        given().header("Authorization", ownerToken).get("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200)
+            .body("shares.expiresAt", org.hamcrest.Matchers.hasItem("2000-01-01T00:00:00Z"))
+    }
+
+    @Test
     fun uploaderGuestUploadsButCannotRead() {
         // an UPLOADER share is a blind drop-off: it may upload but not read the gallery/journal
         val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
