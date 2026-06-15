@@ -12,7 +12,7 @@ import { createNode } from '../createTree/memoryTree'
 import { uploadMedia } from '../../uploads/media/media'
 import { updateJournal } from '../journal/journal'
 import { listMySpaces } from '../../spaces/switchActiveSpace/switchActiveSpace'
-import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, SharePasswordRequired, uploadShareMedia } from './share'
+import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, SharePasswordRequired, updateShare, uploadShareMedia } from './share'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_SEED === '1' ? describe : describe.skip
@@ -77,6 +77,9 @@ run('share e2e', () => {
     const eShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', expiresAt: new Date(Date.now() - 1000).toISOString() })
     const eKey = new URLSearchParams(eShare.link.slice(eShare.link.indexOf('#') + 1)).get('k')!
     await expect(resolvePublicShare(apiBase, eShare.shareId, eKey)).rejects.toThrow()
+    // edit: deactivate the expiry (+ relabel) → the same link works again
+    await updateShare(apiBase, session, active, memory.id, eShare.shareId, { label: 'renewed' })
+    expect((await resolvePublicShare(apiBase, eShare.shareId, eKey)).rootName).toBe('Italien 2026')
 
     // (6) NOTICE — a per-share notice rides the resolve (the viewer gates content behind accepting it)
     const nShare = await createShare(apiBase, session, active, memory.id, { role: 'VIEWER', noticeMarkdown: '## Bitte nur privat teilen' })

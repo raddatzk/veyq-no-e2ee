@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { createShare, listShares, revokeShare, type ShareRole, type ShareSummary } from '../../features/memory/share/share'
+import { createShare, listShares, revokeShare, updateShare, type ShareRole, type ShareSummary } from '../../features/memory/share/share'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
@@ -63,6 +63,26 @@ async function revoke(shareId: string) {
   await revokeShare(session.apiBase, session.unlocked!, props.active, props.memory.id, shareId)
   shares.value = shares.value.filter((s) => s.shareId !== shareId)
 }
+
+// --- per-link editing (expiry / label / notice; the password can't change) ---
+const editId = ref('')
+const editLabel = ref('')
+const editExpiry = ref<'keep' | 'never' | '1d' | '7d' | '30d'>('keep')
+const editNotice = ref('')
+function startEdit(s: ShareSummary) {
+  editId.value = s.shareId
+  editLabel.value = s.label
+  editExpiry.value = s.expiresAt ? 'keep' : 'never'
+  editNotice.value = s.noticeMarkdown ?? ''
+}
+async function saveEdit(s: ShareSummary) {
+  const edit: { expiresAt?: string; label?: string; noticeMarkdown?: string } = { label: editLabel.value.trim(), noticeMarkdown: editNotice.value.trim() || undefined }
+  if (editExpiry.value === 'keep') edit.expiresAt = s.expiresAt // unchanged
+  else { const d = EXPIRY_DAYS[editExpiry.value]; edit.expiresAt = d ? new Date(Date.now() + d * 86400_000).toISOString() : undefined }
+  const updated = await updateShare(session.apiBase, session.unlocked!, props.active, props.memory.id, s.shareId, edit)
+  Object.assign(s, updated)
+  editId.value = ''
+}
 </script>
 
 <template>
@@ -109,9 +129,23 @@ async function revoke(shareId: string) {
       <template v-if="shares.length">
         <div class="settings-section">{{ t('share.existing') }}</div>
         <ul class="track-list">
-          <li v-for="s in shares" :key="s.shareId" class="track-row">
-            <span class="track-name">{{ s.passwordProtected ? '🔒' : '🔗' }} {{ s.label || s.shareId.slice(0, 8) + '…' }}<small v-if="s.expiresAt" class="share-exp"> · {{ t('share.until') }} {{ new Date(s.expiresAt).toLocaleDateString() }}</small></span>
-            <button class="btn btn-ghost track-del" type="button" @click="revoke(s.shareId)">{{ t('share.revoke') }}</button>
+          <li v-for="s in shares" :key="s.shareId" class="share-li">
+            <div class="track-row">
+              <span class="track-name">{{ s.passwordProtected ? '🔒' : '🔗' }} {{ s.label || s.shareId.slice(0, 8) + '…' }}<small v-if="s.expiresAt" class="share-exp"> · {{ t('share.until') }} {{ new Date(s.expiresAt).toLocaleDateString() }}</small></span>
+              <button class="btn btn-ghost track-del" type="button" @click="editId === s.shareId ? (editId = '') : startEdit(s)">{{ t('share.edit') }}</button>
+              <button class="btn btn-ghost track-del" type="button" @click="revoke(s.shareId)">{{ t('share.revoke') }}</button>
+            </div>
+            <div v-if="editId === s.shareId" class="share-edit">
+              <input class="share-field" v-model="editLabel" type="text" :placeholder="t('share.labelPlaceholder')" />
+              <div class="seg">
+                <button type="button" :class="{ active: editExpiry === 'keep' }" :disabled="!s.expiresAt" @click="editExpiry = 'keep'">{{ t('share.expKeep') }}</button>
+                <button type="button" :class="{ active: editExpiry === 'never' }" @click="editExpiry = 'never'">{{ t('share.expNever') }}</button>
+                <button type="button" :class="{ active: editExpiry === '7d' }" @click="editExpiry = '7d'">{{ t('share.exp7d') }}</button>
+                <button type="button" :class="{ active: editExpiry === '30d' }" @click="editExpiry = '30d'">{{ t('share.exp30d') }}</button>
+              </div>
+              <textarea class="share-field share-notice-input" v-model="editNotice" :placeholder="t('share.noticePlaceholder')"></textarea>
+              <button class="btn btn-primary invite-gen" type="button" @click="saveEdit(s)">{{ t('terms.save') }}</button>
+            </div>
           </li>
         </ul>
       </template>

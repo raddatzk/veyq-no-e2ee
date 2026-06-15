@@ -100,6 +100,9 @@
 .terms-clause { border: 1px solid var(--app-line); background: var(--app-surface-muted); color: var(--app-muted); border-radius: 999px; padding: 0.25rem 0.6rem; font-size: 0.78rem; cursor: pointer; }
 .terms-clause:hover { color: var(--app-text); background: var(--app-hover); }
 .terms-editor { min-height: 160px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.share-li { list-style: none; }
+.share-edit { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem 0 0.9rem; }
+.share-edit .seg { align-self: flex-start; }
 
 .home-spacer { flex: 1; }
 

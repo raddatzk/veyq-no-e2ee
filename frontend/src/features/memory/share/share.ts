@@ -27,7 +27,8 @@ function fromB64url(s: string): Uint8Array {
   return out
 }
 
-export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; passwordProtected: boolean; expiresAt?: string; label: string; createdAt: string }
+export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; passwordProtected: boolean; expiresAt?: string; label: string; noticeMarkdown?: string; createdAt: string }
+export type ShareEdit = { expiresAt?: string; label?: string; noticeMarkdown?: string }
 export type CreateShareOptions = { role?: ShareRole; password?: string; expiresAt?: string; label?: string; noticeMarkdown?: string; origin?: string }
 
 /** Thrown by resolvePublicShare when the share needs a password the caller didn't supply (or got wrong). */
@@ -66,6 +67,17 @@ export async function listShares(apiBase: string, session: UnlockedSession, acti
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
   if (!res.ok) throw new Error(`list shares failed: ${res.status} ${await res.text()}`)
   return (await res.json()).shares
+}
+
+/** Edit a link's editable fields (expiry/label/notice). Omit expiresAt to deactivate the expiry. */
+export async function updateShare(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, shareId: string, edit: ShareEdit): Promise<ShareSummary> {
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares/${shareId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify(edit),
+  })
+  if (!res.ok) throw new Error(`update share failed: ${res.status} ${await res.text()}`)
+  return res.json()
 }
 
 /** Revoke a share. */
