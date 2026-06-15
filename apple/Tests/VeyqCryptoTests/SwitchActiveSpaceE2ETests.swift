@@ -19,7 +19,7 @@ final class SwitchActiveSpaceE2ETests: XCTestCase {
         // the switcher lists both spaces: the personal one + the group just claimed
         let spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: a)
         let personal = spaces.first { $0.kind == "PERSONAL" }
-        let group = spaces.first { $0.kind == "GROUP" }
+        let group = spaces.first { $0.kind == "TENANT" }
         XCTAssertEqual(personal?.displayName, "Admin")
         XCTAssertEqual(group?.role, "Owner")
         XCTAssertEqual(group?.tenantId, t1.id)

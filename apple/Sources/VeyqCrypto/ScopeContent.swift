@@ -51,6 +51,21 @@ public enum ScopeContent {
         return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)), scopePriv: scopePriv)
     }
 
+    /// Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope — no tenant path).
+    public static func openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String) async throws -> OpenScope {
+        let (data, code) = try await send(apiBase, "/api/scopes/\(scopeId)/grants/me", session.sessionToken)
+        guard code == 200 else { throw err("scope grant failed: \(String(data: data, encoding: .utf8) ?? "")") }
+        let g = try JSONDecoder().decode(PersonalScopeDTO.self, from: data)
+        let idKem = session.kemPublicKey
+        let scopePrivBytes = try V1.asymUnwrap(
+            skX: session.identity.kemX, mlkemSeed: session.identity.mlkemSeed,
+            pkX: Data(idKem.prefix(32)), pkM: Data(idKem.dropFirst(32)),
+            blob: Login.b64urlDecode(g.wrappedScopePrivateKey.bytes), context: "scope-grant")
+        let scopeKem = Login.b64urlDecode(g.scopePublicKey.kemPublicKey)
+        return OpenScope(scopeId: g.scopeId, scopePkX: Data(scopeKem.prefix(32)), scopePkM: Data(scopeKem.dropFirst(32)),
+                         scopePriv: V1.deserializeIdentityPrivate(scopePrivBytes))
+    }
+
     /// Get the scope's content key, provisioning one (wrapped to the scope) on first use.
     public static func getOrCreateContentKey(apiBase: String, session: Login.UnlockedSession, scope: OpenScope) async throws -> Data {
         let path = "/api/scopes/\(scope.scopeId)/content-key"

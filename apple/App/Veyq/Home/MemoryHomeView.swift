@@ -16,8 +16,11 @@ struct MemoryHomeView: View {
     @State private var renameName = ""
     @State private var moveEntry: HomeStore.Entry?
     @State private var showJoinGroup = false
+    @State private var showCreateTenant = false
+    @State private var newTenantName = ""
     @State private var showCreateGroup = false
     @State private var newGroupName = ""
+    @State private var newGroupTenant = ""
 
     init(apiBase: String, session: Login.UnlockedSession) {
         _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
@@ -48,10 +51,35 @@ struct MemoryHomeView: View {
             Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $moveEntry) { entry in MovePickerView(store: store, entry: entry) }
-        .alert(T("groups.create"), isPresented: $showCreateGroup) {
-            TextField(T("common.name"), text: $newGroupName)
-            Button(T("common.create")) { let n = newGroupName; newGroupName = ""; Task { _ = await store.createGroup(displayName: n) } }
-            Button(T("common.cancel"), role: .cancel) { newGroupName = "" }
+        .alert(T("tenants.create"), isPresented: $showCreateTenant) {
+            TextField(T("common.name"), text: $newTenantName)
+            Button(T("common.create")) { let n = newTenantName; newTenantName = ""; Task { _ = await store.createGroup(displayName: n) } }
+            Button(T("common.cancel"), role: .cancel) { newTenantName = "" }
+        }
+        .sheet(isPresented: $showCreateGroup) { createGroupSheet }
+    }
+
+    private var createGroupSheet: some View {
+        NavigationStack {
+            Form {
+                if tenantSpaces.count > 1 {
+                    Picker(T("groups.inTenant"), selection: $newGroupTenant) {
+                        ForEach(tenantSpaces, id: \.scopeId) { Text(store.displayName(for: $0)).tag($0.tenantId ?? "") }
+                    }
+                }
+                TextField(T("groups.name"), text: $newGroupName)
+            }
+            .navigationTitle(T("groups.createTitle"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button(T("common.cancel")) { showCreateGroup = false } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(T("common.create")) {
+                        let tid = newGroupTenant.isEmpty ? tenantSpaces.first?.tenantId : newGroupTenant
+                        let n = newGroupName; newGroupName = ""; showCreateGroup = false
+                        if let tid { Task { _ = await store.createGroupSpace(tenantId: tid, name: n) } }
+                    }.disabled(newGroupName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
         }
     }
 
@@ -87,10 +115,11 @@ struct MemoryHomeView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     ForEach(store.spaces, id: \.scopeId) { space in
-                        Button(space.displayName) { Task { await store.switchSpace(space) } }
+                        Button(store.displayName(for: space)) { Task { await store.switchSpace(space) } }
                     }
                     Divider()
-                    Button { showCreateGroup = true } label: { Label(T("groups.create"), systemImage: "person.2.badge.gearshape") }
+                    Button { showCreateTenant = true } label: { Label(T("tenants.create"), systemImage: "building.2") }
+                    Button { newGroupTenant = ""; showCreateGroup = true } label: { Label(T("groups.create"), systemImage: "person.2.badge.gearshape") }
                     Button { showJoinGroup = true } label: { Label(T("groups.join"), systemImage: "person.badge.plus") }
                 } label: { Image(systemName: "square.grid.2x2") }
             }
@@ -124,13 +153,21 @@ struct MemoryHomeView: View {
             Section(T("home.spaces")) {
                 ForEach(personalSpaces, id: \.scopeId) { spaceRow($0) }
             }
-            Section(T("home.groups")) {
-                ForEach(groupSpaces, id: \.scopeId) { spaceRow($0) }
-                Button { showCreateGroup = true } label: {
-                    Label(T("groups.create"), systemImage: "plus.circle").foregroundStyle(VeyqStyle.accent)
+            Section(T("home.tenants")) {
+                ForEach(tenantSpaces, id: \.scopeId) { spaceRow($0) }
+                Button { showCreateTenant = true } label: {
+                    Label(T("tenants.create"), systemImage: "building.2").foregroundStyle(VeyqStyle.accent)
                 }
                 Button { showJoinGroup = true } label: {
                     Label(T("groups.join"), systemImage: "person.badge.plus").foregroundStyle(VeyqStyle.accent)
+                }
+            }
+            Section(T("home.groups")) {
+                ForEach(groupSpaces, id: \.scopeId) { spaceRow($0) }
+                if !tenantSpaces.isEmpty {
+                    Button { newGroupTenant = ""; showCreateGroup = true } label: {
+                        Label(T("groups.create"), systemImage: "plus.circle").foregroundStyle(VeyqStyle.accent)
+                    }
                 }
             }
         }
@@ -149,6 +186,7 @@ struct MemoryHomeView: View {
     }
 
     private var personalSpaces: [SwitchActiveSpace.SpaceEntry] { store.spaces.filter { $0.kind == "PERSONAL" } }
+    private var tenantSpaces: [SwitchActiveSpace.SpaceEntry] { store.spaces.filter { $0.kind == "TENANT" } }
     private var groupSpaces: [SwitchActiveSpace.SpaceEntry] { store.spaces.filter { $0.kind == "GROUP" } }
 
     private func spaceSub(_ s: SwitchActiveSpace.SpaceEntry) -> String {
@@ -156,14 +194,15 @@ struct MemoryHomeView: View {
     }
 
     private func spaceRow(_ s: SwitchActiveSpace.SpaceEntry) -> some View {
-        Button { Task { await store.switchSpace(s) } } label: {
+        let name = store.displayName(for: s)
+        return Button { Task { await store.switchSpace(s) } } label: {
             HStack(spacing: 10) {
-                Text(String(s.displayName.prefix(1)).uppercased())
+                Text(String(name.prefix(1)).uppercased())
                     .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
                     .frame(width: 28, height: 28)
                     .background(VeyqStyle.accent, in: RoundedRectangle(cornerRadius: 7))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(s.displayName).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
+                    Text(name).font(.system(size: 14, weight: .semibold)).foregroundStyle(VeyqStyle.text)
                     Text(spaceSub(s)).font(.system(size: 11)).foregroundStyle(VeyqStyle.muted)
                 }
             }

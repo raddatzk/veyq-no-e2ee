@@ -5,12 +5,14 @@ import Foundation
 /// it opens the chosen scope with the wrap the client already holds. Content ops reuse ScopeContent.
 public enum SwitchActiveSpace {
     public struct KemPublicKeyDTO: Codable, Sendable { public let suiteId, kemPublicKey: String }
+    public struct BlobDTO: Codable, Sendable { public let suiteId, bytes: String }
     public struct SpaceEntry: Codable, Sendable {
-        public let kind: String            // "PERSONAL" | "GROUP"
+        public let kind: String            // "PERSONAL" | "TENANT" | "GROUP"
         public let tenantId: String?
         public let name: String?
-        public let displayName: String
+        public let displayName: String?
         public let role: String?
+        public let sealedName: BlobDTO?    // GROUP only — the name sealed under the group content key
         public let scopeId: String
         public let scopePublicKey: KemPublicKeyDTO
     }
@@ -33,8 +35,12 @@ public enum SwitchActiveSpace {
         if entry.kind == "PERSONAL" {
             return try await ScopeContent.openPersonalScope(apiBase: apiBase, session: session)
         }
+        // A group is opened by scope id (no tenant-keyed grant path); a tenant-wide space by its tenant id.
+        if entry.kind == "GROUP" {
+            return try await ScopeContent.openScopeById(apiBase: apiBase, session: session, scopeId: entry.scopeId)
+        }
         guard let tenantId = entry.tenantId else {
-            throw NSError(domain: "veyq.spaces", code: 2, userInfo: [NSLocalizedDescriptionKey: "group space entry is missing its tenantId"])
+            throw NSError(domain: "veyq.spaces", code: 2, userInfo: [NSLocalizedDescriptionKey: "tenant space entry is missing its tenantId"])
         }
         return try await ScopeContent.openTenantScope(apiBase: apiBase, session: session, tenantId: tenantId)
     }

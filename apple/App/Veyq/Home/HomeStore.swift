@@ -30,6 +30,7 @@ final class HomeStore: ObservableObject {
     @Published var error: String?
     @Published var searchText = ""
     @Published var searchHits: [Entry] = []
+    @Published var groupNames: [String: String] = [:] // groupScopeId → decrypted name (sealed under the group key)
 
     private(set) var scope: ScopeContent.OpenScope?
     private(set) var contentKey: Data?
@@ -43,11 +44,46 @@ final class HomeStore: ObservableObject {
     func start() async {
         do {
             spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
+            await resolveGroupNames()
             if let personal = spaces.first(where: { $0.kind == "PERSONAL" }) ?? spaces.first {
                 await switchSpace(personal)
             }
         } catch {
             self.error = "Konnte Bereiche nicht laden."
+        }
+    }
+
+    /// Decrypt the sealed name of each group so the sidebar can show it (opens the group scope + content key).
+    func resolveGroupNames() async {
+        for entry in spaces where entry.kind == "GROUP" {
+            guard groupNames[entry.scopeId] == nil, let sealed = entry.sealedName else { continue }
+            if let opened = try? await SwitchActiveSpace.openSpace(apiBase: apiBase, session: session, entry: entry),
+               let ck = try? await ScopeContent.getOrCreateContentKey(apiBase: apiBase, session: session, scope: opened),
+               let name = try? Groups.openSealedName(contentKey: ck, sealedB64: sealed.bytes) {
+                groupNames[entry.scopeId] = name
+            }
+        }
+    }
+
+    /// The label to show for a space: its plaintext name, or the decrypted group name, else a lock.
+    func displayName(for entry: SwitchActiveSpace.SpaceEntry) -> String {
+        if let n = entry.displayName, !n.isEmpty { return n }
+        return groupNames[entry.scopeId] ?? "🔒"
+    }
+
+    /// Create a group within a tenant (the caller becomes its GroupOwner), refresh, and switch into it.
+    func createGroupSpace(tenantId: String, name: String) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        do {
+            let group = try await Groups.createGroup(apiBase: apiBase, session: session, tenantId: tenantId, name: trimmed)
+            spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
+            await resolveGroupNames()
+            if let entry = spaces.first(where: { $0.scopeId == group.scopeId }) { await switchSpace(entry) }
+            return true
+        } catch {
+            self.error = T("groups.createFailed")
+            return false
         }
     }
 
@@ -76,7 +112,7 @@ final class HomeStore: ObservableObject {
         do {
             let tenant = try await Tenant.createGroup(apiBase: apiBase, token: session.sessionToken, identityKemPublicKey: session.kemPublicKey, displayName: trimmed)
             spaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session)
-            if let entry = spaces.first(where: { $0.tenantId == tenant.id }) { await switchSpace(entry) }
+            if let entry = spaces.first(where: { $0.kind == "TENANT" && $0.tenantId == tenant.id }) { await switchSpace(entry) }
             return true
         } catch {
             self.error = T("groups.createFailed")
@@ -92,7 +128,7 @@ final class HomeStore: ObservableObject {
             contentKey = key
             activeScopeId = entry.scopeId
             allNodes = nil
-            crumbs = [Crumb(id: "root", nodeId: nil, name: entry.displayName)]
+            crumbs = [Crumb(id: "root", nodeId: nil, name: displayName(for: entry))]
             await openLevel()
         } catch {
             self.error = "Konnte den Bereich nicht öffnen."
