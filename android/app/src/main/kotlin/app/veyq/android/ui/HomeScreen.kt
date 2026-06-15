@@ -21,6 +21,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,9 +51,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import app.veyq.crypto.Browse
 import app.veyq.crypto.Curate
+import app.veyq.crypto.InviteMembers
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import app.veyq.crypto.MemoryTree
+import app.veyq.crypto.RegisterViaInvitation
 import app.veyq.crypto.ScopeContent
 import app.veyq.crypto.SwitchActiveSpace
 import kotlinx.coroutines.Dispatchers
@@ -94,6 +97,25 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         } catch (e: Exception) {
             error = "Konnte Bereiche nicht laden."
         }
+    }
+
+    /** Look up an invite's tenant + role for a confirmation preview (public metadata; no secret needed). */
+    suspend fun inviteInfo(inviteId: String): Pair<String, String>? = runCatching {
+        withContext(Dispatchers.IO) {
+            val m = RegisterViaInvitation.getInviteMetadata(apiBase, inviteId)
+            m.getJSONObject("tenant").getString("displayName") to m.getString("role")
+        }
+    }.getOrNull()
+
+    /** Accept an invite onto this (logged-in) account, then refresh the space list so the group appears. */
+    suspend fun joinGroup(parts: InviteLink.Parts): Boolean = try {
+        withContext(Dispatchers.IO) { InviteMembers.acceptMemberInvite(apiBase, session, parts.inviteId, parts.bootstrapSecret, parts.tempPrivateKey) }
+        val arr = withContext(Dispatchers.IO) { SwitchActiveSpace.listMySpaces(apiBase, session) }
+        spaces = (0 until arr.length()).map { arr.getJSONObject(it) }
+        true
+    } catch (e: Exception) {
+        error = L10n.t("accept.failed")
+        false
     }
 
     suspend fun switchSpace(entry: JSONObject) {
@@ -252,6 +274,10 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     val controller = remember { HomeController(apiBase, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
+    var joinOpen by remember { mutableStateOf(false) }
+    var joinLink by remember { mutableStateOf("") }
+    var joinInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var joinBusy by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<HomeController.Entry?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     var createMenuOpen by remember { mutableStateOf(false) }
@@ -294,6 +320,8 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                                     menuOpen = false; scope.launch { controller.switchSpace(s) }
                                 })
                             }
+                            HorizontalDivider()
+                            DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinOpen = true })
                         }
                     }
                 },
@@ -373,6 +401,47 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                 }
             },
             dismissButton = { TextButton(onClick = { showNameDialog = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    if (joinOpen) {
+        AlertDialog(
+            onDismissRequest = { joinOpen = false },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("groups.join"), color = Veyq.Text) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = joinLink,
+                        onValueChange = { v ->
+                            joinLink = v; joinInfo = null
+                            InviteLink.parse(v)?.let { p -> scope.launch { joinInfo = controller.inviteInfo(p.inviteId) } }
+                        },
+                        placeholder = { Text(L10n.t("accept.paste"), color = Veyq.Muted) },
+                        singleLine = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+                            focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                            focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                        ),
+                    )
+                    joinInfo?.let { (name, role) ->
+                        val roleLabel = if (role == "Owner") L10n.t("invite.owner") else L10n.t("invite.member")
+                        Text("$name — ${L10n.t("accept.as")} $roleLabel", color = Veyq.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val p = InviteLink.parse(joinLink) ?: return@TextButton
+                        joinBusy = true
+                        scope.launch { if (controller.joinGroup(p)) joinOpen = false; joinBusy = false }
+                    },
+                    enabled = !joinBusy && InviteLink.parse(joinLink) != null,
+                ) { Text(if (joinBusy) L10n.t("accept.joining") else L10n.t("accept.join"), color = Veyq.Accent) }
+            },
+            dismissButton = { TextButton(onClick = { joinOpen = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
 
