@@ -49,6 +49,13 @@ export async function moveDestinations(apiBase: string, session: UnlockedSession
   return dests
 }
 
+/** Resolve a single node by id (with its decrypted name) — used to deep-link into a memory from a share. */
+export async function loadMemoryById(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<LevelEntry | null> {
+  const all = await listNodes(apiBase, session, active.scope.scopeId)
+  const node = all.find((n) => n.id === nodeId)
+  return node ? { node, name: decodeNode(active.contentKey, node).name } : null
+}
+
 /** A memory's cover: the pinned cover media (or the first media) thumbnail, decrypted to an object URL. */
 export async function loadCover(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode): Promise<string | null> {
   const media = await listMedia(apiBase, session, active.scope.scopeId, node.id)

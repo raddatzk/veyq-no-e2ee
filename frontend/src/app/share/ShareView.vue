@@ -8,8 +8,10 @@ import type { GalleryTile } from '../../features/gallery/gallery'
 import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, uploadShareMedia, type ShareContext } from '../../features/memory/share/share'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
+import { listMySpaces } from '../../features/spaces/switchActiveSpace/switchActiveSpace'
 
 const props = defineProps<{ shareId: string; shareKey: string }>()
+const emit = defineEmits<{ internal: [target: { scopeId: string; nodeId: string }] }>()
 
 const ctx = ref<ShareContext | null>(null)
 const title = ref('')
@@ -42,6 +44,18 @@ onMounted(async () => {
   ro = new ResizeObserver((entries) => { containerWidth.value = entries[0].contentRect.width })
   if (galleryEl.value) ro.observe(galleryEl.value)
   try {
+    // A logged-in member who already holds this scope gets the FULL internal memory (not the guest view).
+    if (session.unlocked) {
+      const peek = await fetch(`${session.apiBase}/api/public/shares/${props.shareId}`)
+      if (peek.ok) {
+        const body = await peek.json()
+        const spaces = await listMySpaces(session.apiBase, session.unlocked).catch(() => [])
+        if (spaces.some((s) => s.scopeId === body.scopeId)) {
+          emit('internal', { scopeId: body.scopeId, nodeId: body.rootNodeId })
+          return
+        }
+      }
+    }
     const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey)
     ctx.value = c
     title.value = c.rootName

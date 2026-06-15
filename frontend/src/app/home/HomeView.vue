@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import { enterSpace, loadCover, loadLevel, loadMemoryById, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import { reorderNode } from '../../features/memory/curate/curate'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -15,6 +15,7 @@ import MovePicker from './MovePicker.vue'
 import CreateGroupModal from './CreateGroupModal.vue'
 import InviteModal from './InviteModal.vue'
 
+const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
 const active = ref<ActiveSpace | null>(null)
@@ -86,6 +87,13 @@ onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   try {
     spaces.value = await loadSpaces(apiBase, session.unlocked!)
+    // Deep-link from a share link the member already holds: open that space + memory directly.
+    const target = props.openTarget ? spaces.value.find((s) => s.scopeId === props.openTarget!.scopeId) : undefined
+    if (target && props.openTarget) {
+      await switchSpace(target)
+      selectedMemory.value = await loadMemoryById(apiBase, session.unlocked!, active.value!, props.openTarget.nodeId)
+      return
+    }
     const personal = spaces.value.find((s) => s.kind === 'PERSONAL') ?? spaces.value[0]
     if (personal) await switchSpace(personal)
   } catch (e) {

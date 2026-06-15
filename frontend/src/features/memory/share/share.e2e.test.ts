@@ -11,6 +11,7 @@ import { getOrCreateContentKey, openPersonalScope } from '../../content/scopeCon
 import { createNode } from '../createTree/memoryTree'
 import { uploadMedia } from '../../uploads/media/media'
 import { updateJournal } from '../journal/journal'
+import { listMySpaces } from '../../spaces/switchActiveSpace/switchActiveSpace'
 import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, uploadShareMedia } from './share'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
@@ -38,6 +39,10 @@ run('share e2e', () => {
     expect(vCtx.role).toBe('VIEWER')
     const vMedia = await listShareMedia(vCtx, vCtx.rootNodeId)
     expect(Array.from(await downloadShareBlob(vCtx, vMedia[0].original))).toEqual(Array.from(photo))
+
+    // member-redirect predicate: the share's scope is one the (logged-in) owner already holds → full internal view
+    const meta = await (await fetch(`${apiBase}/api/public/shares/${vShare.shareId}`)).json()
+    expect((await listMySpaces(apiBase, session)).some((s) => s.scopeId === meta.scopeId)).toBe(true)
 
     // (2) CONTRIBUTOR — a guest adds a photo + writes the journal, sealed under the fragment content key
     const cShare = await createShare(apiBase, session, active, memory.id, 'CONTRIBUTOR')
