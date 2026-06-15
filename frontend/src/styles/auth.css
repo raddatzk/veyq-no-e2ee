@@ -118,6 +118,8 @@
 }
 
 .auth-unlock { width: 100%; margin-bottom: 0.9rem; }
+.accept-modes { width: 100%; margin: 0.9rem 0; }
+.accept-modes button { flex: 1; }
 .remember-row { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
 .remember-row input { width: auto; }
 
