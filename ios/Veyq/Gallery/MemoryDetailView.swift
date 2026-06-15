@@ -252,6 +252,7 @@ struct MemoryDetailView: View {
         .confirmationDialog(T("share.share"), isPresented: $showShareRole, titleVisibility: .visible) {
             Button(T("share.roleViewer")) { Task { if let url = await store.createShareLink(role: "VIEWER") { shareItem = ShareItem(url: url) } } }
             Button(T("share.roleContributor")) { Task { if let url = await store.createShareLink(role: "CONTRIBUTOR") { shareItem = ShareItem(url: url) } } }
+            Button(T("share.roleUploader")) { Task { if let url = await store.createShareLink(role: "UPLOADER") { shareItem = ShareItem(url: url) } } }
             Button(T("common.cancel"), role: .cancel) {}
         }
         .sheet(item: $shareItem) { item in ActivityView(url: item.url) }

@@ -330,9 +330,16 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             onDismissRequest = { showShareRole = false },
             containerColor = Veyq.Surface,
             title = { Text(L10n.t("share.share"), color = Veyq.Text) },
-            text = { Text(L10n.t("share.hint"), color = Veyq.Muted) },
-            confirmButton = { TextButton(onClick = { share("CONTRIBUTOR") }) { Text(L10n.t("share.roleContributor"), color = Veyq.Accent) } },
-            dismissButton = { TextButton(onClick = { share("VIEWER") }) { Text(L10n.t("share.roleViewer"), color = Veyq.Accent) } },
+            text = {
+                Column {
+                    Text(L10n.t("share.hint"), color = Veyq.Muted)
+                    TextButton(onClick = { share("VIEWER") }, modifier = Modifier.fillMaxWidth()) { Text(L10n.t("share.roleViewer"), color = Veyq.Text, modifier = Modifier.fillMaxWidth()) }
+                    TextButton(onClick = { share("CONTRIBUTOR") }, modifier = Modifier.fillMaxWidth()) { Text(L10n.t("share.roleContributor"), color = Veyq.Text, modifier = Modifier.fillMaxWidth()) }
+                    TextButton(onClick = { share("UPLOADER") }, modifier = Modifier.fillMaxWidth()) { Text(L10n.t("share.roleUploader"), color = Veyq.Text, modifier = Modifier.fillMaxWidth()) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showShareRole = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
 
