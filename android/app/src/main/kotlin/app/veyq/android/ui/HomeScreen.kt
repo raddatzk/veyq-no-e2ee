@@ -63,6 +63,7 @@ import app.veyq.crypto.Tenant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** MemoryHome state holder. Blocking core calls run on IO; Compose state is updated on the caller's (main). */
@@ -183,6 +184,42 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
     } catch (e: Exception) {
         error = L10n.t("accept.failed")
         false
+    }
+
+    // --- group member management (GroupOwner) ---
+    suspend fun groupMembers(entry: JSONObject): JSONArray = withContext(Dispatchers.IO) { Groups.listGroupMembers(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId")) }
+    suspend fun tenantMembers(tenantId: String): JSONArray = withContext(Dispatchers.IO) { InviteMembers.listTenantMembers(apiBase, session.sessionToken, tenantId) }
+    suspend fun addGroupMember(entry: JSONObject, userId: String, kemB64: String): Boolean = runCatching {
+        withContext(Dispatchers.IO) { Groups.addGroupMember(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId"), userId, kemB64) }
+    }.isSuccess
+    suspend fun setGroupRole(entry: JSONObject, userId: String, role: String): Boolean = runCatching {
+        withContext(Dispatchers.IO) { Groups.setGroupMemberRole(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId"), userId, role) }
+    }.isSuccess
+    suspend fun removeGroupMember(entry: JSONObject, userId: String): Boolean = runCatching {
+        withContext(Dispatchers.IO) { Groups.removeGroupMember(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId"), userId) }
+    }.isSuccess
+
+    // --- deletes ---
+    suspend fun deleteNode(nodeId: String) {
+        val s = scope ?: return
+        try { withContext(Dispatchers.IO) { Groups.deleteNode(apiBase, session, s.scopeId, nodeId) }; allNodes = null; openLevel() }
+        catch (e: Exception) { error = "Konnte nicht löschen." }
+    }
+    suspend fun deleteGroup(entry: JSONObject) {
+        try { withContext(Dispatchers.IO) { Groups.deleteGroup(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId")) }; afterSpaceDeleted(entry.getString("scopeId")) }
+        catch (e: Exception) { error = "Konnte Gruppe nicht löschen." }
+    }
+    suspend fun deleteTenant(entry: JSONObject) {
+        try { withContext(Dispatchers.IO) { Groups.deleteTenant(apiBase, session, entry.optString("tenantId")) }; afterSpaceDeleted(entry.getString("scopeId")) }
+        catch (e: Exception) { error = "Konnte Tenant nicht löschen." }
+    }
+    private suspend fun afterSpaceDeleted(scopeId: String) {
+        val wasActive = activeScopeId == scopeId
+        reloadSpaces()
+        if (wasActive) {
+            scope = null; contentKey = null; activeScopeId = null; folders = emptyList(); memories = emptyList()
+            (spaces.firstOrNull { it.getString("kind") == "PERSONAL" } ?: spaces.firstOrNull())?.let { switchSpace(it) }
+        }
     }
 
     suspend fun switchSpace(entry: JSONObject) {
@@ -346,6 +383,10 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     var createGroupOpen by remember { mutableStateOf(false) }
     var newSpaceName by remember { mutableStateOf("") }
     var newGroupTenant by remember { mutableStateOf("") }
+    var manageGroupEntry by remember { mutableStateOf<JSONObject?>(null) }
+    var confirmDelName by remember { mutableStateOf<String?>(null) }
+    var confirmDelAction by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+    var confirmDelText by remember { mutableStateOf("") }
     var joinLink by remember { mutableStateOf("") }
     var joinInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
@@ -401,6 +442,21 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                                 })
                             }
                             DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinOpen = true })
+                            // Management actions for the ACTIVE space (owner only)
+                            val activeSpace = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
+                            if (activeSpace != null && activeSpace.getString("kind") == "GROUP" && activeSpace.optString("role") == "GroupOwner") {
+                                HorizontalDivider()
+                                DropdownMenuItem(text = { Text(L10n.t("groups.members")) }, onClick = { menuOpen = false; manageGroupEntry = activeSpace })
+                                DropdownMenuItem(text = { Text(L10n.t("delete.group"), color = Veyq.Danger) }, onClick = {
+                                    menuOpen = false; confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteGroup(activeSpace) }
+                                })
+                            }
+                            if (activeSpace != null && activeSpace.getString("kind") == "TENANT" && activeSpace.optString("role") == "Owner") {
+                                HorizontalDivider()
+                                DropdownMenuItem(text = { Text(L10n.t("delete.tenant"), color = Veyq.Danger) }, onClick = {
+                                    menuOpen = false; confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteTenant(activeSpace) }
+                                })
+                            }
                         }
                     }
                 },
@@ -613,11 +669,44 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                     TextButton(onClick = { val e = entry; actionEntry = null; scope.launch { moveDests = controller.moveDestinations(e); moveEntry = e } }, modifier = Modifier.fillMaxWidth()) {
                         Text(L10n.t("common.move"), color = Veyq.Text, modifier = Modifier.fillMaxWidth())
                     }
+                    TextButton(onClick = { val e = entry; actionEntry = null; confirmDelText = ""; confirmDelName = e.name; confirmDelAction = { controller.deleteNode(e.id) } }, modifier = Modifier.fillMaxWidth()) {
+                        Text(L10n.t("common.delete"), color = Veyq.Danger, modifier = Modifier.fillMaxWidth())
+                    }
                 }
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { actionEntry = null }) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
         )
+    }
+
+    // Confirm-by-name gate for every destructive delete (node/group/tenant).
+    confirmDelName?.let { name ->
+        AlertDialog(
+            onDismissRequest = { confirmDelName = null; confirmDelAction = null },
+            containerColor = Veyq.Surface,
+            title = { Text(L10n.t("delete.title"), color = Veyq.Text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(L10n.t("delete.warning"), color = Veyq.Muted, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = confirmDelText, onValueChange = { confirmDelText = it }, singleLine = true,
+                        placeholder = { Text(name, color = Veyq.Muted) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text),
+                    )
+                }
+            },
+            confirmButton = {
+                val act = confirmDelAction
+                TextButton(enabled = confirmDelText == name, onClick = { confirmDelName = null; confirmDelAction = null; scope.launch { act?.invoke() } }) {
+                    Text(L10n.t("delete.confirm"), color = if (confirmDelText == name) Veyq.Danger else Veyq.Muted)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelName = null; confirmDelAction = null }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+        )
+    }
+
+    manageGroupEntry?.let { g ->
+        GroupMembersDialog(controller, g, onClose = { manageGroupEntry = null })
     }
 
     moveEntry?.let { entry ->
@@ -735,4 +824,60 @@ private fun SearchRow(hit: HomeController.Entry, onOpen: () -> Unit) {
         Text(hit.name, color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
         Text(if (hit.type == "FOLDER") L10n.t("search.folder") else L10n.t("search.memory"), color = Veyq.Accent, fontSize = 12.sp)
     }
+}
+
+/** Manage a group's members (GroupOwner): list, add a tenant member, toggle role, remove. */
+@Composable
+fun GroupMembersDialog(controller: HomeController, group: JSONObject, onClose: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var members by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    var candidates by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    var addMenuOpen by remember { mutableStateOf(false) }
+
+    suspend fun reload() {
+        val m = controller.groupMembers(group)
+        members = (0 until m.length()).map { m.getJSONObject(it) }
+        val inGroup = members.map { it.getString("userId") }.toSet()
+        val tm = controller.tenantMembers(group.optString("tenantId"))
+        candidates = (0 until tm.length()).map { tm.getJSONObject(it) }.filter { it.getString("status") == "ACTIVE" && it.getString("userId") !in inGroup }
+    }
+    LaunchedEffect(group) { reload() }
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        containerColor = Veyq.Surface,
+        title = { Text(L10n.t("groups.members"), color = Veyq.Text) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                members.forEach { m ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(m.getString("displayName"), color = Veyq.Text, modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            val newRole = if (m.getString("role") == "GroupOwner") "GroupMember" else "GroupOwner"
+                            scope.launch { if (controller.setGroupRole(group, m.getString("userId"), newRole)) reload() }
+                        }) { Text(if (m.getString("role") == "GroupOwner") L10n.t("groups.roleOwner") else L10n.t("groups.roleMember"), color = Veyq.Accent, fontSize = 12.sp) }
+                        TextButton(onClick = { scope.launch { if (controller.removeGroupMember(group, m.getString("userId"))) reload() } }) {
+                            Text(L10n.t("common.remove"), color = Veyq.Danger, fontSize = 12.sp)
+                        }
+                    }
+                }
+                if (candidates.isNotEmpty()) {
+                    HorizontalDivider()
+                    Box {
+                        TextButton(onClick = { addMenuOpen = true }) { Text(L10n.t("groups.addMember"), color = Veyq.Accent) }
+                        DropdownMenu(expanded = addMenuOpen, onDismissRequest = { addMenuOpen = false }) {
+                            candidates.forEach { c ->
+                                DropdownMenuItem(text = { Text(c.getString("displayName")) }, onClick = {
+                                    addMenuOpen = false
+                                    scope.launch { if (controller.addGroupMember(group, c.getString("userId"), c.getJSONObject("identityPublicKey").getString("kemPublicKey"))) reload() }
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onClose) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
+    )
 }

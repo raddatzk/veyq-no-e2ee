@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Curate
+import app.veyq.crypto.Groups
 import app.veyq.crypto.Journal
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
@@ -116,6 +117,11 @@ class GalleryController(
         runCatching { withContext(Dispatchers.IO) { Journal.updateJournal(apiBase, session, scopeId, contentKey, nodeId, markdown) } }
             .onSuccess { journalMarkdown = markdown }
         journalSaving = false
+    }
+
+    suspend fun deleteMedia(mediaId: String) {
+        runCatching { withContext(Dispatchers.IO) { Groups.deleteMedia(apiBase, session, scopeId, nodeId, mediaId) } }
+        load()
     }
 
     suspend fun setCover(mediaId: String) {
@@ -200,6 +206,7 @@ class GalleryController(
 fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
     val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
     var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
+    var mediaDelArm by remember { mutableStateOf(false) }
     var showDownload by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
     var showShareRole by remember { mutableStateOf(false) }
@@ -309,7 +316,12 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 Image(tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TextButton(onClick = { val id = tile.id; lightboxTile = null; scope.launch { controller.setCover(id) } }) { Text(L10n.t("cover.setAsCover"), color = Veyq.Accent) }
-                    TextButton(onClick = { lightboxTile = null }) { Text(L10n.t("common.close"), color = Color.White) }
+                    if (!mediaDelArm) {
+                        TextButton(onClick = { mediaDelArm = true }) { Text(L10n.t("common.delete"), color = Veyq.Danger) }
+                    } else {
+                        TextButton(onClick = { val id = tile.id; lightboxTile = null; mediaDelArm = false; scope.launch { controller.deleteMedia(id) } }) { Text(L10n.t("delete.confirm"), color = Veyq.Danger) }
+                    }
+                    TextButton(onClick = { lightboxTile = null; mediaDelArm = false }) { Text(L10n.t("common.close"), color = Color.White) }
                 }
             }
         }
