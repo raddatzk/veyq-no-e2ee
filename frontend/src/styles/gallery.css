@@ -15,8 +15,30 @@
   text-overflow: ellipsis;
 }
 
-.detail-download { margin-left: auto; padding: 0.45rem 0.9rem; }
+.detail-share { margin-left: auto; padding: 0.45rem 0.9rem; }
+.detail-download { margin-left: 0.5rem; padding: 0.45rem 0.9rem; }
 .detail-upload { margin-left: 0.5rem; padding: 0.45rem 0.9rem; }
+
+.share-view { min-height: 100vh; background: var(--app-bg); color: var(--app-text); }
+.share-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--app-line);
+}
+.share-titles { display: flex; flex-direction: column; gap: 0.1rem; }
+.share-titles .detail-daterange { margin: 0; }
+.share-badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-muted);
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+}
+.share-content { padding: 1.5rem; }
 
 .dl-option {
   display: flex;

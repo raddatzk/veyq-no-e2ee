@@ -14,6 +14,7 @@ import { createTrack, deleteTrack, getTracks, type Track } from '../../features/
 import { parseGpx } from '../../features/memory/track/gpx'
 import DownloadModal from './DownloadModal.vue'
 import MemoryMap from './MemoryMap.vue'
+import ShareModal from './ShareModal.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
@@ -28,6 +29,7 @@ const lightboxTile = ref<GalleryTile | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const downloadOpen = ref(false)
+const shareOpen = ref(false)
 const tab = ref<'gallery' | 'journal' | 'map'>('gallery')
 const journalMarkdown = ref('')
 const journalDraft = ref('')
@@ -176,6 +178,7 @@ async function setAsCover() {
       <button class="crumb" @click="emit('back')">{{ t('common.back') }}</button>
       <h1 class="detail-title">{{ name }}</h1>
       <span class="content-count">{{ t('detail.mediaCount', { n: tiles.length }) }}</span>
+      <button class="btn btn-ghost detail-share" type="button" @click="shareOpen = true">{{ t('share.share') }}</button>
       <template v-if="tab === 'gallery'">
         <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">{{ t('detail.download') }}</button>
         <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
@@ -192,6 +195,7 @@ async function setAsCover() {
     </div>
 
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
+    <ShareModal v-if="shareOpen" :active="active" :memory="memory" :name="name" @close="shareOpen = false" />
 
     <section v-if="tab === 'journal'" class="journal">
       <template v-if="journalEditing">

@@ -6,8 +6,13 @@ import { getSetupStatus } from './features/account/instance/instance'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
 import AcceptInvitePanel from './app/auth/AcceptInvitePanel.vue'
+import ShareView from './app/share/ShareView.vue'
 import HomeView from './app/home/HomeView.vue'
 import { parseInviteHash, type InviteParts } from './features/spaces/invite/inviteLink'
+
+// A public share link is `/s/<shareId>#k=<shareKey>` — viewable with no account.
+const sharePath = /^\/s\/([^/]+)$/.exec(window.location.pathname)
+const share = sharePath ? { shareId: sharePath[1], shareKey: new URLSearchParams(window.location.hash.slice(1)).get('k') ?? '' } : null
 
 // Slice 1 (web): same-origin instance → on boot check setup status → setup (first run) or login →
 // landed. An invite link (#invite=…&s=…&k=…) shows the accept flow instead.
@@ -39,7 +44,8 @@ function clearInvite() {
 </script>
 
 <template>
-  <AcceptInvitePanel v-if="invite" :invite="invite" @done="clearInvite" @dismiss="clearInvite" />
+  <ShareView v-if="share" :share-id="share.shareId" :share-key="share.shareKey" />
+  <AcceptInvitePanel v-else-if="invite" :invite="invite" @done="clearInvite" @dismiss="clearInvite" />
   <HomeView v-else-if="session.unlocked" />
   <div v-else-if="phase === 'loading'" class="auth-screen">
     <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">{{ t('app.loading') }}</p></div>
