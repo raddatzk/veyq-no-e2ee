@@ -40,6 +40,7 @@ class GroupSliceTest {
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
+    private lateinit var memberToken: String
     private lateinit var outsiderToken: String
     private val tenantId = "gsl-tenant"
     private val tenantScopeId = "gsl-tscope"
@@ -58,13 +59,62 @@ class GroupSliceTest {
             val now = Instant.now()
             users.persist(User().apply { id = "gsl-owner"; email = "gsl-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "gsl-out"; email = "gsl-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
+            users.persist(User().apply { id = "gsl-member"; email = "gsl-member@example.com"; displayName = "M"; serverRole = ServerRole.ServerMember; createdAt = now })
             tenants.persist(Tenant().apply { id = tenantId; name = "gsl-t"; displayName = "T"; status = "ACTIVE"; termsVersion = 0; createdBy = "gsl-owner"; createdAt = now })
             memberships.persist(Membership().apply { id = "gsl-mb"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
+            memberships.persist(Membership().apply { id = "gsl-mb2"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
             scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@GroupSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "gsl-tg"; scopeId = tenantScopeId; userId = "gsl-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("gsl-owner")}"
+        memberToken = "Bearer ${sessions.issue("gsl-member")}"
         outsiderToken = "Bearer ${sessions.issue("gsl-out")}"
+    }
+
+    private fun createGroup() = given().header("Authorization", ownerToken).contentType(ContentType.JSON).body(body)
+        .post("/api/tenants/$tenantId/groups").then().statusCode(200).extract().path<String>("scopeId")
+
+    private fun addMember(token: String, scopeId: String, userId: String) =
+        given().header("Authorization", token).contentType(ContentType.JSON)
+            .body("""{"userId":"$userId","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"EEEE"}}""")
+            .post("/api/tenants/$tenantId/groups/$scopeId/members").then()
+
+    private fun setRole(scopeId: String, userId: String, role: String) =
+        given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"$role"}""")
+            .patch("/api/tenants/$tenantId/groups/$scopeId/members/$userId").then()
+
+    @Test
+    fun managesMembersAndRolesWithLastOwnerGuard() {
+        val scopeId = createGroup()
+
+        // a non-tenant-member cannot be added; a GroupMember cannot manage; the creator is the sole GroupOwner
+        addMember(ownerToken, scopeId, "gsl-out").statusCode(400).body("code", `is`("NOT_A_TENANT_MEMBER"))
+        addMember(ownerToken, scopeId, "gsl-member").statusCode(200).body("role", `is`("GroupMember"))
+        addMember(ownerToken, scopeId, "gsl-member").statusCode(409).body("code", `is`("ALREADY_GROUP_MEMBER"))
+        addMember(memberToken, scopeId, "gsl-out").statusCode(403).body("code", `is`("NOT_A_GROUP_OWNER"))
+
+        QuarkusTransaction.requiringNew().run {
+            assertNotNull(grants.find(scopeId, "gsl-member"))
+            assertEquals("GroupMember", groupMembers.find(scopeId, "gsl-member")?.role)
+        }
+
+        given().header("Authorization", ownerToken).get("/api/tenants/$tenantId/groups/$scopeId/members")
+            .then().statusCode(200).body("members.size()", `is`(2))
+
+        // the last GroupOwner can be neither removed nor demoted
+        given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId/groups/$scopeId/members/gsl-owner")
+            .then().statusCode(409).body("code", `is`("LAST_OWNER"))
+        setRole(scopeId, "gsl-owner", "GroupMember").statusCode(409).body("code", `is`("LAST_OWNER"))
+
+        // promote the member → now two owners → demoting the original owner is allowed, then removing them
+        setRole(scopeId, "gsl-member", "GroupOwner").statusCode(200).body("role", `is`("GroupOwner"))
+        setRole(scopeId, "gsl-owner", "GroupMember").statusCode(200)
+        given().header("Authorization", memberToken).delete("/api/tenants/$tenantId/groups/$scopeId/members/gsl-owner")
+            .then().statusCode(204)
+        QuarkusTransaction.requiringNew().run {
+            assertEquals(null, groupMembers.find(scopeId, "gsl-owner"))
+            assertEquals(null, grants.find(scopeId, "gsl-owner"))
+        }
     }
 
     @Test

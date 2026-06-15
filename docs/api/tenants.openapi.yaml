@@ -75,6 +75,77 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/tenants/{tenantId}/groups/{scopeId}/members:
+    get:
+      tags: [Groups]
+      operationId: listGroupMembers
+      summary: List the members of a group (any group member may).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The group's members., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMemberList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [Groups]
+      operationId: addGroupMember
+      summary: Add a tenant member to the group (GroupOwner only).
+      description: >
+        The GroupOwner wraps the group scope private key to the target member's identity and posts it as a
+        grant. The target must be an active member of the tenant. Defaults to the GroupMember role.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/AddGroupMemberRequest' } } }
+      responses:
+        '200': { description: The added member., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMember' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/tenants/{tenantId}/groups/{scopeId}/members/{userId}:
+    patch:
+      tags: [Groups]
+      operationId: setGroupMemberRole
+      summary: Change a group member's role (GroupOwner only). Cannot demote the last GroupOwner.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SetGroupRoleRequest' } } }
+      responses:
+        '200': { description: The updated member., content: { application/json: { schema: { $ref: '#/components/schemas/GroupMember' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+    delete:
+      tags: [Groups]
+      operationId: removeGroupMember
+      summary: Remove a member from the group (GroupOwner only). Cannot remove the last GroupOwner.
+      description: Drops the member's group scope grant + membership. Already-downloaded content cannot be retracted.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: tenantId, in: path, required: true, schema: { type: string } }
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/tenants/{tenantId}/owner-invite:
     post:
       tags: [TenantProvisioning]
@@ -438,6 +509,30 @@ components:
       required: [groups]
       properties:
         groups: { type: array, items: { $ref: '#/components/schemas/GroupSummary' } }
+    AddGroupMemberRequest:
+      type: object
+      required: [userId, wrappedScopePrivateKey]
+      properties:
+        userId: { type: string }
+        wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'Group scope private key wrapped to the target member''s identity.' }
+        role: { type: string, description: 'GroupOwner | GroupMember (defaults to GroupMember).' }
+    SetGroupRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, description: 'GroupOwner | GroupMember.' }
+    GroupMember:
+      type: object
+      required: [userId, displayName, role]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        role: { type: string }
+    GroupMemberList:
+      type: object
+      required: [members]
+      properties:
+        members: { type: array, items: { $ref: '#/components/schemas/GroupMember' } }
     OwnerInvite:
       type: object
       required: [inviteId, bootstrapSecret, expiresAt]
