@@ -22,6 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +55,18 @@ fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: Strin
 
             Section(L10n.t("settings.account"))
             SettingRow(L10n.t("common.email"), session.email)
+
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            var unlockOn by remember { mutableStateOf(DeviceUnlock.isEnabled(ctx)) }
+            if (unlockOn) {
+                Section(L10n.t("settings.deviceUnlock"))
+                Button(
+                    onClick = { DeviceUnlock.forget(ctx); unlockOn = false },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Veyq.SurfaceMuted, contentColor = Veyq.Danger),
+                ) { Text(L10n.t("settings.forgetDevice"), fontWeight = FontWeight.SemiBold) }
+            }
 
             Section(L10n.t("settings.instance"))
             SettingRow(L10n.t("settings.instance"), apiBase)

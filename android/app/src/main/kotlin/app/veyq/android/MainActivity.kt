@@ -2,8 +2,8 @@ package app.veyq.android
 
 import android.content.Context
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -24,7 +24,7 @@ import app.veyq.crypto.Login
  * Greenfield Android app entry. Slice 1: connect → login → landed, following iOS in Material 3 on top of
  * the `:core` crypto module. The real tab bar + MemoryHome arrive in slice 2.
  */
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("veyq", Context.MODE_PRIVATE)

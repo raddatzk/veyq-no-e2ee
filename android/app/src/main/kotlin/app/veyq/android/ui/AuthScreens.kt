@@ -151,19 +151,46 @@ fun LoginScreen(apiBase: String, onChangeInstance: () -> Unit, onLoggedIn: (Logi
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var secretKey by remember { mutableStateOf("") }
+    var remember0 by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val activity = ctx as? androidx.fragment.app.FragmentActivity
 
     AuthCard(L10n.t("login.title"), apiBase) {
+        if (DeviceUnlock.isEnabled(ctx) && activity != null) {
+            PrimaryButton("🔓 ${L10n.t("login.unlock")}", busy) {
+                busy = true; error = ""
+                scope.launch {
+                    val creds = DeviceUnlock.load(activity)
+                    if (creds == null) { error = L10n.t("login.unlockFailed"); busy = false; return@launch }
+                    try {
+                        val session = withContext(Dispatchers.IO) { Login.login(creds.apiBase, creds.email, creds.password, creds.secretKey) }
+                        onLoggedIn(session)
+                    } catch (e: Exception) {
+                        error = L10n.t("login.unlockFailed")
+                    } finally {
+                        busy = false
+                    }
+                }
+            }
+        }
         VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
         VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
         VeyqField(L10n.t("common.secretKey"), secretKey, { secretKey = it }, secure = true, hint = L10n.t("login.secretHint"))
+        if (DeviceUnlock.available(ctx)) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                androidx.compose.material3.Switch(checked = remember0, onCheckedChange = { remember0 = it })
+                Text(L10n.t("login.remember"), fontSize = 14.sp, color = Veyq.Text, modifier = Modifier.padding(start = 8.dp))
+            }
+        }
         PrimaryButton(L10n.t("login.submit"), busy) {
             busy = true; error = ""
             scope.launch {
                 try {
                     val session = withContext(Dispatchers.IO) { Login.login(apiBase, email, password, secretKey) }
+                    if (remember0) DeviceUnlock.save(ctx, DeviceUnlock.Creds(apiBase, email, password, secretKey))
                     onLoggedIn(session)
                 } catch (e: Exception) {
                     error = L10n.t("login.error")
