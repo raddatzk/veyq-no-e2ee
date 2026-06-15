@@ -18,6 +18,9 @@ final class GalleryStore: ObservableObject {
     @Published var tiles: [Tile] = []
     @Published var loading = true
     @Published var uploading = false
+    @Published var journalMarkdown = ""
+    @Published var journalSaving = false
+    private var journalLoaded = false
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String) {
         self.apiBase = apiBase; self.session = session; self.scopeId = scopeId; self.contentKey = contentKey; self.nodeId = nodeId
@@ -58,6 +61,22 @@ final class GalleryStore: ObservableObject {
         _ = try? await Curate.setCover(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, coverMediaId: mediaId)
     }
 
+    func loadJournal() async {
+        guard !journalLoaded else { return }
+        if let content = try? await Journal.getJournal(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) {
+            journalMarkdown = content.markdown
+        }
+        journalLoaded = true
+    }
+
+    func saveJournal(_ markdown: String) async {
+        journalSaving = true
+        if (try? await Journal.updateJournal(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, markdown: markdown)) != nil {
+            journalMarkdown = markdown
+        }
+        journalSaving = false
+    }
+
     static func thumbnail(_ data: Data, maxDim: CGFloat = 400) -> Data? {
         guard let img = UIImage(data: data) else { return nil }
         let scale = min(1, maxDim / max(img.size.width, img.size.height))
@@ -76,6 +95,7 @@ struct MemoryDetailView: View {
     @State private var showDownload = false
     @State private var downloading = false
     @State private var shareItem: ShareItem?
+    @State private var tab = 0
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
         _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
@@ -87,6 +107,15 @@ struct MemoryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
+                    Picker("", selection: $tab) {
+                        Text(T("detail.gallery")).tag(0)
+                        Text(T("detail.journal")).tag(1)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if tab == 1 {
+                        JournalView(store: store)
+                    } else {
                     Text("\(store.tiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
                     if store.loading {
                         Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
@@ -103,6 +132,7 @@ struct MemoryDetailView: View {
                                 gallery(bucket.items, width: geo.size.width - 32)
                             }
                         }
+                    }
                     }
                 }
                 .padding(16)
