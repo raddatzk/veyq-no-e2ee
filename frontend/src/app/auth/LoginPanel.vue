@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { login } from '../../features/account/login/login'
+import { t } from '../../i18n/i18n'
 import { session, setUnlocked } from '../session'
 
 const props = defineProps<{ prefill?: { email?: string; secretKey?: string } }>()
@@ -17,7 +18,7 @@ async function submit() {
   try {
     setUnlocked(await login(session.apiBase, email.value, password.value, secretKey.value))
   } catch {
-    error.value = 'Anmeldung fehlgeschlagen. Prüfe E-Mail, Passwort und Secret Key.'
+    error.value = t('login.failed')
   } finally {
     busy.value = false
   }
@@ -28,24 +29,24 @@ async function submit() {
   <div class="auth-screen">
     <div class="auth-card">
       <p class="auth-wordmark">veyq</p>
-      <h1 class="auth-title">Anmelden</h1>
+      <h1 class="auth-title">{{ t('login.title') }}</h1>
       <p class="auth-sub">{{ host }}</p>
       <form class="veyq-form" @submit.prevent="submit">
         <label>
-          E-Mail
+          {{ t('common.email') }}
           <input v-model="email" type="email" autocomplete="username" required autofocus />
         </label>
         <label>
-          Passwort
+          {{ t('common.password') }}
           <input v-model="password" type="password" autocomplete="current-password" required />
         </label>
         <label>
-          Secret Key
+          {{ t('common.secretKey') }}
           <input v-model="secretKey" type="password" autocomplete="off" required />
-          <span class="field-hint">Aus deinem Emergency Kit.</span>
+          <span class="field-hint">{{ t('login.secretHint') }}</span>
         </label>
         <button class="btn btn-primary" type="submit" :disabled="busy">
-          {{ busy ? 'Melde an…' : 'Anmelden' }}
+          {{ busy ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
       <div v-if="error" class="auth-msg auth-msg-error">{{ error }}</div>

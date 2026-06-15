@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
+import { t } from '../../i18n/i18n'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import type { SearchHit } from '../../features/search/search'
 import MemoryDetailView from './MemoryDetailView.vue'
@@ -85,7 +86,7 @@ async function gotoCrumb(i: number) {
 }
 
 function spaceSub(s: SpaceEntry): string {
-  return s.kind === 'PERSONAL' ? 'Persönlich' : (s.role ?? 'Gruppe')
+  return s.kind === 'PERSONAL' ? t('home.personal') : (s.role ?? t('home.group'))
 }
 
 const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
@@ -97,14 +98,14 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <aside class="home-sidebar">
       <div class="home-brand">veyq</div>
 
-      <div class="home-section">Bereich</div>
+      <div class="home-section">{{ t('home.spaces') }}</div>
       <button v-for="s in personalSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
         <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
         <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
       </button>
 
       <template v-if="groupSpaces().length">
-        <div class="home-section">Gruppen</div>
+        <div class="home-section">{{ t('home.groups') }}</div>
         <button v-for="s in groupSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
           <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
           <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
@@ -114,7 +115,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       <div class="home-spacer" />
       <button class="space-row" @click="settingsOpen = true">
         <span class="space-avatar">{{ (session.unlocked?.user.displayName || '?').charAt(0).toUpperCase() }}</span>
-        <span class="space-meta"><div class="space-name">{{ session.unlocked?.user.displayName }}</div><div class="space-sub">Einstellungen</div></span>
+        <span class="space-meta"><div class="space-name">{{ session.unlocked?.user.displayName }}</div><div class="space-sub">{{ t('home.settings') }}</div></span>
       </button>
     </aside>
 
@@ -127,7 +128,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
           <button class="crumb" :class="{ current: i === crumbs.length - 1 }" @click="gotoCrumb(i)">{{ c.name }}</button>
         </template>
       </nav>
-      <input class="home-search" type="search" placeholder="Suche einfach überall…  ⌘K" readonly @focus="active && (searchOpen = true)" @click="active && (searchOpen = true)" />
+      <input class="home-search" type="search" :placeholder="t('home.search')" readonly @focus="active && (searchOpen = true)" @click="active && (searchOpen = true)" />
     </header>
 
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
@@ -137,7 +138,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       <template v-else>
         <div v-if="error" class="home-empty">{{ error }}</div>
 
-        <div class="content-head"><span class="content-title">Memories</span><span class="content-count">{{ memories.length }}</span></div>
+        <div class="content-head"><span class="content-title">{{ t('home.memories') }}</span><span class="content-count">{{ memories.length }}</span></div>
         <div v-if="memories.length" class="card-grid">
           <button v-for="m in memories" :key="m.node.id" class="memory-card" @click="selectedMemory = m">
             <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
@@ -145,15 +146,15 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
             <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
           </button>
         </div>
-        <div v-else class="home-empty">Noch keine Memories hier.</div>
+        <div v-else class="home-empty">{{ t('home.noMemories') }}</div>
 
-        <div class="content-head"><span class="content-title">Ordner</span><span class="content-count">{{ folders.length }}</span></div>
+        <div class="content-head"><span class="content-title">{{ t('home.folders') }}</span><span class="content-count">{{ folders.length }}</span></div>
         <div v-if="folders.length" class="card-grid">
           <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
             <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
           </button>
         </div>
-        <div v-else class="home-empty">Keine Ordner.</div>
+        <div v-else class="home-empty">{{ t('home.noFolders') }}</div>
       </template>
     </main>
   </div>

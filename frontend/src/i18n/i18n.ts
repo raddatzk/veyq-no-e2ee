@@ -1,0 +1,146 @@
+// Lightweight runtime i18n: a reactive locale + a t() lookup with {n}-interpolation. German is the source;
+// English is provided. The language is switchable at runtime (Settings) and persisted.
+import { reactive } from 'vue'
+
+type Dict = Record<string, string>
+
+const de: Dict = {
+  'common.email': 'E-Mail',
+  'common.password': 'Passwort',
+  'common.secretKey': 'Secret Key',
+  'common.back': '← Zurück',
+  'common.close': 'Schließen',
+  'common.done': 'Fertig',
+  'app.loading': 'Lädt…',
+  'app.unreachableTitle': 'Instanz nicht erreichbar',
+  'app.unreachableSub': 'Der veyq-Server antwortet nicht. Lade die Seite neu.',
+  'setup.title': 'Server einrichten',
+  'setup.sub': 'Diese Instanz ist noch leer — lege den ersten Server-Owner an.',
+  'setup.displayName': 'Anzeigename',
+  'setup.submit': 'Server einrichten',
+  'setup.submitting': 'Richte ein…',
+  'setup.failed': 'Einrichtung fehlgeschlagen. Möglicherweise ist die Instanz schon eingerichtet.',
+  'setup.kitTitle': 'Emergency Kit sichern',
+  'setup.kitSub': 'Dein Secret Key. Ohne ihn ist keine Anmeldung möglich — sicher speichern, er wird nicht erneut angezeigt.',
+  'setup.kitProceed': 'Gespeichert — weiter zur Anmeldung',
+  'login.title': 'Anmelden',
+  'login.secretHint': 'Aus deinem Emergency Kit.',
+  'login.submit': 'Anmelden',
+  'login.submitting': 'Melde an…',
+  'login.failed': 'Anmeldung fehlgeschlagen. Prüfe E-Mail, Passwort und Secret Key.',
+  'home.spaces': 'Bereich',
+  'home.groups': 'Gruppen',
+  'home.personal': 'Persönlich',
+  'home.group': 'Gruppe',
+  'home.settings': 'Einstellungen',
+  'home.search': 'Suche einfach überall…  ⌘K',
+  'home.memories': 'Memories',
+  'home.folders': 'Ordner',
+  'home.noMemories': 'Noch keine Memories hier.',
+  'home.noFolders': 'Keine Ordner.',
+  'detail.mediaCount': '{n} Medien',
+  'detail.download': 'Herunterladen',
+  'detail.upload': 'Hochladen',
+  'detail.uploading': 'Lädt hoch…',
+  'detail.loadingGallery': 'Lädt Galerie…',
+  'detail.noMedia': 'Noch keine Medien.',
+  'search.placeholder': 'Suche einfach überall…',
+  'search.folder': 'Ordner',
+  'search.memory': 'Memory',
+  'search.nothing': 'Nichts gefunden.',
+  'settings.title': 'Einstellungen',
+  'settings.appearance': 'Darstellung',
+  'settings.theme': 'Theme',
+  'settings.dark': 'Dunkel',
+  'settings.light': 'Hell',
+  'settings.system': 'System',
+  'settings.language': 'Sprache',
+  'settings.account': 'Account',
+  'settings.instance': 'Instanz',
+  'settings.signOut': 'Abmelden',
+  'download.title': 'Herunterladen',
+  'download.onlyThis': 'Nur diese Memory',
+  'download.onlyThisSub': '{n} Originale aus dieser Memory',
+  'download.withChapters': 'Mit Kapiteln',
+  'download.withChaptersSub': '{n} Originale aus dieser Memory und ihren Kapiteln',
+  'download.building': 'Pakete werden erstellt…',
+}
+
+const en: Dict = {
+  'common.email': 'Email',
+  'common.password': 'Password',
+  'common.secretKey': 'Secret Key',
+  'common.back': '← Back',
+  'common.close': 'Close',
+  'common.done': 'Done',
+  'app.loading': 'Loading…',
+  'app.unreachableTitle': 'Instance unreachable',
+  'app.unreachableSub': 'The veyq server is not responding. Reload the page.',
+  'setup.title': 'Set up server',
+  'setup.sub': 'This instance is empty — create the first server owner.',
+  'setup.displayName': 'Display name',
+  'setup.submit': 'Set up server',
+  'setup.submitting': 'Setting up…',
+  'setup.failed': 'Setup failed. The instance may already be set up.',
+  'setup.kitTitle': 'Save your Emergency Kit',
+  'setup.kitSub': 'Your Secret Key. Without it you cannot sign in — save it safely, it is not shown again.',
+  'setup.kitProceed': 'Saved — continue to sign in',
+  'login.title': 'Sign in',
+  'login.secretHint': 'From your Emergency Kit.',
+  'login.submit': 'Sign in',
+  'login.submitting': 'Signing in…',
+  'login.failed': 'Sign-in failed. Check email, password and Secret Key.',
+  'home.spaces': 'Spaces',
+  'home.groups': 'Groups',
+  'home.personal': 'Personal',
+  'home.group': 'Group',
+  'home.settings': 'Settings',
+  'home.search': 'Search everything…  ⌘K',
+  'home.memories': 'Memories',
+  'home.folders': 'Folders',
+  'home.noMemories': 'No memories here yet.',
+  'home.noFolders': 'No folders.',
+  'detail.mediaCount': '{n} media',
+  'detail.download': 'Download',
+  'detail.upload': 'Upload',
+  'detail.uploading': 'Uploading…',
+  'detail.loadingGallery': 'Loading gallery…',
+  'detail.noMedia': 'No media yet.',
+  'search.placeholder': 'Search everything…',
+  'search.folder': 'Folder',
+  'search.memory': 'Memory',
+  'search.nothing': 'Nothing found.',
+  'settings.title': 'Settings',
+  'settings.appearance': 'Appearance',
+  'settings.theme': 'Theme',
+  'settings.dark': 'Dark',
+  'settings.light': 'Light',
+  'settings.system': 'System',
+  'settings.language': 'Language',
+  'settings.account': 'Account',
+  'settings.instance': 'Instance',
+  'settings.signOut': 'Sign out',
+  'download.title': 'Download',
+  'download.onlyThis': 'Only this memory',
+  'download.onlyThisSub': '{n} originals from this memory',
+  'download.withChapters': 'With chapters',
+  'download.withChaptersSub': '{n} originals from this memory and its chapters',
+  'download.building': 'Building archive…',
+}
+
+const messages: Record<string, Dict> = { de, en }
+export type Locale = 'de' | 'en'
+
+export const i18n = reactive({ locale: ((localStorage.getItem('veyq.locale') as Locale) ?? 'de') as Locale })
+
+export function setLocale(locale: Locale): void {
+  i18n.locale = locale
+  localStorage.setItem('veyq.locale', locale)
+  document.documentElement.lang = locale
+}
+
+export function t(key: string, params?: Record<string, string | number>): string {
+  let s = messages[i18n.locale][key] ?? de[key] ?? key
+  if (params) for (const [k, v] of Object.entries(params)) s = s.replace(`{${k}}`, String(v))
+  return s
+}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
+import { t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
@@ -80,12 +81,12 @@ function closeLightbox() {
 <template>
   <div class="memory-detail">
     <div class="detail-head">
-      <button class="crumb" @click="emit('back')">← Zurück</button>
+      <button class="crumb" @click="emit('back')">{{ t('common.back') }}</button>
       <h1 class="detail-title">{{ name }}</h1>
-      <span class="content-count">{{ tiles.length }} Medien</span>
-      <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">Herunterladen</button>
+      <span class="content-count">{{ t('detail.mediaCount', { n: tiles.length }) }}</span>
+      <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">{{ t('detail.download') }}</button>
       <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
-        {{ uploading ? 'Lädt hoch…' : 'Hochladen' }}
+        {{ uploading ? t('detail.uploading') : t('detail.upload') }}
       </button>
       <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
     </div>
@@ -104,8 +105,8 @@ function closeLightbox() {
       </button>
     </div>
 
-    <div v-if="loading" class="home-empty">Lädt Galerie…</div>
-    <div v-else-if="!tiles.length" class="home-empty">Noch keine Medien.</div>
+    <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
+    <div v-else-if="!tiles.length" class="home-empty">{{ t('detail.noMedia') }}</div>
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox"><img :src="lightbox" alt="" /></div>
   </div>

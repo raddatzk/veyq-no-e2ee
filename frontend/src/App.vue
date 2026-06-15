@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { applyTheme, session } from './app/session'
+import { t } from './i18n/i18n'
 import { getSetupStatus } from './features/account/instance/instance'
 import SetupPanel from './app/auth/SetupPanel.vue'
 import LoginPanel from './app/auth/LoginPanel.vue'
@@ -32,13 +33,13 @@ function onSetupDone(email: string, secretKey: string) {
 <template>
   <HomeView v-if="session.unlocked" />
   <div v-else-if="phase === 'loading'" class="auth-screen">
-    <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">Lädt…</p></div>
+    <div class="auth-card"><p class="auth-wordmark">veyq</p><p class="auth-sub">{{ t('app.loading') }}</p></div>
   </div>
   <div v-else-if="phase === 'error'" class="auth-screen">
     <div class="auth-card">
       <p class="auth-wordmark">veyq</p>
-      <h1 class="auth-title">Instanz nicht erreichbar</h1>
-      <p class="auth-sub">Der veyq-Server antwortet nicht. Lade die Seite neu.</p>
+      <h1 class="auth-title">{{ t('app.unreachableTitle') }}</h1>
+      <p class="auth-sub">{{ t('app.unreachableSub') }}</p>
     </div>
   </div>
   <SetupPanel v-else-if="phase === 'setup'" @done="onSetupDone" />
