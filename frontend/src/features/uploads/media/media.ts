@@ -3,9 +3,12 @@
 // DB). A small file is one frame; a large one is many — both resumable, both opened frame-by-frame on the
 // way back. A "media" attaches a stored blob to a Memory/Chapter together with typed derivatives
 // (thumbnail/preview), which are themselves ordinary blobs uploaded the same way. The server stays blind:
-// it sees only ciphertext frames, a per-scope dedup token, and low-sensitivity metadata (mime, size, takenAt).
+// it sees ciphertext frames, a per-scope dedup token, blob sizes and the mime type — but NOT capture time
+// or GPS location, which are sealed per-media (sealedMeta) under the scope content key.
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
+
+const EMPTY = new Uint8Array(0)
 
 function b64url(b: Uint8Array): string {
   let s = ''
@@ -29,13 +32,28 @@ export type MediaItem = {
   id: string
   scopeId: string
   nodeId: string
-  takenAt: string
+  sealedMeta: { suiteId: string; bytes: string }
   mimeType: string
   original: BlobRef
   derivatives: { kind: DerivativeKind; blob: BlobRef }[]
   createdAt: string
 }
-export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; takenAt: string; mimeType: string }
+/** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
+export type MediaMeta = { takenAt: string; lat?: number; lng?: number }
+export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; takenAt: string; mimeType: string; lat?: number; lng?: number }
+
+/** Seal {takenAt, lat?, lng?} into a sealedMeta blob (nonce || AEAD) for the create request. */
+export function sealMediaMeta(contentKey: Uint8Array, meta: MediaMeta): { suiteId: string; bytes: string } {
+  const nonce = v1.randomBytes(12)
+  const sealed = v1.concat(nonce, v1.aeadSeal(contentKey, nonce, v1.utf8(JSON.stringify(meta)), EMPTY))
+  return { suiteId: 'v1', bytes: b64url(sealed) }
+}
+
+/** Decrypt a media item's sealedMeta back to {takenAt, lat?, lng?}. */
+export function decodeMediaMeta(contentKey: Uint8Array, item: MediaItem): MediaMeta {
+  const sealed = fromB64url(item.sealedMeta.bytes)
+  return JSON.parse(new TextDecoder().decode(v1.aeadOpen(contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY)))
+}
 
 // ---- blob layer (the single upload/download path) -------------------------------------------------------
 
@@ -118,8 +136,8 @@ export async function downloadBlob(apiBase: string, session: UnlockedSession, sc
 
 // ---- media layer (attach blobs to a Memory) -------------------------------------------------------------
 
-/** Attach a stored blob (+ derivatives) to a Memory/Chapter node. */
-export async function createMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, req: { originalBlobId: string; takenAt: string; mimeType: string; derivatives?: { kind: DerivativeKind; blobId: string }[] }): Promise<MediaItem> {
+/** Attach a stored blob (+ derivatives) to a Memory/Chapter node. The metadata is pre-sealed by the caller. */
+export async function createMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, req: { originalBlobId: string; sealedMeta: { suiteId: string; bytes: string }; mimeType: string; derivatives?: { kind: DerivativeKind; blobId: string }[] }): Promise<MediaItem> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session) },
@@ -141,10 +159,11 @@ export async function uploadMedia(apiBase: string, session: UnlockedSession, sco
     const thumb = await uploadBlob(apiBase, session, scopeId, contentKey, m.thumb, chunkSize)
     derivatives.push({ kind: 'THUMBNAIL', blobId: thumb.blobId })
   }
-  return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, takenAt: m.takenAt, mimeType: m.mimeType, derivatives })
+  const sealedMeta = sealMediaMeta(contentKey, { takenAt: m.takenAt, lat: m.lat, lng: m.lng })
+  return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives })
 }
 
-/** List a Memory's media, ordered by takenAt (gallery order). */
+/** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
 export async function listMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string): Promise<MediaItem[]> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, { headers: auth(session) })
   if (!res.ok) throw new Error(`list media failed: ${res.status} ${await res.text()}`)

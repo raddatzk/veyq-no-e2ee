@@ -53,10 +53,10 @@ suite('unified media E2E (web -> live backend): one upload/download path for sma
     const resumed = await uploadBlob(apiBase, a, scope.scopeId, ck, partial, chunkSize) // resumes the same content
     expect(Array.from(await downloadBlob(apiBase, a, scope.scopeId, ck, resumed))).toEqual(Array.from(partial))
 
-    // the gallery lists both media, ordered by takenAt (video first, photo second), with their blob refs
+    // the gallery lists both media in upload order (photo then video; the client sorts by decrypted takenAt)
     const gallery = await listMedia(apiBase, a, scope.scopeId, memory.id)
-    expect(gallery.map((g) => g.id)).toEqual([m2.id, m1.id])
-    expect(gallery[1].derivatives[0].kind).toBe('THUMBNAIL')
+    expect(gallery.map((g) => g.id)).toEqual([m1.id, m2.id])
+    expect(gallery[0].derivatives[0].kind).toBe('THUMBNAIL')
 
     // anti-reorder still holds: a frame sealed at index 0 must NOT open at index 1 (AAD binds position)
     const frame0 = v1.sealFrame(ck, 0, pchunks.length, pchunks[0], v1.randomBytes(12))

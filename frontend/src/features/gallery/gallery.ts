@@ -3,10 +3,10 @@
 // needs. (The greenfield media model stores no dimensions, so the ratio comes from the bytes we load anyway.)
 import type { UnlockedSession } from '../account/login/login'
 import type { ActiveSpace } from '../home/home'
-import { downloadBlob, listMedia, type BlobRef } from '../uploads/media/media'
+import { decodeMediaMeta, downloadBlob, listMedia, type BlobRef } from '../uploads/media/media'
 import { galleryDisplayAspectRatio } from './justifiedLayout'
 
-export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; original: BlobRef }
+export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; lat?: number; lng?: number; original: BlobRef }
 
 function imageAspectRatio(url: string): Promise<number> {
   return new Promise((resolve) => {
@@ -20,12 +20,15 @@ function imageAspectRatio(url: string): Promise<number> {
 /** Load a memory's media as gallery tiles (thumbnail URL + clamped aspect ratio), ordered by takenAt. */
 export async function loadGalleryTiles(apiBase: string, session: UnlockedSession, active: ActiveSpace, memoryNodeId: string): Promise<GalleryTile[]> {
   const media = await listMedia(apiBase, session, active.scope.scopeId, memoryNodeId)
+  // Sort by decrypted capture time (the server lists in upload order and is blind to takenAt).
+  const withMeta = media.map((m) => ({ m, meta: decodeMediaMeta(active.contentKey, m) }))
+  withMeta.sort((a, b) => a.meta.takenAt.localeCompare(b.meta.takenAt))
   const tiles: GalleryTile[] = []
-  for (const m of media) {
+  for (const { m, meta } of withMeta) {
     const ref = m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original
     const bytes = await downloadBlob(apiBase, session, active.scope.scopeId, active.contentKey, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    tiles.push({ id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: m.takenAt, original: m.original })
+    tiles.push({ id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, original: m.original })
   }
   return tiles
 }
