@@ -42,7 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Image
@@ -67,7 +70,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** MemoryHome state holder. Blocking core calls run on IO; Compose state is updated on the caller's (main). */
-class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
+class HomeController(val apiBase: String, val appBaseUrl: String, val session: Login.UnlockedSession) {
     data class Entry(val node: JSONObject, val name: String) {
         val id: String get() = node.getString("id")
         val type: String get() = node.getString("type")
@@ -176,14 +179,49 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         }
     }.getOrNull()
 
-    /** Accept an invite onto this (logged-in) account, then refresh the space list so the group appears. */
-    suspend fun joinGroup(parts: InviteLink.Parts): Boolean = try {
-        withContext(Dispatchers.IO) { InviteMembers.acceptMemberInvite(apiBase, session, parts.inviteId, parts.bootstrapSecret, parts.tempPrivateKey) }
+    /** Accept an invite onto this (logged-in) account, then refresh the space list so the group appears. A
+     *  passphrase-protected invite needs the out-of-band passphrase to resolve its (encrypted) temp key. */
+    suspend fun joinGroup(parts: InviteLink.Parts, passphrase: String? = null): Boolean = try {
+        val tempKey = if (parts.isProtected) {
+            if (passphrase.isNullOrEmpty()) throw RuntimeException("passphrase required")
+            withContext(Dispatchers.IO) { InviteMembers.unprotectTempKey(parts.encTempKey!!, parts.pwSalt!!, passphrase) }
+        } else parts.tempPrivateKey ?: ""
+        withContext(Dispatchers.IO) { InviteMembers.acceptMemberInvite(apiBase, session, parts.inviteId, parts.bootstrapSecret, tempKey) }
         reloadSpaces()
         true
     } catch (e: Exception) {
-        error = L10n.t("accept.failed")
+        error = if (parts.isProtected) L10n.t("accept.wrongPassphrase") else L10n.t("accept.failed")
         false
+    }
+
+    /** Owner action: mint a member invite and have the server email the link (pragmatic or passphrase-protected). */
+    suspend fun emailMemberInvite(tenantId: String, role: String, email: String, passphrase: String?): Boolean = try {
+        withContext(Dispatchers.IO) {
+            val invite = InviteMembers.issueMemberInvite(apiBase, session, tenantId, role)
+            val link = if (!passphrase.isNullOrEmpty()) {
+                val (ek, ps) = InviteMembers.protectTempKey(invite.tempPrivateKey, passphrase)
+                InviteLink.buildProtected(appBaseUrl, invite.inviteId, invite.bootstrapSecret, ek, ps)
+            } else InviteLink.build(appBaseUrl, invite.inviteId, invite.bootstrapSecret, invite.tempPrivateKey)
+            InviteMembers.emailMemberInvite(apiBase, session.sessionToken, tenantId, email, invite.inviteId, link)
+        }
+        true
+    } catch (e: Exception) {
+        error = L10n.t("invite.emailFailed")
+        false
+    }
+
+    /** Owner action: mint a member invite and return a shareable link (pragmatic or passphrase-protected). */
+    suspend fun buildMemberInviteLink(tenantId: String, role: String, passphrase: String?): String? = try {
+        withContext(Dispatchers.IO) {
+            val invite = InviteMembers.issueMemberInvite(apiBase, session, tenantId, role)
+            if (!passphrase.isNullOrEmpty()) {
+                val (ek, ps) = InviteMembers.protectTempKey(invite.tempPrivateKey, passphrase)
+                InviteLink.buildProtected(appBaseUrl, invite.inviteId, invite.bootstrapSecret, ek, ps)
+            } else InviteLink.build(appBaseUrl, invite.inviteId, invite.bootstrapSecret, invite.tempPrivateKey)
+        }
+    } catch (e: Exception) {
+        error = L10n.t("invite.emailFailed")
+        null
     }
 
     // --- group member management (GroupOwner) ---
@@ -387,8 +425,8 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, onSignOut: () -> Unit) {
-    val controller = remember { HomeController(apiBase, session) }
+fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, onSignOut: () -> Unit) {
+    val controller = remember { HomeController(apiBase, appBaseUrl.ifEmpty { apiBase }, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var joinOpen by remember { mutableStateOf(false) }
@@ -403,6 +441,8 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     var joinLink by remember { mutableStateOf("") }
     var joinInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
     var joinBusy by remember { mutableStateOf(false) }
+    var joinPassphrase by remember { mutableStateOf("") }
+    var inviteTenant by remember { mutableStateOf<JSONObject?>(null) }
     var detail by remember { mutableStateOf<HomeController.Entry?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     var createMenuOpen by remember { mutableStateOf(false) }
@@ -454,7 +494,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                                     createGroupOpen = true
                                 })
                             }
-                            DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinOpen = true })
+                            DropdownMenuItem(text = { Text(L10n.t("groups.join")) }, onClick = { menuOpen = false; joinLink = ""; joinInfo = null; joinPassphrase = ""; joinOpen = true })
                             // Management actions for the ACTIVE space (owner only)
                             val activeSpace = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
                             if (activeSpace != null && activeSpace.getString("kind") == "GROUP" && activeSpace.optString("role") == "GroupOwner") {
@@ -466,6 +506,7 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                             }
                             if (activeSpace != null && activeSpace.getString("kind") == "TENANT" && activeSpace.optString("role") == "Owner") {
                                 HorizontalDivider()
+                                DropdownMenuItem(text = { Text(L10n.t("invite.title")) }, onClick = { menuOpen = false; inviteTenant = activeSpace })
                                 DropdownMenuItem(text = { Text(L10n.t("delete.tenant"), color = Veyq.Danger) }, onClick = {
                                     menuOpen = false; confirmDelText = ""; confirmDelName = controller.displayName(activeSpace); confirmDelAction = { controller.deleteTenant(activeSpace) }
                                 })
@@ -636,21 +677,39 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
                         val roleLabel = if (role == "Owner") L10n.t("invite.owner") else L10n.t("invite.member")
                         Text("$name — ${L10n.t("accept.as")} $roleLabel", color = Veyq.Text, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
                     }
+                    if (InviteLink.parse(joinLink)?.isProtected == true) {
+                        OutlinedTextField(
+                            value = joinPassphrase,
+                            onValueChange = { joinPassphrase = it },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            placeholder = { Text(L10n.t("accept.passphraseHint"), color = Veyq.Muted) },
+                            modifier = Modifier.padding(top = 8.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+                                focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                                focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                            ),
+                        )
+                    }
                 }
             },
             confirmButton = {
+                val parsed = InviteLink.parse(joinLink)
                 TextButton(
                     onClick = {
-                        val p = InviteLink.parse(joinLink) ?: return@TextButton
+                        val p = parsed ?: return@TextButton
                         joinBusy = true
-                        scope.launch { if (controller.joinGroup(p)) joinOpen = false; joinBusy = false }
+                        scope.launch { if (controller.joinGroup(p, joinPassphrase)) joinOpen = false; joinBusy = false }
                     },
-                    enabled = !joinBusy && InviteLink.parse(joinLink) != null,
+                    enabled = !joinBusy && parsed != null && !(parsed.isProtected && joinPassphrase.isBlank()),
                 ) { Text(if (joinBusy) L10n.t("accept.joining") else L10n.t("accept.join"), color = Veyq.Accent) }
             },
             dismissButton = { TextButton(onClick = { joinOpen = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
+
+    inviteTenant?.let { t -> InviteMemberDialog(controller, t, onClose = { inviteTenant = null }) }
 
     renameEntry?.let { entry ->
         AlertDialog(
@@ -751,6 +810,92 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
             dismissButton = { TextButton(onClick = { moveEntry = null }) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
         )
     }
+}
+
+/**
+ * Owner-side member invite for a tenant: role + protection mode, then email the invite or copy the link.
+ * Pragmatic = the temp key rides the link in the clear; passphrase = it's encrypted under an out-of-band
+ * passphrase (operator-blind, even against the email relay), so the link alone can't join.
+ */
+@Composable
+private fun InviteMemberDialog(controller: HomeController, tenant: JSONObject, onClose: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val tenantId = tenant.optString("tenantId")
+    var role by remember { mutableStateOf("Member") }
+    var passphraseMode by remember { mutableStateOf(false) }
+    var passphrase by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var sent by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+    val passMissing = passphraseMode && passphrase.isBlank()
+    val passOrNull = if (passphraseMode) passphrase else null
+
+    @Composable
+    fun toggle(label: String, active: Boolean, onClick: () -> Unit) {
+        TextButton(onClick = onClick) {
+            Text(label, color = if (active) Veyq.Accent else Veyq.Muted, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+        }
+    }
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted,
+        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+    )
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        containerColor = Veyq.Surface,
+        title = { Text(L10n.t("invite.title"), color = Veyq.Text) },
+        text = {
+            Column {
+                Text(L10n.t("invite.role"), color = Veyq.Muted, fontSize = 13.sp)
+                Row { toggle(L10n.t("invite.member"), role == "Member") { role = "Member" }; toggle(L10n.t("invite.owner"), role == "Owner") { role = "Owner" } }
+                Text(L10n.t("invite.protection"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                Row { toggle(L10n.t("invite.protLink"), !passphraseMode) { passphraseMode = false }; toggle(L10n.t("invite.protPassphrase"), passphraseMode) { passphraseMode = true } }
+                if (passphraseMode) {
+                    OutlinedTextField(
+                        value = passphrase, onValueChange = { passphrase = it }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        placeholder = { Text(L10n.t("invite.passphrasePlaceholder"), color = Veyq.Muted) },
+                        colors = fieldColors,
+                    )
+                    Text(L10n.t("invite.passphraseOob"), color = Veyq.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                Text(L10n.t("invite.emailHint"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                OutlinedTextField(
+                    value = email, onValueChange = { email = it }, singleLine = true,
+                    placeholder = { Text(L10n.t("invite.emailPlaceholder"), color = Veyq.Muted) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    colors = fieldColors,
+                )
+                TextButton(
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            if (!passMissing && controller.buildMemberInviteLink(tenantId, role, passOrNull)?.also { link ->
+                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(link))
+                                } != null) copied = true
+                            busy = false
+                        }
+                    },
+                    enabled = !busy && !passMissing,
+                ) { Text(if (copied) L10n.t("invite.linkCopied") else L10n.t("invite.copyLink"), color = Veyq.Accent) }
+                controller.error?.let { MessageBox(it) }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    busy = true
+                    scope.launch { sent = controller.emailMemberInvite(tenantId, role, email, passOrNull); busy = false; if (sent) email = "" }
+                },
+                enabled = !busy && email.isNotBlank() && !passMissing,
+            ) { Text(if (sent) L10n.t("invite.emailSent") else L10n.t("invite.emailSend"), color = Veyq.Accent) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text(L10n.t("common.close"), color = Veyq.Muted) } },
+    )
 }
 
 @Composable

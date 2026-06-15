@@ -13,7 +13,8 @@ import java.net.http.HttpResponse
 object Instance {
     private val client = HttpClient.newHttpClient()
 
-    data class SetupStatus(val setupRequired: Boolean, val suites: List<String>)
+    /** appBaseUrl = the instance's public app origin (for assembling invite links); null on older instances. */
+    data class SetupStatus(val setupRequired: Boolean, val suites: List<String>, val appBaseUrl: String?)
 
     /** Fetch `GET /api/setup` (public, no auth). Blocking — call off the main thread. */
     fun getSetupStatus(apiBase: String): SetupStatus {
@@ -24,6 +25,6 @@ object Instance {
         if (resp.statusCode() != 200) throw RuntimeException("setup status failed: ${resp.statusCode()} ${resp.body()}")
         val j = JSONObject(resp.body())
         val arr = j.getJSONArray("suites")
-        return SetupStatus(j.getBoolean("setupRequired"), (0 until arr.length()).map { arr.getString(it) })
+        return SetupStatus(j.getBoolean("setupRequired"), (0 until arr.length()).map { arr.getString(it) }, j.optString("appBaseUrl").ifEmpty { null })
     }
 }

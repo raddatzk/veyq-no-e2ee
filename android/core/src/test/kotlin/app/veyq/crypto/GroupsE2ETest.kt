@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -61,6 +62,24 @@ class GroupsE2ETest {
         // owner sees 2 members and promotes Bob
         assertEquals(2, Groups.listGroupMembers(apiBase, owner, tid, gScope).length())
         assertEquals("GroupOwner", Groups.setGroupMemberRole(apiBase, owner, tid, gScope, bobId, "GroupOwner").getString("role"))
+
+        // passphrase-protected invite (operator-blind): protect the temp key, resolve it with the out-of-band
+        // passphrase and register a brand-new user — wrong passphrase must fail.
+        val pinv = InviteMembers.issueMemberInvite(apiBase, owner, tid, "Member")
+        val invitePass = "shared out of band"
+        val (ek, ps) = InviteMembers.protectTempKey(pinv.tempPrivateKey, invitePass)
+        assertFailsWith<Exception> { InviteMembers.unprotectTempKey(ek, ps, "wrong") }
+        val resolved = InviteMembers.unprotectTempKey(ek, ps, invitePass)
+        assertEquals(pinv.tempPrivateKey, resolved)
+        val creg = InviteMembers.registerViaMemberInvite(apiBase, pinv.inviteId, pinv.bootstrapSecret, resolved, "carol@example.com", "Carol", pass)
+        val carol = Login.login(apiBase, "carol@example.com", pass, creg.emergencyKit.secretKey)
+        assertNotNull(firstOfKind(SwitchActiveSpace.listMySpaces(apiBase, carol), "TENANT"))
+
+        // email relay (mailer mock): returns 204 when the link targets this instance's app origin.
+        val appOrigin = System.getenv("VEYQ_APP_BASE") ?: "http://localhost:5173"
+        val einv = InviteMembers.issueMemberInvite(apiBase, owner, tid, "Member")
+        val plainLink = "$appOrigin/#invite=${einv.inviteId}&s=${einv.bootstrapSecret}&k=${einv.tempPrivateKey}"
+        InviteMembers.emailMemberInvite(apiBase, owner.sessionToken, tid, "pragmatic@example.com", einv.inviteId, plainLink)
 
         // delete the group (gone from roster)
         Groups.deleteGroup(apiBase, owner, tid, gScope)

@@ -80,21 +80,22 @@ private fun AuthFlow(
 ) {
     var phase by remember { mutableStateOf(Phase.Connect) }
     var apiBase by remember { mutableStateOf("") }
+    var appBaseUrl by remember { mutableStateOf("") }
     var session by remember { mutableStateOf<Login.UnlockedSession?>(null) }
     var invite by remember { mutableStateOf<InviteLink.Parts?>(null) }
 
     // A fresh invite deep link (when not already signed in) jumps straight to registration on that instance.
     androidx.compose.runtime.LaunchedEffect(deepLink) {
         if (deepLink != null && session == null) {
-            apiBase = deepLink.apiBase; invite = deepLink.parts; phase = Phase.Register
+            apiBase = deepLink.apiBase; appBaseUrl = deepLink.apiBase; invite = deepLink.parts; phase = Phase.Register
             onDeepLinkConsumed()
         }
     }
 
     when (phase) {
-        Phase.Connect -> ConnectScreen(apiBase) { apiBase = it; phase = Phase.Login }
+        Phase.Connect -> ConnectScreen(apiBase) { base, appUrl -> apiBase = base; appBaseUrl = appUrl ?: base; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
         Phase.Register -> RegisterScreen(apiBase, invite!!, onCancel = { phase = Phase.Login }) { session = it; phase = Phase.Landed }
-        Phase.Landed -> HomeScreen(apiBase, session!!, theme, onTheme, onLocale) { session = null; phase = Phase.Login }
+        Phase.Landed -> HomeScreen(apiBase, appBaseUrl, session!!, theme, onTheme, onLocale) { session = null; phase = Phase.Login }
     }
 }

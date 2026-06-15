@@ -210,4 +210,39 @@ object InviteMembers {
         if (resp.statusCode() != 200) throw RuntimeException("accept failed: ${resp.statusCode()} ${resp.body()}")
         return JSONObject(resp.body())
     }
+
+    // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id (matching the web
+    // ARGON params so a link minted on one platform opens on another). The temp key is sym-wrapped under it;
+    // the link carries only the ciphertext + salt, so the email relay can't resolve it without the passphrase.
+    private val inviteArgon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
+    private const val TEMP_KEY_CONTEXT = "invite-temp-key"
+    private fun passphraseKek(passphrase: String, salt: ByteArray): ByteArray =
+        V1.kekRecovery(java.text.Normalizer.normalize(passphrase, java.text.Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), salt, inviteArgon)
+
+    /** Encrypt a temp private key (b64) under a passphrase → the `ek`/`ps` link fields (operator-blind invite). */
+    fun protectTempKey(tempPrivateKeyB64: String, passphrase: String): Pair<String, String> {
+        val salt = V1.randomBytes(16)
+        val enc2 = V1.symWrap(passphraseKek(passphrase, salt), dec.decode(tempPrivateKeyB64), TEMP_KEY_CONTEXT, V1.randomBytes(12))
+        return enc.encodeToString(enc2) to enc.encodeToString(salt) // (encTempKey, pwSalt)
+    }
+
+    /** Decrypt a passphrase-protected temp key back to its b64 form (wrong passphrase → throws on AEAD failure). */
+    fun unprotectTempKey(encTempKey: String, pwSalt: String, passphrase: String): String =
+        enc.encodeToString(V1.symUnwrap(passphraseKek(passphrase, dec.decode(pwSalt)), dec.decode(encTempKey), TEMP_KEY_CONTEXT))
+
+    /**
+     * Have the server email an already-assembled invite link to an address. The link is built client-side,
+     * so the mode decides what the server/mail relay sees (pragmatic = temp key in the clear; passphrase =
+     * only the encrypted temp key). The server validates ownership + that the link targets this instance.
+     */
+    fun emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) {
+        val json = JSONObject().put("email", email.trim()).put("inviteId", inviteId).put("link", link).toString()
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/member-invites/email"))
+            .header("Authorization", "Bearer $token")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 204) throw RuntimeException("email invite failed: ${resp.statusCode()} ${resp.body()}")
+    }
 }

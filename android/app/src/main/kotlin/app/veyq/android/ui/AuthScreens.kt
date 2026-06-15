@@ -135,7 +135,7 @@ fun MessageBox(text: String, error: Boolean = true) {
 }
 
 @Composable
-fun ConnectScreen(initialUrl: String, onConnected: (String) -> Unit) {
+fun ConnectScreen(initialUrl: String, onConnected: (String, String?) -> Unit) {
     var url by remember { mutableStateOf(initialUrl) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -151,7 +151,7 @@ fun ConnectScreen(initialUrl: String, onConnected: (String) -> Unit) {
                 try {
                     val base = normalizeApiBase(url)
                     val status = withContext(Dispatchers.IO) { Instance.getSetupStatus(base) }
-                    if (status.setupRequired) setupNeeded = true else onConnected(base)
+                    if (status.setupRequired) setupNeeded = true else onConnected(base, status.appBaseUrl)
                 } catch (e: Exception) {
                     error = L10n.t("connect.error")
                 } finally {
@@ -248,6 +248,7 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
     var displayName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
     var kit by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -271,6 +272,7 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
             VeyqField(L10n.t("setup.displayName"), displayName, { displayName = it })
             VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
             VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
+            if (parts.isProtected) VeyqField(L10n.t("accept.passphrase"), passphrase, { passphrase = it }, secure = true)
             PrimaryButton(L10n.t("accept.register"), busy) {
                 busy = true; error = ""
                 scope.launch {
@@ -278,12 +280,16 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
                         val res = withContext(Dispatchers.IO) {
                             if (role == "Owner")
                                 app.veyq.crypto.RegisterViaInvitation.registerViaInvitation(apiBase, parts.inviteId, parts.bootstrapSecret, email, displayName, password)
-                            else
-                                app.veyq.crypto.InviteMembers.registerViaMemberInvite(apiBase, parts.inviteId, parts.bootstrapSecret, parts.tempPrivateKey, email, displayName, password)
+                            else {
+                                val tempKey = if (parts.isProtected)
+                                    app.veyq.crypto.InviteMembers.unprotectTempKey(parts.encTempKey!!, parts.pwSalt!!, passphrase)
+                                else parts.tempPrivateKey ?: ""
+                                app.veyq.crypto.InviteMembers.registerViaMemberInvite(apiBase, parts.inviteId, parts.bootstrapSecret, tempKey, email, displayName, password)
+                            }
                         }
                         kit = res.emergencyKit.secretKey
                     } catch (e: Exception) {
-                        error = L10n.t("accept.registerFailed")
+                        error = if (parts.isProtected) L10n.t("accept.wrongPassphrase") else L10n.t("accept.registerFailed")
                     } finally {
                         busy = false
                     }
