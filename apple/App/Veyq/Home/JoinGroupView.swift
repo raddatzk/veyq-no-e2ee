@@ -9,6 +9,7 @@ struct JoinGroupView: View {
     @State private var link = ""
     @State private var info: (name: String, role: String)?
     @State private var busy = false
+    @State private var passphrase = ""
 
     private var parts: InviteLink.Parts? { InviteLink.parse(link) }
 
@@ -29,14 +30,24 @@ struct JoinGroupView: View {
                     Text("\(info.name) — \(T("accept.as")) \(role)").font(.system(size: 15, weight: .semibold)).foregroundStyle(VeyqStyle.text)
                 }
 
+                if parts?.isProtected == true {
+                    Text(T("accept.passphrase")).font(.subheadline).foregroundStyle(VeyqStyle.muted)
+                    SecureField(T("accept.passphraseHint"), text: $passphrase)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .padding(10)
+                        .background(VeyqStyle.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+                        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+                }
+
                 Button {
                     guard let p = parts else { return }
                     busy = true
-                    Task { if await store.joinGroup(p) { dismiss() }; busy = false }
+                    Task { if await store.joinGroup(p, passphrase: passphrase) { dismiss() }; busy = false }
                 } label: {
                     Text(busy ? T("accept.joining") : T("accept.join")).frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent).tint(VeyqStyle.accent).disabled(parts == nil || busy)
+                .buttonStyle(.borderedProminent).tint(VeyqStyle.accent).disabled(parts == nil || busy || (parts?.isProtected == true && passphrase.isEmpty))
 
                 Spacer()
             }

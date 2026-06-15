@@ -17,7 +17,7 @@ struct RootView: View {
                 }
             case .landed:
                 if let session = app.session {
-                    MemoryHomeView(apiBase: app.apiBase, session: session)
+                    MemoryHomeView(apiBase: app.apiBase, appBaseUrl: app.appBaseUrl, session: session)
                 }
             }
         }

@@ -46,6 +46,12 @@ components:
         suites:
           type: array
           items: { $ref: './common.openapi.yaml#/components/schemas/CryptoSuiteId' }
+        appBaseUrl:
+          type: string
+          description: >
+            This instance's public app origin (the web client base URL). Clients that assemble invite links
+            (e.g. mobile owners emailing an invite) build them against this so the server's anti-abuse origin
+            check passes. Low-sensitivity config — same value the web app is served from.
     CreateServerOwnerRequest:
       type: object
       required:

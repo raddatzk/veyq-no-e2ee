@@ -210,6 +210,45 @@ public enum InviteMembers {
         }
     }
 
+    // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id (matching the web
+    // ARGON params so a link minted on one platform opens on another). The temp key is sym-wrapped under it;
+    // the link carries only the ciphertext + salt, so the email relay can't resolve it without the passphrase.
+    static let inviteArgon = V1.ArgonParams(t: 3, m: 65536, p: 1, dkLen: 32)
+    static let tempKeyContext = "invite-temp-key"
+
+    /// Encrypt a temp private key (b64) under a passphrase → the `ek`/`ps` link fields (operator-blind invite).
+    public static func protectTempKey(tempPrivateKeyB64: String, passphrase: String) throws -> (encTempKey: String, pwSalt: String) {
+        let salt = V1.randomBytes(16)
+        let kek = try V1.kekRecovery(recoveryCode: Data(passphrase.precomposedStringWithCanonicalMapping.utf8), salt: salt, params: inviteArgon)
+        let enc = try V1.symWrap(kek: kek, targetKey: Login.b64urlDecode(tempPrivateKeyB64), context: tempKeyContext, nonce: V1.randomBytes(12))
+        return (SetupServer.b64url(enc), SetupServer.b64url(salt))
+    }
+
+    /// Decrypt a passphrase-protected temp key back to its b64 form (wrong passphrase → throws on AEAD failure).
+    public static func unprotectTempKey(encTempKey: String, pwSalt: String, passphrase: String) throws -> String {
+        let kek = try V1.kekRecovery(recoveryCode: Data(passphrase.precomposedStringWithCanonicalMapping.utf8), salt: Login.b64urlDecode(pwSalt), params: inviteArgon)
+        return SetupServer.b64url(try V1.symUnwrap(kek: kek, blob: Login.b64urlDecode(encTempKey), context: tempKeyContext))
+    }
+
+    struct EmailInviteRequest: Codable { let email, inviteId, link: String }
+
+    /// Have the server email an already-assembled invite link to an address. The link is built client-side,
+    /// so the mode decides what the server/mail relay sees (pragmatic = temp key in the clear; passphrase =
+    /// only the encrypted temp key). The server validates ownership + that the link targets this instance.
+    public static func emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) async throws {
+        let req = EmailInviteRequest(email: email.trimmingCharacters(in: .whitespacesAndNewlines), inviteId: inviteId, link: link)
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/tenants/\(tenantId)/member-invites/email")!)
+        r.httpMethod = "POST"
+        r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 204 else {
+            throw NSError(domain: "veyq.emailinvite", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "email invite failed: \(String(data: data, encoding: .utf8) ?? "")"])
+        }
+    }
+
     struct AcceptRequest: Codable { let bootstrapSecret: String; let wrappedScopePrivateKey: BlobDTO }
 
     /// Accept a temp-wrap member invite onto an EXISTING (already logged-in) account — the "confirm" path.

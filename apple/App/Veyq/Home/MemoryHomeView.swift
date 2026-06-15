@@ -24,9 +24,10 @@ struct MemoryHomeView: View {
     @State private var manageGroup: SwitchActiveSpace.SpaceEntry?
     @State private var deleteNodeTarget: HomeStore.Entry?
     @State private var deleteTenantTarget: SwitchActiveSpace.SpaceEntry?
+    @State private var inviteTenant: SwitchActiveSpace.SpaceEntry?
 
-    init(apiBase: String, session: Login.UnlockedSession) {
-        _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, session: session))
+    init(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession) {
+        _store = StateObject(wrappedValue: HomeStore(apiBase: apiBase, appBaseUrl: appBaseUrl, session: session))
     }
 
     var body: some View {
@@ -67,6 +68,7 @@ struct MemoryHomeView: View {
         .sheet(item: $deleteTenantTarget) { t in
             ConfirmDeleteView(name: store.displayName(for: t)) { Task { await store.deleteTenant(t) } }
         }
+        .sheet(item: $inviteTenant) { t in InviteMemberView(store: store, space: t) }
     }
 
     private var createGroupSheet: some View {
@@ -254,6 +256,7 @@ struct MemoryHomeView: View {
                 Button { manageGroup = s } label: { Label(T("groups.members"), systemImage: "person.2") }
             }
             if s.kind == "TENANT" && s.role == "Owner" {
+                Button { inviteTenant = s } label: { Label(T("invite.title"), systemImage: "envelope") }
                 Button(role: .destructive) { deleteTenantTarget = s } label: { Label(T("delete.tenant"), systemImage: "trash") }
             }
         }

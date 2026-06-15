@@ -37,12 +37,14 @@ class SetupServerHandler(
     private val grants: ScopeGrantRepository,
     private val suites: CryptoSuiteRegistry,
     private val setupGate: SetupGate,
+    @param:org.eclipse.microprofile.config.inject.ConfigProperty(name = "veyq.app.base-url")
+    private val appBaseUrl: String,
 ) {
     private val b64 = Base64.getUrlDecoder()
 
     @Transactional
     fun status(): SetupStatus =
-        SetupStatus(setupRequired = !setupGate.isComplete(), suites = suites.supported())
+        SetupStatus(setupRequired = !setupGate.isComplete(), suites = suites.supported(), appBaseUrl = appBaseUrl)
 
     @Transactional
     fun createServerOwner(req: CreateServerOwnerRequest): UserSummary {

@@ -12,6 +12,7 @@ struct RegisterView: View {
     @State private var displayName = ""
     @State private var email = ""
     @State private var password = ""
+    @State private var passphrase = ""
     @State private var kit: String?
     @State private var busy = false
     @State private var error = ""
@@ -43,6 +44,9 @@ struct RegisterView: View {
                     VeyqField(label: T("setup.displayName"), text: $displayName)
                     VeyqField(label: T("common.email"), text: $email, keyboard: .emailAddress)
                     VeyqField(label: T("common.password"), text: $password, secure: true)
+                    if parts.isProtected {
+                        VeyqField(label: T("accept.passphrase"), text: $passphrase, secure: true)
+                    }
                     PrimaryButton(title: T("accept.register"), busy: busy) { register() }
                     Button(T("common.cancel")) { app.cancelRegister() }
                         .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted)
@@ -70,13 +74,16 @@ struct RegisterView: View {
                         apiBase: app.apiBase, inviteId: parts.inviteId, bootstrapSecret: parts.bootstrapSecret,
                         email: email, displayName: displayName, password: password)
                 } else {
+                    let tempKey = parts.isProtected
+                        ? try InviteMembers.unprotectTempKey(encTempKey: parts.encTempKey!, pwSalt: parts.pwSalt!, passphrase: passphrase)
+                        : (parts.tempPrivateKey ?? "")
                     res = try await InviteMembers.registerViaMemberInvite(
                         apiBase: app.apiBase, inviteId: parts.inviteId, bootstrapSecret: parts.bootstrapSecret,
-                        tempPrivateKeyB64: parts.tempPrivateKey, email: email, displayName: displayName, password: password)
+                        tempPrivateKeyB64: tempKey, email: email, displayName: displayName, password: password)
                 }
                 kit = res.emergencyKit.secretKey
             } catch {
-                self.error = T("accept.registerFailed")
+                self.error = parts.isProtected ? T("accept.wrongPassphrase") : T("accept.registerFailed")
             }
         }
     }

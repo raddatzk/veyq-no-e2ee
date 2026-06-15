@@ -6,6 +6,9 @@ public enum Instance {
     public struct SetupStatus: Codable, Sendable {
         public let setupRequired: Bool
         public let suites: [String]
+        /// This instance's public app origin — clients assembling invite links build against it. Optional
+        /// (older instances omit it); fall back to apiBase when absent.
+        public let appBaseUrl: String?
     }
 
     /// Fetch `GET /api/setup` (public, no auth).

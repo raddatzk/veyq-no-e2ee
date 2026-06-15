@@ -19,6 +19,7 @@ final class HomeStore: ObservableObject {
     }
 
     let apiBase: String
+    let appBaseUrl: String  // the instance's public app origin, for assembling invite links
     let session: Login.UnlockedSession
 
     @Published var spaces: [SwitchActiveSpace.SpaceEntry] = []
@@ -36,8 +37,9 @@ final class HomeStore: ObservableObject {
     private(set) var contentKey: Data?
     private var allNodes: [MemoryTree.MemoryNode]?
 
-    init(apiBase: String, session: Login.UnlockedSession) {
+    init(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession) {
         self.apiBase = apiBase
+        self.appBaseUrl = appBaseUrl.isEmpty ? apiBase : appBaseUrl
         self.session = session
     }
 
@@ -93,14 +95,57 @@ final class HomeStore: ObservableObject {
         return (meta.tenant.displayName, meta.role)
     }
 
-    /// Accept an invite onto this (logged-in) account, then refresh the space list so the group appears.
-    func joinGroup(_ parts: InviteLink.Parts) async -> Bool {
+    /// Accept an invite onto this (logged-in) account, then refresh the space list so the group appears. A
+    /// passphrase-protected invite needs the out-of-band passphrase to resolve its (encrypted) temp key.
+    func joinGroup(_ parts: InviteLink.Parts, passphrase: String? = nil) async -> Bool {
         do {
-            _ = try await InviteMembers.acceptMemberInvite(apiBase: apiBase, session: session, inviteId: parts.inviteId, bootstrapSecret: parts.bootstrapSecret, tempPrivateKeyB64: parts.tempPrivateKey)
+            let tempKey: String
+            if parts.isProtected {
+                guard let pass = passphrase, !pass.isEmpty else { self.error = T("accept.passphraseHint"); return false }
+                tempKey = try InviteMembers.unprotectTempKey(encTempKey: parts.encTempKey!, pwSalt: parts.pwSalt!, passphrase: pass)
+            } else {
+                tempKey = parts.tempPrivateKey ?? ""
+            }
+            _ = try await InviteMembers.acceptMemberInvite(apiBase: apiBase, session: session, inviteId: parts.inviteId, bootstrapSecret: parts.bootstrapSecret, tempPrivateKeyB64: tempKey)
             if let refreshed = try? await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: session) { spaces = refreshed }
             return true
         } catch {
-            self.error = T("accept.failed")
+            self.error = parts.isProtected ? T("accept.wrongPassphrase") : T("accept.failed")
+            return false
+        }
+    }
+
+    /// Owner action: mint a member invite and return a shareable link (pragmatic, or passphrase-protected).
+    func buildMemberInviteLink(tenantId: String, role: String, passphrase: String?) async -> String? {
+        do {
+            let invite = try await InviteMembers.issueMemberInvite(apiBase: apiBase, owner: session, tenantId: tenantId, role: role)
+            if let pass = passphrase, !pass.isEmpty {
+                let prot = try InviteMembers.protectTempKey(tempPrivateKeyB64: invite.tempPrivateKey, passphrase: pass)
+                return InviteLink.buildProtected(origin: appBaseUrl, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, encTempKey: prot.encTempKey, pwSalt: prot.pwSalt)
+            }
+            return InviteLink.build(origin: appBaseUrl, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, tempPrivateKey: invite.tempPrivateKey)
+        } catch {
+            self.error = T("invite.emailFailed")
+            return nil
+        }
+    }
+
+    /// Owner action: mint a member invite and have the server email the link. With a passphrase, the link is
+    /// the operator-blind variant (temp key encrypted, `ek`/`ps`) — the passphrase is shared out of band.
+    func emailMemberInvite(tenantId: String, role: String, email: String, passphrase: String?) async -> Bool {
+        do {
+            let invite = try await InviteMembers.issueMemberInvite(apiBase: apiBase, owner: session, tenantId: tenantId, role: role)
+            let link: String
+            if let pass = passphrase, !pass.isEmpty {
+                let prot = try InviteMembers.protectTempKey(tempPrivateKeyB64: invite.tempPrivateKey, passphrase: pass)
+                link = InviteLink.buildProtected(origin: appBaseUrl, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, encTempKey: prot.encTempKey, pwSalt: prot.pwSalt)
+            } else {
+                link = InviteLink.build(origin: appBaseUrl, inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, tempPrivateKey: invite.tempPrivateKey)
+            }
+            try await InviteMembers.emailMemberInvite(apiBase: apiBase, token: session.sessionToken, tenantId: tenantId, email: email, inviteId: invite.inviteId, link: link)
+            return true
+        } catch {
+            self.error = T("invite.emailFailed")
             return false
         }
     }

@@ -31,7 +31,7 @@ struct ConnectView: View {
             do {
                 let base = normalizeApiBase(url)
                 let status = try await Instance.getSetupStatus(apiBase: base)
-                if status.setupRequired { setupNeeded = true } else { app.connected(apiBase: base) }
+                if status.setupRequired { setupNeeded = true } else { app.connected(apiBase: base, appBaseUrl: status.appBaseUrl) }
             } catch {
                 self.error = T("connect.error")
             }

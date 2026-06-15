@@ -51,6 +51,25 @@ final class GroupsE2ETests: XCTestCase {
         let promoted = try await Groups.setGroupMemberRole(apiBase: apiBase, session: owner, tenantId: tenant.id, scopeId: group.scopeId, userId: bob.user.id, role: "GroupOwner")
         XCTAssertEqual(promoted.role, "GroupOwner")
 
+        // passphrase-protected invite (operator-blind): protect the temp key, then resolve it with the
+        // out-of-band passphrase and register a brand-new user — wrong passphrase must fail.
+        let pinv = try await InviteMembers.issueMemberInvite(apiBase: apiBase, owner: owner, tenantId: tenant.id, role: "Member")
+        let invitePass = "shared out of band"
+        let prot = try InviteMembers.protectTempKey(tempPrivateKeyB64: pinv.tempPrivateKey, passphrase: invitePass)
+        XCTAssertThrowsError(try InviteMembers.unprotectTempKey(encTempKey: prot.encTempKey, pwSalt: prot.pwSalt, passphrase: "wrong"))
+        let resolved = try InviteMembers.unprotectTempKey(encTempKey: prot.encTempKey, pwSalt: prot.pwSalt, passphrase: invitePass)
+        XCTAssertEqual(resolved, pinv.tempPrivateKey)
+        let creg = try await InviteMembers.registerViaMemberInvite(apiBase: apiBase, inviteId: pinv.inviteId, bootstrapSecret: pinv.bootstrapSecret, tempPrivateKeyB64: resolved, email: "carol@example.com", displayName: "Carol", password: pass)
+        let carol = try await Login.login(apiBase: apiBase, email: "carol@example.com", password: pass, secretKeyB64: creg.emergencyKit.secretKey)
+        let carolSpaces = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: carol)
+        XCTAssertTrue(carolSpaces.contains { $0.tenantId == tenant.id })
+
+        // email relay (mailer mock): both modes return 204 when the link targets this instance's app origin.
+        let appOrigin = env["VEYQ_APP_BASE"] ?? "http://localhost:5173"
+        let einv = try await InviteMembers.issueMemberInvite(apiBase: apiBase, owner: owner, tenantId: tenant.id, role: "Member")
+        let plainLink = "\(appOrigin)/#invite=\(einv.inviteId)&s=\(einv.bootstrapSecret)&k=\(einv.tempPrivateKey)"
+        try await InviteMembers.emailMemberInvite(apiBase: apiBase, token: owner.sessionToken, tenantId: tenant.id, email: "pragmatic@example.com", inviteId: einv.inviteId, link: plainLink)
+
         // delete the group (gone from roster)
         try await Groups.deleteGroup(apiBase: apiBase, session: owner, tenantId: tenant.id, scopeId: group.scopeId)
         let afterGroupDelete = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: owner).first { $0.scopeId == group.scopeId }

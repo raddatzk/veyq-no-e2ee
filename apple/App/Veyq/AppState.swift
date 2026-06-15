@@ -13,9 +13,12 @@ final class AppState: ObservableObject {
     @Published var apiBase: String = UserDefaults.standard.string(forKey: AppState.instanceKey) ?? ""
     @Published var session: Login.UnlockedSession?
     @Published var pendingInvite: InviteLink.Parts?
+    /// The instance's public app origin (for assembling invite links); falls back to apiBase if unknown.
+    @Published var appBaseUrl: String = ""
 
-    func connected(apiBase: String) {
+    func connected(apiBase: String, appBaseUrl: String? = nil) {
         self.apiBase = apiBase
+        self.appBaseUrl = appBaseUrl ?? apiBase
         UserDefaults.standard.set(apiBase, forKey: Self.instanceKey)
         phase = .login
     }
