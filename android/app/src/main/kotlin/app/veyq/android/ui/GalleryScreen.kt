@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -99,16 +100,34 @@ class GalleryController(
 
     suspend fun upload(items: List<ByteArray>) {
         uploading = true
-        val takenAt = Instant.now().toString()
         for (data in items) {
+            val exif = exifGps(data)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), takenAt, "image/jpeg")
+                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), exif.takenAt ?: Instant.now().toString(), "image/jpeg", exif.lat, exif.lng)
                 }
             }
         }
         load()
         uploading = false
+    }
+
+    private data class Exif(val lat: Double?, val lng: Double?, val takenAt: String?)
+
+    /** Pull GPS + capture time from a JPEG's EXIF (sealed client-side — the server never sees either). */
+    private fun exifGps(data: ByteArray): Exif {
+        return runCatching {
+            val exif = ExifInterface(java.io.ByteArrayInputStream(data))
+            val ll = exif.latLong
+            val raw = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+            val takenAt = raw?.let {
+                runCatching {
+                    val parser = java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US)
+                    parser.parse(it)?.toInstant()?.toString()
+                }.getOrNull()
+            }
+            Exif(ll?.get(0), ll?.get(1), takenAt)
+        }.getOrDefault(Exif(null, null, null))
     }
 
     private fun thumbnail(data: ByteArray, maxDim: Int = 400): ByteArray? {
@@ -209,9 +228,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
                 TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+                TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
             }
             if (tab == 1) {
                 JournalTab(controller, scope)
+            } else if (tab == 2) {
+                val points = controller.tiles.mapNotNull { t -> if (t.lat != null && t.lng != null) Triple(t.id, t.lat, t.lng) else null }
+                if (points.isEmpty()) Text(L10n.t("map.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                else MemoryMap(points) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
             } else {
                 Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
                 when {
@@ -308,6 +332,35 @@ private fun inlineMd(text: String): androidx.compose.ui.text.AnnotatedString = a
             else -> { append(text[i]); i++ }
         }
     }
+}
+
+/** An osmdroid (OpenStreetMap) map with a marker per geotagged medium; tapping a marker opens it. */
+@Composable
+private fun MemoryMap(points: List<Triple<String, Double, Double>>, onSelect: (String) -> Unit) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(Veyq.Radius)),
+        factory = { ctx ->
+            org.osmdroid.config.Configuration.getInstance().userAgentValue = ctx.packageName
+            org.osmdroid.config.Configuration.getInstance().osmdroidBasePath = ctx.cacheDir
+            org.osmdroid.views.MapView(ctx).apply {
+                setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                points.forEach { (id, lat, lng) ->
+                    val marker = org.osmdroid.views.overlay.Marker(this)
+                    marker.position = org.osmdroid.util.GeoPoint(lat, lng)
+                    marker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                    marker.setOnMarkerClickListener { _, _ -> onSelect(id); true }
+                    overlays.add(marker)
+                }
+                val geo = points.map { org.osmdroid.util.GeoPoint(it.second, it.third) }
+                if (geo.size == 1) {
+                    controller.setCenter(geo[0]); controller.setZoom(13.0)
+                } else if (geo.size > 1) {
+                    post { zoomToBoundingBox(org.osmdroid.util.BoundingBox.fromGeoPoints(geo).increaseByScale(1.4f), false) }
+                }
+            }
+        },
+    )
 }
 
 @Composable
