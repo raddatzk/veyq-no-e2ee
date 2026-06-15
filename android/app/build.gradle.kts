@@ -39,6 +39,7 @@ kotlin {
 dependencies {
     implementation(project(":core"))
 
+    implementation("androidx.core:core-ktx:1.13.1")
     val composeBom = platform("androidx.compose:compose-bom:2025.10.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")

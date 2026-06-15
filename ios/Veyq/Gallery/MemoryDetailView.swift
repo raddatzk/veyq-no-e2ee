@@ -68,6 +68,9 @@ struct MemoryDetailView: View {
     let name: String
     @State private var lightbox: UIImage?
     @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showDownload = false
+    @State private var downloading = false
+    @State private var shareItem: ShareItem?
 
     init(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, node: MemoryTree.MemoryNode, name: String) {
         _store = StateObject(wrappedValue: GalleryStore(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: node.id))
@@ -97,12 +100,22 @@ struct MemoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { showDownload = true } label: { Image(systemName: downloading ? "ellipsis" : "square.and.arrow.down") }
+                    .disabled(downloading || store.tiles.isEmpty)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
                     Text(store.uploading ? "Lädt…" : "Hochladen").foregroundStyle(VeyqStyle.accent)
                 }
                 .disabled(store.uploading)
             }
         }
+        .confirmationDialog("Herunterladen", isPresented: $showDownload, titleVisibility: .visible) {
+            Button("Nur diese Memory") { startDownload(false) }
+            Button("Mit Kapiteln") { startDownload(true) }
+            Button("Abbrechen", role: .cancel) {}
+        }
+        .sheet(item: $shareItem) { item in ActivityView(url: item.url) }
         .onChange(of: pickerItems) { _, items in
             guard !items.isEmpty else { return }
             Task {
@@ -121,6 +134,16 @@ struct MemoryDetailView: View {
                 Image(uiImage: item.image).resizable().scaledToFit()
             }
             .onTapGesture { lightbox = nil }
+        }
+    }
+
+    private func startDownload(_ withChapters: Bool) {
+        downloading = true
+        Task {
+            defer { downloading = false }
+            if let url = try? await DownloadService.buildZip(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, nodeId: store.nodeId, name: name, withChapters: withChapters) {
+                shareItem = ShareItem(url: url)
+            }
         }
     }
 
@@ -143,3 +166,14 @@ struct MemoryDetailView: View {
 }
 
 private struct LightboxImage: Identifiable { let id = UUID(); let image: UIImage }
+
+struct ShareItem: Identifiable { let id = UUID(); let url: URL }
+
+/// Bridges UIActivityViewController so the built zip can be saved to Files / shared.
+struct ActivityView: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}

@@ -1,7 +1,9 @@
 package app.veyq.android.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,10 +23,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -120,9 +124,29 @@ class GalleryController(
 fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
     val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
     var lightbox by remember { mutableStateOf<ImageBitmap?>(null) }
+    var showDownload by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load() }
+
+    fun download(withChapters: Boolean) {
+        showDownload = false
+        downloading = true
+        scope.launch {
+            runCatching {
+                val file = withContext(Dispatchers.IO) { DownloadService.buildZip(context, apiBase, session, scopeId, contentKey, nodeId, name, withChapters) }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val share = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(share, "Teilen"))
+            }
+            downloading = false
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
         if (uris.isNotEmpty()) scope.launch {
@@ -141,6 +165,9 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Veyq.Surface),
                 navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Veyq.Text, fontSize = 24.sp) } },
                 actions = {
+                    IconButton(onClick = { showDownload = true }, enabled = !downloading && controller.tiles.isNotEmpty()) {
+                        Text(if (downloading) "…" else "⬇", color = Veyq.Text, fontSize = 20.sp)
+                    }
                     IconButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !controller.uploading) {
                         Text(if (controller.uploading) "…" else "+", color = Veyq.Accent, fontSize = 22.sp)
                     }
@@ -162,6 +189,17 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).clickable { lightbox = null }, contentAlignment = Alignment.Center) {
             Image(img, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
         }
+    }
+
+    if (showDownload) {
+        AlertDialog(
+            onDismissRequest = { showDownload = false },
+            containerColor = Veyq.Surface,
+            title = { Text("Herunterladen", color = Veyq.Text) },
+            text = { Text("Originale dieser Memory als ZIP teilen.", color = Veyq.Muted) },
+            confirmButton = { TextButton(onClick = { download(true) }) { Text("Mit Kapiteln", color = Veyq.Accent) } },
+            dismissButton = { TextButton(onClick = { download(false) }) { Text("Nur diese Memory", color = Veyq.Accent) } },
+        )
     }
 }
 
