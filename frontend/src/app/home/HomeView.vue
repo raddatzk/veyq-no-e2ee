@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { enterSpace, loadCover, loadLevel, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
+import { reorderNode } from '../../features/memory/curate/curate'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import MemoryDetailView from './MemoryDetailView.vue'
@@ -10,6 +11,7 @@ import SearchOverlay from './SearchOverlay.vue'
 import SettingsOverlay from './SettingsOverlay.vue'
 import CreateModal from './CreateModal.vue'
 import RenameModal from './RenameModal.vue'
+import MovePicker from './MovePicker.vue'
 
 const apiBase = session.apiBase
 const spaces = ref<SpaceEntry[]>([])
@@ -24,6 +26,9 @@ const searchOpen = ref(false)
 const settingsOpen = ref(false)
 const createType = ref<NodeType | null>(null)
 const renameTarget = ref<LevelEntry | null>(null)
+const menuTarget = ref<LevelEntry | null>(null)
+const moveTarget = ref<LevelEntry | null>(null)
+const dragged = ref<{ entry: LevelEntry; section: 'M' | 'F' } | null>(null)
 
 const currentParentId = () => (crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined)
 async function onCreated() {
@@ -33,6 +38,27 @@ async function onCreated() {
 async function onRenamed() {
   renameTarget.value = null
   await openLevel()
+}
+async function onMoved() {
+  moveTarget.value = null
+  await openLevel()
+}
+
+function onDragStart(entry: LevelEntry, section: 'M' | 'F') {
+  dragged.value = { entry, section }
+}
+async function onReorderDrop(target: LevelEntry, section: 'M' | 'F') {
+  const d = dragged.value
+  dragged.value = null
+  if (!d || d.section !== section || d.entry.node.id === target.node.id || !active.value) return
+  const listRef = section === 'M' ? memories : folders
+  const arr = [...listRef.value]
+  const from = arr.findIndex((e) => e.node.id === d.entry.node.id)
+  const to = arr.findIndex((e) => e.node.id === target.node.id)
+  if (from < 0 || to < 0) return
+  arr.splice(to, 0, arr.splice(from, 1)[0])
+  listRef.value = arr
+  for (let i = 0; i < arr.length; i++) await reorderNode(apiBase, session.unlocked!, active.value, arr[i].node.id, i)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -155,20 +181,38 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
 
         <div class="content-head"><span class="content-title">{{ t('home.memories') }}</span><span class="content-count">{{ memories.length }}</span></div>
         <div class="card-grid">
-          <button v-for="m in memories" :key="m.node.id" class="memory-card" @click="selectedMemory = m">
+          <button
+            v-for="m in memories"
+            :key="m.node.id"
+            class="memory-card"
+            draggable="true"
+            @click="selectedMemory = m"
+            @dragstart="onDragStart(m, 'M')"
+            @dragover.prevent
+            @drop="onReorderDrop(m, 'M')"
+          >
             <img v-if="covers[m.node.id]" class="memory-cover" :src="covers[m.node.id]!" alt="" />
             <div v-else class="memory-cover placeholder">…</div>
             <div class="memory-label"><div class="memory-name">{{ m.name }}</div></div>
-            <span class="card-more" :title="t('common.rename')" @click.stop="renameTarget = m">⋯</span>
+            <span class="card-more" @click.stop="menuTarget = m">⋯</span>
           </button>
           <button class="create-card" @click="createType = 'MEMORY'"><span class="create-plus">＋</span>{{ t('home.createMemory') }}</button>
         </div>
 
         <div class="content-head"><span class="content-title">{{ t('home.folders') }}</span><span class="content-count">{{ folders.length }}</span></div>
         <div class="card-grid">
-          <button v-for="f in folders" :key="f.node.id" class="folder-card" @click="openFolder(f)">
+          <button
+            v-for="f in folders"
+            :key="f.node.id"
+            class="folder-card"
+            draggable="true"
+            @click="openFolder(f)"
+            @dragstart="onDragStart(f, 'F')"
+            @dragover.prevent
+            @drop="onReorderDrop(f, 'F')"
+          >
             <span class="folder-icon">📁</span><span class="folder-name">{{ f.name }}</span>
-            <span class="card-more" :title="t('common.rename')" @click.stop="renameTarget = f">⋯</span>
+            <span class="card-more" @click.stop="menuTarget = f">⋯</span>
           </button>
           <button class="create-card create-card-row" @click="createType = 'FOLDER'"><span class="create-plus">＋</span>{{ t('home.createFolder') }}</button>
         </div>
@@ -185,5 +229,14 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
       @created="onCreated"
     />
     <RenameModal v-if="renameTarget && active" :active="active" :entry="renameTarget" @close="renameTarget = null" @renamed="onRenamed" />
+    <MovePicker v-if="moveTarget && active" :active="active" :entry="moveTarget" @close="moveTarget = null" @moved="onMoved" />
+
+    <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
+      <div class="settings-panel action-sheet">
+        <div class="settings-head"><h2 class="settings-title">{{ menuTarget.name }}</h2></div>
+        <button class="btn btn-ghost action-row" type="button" @click="renameTarget = menuTarget; menuTarget = null">{{ t('common.rename') }}</button>
+        <button class="btn btn-ghost action-row" type="button" @click="moveTarget = menuTarget; menuTarget = null">{{ t('common.move') }}</button>
+      </div>
+    </div>
   </div>
 </template>

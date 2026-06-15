@@ -143,6 +143,9 @@
 .memory-card:hover .card-more,
 .folder-card:hover .card-more { opacity: 1; }
 .card-more:hover { background: rgba(0, 0, 0, 0.7); }
+
+.action-sheet { max-width: 360px; }
+.action-row { width: 100%; justify-content: flex-start; margin-top: 0.4rem; }
 .memory-card:hover { box-shadow: var(--app-shadow-md); }
 .memory-cover { aspect-ratio: 4 / 3; background: var(--app-surface-muted); display: block; width: 100%; object-fit: cover; }
 .memory-cover.placeholder { display: grid; place-items: center; color: var(--app-muted); font-size: 0.8rem; }

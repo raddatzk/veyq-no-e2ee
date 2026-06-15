@@ -2,8 +2,10 @@
 // list a level of the tree with decrypted names, and lazily resolve a memory's cover image. All built on
 // the existing E2E-tested slices (spaces / browse / media); the server stays blind to names and bytes.
 import type { UnlockedSession } from '../account/login/login'
+import { t } from '../../i18n/i18n'
 import { getOrCreateContentKey, type OpenScope } from '../content/scopeContent'
 import { decodeNode, listChildren, type MemoryNode } from '../memory/browse/browse'
+import { listNodes } from '../memory/createTree/memoryTree'
 import { listMySpaces, openSpace, type SpaceEntry } from '../spaces/switchActiveSpace/switchActiveSpace'
 import { downloadBlob, listMedia } from '../uploads/media/media'
 
@@ -29,6 +31,22 @@ export async function enterSpace(apiBase: string, session: UnlockedSession, entr
 export async function loadLevel(apiBase: string, session: UnlockedSession, active: ActiveSpace, parentId?: string): Promise<LevelEntry[]> {
   const nodes = await listChildren(apiBase, session, active.scope.scopeId, parentId)
   return nodes.map((node) => ({ node, name: decodeNode(active.contentKey, node).name }))
+}
+
+/** Valid move targets for a node: the root + every folder that isn't the node or in its own subtree. */
+export async function moveDestinations(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode): Promise<{ id: string; name: string }[]> {
+  const all = await listNodes(apiBase, session, active.scope.scopeId)
+  const root = active.scope.scopeId
+  const childrenOf = (id: string) => all.filter((n) => (n.parentId ?? root) === id)
+  const banned = new Set<string>([node.id])
+  const stack = [node.id]
+  while (stack.length) {
+    const cur = stack.pop()!
+    for (const c of childrenOf(cur)) if (!banned.has(c.id)) { banned.add(c.id); stack.push(c.id) }
+  }
+  const dests: { id: string; name: string }[] = [{ id: 'root', name: t('move.toRoot') }]
+  for (const n of all) if (n.type === 'FOLDER' && !banned.has(n.id)) dests.push({ id: n.id, name: decodeNode(active.contentKey, n).name })
+  return dests
 }
 
 /** A memory's cover: the pinned cover media (or the first media) thumbnail, decrypted to an object URL. */
