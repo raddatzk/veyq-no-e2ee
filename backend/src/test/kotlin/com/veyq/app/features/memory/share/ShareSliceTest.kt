@@ -107,11 +107,10 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-other/media").then().statusCode(404)
         given().get("/api/public/shares/$shareId/blobs/shr-b2/chunks/0").then().statusCode(404)
 
-        // a VIEWER share rejects guest writes (read-only)
+        // a VIEWER share rejects guest writes (read-only) but may READ the journal
         given().contentType(ContentType.JSON).body("""{"dedupToken":"x","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_READ_ONLY"))
-        given().contentType(ContentType.JSON).body("""{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""")
-            .put("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(403)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(200)
 
         // revoke; the share (and guest access) is gone
         given().header("Authorization", ownerToken).delete("/api/scopes/$scopeId/nodes/shr-mem/shares/$shareId").then().statusCode(204)
@@ -142,11 +141,8 @@ class ShareSliceTest {
         // the shared gallery now lists the guest's contribution
         given().get("/api/public/shares/$shareId/nodes/shr-mem2/media").then().statusCode(200).body("media.size()", `is`(1))
 
-        // the guest writes the journal, then reads it back
-        given().contentType(ContentType.JSON).body("""{"sealedContent":{"suiteId":"v1","bytes":"am91cm5hbA"}}""")
-            .put("/api/public/shares/$shareId/nodes/shr-mem2/journal").then().statusCode(200)
+        // a CONTRIBUTOR may READ the journal but not write it (no PUT route — journal is owner-only)
         given().get("/api/public/shares/$shareId/nodes/shr-mem2/journal").then().statusCode(200)
-            .body("sealedContent.bytes", `is`("am91cm5hbA"))
 
         // a guest still cannot contribute outside the subtree
         given().contentType(ContentType.JSON)
@@ -167,8 +163,6 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes").then().statusCode(403).body("code", `is`("SHARE_NO_READ"))
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/media").then().statusCode(403)
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/journal").then().statusCode(403)
-        given().contentType(ContentType.JSON).body("""{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""")
-            .put("/api/public/shares/$shareId/nodes/shr-mem3/journal").then().statusCode(403)
 
         // but uploading a blob + attaching media works
         val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"up-1","totalChunks":1,"byteSize":6}""")

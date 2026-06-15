@@ -10,7 +10,8 @@ import { login } from '../../account/login/login'
 import { getOrCreateContentKey, openPersonalScope } from '../../content/scopeContent'
 import { createNode } from '../createTree/memoryTree'
 import { uploadMedia } from '../../uploads/media/media'
-import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, updateShareJournal, uploadShareMedia } from './share'
+import { updateJournal } from '../journal/journal'
+import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, uploadShareMedia } from './share'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_SEED === '1' ? describe : describe.skip
@@ -45,12 +46,11 @@ run('share e2e', () => {
     expect(cCtx.role).toBe('CONTRIBUTOR')
     const contributed = Uint8Array.from({ length: 90 }, (_, i) => (i * 7 + 5) & 0xff)
     await uploadShareMedia(cCtx, { bytes: contributed, takenAt: '2026-05-01T10:00:00Z', mimeType: 'image/jpeg' })
-    await updateShareJournal(cCtx, '# Unser Trip\n\nDanke fürs Teilen!')
 
-    // the owner's gallery now holds both media, and the guest's journal round-trips
-    const all = await listShareMedia(cCtx, cCtx.rootNodeId)
-    expect(all).toHaveLength(2)
-    expect(await getShareJournal(cCtx)).toContain('Danke fürs Teilen')
+    // the owner's gallery now holds both media; the owner's journal is READ-ONLY to the contributor
+    expect(await listShareMedia(cCtx, cCtx.rootNodeId)).toHaveLength(2)
+    await updateJournal(apiBase, session, active, memory.id, '# Unser Trip\n\nDanke fürs Mitmachen!')
+    expect(await getShareJournal(cCtx)).toContain('Danke fürs Mitmachen')
 
     // (3) UPLOADER — a blind drop-off: can add media, but reads are denied
     const uShare = await createShare(apiBase, session, active, memory.id, 'UPLOADER')

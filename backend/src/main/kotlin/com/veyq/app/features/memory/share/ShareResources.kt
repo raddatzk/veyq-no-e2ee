@@ -8,7 +8,6 @@ import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.CreateShareRequest
 import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
-import com.veyq.app.generated.model.UpdateMemoryJournalRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -33,8 +32,6 @@ class PublicShareTreeResource(private val handler: PublicShareTreeHandler) : Pub
     override fun getPublicShare(shareId: String): Response = Response.ok(handler.getPublicShare(shareId)).build()
     override fun listShareNodes(shareId: String): Response = Response.ok(handler.listShareNodes(shareId)).build()
     override fun getShareJournal(shareId: String, nodeId: String): Response = Response.ok(handler.getShareJournal(shareId, nodeId)).build()
-    override fun updateShareJournal(shareId: String, nodeId: String, updateMemoryJournalRequest: UpdateMemoryJournalRequest): Response =
-        Response.ok(handler.updateShareJournal(shareId, nodeId, updateMemoryJournalRequest)).build()
 }
 
 /** Guest-side contribution: blob upload + media create (no auth, CONTRIBUTOR shares only). */

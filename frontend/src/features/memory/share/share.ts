@@ -177,7 +177,7 @@ export async function uploadShareMedia(ctx: ShareContext, m: NewMedia): Promise<
   if (!res.ok) throw new Error(`contribute media failed: ${res.status} ${await res.text()}`)
 }
 
-/** Read the shared memory's journal Markdown ('' when none). */
+/** Read the shared memory's journal Markdown ('' when none). Read-only over a share — only the owner edits. */
 export async function getShareJournal(ctx: ShareContext): Promise<string> {
   const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/journal`)
   if (!res.ok) throw new Error(`share journal failed: ${res.status} ${await res.text()}`)
@@ -185,17 +185,6 @@ export async function getShareJournal(ctx: ShareContext): Promise<string> {
   if (!body.sealedContent) return ''
   const sealed = fromB64url(body.sealedContent.bytes)
   return new TextDecoder().decode(v1.aeadOpen(ctx.contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY))
-}
-
-/** Write the shared memory's journal Markdown (CONTRIBUTOR shares only). */
-export async function updateShareJournal(ctx: ShareContext, markdown: string): Promise<void> {
-  const nonce = v1.randomBytes(12)
-  const sealed = v1.concat(nonce, v1.aeadSeal(ctx.contentKey, nonce, v1.utf8(markdown), EMPTY))
-  const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/journal`, {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
-  })
-  if (!res.ok) throw new Error(`update share journal failed: ${res.status} ${await res.text()}`)
 }
 
 export { decodeMediaMeta }

@@ -259,25 +259,12 @@ paths:
     get:
       tags: [PublicShareTree]
       operationId: getShareJournal
-      summary: A shared node's journal (ciphertext, no auth — any share role may read).
+      summary: A shared node's journal — READ-ONLY (ciphertext, no auth; only the owner edits it).
       parameters:
         - { name: shareId, in: path, required: true, schema: { type: string } }
         - { name: nodeId, in: path, required: true, schema: { type: string } }
       responses:
         '200': { description: The journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
-        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-    put:
-      tags: [PublicShareTree]
-      operationId: updateShareJournal
-      summary: Replace a shared node's journal (no auth — CONTRIBUTOR shares only).
-      parameters:
-        - { name: shareId, in: path, required: true, schema: { type: string } }
-        - { name: nodeId, in: path, required: true, schema: { type: string } }
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateMemoryJournalRequest' } } }
-      responses:
-        '200': { description: The updated journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:

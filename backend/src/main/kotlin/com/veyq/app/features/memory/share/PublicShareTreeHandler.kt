@@ -5,7 +5,6 @@ import com.veyq.app.generated.model.MemoryJournal
 import com.veyq.app.generated.model.MemoryNodeList
 import com.veyq.app.generated.model.PublicShare
 import com.veyq.app.generated.model.ShareRole
-import com.veyq.app.generated.model.UpdateMemoryJournalRequest
 import com.veyq.app.features.memory.journal.JournalHandler
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.NodeRepository
@@ -51,20 +50,13 @@ class PublicShareTreeHandler(
         return MemoryNodeList(nodes = all.filter { it.id in ids }.map { ShareHandler.nodeToApi(it, share.scopeId, enc) })
     }
 
+    // Journal is READ-ONLY over a share — only the owner edits it (via the authed endpoint).
     @Transactional
     fun getShareJournal(shareId: String, nodeId: String): MemoryJournal {
         val share = shareOr404(shareId)
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
         requireSubtree(share, nodeId)
         return journals.getJournalAs(share.scopeId, nodeId)
-    }
-
-    @Transactional
-    fun updateShareJournal(shareId: String, nodeId: String, req: UpdateMemoryJournalRequest): MemoryJournal {
-        val share = shareOr404(shareId)
-        if (!ShareHandler.canWriteJournal(share.role)) throw ApiException(403, "SHARE_NO_JOURNAL", "This share cannot write the journal")
-        requireSubtree(share, nodeId)
-        return journals.updateJournalAs(share.scopeId, nodeId, req)
     }
 
     private fun shareOr404(shareId: String): Share =
