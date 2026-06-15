@@ -124,6 +124,29 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/media:
+    get:
+      tags: [PublicShareMedia]
+      operationId: listShareMedia
+      summary: A shared node's media (ciphertext, no auth — gated to the share's subtree).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The node's media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaList' } } } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blobs/{blobId}/chunks/{index}:
+    get:
+      tags: [PublicShareMedia]
+      operationId: getShareChunk
+      summary: One AEAD frame of a shared blob (ciphertext, no auth — gated to the share's subtree).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: blobId, in: path, required: true, schema: { type: string } }
+        - { name: index, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: The frame ciphertext., content: { application/json: { schema: { $ref: '#/components/schemas/ChunkResponse' } } } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     StartBlobRequest:

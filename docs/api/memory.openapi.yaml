@@ -181,6 +181,80 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/shares:
+    get:
+      tags: [MemoryShare]
+      operationId: listShares
+      summary: The read-only public share links for a Memory.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The node's shares., content: { application/json: { schema: { $ref: '#/components/schemas/ShareList' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    post:
+      tags: [MemoryShare]
+      operationId: createShare
+      summary: Create a read-only public share link for a Memory subtree.
+      description: >
+        Stores the scope content key wrapped under a per-share key (the share key rides the returned link's
+        fragment and never reaches the server). The server is blind to the content and only gates which
+        ciphertext a guest can fetch to this node's subtree.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateShareRequest' } } }
+      responses:
+        '200': { description: The created share., content: { application/json: { schema: { $ref: '#/components/schemas/ShareSummary' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/shares/{shareId}:
+    delete:
+      tags: [MemoryShare]
+      operationId: revokeShare
+      summary: Revoke a public share link.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Revoked. }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}:
+    get:
+      tags: [PublicShareTree]
+      operationId: getPublicShare
+      summary: Resolve a public share — the wrapped content key + the shared root node (no auth).
+      description: >
+        Unauthenticated. Returns the share-key-wrapped content key and the shared subtree's root node
+        (ciphertext). The guest unwraps the content key with the share key from the link fragment and
+        decrypts client-side; the server never sees the share key or any plaintext.
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The share., content: { application/json: { schema: { $ref: '#/components/schemas/PublicShare' } } } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes:
+    get:
+      tags: [PublicShareTree]
+      operationId: listShareNodes
+      summary: The shared subtree's nodes — the root and its descendants (ciphertext, no auth).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The subtree nodes., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryNodeList' } } } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:
@@ -259,3 +333,31 @@ components:
       required: [sealedContent]
       properties:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    CreateShareRequest:
+      type: object
+      required: [wrappedContentKey]
+      properties:
+        wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    ShareSummary:
+      type: object
+      required: [shareId, nodeId, createdAt]
+      properties:
+        shareId: { type: string }
+        nodeId: { type: string }
+        createdAt: { type: string, format: date-time }
+    ShareList:
+      type: object
+      required: [shares]
+      properties:
+        shares:
+          type: array
+          items: { $ref: '#/components/schemas/ShareSummary' }
+    PublicShare:
+      type: object
+      required: [shareId, scopeId, rootNodeId, wrappedContentKey, root]
+      properties:
+        shareId: { type: string }
+        scopeId: { type: string }
+        rootNodeId: { type: string }
+        wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        root: { $ref: '#/components/schemas/MemoryNode' }
