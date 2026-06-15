@@ -7,6 +7,11 @@ func T(_ key: String) -> String {
     return L10nStrings[locale]?[key] ?? L10nStrings["de"]?[key] ?? key
 }
 
+/// `T(key, args…)` — the same lookup, then `String(format:)` for keys with `%@` placeholders.
+func T(_ key: String, _ args: CVarArg...) -> String {
+    String(format: T(key), arguments: args)
+}
+
 let L10nStrings: [String: [String: String]] = [
     "de": [
         "common.email": "E-Mail", "common.password": "Passwort", "common.secretKey": "Secret Key",
@@ -32,6 +37,8 @@ let L10nStrings: [String: [String: String]] = [
         "common.delete": "Löschen", "common.remove": "Entfernen",
         "delete.title": "Löschen bestätigen", "delete.warning": "Das kann nicht rückgängig gemacht werden. Alles darunter wird mitgelöscht.",
         "delete.confirmPrompt": "Tippe „%@\" zum Bestätigen:", "delete.confirm": "Endgültig löschen", "delete.group": "Gruppe löschen", "delete.tenant": "Tenant löschen",
+        "delete.tenantWarning": "Der Tenant wird nach einer Frist endgültig gelöscht. Alle Mitglieder sollten bis dahin ihre Daten sichern.",
+        "delete.scheduledBanner": "Dieser Tenant wird am %@ gelöscht. Sichere bis dahin deine Daten.", "delete.cancelDeletion": "Löschung abbrechen",
         "search.nothing": "Nichts gefunden.", "search.memory": "Memory", "search.folder": "Ordner",
         "detail.media": "Medien", "detail.loadingGallery": "Lädt Galerie…", "detail.noMedia": "Noch keine Medien.",
         "detail.upload": "Hochladen", "detail.uploading": "Lädt…",
@@ -83,6 +90,8 @@ let L10nStrings: [String: [String: String]] = [
         "common.delete": "Delete", "common.remove": "Remove",
         "delete.title": "Confirm deletion", "delete.warning": "This cannot be undone. Everything beneath it is deleted too.",
         "delete.confirmPrompt": "Type \"%@\" to confirm:", "delete.confirm": "Delete permanently", "delete.group": "Delete group", "delete.tenant": "Delete tenant",
+        "delete.tenantWarning": "The tenant will be permanently deleted after a grace period. All members should secure their data before then.",
+        "delete.scheduledBanner": "This tenant will be deleted on %@. Secure your data before then.", "delete.cancelDeletion": "Cancel deletion",
         "search.nothing": "Nothing found.", "search.memory": "Memory", "search.folder": "Folder",
         "detail.media": "media", "detail.loadingGallery": "Loading gallery…", "detail.noMedia": "No media yet.",
         "detail.upload": "Upload", "detail.uploading": "…",

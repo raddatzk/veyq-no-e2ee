@@ -105,6 +105,9 @@ struct MemoryHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 if let error = store.error { MessageBox(text: error) }
+                if let entry = store.activeEntry, let deadline = entry.scheduledDeletionAt {
+                    deletionBanner(entry: entry, deadline: deadline)
+                }
                 if !store.searchText.isEmpty {
                     searchResults
                 } else {
@@ -117,6 +120,34 @@ struct MemoryHomeView: View {
         .background(VeyqStyle.bg)
         .navigationTitle(store.crumbs.last?.name ?? "veyq")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// A warning that the active tenant is scheduled for deletion, with an owner-only cancel action.
+    @ViewBuilder private func deletionBanner(entry: SwitchActiveSpace.SpaceEntry, deadline: String) -> some View {
+        HStack(spacing: 12) {
+            Text(T("delete.scheduledBanner", formatDeletionDate(deadline)))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(VeyqStyle.danger)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if entry.role == "Owner" {
+                Button(T("delete.cancelDeletion")) { Task { await store.cancelTenantDeletion(entry) } }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(VeyqStyle.danger)
+            }
+        }
+        .padding(12)
+        .background(VeyqStyle.dangerSoft, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(VeyqStyle.dangerLine, lineWidth: 1))
+    }
+
+    private func formatDeletionDate(_ iso: String) -> String {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = parser.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        guard let date else { return iso }
+        let out = DateFormatter()
+        out.dateStyle = .medium
+        return out.string(from: date)
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {

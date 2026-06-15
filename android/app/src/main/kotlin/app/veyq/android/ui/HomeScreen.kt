@@ -209,9 +209,22 @@ class HomeController(val apiBase: String, val session: Login.UnlockedSession) {
         try { withContext(Dispatchers.IO) { Groups.deleteGroup(apiBase, session, entry.optString("tenantId"), entry.getString("scopeId")) }; afterSpaceDeleted(entry.getString("scopeId")) }
         catch (e: Exception) { error = "Konnte Gruppe nicht löschen." }
     }
+    /** Schedule the tenant for deletion (grace period). It stays usable, so refresh + re-select it to
+     *  surface the scheduled-deletion banner with its cancel action. */
     suspend fun deleteTenant(entry: JSONObject) {
-        try { withContext(Dispatchers.IO) { Groups.deleteTenant(apiBase, session, entry.optString("tenantId")) }; afterSpaceDeleted(entry.getString("scopeId")) }
-        catch (e: Exception) { error = "Konnte Tenant nicht löschen." }
+        try {
+            withContext(Dispatchers.IO) { Groups.deleteTenant(apiBase, session, entry.optString("tenantId")) }
+            reloadSpaces()
+            spaces.firstOrNull { it.getString("scopeId") == entry.getString("scopeId") }?.let { switchSpace(it) }
+        } catch (e: Exception) { error = "Konnte Tenant nicht löschen." }
+    }
+    /** Cancel a scheduled tenant deletion and refresh so the banner clears. */
+    suspend fun cancelTenantDeletion(entry: JSONObject) {
+        try {
+            withContext(Dispatchers.IO) { Groups.cancelTenantDeletion(apiBase, session, entry.optString("tenantId")) }
+            reloadSpaces()
+            spaces.firstOrNull { it.getString("scopeId") == entry.getString("scopeId") }?.let { switchSpace(it) }
+        } catch (e: Exception) { error = "Konnte Löschung nicht abbrechen." }
     }
     private suspend fun afterSpaceDeleted(scopeId: String) {
         val wasActive = activeScopeId == scopeId
@@ -475,6 +488,12 @@ fun HomeScreen(apiBase: String, session: Login.UnlockedSession, theme: String, o
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             controller.error?.let { MessageBox(it) }
+
+            val active = controller.spaces.firstOrNull { it.getString("scopeId") == controller.activeScopeId }
+            val deadline = active?.optString("scheduledDeletionAt")?.ifEmpty { null }
+            if (active != null && deadline != null) DeletionBanner(deadline, active.optString("role") == "Owner") {
+                scope.launch { controller.cancelTenantDeletion(active) }
+            }
 
             OutlinedTextField(
                 value = controller.searchText,
@@ -761,6 +780,26 @@ private fun SectionHeader(title: String, count: Int) {
 
 @Composable
 private fun EmptyText(text: String) = Text(text, fontSize = 14.sp, color = Veyq.Muted)
+
+/** Warns that the active tenant is scheduled for deletion; owner gets an inline cancel action. */
+@Composable
+private fun DeletionBanner(deadlineIso: String, isOwner: Boolean, onCancel: () -> Unit) {
+    val date = runCatching {
+        java.time.OffsetDateTime.parse(deadlineIso)
+            .format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM))
+    }.getOrDefault(deadlineIso)
+    Row(
+        Modifier.fillMaxWidth()
+            .background(Veyq.Danger.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+            .border(1.dp, Veyq.Danger.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(L10n.t("delete.scheduledBanner").format(date), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Veyq.Danger, modifier = Modifier.weight(1f))
+        if (isOwner) TextButton(onClick = onCancel) { Text(L10n.t("delete.cancelDeletion"), color = Veyq.Danger, fontWeight = FontWeight.SemiBold) }
+    }
+}
 
 @Composable
 private fun MemoryGrid(memories: List<HomeController.Entry>, covers: Map<String, ImageBitmap>, onOpen: (HomeController.Entry) -> Unit, onRename: (HomeController.Entry) -> Unit) {

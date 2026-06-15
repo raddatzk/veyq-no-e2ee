@@ -14,6 +14,7 @@ public enum SwitchActiveSpace {
         public let displayName: String?
         public let role: String?
         public let sealedName: BlobDTO?    // GROUP only — the name sealed under the group content key
+        public let scheduledDeletionAt: String?  // TENANT only — set when scheduled for deletion (grace period)
         public let scopeId: String
         public let scopePublicKey: KemPublicKeyDTO
     }

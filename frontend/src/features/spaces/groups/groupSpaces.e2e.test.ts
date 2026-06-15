@@ -7,7 +7,7 @@ import { issueMemberInvite, registerViaMemberInvite } from '../../admin/inviteMe
 import { getOrCreateContentKey, writeItem, readItems } from '../../content/scopeContent'
 import { createChild, deleteNode } from '../../memory/curate/curate'
 import { listChildren } from '../../memory/browse/browse'
-import { deleteTenant } from '../invite/groups'
+import { deleteTenant, cancelTenantDeletion } from '../invite/groups'
 import { listMySpaces, openSpace } from '../switchActiveSpace/switchActiveSpace'
 import { addGroupMember, createGroupSpace, deleteGroup, listGroupMembers, openSealedName, setGroupMemberRole } from './groupSpaces'
 
@@ -70,10 +70,16 @@ suite('groups E2E (web -> live backend)', () => {
     await deleteGroup(apiBase, owner, tenant.id, group.scopeId)
     expect((await listMySpaces(apiBase, owner)).some((s) => s.scopeId === group.scopeId)).toBe(false)
 
-    // delete the tenant → its TENANT space is gone; the personal space remains
+    // schedule the tenant for deletion → it stays usable but carries a deadline (grace period)
     await deleteTenant(apiBase, owner, tenant.id)
+    const scheduled = (await listMySpaces(apiBase, owner)).find((s) => s.kind === 'TENANT')!
+    expect(scheduled).toBeTruthy()
+    expect(scheduled.scheduledDeletionAt).toBeTruthy()
+
+    // owner cancels → the deadline clears, the personal space remains
+    await cancelTenantDeletion(apiBase, owner, tenant.id)
     const after = await listMySpaces(apiBase, owner)
-    expect(after.some((s) => s.kind === 'TENANT')).toBe(false)
+    expect(after.find((s) => s.kind === 'TENANT')?.scheduledDeletionAt).toBeFalsy()
     expect(after.some((s) => s.kind === 'PERSONAL')).toBe(true)
   })
 })

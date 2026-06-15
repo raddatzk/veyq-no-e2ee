@@ -113,8 +113,15 @@ public enum Groups {
         let (data, code) = try await send(apiBase, "/api/scopes/\(scopeId)/nodes/\(nodeId)/media/\(mediaId)", session.sessionToken, method: "DELETE")
         guard code == 204 else { throw err("delete media failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
+    /// Schedule a tenant for deletion after a grace period (owner only). The tenant stays usable until the
+    /// deadline (members secure their data), then the server GC purges it. Idempotent.
     public static func deleteTenant(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws {
         let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)", session.sessionToken, method: "DELETE")
         guard code == 204 else { throw err("delete tenant failed: \(String(data: data, encoding: .utf8) ?? "")") }
+    }
+    /// Cancel a scheduled tenant deletion — clears the deadline (owner only).
+    public static func cancelTenantDeletion(apiBase: String, session: Login.UnlockedSession, tenantId: String) async throws {
+        let (data, code) = try await send(apiBase, "/api/tenants/\(tenantId)/cancel-deletion", session.sessionToken, method: "POST")
+        guard code == 204 else { throw err("cancel tenant deletion failed: \(String(data: data, encoding: .utf8) ?? "")") }
     }
 }

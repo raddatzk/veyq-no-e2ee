@@ -12,6 +12,8 @@ enum VeyqStyle {
     static let line = Color(light: 0xDCE2EC, dark: 0x333D49)
     static let accent = Color(light: 0x5B4DF5, dark: 0x9B8CFF)
     static let danger = Color(light: 0xB42318, dark: 0xF87171)
+    static let dangerSoft = Color(light: 0xFEF2F2, dark: 0x3B1D24)
+    static let dangerLine = Color(light: 0xFECACA, dark: 0x7F1D1D)
     static let radius: CGFloat = 12
     static let radiusSm: CGFloat = 10
 }

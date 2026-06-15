@@ -62,12 +62,20 @@ class GroupsE2ETest {
         assertEquals(2, Groups.listGroupMembers(apiBase, owner, tid, gScope).length())
         assertEquals("GroupOwner", Groups.setGroupMemberRole(apiBase, owner, tid, gScope, bobId, "GroupOwner").getString("role"))
 
-        // delete the group (gone from roster), then the tenant (TENANT gone, personal remains)
+        // delete the group (gone from roster)
         Groups.deleteGroup(apiBase, owner, tid, gScope)
         assertNull(firstWithScope(SwitchActiveSpace.listMySpaces(apiBase, owner), gScope))
+
+        // schedule the tenant for deletion → it stays on the roster but carries a deadline (grace period)
         Groups.deleteTenant(apiBase, owner, tid)
+        val scheduled = firstOfKind(SwitchActiveSpace.listMySpaces(apiBase, owner), "TENANT")
+        assertNotNull(scheduled)
+        assertNotNull(scheduled.optString("scheduledDeletionAt").ifEmpty { null })
+
+        // owner cancels → the deadline clears, personal remains
+        Groups.cancelTenantDeletion(apiBase, owner, tid)
         val after = SwitchActiveSpace.listMySpaces(apiBase, owner)
-        assertNull(firstOfKind(after, "TENANT"))
+        assertNull(firstOfKind(after, "TENANT")?.optString("scheduledDeletionAt")?.ifEmpty { null })
         assertNotNull(firstOfKind(after, "PERSONAL"))
     }
 }

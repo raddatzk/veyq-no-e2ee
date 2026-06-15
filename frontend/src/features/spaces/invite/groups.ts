@@ -35,8 +35,18 @@ export async function inviteToGroup(apiBase: string, session: UnlockedSession, t
   return buildInviteLink(origin, { inviteId: invite.inviteId, bootstrapSecret: invite.bootstrapSecret, tempPrivateKey: invite.tempPrivateKey })
 }
 
-/** Delete a tenant (workspace) and everything it owns — its scope, all groups, members, invites. Owner only. */
+/**
+ * Schedule a tenant (workspace) for deletion after a grace period. Owner only. The tenant stays usable
+ * until the deadline (members secure their data), then the server GC purges it — scope, groups, members,
+ * invites. Idempotent; the deadline is exposed on the roster as scheduledDeletionAt.
+ */
 export async function deleteTenant(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}`, { method: 'DELETE', headers: { authorization: `Bearer ${session.sessionToken}` } })
   if (!res.ok) throw new Error(`delete tenant failed: ${res.status} ${await res.text()}`)
+}
+
+/** Cancel a scheduled tenant deletion (clears the deadline). Owner only. */
+export async function cancelTenantDeletion(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/tenants/${tenantId}/cancel-deletion`, { method: 'POST', headers: { authorization: `Bearer ${session.sessionToken}` } })
+  if (!res.ok) throw new Error(`cancel tenant deletion failed: ${res.status} ${await res.text()}`)
 }

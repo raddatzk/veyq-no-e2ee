@@ -109,8 +109,16 @@ object Groups {
         if (code != 204) throw RuntimeException("delete media failed: $code $body")
     }
 
+    /** Schedule a tenant for deletion after a grace period (owner only). It stays usable until the deadline,
+     *  then the server GC purges it. Idempotent. */
     fun deleteTenant(apiBase: String, session: Login.UnlockedSession, tenantId: String) {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId", session.sessionToken, "DELETE")
         if (code != 204) throw RuntimeException("delete tenant failed: $code $body")
+    }
+
+    /** Cancel a scheduled tenant deletion — clears the deadline (owner only). */
+    fun cancelTenantDeletion(apiBase: String, session: Login.UnlockedSession, tenantId: String) {
+        val (code, body) = send(apiBase, "/api/tenants/$tenantId/cancel-deletion", session.sessionToken, "POST")
+        if (code != 204) throw RuntimeException("cancel tenant deletion failed: $code $body")
     }
 }

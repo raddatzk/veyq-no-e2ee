@@ -51,13 +51,21 @@ final class GroupsE2ETests: XCTestCase {
         let promoted = try await Groups.setGroupMemberRole(apiBase: apiBase, session: owner, tenantId: tenant.id, scopeId: group.scopeId, userId: bob.user.id, role: "GroupOwner")
         XCTAssertEqual(promoted.role, "GroupOwner")
 
-        // delete the group (gone from roster), then the tenant (TENANT gone, personal remains)
+        // delete the group (gone from roster)
         try await Groups.deleteGroup(apiBase: apiBase, session: owner, tenantId: tenant.id, scopeId: group.scopeId)
         let afterGroupDelete = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: owner).first { $0.scopeId == group.scopeId }
         XCTAssertNil(afterGroupDelete)
+
+        // schedule the tenant for deletion → it stays on the roster but carries a deadline (grace period)
         try await Groups.deleteTenant(apiBase: apiBase, session: owner, tenantId: tenant.id)
+        let scheduled = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: owner).first { $0.kind == "TENANT" }
+        XCTAssertNotNil(scheduled)
+        XCTAssertNotNil(scheduled?.scheduledDeletionAt)
+
+        // owner cancels → the deadline clears, personal remains
+        try await Groups.cancelTenantDeletion(apiBase: apiBase, session: owner, tenantId: tenant.id)
         let after = try await SwitchActiveSpace.listMySpaces(apiBase: apiBase, session: owner)
-        XCTAssertNil(after.first { $0.kind == "TENANT" })
+        XCTAssertNil(after.first { $0.kind == "TENANT" }?.scheduledDeletionAt)
         XCTAssertNotNil(after.first { $0.kind == "PERSONAL" })
     }
 }

@@ -4,6 +4,7 @@ import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { enterSpace, loadCover, loadLevel, loadMemoryById, loadSpaces, type ActiveSpace, type LevelEntry, type SpaceEntry } from '../../features/home/home'
 import { deleteNode, reorderNode } from '../../features/memory/curate/curate'
+import { cancelTenantDeletion } from '../../features/spaces/invite/groups'
 import type { SearchHit } from '../../features/search/search'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
 import MemoryDetailView from './MemoryDetailView.vue'
@@ -65,10 +66,11 @@ async function onGroupDeleted() {
 }
 
 async function onTenantDeleted() {
+  // Deletion is only *scheduled* (grace period) — the tenant stays usable, so keep the user in it and
+  // re-select it to surface the scheduled-deletion banner with its cancel action.
   const tid = inviteTarget.value?.tenantId
   inviteTarget.value = null
-  if (active.value?.entry.tenantId === tid) active.value = null
-  await reloadSpaces()
+  await reloadSpaces(tid)
 }
 
 async function reloadSpaces(selectTenantId?: string) {
@@ -188,6 +190,17 @@ function spaceSub(s: SpaceEntry): string {
   return s.kind === 'PERSONAL' ? t('home.personal') : (s.role ?? t('home.group'))
 }
 
+async function cancelDeletion() {
+  const entry = active.value?.entry
+  if (!entry?.tenantId || !session.unlocked) return
+  try {
+    await cancelTenantDeletion(apiBase, session.unlocked, entry.tenantId)
+    await reloadSpaces(entry.tenantId)
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
 const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
 const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
 const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
@@ -252,6 +265,10 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <SearchOverlay v-if="searchOpen && active" :active="active" @close="searchOpen = false" @select="onSearchSelect" />
 
     <main class="home-content">
+      <div v-if="active?.entry.scheduledDeletionAt" class="deletion-banner">
+        <span class="deletion-banner-text">{{ t('delete.scheduledBanner', { date: new Date(active.entry.scheduledDeletionAt).toLocaleDateString() }) }}</span>
+        <button v-if="active.entry.role === 'Owner'" class="btn btn-ghost deletion-banner-cancel" type="button" @click="cancelDeletion">{{ t('delete.cancelDeletion') }}</button>
+      </div>
       <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="selectedMemory = null" />
       <template v-else>
         <div v-if="error" class="home-empty">{{ error }}</div>

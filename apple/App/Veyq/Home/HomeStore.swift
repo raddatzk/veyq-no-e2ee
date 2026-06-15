@@ -153,13 +153,29 @@ final class HomeStore: ObservableObject {
         } catch { self.error = "Konnte Gruppe nicht löschen." }
     }
 
+    /// Schedule a tenant for deletion (grace period). It stays usable, so keep the user in it and refresh
+    /// the roster — the scheduled-deletion banner then surfaces with its cancel action.
     func deleteTenant(_ entry: SwitchActiveSpace.SpaceEntry) async {
         guard let tid = entry.tenantId else { return }
         do {
             try await Groups.deleteTenant(apiBase: apiBase, session: session, tenantId: tid)
-            await afterSpaceDeleted(scopeId: entry.scopeId)
+            await refreshSpaces()
+            if let fresh = spaces.first(where: { $0.scopeId == entry.scopeId }) { await switchSpace(fresh) }
         } catch { self.error = "Konnte Tenant nicht löschen." }
     }
+
+    /// Cancel a scheduled tenant deletion and refresh so the banner clears.
+    func cancelTenantDeletion(_ entry: SwitchActiveSpace.SpaceEntry) async {
+        guard let tid = entry.tenantId else { return }
+        do {
+            try await Groups.cancelTenantDeletion(apiBase: apiBase, session: session, tenantId: tid)
+            await refreshSpaces()
+            if let fresh = spaces.first(where: { $0.scopeId == entry.scopeId }) { await switchSpace(fresh) }
+        } catch { self.error = "Konnte Löschung nicht abbrechen." }
+    }
+
+    /// The currently active space entry (for surfaces like the scheduled-deletion banner).
+    var activeEntry: SwitchActiveSpace.SpaceEntry? { spaces.first { $0.scopeId == activeScopeId } }
 
     func switchSpace(_ entry: SwitchActiveSpace.SpaceEntry) async {
         do {

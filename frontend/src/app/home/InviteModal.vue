@@ -6,7 +6,7 @@ import { inviteToGroup } from '../../features/spaces/invite/groups'
 import { getTenantTerms, setTenantTerms } from '../../features/memory/share/share'
 import { TERMS_CLAUSES } from '../../features/memory/share/termsTemplate'
 import { changeMemberRole, listTenantMembers, removeMember, rotateScope, type MemberRole, type TenantMember } from '../../features/admin/inviteMembersRoles/inviteMembers'
-import { deleteTenant } from '../../features/spaces/invite/groups'
+import { deleteTenant, cancelTenantDeletion } from '../../features/spaces/invite/groups'
 import ConfirmDeleteModal from './ConfirmDeleteModal.vue'
 import type { SpaceEntry } from '../../features/home/home'
 
@@ -18,6 +18,16 @@ async function doDeleteTenant() {
   if (!session.unlocked || !props.space.tenantId) return
   try {
     await deleteTenant(session.apiBase, session.unlocked, props.space.tenantId)
+    emit('deleted')
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
+async function doCancelDeletion() {
+  if (!session.unlocked || !props.space.tenantId) return
+  try {
+    await cancelTenantDeletion(session.apiBase, session.unlocked, props.space.tenantId)
     emit('deleted')
   } catch (e) {
     error.value = (e as Error).message
@@ -195,7 +205,14 @@ async function copy() {
       </template>
       <button v-else class="btn btn-ghost invite-gen" type="button" @click="openMembers">{{ t('members.manage') }}</button>
 
-      <button class="btn btn-ghost invite-gen" type="button" style="color: var(--app-danger)" @click="confirmDelete = true">{{ t('delete.tenant') }}</button>
+      <template v-if="space.scheduledDeletionAt">
+        <p class="invite-hint">{{ t('delete.scheduledBanner', { date: new Date(space.scheduledDeletionAt).toLocaleDateString() }) }}</p>
+        <button class="btn btn-ghost invite-gen" type="button" @click="doCancelDeletion">{{ t('delete.cancelDeletion') }}</button>
+      </template>
+      <template v-else>
+        <p class="invite-hint">{{ t('delete.tenantWarning') }}</p>
+        <button class="btn btn-ghost invite-gen" type="button" style="color: var(--app-danger)" @click="confirmDelete = true">{{ t('delete.tenant') }}</button>
+      </template>
     </div>
     <ConfirmDeleteModal v-if="confirmDelete" :name="space.displayName" @close="confirmDelete = false" @confirm="doDeleteTenant" />
   </div>

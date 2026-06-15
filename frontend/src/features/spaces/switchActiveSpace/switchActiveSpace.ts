@@ -12,6 +12,8 @@ export type SpaceEntry = {
   role?: string
   // GROUP only — the group name sealed under its content key (the client decrypts it into displayName).
   sealedName?: { suiteId: string; bytes: string }
+  // TENANT only — set when the tenant is scheduled for deletion; the client shows a warning + cancel.
+  scheduledDeletionAt?: string
   scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
 }
