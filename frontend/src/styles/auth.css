@@ -147,6 +147,27 @@
   font-size: 0.82rem;
 }
 
+.open-in-app {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+.open-in-app-text { flex: 1; font-size: 0.82rem; color: var(--app-muted); }
+.open-in-app-btn { padding: 0.4rem 0.7rem; font-size: 0.82rem; text-decoration: none; }
+.open-in-app-x {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
 .qr-scan-overlay {
   position: fixed;
   inset: 0;

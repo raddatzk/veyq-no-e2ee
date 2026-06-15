@@ -10,6 +10,16 @@ export function buildInviteLink(origin: string, p: InviteParts): string {
   return `${origin.replace(/\/$/, '')}/#${frag.toString()}`
 }
 
+/**
+ * Build the native deep link that opens this invite in the veyq mobile app: `veyq://invite#…&api=<origin>`.
+ * The instance origin rides along (in `api`) so the app — which may face many self-hosted instances — knows
+ * which backend to register against. Everything stays in the fragment, so no secret hits any server.
+ */
+export function buildInviteDeepLink(origin: string, p: InviteParts): string {
+  const frag = new URLSearchParams({ invite: p.inviteId, s: p.bootstrapSecret, k: p.tempPrivateKey, api: origin.replace(/\/$/, '') })
+  return `veyq://invite#${frag.toString()}`
+}
+
 /** Parse an invite out of a URL fragment (e.g. window.location.hash), or null if it isn't one. */
 export function parseInviteHash(hash: string): InviteParts | null {
   const h = hash.startsWith('#') ? hash.slice(1) : hash

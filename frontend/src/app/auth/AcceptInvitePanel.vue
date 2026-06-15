@@ -8,6 +8,7 @@ import { login } from '../../features/account/login/login'
 import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
 import type { InviteParts } from '../../features/spaces/invite/inviteLink'
 import LoginPanel from './LoginPanel.vue'
+import OpenInApp from './OpenInApp.vue'
 
 const props = defineProps<{ invite: InviteParts }>()
 const emit = defineEmits<{ done: [tenantId: string]; dismiss: [] }>()
@@ -104,6 +105,7 @@ async function proceed() {
 
         <!-- not signed in: create an account, or sign in to an existing one -->
         <template v-else>
+          <OpenInApp :invite="props.invite" />
           <div class="seg accept-modes">
             <button type="button" :class="{ active: mode === 'register' }" @click="mode = 'register'">{{ t('accept.createAccount') }}</button>
             <button type="button" :class="{ active: mode === 'signin' }" @click="mode = 'signin'">{{ t('accept.haveAccount') }}</button>
