@@ -11,6 +11,7 @@ import com.veyq.app.generated.model.KemPublicKey
 import com.veyq.app.generated.model.SetGroupRoleRequest
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.identity.UserRepository
+import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.content.ScopeContentKey
 import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
@@ -45,6 +46,7 @@ class GroupProvisioningHandler(
     private val contentKeys: ScopeContentKeyRepository,
     private val groupMembers: GroupMembershipRepository,
     private val users: UserRepository,
+    private val purge: ContentPurge,
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -88,6 +90,14 @@ class GroupProvisioningHandler(
             toSummary(scope, gm.role)
         }
         return GroupList(groups = groups)
+    }
+
+    /** Delete a group and all its content. GroupOwner only; the tenant and other groups are untouched. */
+    @Transactional
+    fun deleteGroup(auth: String?, tenantId: String, scopeId: String) {
+        requireGroupOwner(tenantId, scopeId, auth)
+        groupMembers.deleteByScopeId(scopeId) // FK references the scope — clear before purgeScope drops it
+        purge.purgeScope(scopeId)
     }
 
     @Transactional

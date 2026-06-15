@@ -16,6 +16,11 @@ class GroupsResource(private val handler: GroupProvisioningHandler) : GroupsApi 
     override fun createGroup(authorization: String, tenantId: String, createGroupRequest: CreateGroupRequest): Response =
         Response.ok(handler.createGroup(authorization, tenantId, createGroupRequest)).build()
 
+    override fun deleteGroup(authorization: String, tenantId: String, scopeId: String): Response {
+        handler.deleteGroup(authorization, tenantId, scopeId)
+        return Response.noContent().build()
+    }
+
     override fun listGroupMembers(authorization: String, tenantId: String, scopeId: String): Response =
         Response.ok(handler.listGroupMembers(authorization, tenantId, scopeId)).build()
 

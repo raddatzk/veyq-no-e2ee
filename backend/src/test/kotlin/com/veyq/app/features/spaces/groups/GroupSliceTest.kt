@@ -84,6 +84,27 @@ class GroupSliceTest {
             .patch("/api/tenants/$tenantId/groups/$scopeId/members/$userId").then()
 
     @Test
+    fun deletesGroupAsGroupOwnerOnly() {
+        val scopeId = createGroup()
+        addMember(ownerToken, scopeId, "gsl-member").statusCode(200)
+
+        // a plain GroupMember cannot delete
+        given().header("Authorization", memberToken).delete("/api/tenants/$tenantId/groups/$scopeId")
+            .then().statusCode(403)
+        given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId/groups/$scopeId")
+            .then().statusCode(204)
+
+        QuarkusTransaction.requiringNew().run {
+            assertEquals(null, scopes.findById(scopeId))
+            assertEquals(null, contentKeys.findByScopeId(scopeId))
+            assertEquals(null, groupMembers.find(scopeId, "gsl-owner"))
+            assertEquals(null, grants.find(scopeId, "gsl-member"))
+            // the tenant-wide scope is untouched
+            assertNotNull(scopes.findById(tenantScopeId))
+        }
+    }
+
+    @Test
     fun managesMembersAndRolesWithLastOwnerGuard() {
         val scopeId = createGroup()
 
