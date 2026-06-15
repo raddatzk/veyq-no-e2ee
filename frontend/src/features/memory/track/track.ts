@@ -1,0 +1,58 @@
+// uc.memory.track (web) — a Memory's GPX tracks are {name, points} routes sealed under the scope content key
+// (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only; we
+// seal before POST and open after GET. Route location data is sensitive, so it never leaves the client clear.
+import * as v1 from '../../../shared/crypto/v1'
+import type { UnlockedSession } from '../../account/login/login'
+import type { ActiveSpace } from '../../home/home'
+import type { GpxTrack } from './gpx'
+
+const EMPTY = new Uint8Array(0)
+
+function b64url(b: Uint8Array): string {
+  let s = ''
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+function fromB64url(s: string): Uint8Array {
+  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
+  const out = new Uint8Array(b.length)
+  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
+  return out
+}
+
+export type Track = { id: string; name: string; points: { lat: number; lng: number }[] }
+
+/** List + decrypt a memory's tracks. */
+export async function getTracks(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Track[]> {
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
+    headers: { authorization: `Bearer ${session.sessionToken}` },
+  })
+  if (!res.ok) throw new Error(`list tracks failed: ${res.status} ${await res.text()}`)
+  const { tracks } = await res.json()
+  return tracks.map((t: { id: string; sealedContent: { bytes: string } }) => {
+    const sealed = fromB64url(t.sealedContent.bytes)
+    const route: GpxTrack = JSON.parse(new TextDecoder().decode(v1.aeadOpen(active.contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY)))
+    return { id: t.id, name: route.name, points: route.points }
+  })
+}
+
+/** Seal a parsed GPX route and store it as a new track. */
+export async function createTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, route: GpxTrack): Promise<void> {
+  const nonce = v1.randomBytes(12)
+  const sealed = v1.concat(nonce, v1.aeadSeal(active.contentKey, nonce, v1.utf8(JSON.stringify(route)), EMPTY))
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
+    body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
+  })
+  if (!res.ok) throw new Error(`create track failed: ${res.status} ${await res.text()}`)
+}
+
+/** Remove a track. */
+export async function deleteTrack(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string, trackId: string): Promise<void> {
+  const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks/${trackId}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${session.sessionToken}` },
+  })
+  if (!res.ok) throw new Error(`delete track failed: ${res.status} ${await res.text()}`)
+}

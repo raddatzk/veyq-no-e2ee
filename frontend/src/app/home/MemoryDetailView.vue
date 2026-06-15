@@ -10,6 +10,8 @@ import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
 import { getJournal, updateJournal } from '../../features/memory/journal/journal'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
+import { createTrack, deleteTrack, getTracks, type Track } from '../../features/memory/track/track'
+import { parseGpx } from '../../features/memory/track/gpx'
 import DownloadModal from './DownloadModal.vue'
 import MemoryMap from './MemoryMap.vue'
 import type { ActiveSpace, MemoryNode } from '../../features/home/home'
@@ -32,6 +34,11 @@ const journalDraft = ref('')
 const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalLoaded = ref(false)
+const tracks = ref<Track[]>([])
+const tracksLoaded = ref(false)
+const importing = ref(false)
+const gpxInput = ref<HTMLInputElement | null>(null)
+const error = ref('')
 let ro: ResizeObserver | null = null
 
 // Group the (takenAt-ordered) tiles into day buckets, each with its own justified layout — a dated timeline.
@@ -56,6 +63,35 @@ const geoPoints = computed(() =>
 function openMapPin(id: string) {
   const tile = tileById.value[id]
   if (tile) openLightbox(tile)
+}
+
+async function openMap() {
+  tab.value = 'map'
+  if (tracksLoaded.value) return
+  try {
+    tracks.value = await getTracks(session.apiBase, session.unlocked!, props.active, props.memory.id)
+  } finally {
+    tracksLoaded.value = true
+  }
+}
+async function onGpxPicked(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  importing.value = true
+  try {
+    const route = parseGpx(await file.text())
+    await createTrack(session.apiBase, session.unlocked!, props.active, props.memory.id, route)
+    tracks.value = await getTracks(session.apiBase, session.unlocked!, props.active, props.memory.id)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    importing.value = false
+    if (gpxInput.value) gpxInput.value.value = ''
+  }
+}
+async function removeTrack(id: string) {
+  await deleteTrack(session.apiBase, session.unlocked!, props.active, props.memory.id, id)
+  tracks.value = tracks.value.filter((t) => t.id !== id)
 }
 
 async function openJournal() {
@@ -152,7 +188,7 @@ async function setAsCover() {
     <div class="detail-tabs">
       <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">{{ t('detail.gallery') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openJournal">{{ t('detail.journal') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'map' }" @click="tab = 'map'">{{ t('detail.map') }}</button>
+      <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openMap">{{ t('detail.map') }}</button>
     </div>
 
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
@@ -175,8 +211,21 @@ async function setAsCover() {
     </section>
 
     <section v-if="tab === 'map'" class="memory-map-wrap">
-      <MemoryMap v-if="geoPoints.length" :points="geoPoints" @select="openMapPin" />
+      <div class="map-bar">
+        <button class="btn btn-ghost" type="button" :disabled="importing" @click="gpxInput?.click()">
+          {{ importing ? t('track.importing') : t('track.import') }}
+        </button>
+        <input ref="gpxInput" type="file" accept=".gpx,application/gpx+xml,application/xml" hidden @change="onGpxPicked" />
+      </div>
+      <div v-if="error" class="home-empty">{{ error }}</div>
+      <MemoryMap v-if="geoPoints.length || tracks.length" :points="geoPoints" :tracks="tracks" @select="openMapPin" />
       <div v-else class="home-empty">{{ t('map.empty') }}</div>
+      <ul v-if="tracks.length" class="track-list">
+        <li v-for="tr in tracks" :key="tr.id" class="track-row">
+          <span class="track-name">🛤 {{ tr.name }}</span>
+          <button class="btn btn-ghost track-del" type="button" @click="removeTrack(tr.id)">{{ t('track.delete') }}</button>
+        </li>
+      </ul>
     </section>
 
     <div v-if="tab === 'gallery' && dateRange" class="detail-daterange">{{ dateRange }}</div>
