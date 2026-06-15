@@ -147,6 +147,75 @@ paths:
       responses:
         '200': { description: The frame ciphertext., content: { application/json: { schema: { $ref: '#/components/schemas/ChunkResponse' } } } }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blobs:
+    post:
+      tags: [PublicShareContribute]
+      operationId: startShareBlob
+      summary: Begin (or dedup) a guest blob upload (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StartBlobRequest' } } }
+      responses:
+        '200': { description: A blob ticket., content: { application/json: { schema: { $ref: '#/components/schemas/BlobTicket' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blob-uploads/{uploadId}:
+    get:
+      tags: [PublicShareContribute]
+      operationId: getShareUpload
+      summary: A guest blob upload's progress (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Upload progress., content: { application/json: { schema: { $ref: '#/components/schemas/BlobUploadProgress' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blob-uploads/{uploadId}/chunks/{index}:
+    put:
+      tags: [PublicShareContribute]
+      operationId: putShareChunk
+      summary: Upload one AEAD frame of a guest blob (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+        - { name: index, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PutChunkRequest' } } }
+      responses:
+        '204': { description: Stored. }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/blob-uploads/{uploadId}/complete:
+    post:
+      tags: [PublicShareContribute]
+      operationId: completeShareBlob
+      summary: Finalize a guest blob upload (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The finalized blob., content: { application/json: { schema: { $ref: '#/components/schemas/CompleteBlobResponse' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/contributed-media:
+    post:
+      tags: [PublicShareContribute]
+      operationId: createShareMedia
+      summary: Attach a guest-uploaded blob as media on a shared node (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateMediaRequest' } } }
+      responses:
+        '200': { description: The created media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaItem' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     StartBlobRequest:

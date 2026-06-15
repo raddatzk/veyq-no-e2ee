@@ -41,6 +41,11 @@ class JournalHandler(
     @Transactional
     fun getJournal(auth: String?, scopeId: String, nodeId: String): ApiMemoryJournal {
         requireKeyHolder(scopeId, auth)
+        return getJournalAs(scopeId, nodeId)
+    }
+
+    @Transactional
+    fun getJournalAs(scopeId: String, nodeId: String): ApiMemoryJournal {
         requireJournalNode(scopeId, nodeId)
         val journal = journals.findById(nodeId)
         return if (journal == null) ApiMemoryJournal(nodeId = nodeId) else toApi(journal)
@@ -49,6 +54,12 @@ class JournalHandler(
     @Transactional
     fun updateJournal(auth: String?, scopeId: String, nodeId: String, req: UpdateMemoryJournalRequest): ApiMemoryJournal {
         requireKeyHolder(scopeId, auth)
+        return updateJournalAs(scopeId, nodeId, req)
+    }
+
+    /** Replace a journal for an already-authorized writer (a session key holder or a CONTRIBUTOR share). */
+    @Transactional
+    fun updateJournalAs(scopeId: String, nodeId: String, req: UpdateMemoryJournalRequest): ApiMemoryJournal {
         requireJournalNode(scopeId, nodeId)
         if (!suites.isKnown(req.sealedContent.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
         val journal = journals.findById(nodeId) ?: MemoryJournal().apply { this.nodeId = nodeId; this.scopeId = scopeId }

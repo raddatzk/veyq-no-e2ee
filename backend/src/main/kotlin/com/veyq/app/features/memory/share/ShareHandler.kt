@@ -5,6 +5,7 @@ import com.veyq.app.generated.model.CreateShareRequest
 import com.veyq.app.generated.model.MemoryNode
 import com.veyq.app.generated.model.NodeType
 import com.veyq.app.generated.model.ShareList
+import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.ShareSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.Node
@@ -59,7 +60,7 @@ class ShareHandler(
         val share = Share().apply {
             id = enc.encodeToString(bytes); this.scopeId = scopeId; this.nodeId = nodeId
             suiteId = req.wrappedContentKey.suiteId; wrappedContentKey = dec.decode(req.wrappedContentKey.bytes)
-            createdBy = userId; createdAt = Instant.now()
+            role = (req.role ?: ShareRole.VIEWER).value; createdBy = userId; createdAt = Instant.now()
         }
         shares.persist(share)
         return toSummary(share)
@@ -80,7 +81,7 @@ class ShareHandler(
     }
 
     private fun toSummary(s: Share): ShareSummary =
-        ShareSummary(shareId = s.id, nodeId = s.nodeId, createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC))
+        ShareSummary(shareId = s.id, nodeId = s.nodeId, role = ShareRole.valueOf(s.role), createdAt = OffsetDateTime.ofInstant(s.createdAt, ZoneOffset.UTC))
 
     private fun requireKeyHolder(scopeId: String, auth: String?): String {
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")

@@ -57,6 +57,12 @@ class BlobUploadHandler(
     @Transactional
     fun startBlob(authz: String?, scopeId: String, req: StartBlobRequest): BlobTicket {
         requireKeyHolder(scopeId, authz)
+        return startBlobAs(scopeId, auth.resolve(authz)!!, req)
+    }
+
+    /** Start a blob upload for an already-authorized writer (session key holder or a CONTRIBUTOR share). */
+    @Transactional
+    fun startBlobAs(scopeId: String, writerId: String, req: StartBlobRequest): BlobTicket {
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before uploading")
         if (req.totalChunks <= 0 || req.totalChunks > maxChunks) throw ApiException(400, "INVALID_CHUNK_COUNT", "totalChunks out of range")
         if (req.byteSize < 0 || req.byteSize > maxUploadBytes) throw ApiException(400, "INVALID_SIZE", "byteSize out of range")
@@ -68,11 +74,10 @@ class BlobUploadHandler(
         if (uploads.countOpenByScope(scopeId) >= maxOpenSessions) {
             throw ApiException(429, "TOO_MANY_OPEN_UPLOADS", "Too many in-progress uploads — finish or abandon some first")
         }
-        val userId = auth.resolve(authz)!!
         val u = BlobUpload().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = req.dedupToken
             totalChunks = req.totalChunks; byteSize = req.byteSize; status = UploadStatus.OPEN.name
-            createdBy = userId; createdAt = Instant.now()
+            createdBy = writerId; createdAt = Instant.now()
         }
         uploads.persist(u)
         return BlobTicket(status = BlobTicket.Status.UPLOADING, uploadId = u.id, totalChunks = u.totalChunks)
@@ -80,7 +85,13 @@ class BlobUploadHandler(
 
     @Transactional
     fun putBlobChunk(authz: String?, scopeId: String, uploadId: String, index: Int, req: PutChunkRequest) {
-        val u = requireUploadHolder(scopeId, uploadId, authz, lock = true)
+        requireKeyHolder(scopeId, authz)
+        putBlobChunkAs(scopeId, uploadId, index, req)
+    }
+
+    @Transactional
+    fun putBlobChunkAs(scopeId: String, uploadId: String, index: Int, req: PutChunkRequest) {
+        val u = requireUploadInScope(scopeId, uploadId, lock = true)
         if (u.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
         if (index < 0 || index >= u.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
         if (req.frame.suiteId != "v1") throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
@@ -103,7 +114,13 @@ class BlobUploadHandler(
 
     @Transactional
     fun getBlobUpload(authz: String?, scopeId: String, uploadId: String): BlobUploadProgress {
-        val u = requireUploadHolder(scopeId, uploadId, authz)
+        requireKeyHolder(scopeId, authz)
+        return getBlobUploadAs(scopeId, uploadId)
+    }
+
+    @Transactional
+    fun getBlobUploadAs(scopeId: String, uploadId: String): BlobUploadProgress {
+        val u = requireUploadInScope(scopeId, uploadId)
         return BlobUploadProgress(
             uploadId = u.id, totalChunks = u.totalChunks,
             receivedChunks = chunks.listByUploadId(uploadId).map { it.chunkIndex },
@@ -113,7 +130,13 @@ class BlobUploadHandler(
 
     @Transactional
     fun completeBlobUpload(authz: String?, scopeId: String, uploadId: String): CompleteBlobResponse {
-        val u = requireUploadHolder(scopeId, uploadId, authz, lock = true)
+        requireKeyHolder(scopeId, authz)
+        return completeBlobUploadAs(scopeId, uploadId)
+    }
+
+    @Transactional
+    fun completeBlobUploadAs(scopeId: String, uploadId: String): CompleteBlobResponse {
+        val u = requireUploadInScope(scopeId, uploadId, lock = true)
         if (u.status == UploadStatus.COMPLETED.name) {
             val b = blobs.findById(u.blobId!!)!!
             return CompleteBlobResponse(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
@@ -171,11 +194,10 @@ class BlobUploadHandler(
         }
     }
 
-    private fun requireUploadHolder(scopeId: String, uploadId: String, authz: String?, lock: Boolean = false): BlobUpload {
+    private fun requireUploadInScope(scopeId: String, uploadId: String, lock: Boolean = false): BlobUpload {
         val u = (if (lock) uploads.lockById(uploadId) else uploads.findById(uploadId))
             ?: throw ApiException(404, "UPLOAD_NOT_FOUND", "Upload not found")
         if (u.scopeId != scopeId) throw ApiException(404, "UPLOAD_NOT_FOUND", "Upload not found in this scope")
-        requireKeyHolder(scopeId, authz)
         return u
     }
 

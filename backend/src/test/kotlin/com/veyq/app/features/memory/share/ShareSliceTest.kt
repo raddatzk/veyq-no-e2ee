@@ -105,8 +105,50 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes/shr-other/media").then().statusCode(404)
         given().get("/api/public/shares/$shareId/blobs/shr-b2/chunks/0").then().statusCode(404)
 
+        // a VIEWER share rejects guest writes (read-only)
+        given().contentType(ContentType.JSON).body("""{"dedupToken":"x","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_READ_ONLY"))
+        given().contentType(ContentType.JSON).body("""{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""")
+            .put("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(403)
+
         // revoke; the share (and guest access) is gone
         given().header("Authorization", ownerToken).delete("/api/scopes/$scopeId/nodes/shr-mem/shares/$shareId").then().statusCode(204)
         given().get("/api/public/shares/$shareId").then().statusCode(404)
+    }
+
+    @Test
+    fun contributorGuestUploadsMediaAndWritesJournal() {
+        // a CONTRIBUTOR share lets a guest contribute
+        val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .post("/api/scopes/$scopeId/nodes/shr-mem/shares").then().statusCode(200)
+            .body("role", `is`("CONTRIBUTOR")).extract().path<String>("shareId")
+
+        // the guest uploads a one-frame blob through the shared blob path (no auth)
+        val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"guest-1","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$shareId/blobs").then().statusCode(200).body("status", `is`("UPLOADING"))
+            .extract().path<String>("uploadId")
+        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+            .put("/api/public/shares/$shareId/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
+        val blobId = given().post("/api/public/shares/$shareId/blob-uploads/$uploadId/complete").then().statusCode(200)
+            .extract().path<String>("blobId")
+
+        // and attaches it as media on the shared memory
+        given().contentType(ContentType.JSON)
+            .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
+            .post("/api/public/shares/$shareId/nodes/shr-mem/contributed-media").then().statusCode(200)
+        // the shared gallery now lists the owner's medium + the guest's
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/media").then().statusCode(200).body("media.size()", `is`(2))
+
+        // the guest writes the journal, then reads it back
+        given().contentType(ContentType.JSON).body("""{"sealedContent":{"suiteId":"v1","bytes":"am91cm5hbA"}}""")
+            .put("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(200)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(200)
+            .body("sealedContent.bytes", `is`("am91cm5hbA"))
+
+        // a guest still cannot contribute outside the subtree
+        given().contentType(ContentType.JSON)
+            .body("""{"originalBlobId":"$blobId","sealedMeta":{"suiteId":"v1","bytes":"bWV0YQ"},"mimeType":"image/jpeg"}""")
+            .post("/api/public/shares/$shareId/nodes/shr-other/contributed-media").then().statusCode(404)
     }
 }

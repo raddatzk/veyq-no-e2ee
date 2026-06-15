@@ -20,6 +20,7 @@ class Share {
     @Column(name = "node_id", nullable = false) var nodeId: String = ""
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "wrapped_content_key", nullable = false) var wrappedContentKey: ByteArray = ByteArray(0)
+    @Column(nullable = false) var role: String = "VIEWER"
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }

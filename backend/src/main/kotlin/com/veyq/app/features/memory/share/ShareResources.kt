@@ -1,9 +1,14 @@
 package com.veyq.app.features.memory.share
 
 import com.veyq.app.generated.api.MemoryShareApi
+import com.veyq.app.generated.api.PublicShareContributeApi
 import com.veyq.app.generated.api.PublicShareMediaApi
 import com.veyq.app.generated.api.PublicShareTreeApi
+import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.CreateShareRequest
+import com.veyq.app.generated.model.PutChunkRequest
+import com.veyq.app.generated.model.StartBlobRequest
+import com.veyq.app.generated.model.UpdateMemoryJournalRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -22,11 +27,35 @@ class ShareResource(private val handler: ShareHandler) : MemoryShareApi {
     }
 }
 
-/** Guest-side share tree (no auth). */
+/** Guest-side share tree + journal (no auth). */
 @ApplicationScoped
 class PublicShareTreeResource(private val handler: PublicShareTreeHandler) : PublicShareTreeApi {
     override fun getPublicShare(shareId: String): Response = Response.ok(handler.getPublicShare(shareId)).build()
     override fun listShareNodes(shareId: String): Response = Response.ok(handler.listShareNodes(shareId)).build()
+    override fun getShareJournal(shareId: String, nodeId: String): Response = Response.ok(handler.getShareJournal(shareId, nodeId)).build()
+    override fun updateShareJournal(shareId: String, nodeId: String, updateMemoryJournalRequest: UpdateMemoryJournalRequest): Response =
+        Response.ok(handler.updateShareJournal(shareId, nodeId, updateMemoryJournalRequest)).build()
+}
+
+/** Guest-side contribution: blob upload + media create (no auth, CONTRIBUTOR shares only). */
+@ApplicationScoped
+class PublicShareContributeResource(private val handler: PublicShareContributeHandler) : PublicShareContributeApi {
+    override fun startShareBlob(shareId: String, startBlobRequest: StartBlobRequest): Response =
+        Response.ok(handler.startShareBlob(shareId, startBlobRequest)).build()
+
+    override fun getShareUpload(shareId: String, uploadId: String): Response =
+        Response.ok(handler.getShareUpload(shareId, uploadId)).build()
+
+    override fun putShareChunk(shareId: String, uploadId: String, index: Int, putChunkRequest: PutChunkRequest): Response {
+        handler.putShareChunk(shareId, uploadId, index, putChunkRequest)
+        return Response.noContent().build()
+    }
+
+    override fun completeShareBlob(shareId: String, uploadId: String): Response =
+        Response.ok(handler.completeShareBlob(shareId, uploadId)).build()
+
+    override fun createShareMedia(shareId: String, nodeId: String, createMediaRequest: CreateMediaRequest): Response =
+        Response.ok(handler.createShareMedia(shareId, nodeId, createMediaRequest)).build()
 }
 
 /** Guest-side share media + blob frames (no auth). */

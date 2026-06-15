@@ -56,6 +56,12 @@ class MediaHandler(
     @Transactional
     fun createMedia(auth: String?, scopeId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
         requireKeyHolder(scopeId, auth)
+        return createMediaAs(scopeId, nodeId, req)
+    }
+
+    /** Attach media for an already-authorized writer (a session key holder or a CONTRIBUTOR share). */
+    @Transactional
+    fun createMediaAs(scopeId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
         requireMemoryNode(scopeId, nodeId)
         requireBlob(scopeId, req.originalBlobId)
         if (!suites.isKnown(req.sealedMeta.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")

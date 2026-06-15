@@ -255,6 +255,31 @@ paths:
       responses:
         '200': { description: The subtree nodes., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryNodeList' } } } }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/journal:
+    get:
+      tags: [PublicShareTree]
+      operationId: getShareJournal
+      summary: A shared node's journal (ciphertext, no auth — any share role may read).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    put:
+      tags: [PublicShareTree]
+      operationId: updateShareJournal
+      summary: Replace a shared node's journal (no auth — CONTRIBUTOR shares only).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateMemoryJournalRequest' } } }
+      responses:
+        '200': { description: The updated journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:
@@ -333,17 +358,22 @@ components:
       required: [sealedContent]
       properties:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    ShareRole:
+      type: string
+      enum: [VIEWER, CONTRIBUTOR]
     CreateShareRequest:
       type: object
       required: [wrappedContentKey]
       properties:
         wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        role: { $ref: '#/components/schemas/ShareRole' }
     ShareSummary:
       type: object
-      required: [shareId, nodeId, createdAt]
+      required: [shareId, nodeId, role, createdAt]
       properties:
         shareId: { type: string }
         nodeId: { type: string }
+        role: { $ref: '#/components/schemas/ShareRole' }
         createdAt: { type: string, format: date-time }
     ShareList:
       type: object
@@ -354,10 +384,11 @@ components:
           items: { $ref: '#/components/schemas/ShareSummary' }
     PublicShare:
       type: object
-      required: [shareId, scopeId, rootNodeId, wrappedContentKey, root]
+      required: [shareId, scopeId, rootNodeId, role, wrappedContentKey, root]
       properties:
         shareId: { type: string }
         scopeId: { type: string }
         rootNodeId: { type: string }
+        role: { $ref: '#/components/schemas/ShareRole' }
         wrappedContentKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         root: { $ref: '#/components/schemas/MemoryNode' }
