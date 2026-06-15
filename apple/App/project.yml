@@ -37,6 +37,11 @@ targets:
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: "YES"
         TARGETED_DEVICE_FAMILY: "1,2"
+        # Universal: iPhone + iPad (device family above) + macOS via Mac Catalyst. We opt into Catalyst
+        # rather than "Designed for iPad" so the Mac build is a real desktop app we can adapt later.
+        SUPPORTS_MACCATALYST: "YES"
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: "NO"
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: "YES"
         INFOPLIST_KEY_CFBundleDisplayName: veyq
         INFOPLIST_KEY_NSCameraUsageDescription: "veyq scannt den QR-Code aus deinem Emergency Kit, um deine Anmeldung vorzubereiten."
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
