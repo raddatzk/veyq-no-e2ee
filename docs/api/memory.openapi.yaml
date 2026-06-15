@@ -88,6 +88,46 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/journal:
+    get:
+      tags: [MemoryJournal]
+      operationId: getJournal
+      summary: A Memory's journal — its sealed Markdown body (ciphertext only).
+      description: >
+        Returns the Memory's journal as a sealed blob (Markdown body sealed client-side under the scope
+        content key) plus the last-updated timestamp. A Memory with no journal yet reports a null body.
+        Journals live only on a Memory or Chapter (not a Folder).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The journal (body may be null)., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+    put:
+      tags: [MemoryJournal]
+      operationId: updateJournal
+      summary: Replace a Memory's journal body.
+      description: >
+        Upserts the Memory's journal with a new sealed Markdown body (whole-document replacement). The server
+        stores ciphertext and a timestamp only; it never sees the journal text.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMemoryJournalRequest' }
+      responses:
+        '200': { description: The updated journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:
@@ -134,3 +174,15 @@ components:
         nodes:
           type: array
           items: { $ref: '#/components/schemas/MemoryNode' }
+    MemoryJournal:
+      type: object
+      required: [nodeId]
+      properties:
+        nodeId: { type: string }
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        updatedAt: { type: string, format: date-time, description: 'When the journal was last written, if ever.' }
+    UpdateMemoryJournalRequest:
+      type: object
+      required: [sealedContent]
+      properties:
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
