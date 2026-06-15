@@ -114,6 +114,7 @@ class MemoryTreeHandler(
             slugToken = node.slugToken,
             orderIndex = node.orderIndex,
             sealedContent = Blob(suiteId = node.suiteId, bytes = enc.encodeToString(node.sealedContent)),
+            coverMediaId = node.coverMediaId,
             createdAt = OffsetDateTime.ofInstant(node.createdAt, ZoneOffset.UTC),
         )
 

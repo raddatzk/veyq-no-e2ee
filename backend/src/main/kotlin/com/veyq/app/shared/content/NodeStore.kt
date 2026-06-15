@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
+import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
 import java.time.Instant
 
@@ -23,6 +24,7 @@ class Node {
     @Column(name = "order_index", nullable = false) var orderIndex: Int = 0
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "sealed_content", nullable = false) var sealedContent: ByteArray = ByteArray(0)
+    @Column(name = "cover_media_id") var coverMediaId: String? = null
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 
@@ -37,4 +39,7 @@ class NodeRepository : PanacheRepositoryBase<Node, String> {
 
     fun findByParentAndSlug(parentId: String, slugToken: String): Node? =
         find("parentId = ?1 and slugToken = ?2", parentId, slugToken).firstResult()
+
+    fun lockById(id: String): Node? =
+        find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
 }

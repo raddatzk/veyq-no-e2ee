@@ -61,6 +61,33 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
+  /api/scopes/{scopeId}/nodes/{nodeId}:
+    patch:
+      tags: [NodeCurate]
+      operationId: updateNode
+      summary: Curate a node — rename, move, reorder, or set its cover.
+      description: >
+        Updates the provided fields of one node. Rename = sealedContent + slugToken (re-sealed name + slug).
+        Move = newParentId ("root" or a node id) + slugToken (recomputed under the new parent) + orderIndex;
+        the server re-checks containment + slug uniqueness and rejects a move into the node's own subtree
+        (NODE_CYCLE). Reorder = orderIndex. Cover = coverMediaId (must be a media of this node). The server
+        stays blind to names.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateNodeRequest' }
+      responses:
+        '200': { description: The updated node., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryNode' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+        '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
 components:
   schemas:
     NodeType:
@@ -79,6 +106,14 @@ components:
           description: Blinded slug token (HMAC of the normalized slug under a per-scope slug key); opaque to the server.
         orderIndex: { type: integer, description: 'Manual sibling ordering (server-visible integer; no name exposure).' }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    UpdateNodeRequest:
+      type: object
+      properties:
+        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        slugToken: { type: string, description: 'Recomputed blinded slug token (required with a rename or a move).' }
+        newParentId: { type: string, description: 'Move target: a node id, or "root" for the scope root. Omit to keep the parent.' }
+        orderIndex: { type: integer }
+        coverMediaId: { type: string, description: 'A media id of this node to pin as its cover.' }
     MemoryNode:
       type: object
       required: [id, scopeId, type, slugToken, orderIndex, sealedContent, createdAt]
@@ -90,6 +125,7 @@ components:
         slugToken: { type: string }
         orderIndex: { type: integer }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        coverMediaId: { type: string, description: 'The pinned cover media id, if any.' }
         createdAt: { type: string, format: date-time }
     MemoryNodeList:
       type: object
