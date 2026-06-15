@@ -6,7 +6,7 @@ const node = (id: string, type: string, name: string) => ({ node: { id, type, sl
 vi.mock('../../features/home/home', () => ({
   loadSpaces: vi.fn(async () => [
     { kind: 'PERSONAL', displayName: 'Kevin', scopeId: 'me', scopePublicKey: { suiteId: 'v1', kemPublicKey: '' } },
-    { kind: 'GROUP', displayName: 'affenbande', role: 'Owner', tenantId: 't1', scopeId: 'g1', scopePublicKey: { suiteId: 'v1', kemPublicKey: '' } },
+    { kind: 'TENANT', displayName: 'affenbande', role: 'Owner', tenantId: 't1', scopeId: 'g1', scopePublicKey: { suiteId: 'v1', kemPublicKey: '' } },
   ]),
   enterSpace: vi.fn(async (_a: unknown, _s: unknown, entry: { scopeId: string }) => ({ entry, scope: { scopeId: entry.scopeId }, contentKey: new Uint8Array() })),
   loadLevel: vi.fn(async () => [node('m1', 'MEMORY', 'Italien 2026'), node('f1', 'FOLDER', 'Urlaube')]),

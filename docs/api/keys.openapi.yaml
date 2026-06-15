@@ -57,6 +57,25 @@ paths:
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
         '409': { $ref: './common.openapi.yaml#/components/responses/Conflict' }
   /api/scopes/{scopeId}/grants/me:
+    get:
+      tags: [Keys]
+      operationId: getMyScopeGrant
+      summary: Fetch the authenticated user's wrapped grant for a scope (to open it by scope id).
+      description: >
+        Returns the caller's existing grant — the scope public key + the scope private key wrapped to the
+        caller's identity. Used to open any scope the caller holds, e.g. a group scope (which has no
+        tenant-keyed grant path). The server never sees the scope private key.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The caller's grant.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScopeGrantResponse' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
     put:
       tags: [Keys]
       operationId: rewrapMyScopeGrant

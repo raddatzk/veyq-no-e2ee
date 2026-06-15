@@ -27,6 +27,19 @@ class ScopeGrantRewrapHandler(
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
 
+    /** Read the caller's grant for a scope — used to open it by scope id (e.g. a group scope). */
+    @Transactional
+    fun getMyScopeGrant(auth: String?, scopeId: String): ScopeGrantResponse {
+        val userId = sessions.resolve(auth) ?: throw unauthorized()
+        val scope = scopes.findById(scopeId) ?: throw notFound("Scope")
+        val grant = grants.find(scope.id, userId) ?: throw notFound("Scope grant")
+        return ScopeGrantResponse(
+            scopeId = scope.id,
+            scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
+            wrappedScopePrivateKey = Blob(suiteId = grant.suiteId, bytes = enc.encodeToString(grant.wrappedPrivateKey)),
+        )
+    }
+
     @Transactional
     fun rewrapMyScopeGrant(auth: String?, scopeId: String, req: RewrapMyScopeGrantRequest): ScopeGrantResponse {
         val userId = sessions.resolve(auth) ?: throw unauthorized()

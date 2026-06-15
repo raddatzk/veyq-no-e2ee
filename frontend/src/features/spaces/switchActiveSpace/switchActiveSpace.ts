@@ -2,14 +2,16 @@
 // (personal + groups) and switch the active context into any of them. Switching fetches no secrets — it
 // opens the chosen scope with the wrap the client already holds. Content ops reuse the content slice.
 import type { UnlockedSession } from '../../account/login/login'
-import { openPersonalScope, openTenantScope, type OpenScope } from '../../content/scopeContent'
+import { openPersonalScope, openScopeById, openTenantScope, type OpenScope } from '../../content/scopeContent'
 
 export type SpaceEntry = {
-  kind: 'PERSONAL' | 'GROUP'
+  kind: 'PERSONAL' | 'TENANT' | 'GROUP'
   tenantId?: string
   name?: string
   displayName: string
   role?: string
+  // GROUP only — the group name sealed under its content key (the client decrypts it into displayName).
+  sealedName?: { suiteId: string; bytes: string }
   scopeId: string
   scopePublicKey: { suiteId: string; kemPublicKey: string }
 }
@@ -24,6 +26,8 @@ export async function listMySpaces(apiBase: string, session: UnlockedSession): P
 /** Switch into a space: open its scope with the already-held wrap (no secrets fetched). */
 export async function openSpace(apiBase: string, session: UnlockedSession, entry: SpaceEntry): Promise<OpenScope> {
   if (entry.kind === 'PERSONAL') return openPersonalScope(apiBase, session)
-  if (!entry.tenantId) throw new Error('group space entry is missing its tenantId')
+  // A group is opened by scope id (no tenant-keyed grant path); a tenant-wide space by its tenant id.
+  if (entry.kind === 'GROUP') return openScopeById(apiBase, session, entry.scopeId)
+  if (!entry.tenantId) throw new Error('tenant space entry is missing its tenantId')
   return openTenantScope(apiBase, session, entry.tenantId)
 }

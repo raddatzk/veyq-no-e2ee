@@ -19,10 +19,10 @@ suite('switch-active-space E2E (web -> live backend)', () => {
     const inv = await issueOwnerInvite(apiBase, a.sessionToken, t1.id)
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
 
-    // the switcher lists both spaces: the personal one + the group just claimed
+    // the switcher lists both spaces: the personal one + the tenant just claimed
     const spaces = await listMySpaces(apiBase, a)
     const personal = spaces.find((s) => s.kind === 'PERSONAL')
-    const group = spaces.find((s) => s.kind === 'GROUP')
+    const group = spaces.find((s) => s.kind === 'TENANT')
     expect(personal?.displayName).toBe('Admin')
     expect(group?.role).toBe('Owner')
     expect(group?.tenantId).toBe(t1.id)

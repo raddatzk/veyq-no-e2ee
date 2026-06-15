@@ -44,6 +44,16 @@ export async function openTenantScope(apiBase: string, session: UnlockedSession,
   return { scopeId: g.scopeId, scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) }, scopePriv }
 }
 
+/** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope, which has no tenant path). */
+export async function openScopeById(apiBase: string, session: UnlockedSession, scopeId: string): Promise<OpenScope> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/grants/me`, { headers: auth(session.sessionToken) })
+  if (!res.ok) throw new Error(`scope grant failed: ${res.status} ${await res.text()}`)
+  const g = await res.json()
+  const scopePriv = openScopeGrant(g, session.identity, session.identityPublicKey.kemPublicKey)
+  const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
+  return { scopeId: g.scopeId, scopePub: { x: scopeKem.slice(0, 32), m: scopeKem.slice(32) }, scopePriv }
+}
+
 /** Get the scope's content key, provisioning one (wrapped to the scope) on first use. */
 export async function getOrCreateContentKey(apiBase: string, session: UnlockedSession, scope: OpenScope): Promise<Uint8Array> {
   const url = `${apiBase}/api/scopes/${scope.scopeId}/content-key`

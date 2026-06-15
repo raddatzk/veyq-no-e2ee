@@ -31,4 +31,7 @@ class UnlockWrapResource(
         rewrapMyScopeGrantRequest: RewrapMyScopeGrantRequest,
     ): Response =
         Response.ok(scopeGrants.rewrapMyScopeGrant(authorization, scopeId, rewrapMyScopeGrantRequest)).build()
+
+    override fun getMyScopeGrant(authorization: String, scopeId: String): Response =
+        Response.ok(scopeGrants.getMyScopeGrant(authorization, scopeId)).build()
 }

@@ -3,7 +3,8 @@
 // the existing E2E-tested slices (spaces / browse / media); the server stays blind to names and bytes.
 import type { UnlockedSession } from '../account/login/login'
 import { t } from '../../i18n/i18n'
-import { getOrCreateContentKey, type OpenScope } from '../content/scopeContent'
+import { getOrCreateContentKey, openScopeById, type OpenScope } from '../content/scopeContent'
+import { openSealedName } from '../spaces/groups/groupSpaces'
 import { decodeNode, listChildren, type MemoryNode } from '../memory/browse/browse'
 import { listNodes } from '../memory/createTree/memoryTree'
 import { listMySpaces, openSpace, type SpaceEntry } from '../spaces/switchActiveSpace/switchActiveSpace'
@@ -15,9 +16,24 @@ export type { MemoryNode } from '../memory/browse/browse'
 export type ActiveSpace = { entry: SpaceEntry; scope: OpenScope; contentKey: Uint8Array }
 export type LevelEntry = { node: MemoryNode; name: string }
 
-/** Every space the user can enter (personal + groups). */
-export function loadSpaces(apiBase: string, session: UnlockedSession): Promise<SpaceEntry[]> {
-  return listMySpaces(apiBase, session)
+/** Every space the user can enter (personal + tenants + groups), with group names decrypted for display. */
+export async function loadSpaces(apiBase: string, session: UnlockedSession): Promise<SpaceEntry[]> {
+  const spaces = await listMySpaces(apiBase, session)
+  // Group names are sealed under the group content key — open each group scope to decrypt its name.
+  await Promise.all(
+    spaces
+      .filter((s) => s.kind === 'GROUP' && s.sealedName)
+      .map(async (s) => {
+        try {
+          const scope = await openScopeById(apiBase, session, s.scopeId)
+          const ck = await getOrCreateContentKey(apiBase, session, scope)
+          s.displayName = openSealedName(ck, s.sealedName!.bytes)
+        } catch {
+          s.displayName = '🔒'
+        }
+      }),
+  )
+  return spaces
 }
 
 /** Switch into a space: open its scope and content key (provisioning the key on first use). */

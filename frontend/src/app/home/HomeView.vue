@@ -13,6 +13,7 @@ import CreateModal from './CreateModal.vue'
 import RenameModal from './RenameModal.vue'
 import MovePicker from './MovePicker.vue'
 import CreateGroupModal from './CreateGroupModal.vue'
+import CreateGroupSpaceModal from './CreateGroupSpaceModal.vue'
 import InviteModal from './InviteModal.vue'
 
 const props = defineProps<{ openTarget?: { scopeId: string; nodeId: string } | null }>()
@@ -33,7 +34,13 @@ const menuTarget = ref<LevelEntry | null>(null)
 const moveTarget = ref<LevelEntry | null>(null)
 const dragged = ref<{ entry: LevelEntry; section: 'M' | 'F' } | null>(null)
 const createGroupOpen = ref(false)
+const createGroupSpaceOpen = ref(false)
 const inviteTarget = ref<SpaceEntry | null>(null)
+
+async function onGroupSpaceCreated() {
+  createGroupSpaceOpen.value = false
+  await reloadSpaces()
+}
 
 async function reloadSpaces(selectTenantId?: string) {
   spaces.value = await loadSpaces(apiBase, session.unlocked!)
@@ -153,6 +160,7 @@ function spaceSub(s: SpaceEntry): string {
 }
 
 const personalSpaces = () => spaces.value.filter((s) => s.kind === 'PERSONAL')
+const tenantSpaces = () => spaces.value.filter((s) => s.kind === 'TENANT')
 const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
 </script>
 
@@ -167,8 +175,8 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
       </button>
 
-      <div class="home-section">{{ t('home.groups') }}</div>
-      <div v-for="s in groupSpaces()" :key="s.scopeId" class="space-row-wrap">
+      <div class="home-section">{{ t('home.tenants') }}</div>
+      <div v-for="s in tenantSpaces()" :key="s.scopeId" class="space-row-wrap">
         <button class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
           <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
           <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
@@ -176,6 +184,16 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <button v-if="s.role === 'Owner'" class="space-invite" :title="t('groups.invite')" @click.stop="inviteTarget = s">＋</button>
       </div>
       <button class="space-row space-create" @click="createGroupOpen = true">
+        <span class="space-avatar space-avatar-ghost">＋</span>
+        <span class="space-meta"><div class="space-name">{{ t('tenants.create') }}</div></span>
+      </button>
+
+      <div class="home-section">{{ t('home.groups') }}</div>
+      <button v-for="s in groupSpaces()" :key="s.scopeId" class="space-row" :class="{ active: active?.entry.scopeId === s.scopeId }" @click="switchSpace(s)">
+        <span class="space-avatar">{{ (s.displayName || '?').charAt(0).toUpperCase() }}</span>
+        <span class="space-meta"><div class="space-name">{{ s.displayName }}</div><div class="space-sub">{{ spaceSub(s) }}</div></span>
+      </button>
+      <button v-if="tenantSpaces().length" class="space-row space-create" @click="createGroupSpaceOpen = true">
         <span class="space-avatar space-avatar-ghost">＋</span>
         <span class="space-meta"><div class="space-name">{{ t('groups.create') }}</div></span>
       </button>
@@ -258,6 +276,7 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
     <RenameModal v-if="renameTarget && active" :active="active" :entry="renameTarget" @close="renameTarget = null" @renamed="onRenamed" />
     <MovePicker v-if="moveTarget && active" :active="active" :entry="moveTarget" @close="moveTarget = null" @moved="onMoved" />
     <CreateGroupModal v-if="createGroupOpen" @close="createGroupOpen = false" @created="onGroupCreated" />
+    <CreateGroupSpaceModal v-if="createGroupSpaceOpen" :tenants="tenantSpaces()" @close="createGroupSpaceOpen = false" @created="onGroupSpaceCreated" />
     <InviteModal v-if="inviteTarget" :space="inviteTarget" @close="inviteTarget = null" />
 
     <div v-if="menuTarget" class="settings-backdrop" @click.self="menuTarget = null">
