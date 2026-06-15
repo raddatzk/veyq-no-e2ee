@@ -5,17 +5,33 @@ import VeyqCrypto
 /// the flow is: connect → login → landed. First-run server setup is web-only.
 @MainActor
 final class AppState: ObservableObject {
-    enum Phase { case connect, login, landed }
+    enum Phase { case connect, login, register, landed }
 
     private static let instanceKey = "veyq.instance.url"
 
     @Published var phase: Phase = .connect
     @Published var apiBase: String = UserDefaults.standard.string(forKey: AppState.instanceKey) ?? ""
     @Published var session: Login.UnlockedSession?
+    @Published var pendingInvite: InviteLink.Parts?
 
     func connected(apiBase: String) {
         self.apiBase = apiBase
         UserDefaults.standard.set(apiBase, forKey: Self.instanceKey)
+        phase = .login
+    }
+
+    /// A veyq://invite deep link (from the mobile browser banner): point at the named instance and jump a
+    /// not-signed-in user straight into registration. Ignored when already signed in.
+    func handleDeepLink(_ url: URL) {
+        guard session == nil, let dl = InviteLink.parseDeepLink(url.absoluteString) else { return }
+        apiBase = dl.apiBase
+        UserDefaults.standard.set(dl.apiBase, forKey: Self.instanceKey)
+        pendingInvite = dl.parts
+        phase = .register
+    }
+
+    func cancelRegister() {
+        pendingInvite = nil
         phase = .login
     }
 

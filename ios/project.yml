@@ -22,6 +22,13 @@ targets:
     dependencies:
       - package: VeyqCrypto
         product: VeyqCrypto
+    # Partial Info.plist for keys without a build-setting form; merged with the generated plist.
+    info:
+      path: Veyq/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: app.veyq.ios
+            CFBundleURLSchemes: [veyq]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.veyq.ios
@@ -31,6 +38,7 @@ targets:
         GENERATE_INFOPLIST_FILE: "YES"
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: veyq
+        INFOPLIST_KEY_NSCameraUsageDescription: "veyq scannt den QR-Code aus deinem Emergency Kit, um deine Anmeldung vorzubereiten."
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         # Simulator builds don't need signing; on-device uses this team (mirrors legacy).

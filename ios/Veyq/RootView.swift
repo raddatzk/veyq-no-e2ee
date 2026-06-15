@@ -11,6 +11,10 @@ struct RootView: View {
             switch app.phase {
             case .connect: ConnectView()
             case .login: LoginView()
+            case .register:
+                if let invite = app.pendingInvite {
+                    RegisterView(parts: invite)
+                }
             case .landed:
                 if let session = app.session {
                     MemoryHomeView(apiBase: app.apiBase, session: session)
@@ -18,6 +22,7 @@ struct RootView: View {
             }
         }
         .environmentObject(app)
+        .onOpenURL { app.handleDeepLink($0) }
         .preferredColorScheme(themeScheme(theme))
         .id(locale) // rebuild the tree so every T(...) re-resolves on language change
     }
