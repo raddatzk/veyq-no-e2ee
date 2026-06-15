@@ -30,8 +30,10 @@ object Tenant {
     }
 
     fun createTenant(apiBase: String, token: String, name: String, displayName: String, domain: String?): JSONObject {
-        val domainField = if (domain != null) ""","domain":"$domain"""" else ""
-        return JSONObject(send(apiBase, "/api/tenants", token, "POST", """{"name":"$name","displayName":"$displayName"$domainField}"""))
+        // A tenant is domain-scoped (domain required + unique). The UI passes a real domain; tests/owner-claim
+        // omit it → derive a unique one from the (unique) handle so the request still validates.
+        val dom = domain?.takeIf { it.isNotEmpty() } ?: "$name.local"
+        return JSONObject(send(apiBase, "/api/tenants", token, "POST", """{"name":"$name","displayName":"$displayName","domain":"$dom"}"""))
     }
 
     fun issueOwnerInvite(apiBase: String, token: String, tenantId: String): JSONObject =

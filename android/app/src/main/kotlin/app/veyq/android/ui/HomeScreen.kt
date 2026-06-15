@@ -136,16 +136,16 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
     }
 
     /** Create a tenant (workspace) the caller owns: tenant + self owner-claim (retries on handle conflict). */
-    suspend fun createTenant(name: String): Boolean {
+    suspend fun createTenant(name: String, domain: String): Boolean {
         val trimmed = name.trim()
-        if (trimmed.isEmpty()) return false
+        if (trimmed.isEmpty() || domain.isBlank()) return false
         return try {
             val tenant = withContext(Dispatchers.IO) {
                 val base = slugify(trimmed)
                 var made: JSONObject? = null
                 for (attempt in 0 until 25) {
                     val handle = if (attempt == 0) base else "$base-${attempt + 1}"
-                    try { made = Tenant.createTenant(apiBase, session.sessionToken, handle, trimmed, null); break }
+                    try { made = Tenant.createTenant(apiBase, session.sessionToken, handle, trimmed, domain.trim().lowercase()); break }
                     catch (e: Exception) { if (!"${e.message}".contains("409") && !"${e.message}".lowercase().contains("exists")) throw e }
                 }
                 val t = made ?: throw RuntimeException("could not create tenant (handle conflict)")
@@ -296,10 +296,12 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
     suspend fun openPath(path: String): Entry? {
         if (spaces.isEmpty()) reloadSpaces()
         val parsed = HomeRoute.parsePath(path)
+        val host = runCatching { java.net.URI(apiBase).host }.getOrNull() // the instance host resolves the tenant
         val target = when (parsed.kind) {
             "PERSONAL" -> spaces.firstOrNull { it.getString("kind") == "PERSONAL" }
             "GROUP" -> spaces.firstOrNull { it.getString("kind") == "GROUP" && HomeRoute.slugify(displayName(it)) == parsed.groupSlug }
-            else -> spaces.firstOrNull { it.getString("kind") == "TENANT" }
+            else -> spaces.firstOrNull { it.getString("kind") == "TENANT" && it.optString("domain") == host }
+                ?: spaces.firstOrNull { it.getString("kind") == "TENANT" }
         } ?: run { error = "Bereich nicht gefunden."; return null }
         switchSpace(target) // sets crumbs = [root] and opens the level
         val sc = scope ?: return null
@@ -466,6 +468,7 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
     var createTenantOpen by remember { mutableStateOf(false) }
     var createGroupOpen by remember { mutableStateOf(false) }
     var newSpaceName by remember { mutableStateOf("") }
+    var newTenantDomain by remember { mutableStateOf("") }
     var newGroupTenant by remember { mutableStateOf("") }
     var manageGroupEntry by remember { mutableStateOf<JSONObject?>(null) }
     var confirmDelName by remember { mutableStateOf<String?>(null) }
@@ -645,13 +648,14 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
             containerColor = Veyq.Surface,
             title = { Text(L10n.t("tenants.create"), color = Veyq.Text) },
             text = {
-                OutlinedTextField(
-                    value = newSpaceName, onValueChange = { newSpaceName = it }, singleLine = true,
-                    placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text),
-                )
+                val fc = OutlinedTextFieldDefaults.colors(focusedContainerColor = Veyq.SurfaceMuted, unfocusedContainerColor = Veyq.SurfaceMuted, focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line, focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text)
+                Column {
+                    OutlinedTextField(value = newSpaceName, onValueChange = { newSpaceName = it }, singleLine = true, placeholder = { Text(L10n.t("common.name"), color = Veyq.Muted) }, colors = fc)
+                    OutlinedTextField(value = newTenantDomain, onValueChange = { newTenantDomain = it }, singleLine = true, placeholder = { Text(L10n.t("tenants.domain"), color = Veyq.Muted) }, modifier = Modifier.padding(top = 8.dp), colors = fc)
+                    Text(L10n.t("tenants.domainHint"), color = Veyq.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
             },
-            confirmButton = { TextButton(onClick = { val n = newSpaceName; createTenantOpen = false; scope.launch { controller.createTenant(n) } }) { Text(L10n.t("common.create"), color = Veyq.Accent) } },
+            confirmButton = { TextButton(onClick = { val n = newSpaceName; val d = newTenantDomain; createTenantOpen = false; newTenantDomain = ""; scope.launch { controller.createTenant(n, d) } }) { Text(L10n.t("common.create"), color = Veyq.Accent) } },
             dismissButton = { TextButton(onClick = { createTenantOpen = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
         )
     }
