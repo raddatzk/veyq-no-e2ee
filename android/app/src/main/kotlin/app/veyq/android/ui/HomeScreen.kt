@@ -291,6 +291,39 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
         openLevel()
     }
 
+    /** Open a member deep-link path (`/@reisegruppe/urlaube/italien`): switch into the space, set the folder
+     *  chain as the breadcrumb back-stack, and return the trailing memory to show (so closing it lands on its folder). */
+    suspend fun openPath(path: String): Entry? {
+        if (spaces.isEmpty()) reloadSpaces()
+        val parsed = HomeRoute.parsePath(path)
+        val target = when (parsed.kind) {
+            "PERSONAL" -> spaces.firstOrNull { it.getString("kind") == "PERSONAL" }
+            "GROUP" -> spaces.firstOrNull { it.getString("kind") == "GROUP" && HomeRoute.slugify(displayName(it)) == parsed.groupSlug }
+            else -> spaces.firstOrNull { it.getString("kind") == "TENANT" }
+        } ?: run { error = "Bereich nicht gefunden."; return null }
+        switchSpace(target) // sets crumbs = [root] and opens the level
+        val sc = scope ?: return null
+        val key = contentKey ?: return null
+        if (parsed.segments.isEmpty()) return null
+        return try {
+            val chain = withContext(Dispatchers.IO) { Browse.resolvePath(apiBase, session, sc.scopeId, key, parsed.segments) }
+            var folders = chain
+            var memory: JSONObject? = null
+            if (chain.isNotEmpty() && chain.last().getString("type") == "MEMORY") { memory = chain.last(); folders = chain.dropLast(1) }
+            var newCrumbs = listOf(Crumb(null, displayName(target)))
+            for (f in folders) {
+                val name = runCatching { MemoryTree.decodeNodeName(key, f) }.getOrDefault("")
+                newCrumbs = newCrumbs + Crumb(f.getString("id"), name)
+            }
+            crumbs = newCrumbs
+            openLevel()
+            memory?.let { Entry(it, runCatching { MemoryTree.decodeNodeName(key, it) }.getOrDefault("")) }
+        } catch (e: Exception) {
+            error = "Konnte den Pfad nicht öffnen."
+            null
+        }
+    }
+
     /** Create a folder/memory at the current level. Name is sealed; the slug retries on collision. */
     suspend fun create(type: String, name: String) {
         val trimmed = name.trim()
@@ -425,7 +458,7 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, onSignOut: () -> Unit) {
+fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSession, theme: String, onTheme: (String) -> Unit, onLocale: (String) -> Unit, pendingOpenPath: String? = null, onOpenHandled: () -> Unit = {}, onSignOut: () -> Unit) {
     val controller = remember { HomeController(apiBase, appBaseUrl.ifEmpty { apiBase }, session) }
     val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
@@ -455,7 +488,14 @@ fun HomeScreen(apiBase: String, appBaseUrl: String, session: Login.UnlockedSessi
     var moveEntry by remember { mutableStateOf<HomeController.Entry?>(null) }
     var moveDests by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     val startAction: (HomeController.Entry) -> Unit = { actionEntry = it }
-    LaunchedEffect(Unit) { controller.start() }
+    // Default land on personal — unless a deep-link path is pending (then openPath sets the space/back-stack).
+    LaunchedEffect(Unit) { if (pendingOpenPath == null) controller.start() }
+    LaunchedEffect(pendingOpenPath) {
+        val p = pendingOpenPath ?: return@LaunchedEffect
+        val m = controller.openPath(p)
+        if (m != null) detail = m
+        onOpenHandled()
+    }
 
     if (settingsOpen) {
         SettingsScreen(apiBase, session, theme, onTheme, onLocale, onBack = { settingsOpen = false }, onSignOut = onSignOut)

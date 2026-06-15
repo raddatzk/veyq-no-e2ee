@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.veyq.android.ui.ConnectScreen
+import app.veyq.android.ui.HomeRoute
 import app.veyq.android.ui.HomeScreen
 import app.veyq.android.ui.InviteLink
 import app.veyq.android.ui.L10n
@@ -28,12 +29,14 @@ import app.veyq.crypto.Login
  * the `:core` crypto module. The real tab bar + MemoryHome arrive in slice 2.
  */
 class MainActivity : FragmentActivity() {
-    // An invite deep link (veyq://invite) the app was opened with — consumed by AuthFlow to register.
+    // Deep links the app was opened with: veyq://invite (→ register) and veyq://open (→ open a member path).
     private val deepLink = mutableStateOf<InviteLink.DeepLink?>(null)
+    private val openLink = mutableStateOf<HomeRoute.DeepOpen?>(null)
 
     private fun captureDeepLink(intent: Intent?) {
         val data = intent?.data?.toString() ?: return
-        InviteLink.parseDeepLink(data)?.let { deepLink.value = it }
+        InviteLink.parseDeepLink(data)?.let { deepLink.value = it; return }
+        HomeRoute.parseDeepLink(data)?.let { openLink.value = it }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -59,6 +62,8 @@ class MainActivity : FragmentActivity() {
                         theme,
                         deepLink = deepLink.value,
                         onDeepLinkConsumed = { deepLink.value = null },
+                        openLink = openLink.value,
+                        onOpenLinkConsumed = { openLink.value = null },
                         onTheme = { theme = it; prefs.edit().putString("veyq.theme", it).apply() },
                         onLocale = { L10n.locale = it; prefs.edit().putString("veyq.locale", it).apply() },
                     )
@@ -75,6 +80,8 @@ private fun AuthFlow(
     theme: String,
     deepLink: InviteLink.DeepLink?,
     onDeepLinkConsumed: () -> Unit,
+    openLink: HomeRoute.DeepOpen?,
+    onOpenLinkConsumed: () -> Unit,
     onTheme: (String) -> Unit,
     onLocale: (String) -> Unit,
 ) {
@@ -83,6 +90,7 @@ private fun AuthFlow(
     var appBaseUrl by remember { mutableStateOf("") }
     var session by remember { mutableStateOf<Login.UnlockedSession?>(null) }
     var invite by remember { mutableStateOf<InviteLink.Parts?>(null) }
+    var pendingOpenPath by remember { mutableStateOf<String?>(null) }
 
     // A fresh invite deep link (when not already signed in) jumps straight to registration on that instance.
     androidx.compose.runtime.LaunchedEffect(deepLink) {
@@ -91,11 +99,19 @@ private fun AuthFlow(
             onDeepLinkConsumed()
         }
     }
+    // A member "open in app" deep link → open that path once landed (sign in first if needed).
+    androidx.compose.runtime.LaunchedEffect(openLink) {
+        openLink?.let {
+            pendingOpenPath = it.path
+            if (session == null) { apiBase = it.apiBase; appBaseUrl = it.apiBase; phase = Phase.Login }
+            onOpenLinkConsumed()
+        }
+    }
 
     when (phase) {
         Phase.Connect -> ConnectScreen(apiBase) { base, appUrl -> apiBase = base; appBaseUrl = appUrl ?: base; phase = Phase.Login }
         Phase.Login -> LoginScreen(apiBase, onChangeInstance = { phase = Phase.Connect }) { session = it; phase = Phase.Landed }
         Phase.Register -> RegisterScreen(apiBase, invite!!, onCancel = { phase = Phase.Login }) { session = it; phase = Phase.Landed }
-        Phase.Landed -> HomeScreen(apiBase, appBaseUrl, session!!, theme, onTheme, onLocale) { session = null; phase = Phase.Login }
+        Phase.Landed -> HomeScreen(apiBase, appBaseUrl, session!!, theme, onTheme, onLocale, pendingOpenPath, { pendingOpenPath = null }) { session = null; phase = Phase.Login }
     }
 }
