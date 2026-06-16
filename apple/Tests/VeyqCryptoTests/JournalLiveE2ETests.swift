@@ -21,9 +21,17 @@ final class JournalLiveE2ETests: XCTestCase {
         let url = URL(string: "\(wsBase)/ws/journal/\(scope.scopeId)/n1?token=\(session.sessionToken)")!
         let a = JournalLiveProvider(url: url, contentKey: ck)
         let b = JournalLiveProvider(url: url, contentKey: ck)
+        let bPeers = PeerBox()
+        b.onPeers = { bPeers.set($0) }
 
         try await waitFor { a.currentText == "" && b.currentText == "" } // both connected
         try await Task.sleep(nanoseconds: 300_000_000) // let the sync settle
+
+        // awareness (presence + cursor): A announces itself; B should see it
+        a.setUser(name: "Alice", color: "#10b981")
+        a.setCursor(3)
+        try await waitFor { bPeers.get().contains { $0.name == "Alice" && $0.cursor == 3 } }
+        XCTAssertTrue(bPeers.get().contains { $0.name == "Alice" && $0.cursor == 3 })
 
         a.applyLocalText("hallo welt")
         try await waitFor { b.currentText == "hallo welt" }
@@ -36,6 +44,13 @@ final class JournalLiveE2ETests: XCTestCase {
         XCTAssertEqual(a.currentText, b.currentText)
 
         a.destroy(); b.destroy()
+    }
+
+    /// Thread-safe holder for the peers list (onPeers fires off the websocket thread).
+    final class PeerBox: @unchecked Sendable {
+        private let lock = NSLock(); private var value: [JournalLiveProvider.Peer] = []
+        func set(_ v: [JournalLiveProvider.Peer]) { lock.lock(); value = v; lock.unlock() }
+        func get() -> [JournalLiveProvider.Peer] { lock.lock(); defer { lock.unlock() }; return value }
     }
 
     private func waitFor(_ cond: @escaping () -> Bool, timeout: TimeInterval = 6) async throws {

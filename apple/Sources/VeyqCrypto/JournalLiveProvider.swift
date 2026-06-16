@@ -16,8 +16,21 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     private var lastSentSV: [UInt8] = []
     private var closed = false
 
+    // Awareness (presence + cursor) — the y-protocols/awareness wire format, so co-editors and their cursor
+    // positions sync across web/iOS/Android. The cursor is a plain UTF-16 char index (`cursorIndex`); the web's
+    // yCollab uses Yjs relative positions, so cross-family shows presence (the `user` field) and same-family
+    // shows exact carets.
+    public struct Peer: Equatable, Sendable { public let clientId: UInt; public let name: String; public let color: String; public let cursor: Int? }
+    private let localClientId: UInt = UInt(UInt32.random(in: 1 ... UInt32.max))
+    private var localClock: UInt = 0
+    private var localUser: [String: String] = [:]
+    private var localCursor: Int?
+    private var peers: [UInt: Peer] = [:]
+    private var peerClocks: [UInt: UInt] = [:]
+
     public var onText: ((String) -> Void)?
     public var onStatus: ((Bool) -> Void)?
+    public var onPeers: (([Peer]) -> Void)?
 
     public init(url: URL, contentKey: Data) {
         self.url = url
@@ -54,6 +67,18 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         if currentText.isEmpty, !markdown.isEmpty { applyLocalText(markdown) }
     }
 
+    /// Publish this editor's identity (name + colour) to co-editors.
+    public func setUser(name: String, color: String) {
+        localUser = ["name": name, "color": color, "colorLight": color + "33"]
+        bumpAwareness()
+    }
+    /// Publish this editor's caret position (char index) so others can draw it.
+    public func setCursor(_ index: Int?) {
+        if localCursor == index { return }
+        localCursor = index
+        bumpAwareness()
+    }
+
     public func destroy() {
         closed = true
         task?.cancel(with: .normalClosure, reason: nil)
@@ -74,6 +99,7 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         let s1 = self.proto.handleConnectionStarted() // STEP_1 (our state vector) → peers send what we miss
         send(encode(sync: 0, payload: s1.buffer))
         lastSentSV = stateVector()
+        if !localUser.isEmpty { send(encodeAwareness()) } // announce presence/cursor
     }
 
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
@@ -96,7 +122,11 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         let bytes = [UInt8](plain)
         var pos = 0
         let msgType = readVarUint(bytes, &pos)
-        guard msgType == 0 else { return } // 0 = sync; 1 = awareness (cursors) — ignored on iOS for now
+        if msgType == 1 { // awareness (presence + cursor)
+            if let upd = readVarUint8Array(bytes, &pos) { applyAwareness(upd) }
+            return
+        }
+        guard msgType == 0 else { return } // 0 = sync
         let syncKind = readVarUint(bytes, &pos)
         guard let payload = readVarUint8Array(bytes, &pos) else { return }
         switch syncKind {
@@ -122,15 +152,49 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
 
     // MARK: - framing + AEAD (matches the web EncryptedRelayProvider)
 
-    /// [varuint 0=sync][varuint syncKind][varUint8Array payload] → AEAD-sealed under the content key.
+    /// nonce(12) || AEAD(contentKey, inner) — the outer seal every relay message uses.
+    private func seal(_ inner: [UInt8]) -> Data {
+        let nonce = V1.randomBytes(12)
+        return nonce + ((try? V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(inner), aad: Data())) ?? Data())
+    }
+    /// [varuint 0=sync][varuint syncKind][varUint8Array payload] → sealed.
     private func encode(sync syncKind: UInt, payload: [UInt8]) -> Data {
         var enc: [UInt8] = []
-        writeVarUint(&enc, 0)
-        writeVarUint(&enc, syncKind)
-        writeVarUint8Array(&enc, payload)
-        let nonce = V1.randomBytes(12)
-        let sealed = (try? V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(enc), aad: Data())) ?? Data()
-        return nonce + sealed
+        writeVarUint(&enc, 0); writeVarUint(&enc, syncKind); writeVarUint8Array(&enc, payload)
+        return seal(enc)
+    }
+    /// [varuint 1=awareness][varUint8Array update], where update = [count][clientId][clock][varString(json)].
+    private func encodeAwareness() -> Data {
+        var state: [String: Any] = ["user": localUser]
+        if let c = localCursor { state["cursorIndex"] = c }
+        let json = (try? JSONSerialization.data(withJSONObject: state)) ?? Data("{}".utf8)
+        var aw: [UInt8] = []
+        writeVarUint(&aw, 1); writeVarUint(&aw, localClientId); writeVarUint(&aw, localClock)
+        writeVarUint8Array(&aw, [UInt8](json))
+        var enc: [UInt8] = []
+        writeVarUint(&enc, 1); writeVarUint8Array(&enc, aw)
+        return seal(enc)
+    }
+    private func bumpAwareness() { localClock += 1; if task != nil { send(encodeAwareness()) } }
+    private func applyAwareness(_ update: [UInt8]) {
+        var p = 0
+        let count = readVarUint(update, &p)
+        var i: UInt = 0
+        while i < count {
+            i += 1
+            let clientId = readVarUint(update, &p)
+            let clock = readVarUint(update, &p)
+            guard let jsonBytes = readVarUint8Array(update, &p) else { break }
+            if clientId == localClientId { continue }
+            if let prev = peerClocks[clientId], prev >= clock { continue }
+            peerClocks[clientId] = clock
+            if let obj = try? JSONSerialization.jsonObject(with: Data(jsonBytes)) as? [String: Any], let user = obj["user"] as? [String: Any] {
+                peers[clientId] = Peer(clientId: clientId, name: (user["name"] as? String) ?? "?", color: (user["color"] as? String) ?? "#888888", cursor: obj["cursorIndex"] as? Int)
+            } else {
+                peers.removeValue(forKey: clientId)
+            }
+        }
+        onPeers?(Array(peers.values))
     }
     private func open(_ data: Data) -> Data? {
         guard data.count > 12 else { return nil }

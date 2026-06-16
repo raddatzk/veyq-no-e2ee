@@ -7,8 +7,11 @@ import VeyqCrypto
 final class LiveJournalModel: ObservableObject {
     @Published var text = ""
     @Published var connected = false
+    @Published var peers: [JournalLiveProvider.Peer] = []
     private var provider: JournalLiveProvider?
     private var ready = false
+
+    private static let colors = ["#5b4df5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6"]
 
     func start(store: GalleryStore, initial: String) {
         text = initial
@@ -17,6 +20,8 @@ final class LiveJournalModel: ObservableObject {
         let p = JournalLiveProvider(url: url, contentKey: store.contentKey)
         p.onStatus = { [weak self] c in Task { @MainActor in self?.connected = c } }
         p.onText = { [weak self] s in Task { @MainActor in guard let self else { return }; if self.text != s { self.text = s } } }
+        p.onPeers = { [weak self] list in Task { @MainActor in self?.peers = list } }
+        p.setUser(name: store.session.user.displayName, color: Self.colors.randomElement() ?? "#5b4df5")
         provider = p
         // Seed the shared doc from the sealed journal once sync with any peers has settled, then mirror back.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -31,6 +36,7 @@ final class LiveJournalModel: ObservableObject {
         guard ready else { return } // ignore edits until the initial seed/sync has settled
         provider?.applyLocalText(s)
     }
+    func onCursor(_ index: Int) { provider?.setCursor(index) }
 
     func stop(save: @escaping (String) -> Void) {
         let final = provider?.currentText ?? text
@@ -50,18 +56,26 @@ struct LiveJournalView: View {
             HStack(spacing: 6) {
                 Circle().fill(model.connected ? Color.green : VeyqStyle.muted).frame(width: 8, height: 8)
                 Text(model.connected ? T("journal.live") : T("journal.connecting")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+                ForEach(model.peers, id: \.clientId) { peer in
+                    HStack(spacing: 3) {
+                        Circle().fill(Color(hex: UInt(peer.color.drop { $0 == "#" }, radix: 16) ?? 0x888888)).frame(width: 7, height: 7)
+                        Text(peer.name).font(.system(size: 11)).foregroundStyle(VeyqStyle.muted)
+                    }
+                }
                 Spacer()
                 Button(T("journal.done")) { model.stop { onClose($0) } }.tint(VeyqStyle.accent)
             }
-            TextEditor(text: Binding(get: { model.text }, set: { v in model.text = v; model.onUserEdit(v) }))
-                .font(.system(size: 15, design: .monospaced))
-                .foregroundStyle(VeyqStyle.text)
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 280)
-                .padding(8)
-                .background(VeyqStyle.surface)
-                .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-                .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+            LiveTextEditor(
+                text: Binding(get: { model.text }, set: { model.text = $0 }),
+                peers: model.peers,
+                onTextChange: { v in model.text = v; model.onUserEdit(v) },
+                onCursorChange: { model.onCursor($0) },
+            )
+            .frame(minHeight: 280)
+            .padding(8)
+            .background(VeyqStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+            .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .onAppear { model.start(store: store, initial: store.journalMarkdown) }
     }
