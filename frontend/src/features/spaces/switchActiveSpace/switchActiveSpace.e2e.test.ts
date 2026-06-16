@@ -15,7 +15,7 @@ suite('switch-active-space E2E (web -> live backend)', () => {
     const pass = 'correct horse battery staple'
     const { emergencyKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', pass)
     const a = await login(apiBase, 'admin@example.com', pass, emergencyKit.secretKey)
-    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme Group')
+    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme Group', 'acme.example')
     const inv = await issueOwnerInvite(apiBase, a.sessionToken, t1.id)
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
 

@@ -17,7 +17,7 @@ suite('use-group E2E (web -> live backend): two members collaborate on one share
     const aPass = 'correct horse battery staple'
     const { emergencyKit: aKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', aPass)
     const a = await login(apiBase, 'admin@example.com', aPass, aKit.secretKey)
-    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme Group')
+    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme Group', 'acme.example')
     const inv = await issueOwnerInvite(apiBase, a.sessionToken, t1.id)
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
 

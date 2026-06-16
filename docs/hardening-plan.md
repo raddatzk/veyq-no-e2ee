@@ -101,7 +101,14 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   `resolveRoute`/`ancestorChain`, which the component gained for path-URL routing — so `restoreFromUrl()` called
   `undefined` and the grid never populated. Completed the mock (`resolveRoute → {folders:[],memory:null}`,
   `ancestorChain → []`). Both tests + the full 62-test unit suite green.
-- [ ] **P5.2 E2E in CI.** Run the `VEYQ_E2E=1` web/Apple/Android paths against a started backend stack.
+- [x] **P5.2 E2E in CI (web).** Added `scripts/run_web_e2e.py` — boots a fresh backend fast-jar per e2e file
+  (each suite registers its own single-owner-per-boot owner; `jdbc:h2:mem` only resets on JVM restart) with
+  rate-limiting off + mail mocked, runs that one file, tears it down, and aggregates pass/fail. Wired as the
+  `web-e2e` CI job (build fast-jar → `npm ci` → orchestrator). Fixed 10 stale suites that omitted the now-
+  required tenant `domain` (V21) → `POST /api/tenants` 400. Verified locally: all 28 web e2e files green
+  (geo/seed intentionally skip on extra env gates).
+  **Backlog:** Apple/Android e2e in CI need dedicated macOS-Xcode / Android-SDK+emulator runners against the
+  live backend — a larger lift than the web path; tracked separately.
 
 ## Phase 6 — Operator-blind journal persistence (snapshot + encrypted increments)
 Today the journal is a single sealed-markdown blob (`veyq_memory_journal`, `sealed_content`,

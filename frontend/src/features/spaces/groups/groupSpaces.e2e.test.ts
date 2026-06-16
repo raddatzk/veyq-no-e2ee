@@ -21,7 +21,7 @@ suite('groups E2E (web -> live backend)', () => {
     const pass = 'correct horse battery staple'
     const { emergencyKit } = await registerServerOwner(apiBase, 'gadmin@example.com', 'GAdmin', pass)
     const owner = await login(apiBase, 'gadmin@example.com', pass, emergencyKit.secretKey)
-    const tenant = await createTenant(apiBase, owner.sessionToken, 'gacme', 'GAcme')
+    const tenant = await createTenant(apiBase, owner.sessionToken, 'gacme', 'GAcme', 'gacme.example')
     const oinv = await issueOwnerInvite(apiBase, owner.sessionToken, tenant.id)
     await claimTenantOwnership(apiBase, owner.sessionToken, oinv.inviteId, oinv.bootstrapSecret, owner.identityPublicKey.kemPublicKey)
 

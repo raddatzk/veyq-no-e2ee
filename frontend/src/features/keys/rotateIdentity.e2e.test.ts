@@ -23,7 +23,7 @@ suite('rotate-identity E2E (web -> live backend)', () => {
     const a = await login(apiBase, 'owner@example.com', pass, emergencyKit.secretKey)
 
     // a tenant scope grant + encrypted content under the personal scope
-    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme')
+    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme', 'acme.example')
     const inv = await issueOwnerInvite(apiBase, a.sessionToken, t1.id)
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
     const scope = await openPersonalScope(apiBase, a)

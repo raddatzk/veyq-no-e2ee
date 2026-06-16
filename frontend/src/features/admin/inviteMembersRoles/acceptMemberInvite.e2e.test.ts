@@ -22,13 +22,13 @@ suite('invite-members-roles accept E2E (web -> live backend)', () => {
     const aPass = 'correct horse battery staple'
     const { emergencyKit: aKit } = await registerServerOwner(apiBase, 'admin@example.com', 'Admin', aPass)
     const a = await login(apiBase, 'admin@example.com', aPass, aKit.secretKey)
-    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme')
+    const t1 = await createTenant(apiBase, a.sessionToken, 'acme', 'Acme', 'acme.example')
     const inv = await issueOwnerInvite(apiBase, a.sessionToken, t1.id)
     await claimTenantOwnership(apiBase, a.sessionToken, inv.inviteId, inv.bootstrapSecret, a.identityPublicKey.kemPublicKey)
 
     // B already has a standalone account (owner of their own tenant T2)
     const bPass = 'a whole new passphrase entirely'
-    const t2 = await createTenant(apiBase, a.sessionToken, 'globex', 'Globex')
+    const t2 = await createTenant(apiBase, a.sessionToken, 'globex', 'Globex', 'globex.example')
     const t2Invite = await issueOwnerInvite(apiBase, a.sessionToken, t2.id)
     const bReg = await registerViaInvitation(apiBase, t2Invite.inviteId, t2Invite.bootstrapSecret, 'b@example.com', 'B', bPass)
     const b = await login(apiBase, 'b@example.com', bPass, bReg.emergencyKit.secretKey)

@@ -91,3 +91,39 @@ jobs:
 
       - name: Validate acceptance coverage
         run: node scripts/validate-feature-coverage.mjs
+
+  web-e2e:
+    name: Web E2E (live backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Build the runnable fast-jar once; the orchestrator boots a fresh copy (fresh in-mem DB) per e2e file,
+      # because every suite registers its own single-owner-per-boot Server Owner.
+      - name: Build backend fast-jar
+        working-directory: backend
+        run: ./gradlew --no-daemon quarkusBuild
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run web E2E suites against a live backend
+        run: python3 scripts/run_web_e2e.py
