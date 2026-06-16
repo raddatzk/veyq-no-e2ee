@@ -6,11 +6,14 @@ import SwiftUI
 struct JournalView: View {
     @ObservedObject var store: GalleryStore
     @State private var editing = false
+    @State private var live = false
     @State private var draft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if editing {
+            if live {
+                LiveJournalView(store: store) { markdown in store.journalMarkdown = markdown; live = false }
+            } else if editing {
                 TextEditor(text: $draft)
                     .font(.system(size: 15, design: .monospaced))
                     .foregroundStyle(VeyqStyle.text)
@@ -32,6 +35,7 @@ struct JournalView: View {
             } else {
                 HStack {
                     Spacer()
+                    Button(T("journal.live")) { live = true }.tint(VeyqStyle.accent)
                     Button(T("journal.edit")) { draft = store.journalMarkdown; editing = true }.tint(VeyqStyle.accent)
                 }
                 if store.journalMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
