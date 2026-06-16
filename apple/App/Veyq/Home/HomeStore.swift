@@ -338,8 +338,11 @@ final class HomeStore: ObservableObject {
             }
             folders = entries.filter { $0.node.type == "FOLDER" }
             memories = entries.filter { $0.node.type == "MEMORY" }
-            covers = [:]
-            for m in memories { await loadCover(m, scope: scope, contentKey: contentKey) }
+            // Keep covers already decrypted for still-visible memories (covers are keyed by node id), so
+            // navigating back/forward doesn't re-download them; prune the rest and fetch only what's missing.
+            let visible = Set(memories.map { $0.node.id })
+            covers = covers.filter { visible.contains($0.key) }
+            for m in memories where covers[m.node.id] == nil { await loadCover(m, scope: scope, contentKey: contentKey) }
         } catch {
             self.error = "Konnte Inhalte nicht laden."
         }

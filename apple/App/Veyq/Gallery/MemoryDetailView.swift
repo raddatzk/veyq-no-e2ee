@@ -9,7 +9,9 @@ import VeyqCrypto
 /// the tiles out with the shared justified algorithm. Tapping a tile opens a lightbox.
 @MainActor
 final class GalleryStore: ObservableObject {
-    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double? }
+    // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
+    // an explicit save. Both refs fall back to the original for media without that derivative.
+    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?; let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String }
 
     let apiBase: String
     let session: Login.UnlockedSession
@@ -32,25 +34,54 @@ final class GalleryStore: ObservableObject {
     }
 
     func load() async {
-        do {
-            let media = try await Media.listMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId)
-            // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
-            let withMeta = media.compactMap { m -> (Media.MediaItem, Media.MediaMeta)? in
-                (try? Media.decodeMediaMeta(contentKey: contentKey, item: m)).map { (m, $0) }
-            }.sorted { $0.1.takenAt < $1.1.takenAt }
-            var result: [Tile] = []
-            for (m, meta) in withMeta {
-                let ref = m.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? m.original
-                let bytes = try await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)
-                if let img = UIImage(data: bytes) {
-                    result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height), takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng))
-                }
-            }
-            tiles = result
-        } catch {
-            // leave empty
+        let media = (try? await Media.listMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId)) ?? []
+        // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
+        let withMeta = media.compactMap { m -> (Media.MediaItem, Media.MediaMeta)? in
+            (try? Media.decodeMediaMeta(contentKey: contentKey, item: m)).map { (m, $0) }
+        }.sorted { $0.1.takenAt < $1.1.takenAt }
+        // Download the (small) thumbnails bound-parallel — Data is Sendable, so only the decode happens on the
+        // main actor after. A 50-image memory no longer serializes 50 round-trips before first render.
+        let thumbRefs = withMeta.map { $0.0.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? $0.0.original }
+        let bytesByIndex = await downloadThumbnails(thumbRefs)
+        var result: [Tile] = []
+        for (i, (m, meta)) in withMeta.enumerated() {
+            guard let bytes = bytesByIndex[i], let img = UIImage(data: bytes) else { continue }
+            let preview = m.derivatives.first(where: { $0.kind == "PREVIEW" })?.blob ?? m.original
+            result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height),
+                               takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType))
         }
+        tiles = result
         loading = false
+    }
+
+    /// Fetch thumbnail bytes for the given refs, at most 6 in flight, returned keyed by their input index.
+    private func downloadThumbnails(_ refs: [Media.BlobRef]) async -> [Int: Data] {
+        let apiBase = apiBase, session = session, scopeId = scopeId, contentKey = contentKey
+        return await withTaskGroup(of: (Int, Data?).self) { group in
+            var out: [Int: Data] = [:]
+            var next = 0
+            func add(_ i: Int) {
+                let ref = refs[i]
+                group.addTask { (i, try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)) }
+            }
+            while next < min(6, refs.count) { add(next); next += 1 }
+            for await (i, data) in group {
+                if let data { out[i] = data }
+                if next < refs.count { add(next); next += 1 }
+            }
+            return out
+        }
+    }
+
+    /// Decrypt a tile's PREVIEW (≈2048px) for the lightbox.
+    func loadPreviewImage(_ tile: Tile) async -> UIImage? {
+        guard let bytes = try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: tile.preview) else { return nil }
+        return UIImage(data: bytes)
+    }
+
+    /// Decrypt a tile's FULL-resolution original (only on an explicit save).
+    func loadOriginalData(_ tile: Tile) async -> Data? {
+        try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: tile.original)
     }
 
     func upload(_ datas: [Data]) async {
@@ -60,7 +91,8 @@ final class GalleryStore: ObservableObject {
             let exif = Self.exifGps(data)
             _ = try? await Media.uploadMedia(
                 apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId,
-                bytes: data, thumb: Self.thumbnail(data), takenAt: exif.takenAt ?? iso.string(from: Date()),
+                bytes: data, thumb: Self.thumbnail(data), preview: Self.preview(data),
+                takenAt: exif.takenAt ?? iso.string(from: Date()),
                 mimeType: "image/jpeg", lat: exif.lat, lng: exif.lng,
             )
         }
@@ -142,20 +174,25 @@ final class GalleryStore: ObservableObject {
         tracks.removeAll { $0.id == id }
     }
 
-    static func thumbnail(_ data: Data, maxDim: CGFloat = 400) -> Data? {
+    /// Downscale to fit `maxDim` (longest edge) as JPEG at `quality`; nil for non-images.
+    static func downscale(_ data: Data, maxDim: CGFloat, quality: CGFloat) -> Data? {
         guard let img = UIImage(data: data) else { return nil }
         let scale = min(1, maxDim / max(img.size.width, img.size.height))
         let size = CGSize(width: img.size.width * scale, height: img.size.height * scale)
         return UIGraphicsImageRenderer(size: size).image { _ in img.draw(in: CGRect(origin: .zero, size: size)) }
-            .jpegData(compressionQuality: 0.8)
+            .jpegData(compressionQuality: quality)
     }
+
+    static func thumbnail(_ data: Data) -> Data? { downscale(data, maxDim: 400, quality: 0.8) }   // gallery grid
+    static func preview(_ data: Data) -> Data? { downscale(data, maxDim: 2048, quality: 0.85) }   // lightbox
 }
 
 struct MemoryDetailView: View {
     @StateObject private var store: GalleryStore
     let name: String
-    @State private var lightbox: UIImage?
-    @State private var lightboxMediaId: String?
+    @State private var lightboxTile: GalleryStore.Tile?
+    @State private var lightboxImage: UIImage?   // the preview, loaded async; the thumbnail shows meanwhile
+    @State private var savingOriginal = false
     @State private var mediaDelArm = false
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showDownload = false
@@ -200,7 +237,7 @@ struct MemoryDetailView: View {
                             Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                         } else {
                             MemoryMapView(points: pts, tracks: store.tracks) { id in
-                                if let tile = store.tiles.first(where: { $0.id == id }) { lightbox = tile.image; lightboxMediaId = id }
+                                if let tile = store.tiles.first(where: { $0.id == id }) { openLightbox(tile) }
                             }
                         }
                         ForEach(store.tracks) { tr in
@@ -285,30 +322,56 @@ struct MemoryDetailView: View {
                 if let data = try? Data(contentsOf: url) { await store.importTrack(data) }
             }
         }
-        .fullScreenCover(item: Binding(get: { lightbox.map { LightboxImage(image: $0) } }, set: { _ in lightbox = nil; lightboxMediaId = nil })) { item in
+        .fullScreenCover(item: $lightboxTile) { tile in
             ZStack {
                 Color.black.ignoresSafeArea()
                 VStack(spacing: 16) {
-                    Image(uiImage: item.image).resizable().scaledToFit()
+                    Image(uiImage: lightboxImage ?? tile.image).resizable().scaledToFit()
                     HStack(spacing: 12) {
                         Button(T("cover.setAsCover")) {
-                            if let id = lightboxMediaId { Task { await store.setCover(id) } }
-                            lightbox = nil; lightboxMediaId = nil
+                            Task { await store.setCover(tile.id) }
+                            closeLightbox()
                         }
                         .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
+                        Button(savingOriginal ? T("detail.uploading") : T("detail.download")) { saveOriginal(tile) }
+                            .tint(.white).disabled(savingOriginal)
                         if !mediaDelArm {
                             Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
                         } else {
                             Button(T("delete.confirm")) {
-                                if let id = lightboxMediaId { Task { await store.deleteMedia(id) } }
-                                lightbox = nil; lightboxMediaId = nil; mediaDelArm = false
+                                Task { await store.deleteMedia(tile.id) }
+                                closeLightbox()
                             }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
                         }
-                        Button(T("common.close")) { lightbox = nil; lightboxMediaId = nil; mediaDelArm = false }.tint(.white)
+                        Button(T("common.close")) { closeLightbox() }.tint(.white)
                     }
                 }
                 .padding()
             }
+        }
+    }
+
+    /// Open the lightbox on `tile`: show its thumbnail instantly, then swap in the higher-res preview.
+    private func openLightbox(_ tile: GalleryStore.Tile) {
+        lightboxTile = tile
+        lightboxImage = nil
+        Task {
+            if let img = await store.loadPreviewImage(tile), lightboxTile?.id == tile.id { lightboxImage = img }
+        }
+    }
+    private func closeLightbox() { lightboxTile = nil; lightboxImage = nil; mediaDelArm = false }
+
+    /// Fetch THIS medium's full-resolution original and hand it to the share sheet (save to Files/Photos).
+    private func saveOriginal(_ tile: GalleryStore.Tile) {
+        guard !savingOriginal else { return }
+        savingOriginal = true
+        Task {
+            defer { savingOriginal = false }
+            guard let data = await store.loadOriginalData(tile) else { return }
+            let ext = (tile.mimeType.split(separator: "/").last.map(String.init) ?? "bin").replacingOccurrences(of: "jpeg", with: "jpg")
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(tile.id.prefix(8)).\(ext)")
+            guard (try? data.write(to: url)) != nil else { return }
+            shareItem = ShareItem(url: url)
         }
     }
 
@@ -332,15 +395,13 @@ struct MemoryDetailView: View {
                         .frame(width: t.width, height: t.height).clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .offset(x: t.left, y: t.top)
-                        .onTapGesture { lightbox = tile.image; lightboxMediaId = tile.id }
+                        .onTapGesture { openLightbox(tile) }
                 }
             }
         }
         .frame(width: width, height: layout.height, alignment: .topLeading)
     }
 }
-
-private struct LightboxImage: Identifiable { let id = UUID(); let image: UIImage }
 
 struct ShareItem: Identifiable { let id = UUID(); let url: URL }
 

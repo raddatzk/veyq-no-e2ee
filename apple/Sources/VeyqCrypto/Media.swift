@@ -142,12 +142,16 @@ public enum Media {
     /// The full client flow: upload the original bytes (chunked + deduped transparently) and any
     /// client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
     /// typed derivative — no special API.
-    public static func uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, bytes: Data, thumb: Data? = nil, takenAt: String, mimeType: String, lat: Double? = nil, lng: Double? = nil, chunkSize: Int = defaultChunkSize) async throws -> MediaItem {
+    public static func uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, bytes: Data, thumb: Data? = nil, preview: Data? = nil, takenAt: String, mimeType: String, lat: Double? = nil, lng: Double? = nil, chunkSize: Int = defaultChunkSize) async throws -> MediaItem {
         let original = try await uploadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, bytes: bytes, chunkSize: chunkSize)
         var derivatives: [(kind: String, blobId: String)] = []
         if let thumb = thumb {
             let t = try await uploadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, bytes: thumb, chunkSize: chunkSize)
             derivatives.append((kind: "THUMBNAIL", blobId: t.blobId))
+        }
+        if let preview = preview {
+            let p = try await uploadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, bytes: preview, chunkSize: chunkSize)
+            derivatives.append((kind: "PREVIEW", blobId: p.blobId))
         }
         let sealedMeta = try sealMediaMeta(contentKey: contentKey, meta: MediaMeta(takenAt: takenAt, lat: lat, lng: lng))
         return try await createMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, originalBlobId: original.blobId, sealedMeta: sealedMeta, mimeType: mimeType, derivatives: derivatives)

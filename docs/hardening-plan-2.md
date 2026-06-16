@@ -85,11 +85,14 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   erhaltend); `gallery.ts`/`share.ts` Tile-Loops darauf umgestellt.
   *Verifiziert: vue-tsc grün, 63 Unit-Tests, alle 28 Web-E2E + share-E2E grün; Media-E2E um den Preview-Tier
   erweitert (Thumbnail+Preview+Original = 3 distinkte Blobs, je byte-identisch zurück).* (C9-Web-Teil.)
-- [ ] **C5 · iOS — Upload PREVIEW + Render-Tiers** *(Feature, M)* — `MemoryDetailView.swift:145` (`preview`-Variante
-  2048/q0.85), `Media.swift:147` (`uploadMedia` lädt Preview-Derivat); Lightbox lädt **Preview** statt Thumbnail
-  (`MemoryDetailView.swift:292`), Download/Save-Button (Share-Sheet/Fotos) lädt Original on-demand.
-- [ ] **C6 · iOS — Galerie bounded-parallel + Downsampling** *(Perf/Memory, M)* — Thumbnail-Loads per `TaskGroup`
-  (~4–6 wide), `NSCache` statt Tiles dauerhaft halten; Cover-Cache nicht pro Level leeren (`HomeStore.swift`).
+- [x] **C5 · iOS — Upload PREVIEW + Render-Tiers** — `MemoryDetailView` `downscale(maxDim,quality)` (thumbnail
+  400/0.8 + preview 2048/0.85), `Media.uploadMedia` lädt das Preview-Derivat; Tile trägt `preview`/`original`,
+  Lightbox zeigt erst das Thumbnail und lädt dann die **Preview** nach; neuer „Download"-Button reicht das
+  Original ans Share-Sheet (Save to Files/Fotos), wie der Bulk-ZIP.
+- [x] **C6 · iOS — Galerie bounded-parallel + Cover-Cache** — Thumbnail-Bytes per `TaskGroup` (~6 in flight,
+  Data ist Sendable → Decode danach auf dem MainActor); `HomeStore` behält bereits entschlüsselte Cover über
+  Navigationen (prune auf sichtbare + nur Fehlende nachladen) statt sie pro Level zu verwerfen. iOS-App
+  kompiliert (xcodebuild, 0 Fehler).
 - [ ] **C7 · Android — Upload PREVIEW + Render-Tiers** *(Feature, M)* — `GalleryScreen.kt:191` (`preview`-Variante),
   `Media.kt:152` (`uploadMedia` lädt Preview-Derivat); Lightbox → **Preview** statt Thumbnail, Download/Save
   (MediaStore/Share) lädt Original on-demand.
