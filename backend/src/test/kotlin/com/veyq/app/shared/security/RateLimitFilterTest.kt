@@ -1,5 +1,6 @@
 package com.veyq.app.shared.security
 
+import java.util.Optional
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -8,7 +9,8 @@ import kotlin.test.assertEquals
  * property is "a client cannot pick its own rate-limit bucket by spoofing X-Forwarded-For".
  */
 class RateLimitFilterTest {
-    private fun filter(trustedProxies: String) = RateLimitFilter(RateLimiter(), enabled = true, trustedProxies = trustedProxies)
+    private fun filter(trustedProxies: String) =
+        RateLimitFilter(RateLimiter(), enabled = true, trustedProxies = Optional.of(trustedProxies))
 
     @Test
     fun `no trusted proxies — XFF is ignored, socket peer is the key`() {

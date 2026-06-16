@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.ext.Provider
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.net.InetAddress
+import java.util.Optional
 
 /**
  * Per-IP rate limiting for the abuse-prone unauthenticated endpoints. A request over its bucket's limit is
@@ -19,7 +20,8 @@ import java.net.InetAddress
 class RateLimitFilter(
     private val limiter: RateLimiter,
     @param:ConfigProperty(name = "veyq.ratelimit.enabled", defaultValue = "true") private val enabled: Boolean,
-    @param:ConfigProperty(name = "veyq.ratelimit.trusted-proxies", defaultValue = "") trustedProxies: String,
+    // Optional<String> because SmallRye converts an empty config value to "absent" (the default deployment).
+    @param:ConfigProperty(name = "veyq.ratelimit.trusted-proxies") trustedProxies: Optional<String>,
 ) : ContainerRequestFilter {
 
     @Inject
@@ -27,7 +29,7 @@ class RateLimitFilter(
 
     /** Proxy IPs/CIDRs whose appended X-Forwarded-For we may trust (empty = trust none, key on the socket). */
     private val trusted: List<CidrMatcher> =
-        trustedProxies.split(",").map(String::trim).filter(String::isNotEmpty).mapNotNull(CidrMatcher::parseOrNull)
+        trustedProxies.orElse("").split(",").map(String::trim).filter(String::isNotEmpty).mapNotNull(CidrMatcher::parseOrNull)
 
     /** (path-substring, limit, windowMs) — only POSTs to these paths are throttled. Generous vs real use. */
     private data class Bucket(val name: String, val match: String, val limit: Int, val windowMs: Long)
