@@ -86,8 +86,12 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   reads carry the real suite (no more hardcoded `"v1"`). Remaining: centralize `toWrap`/`requireSuite`/Base64/
   `unauthorized()` (cosmetic, deferred — folded into P4.4).
 - [ ] **P4.3 String → typed enums** for roles/status/scope-kind in entities (`Tenancy.kt:21`).
-- [ ] **P4.4 Base64 decode → 400 `INVALID_BLOB`** centrally instead of a generic 500.
-- [ ] **P4.5 `js-yaml` advisory** bump in `scripts/validate-feature-coverage.mjs` (dev-only).
+- [x] **P4.4 Base64 decode → 400 `INVALID_BLOB`** centrally. Added `MalformedInputMapper`
+  (`ExceptionMapper<IllegalArgumentException>` in `platform/error`) → 400 `INVALID_BLOB`, logged at WARN.
+  Safe because deliberate validation always throws `ApiException`; the only raw IAEs are bad base64 / enum
+  values from untrusted input. Verified live: a malformed `verifier` on `/api/setup/owner` now returns 400.
+- [x] **P4.5 `js-yaml` advisory** bump `^4.1.1` → `^4.2.0` (fixes GHSA-h67p-54hq-rp68, `npm audit` clean);
+  `scripts/validate-feature-coverage.mjs` still runs green.
 
 ## Phase 5 — Tests / CI
 - [ ] **P5.1 Fix `HomeView.test.ts`.** `.memory-name`/`.folder-card` exist in `HomeView.vue:361/372`, so the
