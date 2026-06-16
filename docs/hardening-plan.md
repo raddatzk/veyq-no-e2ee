@@ -121,6 +121,17 @@ Subsumes some of the P2.3 seed-race/cursor cleanup.
 
 ---
 
+### Backlog (future, not scheduled)
+- **Publish the Android Yrs binding as an AAR.** iOS already consumes a published library (YSwift,
+  github.com/y-crdt/yswift) — nothing to publish there. Android uses our own `yniffi` (Rust yrs + uniffi,
+  cross-compiled `.so` per ABI + generated Kotlin binding), currently committed into the repo
+  (`android/app/.../jniLibs`, `android/core/.../uniffi/yniffi/yniffi.kt`, host `.dylib`). Packaging it as a
+  `yrs-android` AAR (native libs + Kotlin binding + JNA) published to Maven Central / GitHub Packages would
+  let the app depend on it normally (drop the committed binaries) and give the ecosystem a ready Kotlin Yrs
+  binding (which it lacks — the reason we built one). Needs a publishing Gradle module + a cross-compile/
+  publish CI job (the existing `scripts/build-yrs.sh` does the build). The operator-blind relay/persistence
+  layer (JournalLiveProvider / JournalPersistence) is veyq-specific app logic, not a generic library.
+
 ### Dropped / refuted during verification
 - Session GC "missing" → **exists** (`SessionGc.kt @Scheduled 1h`).
 - Apple `randomBytes` "not a CSPRNG / catastrophic" → uses `SystemRandomNumberGenerator` (documented CSPRNG
