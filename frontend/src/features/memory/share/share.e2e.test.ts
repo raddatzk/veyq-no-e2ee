@@ -62,6 +62,7 @@ run('share e2e', () => {
     const uKey = new URLSearchParams(uShare.link.slice(uShare.link.indexOf('#') + 1)).get('k')!
     const uCtx = await resolvePublicShare(apiBase, uShare.shareId, uKey)
     expect(uCtx.role).toBe('UPLOADER')
+    expect(uCtx.rootName).toBe('') // blind drop-off: the server withholds the root node, so no album name leaks
     await uploadShareMedia(uCtx, { bytes: Uint8Array.from({ length: 50 }, (_, i) => i & 0xff), takenAt: '2026-06-01T10:00:00Z', mimeType: 'image/jpeg' })
     await expect(listShareMedia(uCtx, uCtx.rootNodeId)).rejects.toThrow() // no read rights
 

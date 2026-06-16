@@ -43,8 +43,8 @@ import kotlinx.serialization.Contextual
  * @param passwordProtected 
  * @param notices 
  * @param wrappedContentKey 
- * @param root 
  * @param passwordSalt 
+ * @param root 
  */
 @Serializable
 
@@ -71,11 +71,11 @@ data class PublicShare (
     @SerialName(value = "wrappedContentKey")
     val wrappedContentKey: Blob,
 
-    @SerialName(value = "root")
-    val root: MemoryNode,
-
     @SerialName(value = "passwordSalt")
-    val passwordSalt: Blob? = null
+    val passwordSalt: Blob? = null,
+
+    @SerialName(value = "root")
+    val root: MemoryNode? = null
 
 ) {
 

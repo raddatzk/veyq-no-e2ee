@@ -429,7 +429,10 @@ components:
         markdown: { type: string }
     PublicShare:
       type: object
-      required: [shareId, scopeId, rootNodeId, role, passwordProtected, notices, wrappedContentKey, root]
+      # `root` (the shared node, incl. its sealed name) is returned ONLY to roles that can read content.
+      # An UPLOADER is a blind drop-off and must not learn metadata: it gets rootNodeId (to target the upload)
+      # + wrappedContentKey (to seal its contribution) but never the root node.
+      required: [shareId, scopeId, rootNodeId, role, passwordProtected, notices, wrappedContentKey]
       properties:
         shareId: { type: string }
         scopeId: { type: string }

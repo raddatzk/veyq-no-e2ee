@@ -74,7 +74,7 @@ async function load(password?: string) {
   try {
     const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey, password)
     ctx.value = c
-    title.value = c.rootName
+    title.value = c.rootName || t('share.uploadOnlyTitle') // uploader gets no album name (blind drop-off)
     needPassword.value = false
     // Consent gate: present any not-yet-accepted notices and block content until the guest clicks Accept.
     pendingNotices.value = c.notices.filter((n) => localStorage.getItem(noticeKey(c.shareId, n)) !== 'true')

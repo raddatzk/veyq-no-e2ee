@@ -56,8 +56,10 @@ class PublicShareTreeHandler(
             passwordProtected = share.passwordSalt != null,
             passwordSalt = share.passwordSalt?.let { Blob(suiteId = "v1", bytes = enc.encodeToString(it)) },
             notices = notices(share),
+            // The content key is required even for a blind UPLOADER (it seals its own contribution), but the
+            // root node carries the sealed name — metadata an uploader must not see. Withhold it for non-readers.
             wrappedContentKey = Blob(suiteId = share.suiteId, bytes = enc.encodeToString(share.wrappedContentKey)),
-            root = ShareHandler.nodeToApi(root, share.scopeId, enc),
+            root = if (ShareHandler.canRead(share.role)) ShareHandler.nodeToApi(root, share.scopeId, enc) else null,
         )
     }
 

@@ -21,9 +21,9 @@ public struct PublicShare: Codable {
     public private(set) var passwordSalt: Blob?
     public private(set) var notices: [ShareNotice]
     public private(set) var wrappedContentKey: Blob
-    public private(set) var root: MemoryNode
+    public private(set) var root: MemoryNode?
 
-    public init(shareId: String, scopeId: String, rootNodeId: String, role: ShareRole, passwordProtected: Bool, passwordSalt: Blob? = nil, notices: [ShareNotice], wrappedContentKey: Blob, root: MemoryNode) {
+    public init(shareId: String, scopeId: String, rootNodeId: String, role: ShareRole, passwordProtected: Bool, passwordSalt: Blob? = nil, notices: [ShareNotice], wrappedContentKey: Blob, root: MemoryNode? = nil) {
         self.shareId = shareId
         self.scopeId = scopeId
         self.rootNodeId = rootNodeId
@@ -59,7 +59,7 @@ public struct PublicShare: Codable {
         try container.encodeIfPresent(passwordSalt, forKey: .passwordSalt)
         try container.encode(notices, forKey: .notices)
         try container.encode(wrappedContentKey, forKey: .wrappedContentKey)
-        try container.encode(root, forKey: .root)
+        try container.encodeIfPresent(root, forKey: .root)
     }
 }
 
