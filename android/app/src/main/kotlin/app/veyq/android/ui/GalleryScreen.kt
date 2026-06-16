@@ -55,7 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.DisposableEffect
 import app.veyq.crypto.Journal
+import app.veyq.crypto.JournalLiveProvider
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import app.veyq.crypto.Share
@@ -117,6 +120,12 @@ class GalleryController(
         runCatching { withContext(Dispatchers.IO) { Journal.updateJournal(apiBase, session, scopeId, contentKey, nodeId, markdown) } }
             .onSuccess { journalMarkdown = markdown }
         journalSaving = false
+    }
+
+    /** A live-journal client for this memory (native Yrs over the operator-blind relay). */
+    fun newLiveProvider(): JournalLiveProvider {
+        val wsBase = apiBase.replace("http", "ws")
+        return JournalLiveProvider("$wsBase/ws/journal/$scopeId/$nodeId?token=${session.sessionToken}", contentKey)
     }
 
     suspend fun deleteMedia(mediaId: String) {
@@ -479,10 +488,13 @@ private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
 @Composable
 private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope) {
     var editing by remember { mutableStateOf(false) }
+    var live by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { controller.loadJournal() }
 
-    if (editing) {
+    if (live) {
+        LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false; scope.launch { controller.saveJournal(md) } }
+    } else if (editing) {
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it },
@@ -503,6 +515,7 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
         }
     } else {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { live = true }) { Text(L10n.t("journal.live"), color = Veyq.Accent) }
             TextButton(onClick = { draft = controller.journalMarkdown; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
         }
         if (controller.journalMarkdown.isBlank()) {
@@ -511,6 +524,40 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
             MarkdownText(controller.journalMarkdown)
         }
     }
+}
+
+/** Live collaborative journal editing — native Yrs over the encrypted relay, wire-compatible with web/iOS. */
+@Composable
+private fun LiveJournalSection(controller: GalleryController, onClose: (String) -> Unit) {
+    var text by remember { mutableStateOf(controller.journalMarkdown) }
+    var connected by remember { mutableStateOf(false) }
+    var ready by remember { mutableStateOf(false) }
+    val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
+    val provider = remember { controller.newLiveProvider() }
+    DisposableEffect(Unit) {
+        provider.onStatus = { c -> main.post { connected = c } }
+        provider.onText = { s -> main.post { if (text != s) text = s } }
+        val initial = controller.journalMarkdown
+        main.postDelayed({ provider.seedIfEmpty(initial); text = provider.currentText; ready = true }, 800)
+        onDispose { provider.destroy() }
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (connected) Color(0xFF10B981) else Veyq.Muted))
+        Text(if (connected) L10n.t("journal.live") else L10n.t("journal.connecting"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+        TextButton(onClick = { onClose(provider.currentText) }) { Text(L10n.t("journal.done"), color = Veyq.Accent) }
+    }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { v -> text = v; if (ready) provider.applyLocalText(v) },
+        modifier = Modifier.fillMaxWidth().height(280.dp),
+        shape = RoundedCornerShape(Veyq.Radius),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
+            focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+            focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+        ),
+    )
 }
 
 /** Renders a safe Markdown subset (headings, bullet/ordered lists, paragraphs) with inline bold/italic/code. */

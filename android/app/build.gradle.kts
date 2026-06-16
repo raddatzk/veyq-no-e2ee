@@ -38,6 +38,8 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    // JNA (Android aar) loads the native Yrs lib (jniLibs/*/libuniffi_yniffi.so) for the live journal.
+    implementation("net.java.dev.jna:jna:5.14.0@aar")
 
     implementation("androidx.core:core-ktx:1.13.1")
     val composeBom = platform("androidx.compose:compose-bom:2025.10.01")

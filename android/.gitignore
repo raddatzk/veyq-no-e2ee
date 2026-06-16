@@ -1,3 +1,6 @@
 build/
 .gradle/
 local.properties
+
+# Native Yrs build workspace (regenerate via scripts/build-yrs.sh; outputs are committed)
+yrs-android/
