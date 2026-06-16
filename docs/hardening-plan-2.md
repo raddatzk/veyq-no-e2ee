@@ -51,10 +51,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   AEAD-Fehler. NFC war bereits konsistent (alle drei normalisieren). Fix: iOS/Android `inviteArgon` 65536 →
   **32768** (= Web + 32-MiB-Projektstandard). Verifiziert: Params auf allen drei Plattformen gleich,
   Web-Round-Trip-Unit-Test grün, iOS/Android kompilieren. Cross-Platform-Pin folgt in **B2**.
-- [ ] **B2 · Conformance-Lücken schließen** *(Tests/Crypto, S)* — `docs/api/crypto-vectors/v1.json`.
-  (a) `journalSeal`→`journalOpen` Round-Trip pro Plattform asserten (heute nur `open` gepinnt);
-  (b) den vorhandenen, aber ungenutzten `hkdf_sha256_rfc5869_case1`-KAT in allen drei Conformance-Tests
-  asserten. Optional Invite-Passphrase-Vektor ergänzen (deckt B1 ab).
+- [x] **B2 · Conformance-Lücken geschlossen** *(Tests/Crypto, S)* — (a) `journalSeal`→`journalOpen`
+  Round-Trip pro Plattform asserted (Seal-Seite war ungetestet); (b) der `hkdf_sha256_rfc5869_case1`-KAT
+  jetzt in allen drei Conformance-Tests (Web `hkdfSha256`-Export, iOS via `@testable`, Android `hkdf`
+  `private`→`internal`). Alle drei Suiten grün. Kein extra Invite-Vektor nötig: `recovery_argon2id` pinnt
+  `kekRecovery` bereits cross-platform — zusammen mit B1 (Param-Alignment) ist die Invite-KEK abgedeckt.
 - [ ] **B3 · Journal erster Append serialisieren statt 500** *(Korrektheit, S)* — `JournalHandler.kt:122` (`lockedJournal`).
   Zwei parallele Erst-Appends ⇒ Unique-Violation. Fix: leere Journal-Row bei Node-Erstellung anlegen
   **oder** Constraint-Violation fangen + Lock-Pfad retry.

@@ -33,6 +33,12 @@ class V1ConformanceTest {
     fun conformance() {
         assertEquals("v1", v.getString("suite"))
 
+        val hk = v.getJSONObject("primitives").getJSONObject("hkdf_sha256_rfc5869_case1")
+        assertEquals(
+            hk.getString("okm"),
+            hex(V1.hkdf(unhex(hk.getString("ikm")), unhex(hk.getString("salt")), unhex(hk.getString("info")), hk.getInt("length"))),
+        )
+
         val aes = v.getJSONObject("primitives").getJSONObject("aes256gcm")
         assertEquals(
             aes.getString("ciphertext_and_tag"),
@@ -81,6 +87,9 @@ class V1ConformanceTest {
         assertEquals(rt.getString("tag"), hex(V1.recoveryAuthTag(unhex(rt.getString("masterKey")))))
         val jo = v.getJSONObject("journal_open")
         assertEquals(jo.getString("plaintext"), hex(V1.journalOpen(unhex(jo.getString("contentKey")), unhex(jo.getString("blob")))!!))
+        // round-trip the SEAL side too (randomized salt/nonce → can't pin a fixed blob)
+        val jSealed = V1.journalSeal(unhex(jo.getString("contentKey")), unhex(jo.getString("plaintext")))
+        assertEquals(jo.getString("plaintext"), hex(V1.journalOpen(unhex(jo.getString("contentKey")), jSealed)!!))
         val f = v.getJSONObject("chunk_frame")
         assertEquals(
             f.getString("frame"),

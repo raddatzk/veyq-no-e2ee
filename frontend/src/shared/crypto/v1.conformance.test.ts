@@ -18,6 +18,11 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(vectors.suite).toBe('v1')
   })
 
+  it('HKDF-SHA256 (RFC 5869 case 1)', () => {
+    const h = vectors.primitives.hkdf_sha256_rfc5869_case1
+    expect(hex(v1.hkdfSha256(unhex(h.ikm), unhex(h.salt), unhex(h.info), h.length))).toBe(h.okm)
+  })
+
   it('AES-256-GCM', () => {
     const p = vectors.primitives.aes256gcm
     expect(hex(v1.aeadSeal(unhex(p.key), unhex(p.nonce), unhex(p.plaintext), unhex(p.aad)))).toBe(
@@ -85,6 +90,10 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
   it('journal seal (per-message sub-key)', () => {
     const j = vectors.journal_open
     expect(hex(v1.journalOpen(unhex(j.contentKey), unhex(j.blob)))).toBe(j.plaintext)
+    // round-trip the SEAL side too (randomized salt/nonce, so we can't pin a fixed blob — but our own seal
+    // must open to the same plaintext, exercising the seal-side HKDF/layout the fixed-blob vector can't).
+    const sealed = v1.journalSeal(unhex(j.contentKey), unhex(j.plaintext))
+    expect(hex(v1.journalOpen(unhex(j.contentKey), sealed))).toBe(j.plaintext)
   })
 
   it('chunked-AEAD frame (resumable upload / streaming)', () => {

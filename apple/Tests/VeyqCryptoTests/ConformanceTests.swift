@@ -35,7 +35,14 @@ final class ConformanceTests: XCTestCase {
         let v = try loadVectors()
         XCTAssertEqual(v["suite"] as? String, "v1")
 
-        let aes = (v["primitives"] as! [String: Any])["aes256gcm"] as! [String: String]
+        let prim = v["primitives"] as! [String: Any]
+        let hk = prim["hkdf_sha256_rfc5869_case1"] as! [String: Any]
+        XCTAssertEqual(
+            toHex(V1.hkdf(ikm: hex(hk["ikm"] as! String), salt: hex(hk["salt"] as! String),
+                          info: hex(hk["info"] as! String), len: (hk["length"] as! NSNumber).intValue)),
+            hk["okm"] as! String, "HKDF-SHA256 RFC 5869")
+
+        let aes = prim["aes256gcm"] as! [String: String]
         XCTAssertEqual(
             toHex(try V1.aeadSeal(key: hex(aes["key"]!), nonce: hex(aes["nonce"]!),
                                   plaintext: hex(aes["plaintext"]!), aad: hex(aes["aad"]!))),
@@ -94,6 +101,9 @@ final class ConformanceTests: XCTestCase {
 
         let jo = v["journal_open"] as! [String: String]
         XCTAssertEqual(toHex(V1.journalOpen(contentKey: hex(jo["contentKey"]!), blob: hex(jo["blob"]!))!), jo["plaintext"]!, "journal seal")
+        // round-trip the SEAL side too (randomized salt/nonce → can't pin a fixed blob)
+        let jSealed = V1.journalSeal(contentKey: hex(jo["contentKey"]!), plaintext: hex(jo["plaintext"]!))
+        XCTAssertEqual(toHex(V1.journalOpen(contentKey: hex(jo["contentKey"]!), blob: jSealed)!), jo["plaintext"]!, "journal seal round-trip")
 
         let f = v["chunk_frame"] as! [String: Any]
         XCTAssertEqual(

@@ -44,6 +44,10 @@ export const decodeKdfParams = (b: Uint8Array): { params: ArgonParams; salt: Uin
   return { params: { t: dv.getUint32(0), m: dv.getUint32(4), p: dv.getUint32(8), dkLen: dv.getUint32(12) }, salt: b.slice(16) }
 }
 
+/** HKDF-SHA256 as every v1 derivation uses it — exposed so the conformance suite can pin the RFC 5869 KAT. */
+export const hkdfSha256 = (ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, len: number): Uint8Array =>
+  hkdf(sha256, ikm, salt, info, len)
+
 export type HybridPublic = { x: Uint8Array; m: Uint8Array }
 export type HybridSecret = { x: Uint8Array; m: Uint8Array }
 

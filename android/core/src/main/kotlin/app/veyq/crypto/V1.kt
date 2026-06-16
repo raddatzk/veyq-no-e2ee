@@ -60,7 +60,7 @@ object V1 {
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
 
-    private fun hkdf(ikm: ByteArray, salt: ByteArray, info: ByteArray, len: Int): ByteArray {
+    internal fun hkdf(ikm: ByteArray, salt: ByteArray, info: ByteArray, len: Int): ByteArray { // internal: pinned by the RFC 5869 conformance KAT
         val gen = HKDFBytesGenerator(SHA256Digest())
         gen.init(HKDFParameters(ikm, salt, info))
         val out = ByteArray(len)
