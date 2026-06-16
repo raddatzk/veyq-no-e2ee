@@ -20,7 +20,10 @@ export class EncryptedRelayProvider {
   onStatus: ((connected: boolean) => void) | null = null
   private destroyed = false
 
-  constructor(private url: string, readonly doc: Y.Doc, private contentKey: Uint8Array) {
+  // `urlFactory` is called on EVERY (re)connect so each handshake gets a fresh single-use relay ticket — a
+  // baked-in URL would break reconnection once its ticket is consumed. (Share connections return a constant
+  // URL: the `?share=` token is a reusable capability.)
+  constructor(private urlFactory: () => Promise<string>, readonly doc: Y.Doc, private contentKey: Uint8Array) {
     this.awareness = new awarenessProtocol.Awareness(doc)
     this._docUpdate = this._docUpdate.bind(this)
     this._awarenessUpdate = this._awarenessUpdate.bind(this)
@@ -36,8 +39,16 @@ export class EncryptedRelayProvider {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(this.seal(msg).slice().buffer)
   }
 
-  private connect() {
-    const ws = new WebSocket(this.url)
+  private async connect() {
+    let url: string
+    try {
+      url = await this.urlFactory()
+    } catch {
+      if (!this.destroyed) setTimeout(() => this.connect(), 1500) // ticket fetch failed — retry the whole connect
+      return
+    }
+    if (this.destroyed) return
+    const ws = new WebSocket(url)
     ws.binaryType = 'arraybuffer'
     this.ws = ws
     ws.onopen = () => {

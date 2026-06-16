@@ -16,17 +16,23 @@ final class LiveJournalModel: ObservableObject {
 
     func start(store: GalleryStore, initial: String) {
         text = initial
+        // Authenticate the relay with a fresh short-lived single-use ticket on every (re)connect — never the
+        // session token in the URL.
         let wsBase = store.apiBase.replacingOccurrences(of: "http", with: "ws")
-        guard let url = URL(string: "\(wsBase)/ws/journal/\(store.scopeId)/\(store.nodeId)?token=\(store.session.sessionToken)") else { return }
-        let p = JournalLiveProvider(url: url, contentKey: store.contentKey)
-        p.onStatus = { [weak self] c in Task { @MainActor in self?.connected = c } }
-        p.onText = { [weak self] s in Task { @MainActor in guard let self else { return }; if self.text != s { self.text = s } } }
-        p.onPeers = { [weak self] list in Task { @MainActor in self?.peers = list } }
-        p.setUser(name: store.session.user.displayName, color: Self.colors.randomElement() ?? "#5b4df5")
-        p.configurePersistence(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, nodeId: store.nodeId)
-        provider = p
-        // Reconstruct from the operator-blind store, then bootstrap a legacy Markdown-only journal into the CRDT.
+        let memberUrl: () async -> URL? = {
+            guard let ticket = try? await JournalPersistence.fetchLiveTicket(apiBase: store.apiBase, session: store.session) else { return nil }
+            let enc = ticket.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ticket
+            return URL(string: "\(wsBase)/ws/journal/\(store.scopeId)/\(store.nodeId)?ticket=\(enc)")
+        }
         Task { @MainActor in
+            let p = JournalLiveProvider(urlFactory: memberUrl, contentKey: store.contentKey)
+            p.onStatus = { [weak self] c in Task { @MainActor in self?.connected = c } }
+            p.onText = { [weak self] s in Task { @MainActor in guard let self else { return }; if self.text != s { self.text = s } } }
+            p.onPeers = { [weak self] list in Task { @MainActor in self?.peers = list } }
+            p.setUser(name: store.session.user.displayName, color: Self.colors.randomElement() ?? "#5b4df5")
+            p.configurePersistence(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, nodeId: store.nodeId)
+            provider = p
+            // Reconstruct from the operator-blind store, then bootstrap a legacy Markdown-only journal into the CRDT.
             await p.loadPersisted()
             if p.currentText.isEmpty, !initial.isEmpty { p.applyLocalText(initial); self.scheduleFlush() }
             self.text = p.currentText

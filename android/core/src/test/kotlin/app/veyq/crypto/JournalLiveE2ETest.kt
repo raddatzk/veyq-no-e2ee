@@ -30,9 +30,10 @@ class JournalLiveE2ETest {
         val ck = ScopeContent.getOrCreateContentKey(apiBase, session, scope)
 
         val wsBase = apiBase.replace("http", "ws")
-        val url = "$wsBase/ws/journal/${scope.scopeId}/n1?token=${session.sessionToken}"
-        val a = JournalLiveProvider(url, ck)
-        val b = JournalLiveProvider(url, ck)
+        // fresh single-use ticket per connect — the session token never rides the URL
+        val urlFactory = { "$wsBase/ws/journal/${scope.scopeId}/n1?ticket=${JournalPersistence.fetchLiveTicket(apiBase, session)}" }
+        val a = JournalLiveProvider(urlFactory, ck)
+        val b = JournalLiveProvider(urlFactory, ck)
         val bPeers = java.util.concurrent.atomic.AtomicReference<List<JournalLiveProvider.Peer>>(emptyList())
         b.onPeers = { bPeers.set(it) }
         waitFor { a.currentText == "" && b.currentText == "" } // both connected

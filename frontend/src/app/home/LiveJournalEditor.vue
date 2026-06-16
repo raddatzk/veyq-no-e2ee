@@ -13,7 +13,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { yCollab } from 'y-codemirror.next'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { appendJournalUpdate, compactJournal, loadJournalDoc, PERSISTENCE_ORIGIN } from '../../features/memory/journalLive/journalPersistence'
+import { appendJournalUpdate, compactJournal, fetchJournalLiveTicket, loadJournalDoc, PERSISTENCE_ORIGIN } from '../../features/memory/journalLive/journalPersistence'
 import { EncryptedRelayProvider } from '../../features/memory/journalLive/encryptedProvider'
 import type { ActiveSpace } from '../../features/home/home'
 
@@ -62,8 +62,13 @@ function onLocalUpdate(update: Uint8Array, origin: unknown) {
 
 onMounted(async () => {
   const wsBase = session.apiBase.replace(/^http/, 'ws').replace(/\/$/, '')
-  const url = `${wsBase}/ws/journal/${scopeId}/${props.nodeId}?token=${encodeURIComponent(session.unlocked!.sessionToken)}`
-  const p = new EncryptedRelayProvider(url, doc, props.active.contentKey)
+  // Authenticate the relay with a fresh short-lived single-use ticket on every (re)connect — never the
+  // session token in the URL.
+  const memberUrl = async () => {
+    const ticket = await fetchJournalLiveTicket(session.apiBase, session.unlocked!)
+    return `${wsBase}/ws/journal/${scopeId}/${props.nodeId}?ticket=${encodeURIComponent(ticket)}`
+  }
+  const p = new EncryptedRelayProvider(memberUrl, doc, props.active.contentKey)
   provider.value = p
   p.awareness.setLocalStateField('user', { name: session.unlocked!.user.displayName, color, colorLight: color + '33' })
   p.onStatus = (c) => { connected.value = c }

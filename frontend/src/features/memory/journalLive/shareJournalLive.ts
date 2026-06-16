@@ -29,5 +29,6 @@ export async function loadShareJournalDoc(apiBase: string, shareId: string, node
 export function subscribeShareJournal(apiBase: string, scopeId: string, nodeId: string, shareId: string, contentKey: Uint8Array, doc: Y.Doc): EncryptedRelayProvider {
   const wsBase = apiBase.replace(/^http/, 'ws').replace(/\/$/, '')
   const url = `${wsBase}/ws/journal/${scopeId}/${nodeId}?share=${encodeURIComponent(shareId)}`
-  return new EncryptedRelayProvider(url, doc, contentKey)
+  // the `?share=` token is a reusable capability, so a constant URL factory is fine across reconnects
+  return new EncryptedRelayProvider(() => Promise.resolve(url), doc, contentKey)
 }

@@ -34,6 +34,17 @@ function auth(session: UnlockedSession) {
   return { authorization: `Bearer ${session.sessionToken}` }
 }
 
+/**
+ * Exchange the Bearer session for a short-lived single-use relay ticket, so the live-journal WebSocket can
+ * authenticate via `?ticket=` rather than carrying the session token in the URL (which leaks into proxy
+ * access logs / browser history).
+ */
+export async function fetchJournalLiveTicket(apiBase: string, session: UnlockedSession): Promise<string> {
+  const res = await fetch(`${apiBase}/api/journal-live/ticket`, { method: 'POST', headers: auth(session) })
+  if (!res.ok) throw new Error(`journal-live ticket failed: ${res.status} ${await res.text()}`)
+  return (await res.json()).ticket
+}
+
 /** Reconstruct the journal into `doc` from the server's snapshot + update log. Returns the max seq applied. */
 export async function loadJournalDoc(
   apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, contentKey: Uint8Array, doc: Y.Doc,

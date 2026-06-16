@@ -11,7 +11,9 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     private let text: YText
     private let proto: YProtocol
     private let contentKey: Data
-    private let url: URL
+    // Called on EVERY (re)connect so each handshake gets a fresh single-use relay ticket (a baked-in URL would
+    // break reconnection once its ticket is consumed). Share connections return a constant URL.
+    private let urlFactory: () async -> URL?
     private var task: URLSessionWebSocketTask?
     private var lastSentSV: [UInt8] = []
     private var closed = false
@@ -41,8 +43,8 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     public var onStatus: ((Bool) -> Void)?
     public var onPeers: (([Peer]) -> Void)?
 
-    public init(url: URL, contentKey: Data) {
-        self.url = url
+    public init(urlFactory: @escaping () async -> URL?, contentKey: Data) {
+        self.urlFactory = urlFactory
         self.contentKey = contentKey
         self.text = doc.getOrCreateText(named: "journal")
         self.proto = YProtocol(document: doc)
@@ -96,11 +98,19 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     // MARK: - websocket
 
     private func connect() {
-        let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
-        let t = session.webSocketTask(with: url)
-        task = t
-        t.resume()
-        receive()
+        Task { [weak self] in
+            guard let self, !self.closed else { return }
+            guard let url = await self.urlFactory() else { // ticket fetch failed — retry the whole connect
+                if !self.closed { try? await Task.sleep(nanoseconds: 1_500_000_000); self.connect() }
+                return
+            }
+            if self.closed { return }
+            let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+            let t = session.webSocketTask(with: url)
+            self.task = t
+            t.resume()
+            self.receive()
+        }
     }
 
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol proto: String?) {

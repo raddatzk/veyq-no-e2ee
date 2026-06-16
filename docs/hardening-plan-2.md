@@ -19,11 +19,14 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   (`veyq.ratelimit.trusted-proxies`, CIDR/IP, leer = keiner) — dann der rechteste Nicht-Proxy-Hop, sonst der
   Socket-Peer. Spoofing des Headers mintet keinen frischen Bucket mehr. Pure `resolveClientIp` + 5 Unit-Tests
   (IPv4/IPv6/CIDR, untrusted Peer, kein XFF).
-- [ ] **A2 · Session-Token raus aus der WebSocket-URL-Query** *(Security, plattformübergreifend, M)* —
-  `frontend/.../LiveJournalEditor.vue:65`, `shareJournalLive.ts:32`, iOS `LiveJournalView.swift:20`,
-  Android `GalleryScreen.kt:141`. Query-Strings landen in Proxy-/Access-Logs & History. Fix: kurzlebiges
-  Single-Use-WS-Ticket (POST → Token) **oder** `Sec-WebSocket-Protocol`-Wert; Backend-Relay entsprechend.
-  (Mobile dabei zugleich percent-encoden, falls Ticket-Weg nicht sofort kommt.)
+- [x] **A2 · Session-Token raus aus der WebSocket-URL-Query** *(Security, plattformübergreifend, M)* —
+  Neuer `JournalLiveTicketService` + `POST /api/journal-live/ticket` (authed → kurzlebiges 30s-Single-Use-
+  Ticket); der Relay authentifiziert Member jetzt über `?ticket=` statt `?token=` (Session-Token nie in der
+  URL). **Wichtig:** alle drei Provider holen ein *frisches* Ticket pro (Re)Connect via URL-Factory — ein
+  fest verdrahtetes Ticket würde Reconnect brechen, sobald es verbraucht ist (Web `EncryptedRelayProvider`,
+  iOS/Android `JournalLiveProvider`). Share-Pfad (`?share=`) unverändert (wiederverwendbares Capability).
+  Verifiziert: Web journalLive- + persistence-E2E grün (Member-Konvergenz + Bad-Ticket-Reject + Share-Live);
+  Android `:core`/:app + iOS-Package kompilieren.
 - [x] **A3 · Share-Contribute kann fremde Scope-Blobs anhängen (IDOR)** *(Security, S)* —
   `PublicShareContributeHandler.createShareMedia` prüft jetzt, dass `originalBlobId` + jedes Derivat-`blobId`
   von einem COMPLETED-Upload **dieses** Shares stammen (`createdBy == "share:<id>"`, via

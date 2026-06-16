@@ -18,9 +18,13 @@ final class JournalLiveE2ETests: XCTestCase {
         let ck = try await ScopeContent.getOrCreateContentKey(apiBase: apiBase, session: session, scope: scope)
 
         let wsBase = apiBase.replacingOccurrences(of: "http", with: "ws")
-        let url = URL(string: "\(wsBase)/ws/journal/\(scope.scopeId)/n1?token=\(session.sessionToken)")!
-        let a = JournalLiveProvider(url: url, contentKey: ck)
-        let b = JournalLiveProvider(url: url, contentKey: ck)
+        // fresh single-use ticket per connect — the session token never rides the URL
+        let urlFactory: () async -> URL? = {
+            guard let ticket = try? await JournalPersistence.fetchLiveTicket(apiBase: apiBase, session: session) else { return nil }
+            return URL(string: "\(wsBase)/ws/journal/\(scope.scopeId)/n1?ticket=\(ticket)")
+        }
+        let a = JournalLiveProvider(urlFactory: urlFactory, contentKey: ck)
+        let b = JournalLiveProvider(urlFactory: urlFactory, contentKey: ck)
         let bPeers = PeerBox()
         b.onPeers = { bPeers.set($0) }
 

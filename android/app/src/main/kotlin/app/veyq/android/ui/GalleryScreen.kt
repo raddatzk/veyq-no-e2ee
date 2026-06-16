@@ -138,7 +138,11 @@ class GalleryController(
     /** A live-journal client for this memory (native Yrs over the operator-blind relay + CRDT store). */
     fun newLiveProvider(): JournalLiveProvider {
         val wsBase = apiBase.replace("http", "ws")
-        return JournalLiveProvider("$wsBase/ws/journal/$scopeId/$nodeId?token=${session.sessionToken}", contentKey).also {
+        // Fresh single-use ticket per (re)connect (fetched on the provider's background thread) — never the
+        // session token in the URL.
+        return JournalLiveProvider({
+            "$wsBase/ws/journal/$scopeId/$nodeId?ticket=${JournalPersistence.fetchLiveTicket(apiBase, session)}"
+        }, contentKey).also {
             it.configurePersistence(apiBase, session, scopeId, nodeId)
         }
     }

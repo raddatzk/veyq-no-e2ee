@@ -4,7 +4,6 @@ import com.veyq.app.features.memory.share.ShareHandler
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ShareRepository
 import com.veyq.app.shared.security.ScopeAccessGuard
-import com.veyq.app.shared.security.SessionService
 import io.quarkus.websockets.next.OnBinaryMessage
 import io.quarkus.websockets.next.OnClose
 import io.quarkus.websockets.next.OnOpen
@@ -30,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @WebSocket(path = "/ws/journal/{scopeId}/{nodeId}")
 class JournalRelay(
-    private val sessions: SessionService,
+    private val tickets: JournalLiveTicketService,
     private val guard: ScopeAccessGuard,
     private val connections: OpenConnections,
     private val shares: ShareRepository,
@@ -55,9 +54,10 @@ class JournalRelay(
         c.pathParam("scopeId") == sender.pathParam("scopeId") && room(c) == room(sender)
 
     /**
-     * Authenticate on connect. A scope MEMBER (session token + active grant) may read AND write. A read-capable
-     * public-share guest (`?share=<id>` over `canRead` + the shared subtree) may live-READ only — it is marked
-     * receive-only, so journal editing stays member-only. Anyone else is closed.
+     * Authenticate on connect. A scope MEMBER presents a short-lived single-use `?ticket=` (minted via
+     * POST /api/journal-live/ticket with its Bearer session — so the long-lived token never rides the URL) and
+     * may read AND write. A read-capable public-share guest (`?share=<id>` over `canRead` + the shared subtree)
+     * may live-READ only — it is marked receive-only, so journal editing stays member-only. Anyone else is closed.
      */
     @OnOpen
     @Blocking
@@ -65,7 +65,7 @@ class JournalRelay(
     fun onOpen(connection: WebSocketConnection) {
         val scopeId = connection.pathParam("scopeId")
         val nodeId = connection.pathParam("nodeId")
-        val userId = sessions.resolve(queryParam(connection, "token")?.let { "Bearer $it" })
+        val userId = queryParam(connection, "ticket")?.let { tickets.consume(it) }
         val member = userId != null && guard.isActiveKeyHolder(userId, scopeId)
         if (!member) {
             val shareId = queryParam(connection, "share")

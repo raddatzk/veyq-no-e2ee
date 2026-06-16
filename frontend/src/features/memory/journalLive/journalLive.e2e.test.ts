@@ -8,6 +8,7 @@ import { registerServerOwner } from '../../admin/setupServer/setupServer'
 import { login } from '../../account/login/login'
 import { openPersonalScope, getOrCreateContentKey } from '../../content/scopeContent'
 import { EncryptedRelayProvider } from './encryptedProvider'
+import { fetchJournalLiveTicket } from './journalPersistence'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_E2E === '1' ? describe : describe.skip
@@ -28,11 +29,13 @@ run('live journal relay e2e', () => {
     const scope = await openPersonalScope(apiBase, session)
     const ck = await getOrCreateContentKey(apiBase, session, scope)
     const wsBase = apiBase.replace(/^http/, 'ws').replace(/\/$/, '')
-    const url = `${wsBase}/ws/journal/${scope.scopeId}/n1?token=${encodeURIComponent(session.sessionToken)}`
+    // a fresh single-use ticket per (re)connect — the session token never rides the URL
+    const urlFor = async () =>
+      `${wsBase}/ws/journal/${scope.scopeId}/n1?ticket=${encodeURIComponent(await fetchJournalLiveTicket(apiBase, session))}`
 
     const dA = new Y.Doc(); const dB = new Y.Doc()
-    const pA = new EncryptedRelayProvider(url, dA, ck)
-    const pB = new EncryptedRelayProvider(url, dB, ck)
+    const pA = new EncryptedRelayProvider(urlFor, dA, ck)
+    const pB = new EncryptedRelayProvider(urlFor, dB, ck)
     await waitFor(() => pA.ws?.readyState === 1 && pB.ws?.readyState === 1)
 
     dA.getText('journal').insert(0, 'hallo welt')
@@ -47,8 +50,8 @@ run('live journal relay e2e', () => {
 
     pA.destroy(); pB.destroy()
 
-    // an invalid session token is refused by the relay (the socket closes without joining)
-    const bad = new WebSocket(`${wsBase}/ws/journal/${scope.scopeId}/n1?token=nope`)
+    // an invalid/forged ticket is refused by the relay (the socket closes without joining)
+    const bad = new WebSocket(`${wsBase}/ws/journal/${scope.scopeId}/n1?ticket=nope`)
     const closed = await new Promise<boolean>((res) => { bad.onclose = () => res(true); bad.onopen = () => bad.send(new Uint8Array([1, 2, 3])); setTimeout(() => res(bad.readyState === 3), 3000) })
     expect(closed).toBe(true)
   }, 30000)

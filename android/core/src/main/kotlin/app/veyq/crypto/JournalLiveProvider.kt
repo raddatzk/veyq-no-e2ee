@@ -17,7 +17,10 @@ import java.util.concurrent.CompletionStage
  * three platforms edit the same document through the dumb, ciphertext-only relay. String-facing API:
  * `onText` pushes remote merges up; `applyLocalText` diffs the editor value into minimal CRDT ops.
  */
-class JournalLiveProvider(private val url: String, private val contentKey: ByteArray) {
+// `urlFactory` is called on EVERY (re)connect so each handshake gets a fresh single-use relay ticket (a
+// baked-in URL would break reconnection once its ticket is consumed). It runs on a background thread, so a
+// blocking ticket fetch is fine. Share connections return a constant URL (the `?share=` token is reusable).
+class JournalLiveProvider(private val urlFactory: () -> String?, private val contentKey: ByteArray) {
     private val doc = YrsDoc()
     private val text: YrsText = doc.getText("journal")
     private val lock = Any()
@@ -92,10 +95,18 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     // --- websocket ---
 
     private fun connect() {
-        HttpClient.newHttpClient().newWebSocketBuilder()
-            .buildAsync(URI.create(url), Listener())
-            .whenComplete { socket, err -> if (err == null) { ws = socket; onStatus?.invoke(true); onOpen() } }
+        // Off-thread: fetch a fresh ticket (blocking) then open the socket; init/reconnect never block the caller.
+        Thread {
+            if (closed) return@Thread
+            val u = runCatching { urlFactory() }.getOrNull()
+            if (u == null) { reconnectAfterDelay(); return@Thread }
+            HttpClient.newHttpClient().newWebSocketBuilder()
+                .buildAsync(URI.create(u), Listener())
+                .whenComplete { socket, err -> if (err == null) { ws = socket; onStatus?.invoke(true); onOpen() } else reconnectAfterDelay() }
+        }.start()
     }
+
+    private fun reconnectAfterDelay() { if (!closed) Thread { Thread.sleep(1500); connect() }.start() }
 
     private fun onOpen() {
         val sv = stateVector() // STEP_1 (our state vector) so peers send what we're missing
@@ -113,7 +124,7 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
         }
         override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
             onStatus?.invoke(false)
-            if (!closed) Thread { Thread.sleep(1500); if (!closed) connect() }.start()
+            reconnectAfterDelay()
             return null
         }
         override fun onError(webSocket: WebSocket, error: Throwable?) { onStatus?.invoke(false) }

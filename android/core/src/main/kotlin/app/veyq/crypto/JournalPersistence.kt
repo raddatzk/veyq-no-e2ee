@@ -34,6 +34,19 @@ object JournalPersistence {
         if (resp.statusCode() != 200) throw RuntimeException("journal GET failed: ${resp.statusCode()} ${resp.body()}")
         return JSONObject(resp.body())
     }
+
+    /**
+     * Exchange the Bearer session for a short-lived single-use relay ticket, so the live-journal WebSocket
+     * authenticates via `?ticket=` instead of putting the session token in the URL (proxy logs / history).
+     */
+    fun fetchLiveTicket(apiBase: String, session: Login.UnlockedSession): String {
+        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/journal-live/ticket"))
+            .header("Authorization", "Bearer ${session.sessionToken}")
+            .POST(HttpRequest.BodyPublishers.noBody()).build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() != 200) throw RuntimeException("journal-live ticket failed: ${resp.statusCode()}")
+        return JSONObject(resp.body()).getString("ticket")
+    }
     private fun send(apiBase: String, session: Login.UnlockedSession, path: String, method: String, body: String): JSONObject {
         val b = HttpRequest.BodyPublishers.ofString(body)
         val req = HttpRequest.newBuilder(URI.create("$apiBase$path"))

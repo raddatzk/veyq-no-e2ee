@@ -26,6 +26,17 @@ public enum JournalPersistence {
     }
     private static func ok(_ resp: URLResponse) -> Bool { (resp as? HTTPURLResponse).map { $0.statusCode == 200 } ?? false }
 
+    private struct TicketResponse: Decodable { let ticket: String }
+
+    /// Exchange the Bearer session for a short-lived single-use relay ticket, so the live-journal WebSocket
+    /// authenticates via `?ticket=` instead of putting the session token in the URL (proxy logs / history).
+    public static func fetchLiveTicket(apiBase: String, session: Login.UnlockedSession) async throws -> String {
+        let r = try request(apiBase, session, "/api/journal-live/ticket", method: "POST")
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard ok(resp) else { throw err("journal-live ticket failed") }
+        return try JSONDecoder().decode(TicketResponse.self, from: data).ticket
+    }
+
     /// Reconstruct the journal into `doc` from the server's snapshot + update log. Returns the max seq applied.
     @discardableResult
     public static func loadJournalDoc(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, contentKey: Data, doc: YDocument) async throws -> Int {
