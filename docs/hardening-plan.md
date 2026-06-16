@@ -83,18 +83,28 @@ Today the journal is a single sealed-markdown blob (`veyq_memory_journal`, `seal
 last-write-wins on PUT). The retired Hocuspocus sidecar held the authoritative doc and merged
 non-overlapping sessions server-side — *in plaintext*. Restore that convergence **operator-blind**:
 
-- [ ] **Schema:** keep `veyq_memory_journal` as the **snapshot** (sealed Yjs state instead of markdown) and
-  add an append-only `veyq_memory_journal_update(node_id, seq /*server-monotonic*/, sealed_update, author_id,
-  created_at)`. Server stores only ciphertext + seq + author-id + timestamps (matches the
-  "op-log offsets and update author-ids" already listed as server-visible in security-model.md).
-- [ ] **Client open:** load snapshot + increments with `seq > base_seq`, decrypt, apply → current state
-  (works with no live peer).
-- [ ] **Client edit:** append a sealed Yjs increment (`POST .../updates`) *and* broadcast live via the relay.
-- [ ] **Compaction:** after N increments / on close, a client writes a new snapshot
-  (`encodeStateAsUpdate`) and the server prunes increments ≤ the new seq.
-- [ ] Touches backend (schema + journal endpoints) + all three clients' journal load/save + the three live
-  providers. Sequence **after Phase 1**, ideally **before P2.3** (it subsumes some of the seed-race/cursor
-  cleanup). This is "the missing half" of operator-blind live journaling that the sidecar used to cover.
+Design note: **hybrid** — the sealed Markdown body stays as the read projection every reader already uses
+(detail view, public share — untouched); the CRDT (sealed Yjs snapshot + sealed increments) is added
+alongside for editors. Increments anchor on the Yjs snapshot (not Markdown), so convergence works;
+compaction writes both projections atomically, so they can't diverge.
+
+- [x] **Schema (backend).** V24: added `sealed_snapshot` + `snapshot_suite_id` + `base_seq` + `next_seq` to
+  `veyq_memory_journal` (Markdown `sealed_content` now nullable) and a new append-only
+  `veyq_memory_journal_update(node_id, seq, sealed_update, author_id, created_at)`. Server stores ciphertext
+  + seq + author-id + timestamps only (the "op-log offsets and author-ids" already server-visible).
+- [x] **Endpoints (backend).** `GET .../journal/live` (snapshot + updates>baseSeq), `POST .../journal/updates`
+  (append, server assigns monotonic seq under a row lock), `PUT .../journal/snapshot` (compaction: write
+  snapshot + Markdown projection, prune updates ≤ coveredSeq). Old Markdown `PUT .../journal` removed — the
+  compaction endpoint is the single writer. `GET .../journal` (Markdown) + public share read unchanged.
+  Routed through `ScopeAccessGuard`. Slice test covers append→seq, live-state, compaction+prune, BAD_SEQ.
+- [ ] **Client open:** load snapshot + updates(seq > baseSeq), decrypt, apply → current state (no live peer
+  needed); track the max applied seq.
+- [ ] **Client edit:** append a sealed Yjs increment (`POST .../journal/updates`) *and* broadcast live via the
+  relay (unchanged).
+- [ ] **Compaction:** after N increments / on close, write a new snapshot + Markdown projection
+  (`PUT .../journal/snapshot`, coveredSeq = max applied seq).
+- [ ] Clients: web (+ e2e proving cross-session convergence), then iOS + Android. Subsumes some of the
+  P2.3 seed-race/cursor cleanup.
 
 ---
 

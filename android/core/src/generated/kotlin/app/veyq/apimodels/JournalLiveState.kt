@@ -25,22 +25,32 @@
 package app.veyq.apimodels
 
 import app.veyq.apimodels.Blob
+import app.veyq.apimodels.JournalUpdate
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * The operator-blind CRDT state of a journal — a sealed Yjs snapshot + the sealed update log.
  *
- * @param sealedContent 
+ * @param baseSeq The highest update seq folded into the snapshot.
+ * @param updates 
+ * @param snapshot 
  */
 @Serializable
 
-data class UpdateMemoryJournalRequest (
+data class JournalLiveState (
 
-    @SerialName(value = "sealedContent")
-    val sealedContent: Blob
+    /* The highest update seq folded into the snapshot. */
+    @SerialName(value = "baseSeq")
+    val baseSeq: kotlin.Long,
+
+    @SerialName(value = "updates")
+    val updates: kotlin.collections.List<JournalUpdate>,
+
+    @SerialName(value = "snapshot")
+    val snapshot: Blob? = null
 
 ) {
 

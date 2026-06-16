@@ -63,37 +63,61 @@ class JournalSliceTest {
         })
     }
 
-    private fun get(token: String, nodeId: String) =
+    private fun getMd(token: String, nodeId: String) =
         given().header("Authorization", token).get("/api/scopes/$scopeId/nodes/$nodeId/journal").then()
 
-    private fun put(token: String, nodeId: String, body: String) =
-        given().header("Authorization", token).contentType(ContentType.JSON).body(body)
-            .put("/api/scopes/$scopeId/nodes/$nodeId/journal").then()
+    private fun getLive(token: String, nodeId: String) =
+        given().header("Authorization", token).get("/api/scopes/$scopeId/nodes/$nodeId/journal/live").then()
+
+    private fun append(token: String, nodeId: String, bytes: String, suite: String = "v1") =
+        given().header("Authorization", token).contentType(ContentType.JSON)
+            .body("""{"sealedUpdate":{"suiteId":"$suite","bytes":"$bytes"}}""")
+            .post("/api/scopes/$scopeId/nodes/$nodeId/journal/updates").then()
+
+    private fun compact(token: String, nodeId: String, snapshot: String, markdown: String, coveredSeq: Int, suite: String = "v1") =
+        given().header("Authorization", token).contentType(ContentType.JSON)
+            .body("""{"snapshot":{"suiteId":"$suite","bytes":"$snapshot"},"markdown":{"suiteId":"$suite","bytes":"$markdown"},"coveredSeq":$coveredSeq}""")
+            .put("/api/scopes/$scopeId/nodes/$nodeId/journal/snapshot").then()
 
     @Test
-    fun readsAndReplacesJournal() {
-        // outsiders cannot read or write
-        get(outsiderToken, "jmem").statusCode(403)
-        put(outsiderToken, "jmem", """{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""").statusCode(403)
+    fun appendsUpdatesThenCompactsOperatorBlind() {
+        // outsiders cannot read or write any projection
+        getMd(outsiderToken, "jmem").statusCode(403)
+        getLive(outsiderToken, "jmem").statusCode(403)
+        append(outsiderToken, "jmem", "dTE").statusCode(403)
 
-        // a Memory with no journal yet reports a null body
-        get(ownerToken, "jmem").statusCode(200).body("nodeId", `is`("jmem")).body("sealedContent", nullValue())
+        // fresh journal: null Markdown body, empty CRDT state
+        getMd(ownerToken, "jmem").statusCode(200).body("nodeId", `is`("jmem")).body("sealedContent", nullValue())
+        getLive(ownerToken, "jmem").statusCode(200).body("snapshot", nullValue()).body("baseSeq", `is`(0)).body("updates.size()", `is`(0))
 
-        // write the journal, then read it back
-        put(ownerToken, "jmem", """{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""")
-            .statusCode(200).body("sealedContent.bytes", `is`("bWQ")).body("updatedAt", notNullValue())
-        get(ownerToken, "jmem").statusCode(200).body("sealedContent.bytes", `is`("bWQ"))
+        // append two sealed updates → server assigns monotonic seqs, tagged with the author
+        append(ownerToken, "jmem", "dTE").statusCode(200).body("seq", `is`(1))
+        append(ownerToken, "jmem", "dTI").statusCode(200).body("seq", `is`(2))
+        getLive(ownerToken, "jmem").statusCode(200)
+            .body("updates.size()", `is`(2))
+            .body("updates[0].seq", `is`(1)).body("updates[0].sealedUpdate.bytes", `is`("dTE")).body("updates[0].authorId", `is`("jnl-owner"))
+            .body("updates[1].seq", `is`(2))
+        // the Markdown projection is still empty until a compaction writes it
+        getMd(ownerToken, "jmem").body("sealedContent", nullValue())
 
-        // a second write replaces the body
-        put(ownerToken, "jmem", """{"sealedContent":{"suiteId":"v1","bytes":"bmV3"}}""")
-            .statusCode(200).body("sealedContent.bytes", `is`("bmV3"))
+        // compact through seq 2: writes the snapshot + Markdown projection and prunes the folded updates
+        compact(ownerToken, "jmem", "c25w", "bWQ", 2).statusCode(200).body("sealedContent.bytes", `is`("bWQ"))
+        getLive(ownerToken, "jmem").statusCode(200)
+            .body("snapshot.bytes", `is`("c25w")).body("baseSeq", `is`(2)).body("updates.size()", `is`(0))
+        getMd(ownerToken, "jmem").statusCode(200).body("sealedContent.bytes", `is`("bWQ")).body("updatedAt", notNullValue())
 
+        // a later append continues from seq 3 on top of the snapshot
+        append(ownerToken, "jmem", "dTM").statusCode(200).body("seq", `is`(3))
+        getLive(ownerToken, "jmem").body("snapshot.bytes", `is`("c25w")).body("updates.size()", `is`(1)).body("updates[0].seq", `is`(3))
+    }
+
+    @Test
+    fun rejectsBadNodeSuiteAndSeq() {
         // a Folder has no journal
-        put(ownerToken, "jfolder", """{"sealedContent":{"suiteId":"v1","bytes":"bWQ"}}""")
-            .statusCode(400).body("code", `is`("NOT_A_MEMORY"))
-
+        append(ownerToken, "jfolder", "dTE").statusCode(400).body("code", `is`("NOT_A_MEMORY"))
         // unknown suite is rejected
-        put(ownerToken, "jmem", """{"sealedContent":{"suiteId":"v999","bytes":"bWQ"}}""")
-            .statusCode(400).body("code", `is`("UNKNOWN_SUITE"))
+        append(ownerToken, "jmem", "dTE", suite = "v999").statusCode(400).body("code", `is`("UNKNOWN_SUITE"))
+        // a compaction can't cover a seq that was never handed out
+        compact(ownerToken, "jmem", "c25w", "bWQ", 9999).statusCode(400).body("code", `is`("BAD_SEQ"))
     }
 }

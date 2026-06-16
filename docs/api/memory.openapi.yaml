@@ -123,13 +123,31 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
-    put:
+  /api/scopes/{scopeId}/nodes/{nodeId}/journal/live:
+    get:
       tags: [MemoryJournal]
-      operationId: updateJournal
-      summary: Replace a Memory's journal body.
+      operationId: getJournalLive
+      summary: The journal's operator-blind CRDT state — sealed Yjs snapshot + sealed update log.
       description: >
-        Upserts the Memory's journal with a new sealed Markdown body (whole-document replacement). The server
-        stores ciphertext and a timestamp only; it never sees the journal text.
+        Returns the sealed Yjs state snapshot (null for a journal never compacted) plus every sealed update
+        with seq > baseSeq. A client applies the snapshot then the updates to reconstruct the document, then
+        edits and appends. Ciphertext only; the server never reads it.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: '#/components/schemas/JournalLiveState' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/journal/updates:
+    post:
+      tags: [MemoryJournal]
+      operationId: appendJournalUpdate
+      summary: Append one sealed Yjs update to the journal log.
+      description: >
+        Persists a sealed Yjs update and returns its server-assigned monotonic seq. Ciphertext only.
       parameters:
         - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
         - { name: scopeId, in: path, required: true, schema: { type: string } }
@@ -138,9 +156,32 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UpdateMemoryJournalRequest' }
+            schema: { $ref: '#/components/schemas/AppendJournalUpdateRequest' }
       responses:
-        '200': { description: The updated journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
+        '200': { description: The assigned seq., content: { application/json: { schema: { $ref: '#/components/schemas/AppendJournalUpdateResponse' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/nodes/{nodeId}/journal/snapshot:
+    put:
+      tags: [MemoryJournal]
+      operationId: compactJournal
+      summary: Compact the journal — write a fresh snapshot + Markdown projection, prune folded updates.
+      description: >
+        Replaces the sealed Yjs state snapshot and the sealed Markdown read projection, sets baseSeq to the
+        covered seq, and deletes every update with seq <= coveredSeq. Whole-document, operator-blind.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompactJournalRequest' }
+      responses:
+        '200': { description: The compacted journal (Markdown projection)., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
         '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
@@ -357,11 +398,41 @@ components:
         nodeId: { type: string }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         updatedAt: { type: string, format: date-time, description: 'When the journal was last written, if ever.' }
-    UpdateMemoryJournalRequest:
+    JournalLiveState:
       type: object
-      required: [sealedContent]
+      description: The operator-blind CRDT state of a journal — a sealed Yjs snapshot + the sealed update log.
+      required: [baseSeq, updates]
       properties:
-        sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        snapshot: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Yjs state; null until first compaction
+        baseSeq: { type: integer, format: int64, description: 'The highest update seq folded into the snapshot.' }
+        updates:
+          type: array
+          items: { $ref: '#/components/schemas/JournalUpdate' }
+    JournalUpdate:
+      type: object
+      required: [seq, sealedUpdate, authorId]
+      properties:
+        seq: { type: integer, format: int64 }
+        sealedUpdate: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+        authorId: { type: string, description: 'The user id that appended this update (low-sensitivity metadata).' }
+    AppendJournalUpdateRequest:
+      type: object
+      required: [sealedUpdate]
+      properties:
+        sealedUpdate: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
+    AppendJournalUpdateResponse:
+      type: object
+      required: [seq]
+      properties:
+        seq: { type: integer, format: int64 }
+    CompactJournalRequest:
+      type: object
+      description: A fresh snapshot covering seq <= coveredSeq, plus the Markdown read projection.
+      required: [snapshot, markdown, coveredSeq]
+      properties:
+        snapshot: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Yjs state
+        markdown: { $ref: './common.openapi.yaml#/components/schemas/Blob' }   # sealed Markdown body (reader projection)
+        coveredSeq: { type: integer, format: int64 }
     MemoryTrack:
       type: object
       required: [id, nodeId, sealedContent, createdAt]
