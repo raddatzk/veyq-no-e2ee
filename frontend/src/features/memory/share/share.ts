@@ -9,6 +9,7 @@ import { decodeNode, type MemoryNode } from '../createTree/memoryTree'
 import { chunkBytes, decodeMediaMeta, dedupTokenFor, sealMediaMeta, DEFAULT_CHUNK_SIZE, type BlobRef, type DerivativeKind, type MediaItem, type NewMedia } from '../../uploads/media/media'
 import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
+import { mapPool } from '../../../shared/pool'
 
 export type ShareRole = 'VIEWER' | 'CONTRIBUTOR' | 'UPLOADER'
 export type ShareNotice = { scope: 'TENANT' | 'SHARE'; version: number; markdown: string }
@@ -180,17 +181,23 @@ export async function loadShareTiles(ctx: ShareContext, nodeId: string): Promise
   const media = await listShareMedia(ctx, nodeId)
   const withMeta = media.map((m) => ({ m, meta: decodeMediaMeta(ctx.contentKey, m) }))
   withMeta.sort((a, b) => a.meta.takenAt.localeCompare(b.meta.takenAt))
-  const tiles: GalleryTile[] = []
-  for (const { m, meta } of withMeta) {
+  // Download the (small) thumbnails bound-parallel rather than one-by-one; mapPool keeps the takenAt order.
+  return mapPool(withMeta, 6, async ({ m, meta }) => {
     const ref = m.derivatives.find((d) => d.kind === 'THUMBNAIL')?.blob ?? m.original
+    const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
     const bytes = await downloadShareBlob(ctx, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    tiles.push({ id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, original: m.original })
-  }
-  return tiles
+    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview, original: m.original }
+  })
 }
 
-/** Decrypt + open a shared media's full-resolution original (lightbox), as an object URL. */
+/** Decrypt + open a shared media's PREVIEW (≈2048px) for the lightbox, as an object URL. */
+export async function loadSharePreview(ctx: ShareContext, tile: GalleryTile): Promise<string> {
+  const bytes = await downloadShareBlob(ctx, tile.preview)
+  return URL.createObjectURL(new Blob([bytes as BlobPart], { type: tile.mimeType }))
+}
+
+/** Decrypt the FULL-resolution original (only on an explicit download), as an object URL. */
 export async function loadShareOriginal(ctx: ShareContext, tile: GalleryTile): Promise<string> {
   const bytes = await downloadShareBlob(ctx, tile.original)
   return URL.createObjectURL(new Blob([bytes as BlobPart], { type: tile.mimeType }))
@@ -231,6 +238,7 @@ export async function uploadShareMedia(ctx: ShareContext, m: NewMedia): Promise<
   const original = await uploadShareBlob(ctx, m.bytes)
   const derivatives: { kind: DerivativeKind; blobId: string }[] = []
   if (m.thumb) derivatives.push({ kind: 'THUMBNAIL', blobId: (await uploadShareBlob(ctx, m.thumb)).blobId })
+  if (m.preview) derivatives.push({ kind: 'PREVIEW', blobId: (await uploadShareBlob(ctx, m.preview)).blobId })
   const sealedMeta = sealMediaMeta(ctx.contentKey, { takenAt: m.takenAt, lat: m.lat, lng: m.lng })
   const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/contributed-media`, {
     method: 'POST', headers: { 'content-type': 'application/json' },

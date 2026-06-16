@@ -6,7 +6,7 @@ import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import type { GalleryTile } from '../../features/gallery/gallery'
 import * as Y from 'yjs'
-import { loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
+import { loadShareOriginal, loadSharePreview, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
 import { loadShareJournalDoc, subscribeShareJournal } from '../../features/memory/journalLive/shareJournalLive'
 import type { EncryptedRelayProvider } from '../../features/memory/journalLive/encryptedProvider'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
@@ -154,13 +154,38 @@ onBeforeUnmount(() => {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
 })
 
+const lightboxTile = ref<GalleryTile | null>(null)
 async function openLightbox(tile: GalleryTile) {
   if (!ctx.value) return
-  lightbox.value = await loadShareOriginal(ctx.value, tile)
+  lightboxTile.value = tile
+  // Show the PREVIEW (≈2048px); the full-res original is only fetched on an explicit download.
+  lightbox.value = await loadSharePreview(ctx.value, tile)
 }
 function closeLightbox() {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
   lightbox.value = null
+  lightboxTile.value = null
+}
+
+const downloading = ref(false)
+/** Fetch this medium's full-resolution original and save it to disk (the only path that pulls full-res). */
+async function downloadThisOriginal() {
+  if (!ctx.value || !lightboxTile.value || downloading.value) return
+  downloading.value = true
+  let url: string | null = null
+  try {
+    url = await loadShareOriginal(ctx.value, lightboxTile.value)
+    const ext = (lightboxTile.value.mimeType.split('/')[1] || 'bin').replace('jpeg', 'jpg')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${lightboxTile.value.id.slice(0, 8)}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    if (url) URL.revokeObjectURL(url)
+    downloading.value = false
+  }
 }
 </script>
 
@@ -240,6 +265,10 @@ function closeLightbox() {
 
     <div v-if="lightbox" class="lightbox" @click="closeLightbox">
       <img :src="lightbox" alt="" @click.stop />
+      <div class="lightbox-actions" @click.stop>
+        <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
+        <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>
+      </div>
     </div>
   </div>
 </template>

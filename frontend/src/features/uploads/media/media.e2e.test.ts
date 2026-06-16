@@ -61,6 +61,19 @@ suite('unified media E2E (web -> live backend): one upload/download path for sma
     // anti-reorder still holds: a frame sealed at index 0 must NOT open at index 1 (AAD binds position)
     const frame0 = v1.sealFrame(ck, 0, pchunks.length, pchunks[0], v1.randomBytes(12))
     expect(() => v1.openFrame(ck, 1, pchunks.length, frame0)).toThrow()
+
+    // media tiers: a photo uploaded with BOTH a thumbnail (grid) and a preview (lightbox) stores three
+    // distinct blobs; the full-res original is only ever pulled on an explicit download.
+    const photo3 = Uint8Array.from({ length: 150 }, (_, i) => (i * 17 + 4) & 0xff)
+    const thumb3 = Uint8Array.from({ length: 30 }, (_, i) => (i * 3 + 1) & 0xff)
+    const preview3 = Uint8Array.from({ length: 80 }, (_, i) => (i * 9 + 6) & 0xff)
+    const m3 = await uploadMedia(apiBase, a, scope.scopeId, ck, memory.id, { bytes: photo3, thumb: thumb3, preview: preview3, takenAt: '2026-02-01T09:00:00Z', mimeType: 'image/jpeg' })
+    expect(m3.derivatives.map((d) => d.kind).sort()).toEqual(['PREVIEW', 'THUMBNAIL'])
+    const previewRef = m3.derivatives.find((d) => d.kind === 'PREVIEW')!.blob
+    const thumbRef = m3.derivatives.find((d) => d.kind === 'THUMBNAIL')!.blob
+    expect(new Set([m3.original.blobId, thumbRef.blobId, previewRef.blobId]).size).toBe(3) // three distinct blobs
+    expect(Array.from(await downloadBlob(apiBase, a, scope.scopeId, ck, previewRef))).toEqual(Array.from(preview3))
+    expect(Array.from(await downloadBlob(apiBase, a, scope.scopeId, ck, thumbRef))).toEqual(Array.from(thumb3))
   })
 })
 

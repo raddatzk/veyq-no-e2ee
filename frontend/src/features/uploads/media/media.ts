@@ -40,7 +40,7 @@ export type MediaItem = {
 }
 /** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
 export type MediaMeta = { takenAt: string; lat?: number; lng?: number }
-export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; takenAt: string; mimeType: string; lat?: number; lng?: number }
+export type NewMedia = { bytes: Uint8Array; thumb?: Uint8Array; preview?: Uint8Array; takenAt: string; mimeType: string; lat?: number; lng?: number }
 
 /** Seal {takenAt, lat?, lng?} into a sealedMeta blob (nonce || AEAD) for the create request. */
 export function sealMediaMeta(contentKey: Uint8Array, meta: MediaMeta): { suiteId: string; bytes: string } {
@@ -164,6 +164,10 @@ export async function uploadMedia(apiBase: string, session: UnlockedSession, sco
   if (m.thumb) {
     const thumb = await uploadBlob(apiBase, session, scopeId, contentKey, m.thumb, chunkSize)
     derivatives.push({ kind: 'THUMBNAIL', blobId: thumb.blobId })
+  }
+  if (m.preview) {
+    const preview = await uploadBlob(apiBase, session, scopeId, contentKey, m.preview, chunkSize)
+    derivatives.push({ kind: 'PREVIEW', blobId: preview.blobId })
   }
   const sealedMeta = sealMediaMeta(contentKey, { takenAt: m.takenAt, lat: m.lat, lng: m.lng })
   return createMedia(apiBase, session, scopeId, nodeId, { originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives })

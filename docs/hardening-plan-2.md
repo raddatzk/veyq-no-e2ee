@@ -72,18 +72,19 @@ Entschieden: Preview ≈ **2048 px Langkante, JPEG q0.85**; Original-Zugriff üb
 Bestandsmedien ohne Preview ⇒ Fallback Thumbnail→Original bleibt erhalten (greenfield, kein Backfill).
 Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-Code anfasst.
 
-- [ ] **C1 · Web — Upload: PREVIEW erzeugen** *(Feature, M)* — `frontend/.../uploads/clientMedia.ts` (`makePreview`,
-  maxDim 2048, q0.85), `media/media.ts` (`uploadMedia` lädt Preview-Blob + `PREVIEW`-Derivat), `NewMedia`-Typ
-  um `preview?` erweitern; gleicher Pfad in `share.ts` (`uploadShareMedia`/Contribute).
-- [ ] **C2 · Web — Render: Preview im Lightbox, Original nur per Download** *(Feature, M)* — `features/gallery/gallery.ts`
-  (`GalleryTile.preview`, Lightbox lädt Preview statt `loadOriginal`; `loadOriginal` bleibt nur für Download),
-  `app/home/MemoryDetailView.vue` + `app/share/ShareView.vue` (Lightbox→Preview, Download-Button → Original als
-  Datei-Download). Gleiches in `share.ts` (`loadShareTiles`/`loadShareOriginal`).
-- [ ] **C3 · Web — Object-URL-Leak + Navigations-Race beheben** *(Quality/Memory, S)* — `HomeView.vue:221-226`:
-  alte Cover-URLs vor Reassign + in `onBeforeUnmount` `revokeObjectURL`; Generation-Guard (`loadSeq`/AbortController)
-  für überholte Cover-/Level-Loads (= Review H4 + M11).
-- [ ] **C4 · Web — Tile-Downloads bounded-parallel** *(Perf, S)* — `gallery.ts`/`share.ts` Tile-Loops von seriell auf
-  Pool (~6 concurrent) umstellen (Review-Perf-Punkt).
+- [x] **C1 · Web — Upload: PREVIEW erzeugen** — `clientMedia.ts` generischer `downscale(maxDim,quality)`,
+  erzeugt Thumbnail (400/0.8) + Preview (2048/0.85); `media.ts uploadMedia` + `share.ts uploadShareMedia`
+  laden das Preview-Blob als `PREVIEW`-Derivat, `NewMedia` um `preview?` erweitert.
+- [x] **C2 · Web — Render: Preview im Lightbox, Original nur per Download** — `gallery.ts` (`GalleryTile.preview`,
+  neues `loadPreview`, `loadOriginal` nur noch für Download); `MemoryDetailView.vue` + `ShareView.vue` Lightbox →
+  Preview, neuer „Download"-Button speichert das Original als Datei (Bulk-ZIP-Download nutzt ohnehin Originale).
+- [x] **C3 · Web — Object-URL-Leak + Navigations-Race behoben** — `HomeView.openLevel` revoked alte Cover-URLs
+  vor Reassign + in `onBeforeUnmount`; `loadSeq`-Generation-Guard verwirft überholte Level-/Cover-Loads (revoked
+  deren späte URLs). (= Review H4 + M11.)
+- [x] **C4 · Web — Tile-Downloads bounded-parallel** — neuer `shared/pool.ts mapPool` (~6 concurrent, ordnung
+  erhaltend); `gallery.ts`/`share.ts` Tile-Loops darauf umgestellt.
+  *Verifiziert: vue-tsc grün, 63 Unit-Tests, alle 28 Web-E2E + share-E2E grün; Media-E2E um den Preview-Tier
+  erweitert (Thumbnail+Preview+Original = 3 distinkte Blobs, je byte-identisch zurück).* (C9-Web-Teil.)
 - [ ] **C5 · iOS — Upload PREVIEW + Render-Tiers** *(Feature, M)* — `MemoryDetailView.swift:145` (`preview`-Variante
   2048/q0.85), `Media.swift:147` (`uploadMedia` lädt Preview-Derivat); Lightbox lädt **Preview** statt Thumbnail
   (`MemoryDetailView.swift:292`), Download/Save-Button (Share-Sheet/Fotos) lädt Original on-demand.

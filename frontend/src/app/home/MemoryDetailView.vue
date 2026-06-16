@@ -6,7 +6,7 @@ const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor
 import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
-import { loadGalleryTiles, loadOriginal, type GalleryTile } from '../../features/gallery/gallery'
+import { loadGalleryTiles, loadOriginal, loadPreview, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
@@ -168,7 +168,31 @@ async function onFilesPicked(event: Event) {
 
 async function openLightbox(tile: GalleryTile) {
   lightboxTile.value = tile
-  lightbox.value = await loadOriginal(session.apiBase, session.unlocked!, props.active, tile)
+  // Show the PREVIEW (≈2048px) — full-res originals are only fetched on an explicit download.
+  lightbox.value = await loadPreview(session.apiBase, session.unlocked!, props.active, tile)
+}
+
+const downloading = ref(false)
+/** Fetch THIS medium's full-resolution original and save it to disk (the only path that pulls full-res). */
+async function downloadThisOriginal() {
+  if (!lightboxTile.value || downloading.value) return
+  downloading.value = true
+  let url: string | null = null
+  try {
+    url = await loadOriginal(session.apiBase, session.unlocked!, props.active, lightboxTile.value)
+    const ext = (lightboxTile.value.mimeType.split('/')[1] || 'bin').replace('jpeg', 'jpg')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${name}-${lightboxTile.value.id.slice(0, 8)}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    if (url) URL.revokeObjectURL(url)
+    downloading.value = false
+  }
 }
 function closeLightbox() {
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
@@ -286,6 +310,7 @@ async function setAsCover() {
       <img :src="lightbox" alt="" @click.stop />
       <div class="lightbox-actions" @click.stop>
         <button class="btn btn-primary" type="button" @click="setAsCover">{{ t('cover.setAsCover') }}</button>
+        <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
         <button v-if="!mediaDelArm" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="mediaDelArm = true">{{ t('common.delete') }}</button>
         <button v-else class="btn btn-danger" type="button" @click="deleteThisMedia">{{ t('delete.confirm') }}</button>
         <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>

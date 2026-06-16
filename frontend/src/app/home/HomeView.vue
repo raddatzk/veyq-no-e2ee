@@ -29,6 +29,7 @@ const crumbs = ref<{ id?: string; name: string; slug?: string }[]>([])
 const folders = ref<LevelEntry[]>([])
 const memories = ref<LevelEntry[]>([])
 const covers = ref<Record<string, string | null>>({})
+let loadSeq = 0 // bumped per navigation so superseded async cover/level loads can discard their results
 const error = ref('')
 const selectedMemory = ref<LevelEntry | null>(null)
 const searchOpen = ref(false)
@@ -149,6 +150,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('popstate', onPopState)
+  loadSeq++ // invalidate any in-flight cover loads so they don't touch a torn-down component
+  revokeCovers()
 })
 
 const toCrumb = (f: LevelEntry) => ({ id: f.node.id, name: f.name, slug: f.slug })
@@ -212,16 +215,27 @@ async function switchSpace(entry: SpaceEntry, push = true) {
   }
 }
 
+/** Revoke every currently-held cover object URL (covers come from URL.createObjectURL → must be freed). */
+function revokeCovers() {
+  for (const u of Object.values(covers.value)) if (u) URL.revokeObjectURL(u)
+}
+
 async function openLevel() {
+  const seq = ++loadSeq // a generation token: late async results from a superseded navigation are discarded
   selectedMemory.value = null
   const parentId = crumbs.value.length > 1 ? crumbs.value[crumbs.value.length - 1].id : undefined
   const entries = await loadLevel(apiBase, session.unlocked!, active.value!, parentId)
+  if (seq !== loadSeq) return // a newer openLevel started while we awaited — drop this stale level
   folders.value = entries.filter((e) => e.node.type === 'FOLDER')
   memories.value = entries.filter((e) => e.node.type === 'MEMORY')
+  revokeCovers()
   covers.value = {}
   for (const m of memories.value) {
     loadCover(apiBase, session.unlocked!, active.value!, m.node)
-      .then((url) => { covers.value[m.node.id] = url })
+      .then((url) => {
+        if (seq !== loadSeq) { if (url) URL.revokeObjectURL(url); return } // landed after a newer navigation
+        if (url) covers.value[m.node.id] = url
+      })
       .catch(() => {})
   }
 }
