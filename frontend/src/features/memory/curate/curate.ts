@@ -4,12 +4,7 @@
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { createNode, decodeNode, resealNode, slugTokenFor, type MemoryNode, type NodeType } from '../createTree/memoryTree'
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
+import { b64url } from '../../../shared/base64'
 
 const parentSlot = (active: ActiveSpace, parentId: string | null | undefined) => parentId ?? active.scope.scopeId
 

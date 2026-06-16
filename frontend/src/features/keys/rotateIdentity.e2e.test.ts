@@ -6,15 +6,11 @@ import { login } from '../account/login/login'
 import { createTenant, issueOwnerInvite, claimTenantOwnership, getMyScopeGrant, openScopeGrant } from '../admin/createTenantInviteOwner/tenant'
 import { openPersonalScope, getOrCreateContentKey, writeItem, readItems } from '../content/scopeContent'
 import { rotateIdentity } from './rotateIdentity'
+import { fromB64url } from '../../shared/base64'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const suite = env.VEYQ_E2E === '1' ? describe : describe.skip
-
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
 
 suite('rotate-identity E2E (web -> live backend)', () => {
   it('rotates the identity and keeps access to every scope + content via the new identity', async () => {

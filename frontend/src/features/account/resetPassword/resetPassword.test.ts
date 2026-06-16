@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as v1 from '../../../shared/crypto/v1'
 import { buildCreateServerOwnerRequest } from '../../admin/setupServer/setupServer'
+import { fromB64url } from '../../../shared/base64'
 
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
 const wrapOf = (req: { masterKeyWraps: Array<{ unlockMethod: string; wrappedKey: string; kdfParams?: string }> }, m: string) =>
   req.masterKeyWraps.find((w) => w.unlockMethod === m)!
 

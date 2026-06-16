@@ -10,23 +10,12 @@ import { chunkBytes, decodeMediaMeta, dedupTokenFor, sealMediaMeta, DEFAULT_CHUN
 import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
 import { mapPool } from '../../../shared/pool'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 export type ShareRole = 'VIEWER' | 'CONTRIBUTOR' | 'UPLOADER'
 export type ShareNotice = { scope: 'TENANT' | 'SHARE'; version: number; markdown: string }
 
 const EMPTY = new Uint8Array(0)
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 
 export type ShareSummary = { shareId: string; nodeId: string; role: ShareRole; passwordProtected: boolean; expiresAt?: string; label: string; noticeMarkdown?: string; createdAt: string }
 export type ShareEdit = { expiresAt?: string; label?: string; noticeMarkdown?: string }

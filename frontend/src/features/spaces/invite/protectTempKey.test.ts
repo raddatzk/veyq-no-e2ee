@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as v1 from '../../../shared/crypto/v1'
 import { protectTempKey, unprotectTempKey } from './groups'
+import { b64url } from '../../../shared/base64'
 
 // b64url of a representative temp private key (any bytes — protect treats it opaquely).
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
 
 describe('protectTempKey', () => {
   const tempKey = b64url(v1.randomBytes(120))

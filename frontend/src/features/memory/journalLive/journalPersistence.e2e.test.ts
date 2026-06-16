@@ -12,17 +12,12 @@ import { login } from '../../account/login/login'
 import { openPersonalScope, getOrCreateContentKey } from '../../content/scopeContent'
 import { createNode } from '../createTree/memoryTree'
 import { appendJournalUpdate, compactJournal, loadJournalDoc } from './journalPersistence'
+import { fromB64url } from '../../../shared/base64'
 
 const apiBase = process.env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const run = process.env.VEYQ_E2E === '1' ? describe : describe.skip
 
 const EMPTY = new Uint8Array(0)
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 
 run('operator-blind journal persistence e2e', () => {
   it('non-overlapping sessions converge via snapshot + increments; markdown projection follows', async () => {

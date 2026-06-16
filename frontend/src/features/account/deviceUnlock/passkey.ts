@@ -3,20 +3,10 @@
 // registered with the server. The PRF output → kekPasskey → a 32-byte device key that unlocks the vault.
 // Biometrics/userVerification gate every PRF evaluation, so opening the vault requires the user's gesture.
 import * as v1 from '../../../shared/crypto/v1'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 const PRF_SALT = new TextEncoder().encode('veyq/device-unlock/prf')
 
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 const prfResult = (cred: PublicKeyCredential): ArrayBuffer | undefined =>
   (cred.getClientExtensionResults() as { prf?: { results?: { first?: ArrayBuffer } } }).prf?.results?.first
 

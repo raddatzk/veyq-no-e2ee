@@ -3,17 +3,9 @@
 // master-key wrap (the crypto factor). The client unwraps the master key, re-wraps it under the new password
 // and ships the new PASSWORD wrap + auth verifier. The server sees neither secret.
 import * as v1 from '../../../shared/crypto/v1'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 const ARGON = v1.ARGON
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
 
 type MasterKeyWrap = { unlockMethod: string; suiteId: string; wrappedKey: string; kdfParams?: string }
 export type ResetMaterial = { email: string; recoveryWrap: MasterKeyWrap }

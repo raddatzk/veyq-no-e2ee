@@ -1,15 +1,10 @@
 // uc.admin.setup-server (web) — cold E2EE registration of the first Server Owner.
 // All key material is generated here; the server only ever receives ciphertext + public keys.
 import * as v1 from '../../../shared/crypto/v1'
+import { b64url } from '../../../shared/base64'
 
 // Argon2id params (t=3, m=32 MiB) — must match the server's auth verifier; carried in kdfParams for agility.
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
 
 export type CreateServerOwnerRequest = {
   email: string

@@ -5,20 +5,9 @@ import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import type { GpxTrack } from './gpx'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 const EMPTY = new Uint8Array(0)
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 
 export type Track = { id: string; name: string; points: { lat: number; lng: number }[] }
 

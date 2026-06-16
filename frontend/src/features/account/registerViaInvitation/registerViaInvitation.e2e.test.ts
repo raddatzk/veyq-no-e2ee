@@ -5,15 +5,11 @@ import { registerServerOwner } from '../../admin/setupServer/setupServer'
 import { fetchPersonalScope, login, openPersonalScopeGrant } from '../login/login'
 import { createTenant, issueOwnerInvite, getMyScopeGrant, openScopeGrant } from '../../admin/createTenantInviteOwner/tenant'
 import { getInviteMetadata, registerViaInvitation } from './registerViaInvitation'
+import { fromB64url } from '../../../shared/base64'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
 const suite = env.VEYQ_E2E === '1' ? describe : describe.skip
-
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
 
 suite('register-via-invitation E2E (web -> live backend)', () => {
   it('registers a new owner from an invite, then logs in and round-trips the scope grant', async () => {

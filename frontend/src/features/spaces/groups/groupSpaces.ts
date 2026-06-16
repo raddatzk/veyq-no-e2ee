@@ -4,17 +4,9 @@
 // the group scope key to their identity. The server stays blind to the name and the content.
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 const EMPTY = new Uint8Array(0)
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
 const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 
 export type Blob = { suiteId: string; bytes: string }

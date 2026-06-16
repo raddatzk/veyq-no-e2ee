@@ -7,23 +7,10 @@
 import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
-
+import { b64url, fromB64url } from '../../../shared/base64'
 
 /** Origin tag for doc updates we applied from the store, so the editor doesn't re-persist them. */
 export const PERSISTENCE_ORIGIN = 'journal-persistence'
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 
 // salt(16) || nonce(12) || AEAD(HKDF(contentKey, salt, "veyq/v1/journal"), …) — a fresh per-message sub-key so
 // the GCM nonce can never collide under the long-lived content key (see v1.journalSeal).

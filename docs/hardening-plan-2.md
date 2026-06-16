@@ -159,6 +159,10 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   nie in GitHub Actions; bei nächstem Push/PR prüfen.
 
 ### Backlog (unverändert, nicht eingeplant)
+- **Developer-Styleguide** — ein gemeinsames Dokument für Konventionen über Backend (Quarkus/Kotlin), Web
+  (Vue/TS), iOS (Swift) und Android (Kotlin): Handler/Guard-Muster, operator-blind-Invarianten, Crypto-Suite-
+  Disziplin (byte-identisch + Conformance-Vektoren), Fehler-/Exception-Konventionen, Commit-Stil, Test-/E2E-
+  Konventionen, Kommentar-Dichte. **Muss noch refined werden** — erst grobe Struktur, dann iterativ füllen.
 - **Android Yrs-Binding als AAR publishen** (yniffi → `yrs-android`, committete Binaries droppen).
 - **Mobile Share-Live-Read** (Live-Push an verbundene Share-Gäste; Gäste sind Browser, daher niedrige Prio).
 - **Share-Read/Chunk-Download Byte-Quota** (D2-Deferral aus Runde 1: GETs der Public-Shares sind ungedrosselt).

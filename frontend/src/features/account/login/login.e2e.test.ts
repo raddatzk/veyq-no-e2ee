@@ -3,17 +3,12 @@ import { describe, it, expect } from 'vitest'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { registerServerOwner } from '../../admin/setupServer/setupServer'
 import { login, logout, fetchCurrentUser, fetchPersonalScope, openPersonalScopeGrant } from './login'
+import { fromB64url } from '../../../shared/base64'
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
 const apiBase = env.VEYQ_API_BASE ?? 'http://localhost:8080'
 // Real end-to-end against a running backend; opt-in so plain `npm test` doesn't require it.
 const suite = env.VEYQ_E2E === '1' ? describe : describe.skip
-
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
-}
 
 suite('login + unlock E2E (web v1 crypto -> live backend)', () => {
   it('registers, logs in, and unlocks the identity key matching the stored public key', async () => {

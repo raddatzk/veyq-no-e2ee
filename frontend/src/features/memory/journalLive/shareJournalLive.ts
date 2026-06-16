@@ -5,13 +5,8 @@
 import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import { EncryptedRelayProvider } from './encryptedProvider'
+import { fromB64url } from '../../../shared/base64'
 
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 const open = v1.journalOpen
 
 /** Reconstruct the shared journal into `doc` from the public snapshot + update log (no auth). */

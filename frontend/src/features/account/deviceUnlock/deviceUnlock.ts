@@ -3,22 +3,12 @@
 // (passkey PRF) is never stored, so the vault is useless without the passkey gesture.
 import { getPasskeyDeviceKey, passkeySupported, registerPasskey } from './passkey'
 import { openVault, sealVault, type DeviceCredentials } from './deviceVault'
+import { b64url, fromB64url } from '../../../shared/base64'
 
 const LS_KEY = 'veyq.deviceUnlock'
 
 type Stored = { credentialId: string; vault: string } // vault = base64url(sealed blob)
 
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 const read = (): Stored | null => { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? 'null') } catch { return null } }
 
 /** Whether this device can offer passkey unlock (browser supports passkeys). */

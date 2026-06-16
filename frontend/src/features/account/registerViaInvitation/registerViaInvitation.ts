@@ -2,15 +2,10 @@
 // material is born here; one POST creates the account, mints the tenant scope as a self grant, and
 // returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
 import * as v1 from '../../../shared/crypto/v1'
+import { b64url } from '../../../shared/base64'
 
 // Must match the params used to wrap the master key (see setupServer.ts / login.ts).
 const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
 
 export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
 export type Blob = { suiteId: string; bytes: string }

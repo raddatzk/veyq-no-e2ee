@@ -1,17 +1,7 @@
 // uc.admin.create-tenant-invite-owner (web) — provision a tenant shell + owner invite, and claim
 // ownership by minting the tenant scope keypair and granting it to oneself (server stays blind).
 import * as v1 from '../../../shared/crypto/v1'
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
-}
+import { b64url, fromB64url } from '../../../shared/base64'
 
 export type TenantSummary = { id: string; name: string; displayName: string; domain?: string; status: string }
 export type OwnerInvite = { inviteId: string; bootstrapSecret: string; expiresAt: string }

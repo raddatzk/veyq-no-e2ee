@@ -6,16 +6,7 @@ import type { UnlockedSession } from '../../account/login/login'
 import { claimTenantOwnership, createTenant, issueOwnerInvite, type TenantSummary } from '../../admin/createTenantInviteOwner/tenant'
 import { issueMemberInvite, type MemberRole } from '../../admin/inviteMembersRoles/inviteMembers'
 import { buildInviteLink, buildProtectedInviteLink, type ProtectedInviteParts } from './inviteLink'
-
-function b64url(b: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i])
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  return Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0))
-}
+import { b64url, fromB64url } from '../../../shared/base64'
 
 // The passphrase that protects an invite's temp key is folded into a KEK via Argon2id (same primitive as
 // password-protected shares). The temp key is sym-wrapped under it; the link carries only the ciphertext +

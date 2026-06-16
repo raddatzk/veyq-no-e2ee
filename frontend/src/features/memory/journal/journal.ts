@@ -5,15 +5,9 @@
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
+import { fromB64url } from '../../../shared/base64'
 
 const EMPTY = new Uint8Array(0)
-
-function fromB64url(s: string): Uint8Array {
-  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  const out = new Uint8Array(b.length)
-  for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
-  return out
-}
 
 export type Journal = { markdown: string; updatedAt: string | null }
 

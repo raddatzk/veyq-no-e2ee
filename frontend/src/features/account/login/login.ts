@@ -1,14 +1,7 @@
 // uc.account.login (web) — authenticate, fetch the wrapped key bag, and unlock the master key locally.
 // The server returns ciphertext only; the master/identity keys are recovered here (auth != unlock).
 import * as v1 from '../../../shared/crypto/v1'
-
-function fromB64url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/')
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
-}
+import { fromB64url } from '../../../shared/base64'
 
 type Blob = { suiteId: string; bytes: string }
 type MasterKeyWrap = { unlockMethod: string; suiteId: string; wrappedKey: string; kdfParams?: string }
