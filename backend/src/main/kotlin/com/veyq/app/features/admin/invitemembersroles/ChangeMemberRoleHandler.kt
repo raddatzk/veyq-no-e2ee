@@ -3,9 +3,8 @@ package com.veyq.app.features.admin.invitemembersroles
 import com.veyq.app.generated.model.ChangeMemberRoleRequest
 import com.veyq.app.generated.model.MembershipSummary
 import com.veyq.app.platform.error.ApiException
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
-import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
@@ -16,19 +15,12 @@ import jakarta.transaction.Transactional
  */
 @ApplicationScoped
 class ChangeMemberRoleHandler(
-    private val tenants: TenantRepository,
     private val memberships: MembershipRepository,
-    private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
 ) {
     @Transactional
     fun changeMemberRole(auth: String?, tenantId: String, userId: String, req: ChangeMemberRoleRequest): MembershipSummary {
-        val callerId = sessions.resolve(auth) ?: throw unauthorized()
-        tenants.findById(tenantId) ?: throw notFound("Tenant")
-
-        val callerMembership = memberships.find(tenantId, callerId)
-        if (callerMembership == null || callerMembership.role != "Owner" || callerMembership.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        }
+        guard.requireOwner(auth, tenantId)
 
         val membership = memberships.find(tenantId, userId) ?: throw notFound("Membership")
         val newRole = req.role.value
@@ -43,6 +35,5 @@ class ChangeMemberRoleHandler(
         return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
     private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

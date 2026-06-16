@@ -3,8 +3,7 @@ package com.veyq.app.features.admin.tenantterms
 import com.veyq.app.generated.model.TenantTerms
 import com.veyq.app.generated.model.UpdateTenantTermsRequest
 import com.veyq.app.platform.error.ApiException
-import com.veyq.app.shared.security.SessionService
-import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -17,8 +16,7 @@ import jakarta.transaction.Transactional
 @ApplicationScoped
 class TenantTermsHandler(
     private val tenants: TenantRepository,
-    private val memberships: MembershipRepository,
-    private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
 ) {
     @Transactional
     fun getTenantTerms(auth: String?, tenantId: String): TenantTerms {
@@ -38,10 +36,7 @@ class TenantTermsHandler(
     }
 
     private fun requireOwner(auth: String?, tenantId: String): com.veyq.app.shared.tenancy.Tenant {
-        val callerId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val tenant = tenants.findById(tenantId) ?: throw ApiException(404, "NOT_FOUND", "Tenant not found")
-        val m = memberships.find(tenantId, callerId)
-        if (m == null || m.role != "Owner" || m.status != "ACTIVE") throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        return tenant
+        guard.requireOwner(auth, tenantId)
+        return tenants.findById(tenantId) ?: throw ApiException(404, "NOT_FOUND", "Tenant not found")
     }
 }

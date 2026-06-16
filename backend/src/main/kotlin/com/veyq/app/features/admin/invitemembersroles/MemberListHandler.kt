@@ -3,12 +3,10 @@ package com.veyq.app.features.admin.invitemembersroles
 import com.veyq.app.generated.model.IdentityPublicKey
 import com.veyq.app.generated.model.TenantMember
 import com.veyq.app.generated.model.TenantMemberList
-import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.keymgmt.IdentityKeyRepository
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
-import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
@@ -22,19 +20,13 @@ class MemberListHandler(
     private val users: UserRepository,
     private val identityKeys: IdentityKeyRepository,
     private val memberships: MembershipRepository,
-    private val tenants: TenantRepository,
-    private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
     @Transactional
     fun listTenantMembers(auth: String?, tenantId: String): TenantMemberList {
-        val callerId = sessions.resolve(auth) ?: throw unauthorized()
-        tenants.findById(tenantId) ?: throw notFound("Tenant")
-        val callerMembership = memberships.find(tenantId, callerId)
-        if (callerMembership == null || callerMembership.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant membership required")
-        }
+        guard.requireActiveMember(auth, tenantId)
 
         val members = memberships.listByTenant(tenantId).mapNotNull { membership ->
             val user = users.findById(membership.userId) ?: return@mapNotNull null
@@ -53,7 +45,4 @@ class MemberListHandler(
         }
         return TenantMemberList(members = members)
     }
-
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

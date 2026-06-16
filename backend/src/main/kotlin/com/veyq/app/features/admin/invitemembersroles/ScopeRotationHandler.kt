@@ -7,9 +7,8 @@ import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
-import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -24,31 +23,24 @@ import java.util.UUID
  */
 @ApplicationScoped
 class ScopeRotationHandler(
-    private val tenants: TenantRepository,
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val contentKeys: com.veyq.app.shared.content.ScopeContentKeyRepository,
     private val items: com.veyq.app.shared.content.ScopeItemRepository,
     private val nodes: com.veyq.app.shared.content.NodeRepository,
-    private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
     private val dec = Base64.getUrlDecoder()
 
     @Transactional
     fun rotateScope(auth: String?, tenantId: String, req: RotateScopeRequest): RotateScopeResponse {
-        val callerId = sessions.resolve(auth) ?: throw unauthorized()
-        tenants.findById(tenantId) ?: throw notFound("Tenant")
+        // authority: an active Owner who actually holds the scope (you can only re-key what you can read)
+        val callerId = guard.requireOwner(auth, tenantId)
         val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
         requireSuite(req.scopePublicKey.suiteId)
         req.grants.forEach { requireSuite(it.wrappedScopePrivateKey.suiteId) }
-
-        // authority: an active Owner who actually holds the scope (you can only re-key what you can read)
-        val callerMembership = memberships.find(tenantId, callerId)
-        if (callerMembership == null || callerMembership.role != "Owner" || callerMembership.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        }
         grants.find(scope.id, callerId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
 
         // the new grants must cover exactly the active members — nobody dropped, no outsiders added
@@ -137,6 +129,5 @@ class ScopeRotationHandler(
         if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
     private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

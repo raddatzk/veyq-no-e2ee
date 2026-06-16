@@ -22,6 +22,7 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
@@ -59,6 +60,7 @@ class TenantProvisioningHandler(
     private val groupMembers: GroupMembershipRepository,
     private val purge: ContentPurge,
     private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
     private val suites: CryptoSuiteRegistry,
     @param:ConfigProperty(name = "veyq.tenant.deletion-grace", defaultValue = "P30D") private val deletionGrace: Duration,
 ) {
@@ -125,13 +127,8 @@ class TenantProvisioningHandler(
     }
 
     private fun requireTenantOwner(auth: String?, tenantId: String): Tenant {
-        val callerId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val tenant = tenants.findById(tenantId) ?: throw notFound("Tenant")
-        val caller = memberships.find(tenantId, callerId)
-        if (caller == null || caller.role != "Owner" || caller.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        }
-        return tenant
+        guard.requireOwner(auth, tenantId)
+        return tenants.findById(tenantId) ?: throw notFound("Tenant")
     }
 
     @Transactional

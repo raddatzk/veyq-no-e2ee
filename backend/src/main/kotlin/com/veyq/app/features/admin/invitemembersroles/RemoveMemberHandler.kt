@@ -5,8 +5,8 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
-import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 
@@ -18,21 +18,15 @@ import jakarta.transaction.Transactional
  */
 @ApplicationScoped
 class RemoveMemberHandler(
-    private val tenants: TenantRepository,
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
     private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
 ) {
     @Transactional
     fun removeMember(auth: String?, tenantId: String, userId: String): MembershipSummary {
-        val callerId = sessions.resolve(auth) ?: throw unauthorized()
-        tenants.findById(tenantId) ?: throw notFound("Tenant")
-
-        val callerMembership = memberships.find(tenantId, callerId)
-        if (callerMembership == null || callerMembership.role != "Owner" || callerMembership.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        }
+        val callerId = guard.requireOwner(auth, tenantId) // ACTIVE Owner; implies the tenant exists
         if (userId == callerId) throw ApiException(400, "CANNOT_REMOVE_SELF", "Cannot remove yourself")
 
         val membership = memberships.find(tenantId, userId) ?: throw notFound("Membership")
@@ -49,6 +43,5 @@ class RemoveMemberHandler(
         return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
     private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

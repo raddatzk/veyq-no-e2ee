@@ -2,9 +2,8 @@ package com.veyq.app.features.admin.invitemembersroles
 
 import com.veyq.app.generated.model.EmailInviteRequest
 import com.veyq.app.platform.error.ApiException
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.InviteStatus
-import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.mailer.Mail
@@ -23,20 +22,15 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 @ApplicationScoped
 class EmailInviteHandler(
     private val tenants: TenantRepository,
-    private val memberships: MembershipRepository,
     private val invites: TenantInviteRepository,
-    private val sessions: SessionService,
+    private val guard: TenantAdminGuard,
     private val mailer: Mailer,
     @param:ConfigProperty(name = "veyq.app.base-url") private val appBaseUrl: String,
 ) {
     @Transactional
     fun emailMemberInvite(auth: String?, tenantId: String, req: EmailInviteRequest) {
-        val callerId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
+        guard.requireOwner(auth, tenantId)
         val tenant = tenants.findById(tenantId) ?: throw ApiException(404, "NOT_FOUND", "Tenant not found")
-        val caller = memberships.find(tenantId, callerId)
-        if (caller == null || caller.role != "Owner" || caller.status != "ACTIVE") {
-            throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
-        }
         val invite = invites.findById(req.inviteId) ?: throw ApiException(404, "NOT_FOUND", "Invite not found")
         if (invite.tenantId != tenantId || invite.status != InviteStatus.PENDING.name) {
             throw ApiException(400, "INVALID_INVITE", "Invite is not pending for this tenant")

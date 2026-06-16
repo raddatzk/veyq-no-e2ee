@@ -129,10 +129,11 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   zusätzliche Anti-Amplifikation — durch Peer-Cap (32) + per-connection-Limit bereits gebounded, niedrige Prio.)*
 
 ## Phase E — Wartbarkeit / Aufräumen
-- [ ] **E1 · `TenantAdminGuard` extrahieren** *(Maintainability, M)* — Owner-ACTIVE-Check in ~7 Admin-Handlern
-  dupliziert (`RemoveMemberHandler:32`, `ChangeMemberRoleHandler:28`, `ScopeRotationHandler:48`, …). Analog zu
-  `ScopeAccessGuard`, aber für den Admin-Gate. **Gemeinsam mit P4.3** (Enum-Migration) erledigen — der Guard
-  wird die eine Stelle mit typisiertem Vergleich.
+- [x] **E1 · `TenantAdminGuard` extrahiert** *(Maintainability, M)* — der duplizierte Owner-ACTIVE-Check (8
+  Handler: RemoveMember, ChangeMemberRole, MemberInvite, EmailInvite, ScopeRotation, MemberList, TenantTerms,
+  TenantProvisioning) läuft jetzt durch `TenantAdminGuard.requireOwner` (+ `requireActiveMember` für die
+  Member-List). Analog zu `ScopeAccessGuard`, kann nicht mehr pro Handler driften — und ist jetzt **die eine
+  Stelle** für E4 (Enum-Migration, nur noch Guard + Entity). Verifiziert: alle 5 admin-E2E grün.
 - [ ] **E2 · `toApiBatch` teilen** *(Maintainability, S)* — `MediaHandler.kt:51` ↔ `PublicShareMediaHandler.kt:76`
   byte-identisch. In gemeinsamen `MediaApiMapper` ziehen.
 - [ ] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* — Backend `unauthorized()`/`notFound()`/
