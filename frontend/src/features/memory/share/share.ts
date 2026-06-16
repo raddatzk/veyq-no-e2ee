@@ -91,7 +91,7 @@ export async function revokeShare(apiBase: string, session: UnlockedSession, act
 
 // ---- guest side (no auth) -------------------------------------------------------------------------------
 
-export type ShareContext = { apiBase: string; shareId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole; notices: ShareNotice[] }
+export type ShareContext = { apiBase: string; shareId: string; scopeId: string; contentKey: Uint8Array; rootNodeId: string; rootName: string; role: ShareRole; notices: ShareNotice[] }
 
 // ---- tenant Terms of Service (owner) --------------------------------------------------------------------
 
@@ -137,7 +137,7 @@ export async function resolvePublicShare(apiBase: string, shareId: string, share
   }
   // A blind UPLOADER gets no root node (it must not learn metadata); only readers see the album name.
   const rootName = body.root ? decodeNode(contentKey, body.root as MemoryNode).name : ''
-  return { apiBase, shareId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
+  return { apiBase, shareId, scopeId: body.scopeId, contentKey, rootNodeId: body.rootNodeId, rootName, role: body.role, notices: body.notices ?? [] }
 }
 
 /** The shared subtree's nodes (ciphertext). */

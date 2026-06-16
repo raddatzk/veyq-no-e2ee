@@ -5,7 +5,10 @@ import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
 import type { GalleryTile } from '../../features/gallery/gallery'
-import { getShareJournal, loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
+import * as Y from 'yjs'
+import { loadShareOriginal, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
+import { loadShareJournalDoc, subscribeShareJournal } from '../../features/memory/journalLive/shareJournalLive'
+import type { EncryptedRelayProvider } from '../../features/memory/journalLive/encryptedProvider'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { listMySpaces } from '../../features/spaces/switchActiveSpace/switchActiveSpace'
@@ -34,6 +37,19 @@ const canRead = computed(() => ctx.value?.role !== 'UPLOADER')
 const canUpload = computed(() => ctx.value?.role === 'CONTRIBUTOR' || ctx.value?.role === 'UPLOADER')
 const journalHtml = computed(() => renderMarkdown(journal.value))
 let ro: ResizeObserver | null = null
+let journalDoc: Y.Doc | null = null
+let journalProvider: EncryptedRelayProvider | null = null
+
+/** Operator-blind live read: reconstruct from the store, then subscribe to the relay for owner edits. */
+async function startLiveJournal(c: ShareContext) {
+  const doc = new Y.Doc()
+  journalDoc = doc
+  try { await loadShareJournalDoc(c.apiBase, c.shareId, c.rootNodeId, c.contentKey, doc) } catch { /* none written yet */ }
+  const ytext = doc.getText('journal')
+  journal.value = ytext.toString()
+  doc.on('update', () => { journal.value = ytext.toString() })
+  journalProvider = subscribeShareJournal(c.apiBase, c.scopeId, c.rootNodeId, c.shareId, c.contentKey, doc)
+}
 
 const buckets = computed(() =>
   groupByDay(tiles.value).map((b) => ({
@@ -109,7 +125,7 @@ async function loadContent() {
   // An UPLOADER is a blind drop-off — it cannot read the gallery or journal (those endpoints 403).
   if (c.role !== 'UPLOADER') {
     tiles.value = await loadShareTiles(c, c.rootNodeId)
-    journal.value = await getShareJournal(c).catch(() => '')
+    await startLiveJournal(c)
     await nextTick()
     if (galleryEl.value && ro) ro.observe(galleryEl.value) // the gallery only renders after content loads
   }
@@ -132,6 +148,8 @@ async function onFilesPicked(event: Event) {
 
 onBeforeUnmount(() => {
   ro?.disconnect()
+  journalProvider?.destroy()
+  journalDoc?.destroy()
   tiles.value.forEach((tt) => URL.revokeObjectURL(tt.url))
   if (lightbox.value) URL.revokeObjectURL(lightbox.value)
 })

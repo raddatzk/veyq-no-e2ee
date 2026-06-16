@@ -5,6 +5,8 @@
 //  (2) a CONTRIBUTOR guest adds a photo and writes the journal — also with no session.
 // Proves the operator-blind public viewer + collect-uploads work end-to-end.
 import { describe, expect, it } from 'vitest'
+import * as Y from 'yjs'
+import { loadShareJournalDoc } from '../journalLive/shareJournalLive'
 import { registerServerOwner } from '../../admin/setupServer/setupServer'
 import { login } from '../../account/login/login'
 import { getOrCreateContentKey, openPersonalScope } from '../../content/scopeContent'
@@ -56,6 +58,11 @@ run('share e2e', () => {
     expect(await listShareMedia(cCtx, cCtx.rootNodeId)).toHaveLength(2)
     await saveJournalMarkdown(apiBase, session, active.scope.scopeId, memory.id, active.contentKey, '# Unser Trip\n\nDanke fürs Mitmachen!')
     expect(await getShareJournal(cCtx)).toContain('Danke fürs Mitmachen')
+    // operator-blind live read: a read-capable guest reconstructs the journal CRDT from the public store
+    const guestDoc = new Y.Doc()
+    await loadShareJournalDoc(apiBase, cCtx.shareId, cCtx.rootNodeId, cCtx.contentKey, guestDoc)
+    expect(guestDoc.getText('journal').toString()).toContain('Danke fürs Mitmachen')
+    guestDoc.destroy()
 
     // (3) UPLOADER — a blind drop-off: can add media, but reads are denied
     const uShare = await createShare(apiBase, session, active, memory.id, { role: 'UPLOADER' })

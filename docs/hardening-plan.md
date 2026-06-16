@@ -116,10 +116,14 @@ Subsumes some of the P2.3 seed-race/cursor cleanup.
   :core + :app compile. **6a complete on all three platforms.**
 
 **6b — live read in shares** (so readers/shares are always current, not just at compaction).
-- [ ] Relay `onOpen` also accepts a share token gated by `canRead` + subtree; share connections are
-  receive-only (no broadcast — journal editing stays member-only).
-- [ ] `GET /public/shares/{id}/nodes/{n}/journal/live` (snapshot + updates) so a guest reconstructs the
-  current state client-side (Yjs), then subscribes to the relay for live deltas. Operator-blind throughout.
+- [x] Relay `onOpen` also accepts a share token (`?share=`) gated by `canRead` + subtree; share connections
+  are receive-only (`onMessage` drops their frames — journal editing stays member-only).
+- [x] `GET /public/shares/{id}/nodes/{n}/journal/live` (sealed snapshot + update log). Slice test: VIEWER
+  gets it (200), a node outside the subtree is 404.
+- [x] Web share viewer reconstructs the journal from the public store (always current, not stale-at-compaction)
+  and subscribes to the relay for live owner edits. share e2e proves the operator-blind guest reconstruct.
+  *(Real-time push to a connected guest is wired but not e2e-covered; mobile share-live read = backlog, since
+  share guests are browsers.)*
 
 ---
 
