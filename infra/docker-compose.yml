@@ -77,10 +77,6 @@ services:
       MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
       FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
       MEDIA_PREVIEW_TIMEOUT_SECONDS: ${MEDIA_PREVIEW_TIMEOUT_SECONDS:-15}
-      JOURNAL_LIVE_WEBSOCKET_URL: ${JOURNAL_LIVE_WEBSOCKET_URL:-/api/collaboration/journal}
-      JOURNAL_LIVE_TOKEN_SECRET: ${JOURNAL_LIVE_TOKEN_SECRET:-}
-      JOURNAL_LIVE_TOKEN_TTL_MINUTES: ${JOURNAL_LIVE_TOKEN_TTL_MINUTES:-15}
-      JOURNAL_LIVE_SIDECAR_SECRET: ${JOURNAL_LIVE_SIDECAR_SECRET:-}
       VEYQ_SOURCE_URL: ${VEYQ_SOURCE_URL:-https://github.com/raddatzk/veyq}
       VEYQ_MOBILE_IOS_APP_STORE_ID: ${VEYQ_MOBILE_IOS_APP_STORE_ID:-}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
@@ -109,44 +105,7 @@ services:
       - traefik.http.routers.veyq.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}
       - traefik.http.routers.veyq.entrypoints=websecure
       - traefik.http.routers.veyq.tls.certresolver=letsencrypt
-      # Explicit low priority so the more specific veyq-collaboration router always
-      # wins. Without this, Traefik's implicit priority equals the rule length, which
-      # can exceed the collaboration router's priority for long multi-host rules.
-      - traefik.http.routers.veyq.priority=1
       - traefik.http.services.veyq.loadbalancer.server.port=8080
-
-  veyq-collaboration:
-    image: ${VEYQ_COLLABORATION_IMAGE:-ghcr.io/raddatzk/veyq-collaboration:latest}
-    profiles: ["collaboration"]
-    container_name: veyq-collaboration
-    environment:
-      VEYQ_BACKEND_URL: http://veyq:8080
-      PORT: 8082
-      HEALTH_PORT: 8083
-      JOURNAL_SNAPSHOT_DEBOUNCE_MS: ${JOURNAL_SNAPSHOT_DEBOUNCE_MS:-750}
-      JOURNAL_DOCUMENT_IDLE_EVICTION_MS: ${JOURNAL_DOCUMENT_IDLE_EVICTION_MS:-300000}
-      JOURNAL_LIVE_SIDECAR_SECRET: ${JOURNAL_LIVE_SIDECAR_SECRET:-}
-    expose:
-      - "8082"
-      - "8083"
-    depends_on:
-      - veyq
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/api/collaboration/journal >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.veyq-collaboration.rule=(${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}) && PathPrefix(`/api/collaboration/journal`)
-      # Must outrank the veyq router regardless of rule length. Both routers use
-      # explicit priorities so ordering no longer depends on Traefik's implicit,
-      # rule-length-based priority.
-      - traefik.http.routers.veyq-collaboration.priority=2
-      - traefik.http.routers.veyq-collaboration.entrypoints=websecure
-      - traefik.http.routers.veyq-collaboration.tls.certresolver=letsencrypt
-      - traefik.http.services.veyq-collaboration.loadbalancer.server.port=8082
 
   veyq-reset:
     profiles: ["reset"]

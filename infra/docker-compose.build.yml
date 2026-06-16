@@ -8,8 +8,3 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: ${VEYQ_BUILD_TARGET:-runtime-jvm}
-
-  veyq-collaboration:
-    build:
-      context: ../collaboration
-      dockerfile: Dockerfile

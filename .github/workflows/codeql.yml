@@ -54,7 +54,6 @@ jobs:
               # OpenAPI specs generate the TypeScript fetch clients consumed by
               # the frontend.
               - 'docs/api/**'
-              - 'collaboration/**'
               - 'load/**'
               - 'site/**'
               - '**/*.js'
