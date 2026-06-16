@@ -24,10 +24,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   Android `GalleryScreen.kt:141`. Query-Strings landen in Proxy-/Access-Logs & History. Fix: kurzlebiges
   Single-Use-WS-Ticket (POST → Token) **oder** `Sec-WebSocket-Protocol`-Wert; Backend-Relay entsprechend.
   (Mobile dabei zugleich percent-encoden, falls Ticket-Weg nicht sofort kommt.)
-- [ ] **A3 · Share-Contribute kann fremde Scope-Blobs anhängen (IDOR)** *(Security, S)* —
-  `backend/.../PublicShareContributeHandler.kt:43` → `MediaHandler.createMediaAs`/`requireBlob:129`.
-  Unauth Guest darf jeden `blobId` im Scope referenzieren. Fix: bei Share-Contributions auf Blobs mit
-  `createdBy == "share:<shareId>"` einschränken.
+- [x] **A3 · Share-Contribute kann fremde Scope-Blobs anhängen (IDOR)** *(Security, S)* —
+  `PublicShareContributeHandler.createShareMedia` prüft jetzt, dass `originalBlobId` + jedes Derivat-`blobId`
+  von einem COMPLETED-Upload **dieses** Shares stammen (`createdBy == "share:<id>"`, via
+  `BlobUploadRepository.existsCompletedBy` — dedup-sicher, da die abgeschlossene Upload-Row die Attribution
+  hält). E2E erweitert: Legit-Contribution grün, Forge eines fremden Blobs → 403 `BLOB_NOT_FROM_SHARE`.
 - [ ] **A4 · Single-Server-Owner-Setup TOCTOU** *(Security, S)* — `SetupServerHandler.kt:32` + `SetupGate.kt:9`.
   Zwei parallele `POST /api/setup/owner` können beide durchkommen. Fix: Partial-Unique-Index/Lock-Row auf die
   ServerOwner-Rolle (Migration V27).

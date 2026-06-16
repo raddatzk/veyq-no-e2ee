@@ -180,6 +180,15 @@ class BlobUploadHandler(
         return ChunkResponse(frame = ApiBlob(suiteId = blob.suiteId, bytes = enc.encodeToString(frame)))
     }
 
+    /**
+     * True if [blobId] was produced by a COMPLETED upload in this scope tagged [createdBy] (e.g. "share:<id>").
+     * Dedup-safe: even when a share upload dedups onto a pre-existing blob, the completed upload row records
+     * that this contributor legitimately produced that exact content — so it gates a guest to the blobs THEY
+     * uploaded, not arbitrary scope blobs they happen to know the id of.
+     */
+    fun wasUploadedBy(scopeId: String, blobId: String, createdBy: String): Boolean =
+        uploads.existsCompletedBy(scopeId, blobId, createdBy)
+
     /** Scheduled GC: reclaim abandoned OPEN uploads (frames + manifest + session). COMPLETED are kept. */
     @Transactional
     fun purgeStaleOpenUploads(cutoff: Instant): Int {

@@ -44,7 +44,18 @@ class PublicShareContributeHandler(
         val share = uploader(shareId)
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
+        // A guest may only attach blobs THEY uploaded via this share — not arbitrary scope blobs whose id they
+        // happen to know. (createMediaAs only checks the blob is in-scope, which is too permissive for guests.)
+        val owner = "share:${share.id}"
+        requireFromThisShare(share.scopeId, req.originalBlobId, owner)
+        req.derivatives.orEmpty().forEach { requireFromThisShare(share.scopeId, it.blobId, owner) }
         return media.createMediaAs(share.scopeId, nodeId, req)
+    }
+
+    private fun requireFromThisShare(scopeId: String, blobId: String, owner: String) {
+        if (!blobUploads.wasUploadedBy(scopeId, blobId, owner)) {
+            throw ApiException(403, "BLOB_NOT_FROM_SHARE", "A contribution may only reference blobs uploaded through this share")
+        }
     }
 
     /** Resolve a non-expired share and require an upload permission (CONTRIBUTOR or the blind-drop UPLOADER). */

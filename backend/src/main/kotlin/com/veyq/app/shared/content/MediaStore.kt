@@ -93,6 +93,13 @@ class BlobUploadRepository : PanacheRepositoryBase<BlobUpload, String> {
     fun countOpenByScope(scopeId: String): Long = count("scopeId = ?1 and status = ?2", scopeId, UploadStatus.OPEN.name)
     fun listStaleOpen(cutoff: Instant): List<BlobUpload> =
         list("status = ?1 and createdAt < ?2", UploadStatus.OPEN.name, cutoff)
+
+    /** True if a COMPLETED upload in this scope produced [blobId] under [createdBy] — gates share contributions. */
+    fun existsCompletedBy(scopeId: String, blobId: String, createdBy: String): Boolean =
+        count(
+            "scopeId = ?1 and blobId = ?2 and createdBy = ?3 and status = ?4",
+            scopeId, blobId, createdBy, UploadStatus.COMPLETED.name,
+        ) > 0
 }
 
 @ApplicationScoped

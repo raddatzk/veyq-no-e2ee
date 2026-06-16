@@ -56,6 +56,16 @@ run('share e2e', () => {
 
     // the owner's gallery now holds both media; the owner's journal is READ-ONLY to the contributor
     expect(await listShareMedia(cCtx, cCtx.rootNodeId)).toHaveLength(2)
+
+    // A3: a contributor may NOT attach a scope blob it didn't upload through this share — referencing the
+    // owner's original blob id (which the guest can see via listShareMedia) is rejected.
+    const forgery = await fetch(`${apiBase}/api/public/shares/${cCtx.shareId}/nodes/${cCtx.rootNodeId}/contributed-media`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ originalBlobId: vMedia[0].original.blobId, sealedMeta: { suiteId: 'v1', bytes: '' }, mimeType: 'image/jpeg', derivatives: [] }),
+    })
+    expect(forgery.status).toBe(403)
+    expect((await forgery.json()).code).toBe('BLOB_NOT_FROM_SHARE')
+    expect(await listShareMedia(cCtx, cCtx.rootNodeId)).toHaveLength(2) // unchanged — no forged attach
     await saveJournalMarkdown(apiBase, session, active.scope.scopeId, memory.id, active.contentKey, '# Unser Trip\n\nDanke fürs Mitmachen!')
     expect(await getShareJournal(cCtx)).toContain('Danke fürs Mitmachen')
     // operator-blind live read: a read-capable guest reconstructs the journal CRDT from the public store
