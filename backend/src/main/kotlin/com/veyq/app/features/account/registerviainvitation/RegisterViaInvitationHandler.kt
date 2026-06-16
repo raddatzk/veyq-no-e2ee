@@ -6,15 +6,11 @@ import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
+import com.veyq.app.shared.identity.AccountFactory
+import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
-import com.veyq.app.shared.keymgmt.AuthVerifier
-import com.veyq.app.shared.keymgmt.AuthVerifierRepository
-import com.veyq.app.shared.keymgmt.IdentityKey
-import com.veyq.app.shared.keymgmt.IdentityKeyRepository
-import com.veyq.app.shared.keymgmt.KeyBlob
-import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
@@ -48,10 +44,8 @@ import com.veyq.app.generated.model.ServerRole as ApiServerRole
  */
 @ApplicationScoped
 class RegisterViaInvitationHandler(
+    private val accounts: AccountFactory,
     private val users: UserRepository,
-    private val identityKeys: IdentityKeyRepository,
-    private val keyBlobs: KeyBlobRepository,
-    private val authVerifiers: AuthVerifierRepository,
     private val tenants: TenantRepository,
     private val invites: TenantInviteRepository,
     private val memberships: MembershipRepository,
@@ -71,18 +65,8 @@ class RegisterViaInvitationHandler(
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }
-        if (req.masterKeyWraps.isEmpty()) {
-            throw ApiException(400, "NO_UNLOCK_METHOD", "At least one unlock method is required")
-        }
-        if (req.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && req.recoveryAuthTag.isNullOrBlank()) {
-            throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
-        }
-        requireSuite(req.identityPublicKey.suiteId)
-        requireSuite(req.wrappedIdentityPrivateKey.suiteId)
-        requireSuite(req.authVerifier.suiteId)
-        req.masterKeyWraps.forEach { requireSuite(it.suiteId) }
-        requireSuite(req.personalScopePublicKey.suiteId)
-        requireSuite(req.wrappedPersonalScopePrivateKey.suiteId)
+        // tenant-scope suites are validated here; the account material (identity/wraps/verifier/personal
+        // scope) is validated by the AccountFactory below.
         requireSuite(req.scopePublicKey.suiteId)
         requireSuite(req.wrappedScopePrivateKey.suiteId)
         if (users.findByEmail(req.email) != null) {
@@ -92,51 +76,21 @@ class RegisterViaInvitationHandler(
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
         val now = Instant.now()
 
-        // 1. the cryptographic account (mirrors uc.admin.setup-server, but as a regular member)
-        val user = User().apply {
-            id = newId(); email = req.email; displayName = req.displayName
-            serverRole = ServerRole.ServerMember; systemAccount = false; createdAt = now
-        }
-        users.persist(user)
-        identityKeys.persist(
-            IdentityKey().apply {
-                id = newId(); userId = user.id; suiteId = req.identityPublicKey.suiteId
-                kemPublicKey = dec.decode(req.identityPublicKey.kemPublicKey)
-                signPublicKey = dec.decode(req.identityPublicKey.signPublicKey)
-                wrappedPrivateKey = dec.decode(req.wrappedIdentityPrivateKey.bytes)
-                wrappedPrivateSuiteId = req.wrappedIdentityPrivateKey.suiteId; createdAt = now
-            },
-        )
-        req.masterKeyWraps.forEach { wrap ->
-            keyBlobs.persist(
-                KeyBlob().apply {
-                    id = newId(); userId = user.id; unlockMethod = wrap.unlockMethod.value
-                    suiteId = wrap.suiteId; wrappedKey = dec.decode(wrap.wrappedKey)
-                    kdfParams = wrap.kdfParams?.let { dec.decode(it) }; credentialRef = wrap.credentialRef; createdAt = now
-                    if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = req.recoveryAuthTag?.let { dec.decode(it) }
-                },
-            )
-        }
-        authVerifiers.persist(
-            AuthVerifier().apply {
-                id = newId(); userId = user.id; kind = req.authVerifier.kind.value
-                suiteId = req.authVerifier.suiteId; verifier = dec.decode(req.authVerifier.verifier); createdAt = now
-            },
-        )
-
-        // 2. the personal scope, born as self-owned and unshared
-        val personalScope = Scope().apply {
-            id = newId(); ownerUserId = user.id; kind = "PERSONAL_ROOT"
-            suiteId = req.personalScopePublicKey.suiteId
-            kemPublicKey = dec.decode(req.personalScopePublicKey.kemPublicKey); createdAt = now
-        }
-        scopes.persist(personalScope)
-        grants.persist(
-            ScopeGrant().apply {
-                id = newId(); scopeId = personalScope.id; userId = user.id
-                suiteId = req.wrappedPersonalScopePrivateKey.suiteId
-                wrappedPrivateKey = dec.decode(req.wrappedPersonalScopePrivateKey.bytes); createdAt = now
-            },
+        // 1+2. the cryptographic account + self-owned personal scope (mirrors uc.admin.setup-server)
+        val user = accounts.createAccount(
+            NewAccount(
+                email = req.email,
+                displayName = req.displayName,
+                serverRole = ServerRole.ServerMember,
+                identityPublicKey = req.identityPublicKey,
+                wrappedIdentityPrivateKey = req.wrappedIdentityPrivateKey,
+                masterKeyWraps = req.masterKeyWraps,
+                recoveryAuthTag = req.recoveryAuthTag,
+                authVerifier = req.authVerifier,
+                personalScopePublicKey = req.personalScopePublicKey,
+                wrappedPersonalScopePrivateKey = req.wrappedPersonalScopePrivateKey,
+            ),
+            now,
         )
 
         // 3. the tenant scope grant — born here for an owner claim, or re-wrapped from a temp invite

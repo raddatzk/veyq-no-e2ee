@@ -76,7 +76,11 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   (ScopeContentKeyHandler, JournalHandler, TrackHandler, MemoryTreeHandler, CurateHandler, MediaHandler,
   ShareHandler, ScopeItemsHandler, BlobUploadHandler) onto it so the check can't drift again. The
   membership/admin handlers keep their own `grants`/`memberships` reads (different gate, out of scope).
-- [ ] **P4.1 Account/KeyBag factory.** Dedup `SetupServerHandler.kt:62` ↔ `RegisterViaInvitationHandler.kt:90`.
+- [x] **P4.1 Account/KeyBag factory.** Extracted `AccountFactory` (`shared/identity`) — the single place a
+  new account's identity keypair + master-key unlock wraps + auth verifier + self-owned PERSONAL_ROOT scope
+  (and account-material suite/wrap/recovery validation) is persisted. Both `SetupServerHandler` (ServerOwner)
+  and `RegisterViaInvitationHandler` (ServerMember) route through it. Verified live: register-via-invitation
+  + media web E2E green against a fresh backend.
 - [~] **P4.2 Shared helpers.** Fixed the hardcoded `if (suiteId != "v1")` in `BlobUploadHandler` →
   `suites.isKnown(...)`; the upload now records its frames' `suite_id` (V26) and the finalized blob + chunk
   reads carry the real suite (no more hardcoded `"v1"`). Remaining: centralize `toWrap`/`requireSuite`/Base64/
