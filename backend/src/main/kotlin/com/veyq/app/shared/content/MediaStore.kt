@@ -35,6 +35,7 @@ class BlobUpload {
     @Column(name = "byte_size", nullable = false) var byteSize: Long = 0
     @Column(nullable = false) var status: String = ""
     @Column(name = "blob_id") var blobId: String? = null
+    @Column(name = "staged_bytes", nullable = false) var stagedBytes: Long = 0 // running sum of staged chunk bytes
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
@@ -82,6 +83,7 @@ enum class DerivativeKind { THUMBNAIL, PREVIEW }
 class BlobRepository : PanacheRepositoryBase<Blob, String> {
     fun findByScopeAndToken(scopeId: String, dedupToken: String): Blob? =
         find("scopeId = ?1 and dedupToken = ?2", scopeId, dedupToken).firstResult()
+    fun listByIds(ids: Collection<String>): List<Blob> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
 }
 
 @ApplicationScoped
@@ -114,5 +116,6 @@ class MediaRepository : PanacheRepositoryBase<Media, String> {
 @ApplicationScoped
 class MediaDerivativeRepository : PanacheRepositoryBase<MediaDerivative, String> {
     fun listByMediaId(mediaId: String): List<MediaDerivative> = list("mediaId", mediaId)
+    fun listByMediaIds(mediaIds: Collection<String>): List<MediaDerivative> = if (mediaIds.isEmpty()) emptyList() else list("mediaId in ?1", mediaIds)
     fun deleteByMediaIds(mediaIds: Collection<String>): Long = if (mediaIds.isEmpty()) 0 else delete("mediaId in ?1", mediaIds)
 }

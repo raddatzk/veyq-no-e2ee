@@ -103,14 +103,18 @@ class TenantProvisioningHandler(
         requireTenantOwner(auth, tenantId).scheduledDeletionAt = null
     }
 
-    /** Hard-purge tenants whose grace period has passed. Called by the scheduler. */
+    /** The tenants whose grace period has passed — a read, so the scheduler can purge them one tx each. */
     @Transactional
-    fun purgeDueTenants(now: Instant) {
-        for (tenant in tenants.listDue(now)) purgeTenant(tenant)
-    }
+    fun dueTenantIds(now: Instant): List<String> = tenants.listDue(now).map { it.id }
 
-    /** Cascade the tenant scope + every group scope, plus memberships + invites, then the tenant row. */
-    private fun purgeTenant(tenant: Tenant) {
+    /**
+     * Hard-purge ONE tenant in its own transaction: cascade the tenant scope + every group scope, plus
+     * memberships + invites, then the tenant row. Per-tenant so a backlog can't become one giant write
+     * transaction (long locks, all-or-nothing rollback); a failed tenant is skipped, not poisoning the rest.
+     */
+    @Transactional
+    fun purgeTenant(tenantId: String) {
+        val tenant = tenants.findById(tenantId) ?: return
         scopes.listByTenantId(tenant.id).forEach { scope ->
             groupMembers.deleteByScopeId(scope.id) // no-op for the tenant root
             purge.purgeScope(scope.id)

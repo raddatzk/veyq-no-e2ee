@@ -50,39 +50,46 @@ class PublicShareMediaHandler(
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
-        return MediaList(media = media.listByNodeId(nodeId).map(::toApi))
+        return MediaList(media = toApiBatch(media.listByNodeId(nodeId)))
     }
 
     @Transactional
     fun getShareChunk(shareId: String, blobId: String, index: Int): ChunkResponse {
         val share = shareOr404(shareId)
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
-        val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
-        // The guest may only fetch blobs that back a medium (or its derivatives) in the shared subtree.
-        val allowed = buildSet {
-            for (nodeId in ids) for (m in media.listByNodeId(nodeId)) {
-                add(m.originalBlobId)
-                derivatives.listByMediaId(m.id).forEach { add(it.blobId) }
-            }
-        }
-        if (blobId !in allowed) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
+        if (!blobBacksSubtreeMedia(share, blobId)) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
         val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
         val frame = store.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
         return ChunkResponse(frame = ApiBlob(suiteId = "v1", bytes = enc.encodeToString(frame)))
     }
 
-    private fun toApi(m: Media): MediaItem =
-        MediaItem(
-            id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
-            sealedMeta = ApiBlob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
-            mimeType = m.mimeType,
-            original = blobRef(m.originalBlobId),
-            derivatives = derivatives.listByMediaId(m.id).map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = blobRef(it.blobId)) },
-            createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
-        )
+    /** Does [blobId] back a medium (original or derivative) in the share's subtree? At most two IN queries
+     *  (subtree media, then their derivatives), vs the old per-node × per-media loop on every chunk fetch. */
+    private fun blobBacksSubtreeMedia(share: com.veyq.app.shared.content.Share, blobId: String): Boolean {
+        val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
+        val subtreeMedia = media.listByNodeIds(ids)
+        if (subtreeMedia.any { it.originalBlobId == blobId }) return true
+        return derivatives.listByMediaIds(subtreeMedia.map { it.id }).any { it.blobId == blobId }
+    }
 
-    private fun blobRef(blobId: String): BlobRef {
-        val b = blobs.findById(blobId) ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
-        return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
+    /** Map a share gallery in a fixed 3 queries (media + derivatives IN + blobs IN), not N+1. */
+    private fun toApiBatch(items: List<Media>): List<MediaItem> {
+        if (items.isEmpty()) return emptyList()
+        val derivsByMedia = derivatives.listByMediaIds(items.map { it.id }).groupBy { it.mediaId }
+        val blobsById = blobs.listByIds((items.map { it.originalBlobId } + derivsByMedia.values.flatten().map { it.blobId }).toSet()).associateBy { it.id }
+        fun ref(blobId: String): BlobRef {
+            val b = blobsById[blobId] ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
+            return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
+        }
+        return items.map { m ->
+            MediaItem(
+                id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
+                sealedMeta = ApiBlob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
+                mimeType = m.mimeType,
+                original = ref(m.originalBlobId),
+                derivatives = derivsByMedia[m.id].orEmpty().map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = ref(it.blobId)) },
+                createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
+            )
+        }
     }
 }

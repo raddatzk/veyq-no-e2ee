@@ -98,10 +98,12 @@ class BlobUploadHandler(
         if (req.frame.bytes.length > maxEncodedFrameChars) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
         val frame = dec.decode(req.frame.bytes)
         if (frame.size > maxFrameBytes) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
-        ensureBudget(u, index, frame.size.toLong())
+        val existing = chunks.findByUpload(uploadId, index)
+        // O(1) budget check off the running counter (re-PUT of a chunk swaps its old size for the new one).
+        val newStaged = u.stagedBytes - (existing?.byteSize ?: 0) + frame.size.toLong()
+        ensureBudget(u, newStaged)
         val key = "$uploadId/$index"
         store.put(key, frame) // idempotent overwrite — re-PUT on resume is harmless
-        val existing = chunks.findByUpload(uploadId, index)
         if (existing == null) {
             chunks.persist(BlobChunk().apply {
                 id = UUID.randomUUID().toString(); this.uploadId = uploadId; chunkIndex = index
@@ -110,6 +112,7 @@ class BlobUploadHandler(
         } else {
             existing.byteSize = frame.size.toLong()
         }
+        u.stagedBytes = newStaged
     }
 
     @Transactional
@@ -186,10 +189,9 @@ class BlobUploadHandler(
         return stale.size
     }
 
-    private fun ensureBudget(u: BlobUpload, replacingIndex: Int, newFrameSize: Long) {
-        val current = chunks.listByUploadId(u.id).filter { it.chunkIndex != replacingIndex }.sumOf { it.byteSize }
+    private fun ensureBudget(u: BlobUpload, newStagedBytes: Long) {
         val budget = minOf(maxUploadBytes + maxChunks * 28L, u.byteSize + u.totalChunks * 28L)
-        if (current > budget || newFrameSize > budget - current) {
+        if (newStagedBytes > budget) {
             throw ApiException(400, "UPLOAD_TOO_LARGE", "Uploaded chunk data exceeds the declared or configured limit")
         }
     }

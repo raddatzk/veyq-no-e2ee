@@ -170,7 +170,8 @@ class DeleteSliceTest {
 
         // re-schedule, then the GC (deadline passed) hard-purges the tenant + its scope
         given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId").then().statusCode(204)
-        tenantHandler.purgeDueTenants(Instant.now().plus(40, ChronoUnit.DAYS))
+        val due = Instant.now().plus(40, ChronoUnit.DAYS)
+        tenantHandler.dueTenantIds(due).forEach { tenantHandler.purgeTenant(it) }
         QuarkusTransaction.requiringNew().run {
             assertNull(tenants.findById(tenantId))
             assertNull(scopes.findById(tenantScopeId))

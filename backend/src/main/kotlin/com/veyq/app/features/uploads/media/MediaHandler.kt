@@ -50,7 +50,28 @@ class MediaHandler(
     fun listMedia(auth: String?, scopeId: String, nodeId: String): MediaList {
         requireKeyHolder(scopeId, auth)
         requireMemoryNode(scopeId, nodeId)
-        return MediaList(media = media.listByNodeId(nodeId).map(::toApi))
+        return MediaList(media = toApiBatch(media.listByNodeId(nodeId)))
+    }
+
+    /** Map a gallery's worth of media in a fixed 3 queries (media + derivatives IN + blobs IN), not N+1. */
+    fun toApiBatch(items: List<Media>): List<MediaItem> {
+        if (items.isEmpty()) return emptyList()
+        val derivsByMedia = derivatives.listByMediaIds(items.map { it.id }).groupBy { it.mediaId }
+        val blobsById = blobs.listByIds((items.map { it.originalBlobId } + derivsByMedia.values.flatten().map { it.blobId }).toSet()).associateBy { it.id }
+        fun ref(blobId: String): BlobRef {
+            val b = blobsById[blobId] ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
+            return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
+        }
+        return items.map { m ->
+            MediaItem(
+                id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
+                sealedMeta = com.veyq.app.generated.model.Blob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
+                mimeType = m.mimeType,
+                original = ref(m.originalBlobId),
+                derivatives = derivsByMedia[m.id].orEmpty().map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = ref(it.blobId)) },
+                createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
+            )
+        }
     }
 
     @Transactional

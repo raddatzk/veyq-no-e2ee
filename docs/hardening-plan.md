@@ -58,16 +58,17 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   on all platforms.
 
 ## Phase 3 — Performance (backend)
-- [ ] **P3.1 Gallery / share-media N+1.** `MediaHandler.kt:49` `toApi`/`blobRef` does +1 blob +1 derivative
-  per medium (~1200 queries / 200 photos); same in `PublicShareMediaHandler`. Batch via `listByMediaIds`
-  + `IN` queries.
-- [ ] **P3.2 Blob: O(n²) chunk sum + IO inside the transaction.** `ensureBudget` re-lists all chunks per
-  PUT (`BlobUploadHandler.kt:189`) — keep a byte counter on the upload row. Move blob IO out of
-  `@Transactional`; add a streaming `InputStream` instead of `readAllBytes` + base64-String.
-- [ ] **P3.3 Share-chunk ACL.** `PublicShareMediaHandler.kt:60` rebuilds the whole subtree blob set on every
-  chunk fetch — resolve once / cache per share.
-- [ ] **P3.4 Indexes + tenant purge.** Add `veyq_blob_upload(scope_id,status)` and restore
-  `veyq_media(scope_id)`; make `purgeDueTenants` one transaction per tenant.
+- [x] **P3.1 Gallery / share-media N+1.** `MediaHandler.toApiBatch` + `PublicShareMediaHandler.toApiBatch`:
+  a gallery maps in a fixed 3 queries (media + `listByMediaIds` IN + `listByIds` IN) instead of +1 blob +1
+  derivative-list +N derivative-blob per medium (~1200 → 3 for 200 photos).
+- [~] **P3.2 Blob budget O(n²)→O(1).** Done: a `staged_bytes` running counter on the (row-locked) upload row
+  replaces re-summing every staged chunk on each PUT. **Deferred:** moving blob IO out of `@Transactional`
+  + a streaming `InputStream` (vs `readAllBytes`+base64) — a BlobStore-interface refactor, its own change.
+- [x] **P3.3 Share-chunk ACL.** `getShareChunk` no longer rebuilds the whole subtree blob set per chunk;
+  `blobBacksSubtreeMedia` checks in at most two IN queries (subtree media, then their derivatives).
+- [x] **P3.4 Indexes + tenant purge.** V25 adds `idx_media_scope`, `idx_blob_upload(scope_id,status)`,
+  `idx_blob_upload(status,created_at)`; tenant purge is one transaction per tenant (GC lists ids, then calls a
+  per-tenant `@Transactional purgeTenant` cross-bean — a backlog can't become one giant write tx).
 
 ## Phase 4 — Maintainability / cleanup
 - [ ] **P4.0 Finish the `ScopeAccessGuard` migration (M1).** Phase 1 created the guard and routed the three
