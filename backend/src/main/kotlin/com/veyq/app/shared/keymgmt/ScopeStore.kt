@@ -46,6 +46,12 @@ class ScopeRepository : PanacheRepositoryBase<Scope, String> {
     /** Every scope under a tenant — its TENANT_ROOT plus all GROUP_ROOT scopes (used by tenant delete). */
     fun listByTenantId(tenantId: String): List<Scope> = list("tenantId", tenantId)
 
+    fun listByIds(ids: Collection<String>): List<Scope> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
+
+    /** The TENANT_ROOT scope of each given tenant (the roster's tenant-space lookup, batched). */
+    fun listTenantRootsByTenantIds(tenantIds: Collection<String>): List<Scope> =
+        if (tenantIds.isEmpty()) emptyList() else list("kind = ?1 and tenantId in ?2", "TENANT_ROOT", tenantIds)
+
     fun listGroupsByTenantId(tenantId: String): List<Scope> =
         list("tenantId = ?1 and kind = ?2", tenantId, "GROUP_ROOT")
     fun findPersonalByOwnerUserId(userId: String): Scope? =

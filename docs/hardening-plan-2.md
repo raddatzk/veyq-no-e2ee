@@ -112,9 +112,11 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   **Verschoben:** Schreib-Pfad (`putBlobChunkAs` schreibt unter Row-Lock) + complete/GC-Deletes — write-outside-tx
   hat eine Orphan-Frame-Subtilität (über-Budget abgelehnte Frames ohne Chunk-Row würde der GC nicht aufräumen);
   braucht Prefix-Delete bzw. Reservierungs-Logik, separat anzugehen.
-- [ ] **D2 · `MySpacesHandler` N+1** *(Perf, M)* — `MySpacesHandler.kt:58-90`. Pro Membership `findById`/`find`
-  in Schleife (Tenant doppelt). Fix: Kandidaten-Scopes/Tenants + User-Grants je per IN-Query, dann im Speicher
-  zusammensetzen.
+- [x] **D2 · `MySpacesHandler` N+1** *(Perf, M)* — Roster jetzt mit fixer Query-Zahl statt O(Tenants+Groups):
+  ein Read aller gehaltenen Grants (`held`-Set), dann Memberships + relevante Tenant-Root-/Group-Scopes +
+  Tenants je per IN-Query, in-memory zusammengesetzt (`grants.listByUserId`, neue `scopes.listByIds`/
+  `listTenantRootsByTenantIds`, `tenants.listByIds`). Verifiziert: switchActiveSpace- + useGroup- +
+  groupSpaces-E2E grün.
 - [ ] **D3 · Share-Chunk-ACL nicht pro Chunk neu scannen** *(Perf, M)* — `PublicShareMediaHandler.kt:57-73`.
   `blobBacksSubtreeMedia` materialisiert den ganzen Subtree je Chunk-Fetch. Fix: erlaubte Blob-ID-Menge pro
   Share cachen bzw. gezielter Lookup statt Subtree-Materialisierung.

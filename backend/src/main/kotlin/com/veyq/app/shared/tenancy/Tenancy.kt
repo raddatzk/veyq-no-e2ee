@@ -63,6 +63,7 @@ class Membership {
 class TenantRepository : PanacheRepositoryBase<Tenant, String> {
     fun findByName(name: String): Tenant? = find("name", name).firstResult()
     fun findByDomain(domain: String): Tenant? = find("domain", domain).firstResult()
+    fun listByIds(ids: Collection<String>): List<Tenant> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
 
     /** Tenants whose scheduled deletion deadline has passed — the GC hard-purges these. */
     fun listDue(now: Instant): List<Tenant> =
