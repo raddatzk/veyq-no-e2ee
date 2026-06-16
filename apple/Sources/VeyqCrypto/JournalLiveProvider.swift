@@ -28,6 +28,15 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     private var peers: [UInt: Peer] = [:]
     private var peerClocks: [UInt: UInt] = [:]
 
+    // Operator-blind persistence (the CRDT store: sealed snapshot + sealed update log). Load reconstructs the
+    // doc; flush appends local edits since the last persist; compact writes a fresh snapshot + Markdown projection.
+    private var persistApiBase: String?
+    private var persistSession: Login.UnlockedSession?
+    private var persistScopeId = ""
+    private var persistNodeId = ""
+    private var lastPersistedSV: [UInt8] = []
+    public private(set) var persistMaxSeq = 0
+
     public var onText: ((String) -> Void)?
     public var onStatus: ((Bool) -> Void)?
     public var onPeers: (([Peer]) -> Void)?
@@ -139,6 +148,39 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
             onText?(currentText)
         default: break
         }
+    }
+
+    // MARK: - operator-blind persistence
+
+    public func configurePersistence(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String) {
+        persistApiBase = apiBase; persistSession = session; persistScopeId = scopeId; persistNodeId = nodeId
+    }
+
+    /// Reconstruct the doc from the store (snapshot + update log); returns the max seq applied.
+    @discardableResult
+    public func loadPersisted() async -> Int {
+        guard let api = persistApiBase, let s = persistSession else { return 0 }
+        persistMaxSeq = (try? await JournalPersistence.loadJournalDoc(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc)) ?? 0
+        lastPersistedSV = stateVector()
+        onText?(currentText)
+        return persistMaxSeq
+    }
+
+    /// Append the edits made since the last persist as one sealed update (local + any relay-applied; idempotent).
+    public func flushPersist() async {
+        guard let api = persistApiBase, let s = persistSession else { return }
+        let diff = doc.transactSync { (try? $0.transactionEncodeStateAsUpdateFromSv(stateVector: self.lastPersistedSV)) ?? [] }
+        guard !diff.isEmpty else { return }
+        if let seq = try? await JournalPersistence.appendJournalUpdate(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, update: diff) {
+            persistMaxSeq = max(persistMaxSeq, seq)
+            lastPersistedSV = stateVector()
+        }
+    }
+
+    /// Compact: write a fresh snapshot + the Markdown reader projection and prune the folded-in updates.
+    public func compactPersisted() async {
+        guard let api = persistApiBase, let s = persistSession else { return }
+        try? await JournalPersistence.compactJournal(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc, markdown: currentText, coveredSeq: persistMaxSeq)
     }
 
     private func broadcastUpdate() {

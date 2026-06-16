@@ -10,6 +10,7 @@ final class LiveJournalModel: ObservableObject {
     @Published var peers: [JournalLiveProvider.Peer] = []
     private var provider: JournalLiveProvider?
     private var ready = false
+    private var flushWork: DispatchWorkItem?
 
     private static let colors = ["#5b4df5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6"]
 
@@ -22,27 +23,43 @@ final class LiveJournalModel: ObservableObject {
         p.onText = { [weak self] s in Task { @MainActor in guard let self else { return }; if self.text != s { self.text = s } } }
         p.onPeers = { [weak self] list in Task { @MainActor in self?.peers = list } }
         p.setUser(name: store.session.user.displayName, color: Self.colors.randomElement() ?? "#5b4df5")
+        p.configurePersistence(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, nodeId: store.nodeId)
         provider = p
-        // Seed the shared doc from the sealed journal once sync with any peers has settled, then mirror back.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            guard let self, let p = self.provider else { return }
-            p.seedIfEmpty(initial)
+        // Reconstruct from the operator-blind store, then bootstrap a legacy Markdown-only journal into the CRDT.
+        Task { @MainActor in
+            await p.loadPersisted()
+            if p.currentText.isEmpty, !initial.isEmpty { p.applyLocalText(initial); self.scheduleFlush() }
             self.text = p.currentText
             self.ready = true
         }
     }
 
     func onUserEdit(_ s: String) {
-        guard ready else { return } // ignore edits until the initial seed/sync has settled
+        guard ready else { return } // ignore edits until the initial load has settled
         provider?.applyLocalText(s)
+        scheduleFlush()
     }
     func onCursor(_ index: Int) { provider?.setCursor(index) }
 
+    /// Coalesce local edits into a debounced append to the store (the live relay broadcast is immediate).
+    private func scheduleFlush() {
+        flushWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in Task { await self?.provider?.flushPersist() } }
+        flushWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: w)
+    }
+
     func stop(save: @escaping (String) -> Void) {
-        let final = provider?.currentText ?? text
-        provider?.destroy()
+        flushWork?.cancel()
+        let p = provider
         provider = nil
-        save(final)
+        Task { @MainActor in
+            await p?.flushPersist()
+            await p?.compactPersisted() // refresh snapshot + Markdown projection, prune the folded updates
+            let final = p?.currentText ?? self.text
+            p?.destroy()
+            save(final)
+        }
     }
 }
 

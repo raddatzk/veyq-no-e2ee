@@ -116,7 +116,7 @@ final class GalleryStore: ObservableObject {
 
     func saveJournal(_ markdown: String) async {
         journalSaving = true
-        if (try? await Journal.updateJournal(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, markdown: markdown)) != nil {
+        if (try? await JournalPersistence.saveJournalMarkdown(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, contentKey: contentKey, markdown: markdown)) != nil {
             journalMarkdown = markdown
         }
         journalSaving = false

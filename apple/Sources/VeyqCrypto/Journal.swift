@@ -1,8 +1,8 @@
 import Foundation
 
-/// uc.memory.journal (Apple) — a Memory's journal is a Markdown body sealed under the scope content key
-/// (nonce || AEAD), the same envelope as node names. The server stores ciphertext only; we seal before PUT
-/// and open after GET. Whole-document replace (no live collaboration in the greenfield).
+/// uc.memory.journal (Apple) — the Markdown READ projection of a Memory's journal, sealed under the scope
+/// content key (nonce || AEAD). The server stores ciphertext only. Editing goes through the operator-blind
+/// CRDT store (JournalPersistence); this is the read path (detail view) that opens the compacted Markdown.
 public enum Journal {
     public struct Content: Sendable { public let markdown: String; public let updatedAt: String? }
 
@@ -26,23 +26,5 @@ public enum Journal {
         let bytes = Login.b64urlDecode(sealed.bytes)
         let pt = try V1.aeadOpen(key: contentKey, nonce: Data(bytes.prefix(12)), aead: Data(bytes.dropFirst(12)), aad: Data())
         return Content(markdown: String(decoding: pt, as: UTF8.self), updatedAt: body.updatedAt)
-    }
-
-    /// Seal and store a memory's journal Markdown (whole-document replace).
-    @discardableResult
-    public static func updateJournal(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, markdown: String) async throws -> Content {
-        let nonce = V1.randomBytes(12)
-        let sealed = nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(markdown.utf8), aad: Data()))
-        var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/nodes/\(nodeId)/journal")!)
-        r.httpMethod = "PUT"
-        r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")
-        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.httpBody = try JSONSerialization.data(withJSONObject: ["sealedContent": ["suiteId": "v1", "bytes": SetupServer.b64url(sealed)]])
-        let (data, resp) = try await URLSession.shared.data(for: r)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
-            throw NSError(domain: "veyq.journal", code: 2, userInfo: [NSLocalizedDescriptionKey: "update journal failed"])
-        }
-        let body = try JSONDecoder().decode(JournalResponse.self, from: data)
-        return Content(markdown: markdown, updatedAt: body.updatedAt)
     }
 }

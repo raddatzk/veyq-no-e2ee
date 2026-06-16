@@ -109,7 +109,9 @@ Subsumes some of the P2.3 seed-race/cursor cleanup.
   compact on close); the live editor + the plain draft save both go through it; the Markdown reader path
   (detail view) stays. e2e proves non-overlapping sessions converge via snapshot+increments and the Markdown
   projection follows. The removed Markdown PUT is fully off the web.
-- [ ] iOS + Android: same (mechanical port, identical wire format).
+- [x] iOS: `JournalPersistence.swift` (load/append/compact + whole-doc save) + provider load/flush/compact;
+  live editor + plain draft save route through it; Markdown read path stays. e2e proves convergence; app builds.
+- [ ] Android: same (mechanical port, identical wire format).
 
 **6b — live read in shares** (so readers/shares are always current, not just at compaction).
 - [ ] Relay `onOpen` also accepts a share token gated by `canRead` + subtree; share connections are
