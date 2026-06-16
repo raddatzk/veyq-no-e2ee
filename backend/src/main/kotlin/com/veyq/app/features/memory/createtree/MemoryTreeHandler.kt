@@ -6,6 +6,8 @@ import com.veyq.app.generated.model.MemoryNode
 import com.veyq.app.generated.model.MemoryNodeList
 import com.veyq.app.generated.model.NodeType
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.MemoryJournal
+import com.veyq.app.shared.content.MemoryJournalRepository
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKeyRepository
@@ -31,6 +33,7 @@ import java.util.UUID
 class MemoryTreeHandler(
     private val nodes: NodeRepository,
     private val contentKeys: ScopeContentKeyRepository,
+    private val journals: MemoryJournalRepository,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -84,6 +87,17 @@ class MemoryTreeHandler(
             suiteId = req.sealedContent.suiteId; sealedContent = dec.decode(req.sealedContent.bytes); createdAt = Instant.now()
         }
         nodes.persist(node)
+        // Pre-create the (empty) journal row for a Memory/Chapter at birth, so the first live append never
+        // races two concurrent INSERTs of the same PK (node_id) into a unique-violation. An empty row
+        // (sealedContent=null, nextSeq=0) reads identically to "no journal yet"; its suiteId is just a
+        // placeholder the node was already sealed under (overwritten when real content is compacted in).
+        if (req.type != NodeType.FOLDER) {
+            journals.persist(
+                MemoryJournal().apply {
+                    nodeId = node.id; this.scopeId = scopeId; suiteId = req.sealedContent.suiteId; updatedAt = Instant.now()
+                },
+            )
+        }
         return toApi(node, scopeId)
     }
 

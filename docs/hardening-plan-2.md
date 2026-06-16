@@ -56,12 +56,15 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   jetzt in allen drei Conformance-Tests (Web `hkdfSha256`-Export, iOS via `@testable`, Android `hkdf`
   `private`→`internal`). Alle drei Suiten grün. Kein extra Invite-Vektor nötig: `recovery_argon2id` pinnt
   `kekRecovery` bereits cross-platform — zusammen mit B1 (Param-Alignment) ist die Invite-KEK abgedeckt.
-- [ ] **B3 · Journal erster Append serialisieren statt 500** *(Korrektheit, S)* — `JournalHandler.kt:122` (`lockedJournal`).
-  Zwei parallele Erst-Appends ⇒ Unique-Violation. Fix: leere Journal-Row bei Node-Erstellung anlegen
-  **oder** Constraint-Violation fangen + Lock-Pfad retry.
-- [ ] **B4 · `suiteId = "v1"` aus Guest-Read-Pfaden entfernen** *(Korrektheit, S)* —
-  `PublicShareMediaHandler.kt:63` (ChunkResponse), `PublicShareTreeHandler.kt:57` (passwordSalt). Echten
-  `blob.suiteId` durchreichen (Member-Pfad ist seit P4.2 sauber).
+- [x] **B3 · Journal erster Append serialisieren statt 500** *(Korrektheit, S)* — `MemoryTreeHandler.createNode`
+  legt für Memory/Chapter jetzt bei Geburt eine leere Journal-Row an (suiteId = Node-Content-Suite, kein
+  Literal), sodass `lockedJournal.findByIdForUpdate` immer trifft und zwei parallele Erst-Appends nicht in
+  eine Unique-Violation rennen. Eine leere Row liest identisch zu „noch kein Journal". Verifiziert:
+  journalPersistence- + memoryTree-E2E grün (Append + Compact auf frischer Memory).
+- [x] **B4 · `suiteId = "v1"` aus Guest-Read-Pfaden entfernt** *(Korrektheit, S)* — `getShareChunk` gibt jetzt
+  `blob.suiteId` zurück (Blob lookup), `getPublicShare` den `share.suiteId` fürs passwordSalt-Blob (beide ohne
+  Migration — Share trägt bereits `suiteId`, Blobs seit P4.2). Verifiziert: share-E2E grün (Chunk-Download +
+  passwortgeschützter Share).
 
 ## Phase C — Medien-Tiering (Feature) + Galerie-Perf/Memory (Web → iOS → Android)
 Zielbild: **Grid → Thumbnail · Lightbox/Vorschau → Preview · Original → nur per Download-Button.**

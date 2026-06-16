@@ -60,7 +60,8 @@ class PublicShareMediaHandler(
         if (!blobBacksSubtreeMedia(share, blobId)) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
         val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
         val frame = store.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        return ChunkResponse(frame = ApiBlob(suiteId = "v1", bytes = enc.encodeToString(frame)))
+        val suiteId = blobs.findById(blobId)?.suiteId ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
+        return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
     }
 
     /** Does [blobId] back a medium (original or derivative) in the share's subtree? At most two IN queries
