@@ -7,7 +7,6 @@ import com.veyq.app.shared.security.ScopeAccessGuard
 import io.quarkus.websockets.next.OnBinaryMessage
 import io.quarkus.websockets.next.OnClose
 import io.quarkus.websockets.next.OnOpen
-import io.quarkus.websockets.next.OpenConnections
 import io.quarkus.websockets.next.WebSocket
 import io.quarkus.websockets.next.WebSocketConnection
 import io.smallrye.common.annotation.Blocking
@@ -31,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap
 class JournalRelay(
     private val tickets: JournalLiveTicketService,
     private val guard: ScopeAccessGuard,
-    private val connections: OpenConnections,
     private val shares: ShareRepository,
     private val nodes: NodeRepository,
 ) {
@@ -49,9 +47,10 @@ class JournalRelay(
     /** Connection ids of read-only share guests — they may RECEIVE live edits but never broadcast (no writes). */
     private val receiveOnly = ConcurrentHashMap.newKeySet<String>()
 
-    private fun room(c: WebSocketConnection) = c.pathParam("scopeId") + "/" + c.pathParam("nodeId")
-    private fun inRoom(c: WebSocketConnection, sender: WebSocketConnection) =
-        c.pathParam("scopeId") == sender.pathParam("scopeId") && room(c) == room(sender)
+    /** room (scope/node) → its open connections, so fan-out is O(room) not O(all connections server-wide). */
+    private val rooms = ConcurrentHashMap<String, MutableSet<WebSocketConnection>>()
+
+    private fun roomKey(c: WebSocketConnection) = c.pathParam("scopeId") + "/" + c.pathParam("nodeId")
 
     /**
      * Authenticate on connect. A scope MEMBER presents a short-lived single-use `?ticket=` (minted via
@@ -76,11 +75,13 @@ class JournalRelay(
                 return
             }
         }
-        val roomPeers = connections.listAll().count { it.id() != connection.id() && inRoom(it, connection) }
-        if (roomPeers >= MAX_PEERS_PER_ROOM) { // room full → shed load
+        val peers = rooms.computeIfAbsent(roomKey(connection)) { ConcurrentHashMap.newKeySet() }
+        if (peers.size >= MAX_PEERS_PER_ROOM) { // room full → shed load
             receiveOnly.remove(connection.id())
             connection.closeAndAwait()
+            return
         }
+        peers.add(connection)
     }
 
     /** A non-expired share with read rights whose subtree contains this room's node (same gate as the HTTP read). */
@@ -99,9 +100,9 @@ class JournalRelay(
             runCatching { sender.closeAndAwait() } // over the rate limit → drop this abuser
             return
         }
-        connections.listAll()
-            .filter { it.id() != sender.id() && inRoom(it, sender) }
-            .forEach { runCatching { it.sendBinaryAndAwait(message) } }
+        rooms[roomKey(sender)]?.forEach { peer ->
+            if (peer.id() != sender.id()) runCatching { peer.sendBinaryAndAwait(message) }
+        }
     }
 
     /** Fixed-window rate check: false once this connection exceeds messages OR bytes within the 1s window. */
@@ -116,7 +117,14 @@ class JournalRelay(
     }
 
     @OnClose
-    fun onClose(connection: WebSocketConnection) { windows.remove(connection.id()); receiveOnly.remove(connection.id()) }
+    fun onClose(connection: WebSocketConnection) {
+        windows.remove(connection.id())
+        receiveOnly.remove(connection.id())
+        rooms[roomKey(connection)]?.let { peers ->
+            peers.remove(connection)
+            if (peers.isEmpty()) rooms.remove(roomKey(connection), peers) // prune empty rooms (only if still empty)
+        }
+    }
 
     private fun queryParam(c: WebSocketConnection, name: String): String? =
         c.handshakeRequest().query()?.split("&")?.firstNotNullOfOrNull {

@@ -120,9 +120,11 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
 - [ ] **D3 · Share-Chunk-ACL nicht pro Chunk neu scannen** *(Perf, M)* — `PublicShareMediaHandler.kt:57-73`.
   `blobBacksSubtreeMedia` materialisiert den ganzen Subtree je Chunk-Fetch. Fix: erlaubte Blob-ID-Menge pro
   Share cachen bzw. gezielter Lookup statt Subtree-Materialisierung.
-- [ ] **D4 · JournalRelay Room-Index + Fan-out-Budget** *(Perf/Security, M)* — `JournalRelay.kt:102` scannt alle
-  offenen Verbindungen je Frame; per-connection-Limit erlaubt Amplifikation. Fix: `room → Set<connId>`-Index,
-  per-Room Aggregat-Byte/Msg-Budget, Connections-pro-User cappen.
+- [x] **D4 · JournalRelay Room-Index** *(Perf, M)* — `room → Set<WebSocketConnection>`-Index in onOpen/onClose
+  gepflegt; Fan-out (onMessage) und der Peer-Cap laufen jetzt O(Room) statt O(alle offenen Verbindungen
+  server-weit). `OpenConnections`-Dependency entfernt. Verifiziert: journalLive- (2-Client-Konvergenz) +
+  share-live-read-E2E grün. *(Kleiner Rest: per-Room Aggregat-Egress-Budget / Connections-pro-User-Cap als
+  zusätzliche Anti-Amplifikation — durch Peer-Cap (32) + per-connection-Limit bereits gebounded, niedrige Prio.)*
 
 ## Phase E — Wartbarkeit / Aufräumen
 - [ ] **E1 · `TenantAdminGuard` extrahieren** *(Maintainability, M)* — Owner-ACTIVE-Check in ~7 Admin-Handlern
