@@ -20,17 +20,17 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   (docker-compose service + `JOURNAL_LIVE_*` envs + traefik routing, build-compose entry, CI
   build/publish jobs, CodeQL path, `.env.template` profile lines).
 
-## Phase 1 — Security-critical (backend)
-- [ ] **P1.1 Session-token hashing.** `Session.kt:21` stores the bearer token in plaintext and looks it up
-  raw → a DB dump grants live API access until expiry. Store `SHA-256(token)`, look up by hash, return the
-  raw token only to the client. Migration.
-- [ ] **P1.2 `ScopeAccessGuard` + close the membership gap.** Most content handlers also require
-  `memberships.find(tenantId, userId)?.status == "ACTIVE"` (e.g. `ScopeContentKeyHandler.kt:67`), but
-  `ScopeGrantRewrapHandler.kt:35/47` and `rotateidentity/MyGrantsHandler` (both return the **wrapped scope
-  private key**) and `JournalRelay.onOpen` gate on the grant alone. Extract one guard and route all through
-  it (also fixes the copy-paste drift M1).
-- [ ] **P1.3 Rate limits.** No throttle on `LoginHandler:46`, password-reset request, invite-claim, or
-  public-share upload. Add a shared (IP+user) limiter; covers the D2 interim mitigation.
+## Phase 1 — Security-critical (backend) — DONE
+- [x] **P1.1 Session-token hashing.** `Session` now stores `token_hash = SHA-256(token)` (base64url), looks
+  up by hash; the raw token only ever reaches the client. Migration V23 (rename column + clear sessions).
+- [x] **P1.2 `ScopeAccessGuard` + close the membership gap.** New `ScopeAccessGuard` (grant **and**, for
+  tenant scopes, ACTIVE membership). The three gap sites now route through it: `ScopeGrantRewrapHandler`
+  (get/rewrap), `MyGrantsHandler` (filters stale tenant grants), `JournalRelay.onOpen` (relay room). Slice
+  test asserts a removed member's stale tenant grant is hidden (`/me/grants`) + unreadable (403 NOT_A_MEMBER).
+  *(Migrating the other ~9 content handlers' identical inline check onto the guard = M1, deferred to Phase 4.)*
+- [x] **P1.3 Rate limits.** `RateLimiter` (fixed-window) + `RateLimitFilter` (per-IP, 429) on login,
+  password-reset, invite, public-share upload. Off in dev/test (`veyq.ratelimit.enabled`) so the suites stay
+  green; covers the D2 interim mitigation. Unit-tested.
 
 ## Phase 2 — Client correctness (cross-platform)
 - [ ] **P2.1 Android raw-JSON → `JSONObject`.** `Login.kt:32`, `SetupServer.kt:49`, `Tenant.kt:36`,
@@ -62,6 +62,10 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   `veyq_media(scope_id)`; make `purgeDueTenants` one transaction per tenant.
 
 ## Phase 4 — Maintainability / cleanup
+- [ ] **P4.0 Finish the `ScopeAccessGuard` migration (M1).** Phase 1 created the guard and routed the three
+  gap sites through it; migrate the remaining ~9 content handlers' identical inline `requireKeyHolder`
+  (ScopeContentKeyHandler, JournalHandler, TrackHandler, MemoryTreeHandler, CurateHandler, MediaHandler,
+  ShareHandler, ScopeItemsHandler, BlobUploadHandler) onto it so the check can't drift again.
 - [ ] **P4.1 Account/KeyBag factory.** Dedup `SetupServerHandler.kt:62` ↔ `RegisterViaInvitationHandler.kt:90`.
 - [ ] **P4.2 Shared helpers.** Centralize `toWrap`/`requireSuite`/Base64/`unauthorized()`; fix the hardcoded
   `if (suiteId != "v1")` in `BlobUploadHandler.kt:97` (ignores `CryptoSuiteRegistry` → latent v2 bug).

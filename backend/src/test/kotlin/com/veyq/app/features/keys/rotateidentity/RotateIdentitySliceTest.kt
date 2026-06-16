@@ -10,6 +10,8 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.Membership
+import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.narayana.jta.QuarkusTransaction
@@ -32,9 +34,11 @@ class RotateIdentitySliceTest {
     @Inject lateinit var scopes: ScopeRepository
     @Inject lateinit var grants: ScopeGrantRepository
     @Inject lateinit var tenants: TenantRepository
+    @Inject lateinit var memberships: MembershipRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var token: String
+    private lateinit var removedToken: String
 
     @BeforeTest
     fun seed() {
@@ -52,9 +56,31 @@ class RotateIdentitySliceTest {
                 scopes.persist(Scope().apply { id = "ri-tscope"; tenantId = "ri-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "tpub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-pg"; scopeId = "ri-personal"; userId = "ri-user"; suiteId = "v1"; wrappedPrivateKey = "pg".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-tg"; scopeId = "ri-tscope"; userId = "ri-user"; suiteId = "v1"; wrappedPrivateKey = "tg".toByteArray(); createdAt = now })
+                // a tenant-scope grant only stands behind active membership (the guard filters stale grants)
+                memberships.persist(Membership().apply { id = "ri-mb"; tenantId = "ri-tenant"; userId = "ri-user"; role = "Member"; status = "ACTIVE"; createdAt = now })
+
+                // a REMOVED member: still has a (stale) grant on the tenant scope, but membership is revoked
+                users.persist(User().apply { id = "ri-removed"; email = "ri-removed@example.com"; displayName = "RIR"; serverRole = ServerRole.ServerMember; createdAt = now })
+                scopes.persist(Scope().apply { id = "ri-removed-personal"; ownerUserId = "ri-removed"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "rpub".toByteArray(); createdAt = now })
+                grants.persist(ScopeGrant().apply { id = "ri-rpg"; scopeId = "ri-removed-personal"; userId = "ri-removed"; suiteId = "v1"; wrappedPrivateKey = "rpg".toByteArray(); createdAt = now })
+                grants.persist(ScopeGrant().apply { id = "ri-rtg"; scopeId = "ri-tscope"; userId = "ri-removed"; suiteId = "v1"; wrappedPrivateKey = "rtg".toByteArray(); createdAt = now })
+                memberships.persist(Membership().apply { id = "ri-rmb"; tenantId = "ri-tenant"; userId = "ri-removed"; role = "Member"; status = "REVOKED"; createdAt = now })
             }
         }
         token = "Bearer ${sessions.issue("ri-user")}"
+        removedToken = "Bearer ${sessions.issue("ri-removed")}"
+    }
+
+    @Test
+    fun removedMembersStaleTenantGrantIsHiddenAndUnreadable() {
+        // the grant roster excludes the tenant scope (only the personal grant remains)
+        given().header("Authorization", removedToken).get("/api/me/grants").then().statusCode(200)
+            .body("grants.size()", `is`(1))
+            .body("grants[0].scopeId", `is`("ri-removed-personal"))
+
+        // and the wrapped tenant scope private key cannot be fetched directly either
+        given().header("Authorization", removedToken).get("/api/scopes/ri-tscope/grants/me")
+            .then().statusCode(403).body("code", `is`("NOT_A_MEMBER"))
     }
 
     @Test

@@ -40,7 +40,7 @@ class SessionGcTest {
         QuarkusTransaction.requiringNew().run {
             sessions.persist(
                 Session().apply {
-                    id = UUID.randomUUID().toString(); this.token = token; userId = "gc-user"
+                    id = UUID.randomUUID().toString(); this.tokenHash = token; userId = "gc-user"
                     createdAt = Instant.now().minus(40, ChronoUnit.DAYS); this.expiresAt = expiresAt
                 },
             )
@@ -57,8 +57,8 @@ class SessionGcTest {
 
         assertEquals(1, purged, "exactly the expired session is swept")
         QuarkusTransaction.requiringNew().run {
-            assertNull(sessions.findByToken("gc-expired"), "expired row is gone")
-            assertNotNull(sessions.findByToken("gc-valid"), "valid row survives")
+            assertNull(sessions.findByTokenHash("gc-expired"), "expired row is gone")
+            assertNotNull(sessions.findByTokenHash("gc-valid"), "valid row survives")
         }
         // a swept token never resolves
         assertNull(service.resolve("Bearer gc-expired"))

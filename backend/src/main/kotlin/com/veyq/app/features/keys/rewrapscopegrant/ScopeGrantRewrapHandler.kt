@@ -8,7 +8,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.ScopeAccessGuard
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
@@ -16,12 +16,15 @@ import java.util.Base64
 /**
  * uc.keys.rewrap-scope-grant — replace only the caller's existing wrapped grant for a scope.
  * The endpoint cannot create access: an existing grant for the authenticated user is required.
+ *
+ * Returns the wrapped scope private key, so it goes through [ScopeAccessGuard] — a held grant alone is not
+ * enough for a tenant scope; the caller must still be an active member (a stale grant must not leak keys).
  */
 @ApplicationScoped
 class ScopeGrantRewrapHandler(
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
-    private val sessions: SessionService,
+    private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -30,7 +33,7 @@ class ScopeGrantRewrapHandler(
     /** Read the caller's grant for a scope — used to open it by scope id (e.g. a group scope). */
     @Transactional
     fun getMyScopeGrant(auth: String?, scopeId: String): ScopeGrantResponse {
-        val userId = sessions.resolve(auth) ?: throw unauthorized()
+        val userId = guard.requireKeyHolder(auth, scopeId)
         val scope = scopes.findById(scopeId) ?: throw notFound("Scope")
         val grant = grants.find(scope.id, userId) ?: throw notFound("Scope grant")
         return ScopeGrantResponse(
@@ -42,7 +45,7 @@ class ScopeGrantRewrapHandler(
 
     @Transactional
     fun rewrapMyScopeGrant(auth: String?, scopeId: String, req: RewrapMyScopeGrantRequest): ScopeGrantResponse {
-        val userId = sessions.resolve(auth) ?: throw unauthorized()
+        val userId = guard.requireKeyHolder(auth, scopeId)
         val scope = scopes.findById(scopeId) ?: throw notFound("Scope")
         val grant = grants.find(scope.id, userId) ?: throw notFound("Scope grant")
         requireSuite(req.wrappedScopePrivateKey.suiteId)
@@ -61,6 +64,5 @@ class ScopeGrantRewrapHandler(
         if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
     private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

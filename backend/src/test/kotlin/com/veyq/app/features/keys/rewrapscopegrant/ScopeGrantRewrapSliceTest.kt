@@ -84,8 +84,8 @@ class ScopeGrantRewrapSliceTest {
         given().header("Authorization", strangerToken).contentType(ContentType.JSON)
             .body("""{"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$newGrant"}}""")
             .put("/api/scopes/rewrap-scope/grants/me")
-            .then().statusCode(404)
-            .body("code", `is`("NOT_FOUND"))
+            .then().statusCode(403)
+            .body("code", `is`("NOT_A_KEY_HOLDER"))
 
         given().header("Authorization", ownerToken).contentType(ContentType.JSON)
             .body("""{"wrappedScopePrivateKey":{"suiteId":"v2","bytes":"$newGrant"}}""")

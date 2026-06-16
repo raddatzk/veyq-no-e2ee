@@ -1,6 +1,6 @@
 package com.veyq.app.features.memory.journallive
 
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.security.ScopeAccessGuard
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.websockets.next.OnBinaryMessage
 import io.quarkus.websockets.next.OnClose
@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
 @WebSocket(path = "/ws/journal/{scopeId}/{nodeId}")
 class JournalRelay(
     private val sessions: SessionService,
-    private val grants: ScopeGrantRepository,
+    private val guard: ScopeAccessGuard,
     private val connections: OpenConnections,
 ) {
     private companion object {
@@ -54,8 +54,10 @@ class JournalRelay(
         val token = queryParam(connection, "token")
         val userId = sessions.resolve(token?.let { "Bearer $it" })
         val scopeId = connection.pathParam("scopeId")
-        if (userId == null || grants.find(scopeId, userId) == null) {
-            connection.closeAndAwait() // not a member of this scope → no room access
+        // Grant AND (for tenant scopes) active membership — same gate as the HTTP content handlers, so a
+        // removed-but-stale-grant member can't join the live room.
+        if (userId == null || !guard.isActiveKeyHolder(userId, scopeId)) {
+            connection.closeAndAwait()
             return
         }
         val roomPeers = connections.listAll().count { it.id() != connection.id() && inRoom(it, connection) }
