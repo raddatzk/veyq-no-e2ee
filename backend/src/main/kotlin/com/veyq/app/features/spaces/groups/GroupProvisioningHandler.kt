@@ -30,6 +30,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.spaces.groups — a Group is a collaborative sub-space within a tenant, for a subset of its members
@@ -56,10 +57,10 @@ class GroupProvisioningHandler(
     @Transactional
     fun createGroup(auth: String?, tenantId: String, req: CreateGroupRequest): GroupSummary {
         val userId = requireTenantMember(tenantId, auth)
-        requireSuite(req.scopePublicKey.suiteId)
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
-        requireSuite(req.contentKey.suiteId)
-        requireSuite(req.sealedName.suiteId)
+        suites.require(req.scopePublicKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.contentKey.suiteId)
+        suites.require(req.sealedName.suiteId)
         val now = Instant.now()
 
         val scope = Scope().apply {
@@ -114,7 +115,7 @@ class GroupProvisioningHandler(
         val target = memberships.find(tenantId, req.userId)
         if (target == null || target.status != "ACTIVE") throw ApiException(400, "NOT_A_TENANT_MEMBER", "Target is not an active tenant member")
         if (groupMembers.find(scopeId, req.userId) != null) throw ApiException(409, "ALREADY_GROUP_MEMBER", "Already a member of this group")
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
         val role = normalizeRole(req.role ?: GroupRole.GroupMember.name)
         val now = Instant.now()
         grants.persist(ScopeGrant().apply {
@@ -173,7 +174,6 @@ class GroupProvisioningHandler(
         return userId
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 
     private fun requireTenantMember(tenantId: String, auth: String?): String {
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
@@ -183,9 +183,6 @@ class GroupProvisioningHandler(
         return userId
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
-    }
 
     private fun toSummary(scope: Scope, role: String) = GroupSummary(
         scopeId = scope.id,

@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.admin.invite-members-roles (A1, scope rotation — eventual layer of AD-24) — a key-holding Owner
@@ -39,8 +40,8 @@ class ScopeRotationHandler(
         // authority: an active Owner who actually holds the scope (you can only re-key what you can read)
         val callerId = guard.requireOwner(auth, tenantId)
         val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
-        requireSuite(req.scopePublicKey.suiteId)
-        req.grants.forEach { requireSuite(it.wrappedScopePrivateKey.suiteId) }
+        suites.require(req.scopePublicKey.suiteId)
+        req.grants.forEach { suites.require(it.wrappedScopePrivateKey.suiteId) }
         grants.find(scope.id, callerId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
 
         // the new grants must cover exactly the active members — nobody dropped, no outsiders added
@@ -75,7 +76,7 @@ class ScopeRotationHandler(
         if (contentKey != null) {
             val newCk = req.wrappedContentKey
                 ?: throw ApiException(400, "CONTENT_KEY_REQUIRED", "The scope has content — provide a fresh content key wrapped to the new keypair")
-            requireSuite(newCk.suiteId)
+            suites.require(newCk.suiteId)
             val reSealed = req.reSealedItems
                 ?: throw ApiException(400, "RESEAL_REQUIRED", "The scope has content — re-seal its items under the new content key")
             val scopeItems = items.listByScopeId(scope.id)
@@ -107,14 +108,14 @@ class ScopeRotationHandler(
             contentKey.wrappedKey = dec.decode(newCk.bytes)
             val byId = scopeItems.associateBy { it.id }
             reSealed.forEach { rs ->
-                requireSuite(rs.sealedContent.suiteId)
+                suites.require(rs.sealedContent.suiteId)
                 val item = byId.getValue(rs.id)
                 item.suiteId = rs.sealedContent.suiteId
                 item.sealedContent = dec.decode(rs.sealedContent.bytes)
             }
             val nodeById = scopeNodes.associateBy { it.id }
             reSealedNodes.forEach { rn ->
-                requireSuite(rn.sealedContent.suiteId)
+                suites.require(rn.sealedContent.suiteId)
                 val node = nodeById.getValue(rn.id)
                 node.suiteId = rn.sealedContent.suiteId
                 node.sealedContent = dec.decode(rn.sealedContent.bytes)
@@ -125,9 +126,5 @@ class ScopeRotationHandler(
         return RotateScopeResponse(scopeId = scope.id, memberCount = req.grants.size)
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

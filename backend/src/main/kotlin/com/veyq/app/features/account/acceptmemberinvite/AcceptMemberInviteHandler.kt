@@ -19,6 +19,8 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.notFound
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.admin.invite-members-roles (existing-user accept) — an already-authenticated user accepts a
@@ -50,7 +52,7 @@ class AcceptMemberInviteHandler(
         if (invite.kind != InviteKind.MEMBER.name) {
             throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites can be accepted onto an existing account")
         }
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
 
         val scope = invite.scopeId?.let { scopes.findById(it) } ?: throw notFound("Scope")
         if (grants.find(scope.id, userId) != null) {
@@ -79,12 +81,7 @@ class AcceptMemberInviteHandler(
         return MembershipSummary(tenantId = invite.tenantId, userId = userId, role = membership.role, status = membership.status)
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
     private fun newId(): String = UUID.randomUUID().toString()
 }

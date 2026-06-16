@@ -31,6 +31,7 @@ import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 import com.veyq.app.generated.model.ServerRole as ApiServerRole
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.account.register-via-invitation — a brand-new invitee accepts an owner invite. Their client
@@ -67,8 +68,8 @@ class RegisterViaInvitationHandler(
         }
         // tenant-scope suites are validated here; the account material (identity/wraps/verifier/personal
         // scope) is validated by the AccountFactory below.
-        requireSuite(req.scopePublicKey.suiteId)
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.scopePublicKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
         if (users.findByEmail(req.email) != null) {
             throw ApiException(409, "EMAIL_TAKEN", "An account with that email already exists")
         }
@@ -148,11 +149,7 @@ class RegisterViaInvitationHandler(
     private fun Tenant.toSummary(): TenantSummary =
         TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status), domain = domain)
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
     private fun newId(): String = UUID.randomUUID().toString()
 }

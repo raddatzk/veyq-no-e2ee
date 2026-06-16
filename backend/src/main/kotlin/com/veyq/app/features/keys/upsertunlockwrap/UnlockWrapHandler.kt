@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.keys.upsert-unlock-wrap — store one opaque wrapped Master Key blob for the current user.
@@ -34,7 +35,7 @@ class UnlockWrapHandler(
         if (wrap.unlockMethod != method) {
             throw ApiException(400, "UNLOCK_METHOD_MISMATCH", "Path unlockMethod must match the payload")
         }
-        requireSuite(wrap.suiteId)
+        suites.require(wrap.suiteId)
 
         val existing = keyBlobs.findByUserIdAndUnlockMethod(userId, method.value)
             .firstOrNull { it.credentialRef == wrap.credentialRef }
@@ -68,9 +69,6 @@ class UnlockWrapHandler(
             credentialRef = blob.credentialRef,
         )
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun parseMethod(unlockMethod: String): MasterKeyWrap.UnlockMethod =
         try {
@@ -79,5 +77,4 @@ class UnlockWrapHandler(
             throw ApiException(400, "UNKNOWN_UNLOCK_METHOD", "Unknown unlock method: $unlockMethod")
         }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

@@ -12,6 +12,7 @@ import com.veyq.app.shared.security.SessionService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.keys.rotate-identity (grant listing) — every scope grant the caller holds, with the scope kind +
@@ -45,5 +46,4 @@ class MyGrantsHandler(
         return MyGrantList(grants = owned)
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

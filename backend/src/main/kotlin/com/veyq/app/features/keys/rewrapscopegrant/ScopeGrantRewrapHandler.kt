@@ -12,6 +12,7 @@ import com.veyq.app.shared.security.ScopeAccessGuard
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.keys.rewrap-scope-grant — replace only the caller's existing wrapped grant for a scope.
@@ -48,7 +49,7 @@ class ScopeGrantRewrapHandler(
         val userId = guard.requireKeyHolder(auth, scopeId)
         val scope = scopes.findById(scopeId) ?: throw notFound("Scope")
         val grant = grants.find(scope.id, userId) ?: throw notFound("Scope grant")
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
 
         grant.suiteId = req.wrappedScopePrivateKey.suiteId
         grant.wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes)
@@ -60,9 +61,5 @@ class ScopeGrantRewrapHandler(
         )
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

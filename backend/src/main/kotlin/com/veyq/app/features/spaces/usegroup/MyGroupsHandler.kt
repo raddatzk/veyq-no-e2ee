@@ -12,6 +12,7 @@ import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.spaces.use-group (roster) — the group spaces the caller can actually enter: a tenant they are an
@@ -48,5 +49,4 @@ class MyGroupsHandler(
         return MyGroupList(groups = groups)
     }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

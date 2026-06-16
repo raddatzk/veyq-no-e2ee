@@ -9,6 +9,7 @@ import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.admin.invite-members-roles (A1, removal — instant layer of AD-24) — a Tenant Owner soft-removes a
@@ -43,5 +44,4 @@ class RemoveMemberHandler(
         return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
     }
 
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

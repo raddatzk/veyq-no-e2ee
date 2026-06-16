@@ -43,6 +43,8 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.notFound
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.admin.create-tenant-invite-owner — the Server Owner provisions a tenant shell and an owner-claim
@@ -198,8 +200,8 @@ class TenantProvisioningHandler(
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }
-        requireSuite(req.scopePublicKey.suiteId)
-        requireSuite(req.wrappedScopePrivateKey.suiteId)
+        suites.require(req.scopePublicKey.suiteId)
+        suites.require(req.wrappedScopePrivateKey.suiteId)
 
         val tenant = tenants.findById(invite.tenantId) ?: throw notFound("Tenant")
         if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
@@ -254,12 +256,7 @@ class TenantProvisioningHandler(
         return user
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
     private fun newId(): String = UUID.randomUUID().toString()
 }

@@ -137,11 +137,13 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
 - [x] **E2 · `toApiBatch` geteilt** *(Maintainability, S)* — die byte-identische Batch-Mapper-Kopie aus
   `MediaHandler` + `PublicShareMediaHandler` in einen gemeinsamen `MediaApiMapper` (`shared/content`) gezogen;
   beide delegieren. Verifiziert: media- + share-E2E grün (identische Ausgabe).
-- [ ] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* — Backend `unauthorized()`/`notFound()`/
-  `requireSuite`/Base64 → `platform/error`/Helper; Web `b64url`/`fromB64url` (21×) → `shared/base64.ts`;
-  Android ein `ApiClient` (ein `HttpClient`, zentrales Send/Fehler-Handling, 9× dedup — deckt A5 Teil 1 mit
-  ab) **und A5 Teil 2**: die 56 Triple-Quote-JSON-Bodies (10 Dateien) auf `JSONObject`/`JSONArray` umstellen,
-  per Android-E2E verifiziert.
+- [~] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* —
+  **Web erledigt:** `b64url`/`fromB64url` (~30 Module) → `shared/base64.ts`. **Backend erledigt:**
+  `CryptoSuiteRegistry.require()` ersetzt 11× lokales `requireSuite`; top-level `unauthorized()`/`notFound()`
+  in `platform/error/ApiErrors.kt` ersetzen die ~19 trivialen Handler-Helfer. Verifiziert: 28 Web-E2E +
+  Backend-Tests + share-E2E grün.
+  **Offen (Android):** zentraler `ApiClient` (9× `HttpClient` + Send/Fehler-Handling) **+ A5 Teil 2** (56
+  Triple-Quote-JSON-Bodies → `JSONObject`/`JSONArray`), per Android-E2E zu verifizieren.
 - [ ] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — Roles/Status/Scope-Kind in Entities
   (`Tenancy.kt:21` u. a.). War bewusst zurückgestellt; jetzt mit **E1** koppeln (Guard + Enums zusammen).
 - [x] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView` reißt jetzt bei JEDEM

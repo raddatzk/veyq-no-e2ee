@@ -21,6 +21,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.admin.invite-members-roles (temp-wrap invite) — a key-holding Tenant Owner issues an invite for a
@@ -46,8 +47,8 @@ class MemberInviteHandler(
         // only an active Owner who actually holds the scope can hand it on (you can only grant what you read)
         val callerId = guard.requireOwner(auth, tenantId)
         val scope = scopes.findByTenantId(tenantId) ?: throw notFound("Scope")
-        requireSuite(req.tempPublicKey.suiteId)
-        requireSuite(req.tempWrappedScopePrivateKey.suiteId)
+        suites.require(req.tempPublicKey.suiteId)
+        suites.require(req.tempWrappedScopePrivateKey.suiteId)
         grants.find(scope.id, callerId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
 
         val secret = ByteArray(32).also { rng.nextBytes(it) }
@@ -70,10 +71,6 @@ class MemberInviteHandler(
         )
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

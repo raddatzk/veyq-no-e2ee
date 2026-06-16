@@ -1,5 +1,6 @@
 package com.veyq.app.shared.crypto
 
+import com.veyq.app.platform.error.ApiException
 import jakarta.enterprise.context.ApplicationScoped
 
 /**
@@ -13,4 +14,9 @@ class CryptoSuiteRegistry {
     fun supported(): List<String> = supported.toList()
 
     fun isKnown(suiteId: String): Boolean = suiteId in supported
+
+    /** Reject a write whose suite the server doesn't recognize (the single suite-validation gate). */
+    fun require(suiteId: String) {
+        if (suiteId !in supported) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
+    }
 }

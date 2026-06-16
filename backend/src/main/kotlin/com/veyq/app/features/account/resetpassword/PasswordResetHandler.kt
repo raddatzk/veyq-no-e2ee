@@ -93,8 +93,8 @@ class PasswordResetHandler(
         if (wrap.unlockMethod != MasterKeyWrap.UnlockMethod.PASSWORD) {
             throw ApiException(400, "EXPECTED_PASSWORD_WRAP", "Reset must submit a PASSWORD master-key wrap")
         }
-        requireSuite(wrap.suiteId)
-        requireSuite(req.authVerifier.suiteId)
+        suites.require(wrap.suiteId)
+        suites.require(req.authVerifier.suiteId)
         val userId = token.userId
 
         // Enforce Secret-Key possession: the client must reproduce the recovery commitment
@@ -145,9 +145,6 @@ class PasswordResetHandler(
             kdfParams = blob.kdfParams?.let { enc.encodeToString(it) },
         )
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun invalidToken() = ApiException(400, "INVALID_TOKEN", "Invalid or expired reset token")
 }

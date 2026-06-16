@@ -7,6 +7,7 @@ import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.admin.invite-members-roles (A3, role change) — a Tenant Owner reassigns a member's role. Roles
@@ -35,5 +36,4 @@ class ChangeMemberRoleHandler(
         return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
     }
 
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

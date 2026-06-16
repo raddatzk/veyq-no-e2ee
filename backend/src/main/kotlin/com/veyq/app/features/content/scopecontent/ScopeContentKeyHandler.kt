@@ -13,6 +13,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
+import com.veyq.app.platform.error.notFound
 
 /**
  * uc.spaces / content (AD-03) — the stable per-scope content key. A key-holder mints a content key,
@@ -55,5 +56,4 @@ class ScopeContentKeyHandler(
         guard.requireKeyHolder(auth, scopeId)
     }
 
-    private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")
 }

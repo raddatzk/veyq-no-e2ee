@@ -18,6 +18,7 @@ import jakarta.transaction.Transactional
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.spaces.switch-active-space (roster) — the unified space switcher: the caller's personal space plus
@@ -106,5 +107,4 @@ class MySpacesHandler(
 
     private fun Scope.toPublicKey() = KemPublicKey(suiteId = suiteId, kemPublicKey = enc.encodeToString(kemPublicKey))
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

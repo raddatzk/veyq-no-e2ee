@@ -85,7 +85,7 @@ class JournalHandler(
     fun appendJournalUpdate(auth: String?, scopeId: String, nodeId: String, req: AppendJournalUpdateRequest): AppendJournalUpdateResponse {
         val userId = guard.requireKeyHolder(auth, scopeId)
         requireJournalNode(scopeId, nodeId)
-        requireSuite(req.sealedUpdate.suiteId)
+        suites.require(req.sealedUpdate.suiteId)
         val journal = lockedJournal(scopeId, nodeId, req.sealedUpdate.suiteId)
         val seq = journal.nextSeq + 1
         journal.nextSeq = seq
@@ -104,8 +104,8 @@ class JournalHandler(
     fun compactJournal(auth: String?, scopeId: String, nodeId: String, req: CompactJournalRequest): ApiMemoryJournal {
         guard.requireKeyHolder(auth, scopeId)
         requireJournalNode(scopeId, nodeId)
-        requireSuite(req.snapshot.suiteId)
-        requireSuite(req.markdown.suiteId)
+        suites.require(req.snapshot.suiteId)
+        suites.require(req.markdown.suiteId)
         val journal = lockedJournal(scopeId, nodeId, req.markdown.suiteId)
         if (req.coveredSeq > journal.nextSeq) throw ApiException(400, "BAD_SEQ", "coveredSeq exceeds the latest update")
         journal.suiteId = req.markdown.suiteId
@@ -131,9 +131,6 @@ class JournalHandler(
         if (NodeType.valueOf(node.type) == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has a journal")
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
-    }
 
     private fun toApi(journal: MemoryJournal): ApiMemoryJournal =
         ApiMemoryJournal(

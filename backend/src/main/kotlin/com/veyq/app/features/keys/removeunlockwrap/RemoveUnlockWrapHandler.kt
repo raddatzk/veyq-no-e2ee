@@ -6,6 +6,7 @@ import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.security.SessionService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.keys.remove-unlock-method — delete one of the caller's opaque Master Key unlock wraps.
@@ -51,5 +52,4 @@ class RemoveUnlockWrapHandler(
             throw ApiException(400, "UNKNOWN_UNLOCK_METHOD", "Unknown unlock method: $unlockMethod")
         }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

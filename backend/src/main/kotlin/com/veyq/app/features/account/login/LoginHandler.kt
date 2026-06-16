@@ -24,6 +24,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
 import com.veyq.app.generated.model.ServerRole as ApiServerRole
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.account.login — authenticate, issue a session, and serve the wrapped key bag.
@@ -126,5 +127,4 @@ class LoginHandler(
         UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 
     private fun invalidCredentials() = ApiException(401, "INVALID_CREDENTIALS", "Invalid email or password")
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

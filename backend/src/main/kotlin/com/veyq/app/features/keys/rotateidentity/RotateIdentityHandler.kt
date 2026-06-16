@@ -13,6 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
 import com.veyq.app.generated.model.ServerRole as ApiServerRole
+import com.veyq.app.platform.error.unauthorized
 
 /**
  * uc.keys.rotate-identity — swap the account identity keypair and re-wrap every owned grant to it. The
@@ -33,9 +34,9 @@ class RotateIdentityHandler(
     fun rotateIdentity(auth: String?, req: RotateIdentityRequest): UserSummary {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         val user = users.findById(userId) ?: throw unauthorized()
-        requireSuite(req.identityPublicKey.suiteId)
-        requireSuite(req.wrappedIdentityPrivateKey.suiteId)
-        req.grants.forEach { requireSuite(it.wrappedScopePrivateKey.suiteId) }
+        suites.require(req.identityPublicKey.suiteId)
+        suites.require(req.wrappedIdentityPrivateKey.suiteId)
+        req.grants.forEach { suites.require(it.wrappedScopePrivateKey.suiteId) }
 
         // the re-wrapped grants must cover exactly the caller's current grants
         val current = grants.listByUserId(userId).associateBy { it.scopeId }
@@ -68,9 +69,5 @@ class RotateIdentityHandler(
     private fun User.toSummary(): UserSummary =
         UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
-    private fun unauthorized() = ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
 }

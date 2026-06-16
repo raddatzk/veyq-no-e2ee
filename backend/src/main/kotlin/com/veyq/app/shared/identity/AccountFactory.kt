@@ -70,12 +70,12 @@ class AccountFactory(
         if (spec.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && spec.recoveryAuthTag.isNullOrBlank()) {
             throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
         }
-        requireSuite(spec.identityPublicKey.suiteId)
-        requireSuite(spec.wrappedIdentityPrivateKey.suiteId)
-        requireSuite(spec.authVerifier.suiteId)
-        spec.masterKeyWraps.forEach { requireSuite(it.suiteId) }
-        requireSuite(spec.personalScopePublicKey.suiteId)
-        requireSuite(spec.wrappedPersonalScopePrivateKey.suiteId)
+        suites.require(spec.identityPublicKey.suiteId)
+        suites.require(spec.wrappedIdentityPrivateKey.suiteId)
+        suites.require(spec.authVerifier.suiteId)
+        spec.masterKeyWraps.forEach { suites.require(it.suiteId) }
+        suites.require(spec.personalScopePublicKey.suiteId)
+        suites.require(spec.wrappedPersonalScopePrivateKey.suiteId)
 
         val user = User().apply {
             id = newId(); email = spec.email; displayName = spec.displayName
@@ -127,9 +127,6 @@ class AccountFactory(
         return user
     }
 
-    private fun requireSuite(suiteId: String) {
-        if (!suites.isKnown(suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite: $suiteId")
-    }
 
     private fun newId(): String = UUID.randomUUID().toString()
 }
