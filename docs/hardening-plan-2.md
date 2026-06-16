@@ -144,8 +144,10 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   per Android-E2E verifiziert.
 - [ ] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — Roles/Status/Scope-Kind in Entities
   (`Tenancy.kt:21` u. a.). War bewusst zurückgestellt; jetzt mit **E1** koppeln (Guard + Enums zusammen).
-- [ ] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView.swift:83`: `.onDisappear`
-  → `model.stop`; `stop()` idempotent machen (Android via `DisposableEffect` bereits korrekt).
+- [x] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView` reißt jetzt bei JEDEM
+  Verschwinden ab (`.onDisappear → model.stop`), nicht nur am Done-Button — sonst leakt der Websocket und Edits
+  im Debounce-Fenster gehen verloren. `stop()` ist idempotent (`stopped`-Guard, in `start()` re-armed), sodass
+  Done + onDisappear nicht doppelt laufen. iOS-App kompiliert. (Android via `DisposableEffect` bereits korrekt.)
 - [ ] **E6 · Web/Mobile Galerie-Duplikate** *(Maintainability, M)* — `useGallery`-Composable (Web: ShareView ↔
   MemoryDetailView ~60 Zeilen identisch); Node-Graph pro Scope cachen (`home.ts`/`search.ts` re-listen sonst
   pro Aktion). Teils schon in Phase C berührt.

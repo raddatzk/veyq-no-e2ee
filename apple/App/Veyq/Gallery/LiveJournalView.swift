@@ -16,6 +16,7 @@ final class LiveJournalModel: ObservableObject {
 
     func start(store: GalleryStore, initial: String) {
         text = initial
+        stopped = false // a fresh session — re-arm teardown (the view may re-appear after a prior stop)
         // Authenticate the relay with a fresh short-lived single-use ticket on every (re)connect — never the
         // session token in the URL.
         let wsBase = store.apiBase.replacingOccurrences(of: "http", with: "ws")
@@ -55,7 +56,12 @@ final class LiveJournalModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: w)
     }
 
+    private var stopped = false
+    /// Tear down once (flush + compact + close the relay), whether triggered by Done or by the view
+    /// disappearing — idempotent so the two paths can't double-run or double-save.
     func stop(save: @escaping (String) -> Void) {
+        if stopped { return }
+        stopped = true
         flushWork?.cancel()
         let p = provider
         provider = nil
@@ -101,5 +107,8 @@ struct LiveJournalView: View {
             .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
         }
         .onAppear { model.start(store: store, initial: store.journalMarkdown) }
+        // Tear down on ANY dismissal (swipe, tab switch, background), not only the Done button — otherwise the
+        // relay leaks and edits in the debounce window are lost. Idempotent with Done via stop()'s guard.
+        .onDisappear { model.stop { onClose($0) } }
     }
 }
