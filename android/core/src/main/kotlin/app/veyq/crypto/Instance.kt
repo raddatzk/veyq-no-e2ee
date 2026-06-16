@@ -22,7 +22,7 @@ object Instance {
             HttpRequest.newBuilder(URI.create("$apiBase/api/setup")).header("Accept", "application/json").GET().build(),
             HttpResponse.BodyHandlers.ofString(),
         )
-        if (resp.statusCode() != 200) throw RuntimeException("setup status failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("setup status failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
         val arr = j.getJSONArray("suites")
         return SetupStatus(j.getBoolean("setupRequired"), (0 until arr.length()).map { arr.getString(it) }, j.optString("appBaseUrl").ifEmpty { null })

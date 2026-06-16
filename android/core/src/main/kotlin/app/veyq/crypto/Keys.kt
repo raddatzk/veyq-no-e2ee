@@ -23,7 +23,7 @@ object Keys {
             .PUT(HttpRequest.BodyPublishers.ofString(body))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("master key wrap upsert failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("master key wrap upsert failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -35,7 +35,7 @@ object Keys {
             .DELETE()
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 204) throw RuntimeException("master key wrap removal failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 204) throw RuntimeException("master key wrap removal failed: ${resp.statusCode()}")
     }
 
     fun rewrapMyScopeGrant(apiBase: String, sessionToken: String, scopeId: String, wrappedScopePrivateKey: JSONObject): JSONObject {
@@ -47,7 +47,7 @@ object Keys {
             .PUT(HttpRequest.BodyPublishers.ofString(body))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("scope grant rewrap failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("scope grant rewrap failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 }

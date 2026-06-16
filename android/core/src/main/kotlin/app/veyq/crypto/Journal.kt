@@ -25,7 +25,7 @@ object Journal {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/journal"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("get journal failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("get journal failed: ${resp.statusCode()}")
         val body = JSONObject(resp.body())
         if (body.isNull("sealedContent")) return Content("", null)
         val sealed = dec.decode(body.getJSONObject("sealedContent").getString("bytes"))

@@ -25,7 +25,7 @@ object Tenant {
             b.GET()
         }
         val resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("$method $path failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("$method $path failed: ${resp.statusCode()}")
         return resp.body()
     }
 

@@ -23,7 +23,7 @@ object InviteMembers {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members"))
             .header("Authorization", "Bearer $token").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list members failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list members failed: ${resp.statusCode()}")
         return JSONObject(resp.body()).getJSONArray("members")
     }
 
@@ -100,7 +100,7 @@ object InviteMembers {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("rotate scope failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("rotate scope failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -112,7 +112,7 @@ object InviteMembers {
             .method("PUT", HttpRequest.BodyPublishers.ofString("""{"role":"$role"}"""))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("change role failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("change role failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -121,7 +121,7 @@ object InviteMembers {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId"))
             .header("Authorization", "Bearer $ownerToken").DELETE().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("remove member failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("remove member failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -151,7 +151,7 @@ object InviteMembers {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("member-invite failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("member-invite failed: ${resp.statusCode()}")
         val body = JSONObject(resp.body())
         return MemberInvite(
             inviteId = body.getString("inviteId"),
@@ -207,7 +207,7 @@ object InviteMembers {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("accept failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("accept failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -243,6 +243,6 @@ object InviteMembers {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 204) throw RuntimeException("email invite failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 204) throw RuntimeException("email invite failed: ${resp.statusCode()}")
     }
 }

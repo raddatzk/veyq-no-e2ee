@@ -27,7 +27,7 @@ object Track {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/tracks"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list tracks failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list tracks failed: ${resp.statusCode()}")
         val arr = JSONObject(resp.body()).getJSONArray("tracks")
         return (0 until arr.length()).map { i ->
             val t = arr.getJSONObject(i)
@@ -54,7 +54,7 @@ object Track {
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(payload)).build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("create track failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("create track failed: ${resp.statusCode()}")
     }
 
     /** Remove a track. */
@@ -62,6 +62,6 @@ object Track {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes/$nodeId/tracks/$trackId"))
             .header("Authorization", "Bearer ${session.sessionToken}").DELETE().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 204 && resp.statusCode() != 200) throw RuntimeException("delete track failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 204 && resp.statusCode() != 200) throw RuntimeException("delete track failed: ${resp.statusCode()}")
     }
 }

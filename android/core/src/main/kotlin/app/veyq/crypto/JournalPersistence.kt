@@ -31,7 +31,7 @@ object JournalPersistence {
     private fun get(apiBase: String, session: Login.UnlockedSession, path: String): JSONObject {
         val req = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("journal GET failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("journal GET failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -53,7 +53,7 @@ object JournalPersistence {
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .method(method, b).build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("journal $method failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("journal $method failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 

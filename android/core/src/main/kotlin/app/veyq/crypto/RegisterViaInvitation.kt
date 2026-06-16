@@ -30,7 +30,7 @@ object RegisterViaInvitation {
     fun getInviteMetadata(apiBase: String, inviteId: String): JSONObject {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId")).GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("invite metadata failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("invite metadata failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -41,7 +41,7 @@ object RegisterViaInvitation {
             .POST(HttpRequest.BodyPublishers.ofString("""{"bootstrapSecret":${JSONObject.quote(bootstrapSecret)}}"""))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("invite material failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("invite material failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -117,7 +117,7 @@ object RegisterViaInvitation {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("register failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("register failed: ${resp.statusCode()}")
         val body = JSONObject(resp.body())
         return RegisterResult(
             sessionToken = body.getString("sessionToken"),

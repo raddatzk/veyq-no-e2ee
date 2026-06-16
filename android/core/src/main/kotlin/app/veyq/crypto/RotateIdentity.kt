@@ -53,7 +53,7 @@ object RotateIdentity {
             .POST(HttpRequest.BodyPublishers.ofString(json))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("rotate identity failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("rotate identity failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 }

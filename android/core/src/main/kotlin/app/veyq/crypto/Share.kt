@@ -27,7 +27,7 @@ object Share {
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(payload)).build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("create share failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("create share failed: ${resp.statusCode()}")
         val shareId = JSONObject(resp.body()).getString("shareId")
         return "${origin.trimEnd('/')}/s/$shareId#k=${enc.encodeToString(shareKey)}"
     }

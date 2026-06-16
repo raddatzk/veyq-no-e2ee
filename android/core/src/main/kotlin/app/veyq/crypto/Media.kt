@@ -77,7 +77,7 @@ object Media {
     fun startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Long): BlobTicket {
         val body = """{"dedupToken":"$dedupToken","totalChunks":$totalChunks,"byteSize":$byteSize}"""
         val resp = send("$apiBase/api/scopes/$scopeId/blobs", session.sessionToken, "POST", body)
-        if (resp.statusCode() != 200) throw RuntimeException("start blob failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("start blob failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
         return BlobTicket(j.getString("status"), j.optString("blobId", null), j.optString("uploadId", null), j.getInt("totalChunks"))
     }
@@ -87,20 +87,20 @@ object Media {
         val frame = V1.sealFrame(contentKey, index, total, plain, V1.randomBytes(12))
         val body = """{"frame":{"suiteId":"v1","bytes":"${enc.encodeToString(frame)}"}}"""
         val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId/chunks/$index", session.sessionToken, "PUT", body)
-        if (resp.statusCode() != 204) throw RuntimeException("put chunk $index failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 204) throw RuntimeException("put chunk $index failed: ${resp.statusCode()}")
     }
 
     /** Which chunk indices have landed (drives resume). */
     fun getProgress(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String): JSONObject {
         val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId", session.sessionToken, "GET")
-        if (resp.statusCode() != 200) throw RuntimeException("upload progress failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("upload progress failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
     /** Finalize the upload once every chunk has landed; promotes the frames to a content blob. */
     fun completeBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String): BlobRef {
         val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId/complete", session.sessionToken, "POST")
-        if (resp.statusCode() != 200) throw RuntimeException("complete blob failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("complete blob failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
         return BlobRef(j.getString("blobId"), j.getInt("totalChunks"), j.getLong("byteSize"))
     }
@@ -126,7 +126,7 @@ object Media {
         var out = ByteArray(0)
         for (i in 0 until ref.totalChunks) {
             val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/chunks/$i", session.sessionToken, "GET")
-            if (resp.statusCode() != 200) throw RuntimeException("get chunk $i failed: ${resp.statusCode()} ${resp.body()}")
+            if (resp.statusCode() != 200) throw RuntimeException("get chunk $i failed: ${resp.statusCode()}")
             val frame = dec.decode(JSONObject(resp.body()).getJSONObject("frame").getString("bytes"))
             out += V1.openFrame(contentKey, i, ref.totalChunks, frame)
         }
@@ -140,7 +140,7 @@ object Media {
         val derivJson = JSONArray().apply { derivatives.forEach { put(JSONObject().put("kind", it.first).put("blobId", it.second)) } }
         val json = JSONObject().put("originalBlobId", originalBlobId).put("sealedMeta", sealedMeta).put("mimeType", mimeType).put("derivatives", derivJson).toString()
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "POST", json)
-        if (resp.statusCode() != 200) throw RuntimeException("create media failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("create media failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -163,7 +163,7 @@ object Media {
     /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
     fun listMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String): List<JSONObject> {
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "GET")
-        if (resp.statusCode() != 200) throw RuntimeException("list media failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list media failed: ${resp.statusCode()}")
         val arr = JSONObject(resp.body()).getJSONArray("media")
         return (0 until arr.length()).map { arr.getJSONObject(it) }
     }

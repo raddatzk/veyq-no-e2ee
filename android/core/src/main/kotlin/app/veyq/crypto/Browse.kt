@@ -22,7 +22,7 @@ object Browse {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes?parentId=$slot"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list children failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list children failed: ${resp.statusCode()}")
         val arr = JSONObject(resp.body()).getJSONArray("nodes")
         return (0 until arr.length()).map { arr.getJSONObject(it) }
     }
@@ -32,7 +32,7 @@ object Browse {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()}")
         val arr = JSONObject(resp.body()).getJSONArray("nodes")
         return (0 until arr.length()).map { arr.getJSONObject(it) }
     }

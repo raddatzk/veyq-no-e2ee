@@ -29,7 +29,7 @@ object Curate {
                 .put("slugToken", MemoryTree.slugTokenFor(contentKey, slot, slug)).toString()
             val resp = patch(apiBase, session, scopeId, node.getString("id"), body)
             if (resp.statusCode() == 200) return JSONObject(resp.body())
-            if (resp.statusCode() != 409 || !resp.body().contains("SLUG_EXISTS")) throw RuntimeException("rename failed: ${resp.statusCode()} ${resp.body()}")
+            if (resp.statusCode() != 409 || !resp.body().contains("SLUG_EXISTS")) throw RuntimeException("rename failed: ${resp.statusCode()}")
         }
         throw RuntimeException("rename slug conflict")
     }
@@ -44,20 +44,20 @@ object Curate {
             if (attempt > 0) body.put("sealedContent", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(MemoryTree.resealNode(contentKey, JSONObject().put("name", name).put("slug", slug)))))
             val resp = patch(apiBase, session, scopeId, node.getString("id"), body.toString())
             if (resp.statusCode() == 200) return JSONObject(resp.body())
-            if (resp.statusCode() != 409 || !resp.body().contains("SLUG_EXISTS")) throw RuntimeException("move failed: ${resp.statusCode()} ${resp.body()}")
+            if (resp.statusCode() != 409 || !resp.body().contains("SLUG_EXISTS")) throw RuntimeException("move failed: ${resp.statusCode()}")
         }
         throw RuntimeException("move slug conflict")
     }
 
     fun setCover(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, coverMediaId: String): JSONObject {
         val resp = patch(apiBase, session, scopeId, nodeId, JSONObject().put("coverMediaId", coverMediaId).toString())
-        if (resp.statusCode() != 200) throw RuntimeException("set cover failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("set cover failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
     fun reorderNode(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, orderIndex: Int): JSONObject {
         val resp = patch(apiBase, session, scopeId, nodeId, JSONObject().put("orderIndex", orderIndex).toString())
-        if (resp.statusCode() != 200) throw RuntimeException("reorder failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("reorder failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 

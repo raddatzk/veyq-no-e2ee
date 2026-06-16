@@ -32,7 +32,7 @@ object Login {
             .POST(HttpRequest.BodyPublishers.ofString("""{"email":${JSONObject.quote(email)},"password":${JSONObject.quote(password)}}"""))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("login failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("login failed: ${resp.statusCode()}")
 
         val body = JSONObject(resp.body())
         val keyBag = body.getJSONObject("keyBag")
@@ -67,7 +67,7 @@ object Login {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/session"))
             .header("Authorization", "Bearer $sessionToken").DELETE().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 204) throw RuntimeException("logout failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 204) throw RuntimeException("logout failed: ${resp.statusCode()}")
     }
 
     /** Returns the response body for the resolved session, or throws on non-200. */
@@ -84,7 +84,7 @@ object Login {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/personal-scope"))
             .header("Authorization", "Bearer $sessionToken").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("personal scope failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("personal scope failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 

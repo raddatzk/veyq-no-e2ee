@@ -34,7 +34,7 @@ object MemoryTree {
             .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(json)).build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("create node failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("create node failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
     }
 
@@ -43,7 +43,7 @@ object MemoryTree {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()}")
         return JSONObject(resp.body()).getJSONArray("nodes")
     }
 

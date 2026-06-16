@@ -20,7 +20,7 @@ object UseGroup {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/me/groups"))
             .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list groups failed: ${resp.statusCode()} ${resp.body()}")
+        if (resp.statusCode() != 200) throw RuntimeException("list groups failed: ${resp.statusCode()}")
         return JSONObject(resp.body()).getJSONArray("groups")
     }
 }

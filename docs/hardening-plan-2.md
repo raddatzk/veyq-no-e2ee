@@ -37,11 +37,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   `PESSIMISTIC_WRITE`) **vor** der `isComplete()`-Prüfung, sodass parallele Setups serialisieren und der
   Verlierer ein sauberes 409 statt eines 500 bekommt. Direkt verifiziert: zwei gleichzeitige
   `POST /api/setup/owner` → genau ein 200 + ein 409 `ALREADY_SETUP`.
-- [ ] **A5 · Android: rohe Response-Bodies in Exceptions + ungeescapte JSON-Interpolation** *(Security, Android, M)* —
-  `Media.kt`, `InviteMembers.kt`, `MemoryTree.kt:31`, `ScopeContent.kt:78`, `Groups.kt` u. a.
-  `throw …${resp.body()}` schleppt Payloads in Crash-Logs; mehrere Bodies via `"""{…}"""` statt `JSONObject`.
-  Fix: typisierte `ApiException(status, label)` ohne Body; alle Bodies über `JSONObject`/`JSONArray`.
-  (Teilweise gemeinsam mit E3 — zentraler `ApiClient` — erledigbar.)
+- [~] **A5 · Android: rohe Response-Bodies in Exceptions + ungeescapte JSON-Interpolation** *(Security, Android, M)* —
+  **Teil 1 erledigt:** alle 44 `${resp.body()}`-Interpolationen aus den Throws über 18 `:core`-Dateien entfernt
+  (nur noch der Statuscode — keine Server-Payloads mehr in Crash-Logs); `:core` kompiliert.
+  **Teil 2 verschoben nach E3:** die 56 Triple-Quote-JSON-Bodies (10 Dateien) → `JSONObject`/`JSONArray`
+  migrieren beim zentralen `ApiClient`-Refactor (riskanter: Wire-Format, per Android-E2E zu verifizieren).
 
 ## Phase B — Crypto-/Interop-Korrektheit
 - [ ] **B1 · Invite-Passphrase Argon2-Parameter prüfen & angleichen** *(Security/Interop, M)* —
@@ -114,7 +114,9 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   byte-identisch. In gemeinsamen `MediaApiMapper` ziehen.
 - [ ] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* — Backend `unauthorized()`/`notFound()`/
   `requireSuite`/Base64 → `platform/error`/Helper; Web `b64url`/`fromB64url` (21×) → `shared/base64.ts`;
-  Android ein `ApiClient` (ein `HttpClient`, zentrales Send/Fehler-Handling, 9× dedup — deckt A5 mit ab).
+  Android ein `ApiClient` (ein `HttpClient`, zentrales Send/Fehler-Handling, 9× dedup — deckt A5 Teil 1 mit
+  ab) **und A5 Teil 2**: die 56 Triple-Quote-JSON-Bodies (10 Dateien) auf `JSONObject`/`JSONArray` umstellen,
+  per Android-E2E verifiziert.
 - [ ] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — Roles/Status/Scope-Kind in Entities
   (`Tenancy.kt:21` u. a.). War bewusst zurückgestellt; jetzt mit **E1** koppeln (Guard + Enums zusammen).
 - [ ] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView.swift:83`: `.onDisappear`
