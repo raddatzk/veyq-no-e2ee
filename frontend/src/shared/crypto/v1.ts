@@ -30,8 +30,8 @@ const u32be = (n: number): Uint8Array => {
 export const lp = (x: Uint8Array): Uint8Array => concat(u32be(x.length), x)
 
 export type ArgonParams = { t: number; m: number; p: number; dkLen: number }
-/** production default: m in KiB = 64 MiB (vectors use lighter params, carried in the vector) */
-export const ARGON: ArgonParams = { t: 3, m: 65536, p: 1, dkLen: 32 }
+/** auth-path default: m in KiB = 32 MiB, matching the server verifier (vectors carry their own params) */
+export const ARGON: ArgonParams = { t: 3, m: 32768, p: 1, dkLen: 32 }
 
 /**
  * kdfParams wire format (crypto agility, AD-25): the unlock cost params travel WITH the wrap so a future

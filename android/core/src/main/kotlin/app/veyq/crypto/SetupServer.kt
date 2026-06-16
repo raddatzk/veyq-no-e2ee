@@ -12,7 +12,7 @@ import java.util.Base64
  * All key material is generated here; the server only ever receives ciphertext + public keys.
  */
 object SetupServer {
-    private val argon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
+    private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private fun b64url(b: ByteArray): String = b64.encodeToString(b)
 

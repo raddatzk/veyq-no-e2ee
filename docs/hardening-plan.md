@@ -37,12 +37,13 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   `RegisterViaInvitation.kt` now wrap every free-text field in `JSONObject.quote(...)`, so `"`/`\`/newline
   can't corrupt or inject the body. Regression: the Android setup e2e registers + logs in with `"`/`\` in
   the display name + password.
-- [x] **P2.2 Argon2 8 → 64 MiB.** `Argon2Verifier` + all client setup/register/reset paths (web/iOS/Android)
-  + `LoginSliceTest` now use `m=65536` (the suite default; matches the invite path and v1.ARGON). This also
-  fixed a latent bug — web reset already minted a 65536 verifier the 8192 backend couldn't verify. The
-  client authVerifier-creation params must match the backend verifier (it hardcodes them, no kdfParams on
-  the verifier); register+login verified cross-stack on web + Android. **Cost:** 64 MiB Argon is ~1–2 s per
-  hash in JS, so register/login takes a few seconds — e2e timeouts raised accordingly.
+- [x] **P2.2 Argon2 8 → 32 MiB.** `Argon2Verifier` + all client setup/register/reset paths (web/iOS/Android,
+  incl. `v1.ARGON` which drives web reset) + `LoginSliceTest` now use `m=32768` — above the OWASP floor while
+  keeping JS login responsive. This also fixed a latent bug — web reset already minted a verifier the 8192
+  backend couldn't verify. The client authVerifier-creation params must match the backend verifier (it
+  hardcodes them, no kdfParams on the verifier), so they move in lockstep; register+login verified
+  cross-stack on web + Android. (The invite-temp-key Argon stays 65536 — it's a separate params-carried KDF,
+  not the auth verifier.)
 - [~] **P2.3 Live-journal bugs.** The seed race is largely resolved by 6a (all platforms now reconstruct from
   the store instead of dual-seeding from markdown; the bootstrap only seeds a legacy empty journal). Still
   minor: cursor unit mismatch (awareness UTF-16 vs char-array/byte offsets → caret drift past emoji) and

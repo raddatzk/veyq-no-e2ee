@@ -4,7 +4,7 @@
 import * as v1 from '../../../shared/crypto/v1'
 
 // Must match the params used to wrap the master key (see setupServer.ts / login.ts).
-const ARGON = { t: 3, m: 65536, p: 1, dkLen: 32 }
+const ARGON = { t: 3, m: 32768, p: 1, dkLen: 32 }
 
 function b64url(b: Uint8Array): string {
   let s = ''
