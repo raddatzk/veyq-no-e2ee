@@ -70,13 +70,32 @@ class PublicShareMediaHandler(
         return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
     }
 
-    /** Does [blobId] back a medium (original or derivative) in the share's subtree? At most two IN queries
-     *  (subtree media, then their derivatives), vs the old per-node × per-media loop on every chunk fetch. */
+    private class AllowedBlobs(val ids: Set<String>, val expiresAtNanos: Long)
+    private val allowedCache = java.util.concurrent.ConcurrentHashMap<String, AllowedBlobs>()
+    private val allowedTtlNanos = 15_000_000_000L // 15s — a gallery's chunk burst reuses one computed set
+
+    /**
+     * Does [blobId] back a medium (original or derivative) in the share's subtree? The allowed-blob set is
+     * cached per share for a few seconds so a gallery's many parallel chunk fetches don't each re-scan the
+     * whole scope's nodes + media. A cache MISS for a blob (stale set, or a just-contributed medium) recomputes
+     * and re-checks, so the answer is always correct — only disallowed-blob probes pay the recompute.
+     */
     private fun blobBacksSubtreeMedia(share: com.veyq.app.shared.content.Share, blobId: String): Boolean {
-        val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
-        val subtreeMedia = media.listByNodeIds(ids)
-        if (subtreeMedia.any { it.originalBlobId == blobId }) return true
-        return derivatives.listByMediaIds(subtreeMedia.map { it.id }).any { it.blobId == blobId }
+        val now = System.nanoTime()
+        allowedCache[share.id]?.let { if (now <= it.expiresAtNanos && blobId in it.ids) return true }
+        val ids = computeAllowedBlobIds(share)
+        allowedCache[share.id] = AllowedBlobs(ids, now + allowedTtlNanos)
+        return blobId in ids
+    }
+
+    /** The set of blob ids (originals + derivatives) backing the share subtree — two IN queries. */
+    private fun computeAllowedBlobIds(share: com.veyq.app.shared.content.Share): Set<String> {
+        val nodeIds = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
+        val subtreeMedia = media.listByNodeIds(nodeIds)
+        val ids = HashSet<String>()
+        subtreeMedia.forEach { ids.add(it.originalBlobId) }
+        derivatives.listByMediaIds(subtreeMedia.map { it.id }).forEach { ids.add(it.blobId) }
+        return ids
     }
 
     /** Map a share gallery in a fixed 3 queries (media + derivatives IN + blobs IN), not N+1. */

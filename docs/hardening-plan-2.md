@@ -117,9 +117,11 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   Tenants je per IN-Query, in-memory zusammengesetzt (`grants.listByUserId`, neue `scopes.listByIds`/
   `listTenantRootsByTenantIds`, `tenants.listByIds`). Verifiziert: switchActiveSpace- + useGroup- +
   groupSpaces-E2E grün.
-- [ ] **D3 · Share-Chunk-ACL nicht pro Chunk neu scannen** *(Perf, M)* — `PublicShareMediaHandler.kt:57-73`.
-  `blobBacksSubtreeMedia` materialisiert den ganzen Subtree je Chunk-Fetch. Fix: erlaubte Blob-ID-Menge pro
-  Share cachen bzw. gezielter Lookup statt Subtree-Materialisierung.
+- [x] **D3 · Share-Chunk-ACL nicht pro Chunk neu scannen** *(Perf, M)* — die erlaubte Blob-ID-Menge wird pro
+  Share 15s gecacht (`blobBacksSubtreeMedia`), sodass die vielen parallelen Chunk-Fetches einer Galerie nicht
+  je den ganzen Scope-Subtree neu materialisieren. Cache-MISS für eine Blob-ID (stale Set / frisch beigesteuertes
+  Medium) rechnet neu + prüft erneut → immer korrekt, nur disallowed-Blob-Probes zahlen den Recompute.
+  Verifiziert: share-E2E grün (Chunk-Download + A3-Forge-Reject über den Recompute-Pfad).
 - [x] **D4 · JournalRelay Room-Index** *(Perf, M)* — `room → Set<WebSocketConnection>`-Index in onOpen/onClose
   gepflegt; Fan-out (onMessage) und der Peer-Cap laufen jetzt O(Room) statt O(alle offenen Verbindungen
   server-weit). `OpenConnections`-Dependency entfernt. Verifiziert: journalLive- (2-Client-Konvergenz) +
