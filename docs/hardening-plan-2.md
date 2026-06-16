@@ -134,8 +134,9 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   TenantProvisioning) läuft jetzt durch `TenantAdminGuard.requireOwner` (+ `requireActiveMember` für die
   Member-List). Analog zu `ScopeAccessGuard`, kann nicht mehr pro Handler driften — und ist jetzt **die eine
   Stelle** für E4 (Enum-Migration, nur noch Guard + Entity). Verifiziert: alle 5 admin-E2E grün.
-- [ ] **E2 · `toApiBatch` teilen** *(Maintainability, S)* — `MediaHandler.kt:51` ↔ `PublicShareMediaHandler.kt:76`
-  byte-identisch. In gemeinsamen `MediaApiMapper` ziehen.
+- [x] **E2 · `toApiBatch` geteilt** *(Maintainability, S)* — die byte-identische Batch-Mapper-Kopie aus
+  `MediaHandler` + `PublicShareMediaHandler` in einen gemeinsamen `MediaApiMapper` (`shared/content`) gezogen;
+  beide delegieren. Verifiziert: media- + share-E2E grün (identische Ausgabe).
 - [ ] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* — Backend `unauthorized()`/`notFound()`/
   `requireSuite`/Base64 → `platform/error`/Helper; Web `b64url`/`fromB64url` (21×) → `shared/base64.ts`;
   Android ein `ApiClient` (ein `HttpClient`, zentrales Send/Fehler-Handling, 9× dedup — deckt A5 Teil 1 mit

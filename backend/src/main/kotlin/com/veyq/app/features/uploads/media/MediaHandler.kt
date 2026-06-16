@@ -11,6 +11,7 @@ import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.DerivativeKind
 import com.veyq.app.shared.content.Media
 import com.veyq.app.shared.content.MediaDerivative
+import com.veyq.app.shared.content.MediaApiMapper
 import com.veyq.app.shared.content.MediaDerivativeRepository
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
@@ -35,6 +36,7 @@ class MediaHandler(
     private val blobs: BlobRepository,
     private val media: MediaRepository,
     private val derivatives: MediaDerivativeRepository,
+    private val mapper: MediaApiMapper,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
@@ -44,28 +46,7 @@ class MediaHandler(
     fun listMedia(auth: String?, scopeId: String, nodeId: String): MediaList {
         requireKeyHolder(scopeId, auth)
         requireMemoryNode(scopeId, nodeId)
-        return MediaList(media = toApiBatch(media.listByNodeId(nodeId)))
-    }
-
-    /** Map a gallery's worth of media in a fixed 3 queries (media + derivatives IN + blobs IN), not N+1. */
-    fun toApiBatch(items: List<Media>): List<MediaItem> {
-        if (items.isEmpty()) return emptyList()
-        val derivsByMedia = derivatives.listByMediaIds(items.map { it.id }).groupBy { it.mediaId }
-        val blobsById = blobs.listByIds((items.map { it.originalBlobId } + derivsByMedia.values.flatten().map { it.blobId }).toSet()).associateBy { it.id }
-        fun ref(blobId: String): BlobRef {
-            val b = blobsById[blobId] ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
-            return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
-        }
-        return items.map { m ->
-            MediaItem(
-                id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
-                sealedMeta = com.veyq.app.generated.model.Blob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
-                mimeType = m.mimeType,
-                original = ref(m.originalBlobId),
-                derivatives = derivsByMedia[m.id].orEmpty().map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = ref(it.blobId)) },
-                createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
-            )
-        }
+        return MediaList(media = mapper.toApiBatch(media.listByNodeId(nodeId)))
     }
 
     @Transactional

@@ -1,10 +1,7 @@
 package com.veyq.app.features.memory.share
 
 import com.veyq.app.generated.model.Blob as ApiBlob
-import com.veyq.app.generated.model.BlobRef
 import com.veyq.app.generated.model.ChunkResponse
-import com.veyq.app.generated.model.MediaDerivativeOut
-import com.veyq.app.generated.model.MediaItem
 import com.veyq.app.generated.model.MediaList
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.BlobChunkRepository
@@ -18,8 +15,6 @@ import com.veyq.app.shared.storage.BlobStore
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import java.util.Base64
 
 /**
@@ -36,6 +31,7 @@ class PublicShareMediaHandler(
     private val blobs: BlobRepository,
     private val chunks: BlobChunkRepository,
     private val store: BlobStore,
+    private val mapper: com.veyq.app.shared.content.MediaApiMapper,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
@@ -51,7 +47,7 @@ class PublicShareMediaHandler(
         if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
         val ids = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
-        return MediaList(media = toApiBatch(media.listByNodeId(nodeId)))
+        return MediaList(media = mapper.toApiBatch(media.listByNodeId(nodeId)))
     }
 
     fun getShareChunk(shareId: String, blobId: String, index: Int): ChunkResponse {
@@ -96,26 +92,5 @@ class PublicShareMediaHandler(
         subtreeMedia.forEach { ids.add(it.originalBlobId) }
         derivatives.listByMediaIds(subtreeMedia.map { it.id }).forEach { ids.add(it.blobId) }
         return ids
-    }
-
-    /** Map a share gallery in a fixed 3 queries (media + derivatives IN + blobs IN), not N+1. */
-    private fun toApiBatch(items: List<Media>): List<MediaItem> {
-        if (items.isEmpty()) return emptyList()
-        val derivsByMedia = derivatives.listByMediaIds(items.map { it.id }).groupBy { it.mediaId }
-        val blobsById = blobs.listByIds((items.map { it.originalBlobId } + derivsByMedia.values.flatten().map { it.blobId }).toSet()).associateBy { it.id }
-        fun ref(blobId: String): BlobRef {
-            val b = blobsById[blobId] ?: throw ApiException(500, "MISSING_BLOB", "Blob not found")
-            return BlobRef(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
-        }
-        return items.map { m ->
-            MediaItem(
-                id = m.id, scopeId = m.scopeId, nodeId = m.nodeId,
-                sealedMeta = ApiBlob(suiteId = m.suiteId, bytes = enc.encodeToString(m.sealedMeta)),
-                mimeType = m.mimeType,
-                original = ref(m.originalBlobId),
-                derivatives = derivsByMedia[m.id].orEmpty().map { MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = ref(it.blobId)) },
-                createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
-            )
-        }
     }
 }
