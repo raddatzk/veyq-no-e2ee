@@ -211,10 +211,11 @@ object InviteMembers {
         return JSONObject(resp.body())
     }
 
-    // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id (matching the web
-    // ARGON params so a link minted on one platform opens on another). The temp key is sym-wrapped under it;
-    // the link carries only the ciphertext + salt, so the email relay can't resolve it without the passphrase.
-    private val inviteArgon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
+    // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id. The params are NOT
+    // carried in the link, so they MUST equal the web ARGON params (t=3, m=32768, p=1) or a link minted on one
+    // platform won't open on another. The temp key is sym-wrapped under it; the link carries only the
+    // ciphertext + salt, so the email relay can't resolve it without the passphrase.
+    private val inviteArgon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private const val TEMP_KEY_CONTEXT = "invite-temp-key"
     private fun passphraseKek(passphrase: String, salt: ByteArray): ByteArray =
         V1.kekRecovery(java.text.Normalizer.normalize(passphrase, java.text.Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), salt, inviteArgon)

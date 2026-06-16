@@ -44,10 +44,13 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   migrieren beim zentralen `ApiClient`-Refactor (riskanter: Wire-Format, per Android-E2E zu verifizieren).
 
 ## Phase B — Crypto-/Interop-Korrektheit
-- [ ] **B1 · Invite-Passphrase Argon2-Parameter prüfen & angleichen** *(Security/Interop, M)* —
-  Web `groups.ts:28,35` (m=32768) vs. iOS/Android `InviteMembers.*:~217` (m=65536). Zuerst **verifizieren**,
-  ob Redeem immer die mitgelieferten `kdfParams` nutzt (dann nur latent) — danach die drei Mint-Konstanten
-  auf einen Wert angleichen. Kein Conformance-Vektor deckt das ab.
+- [x] **B1 · Invite-Passphrase Argon2-Parameter angeglichen** *(Security/Interop, M)* — **Echter Interop-Bug
+  bestätigt:** die Invite-Temp-Key-KEK-Params werden NICHT im Link getragen (nur Salt), und Mobile nutzte
+  `inviteArgon m=65536` während Web `kekRecovery` den `ARGON`-Default m=32768 nutzt → ein passwortgeschützter
+  Invite, der auf Web gemintet und auf Mobile (oder umgekehrt) eingelöst wird, leitet eine andere KEK ab →
+  AEAD-Fehler. NFC war bereits konsistent (alle drei normalisieren). Fix: iOS/Android `inviteArgon` 65536 →
+  **32768** (= Web + 32-MiB-Projektstandard). Verifiziert: Params auf allen drei Plattformen gleich,
+  Web-Round-Trip-Unit-Test grün, iOS/Android kompilieren. Cross-Platform-Pin folgt in **B2**.
 - [ ] **B2 · Conformance-Lücken schließen** *(Tests/Crypto, S)* — `docs/api/crypto-vectors/v1.json`.
   (a) `journalSeal`→`journalOpen` Round-Trip pro Plattform asserten (heute nur `open` gepinnt);
   (b) den vorhandenen, aber ungenutzten `hkdf_sha256_rfc5869_case1`-KAT in allen drei Conformance-Tests
