@@ -188,11 +188,8 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
 
     // --- framing (lib0 varint, matches web/iOS) + AEAD ---
 
-    /** nonce(12) || AEAD(contentKey, inner) — the outer seal every relay message uses. */
-    private fun seal(inner: ByteArray): ByteArray {
-        val nonce = V1.randomBytes(12)
-        return nonce + V1.aeadSeal(contentKey, nonce, inner, ByteArray(0))
-    }
+    /** salt(16) || nonce(12) || AEAD(HKDF(contentKey, salt), inner) — fresh per-message sub-key (see V1.journalSeal). */
+    private fun seal(inner: ByteArray): ByteArray = V1.journalSeal(contentKey, inner)
     /** [varuint 0=sync][varuint syncKind][varUint8Array payload] → sealed. */
     private fun encode(syncKind: Long, payload: ByteArray): ByteArray {
         val enc = ArrayList<Byte>()
@@ -236,10 +233,7 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
         }
         onPeers?.invoke(peers.values.toList())
     }
-    private fun open(data: ByteArray): ByteArray? {
-        if (data.size <= 12) return null
-        return runCatching { V1.aeadOpen(contentKey, data.copyOfRange(0, 12), data.copyOfRange(12, data.size), ByteArray(0)) }.getOrNull()
-    }
+    private fun open(data: ByteArray): ByteArray? = V1.journalOpen(contentKey, data)
 
     private fun writeVarUint(out: MutableList<Byte>, value: Long) {
         var v = value

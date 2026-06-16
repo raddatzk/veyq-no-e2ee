@@ -178,6 +178,24 @@ object V1 {
         sha256("veyq/v1/recovery-auth".toByteArray(Charsets.UTF_8) + masterKey)
 
     /**
+     * Journal sealing (live relay frames + persisted blobs). A fresh per-message sub-key from a random salt:
+     * salt(16) || nonce(12) || AES-256-GCM(HKDF(contentKey, salt, "veyq/v1/journal"), nonce, plaintext). Each
+     * GCM key is used exactly once, so the random 96-bit nonce can never collide under the long-lived content
+     * key (no birthday bound). Byte-identical to web/iOS.
+     */
+    fun journalSeal(contentKey: ByteArray, plaintext: ByteArray): ByteArray {
+        val salt = randomBytes(16)
+        val subkey = hkdf(contentKey, salt, "veyq/v1/journal".toByteArray(Charsets.UTF_8), 32)
+        val nonce = randomBytes(12)
+        return salt + nonce + aeadSeal(subkey, nonce, plaintext, ByteArray(0))
+    }
+    fun journalOpen(contentKey: ByteArray, blob: ByteArray): ByteArray? {
+        if (blob.size <= 28) return null
+        val subkey = hkdf(contentKey, blob.copyOfRange(0, 16), "veyq/v1/journal".toByteArray(Charsets.UTF_8), 32)
+        return runCatching { aeadOpen(subkey, blob.copyOfRange(16, 28), blob.copyOfRange(28, blob.size), ByteArray(0)) }.getOrNull()
+    }
+
+    /**
      * Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
      * plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
      * reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).

@@ -155,6 +155,24 @@ export function recoveryAuthTag(masterKey: Uint8Array): Uint8Array {
 }
 
 /**
+ * Journal sealing (live relay frames + persisted snapshot/update blobs). Each message gets a FRESH per-message
+ * sub-key derived from a random 16-byte salt: salt(16) || nonce(12) || AES-256-GCM(HKDF(contentKey, salt,
+ * "veyq/v1/journal"), nonce, plaintext). Because every blob carries its own salt, every GCM key is used exactly
+ * once, so the random 96-bit nonce can never collide under one long-lived content key (no birthday bound, even
+ * under months of keystroke-rate co-editing). Anyone with the content key derives the sub-key from the salt.
+ */
+export function journalSeal(contentKey: Uint8Array, plaintext: Uint8Array): Uint8Array {
+  const salt = randomBytes(16)
+  const subkey = hkdf(sha256, contentKey, salt, utf8('veyq/v1/journal'), 32)
+  const nonce = randomBytes(12)
+  return concat(salt, nonce, aeadSeal(subkey, nonce, plaintext, new Uint8Array(0)))
+}
+export function journalOpen(contentKey: Uint8Array, blob: Uint8Array): Uint8Array {
+  const subkey = hkdf(sha256, contentKey, blob.slice(0, 16), utf8('veyq/v1/journal'), 32)
+  return aeadOpen(subkey, blob.slice(16, 28), blob.slice(28), new Uint8Array(0))
+}
+
+/**
  * Chunked-AEAD frame (resumable upload + segmented streaming): a large blob is split into independent,
  * self-contained frames so chunks resume individually and segments decrypt without the whole file. Each
  * frame = nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad) with aad = u32be(index) || u32be(total),

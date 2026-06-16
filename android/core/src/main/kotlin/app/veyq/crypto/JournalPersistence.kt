@@ -19,20 +19,14 @@ object JournalPersistence {
     private val client = HttpClient.newHttpClient()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val EMPTY = ByteArray(0)
 
     private fun ByteArray.toUByteList(): List<UByte> = map { it.toUByte() }
     private fun List<UByte>.toByteArray(): ByteArray = ByteArray(size) { this[it].toByte() }
 
-    /** nonce(12) || AEAD(contentKey, bytes) — the same envelope as every other sealed blob. */
-    private fun seal(key: ByteArray, inner: ByteArray): ByteArray {
-        val nonce = V1.randomBytes(12)
-        return nonce + V1.aeadSeal(key, nonce, inner, EMPTY)
-    }
-    private fun open(key: ByteArray, blob: ByteArray): ByteArray? {
-        if (blob.size <= 12) return null
-        return runCatching { V1.aeadOpen(key, blob.copyOfRange(0, 12), blob.copyOfRange(12, blob.size), EMPTY) }.getOrNull()
-    }
+    // salt(16) || nonce(12) || AEAD(HKDF(key, salt, "veyq/v1/journal"), …) — fresh per-message sub-key so the GCM
+    // nonce can never collide under the long-lived content key (see V1.journalSeal).
+    private fun seal(key: ByteArray, inner: ByteArray): ByteArray = V1.journalSeal(key, inner)
+    private fun open(key: ByteArray, blob: ByteArray): ByteArray? = V1.journalOpen(key, blob)
 
     private fun get(apiBase: String, session: Login.UnlockedSession, path: String): JSONObject {
         val req = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer ${session.sessionToken}").GET().build()
@@ -81,9 +75,13 @@ object JournalPersistence {
     /** Compact: write a fresh sealed snapshot + the Markdown reader projection, pruning updates <= coveredSeq. */
     fun compactJournal(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, contentKey: ByteArray, doc: YrsDoc, lock: Any, markdown: String, coveredSeq: Int) {
         val full = synchronized(lock) { doc.transact(null).use { it.transactionEncodeStateAsUpdate().toByteArray() } }
+        // The Markdown projection is low-volume at-rest content read by the plain getJournal reader, so it keeps
+        // the plain nonce||AEAD(contentKey) envelope (not the per-message journal sub-key — that's the CRDT layer).
+        val mdNonce = V1.randomBytes(12)
+        val md = mdNonce + V1.aeadSeal(contentKey, mdNonce, markdown.toByteArray(Charsets.UTF_8), ByteArray(0))
         val body = JSONObject()
             .put("snapshot", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(seal(contentKey, full))))
-            .put("markdown", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(seal(contentKey, markdown.toByteArray(Charsets.UTF_8)))))
+            .put("markdown", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(md)))
             .put("coveredSeq", coveredSeq).toString()
         send(apiBase, session, "/api/scopes/$scopeId/nodes/$nodeId/journal/snapshot", "PUT", body)
     }

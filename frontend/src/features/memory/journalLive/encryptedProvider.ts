@@ -11,7 +11,6 @@ import * as v1 from '../../../shared/crypto/v1'
 
 const messageSync = 0
 const messageAwareness = 1
-const EMPTY = new Uint8Array(0)
 
 export class EncryptedRelayProvider {
   ws: WebSocket | null = null
@@ -31,8 +30,7 @@ export class EncryptedRelayProvider {
   }
 
   private seal(msg: Uint8Array): Uint8Array {
-    const nonce = v1.randomBytes(12)
-    return v1.concat(nonce, v1.aeadSeal(this.contentKey, nonce, msg, EMPTY))
+    return v1.journalSeal(this.contentKey, msg)
   }
   private send(msg: Uint8Array) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(this.seal(msg).slice().buffer)
@@ -60,7 +58,7 @@ export class EncryptedRelayProvider {
     ws.onmessage = (ev) => {
       let plain: Uint8Array
       try {
-        plain = v1.aeadOpen(this.contentKey, new Uint8Array(ev.data as ArrayBuffer).slice(0, 12), new Uint8Array(ev.data as ArrayBuffer).slice(12), EMPTY)
+        plain = v1.journalOpen(this.contentKey, new Uint8Array(ev.data as ArrayBuffer))
       } catch {
         return // wrong key / not a message we can read — ignore (operator-blind: we can't, the server can't either)
       }

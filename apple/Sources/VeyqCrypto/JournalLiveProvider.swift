@@ -194,11 +194,8 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
 
     // MARK: - framing + AEAD (matches the web EncryptedRelayProvider)
 
-    /// nonce(12) || AEAD(contentKey, inner) — the outer seal every relay message uses.
-    private func seal(_ inner: [UInt8]) -> Data {
-        let nonce = V1.randomBytes(12)
-        return nonce + ((try? V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: Data(inner), aad: Data())) ?? Data())
-    }
+    /// salt(16) || nonce(12) || AEAD(HKDF(contentKey, salt), inner) — fresh per-message sub-key (see V1.journalSeal).
+    private func seal(_ inner: [UInt8]) -> Data { V1.journalSeal(contentKey: contentKey, plaintext: Data(inner)) }
     /// [varuint 0=sync][varuint syncKind][varUint8Array payload] → sealed.
     private func encode(sync syncKind: UInt, payload: [UInt8]) -> Data {
         var enc: [UInt8] = []
@@ -238,10 +235,7 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         }
         onPeers?(Array(peers.values))
     }
-    private func open(_ data: Data) -> Data? {
-        guard data.count > 12 else { return nil }
-        return try? V1.aeadOpen(key: contentKey, nonce: data.prefix(12), aead: data.dropFirst(12), aad: Data())
-    }
+    private func open(_ data: Data) -> Data? { V1.journalOpen(contentKey: contentKey, blob: data) }
 
     private func writeVarUint(_ out: inout [UInt8], _ value: UInt) {
         var v = value

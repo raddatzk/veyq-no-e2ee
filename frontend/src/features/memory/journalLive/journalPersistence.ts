@@ -8,7 +8,6 @@ import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 
-const EMPTY = new Uint8Array(0)
 
 /** Origin tag for doc updates we applied from the store, so the editor doesn't re-persist them. */
 export const PERSISTENCE_ORIGIN = 'journal-persistence'
@@ -26,14 +25,10 @@ function fromB64url(s: string): Uint8Array {
   return out
 }
 
-/** nonce(12) || AEAD(contentKey, bytes) — the same envelope as every other sealed blob. */
-function seal(contentKey: Uint8Array, bytes: Uint8Array): Uint8Array {
-  const nonce = v1.randomBytes(12)
-  return v1.concat(nonce, v1.aeadSeal(contentKey, nonce, bytes, EMPTY))
-}
-function open(contentKey: Uint8Array, blob: Uint8Array): Uint8Array {
-  return v1.aeadOpen(contentKey, blob.slice(0, 12), blob.slice(12), EMPTY)
-}
+// salt(16) || nonce(12) || AEAD(HKDF(contentKey, salt, "veyq/v1/journal"), …) — a fresh per-message sub-key so
+// the GCM nonce can never collide under the long-lived content key (see v1.journalSeal).
+const seal = v1.journalSeal
+const open = v1.journalOpen
 
 function auth(session: UnlockedSession) {
   return { authorization: `Bearer ${session.sessionToken}` }
@@ -92,7 +87,10 @@ export async function compactJournal(
   doc: Y.Doc, markdown: string, coveredSeq: number,
 ): Promise<void> {
   const snapshot = seal(contentKey, Y.encodeStateAsUpdate(doc))
-  const md = seal(contentKey, v1.utf8(markdown))
+  // The Markdown projection is low-volume at-rest content read by the plain getJournal reader, so it keeps the
+  // plain nonce||AEAD(contentKey) envelope (not the per-message journal sub-key — that's for the CRDT layer).
+  const mdNonce = v1.randomBytes(12)
+  const md = v1.concat(mdNonce, v1.aeadSeal(contentKey, mdNonce, v1.utf8(markdown), new Uint8Array(0)))
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/journal/snapshot`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', ...auth(session) },

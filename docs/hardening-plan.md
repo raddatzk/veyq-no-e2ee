@@ -48,10 +48,14 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   the store instead of dual-seeding from markdown; the bootstrap only seeds a legacy empty journal). Still
   minor: cursor unit mismatch (awareness UTF-16 vs char-array/byte offsets → caret drift past emoji) and
   iOS `handleStep2(payload) {}` reading `currentText` before the completion. Deferred (cosmetic).
-- [ ] **P2.4 Live-journal GCM nonce.** Fixed scope `contentKey` + random 96-bit nonce per relayed frame →
-  birthday bound under heavy co-editing. Derive a per-session sub-key
-  `HKDF(contentKey, "veyq/v1/journal", sessionRandom)` (or XChaCha20). Note: the persisted snapshot/update
-  blobs share this — the same sub-key (or a persist-specific one) should cover them.
+- [x] **P2.4 Live-journal GCM nonce.** `V1.journalSeal`/`journalOpen` on all three platforms: each frame/blob
+  is `salt(16) || nonce(12) || AES-256-GCM(HKDF(contentKey, salt, "veyq/v1/journal"), nonce, pt)` — a FRESH
+  per-message sub-key, so every GCM key is used exactly once and the random 96-bit nonce can never collide
+  under the long-lived content key (birthday bound eliminated). Applied to the CRDT layer (relay frames +
+  persisted snapshot + increments). The low-volume Markdown read projection stays on the plain
+  `nonce||AEAD(contentKey)` envelope (it's read by the plain getJournal reader). Conformance vector
+  (`journal_open`) pins byte-identical opening across web/iOS/Android; persistence + relay + share e2e pass
+  on all platforms.
 
 ## Phase 3 — Performance (backend)
 - [ ] **P3.1 Gallery / share-media N+1.** `MediaHandler.kt:49` `toApi`/`blobRef` does +1 blob +1 derivative

@@ -92,6 +92,9 @@ final class ConformanceTests: XCTestCase {
         let rt = v["recovery_auth_tag"] as! [String: String]
         XCTAssertEqual(toHex(V1.recoveryAuthTag(masterKey: hex(rt["masterKey"]!))), rt["tag"]!, "recovery commitment")
 
+        let jo = v["journal_open"] as! [String: String]
+        XCTAssertEqual(toHex(V1.journalOpen(contentKey: hex(jo["contentKey"]!), blob: hex(jo["blob"]!))!), jo["plaintext"]!, "journal seal")
+
         let f = v["chunk_frame"] as! [String: Any]
         XCTAssertEqual(
             toHex(try V1.sealFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,

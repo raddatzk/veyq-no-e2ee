@@ -82,6 +82,11 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.recoveryAuthTag(unhex(r.masterKey)))).toBe(r.tag)
   })
 
+  it('journal seal (per-message sub-key)', () => {
+    const j = vectors.journal_open
+    expect(hex(v1.journalOpen(unhex(j.contentKey), unhex(j.blob)))).toBe(j.plaintext)
+  })
+
   it('chunked-AEAD frame (resumable upload / streaming)', () => {
     const f = vectors.chunk_frame
     const frame = v1.sealFrame(unhex(f.contentKey), f.index, f.total, unhex(f.plaintext), unhex(f.nonce))

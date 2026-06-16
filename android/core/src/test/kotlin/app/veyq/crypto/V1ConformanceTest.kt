@@ -79,6 +79,8 @@ class V1ConformanceTest {
         )
         val rt = v.getJSONObject("recovery_auth_tag")
         assertEquals(rt.getString("tag"), hex(V1.recoveryAuthTag(unhex(rt.getString("masterKey")))))
+        val jo = v.getJSONObject("journal_open")
+        assertEquals(jo.getString("plaintext"), hex(V1.journalOpen(unhex(jo.getString("contentKey")), unhex(jo.getString("blob")))!!))
         val f = v.getJSONObject("chunk_frame")
         assertEquals(
             f.getString("frame"),

@@ -12,16 +12,10 @@ public enum JournalPersistence {
     private struct LiveState: Decodable { let snapshot: Blob?; let baseSeq: Int; let updates: [Update] }
     private struct AppendResponse: Decodable { let seq: Int }
 
-    /// nonce(12) || AEAD(contentKey, bytes) — the same envelope as every other sealed blob.
-    static func seal(_ key: Data, _ inner: [UInt8]) -> Data {
-        let nonce = V1.randomBytes(12)
-        return nonce + ((try? V1.aeadSeal(key: key, nonce: nonce, plaintext: Data(inner), aad: Data())) ?? Data())
-    }
-    static func open(_ key: Data, _ blob: [UInt8]) -> [UInt8]? {
-        guard blob.count > 12 else { return nil }
-        let d = Data(blob)
-        return (try? V1.aeadOpen(key: key, nonce: d.prefix(12), aead: d.dropFirst(12), aad: Data())).map { [UInt8]($0) }
-    }
+    // salt(16) || nonce(12) || AEAD(HKDF(key, salt, "veyq/v1/journal"), …) — a fresh per-message sub-key so the
+    // GCM nonce can never collide under the long-lived content key (see V1.journalSeal).
+    static func seal(_ key: Data, _ inner: [UInt8]) -> Data { V1.journalSeal(contentKey: key, plaintext: Data(inner)) }
+    static func open(_ key: Data, _ blob: [UInt8]) -> [UInt8]? { V1.journalOpen(contentKey: key, blob: Data(blob)).map { [UInt8]($0) } }
 
     private static func request(_ apiBase: String, _ session: Login.UnlockedSession, _ path: String, method: String = "GET", body: Any? = nil) throws -> URLRequest {
         var r = URLRequest(url: URL(string: "\(apiBase)\(path)")!)
@@ -65,9 +59,13 @@ public enum JournalPersistence {
     /// Compact: write a fresh sealed snapshot + the Markdown reader projection, pruning updates <= coveredSeq.
     public static func compactJournal(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, contentKey: Data, doc: YDocument, markdown: String, coveredSeq: Int) async throws {
         let full = doc.transactSync { $0.transactionEncodeStateAsUpdate() }
+        // The Markdown projection is low-volume at-rest content read by the plain getJournal reader, so it keeps
+        // the plain nonce||AEAD(contentKey) envelope (not the per-message journal sub-key — that's the CRDT layer).
+        let mdNonce = V1.randomBytes(12)
+        let md = mdNonce + ((try? V1.aeadSeal(key: contentKey, nonce: mdNonce, plaintext: Data(markdown.utf8), aad: Data())) ?? Data())
         let r = try request(apiBase, session, "/api/scopes/\(scopeId)/nodes/\(nodeId)/journal/snapshot", method: "PUT", body: [
             "snapshot": ["suiteId": "v1", "bytes": SetupServer.b64url(seal(contentKey, full))],
-            "markdown": ["suiteId": "v1", "bytes": SetupServer.b64url(seal(contentKey, [UInt8](markdown.utf8)))],
+            "markdown": ["suiteId": "v1", "bytes": SetupServer.b64url(md)],
             "coveredSeq": coveredSeq,
         ])
         let (_, resp) = try await URLSession.shared.data(for: r)

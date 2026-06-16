@@ -6,17 +6,13 @@ import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import { EncryptedRelayProvider } from './encryptedProvider'
 
-const EMPTY = new Uint8Array(0)
-
 function fromB64url(s: string): Uint8Array {
   const b = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
   const out = new Uint8Array(b.length)
   for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i)
   return out
 }
-function open(contentKey: Uint8Array, blob: Uint8Array): Uint8Array {
-  return v1.aeadOpen(contentKey, blob.slice(0, 12), blob.slice(12), EMPTY)
-}
+const open = v1.journalOpen
 
 /** Reconstruct the shared journal into `doc` from the public snapshot + update log (no auth). */
 export async function loadShareJournalDoc(apiBase: string, shareId: string, nodeId: string, contentKey: Uint8Array, doc: Y.Doc): Promise<void> {
