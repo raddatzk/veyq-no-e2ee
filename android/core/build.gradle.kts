@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization") // for the spec-generated API models (kotlinx.serialization)
 }
 
 java {
@@ -8,8 +9,13 @@ java {
     }
 }
 
+// Spike: API DTOs generated from docs/api/*.openapi.yaml via scripts/gen_mobile_models.py.
+// Single source of truth for the wire shape; the hand-written transport/crypto layer stays.
+sourceSets.main { java.srcDir("src/generated/kotlin") }
+
 dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.79")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") // runtime for generated models
     implementation("org.json:json:20240303") // platform-provided on Android; explicit for this JVM core
     // JNA backs the uniffi-generated Yrs (y-crdt) binding. compileOnly so the JVM jar doesn't leak into the
     // Android app (which supplies the JNA *aar* for the native runtime); the JVM tests add it back below.
