@@ -1,5 +1,8 @@
 package com.veyq.app.features.memory.journallive
 
+import com.veyq.app.features.memory.share.ShareHandler
+import com.veyq.app.shared.content.NodeRepository
+import com.veyq.app.shared.content.ShareRepository
 import com.veyq.app.shared.security.ScopeAccessGuard
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.websockets.next.OnBinaryMessage
@@ -30,6 +33,8 @@ class JournalRelay(
     private val sessions: SessionService,
     private val guard: ScopeAccessGuard,
     private val connections: OpenConnections,
+    private val shares: ShareRepository,
+    private val nodes: NodeRepository,
 ) {
     private companion object {
         const val MAX_PEERS_PER_ROOM = 32          // bound fan-out amplification
@@ -42,31 +47,53 @@ class JournalRelay(
     private class Window { var startNanos = System.nanoTime(); var msgs = 0; var bytes = 0L }
     private val windows = ConcurrentHashMap<String, Window>()
 
+    /** Connection ids of read-only share guests — they may RECEIVE live edits but never broadcast (no writes). */
+    private val receiveOnly = ConcurrentHashMap.newKeySet<String>()
+
     private fun room(c: WebSocketConnection) = c.pathParam("scopeId") + "/" + c.pathParam("nodeId")
     private fun inRoom(c: WebSocketConnection, sender: WebSocketConnection) =
         c.pathParam("scopeId") == sender.pathParam("scopeId") && room(c) == room(sender)
 
-    /** Authenticate on connect: a valid session token (query `?token=`) that holds the scope's grant. Else close. */
+    /**
+     * Authenticate on connect. A scope MEMBER (session token + active grant) may read AND write. A read-capable
+     * public-share guest (`?share=<id>` over `canRead` + the shared subtree) may live-READ only — it is marked
+     * receive-only, so journal editing stays member-only. Anyone else is closed.
+     */
     @OnOpen
     @Blocking
     @Transactional
     fun onOpen(connection: WebSocketConnection) {
-        val token = queryParam(connection, "token")
-        val userId = sessions.resolve(token?.let { "Bearer $it" })
         val scopeId = connection.pathParam("scopeId")
-        // Grant AND (for tenant scopes) active membership — same gate as the HTTP content handlers, so a
-        // removed-but-stale-grant member can't join the live room.
-        if (userId == null || !guard.isActiveKeyHolder(userId, scopeId)) {
-            connection.closeAndAwait()
-            return
+        val nodeId = connection.pathParam("nodeId")
+        val userId = sessions.resolve(queryParam(connection, "token")?.let { "Bearer $it" })
+        val member = userId != null && guard.isActiveKeyHolder(userId, scopeId)
+        if (!member) {
+            val shareId = queryParam(connection, "share")
+            if (shareId != null && canReadViaShare(shareId, scopeId, nodeId)) {
+                receiveOnly.add(connection.id())
+            } else {
+                connection.closeAndAwait()
+                return
+            }
         }
         val roomPeers = connections.listAll().count { it.id() != connection.id() && inRoom(it, connection) }
-        if (roomPeers >= MAX_PEERS_PER_ROOM) connection.closeAndAwait() // room full → shed load
+        if (roomPeers >= MAX_PEERS_PER_ROOM) { // room full → shed load
+            receiveOnly.remove(connection.id())
+            connection.closeAndAwait()
+        }
+    }
+
+    /** A non-expired share with read rights whose subtree contains this room's node (same gate as the HTTP read). */
+    private fun canReadViaShare(shareId: String, scopeId: String, nodeId: String): Boolean {
+        val share = shares.findById(shareId) ?: return false
+        if (ShareHandler.isExpired(share) || !ShareHandler.canRead(share.role) || share.scopeId != scopeId) return false
+        return nodeId in ShareHandler.subtreeIds(nodes.listByScopeId(scopeId), share.nodeId)
     }
 
     /** Relay one opaque (client-encrypted) CRDT message to every other connection in the same room. */
     @OnBinaryMessage
     fun onMessage(message: Buffer, sender: WebSocketConnection) {
+        if (sender.id() in receiveOnly) return // read-only share guests receive but never broadcast
         if (!allow(sender, message.length().toLong())) {
             windows.remove(sender.id())
             runCatching { sender.closeAndAwait() } // over the rate limit → drop this abuser
@@ -89,7 +116,7 @@ class JournalRelay(
     }
 
     @OnClose
-    fun onClose(connection: WebSocketConnection) { windows.remove(connection.id()) }
+    fun onClose(connection: WebSocketConnection) { windows.remove(connection.id()); receiveOnly.remove(connection.id()) }
 
     private fun queryParam(c: WebSocketConnection, name: String): String? =
         c.handshakeRequest().query()?.split("&")?.firstNotNullOfOrNull {

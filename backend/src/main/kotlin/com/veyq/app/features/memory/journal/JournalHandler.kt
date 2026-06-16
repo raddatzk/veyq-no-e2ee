@@ -66,6 +66,12 @@ class JournalHandler(
     @Transactional
     fun getJournalLive(auth: String?, scopeId: String, nodeId: String): JournalLiveState {
         guard.requireKeyHolder(auth, scopeId)
+        return getJournalLiveAs(scopeId, nodeId)
+    }
+
+    /** The CRDT state for an already-authorized reader (a key holder or a read-capable public share). */
+    @Transactional
+    fun getJournalLiveAs(scopeId: String, nodeId: String): JournalLiveState {
         requireJournalNode(scopeId, nodeId)
         val journal = journals.findById(nodeId)
         val snapshot = journal?.sealedSnapshot?.let { Blob(suiteId = journal.snapshotSuiteId ?: "v1", bytes = enc.encodeToString(it)) }

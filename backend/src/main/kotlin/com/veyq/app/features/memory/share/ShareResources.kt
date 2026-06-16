@@ -35,6 +35,7 @@ class PublicShareTreeResource(private val handler: PublicShareTreeHandler) : Pub
     override fun getPublicShare(shareId: String): Response = Response.ok(handler.getPublicShare(shareId)).build()
     override fun listShareNodes(shareId: String): Response = Response.ok(handler.listShareNodes(shareId)).build()
     override fun getShareJournal(shareId: String, nodeId: String): Response = Response.ok(handler.getShareJournal(shareId, nodeId)).build()
+    override fun getShareJournalLive(shareId: String, nodeId: String): Response = Response.ok(handler.getShareJournalLive(shareId, nodeId)).build()
 }
 
 /** Guest-side contribution: blob upload + media create (no auth, CONTRIBUTOR shares only). */

@@ -345,6 +345,21 @@ paths:
         '200': { description: The journal., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryJournal' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/journal/live:
+    get:
+      tags: [PublicShareTree]
+      operationId: getShareJournalLive
+      summary: A shared node's journal CRDT state — READ-ONLY (sealed snapshot + update log, no auth).
+      description: >
+        Lets a read-capable share guest reconstruct the live journal (snapshot + updates), then subscribe to
+        the relay (`?share=<shareId>`) for live deltas. Ciphertext only; the server never decrypts it.
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The CRDT state., content: { application/json: { schema: { $ref: '#/components/schemas/JournalLiveState' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:

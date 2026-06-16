@@ -111,6 +111,11 @@ class ShareSliceTest {
         given().contentType(ContentType.JSON).body("""{"dedupToken":"x","totalChunks":1,"byteSize":6}""")
             .post("/api/public/shares/$shareId/blobs").then().statusCode(403).body("code", `is`("SHARE_READ_ONLY"))
         given().get("/api/public/shares/$shareId/nodes/shr-mem/journal").then().statusCode(200)
+        // ...and the journal CRDT live state (for live-reading owner edits over the relay)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/journal/live").then().statusCode(200)
+            .body("baseSeq", `is`(0)).body("updates.size()", `is`(0))
+        // a node outside the shared subtree is 404 even for the live state
+        given().get("/api/public/shares/$shareId/nodes/shr-other/journal/live").then().statusCode(404)
 
         // revoke; the share (and guest access) is gone
         given().header("Authorization", ownerToken).delete("/api/scopes/$scopeId/nodes/shr-mem/shares/$shareId").then().statusCode(204)

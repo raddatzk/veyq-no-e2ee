@@ -81,6 +81,16 @@ class PublicShareTreeHandler(
         return journals.getJournalAs(share.scopeId, nodeId)
     }
 
+    // The journal's CRDT state over a share — READ-ONLY: the guest reconstructs it client-side and (via the
+    // relay with `?share=`) live-reads owner edits, but cannot write. Same gate as the Markdown read.
+    @Transactional
+    fun getShareJournalLive(shareId: String, nodeId: String): com.veyq.app.generated.model.JournalLiveState {
+        val share = shareOr404(shareId)
+        if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
+        requireSubtree(share, nodeId)
+        return journals.getJournalLiveAs(share.scopeId, nodeId)
+    }
+
     private fun shareOr404(shareId: String): Share {
         val share = shares.findById(shareId) ?: throw ApiException(404, "SHARE_NOT_FOUND", "Share not found")
         if (ShareHandler.isExpired(share)) throw ApiException(404, "SHARE_EXPIRED", "This share has expired")
