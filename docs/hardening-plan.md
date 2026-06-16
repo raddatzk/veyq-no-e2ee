@@ -71,13 +71,16 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   per-tenant `@Transactional purgeTenant` cross-bean — a backlog can't become one giant write tx).
 
 ## Phase 4 — Maintainability / cleanup
-- [ ] **P4.0 Finish the `ScopeAccessGuard` migration (M1).** Phase 1 created the guard and routed the three
-  gap sites through it; migrate the remaining ~9 content handlers' identical inline `requireKeyHolder`
+- [x] **P4.0 Finish the `ScopeAccessGuard` migration (M1).** Phase 1 created the guard and routed the three
+  gap sites through it; migrated the remaining content handlers' identical inline `requireKeyHolder`
   (ScopeContentKeyHandler, JournalHandler, TrackHandler, MemoryTreeHandler, CurateHandler, MediaHandler,
-  ShareHandler, ScopeItemsHandler, BlobUploadHandler) onto it so the check can't drift again.
+  ShareHandler, ScopeItemsHandler, BlobUploadHandler) onto it so the check can't drift again. The
+  membership/admin handlers keep their own `grants`/`memberships` reads (different gate, out of scope).
 - [ ] **P4.1 Account/KeyBag factory.** Dedup `SetupServerHandler.kt:62` ↔ `RegisterViaInvitationHandler.kt:90`.
-- [ ] **P4.2 Shared helpers.** Centralize `toWrap`/`requireSuite`/Base64/`unauthorized()`; fix the hardcoded
-  `if (suiteId != "v1")` in `BlobUploadHandler.kt:97` (ignores `CryptoSuiteRegistry` → latent v2 bug).
+- [~] **P4.2 Shared helpers.** Fixed the hardcoded `if (suiteId != "v1")` in `BlobUploadHandler` →
+  `suites.isKnown(...)`; the upload now records its frames' `suite_id` (V26) and the finalized blob + chunk
+  reads carry the real suite (no more hardcoded `"v1"`). Remaining: centralize `toWrap`/`requireSuite`/Base64/
+  `unauthorized()` (cosmetic, deferred — folded into P4.4).
 - [ ] **P4.3 String → typed enums** for roles/status/scope-kind in entities (`Tenancy.kt:21`).
 - [ ] **P4.4 Base64 decode → 400 `INVALID_BLOB`** centrally instead of a generic 500.
 - [ ] **P4.5 `js-yaml` advisory** bump in `scripts/validate-feature-coverage.mjs` (dev-only).

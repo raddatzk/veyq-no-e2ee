@@ -10,10 +10,7 @@ import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
-import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
-import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.security.ScopeAccessGuard
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.OffsetDateTime
@@ -27,13 +24,10 @@ import java.util.Base64
  */
 @ApplicationScoped
 class CurateHandler(
-    private val scopes: ScopeRepository,
-    private val grants: ScopeGrantRepository,
     private val nodes: NodeRepository,
     private val media: MediaRepository,
     private val purge: ContentPurge,
-    private val memberships: MembershipRepository,
-    private val sessions: SessionService,
+    private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -123,8 +117,8 @@ class CurateHandler(
     /** True if `candidate` is `root` itself or one of its descendants (walk up from candidate to the scope root). */
     private fun isInSubtree(root: String, candidate: String, scopeId: String): Boolean {
         var current: String? = candidate
-        var guard = 0
-        while (current != null && current != scopeId && guard++ < 4096) {
+        var hops = 0
+        while (current != null && current != scopeId && hops++ < 4096) {
             if (current == root) return true
             current = nodes.findById(current)?.parentId
         }
@@ -156,12 +150,6 @@ class CurateHandler(
         )
 
     private fun requireKeyHolder(scopeId: String, auth: String?) {
-        val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val scope = scopes.findById(scopeId) ?: throw ApiException(404, "NOT_FOUND", "Scope not found")
-        grants.find(scope.id, userId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
-        val tenantId = scope.tenantId
-        if (tenantId != null && memberships.find(tenantId, userId)?.status != "ACTIVE") {
-            throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
-        }
+        guard.requireKeyHolder(auth, scopeId)
     }
 }

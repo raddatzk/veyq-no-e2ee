@@ -36,6 +36,7 @@ class BlobUpload {
     @Column(nullable = false) var status: String = ""
     @Column(name = "blob_id") var blobId: String? = null
     @Column(name = "staged_bytes", nullable = false) var stagedBytes: Long = 0 // running sum of staged chunk bytes
+    @Column(name = "suite_id") var suiteId: String? = null // crypto suite of the frames (set on first chunk)
     @Column(name = "created_by", nullable = false) var createdBy: String = ""
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }

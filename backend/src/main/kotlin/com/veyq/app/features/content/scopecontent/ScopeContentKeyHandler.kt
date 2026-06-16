@@ -7,10 +7,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.ScopeContentKey
 import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
-import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
-import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.security.ScopeAccessGuard
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -25,11 +22,8 @@ import java.util.UUID
  */
 @ApplicationScoped
 class ScopeContentKeyHandler(
-    private val scopes: ScopeRepository,
-    private val grants: ScopeGrantRepository,
     private val contentKeys: ScopeContentKeyRepository,
-    private val memberships: MembershipRepository,
-    private val sessions: SessionService,
+    private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -58,15 +52,7 @@ class ScopeContentKeyHandler(
     }
 
     private fun requireKeyHolder(scopeId: String, auth: String?) {
-        val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val scope = scopes.findById(scopeId) ?: throw notFound("Scope")
-        grants.find(scope.id, userId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
-        // defense in depth for tenant scopes: a held grant must also be backed by active membership, so a
-        // missed grant cleanup can't silently become an IDOR (personal scopes have no membership).
-        val tenantId = scope.tenantId
-        if (tenantId != null && memberships.find(tenantId, userId)?.status != "ACTIVE") {
-            throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
-        }
+        guard.requireKeyHolder(auth, scopeId)
     }
 
     private fun notFound(what: String) = ApiException(404, "NOT_FOUND", "$what not found")

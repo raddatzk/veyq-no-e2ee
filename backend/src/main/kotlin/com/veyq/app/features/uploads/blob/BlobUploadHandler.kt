@@ -16,11 +16,10 @@ import com.veyq.app.shared.content.BlobUpload
 import com.veyq.app.shared.content.BlobUploadRepository
 import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.content.UploadStatus
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.security.ScopeAccessGuard
 import com.veyq.app.shared.storage.BlobStore
-import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -37,14 +36,13 @@ import java.util.UUID
 @ApplicationScoped
 class BlobUploadHandler(
     private val scopes: ScopeRepository,
-    private val grants: ScopeGrantRepository,
     private val contentKeys: ScopeContentKeyRepository,
     private val blobs: BlobRepository,
     private val uploads: BlobUploadRepository,
     private val chunks: BlobChunkRepository,
     private val store: BlobStore,
-    private val memberships: MembershipRepository,
-    private val auth: SessionService,
+    private val guard: ScopeAccessGuard,
+    private val suites: CryptoSuiteRegistry,
     @param:ConfigProperty(name = "veyq.uploads.max-chunks", defaultValue = "10000") private val maxChunks: Int,
     @param:ConfigProperty(name = "veyq.uploads.max-upload-bytes", defaultValue = "10737418240") private val maxUploadBytes: Long,
     @param:ConfigProperty(name = "veyq.uploads.max-frame-bytes", defaultValue = "16777244") private val maxFrameBytes: Int,
@@ -56,8 +54,8 @@ class BlobUploadHandler(
 
     @Transactional
     fun startBlob(authz: String?, scopeId: String, req: StartBlobRequest): BlobTicket {
-        requireKeyHolder(scopeId, authz)
-        return startBlobAs(scopeId, auth.resolve(authz)!!, req)
+        val writerId = requireKeyHolder(scopeId, authz)
+        return startBlobAs(scopeId, writerId, req)
     }
 
     /** Start a blob upload for an already-authorized writer (session key holder or a CONTRIBUTOR share). */
@@ -94,7 +92,9 @@ class BlobUploadHandler(
         val u = requireUploadInScope(scopeId, uploadId, lock = true)
         if (u.status != UploadStatus.OPEN.name) throw ApiException(409, "UPLOAD_NOT_OPEN", "The upload is already finalized")
         if (index < 0 || index >= u.totalChunks) throw ApiException(400, "INDEX_OUT_OF_RANGE", "Chunk index out of range")
-        if (req.frame.suiteId != "v1") throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        if (!suites.isKnown(req.frame.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+        // all frames of one upload seal the same content stream → one suite; reject a mid-upload suite switch.
+        if (u.suiteId != null && u.suiteId != req.frame.suiteId) throw ApiException(400, "SUITE_MISMATCH", "All chunks must share one crypto suite")
         if (req.frame.bytes.length > maxEncodedFrameChars) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
         val frame = dec.decode(req.frame.bytes)
         if (frame.size > maxFrameBytes) throw ApiException(400, "FRAME_TOO_LARGE", "Chunk frame too large")
@@ -113,6 +113,7 @@ class BlobUploadHandler(
             existing.byteSize = frame.size.toLong()
         }
         u.stagedBytes = newStaged
+        u.suiteId = req.frame.suiteId
     }
 
     @Transactional
@@ -158,7 +159,9 @@ class BlobUploadHandler(
         } else {
             val b = Blob().apply {
                 id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = u.dedupToken
-                totalChunks = u.totalChunks; byteSize = u.byteSize; suiteId = "v1"; createdAt = Instant.now()
+                totalChunks = u.totalChunks; byteSize = u.byteSize
+                suiteId = u.suiteId ?: throw ApiException(409, "INCOMPLETE_UPLOAD", "Upload has no sealed frames")
+                createdAt = Instant.now()
             }.also(blobs::persist)
             staged.forEach { it.blobId = b.id; it.uploadId = null } // promote the frames from upload to blob
             b
@@ -174,7 +177,7 @@ class BlobUploadHandler(
         if (blob.scopeId != scopeId) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found in this scope")
         val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
         val frame = store.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        return ChunkResponse(frame = ApiBlob(suiteId = "v1", bytes = enc.encodeToString(frame)))
+        return ChunkResponse(frame = ApiBlob(suiteId = blob.suiteId, bytes = enc.encodeToString(frame)))
     }
 
     /** Scheduled GC: reclaim abandoned OPEN uploads (frames + manifest + session). COMPLETED are kept. */
@@ -203,13 +206,6 @@ class BlobUploadHandler(
         return u
     }
 
-    private fun requireKeyHolder(scopeId: String, authz: String?) {
-        val userId = auth.resolve(authz) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val scope = scopes.findById(scopeId) ?: throw ApiException(404, "NOT_FOUND", "Scope not found")
-        grants.find(scope.id, userId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
-        val tenantId = scope.tenantId
-        if (tenantId != null && memberships.find(tenantId, userId)?.status != "ACTIVE") {
-            throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
-        }
-    }
+    private fun requireKeyHolder(scopeId: String, authz: String?): String =
+        guard.requireKeyHolder(authz, scopeId)
 }

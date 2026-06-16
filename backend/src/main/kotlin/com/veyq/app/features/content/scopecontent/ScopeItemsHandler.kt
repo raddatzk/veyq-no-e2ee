@@ -9,10 +9,7 @@ import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.content.ScopeItem
 import com.veyq.app.shared.content.ScopeItemRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
-import com.veyq.app.shared.keymgmt.ScopeGrantRepository
-import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.SessionService
-import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.security.ScopeAccessGuard
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.Instant
@@ -27,12 +24,9 @@ import java.util.UUID
  */
 @ApplicationScoped
 class ScopeItemsHandler(
-    private val scopes: ScopeRepository,
-    private val grants: ScopeGrantRepository,
     private val items: ScopeItemRepository,
     private val contentKeys: ScopeContentKeyRepository,
-    private val memberships: MembershipRepository,
-    private val sessions: SessionService,
+    private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
@@ -67,12 +61,6 @@ class ScopeItemsHandler(
         )
 
     private fun requireKeyHolder(scopeId: String, auth: String?) {
-        val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
-        val scope = scopes.findById(scopeId) ?: throw ApiException(404, "NOT_FOUND", "Scope not found")
-        grants.find(scope.id, userId) ?: throw ApiException(403, "NOT_A_KEY_HOLDER", "You do not hold this scope")
-        val tenantId = scope.tenantId
-        if (tenantId != null && memberships.find(tenantId, userId)?.status != "ACTIVE") {
-            throw ApiException(403, "NOT_A_MEMBER", "You are not an active member of this tenant")
-        }
+        guard.requireKeyHolder(auth, scopeId)
     }
 }
