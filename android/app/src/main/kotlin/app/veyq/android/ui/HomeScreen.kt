@@ -64,7 +64,12 @@ import app.veyq.crypto.ScopeContent
 import app.veyq.crypto.SwitchActiveSpace
 import app.veyq.crypto.Tenant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -431,31 +436,33 @@ class HomeController(val apiBase: String, val appBaseUrl: String, val session: L
             }
             folders = entries.filter { it.type == "FOLDER" }
             memories = entries.filter { it.type == "MEMORY" }
-            covers = emptyMap()
-            for (m in memories) loadCover(m, s.scopeId, key)
+            // Keep covers already decrypted for still-visible memories (no re-download on back/forward); fetch
+            // the missing ones bound-parallel and merge once (not a whole-map rebuild per cover).
+            val visible = memories.map { it.id }.toSet()
+            val kept = covers.filterKeys { it in visible }
+            val missing = memories.filter { it.id !in kept }
+            val fetched = withContext(Dispatchers.IO) {
+                val sem = Semaphore(6)
+                coroutineScope { missing.map { m -> async { sem.withPermit { m.id to loadCoverBitmap(m, s.scopeId, key) } } }.awaitAll() }
+            }.mapNotNull { (id, bmp) -> bmp?.let { id to it } }
+            covers = kept + fetched
         } catch (e: Exception) {
             error = "Konnte Inhalte nicht laden."
         }
     }
 
-    private suspend fun loadCover(m: Entry, scopeId: String, key: ByteArray) {
-        try {
-            val media = withContext(Dispatchers.IO) { Media.listMedia(apiBase, session, scopeId, m.id) }
-            val first = (m.coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } } ?: media.firstOrNull()) ?: return
-            val derivs = first.getJSONArray("derivatives")
-            var blob: JSONObject? = first.getJSONObject("original")
-            for (i in 0 until derivs.length()) {
-                if (derivs.getJSONObject(i).getString("kind") == "THUMBNAIL") blob = derivs.getJSONObject(i).getJSONObject("blob")
-            }
-            val b = blob ?: return
-            val ref = Media.BlobRef(b.getString("blobId"), b.getInt("totalChunks"), b.getLong("byteSize"))
-            val bytes = withContext(Dispatchers.IO) { Media.downloadBlob(apiBase, session, scopeId, key, ref) }
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
-            covers = covers + (m.id to bmp.asImageBitmap())
-        } catch (e: Exception) {
-            // no cover
+    private fun loadCoverBitmap(m: Entry, scopeId: String, key: ByteArray): ImageBitmap? = runCatching {
+        val media = Media.listMedia(apiBase, session, scopeId, m.id)
+        val first = (m.coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } } ?: media.firstOrNull()) ?: return null
+        val derivs = first.getJSONArray("derivatives")
+        var blob = first.getJSONObject("original")
+        for (i in 0 until derivs.length()) {
+            if (derivs.getJSONObject(i).getString("kind") == "THUMBNAIL") blob = derivs.getJSONObject(i).getJSONObject("blob")
         }
-    }
+        val ref = Media.BlobRef(blob.getString("blobId"), blob.getInt("totalChunks"), blob.getLong("byteSize"))
+        val bytes = Media.downloadBlob(apiBase, session, scopeId, key, ref)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

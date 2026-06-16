@@ -24,18 +24,20 @@ class MediaE2ETest {
         val memory = MemoryTree.createNode(apiBase, a, scope.scopeId, ck, "MEMORY", "Italien 2026", "italien-2026", 0)
         val memId = memory.getString("id")
 
-        // a small photo (one frame) + its thumbnail, both through the SAME upload path
+        // a small photo (one frame) + its thumbnail + preview, all through the SAME upload path
         val photo = ByteArray(200) { ((it * 13 + 1) and 0xff).toByte() }
         val thumb = ByteArray(40) { ((it * 5 + 2) and 0xff).toByte() }
-        val m1 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, photo, thumb, "2026-03-15T12:00:00Z", "image/jpeg")
+        val preview = ByteArray(80) { ((it * 9 + 6) and 0xff).toByte() }
+        val m1 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, photo, thumb, preview, takenAt = "2026-03-15T12:00:00Z", mimeType = "image/jpeg")
         assertEquals(1, m1.getJSONObject("original").getInt("totalChunks"))
-        assertEquals("THUMBNAIL", m1.getJSONArray("derivatives").getJSONObject(0).getString("kind"))
+        val kinds = (0 until m1.getJSONArray("derivatives").length()).map { m1.getJSONArray("derivatives").getJSONObject(it).getString("kind") }.sorted()
+        assertEquals(listOf("PREVIEW", "THUMBNAIL"), kinds) // grid uses the thumbnail, the lightbox the preview
         val origBlobId = m1.getJSONObject("original").getString("blobId")
 
         // a large "video" split into many frames — same call, chunked transparently
         val chunkSize = 10
         val video = ByteArray(35) { ((it * 7 + 3) and 0xff).toByte() }
-        val m2 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, video, null, "2026-01-01T08:00:00Z", "video/mp4", chunkSize = chunkSize)
+        val m2 = Media.uploadMedia(apiBase, a, scope.scopeId, ck, memId, video, thumb = null, takenAt = "2026-01-01T08:00:00Z", mimeType = "video/mp4", chunkSize = chunkSize)
         assertEquals(4, m2.getJSONObject("original").getInt("totalChunks"))
         assertEquals(0, m2.getJSONArray("derivatives").length())
 

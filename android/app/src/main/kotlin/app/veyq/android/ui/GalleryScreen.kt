@@ -1,6 +1,10 @@
 package app.veyq.android.ui
 
+import android.content.ContentValues
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.core.content.FileProvider
@@ -74,7 +78,12 @@ import app.veyq.crypto.Media
 import app.veyq.crypto.Share
 import app.veyq.crypto.Track
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -87,7 +96,9 @@ class GalleryController(
     private val contentKey: ByteArray,
     private val nodeId: String,
 ) {
-    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?)
+    // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
+    // an explicit download. Both refs fall back to the original for media without that derivative.
+    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?, val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String)
 
     /** A short label for live-presence (the session carries no display name yet — use the email local-part). */
     val displayName: String get() = session.email.substringBefore("@")
@@ -166,7 +177,7 @@ class GalleryController(
             val exif = exifGps(data)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), exif.takenAt ?: Instant.now().toString(), "image/jpeg", exif.lat, exif.lng)
+                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), preview(data), exif.takenAt ?: Instant.now().toString(), "image/jpeg", exif.lat, exif.lng)
                 }
             }
         }
@@ -192,15 +203,26 @@ class GalleryController(
         }.getOrDefault(Exif(null, null, null))
     }
 
-    private fun thumbnail(data: ByteArray, maxDim: Int = 400): ByteArray? {
+    /** Downscale to fit `maxDim` (longest edge) as JPEG at `quality`; null for non-images. */
+    private fun downscale(data: ByteArray, maxDim: Int, quality: Int): ByteArray? {
         val bmp = BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
         val scale = minOf(1f, maxDim.toFloat() / maxOf(bmp.width, bmp.height))
         val w = maxOf(1, (bmp.width * scale).toInt())
         val h = maxOf(1, (bmp.height * scale).toInt())
         val scaled = Bitmap.createScaledBitmap(bmp, w, h, true)
         val out = ByteArrayOutputStream()
-        scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
+        scaled.compress(Bitmap.CompressFormat.JPEG, quality, out)
         return out.toByteArray()
+    }
+
+    private fun thumbnail(data: ByteArray): ByteArray? = downscale(data, 400, 80)    // gallery grid
+    private fun preview(data: ByteArray): ByteArray? = downscale(data, 2048, 85)     // lightbox
+
+    private fun blobRef(o: JSONObject): Media.BlobRef = Media.BlobRef(o.getString("blobId"), o.getInt("totalChunks"), o.getLong("byteSize"))
+    private fun derivativeRef(m: JSONObject, kind: String): Media.BlobRef {
+        val derivs = m.getJSONArray("derivatives")
+        for (i in 0 until derivs.length()) if (derivs.getJSONObject(i).getString("kind") == kind) return blobRef(derivs.getJSONObject(i).getJSONObject("blob"))
+        return blobRef(m.getJSONObject("original")) // fall back to the original
     }
 
     suspend fun load() {
@@ -209,23 +231,38 @@ class GalleryController(
             // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
             val withMeta = media.mapNotNull { m -> runCatching { m to Media.decodeMediaMeta(contentKey, m) }.getOrNull() }
                 .sortedBy { it.second.takenAt }
-            val result = mutableListOf<Tile>()
-            for ((m, meta) in withMeta) {
-                val derivs = m.getJSONArray("derivatives")
-                var blob: JSONObject = m.getJSONObject("original")
-                for (i in 0 until derivs.length()) {
-                    if (derivs.getJSONObject(i).getString("kind") == "THUMBNAIL") blob = derivs.getJSONObject(i).getJSONObject("blob")
+            // Download the (small) thumbnails bound-parallel rather than one-by-one; preserves the takenAt order.
+            val sem = Semaphore(6)
+            tiles = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    withMeta.map { (m, meta) ->
+                        async {
+                            sem.withPermit {
+                                val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, derivativeRef(m, "THUMBNAIL")) }.getOrNull() ?: return@async null
+                                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@async null
+                                Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()),
+                                    meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"))
+                            }
+                        }
+                    }.awaitAll().filterNotNull()
                 }
-                val ref = Media.BlobRef(blob.getString("blobId"), blob.getInt("totalChunks"), blob.getLong("byteSize"))
-                val bytes = withContext(Dispatchers.IO) { Media.downloadBlob(apiBase, session, scopeId, contentKey, ref) }
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: continue
-                result.add(Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()), meta.takenAt, meta.lat, meta.lng))
             }
-            tiles = result
         } catch (e: Exception) {
             // leave empty
         }
         loading = false
+    }
+
+    /** Decrypt a tile's PREVIEW (≈2048px) for the lightbox, downsampled to a sane display size to bound memory. */
+    suspend fun loadPreviewImage(tile: Tile): ImageBitmap? = withContext(Dispatchers.IO) {
+        val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, tile.preview) }.getOrNull() ?: return@withContext null
+        val opts = BitmapFactory.Options().apply { inSampleSize = 2 } // ~halves the decoded bitmap; preview is already ≤2048px
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
+    }
+
+    /** Decrypt a tile's FULL-resolution original bytes (only on an explicit download). */
+    suspend fun loadOriginalData(tile: Tile): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, tile.original) }.getOrNull()
     }
 }
 
@@ -234,14 +271,50 @@ class GalleryController(
 fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, name: String, onBack: () -> Unit) {
     val controller = remember { GalleryController(apiBase, session, scopeId, contentKey, nodeId) }
     var lightboxTile by remember { mutableStateOf<GalleryController.Tile?>(null) }
+    var lightboxPreview by remember { mutableStateOf<ImageBitmap?>(null) } // higher-res preview, loaded async
     var mediaDelArm by remember { mutableStateOf(false) }
     var showDownload by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
+    var savingOriginal by remember { mutableStateOf(false) }
     var showShareRole by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { controller.load() }
+    // When the lightbox opens on a tile, show its thumbnail instantly then swap in the higher-res preview.
+    LaunchedEffect(lightboxTile?.id) {
+        lightboxPreview = null
+        lightboxTile?.let { lightboxPreview = controller.loadPreviewImage(it) }
+    }
+
+    /** Fetch THIS medium's full-resolution original and save it (MediaStore on API 29+, app storage below). */
+    fun saveOriginal(tile: GalleryController.Tile) {
+        if (savingOriginal) return
+        savingOriginal = true
+        scope.launch {
+            try {
+                val data = controller.loadOriginalData(tile) ?: return@launch
+                val ext = tile.mimeType.substringAfter('/', "bin").replace("jpeg", "jpg")
+                val fileName = "veyq-${tile.id.take(8)}.$ext"
+                withContext(Dispatchers.IO) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                            put(MediaStore.Images.Media.MIME_TYPE, tile.mimeType)
+                            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Veyq")
+                        }
+                        context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)?.let { uri ->
+                            context.contentResolver.openOutputStream(uri)?.use { it.write(data) }
+                        }
+                    } else {
+                        java.io.File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), fileName).writeBytes(data)
+                    }
+                }
+            } finally {
+                savingOriginal = false
+            }
+        }
+    }
 
     fun download(withChapters: Boolean) {
         showDownload = false
@@ -341,9 +414,10 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     lightboxTile?.let { tile ->
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Image(tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                Image(lightboxPreview ?: tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TextButton(onClick = { val id = tile.id; lightboxTile = null; scope.launch { controller.setCover(id) } }) { Text(L10n.t("cover.setAsCover"), color = Veyq.Accent) }
+                    TextButton(enabled = !savingOriginal, onClick = { saveOriginal(tile) }) { Text(L10n.t("detail.download"), color = Color.White) }
                     if (!mediaDelArm) {
                         TextButton(onClick = { mediaDelArm = true }) { Text(L10n.t("common.delete"), color = Veyq.Danger) }
                     } else {

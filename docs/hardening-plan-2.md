@@ -93,14 +93,16 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   Data ist Sendable → Decode danach auf dem MainActor); `HomeStore` behält bereits entschlüsselte Cover über
   Navigationen (prune auf sichtbare + nur Fehlende nachladen) statt sie pro Level zu verwerfen. iOS-App
   kompiliert (xcodebuild, 0 Fehler).
-- [ ] **C7 · Android — Upload PREVIEW + Render-Tiers** *(Feature, M)* — `GalleryScreen.kt:191` (`preview`-Variante),
-  `Media.kt:152` (`uploadMedia` lädt Preview-Derivat); Lightbox → **Preview** statt Thumbnail, Download/Save
-  (MediaStore/Share) lädt Original on-demand.
-- [ ] **C8 · Android — Galerie bounded-parallel + Downsampling + O(n²)-Fixes** *(Perf/Memory, M)* — `GalleryScreen.kt`:
-  `inSampleSize`-Downsampling, `Semaphore`-begrenzt parallel; Download-Akkumulation in `ByteArrayOutputStream`
-  (`Media.kt:127`), Cover-Map nicht pro Item neu bauen (`HomeScreen.kt:445`).
-- [ ] **C9 · E2E je Plattform** *(Tests, S)* — Media-E2E erweitern: Preview-Derivat wird erzeugt, Grid nutzt
-  Thumbnail, Lightbox Preview, Download zieht Original. Über `run_web_e2e.py` bzw. mobile E2E.
+- [x] **C7 · Android — Upload PREVIEW + Render-Tiers** — `GalleryScreen` `downscale(maxDim,quality)` (thumb
+  400/80 + preview 2048/85), `Media.uploadMedia` lädt das Preview-Derivat; Tile trägt `preview`/`original`,
+  Lightbox lädt die **Preview** nach (Thumbnail als Platzhalter), neuer „Download"-Button speichert das Original
+  (MediaStore auf API 29+, sonst app-eigener Picture-Ordner — permission-frei).
+- [x] **C8 · Android — Galerie bounded-parallel + O(n²)-Fixes** — Thumbnail-Loads `Semaphore(6)`-parallel,
+  Preview-Decode mit `inSampleSize=2`; Blob-Download akkumuliert in `ByteArrayOutputStream` statt `out += frame`
+  (O(n²)); `HomeScreen`-Cover behalten (prune+nur-Fehlende, parallel, einmaliges Merge statt Map-Rebuild pro Cover).
+- [x] **C9 · E2E** — Media-E2E (Web + Android) asserten den Preview-Tier (Thumbnail+Preview als getrennte
+  Derivate). Web: 3 distinkte Blobs, je byte-identisch. Android: `MediaE2ETest` live grün gegen ein frisches
+  Backend (THUMBNAIL+PREVIEW erzeugt). iOS: App + Package kompilieren (uploadMedia-Preview-Param default-nil).
 
 ## Phase D — Backend-Performance
 - [ ] **D1 · Blob-IO aus der DB-Transaktion** *(Perf, L)* — `BlobUploadHandler.kt:106,156`, `PublicShareMediaHandler.kt:62`

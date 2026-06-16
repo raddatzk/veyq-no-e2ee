@@ -123,14 +123,14 @@ object Media {
 
     /** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
     fun downloadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray {
-        var out = ByteArray(0)
+        val out = java.io.ByteArrayOutputStream() // accumulate into a growable buffer, not `out += frame` (O(n^2) copying)
         for (i in 0 until ref.totalChunks) {
             val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/chunks/$i", session.sessionToken, "GET")
             if (resp.statusCode() != 200) throw RuntimeException("get chunk $i failed: ${resp.statusCode()}")
             val frame = dec.decode(JSONObject(resp.body()).getJSONObject("frame").getString("bytes"))
-            out += V1.openFrame(contentKey, i, ref.totalChunks, frame)
+            out.write(V1.openFrame(contentKey, i, ref.totalChunks, frame))
         }
-        return out
+        return out.toByteArray()
     }
 
     // ---- media layer (attach blobs to a Memory) ---------------------------------------------------------
@@ -149,12 +149,16 @@ object Media {
      * client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
      * typed derivative — no special API.
      */
-    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
+    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, preview: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
         val original = uploadBlob(apiBase, session, scopeId, contentKey, bytes, chunkSize)
         val derivatives = mutableListOf<Pair<String, String>>()
         if (thumb != null) {
             val t = uploadBlob(apiBase, session, scopeId, contentKey, thumb, chunkSize)
             derivatives.add("THUMBNAIL" to t.blobId)
+        }
+        if (preview != null) {
+            val p = uploadBlob(apiBase, session, scopeId, contentKey, preview, chunkSize)
+            derivatives.add("PREVIEW" to p.blobId)
         }
         val sealedMeta = sealMediaMeta(contentKey, takenAt, lat, lng)
         return createMedia(apiBase, session, scopeId, nodeId, original.blobId, sealedMeta, mimeType, derivatives)
