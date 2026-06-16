@@ -33,8 +33,16 @@ class JournalLiveE2ETest {
         val url = "$wsBase/ws/journal/${scope.scopeId}/n1?token=${session.sessionToken}"
         val a = JournalLiveProvider(url, ck)
         val b = JournalLiveProvider(url, ck)
+        val bPeers = java.util.concurrent.atomic.AtomicReference<List<JournalLiveProvider.Peer>>(emptyList())
+        b.onPeers = { bPeers.set(it) }
         waitFor { a.currentText == "" && b.currentText == "" } // both connected
         Thread.sleep(300)
+
+        // awareness (presence + cursor): A announces itself; B should see it
+        a.setUser("Alice", "#10b981")
+        a.setCursor(3)
+        waitFor { bPeers.get().any { it.name == "Alice" && it.cursor == 3 } }
+        assertTrue(bPeers.get().any { it.name == "Alice" && it.cursor == 3 })
 
         a.applyLocalText("hallo welt")
         waitFor { b.currentText == "hallo welt" }

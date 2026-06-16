@@ -1,5 +1,6 @@
 package app.veyq.crypto
 
+import org.json.JSONObject
 import uniffi.yniffi.YrsDoc
 import uniffi.yniffi.YrsText
 import uniffi.yniffi.YrsTransaction
@@ -24,8 +25,21 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     private var lastSentSV: ByteArray = ByteArray(0)
     @Volatile private var closed = false
 
+    // Awareness (presence + cursor) — the y-protocols/awareness wire format, byte-identical to web/iOS, so
+    // co-editors and their caret positions sync across all three platforms. The cursor is a plain UTF-16 char
+    // index (`cursorIndex`); the web's yCollab uses Yjs relative positions, so cross-family shows presence (the
+    // `user` field) and same-family shows exact carets.
+    data class Peer(val clientId: Long, val name: String, val color: String, val cursor: Int?)
+    private val localClientId: Long = (Math.abs(java.util.UUID.randomUUID().mostSignificantBits) % 0x7FFFFFFFL) + 1
+    private var localClock: Long = 0
+    private var localUser: JSONObject? = null
+    private var localCursor: Int? = null
+    private val peers = LinkedHashMap<Long, Peer>()
+    private val peerClocks = HashMap<Long, Long>()
+
     var onText: ((String) -> Unit)? = null
     var onStatus: ((Boolean) -> Unit)? = null
+    var onPeers: ((List<Peer>) -> Unit)? = null
 
     init { connect() }
 
@@ -52,6 +66,18 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     /** Seed an empty shared doc from the sealed journal (call once after a short sync settle, like web/iOS). */
     fun seedIfEmpty(markdown: String) { if (currentText.isEmpty() && markdown.isNotEmpty()) applyLocalText(markdown) }
 
+    /** Publish this editor's identity (name + colour) to co-editors. */
+    fun setUser(name: String, color: String) {
+        localUser = JSONObject().put("name", name).put("color", color).put("colorLight", color + "33")
+        bumpAwareness()
+    }
+    /** Publish this editor's caret position (char index) so others can draw it. */
+    fun setCursor(index: Int?) {
+        if (localCursor == index) return
+        localCursor = index
+        bumpAwareness()
+    }
+
     fun destroy() { closed = true; ws?.sendClose(WebSocket.NORMAL_CLOSURE, "") }
 
     // --- websocket ---
@@ -65,6 +91,7 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     private fun onOpen() {
         val sv = stateVector() // STEP_1 (our state vector) so peers send what we're missing
         send(encode(0, sv)); lastSentSV = sv
+        if (localUser != null) send(encodeAwareness()) // announce presence/cursor
     }
 
     private inner class Listener : WebSocket.Listener {
@@ -86,7 +113,12 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     private fun handle(data: ByteArray) {
         val plain = open(data) ?: return
         val pos = intArrayOf(0)
-        if (readVarUint(plain, pos) != 0L) return // 0 = sync; 1 = awareness (cursors) — ignored on Android for now
+        val msgType = readVarUint(plain, pos)
+        if (msgType == 1L) { // awareness (presence + cursor)
+            readVarUint8Array(plain, pos)?.let { applyAwareness(it) }
+            return
+        }
+        if (msgType != 0L) return // 0 = sync
         val syncKind = readVarUint(plain, pos)
         val payload = readVarUint8Array(plain, pos) ?: return
         when (syncKind) {
@@ -114,11 +146,53 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
 
     // --- framing (lib0 varint, matches web/iOS) + AEAD ---
 
+    /** nonce(12) || AEAD(contentKey, inner) — the outer seal every relay message uses. */
+    private fun seal(inner: ByteArray): ByteArray {
+        val nonce = V1.randomBytes(12)
+        return nonce + V1.aeadSeal(contentKey, nonce, inner, ByteArray(0))
+    }
+    /** [varuint 0=sync][varuint syncKind][varUint8Array payload] → sealed. */
     private fun encode(syncKind: Long, payload: ByteArray): ByteArray {
         val enc = ArrayList<Byte>()
         writeVarUint(enc, 0); writeVarUint(enc, syncKind); writeVarUint8Array(enc, payload)
-        val nonce = V1.randomBytes(12)
-        return nonce + V1.aeadSeal(contentKey, nonce, enc.toByteArray(), ByteArray(0))
+        return seal(enc.toByteArray())
+    }
+    /** [varuint 1=awareness][varUint8Array update], where update = [count][clientId][clock][varString(json)]. */
+    private fun encodeAwareness(): ByteArray {
+        val state = JSONObject().put("user", localUser ?: JSONObject())
+        localCursor?.let { state.put("cursorIndex", it) }
+        val json = state.toString().toByteArray(Charsets.UTF_8)
+        val aw = ArrayList<Byte>()
+        writeVarUint(aw, 1); writeVarUint(aw, localClientId); writeVarUint(aw, localClock)
+        writeVarUint8Array(aw, json)
+        val enc = ArrayList<Byte>()
+        writeVarUint(enc, 1); writeVarUint8Array(enc, aw.toByteArray())
+        return seal(enc.toByteArray())
+    }
+    private fun bumpAwareness() { localClock++; if (ws != null) send(encodeAwareness()) }
+    private fun applyAwareness(update: ByteArray) {
+        val p = intArrayOf(0)
+        val count = readVarUint(update, p)
+        var i = 0L
+        while (i < count) {
+            i++
+            val clientId = readVarUint(update, p)
+            val clock = readVarUint(update, p)
+            val jsonBytes = readVarUint8Array(update, p) ?: break
+            if (clientId == localClientId) continue
+            val prev = peerClocks[clientId]
+            if (prev != null && prev >= clock) continue
+            peerClocks[clientId] = clock
+            val obj = runCatching { JSONObject(String(jsonBytes, Charsets.UTF_8)) }.getOrNull()
+            val user = obj?.optJSONObject("user")
+            if (user != null) {
+                val cursor = if (obj.has("cursorIndex")) obj.optInt("cursorIndex") else null
+                peers[clientId] = Peer(clientId, user.optString("name", "?"), user.optString("color", "#888888"), cursor)
+            } else {
+                peers.remove(clientId)
+            }
+        }
+        onPeers?.invoke(peers.values.toList())
     }
     private fun open(data: ByteArray): ByteArray? {
         if (data.size <= 12) return null

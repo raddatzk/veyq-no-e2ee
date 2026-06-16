@@ -10,7 +10,9 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,10 +49,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Curate
@@ -78,6 +87,9 @@ class GalleryController(
     private val nodeId: String,
 ) {
     data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?)
+
+    /** A short label for live-presence (the session carries no display name yet — use the email local-part). */
+    val displayName: String get() = session.email.substringBefore("@")
 
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
@@ -526,39 +538,85 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
     }
 }
 
-/** Live collaborative journal editing — native Yrs over the encrypted relay, wire-compatible with web/iOS. */
+/** Live collaborative journal editing — native Yrs over the encrypted relay, wire-compatible with web/iOS.
+ *  Co-editors' carets (a coloured line + name chip) are overlaid at their reported char index. */
 @Composable
 private fun LiveJournalSection(controller: GalleryController, onClose: (String) -> Unit) {
-    var text by remember { mutableStateOf(controller.journalMarkdown) }
+    var value by remember { mutableStateOf(TextFieldValue(controller.journalMarkdown)) }
     var connected by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
+    var peers by remember { mutableStateOf<List<JournalLiveProvider.Peer>>(emptyList()) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
     val provider = remember { controller.newLiveProvider() }
+    val palette = remember { listOf("#5b4df5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6") }
     DisposableEffect(Unit) {
         provider.onStatus = { c -> main.post { connected = c } }
-        provider.onText = { s -> main.post { if (text != s) text = s } }
+        provider.onText = { s -> main.post { if (value.text != s) value = value.copy(text = s, selection = androidx.compose.ui.text.TextRange(minOf(value.selection.start, s.length))) } }
+        provider.onPeers = { list -> main.post { peers = list } }
+        provider.setUser(controller.displayName, palette[(controller.displayName.hashCode() and 0x7fffffff) % palette.size])
         val initial = controller.journalMarkdown
-        main.postDelayed({ provider.seedIfEmpty(initial); text = provider.currentText; ready = true }, 800)
+        main.postDelayed({ provider.seedIfEmpty(initial); value = value.copy(text = provider.currentText); ready = true }, 800)
         onDispose { provider.destroy() }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(if (connected) Color(0xFF10B981) else Veyq.Muted))
         Text(if (connected) L10n.t("journal.live") else L10n.t("journal.connecting"), color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+        peers.forEach { peer ->
+            Row(Modifier.padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(hexColor(peer.color)))
+                Text(peer.name, color = Veyq.Muted, fontSize = 11.sp, modifier = Modifier.padding(start = 3.dp))
+            }
+        }
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
         TextButton(onClick = { onClose(provider.currentText) }) { Text(L10n.t("journal.done"), color = Veyq.Accent) }
     }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { v -> text = v; if (ready) provider.applyLocalText(v) },
-        modifier = Modifier.fillMaxWidth().height(280.dp),
-        shape = RoundedCornerShape(Veyq.Radius),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
-            focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
-            focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
-        ),
-    )
+    val density = LocalDensity.current
+    Box(
+        Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(Veyq.Radius)).background(Veyq.Surface)
+            .border(1.dp, Veyq.Line, RoundedCornerShape(Veyq.Radius)).padding(10.dp),
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = { v ->
+                val textChanged = v.text != value.text
+                value = v
+                if (ready && textChanged) provider.applyLocalText(v.text)
+                if (ready) provider.setCursor(v.selection.start)
+            },
+            modifier = Modifier.fillMaxSize(),
+            textStyle = TextStyle(color = Veyq.Text, fontSize = 15.sp, fontFamily = FontFamily.Monospace),
+            cursorBrush = SolidColor(Veyq.Accent),
+            onTextLayout = { layout = it },
+        )
+        // overlay remote carets at their char index
+        val lr = layout
+        if (lr != null) {
+            peers.forEach { peer ->
+                val idx = peer.cursor
+                if (idx != null && idx in 0..value.text.length) {
+                    val rect = lr.getCursorRect(idx)
+                    val color = hexColor(peer.color)
+                    Box(
+                        Modifier.offset { IntOffset(rect.left.toInt(), rect.top.toInt()) }
+                            .size(width = 2.dp, height = with(density) { rect.height.toDp() })
+                            .background(color),
+                    )
+                    Text(
+                        peer.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .offset { IntOffset(rect.left.toInt(), (rect.top - with(density) { 14.dp.toPx() }).toInt()) }
+                            .clip(RoundedCornerShape(3.dp)).background(color).padding(horizontal = 4.dp),
+                    )
+                }
+            }
+        }
+    }
 }
+
+/** Parse a "#rrggbb" string into a Compose Color (falls back to grey). */
+private fun hexColor(hex: String): Color =
+    runCatching { Color(("ff" + hex.trim().removePrefix("#")).toLong(16)) }.getOrDefault(Color(0xFF888888))
 
 /** Renders a safe Markdown subset (headings, bullet/ordered lists, paragraphs) with inline bold/italic/code. */
 @Composable
