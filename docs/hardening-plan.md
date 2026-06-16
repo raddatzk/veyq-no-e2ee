@@ -129,12 +129,12 @@ compaction writes both projections atomically, so they can't diverge.
   snapshot + Markdown projection, prune updates ≤ coveredSeq). Old Markdown `PUT .../journal` removed — the
   compaction endpoint is the single writer. `GET .../journal` (Markdown) + public share read unchanged.
   Routed through `ScopeAccessGuard`. Slice test covers append→seq, live-state, compaction+prune, BAD_SEQ.
-- [ ] **Client open:** load snapshot + updates(seq > baseSeq), decrypt, apply → current state (no live peer
-  needed); track the max applied seq.
-- [ ] **Client edit:** append a sealed Yjs increment (`POST .../journal/updates`) *and* broadcast live via the
-  relay (unchanged).
-- [ ] **Compaction:** after N increments / on close, write a new snapshot + Markdown projection
-  (`PUT .../journal/snapshot`, coveredSeq = max applied seq).
+- [x] **Client open:** load snapshot + updates(seq > baseSeq), decrypt, apply → current state (no live peer
+  needed); track the max applied seq. *(Realized per-platform in 6a below.)*
+- [x] **Client edit:** append a sealed Yjs increment (`POST .../journal/updates`) *and* broadcast live via the
+  relay (unchanged). *(Realized per-platform in 6a below.)*
+- [x] **Compaction:** after N increments / on close, write a new snapshot + Markdown projection
+  (`PUT .../journal/snapshot`, coveredSeq = max applied seq). *(Realized per-platform in 6a below.)*
 **6a — member editor on the CRDT model** (web + e2e proving cross-session convergence, then iOS + Android).
 Subsumes some of the P2.3 seed-race/cursor cleanup.
 - [x] Web: `journalPersistence.ts` (load `journal/live` into a Y.Doc, append coalesced sealed increments,
