@@ -758,6 +758,8 @@ components:
           minItems: 1
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+        # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — the recovery commitment (see setup spec).
+        recoveryAuthTag: { type: string }
         personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }

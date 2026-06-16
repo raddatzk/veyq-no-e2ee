@@ -20,12 +20,13 @@ public struct RegisterViaInvitationRequest: Codable {
     public private(set) var wrappedIdentityPrivateKey: Blob
     public private(set) var masterKeyWraps: [MasterKeyWrap]
     public private(set) var authVerifier: AuthVerifier
+    public private(set) var recoveryAuthTag: String?
     public private(set) var personalScopePublicKey: KemPublicKey
     public private(set) var wrappedPersonalScopePrivateKey: Blob
     public private(set) var scopePublicKey: KemPublicKey
     public private(set) var wrappedScopePrivateKey: Blob
 
-    public init(bootstrapSecret: String, email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], authVerifier: AuthVerifier, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob, scopePublicKey: KemPublicKey, wrappedScopePrivateKey: Blob) {
+    public init(bootstrapSecret: String, email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], authVerifier: AuthVerifier, recoveryAuthTag: String? = nil, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob, scopePublicKey: KemPublicKey, wrappedScopePrivateKey: Blob) {
         self.bootstrapSecret = bootstrapSecret
         self.email = email
         self.displayName = displayName
@@ -33,6 +34,7 @@ public struct RegisterViaInvitationRequest: Codable {
         self.wrappedIdentityPrivateKey = wrappedIdentityPrivateKey
         self.masterKeyWraps = masterKeyWraps
         self.authVerifier = authVerifier
+        self.recoveryAuthTag = recoveryAuthTag
         self.personalScopePublicKey = personalScopePublicKey
         self.wrappedPersonalScopePrivateKey = wrappedPersonalScopePrivateKey
         self.scopePublicKey = scopePublicKey
@@ -47,6 +49,7 @@ public struct RegisterViaInvitationRequest: Codable {
         case wrappedIdentityPrivateKey
         case masterKeyWraps
         case authVerifier
+        case recoveryAuthTag
         case personalScopePublicKey
         case wrappedPersonalScopePrivateKey
         case scopePublicKey
@@ -64,6 +67,7 @@ public struct RegisterViaInvitationRequest: Codable {
         try container.encode(wrappedIdentityPrivateKey, forKey: .wrappedIdentityPrivateKey)
         try container.encode(masterKeyWraps, forKey: .masterKeyWraps)
         try container.encode(authVerifier, forKey: .authVerifier)
+        try container.encodeIfPresent(recoveryAuthTag, forKey: .recoveryAuthTag)
         try container.encode(personalScopePublicKey, forKey: .personalScopePublicKey)
         try container.encode(wrappedPersonalScopePrivateKey, forKey: .wrappedPersonalScopePrivateKey)
         try container.encode(scopePublicKey, forKey: .scopePublicKey)

@@ -19,16 +19,18 @@ public struct CreateServerOwnerRequest: Codable {
     public private(set) var wrappedIdentityPrivateKey: Blob
     public private(set) var masterKeyWraps: [MasterKeyWrap]
     public private(set) var authVerifier: AuthVerifier
+    public private(set) var recoveryAuthTag: String?
     public private(set) var personalScopePublicKey: KemPublicKey
     public private(set) var wrappedPersonalScopePrivateKey: Blob
 
-    public init(email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], authVerifier: AuthVerifier, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob) {
+    public init(email: String, displayName: String, identityPublicKey: IdentityPublicKey, wrappedIdentityPrivateKey: Blob, masterKeyWraps: [MasterKeyWrap], authVerifier: AuthVerifier, recoveryAuthTag: String? = nil, personalScopePublicKey: KemPublicKey, wrappedPersonalScopePrivateKey: Blob) {
         self.email = email
         self.displayName = displayName
         self.identityPublicKey = identityPublicKey
         self.wrappedIdentityPrivateKey = wrappedIdentityPrivateKey
         self.masterKeyWraps = masterKeyWraps
         self.authVerifier = authVerifier
+        self.recoveryAuthTag = recoveryAuthTag
         self.personalScopePublicKey = personalScopePublicKey
         self.wrappedPersonalScopePrivateKey = wrappedPersonalScopePrivateKey
     }
@@ -40,6 +42,7 @@ public struct CreateServerOwnerRequest: Codable {
         case wrappedIdentityPrivateKey
         case masterKeyWraps
         case authVerifier
+        case recoveryAuthTag
         case personalScopePublicKey
         case wrappedPersonalScopePrivateKey
     }
@@ -54,6 +57,7 @@ public struct CreateServerOwnerRequest: Codable {
         try container.encode(wrappedIdentityPrivateKey, forKey: .wrappedIdentityPrivateKey)
         try container.encode(masterKeyWraps, forKey: .masterKeyWraps)
         try container.encode(authVerifier, forKey: .authVerifier)
+        try container.encodeIfPresent(recoveryAuthTag, forKey: .recoveryAuthTag)
         try container.encode(personalScopePublicKey, forKey: .personalScopePublicKey)
         try container.encode(wrappedPersonalScopePrivateKey, forKey: .wrappedPersonalScopePrivateKey)
     }

@@ -88,6 +88,8 @@ object RegisterViaInvitation {
             """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +
             """{"unlockMethod":"RECOVERY","suiteId":"v1","wrappedKey":"${b64url(recWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, recSalt))}"}],""" +
             """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
+            // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
+            """"recoveryAuthTag":"${b64url(V1.recoveryAuthTag(masterKey))}",""" +
             """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
             """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +
             """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePublic"},""" +

@@ -34,6 +34,9 @@ class KeyBlob {
     @Column(name = "wrapped_key", nullable = false) var wrappedKey: ByteArray = ByteArray(0)
     @Column(name = "kdf_params") var kdfParams: ByteArray? = null
     @Column(name = "credential_ref") var credentialRef: String? = null
+    // RECOVERY rows only: SHA-256("veyq/v1/recovery-auth" || masterKey) — the recovery commitment a password
+    // reset must reproduce to prove Secret-Key possession (see PasswordResetHandler.confirm).
+    @Column(name = "recovery_auth_tag") var recoveryAuthTag: ByteArray? = null
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 

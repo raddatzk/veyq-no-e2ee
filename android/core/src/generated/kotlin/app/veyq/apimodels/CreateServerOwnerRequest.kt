@@ -45,6 +45,7 @@ import kotlinx.serialization.Contextual
  * @param authVerifier 
  * @param personalScopePublicKey 
  * @param wrappedPersonalScopePrivateKey 
+ * @param recoveryAuthTag 
  */
 @Serializable
 
@@ -72,7 +73,10 @@ data class CreateServerOwnerRequest (
     val personalScopePublicKey: KemPublicKey,
 
     @SerialName(value = "wrappedPersonalScopePrivateKey")
-    val wrappedPersonalScopePrivateKey: Blob
+    val wrappedPersonalScopePrivateKey: Blob,
+
+    @SerialName(value = "recoveryAuthTag")
+    val recoveryAuthTag: kotlin.String? = null
 
 ) {
 

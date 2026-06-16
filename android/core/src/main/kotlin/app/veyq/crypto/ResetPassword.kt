@@ -65,6 +65,8 @@ object ResetPassword {
             .put("token", token)
             .put("masterKeyWrap", JSONObject().put("unlockMethod", "PASSWORD").put("suiteId", "v1").put("wrappedKey", enc.encodeToString(newWrap)).put("kdfParams", enc.encodeToString(V1.encodeKdfParams(argon, newSalt))))
             .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", enc.encodeToString(authSalt + verifier)))
+            // prove Secret-Key possession: reproduce the commitment the server stored for this master key
+            .put("recoveryAuthTag", enc.encodeToString(V1.recoveryAuthTag(masterKey)))
             .toString()
         val (code, resp) = post(apiBase, "/api/account/password-reset/confirm", body)
         if (code != 204) throw RuntimeException("reset confirm failed: $code $resp")

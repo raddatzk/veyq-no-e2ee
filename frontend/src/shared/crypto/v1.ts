@@ -145,6 +145,16 @@ export function dedupToken(contentKey: Uint8Array, content: Uint8Array): Uint8Ar
 }
 
 /**
+ * Recovery commitment (AD: password reset). A domain-separated hash of the master key, stored server-side
+ * when the RECOVERY wrap is written. Password reset must reproduce it — which needs the master key, i.e. the
+ * Secret Key — so an email-token-only attacker cannot hijack the server account. Not a secret: the master key
+ * is 32 random bytes and the hash is not invertible.
+ */
+export function recoveryAuthTag(masterKey: Uint8Array): Uint8Array {
+  return sha256(concat(utf8('veyq/v1/recovery-auth'), masterKey))
+}
+
+/**
  * Chunked-AEAD frame (resumable upload + segmented streaming): a large blob is split into independent,
  * self-contained frames so chunks resume individually and segments decrypt without the whole file. Each
  * frame = nonce(12) || AEAD(contentKey, nonce, plaintextChunk, aad) with aad = u32be(index) || u32be(total),

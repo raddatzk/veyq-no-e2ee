@@ -89,6 +89,9 @@ final class ConformanceTests: XCTestCase {
             toHex(V1.dedupToken(contentKey: hex(dd["contentKey"]!), content: hex(dd["content"]!))),
             dd["token"]!, "media dedup token")
 
+        let rt = v["recovery_auth_tag"] as! [String: String]
+        XCTAssertEqual(toHex(V1.recoveryAuthTag(masterKey: hex(rt["masterKey"]!))), rt["tag"]!, "recovery commitment")
+
         let f = v["chunk_frame"] as! [String: Any]
         XCTAssertEqual(
             toHex(try V1.sealFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,

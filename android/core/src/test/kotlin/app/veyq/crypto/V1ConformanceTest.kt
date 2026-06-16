@@ -77,6 +77,8 @@ class V1ConformanceTest {
             dd.getString("token"),
             hex(V1.dedupToken(unhex(dd.getString("contentKey")), unhex(dd.getString("content")))),
         )
+        val rt = v.getJSONObject("recovery_auth_tag")
+        assertEquals(rt.getString("tag"), hex(V1.recoveryAuthTag(unhex(rt.getString("masterKey")))))
         val f = v.getJSONObject("chunk_frame")
         assertEquals(
             f.getString("frame"),

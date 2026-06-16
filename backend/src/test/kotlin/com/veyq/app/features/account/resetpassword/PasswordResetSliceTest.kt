@@ -50,7 +50,7 @@ class PasswordResetSliceTest {
             // a recoverable account: PASSWORD + RECOVERY wraps + an auth verifier
             users.persist(User().apply { id = "pr-user"; this.email = this@PasswordResetSliceTest.email; displayName = "U"; serverRole = ServerRole.ServerMember; createdAt = now })
             keyBlobs.persist(KeyBlob().apply { id = "pr-pw"; userId = "pr-user"; unlockMethod = "PASSWORD"; suiteId = "v1"; wrappedKey = "old-pw".toByteArray(); kdfParams = "kp".toByteArray() })
-            keyBlobs.persist(KeyBlob().apply { id = "pr-rec"; userId = "pr-user"; unlockMethod = "RECOVERY"; suiteId = "v1"; wrappedKey = "rec-wrap".toByteArray(); kdfParams = "rk".toByteArray() })
+            keyBlobs.persist(KeyBlob().apply { id = "pr-rec"; userId = "pr-user"; unlockMethod = "RECOVERY"; suiteId = "v1"; wrappedKey = "rec-wrap".toByteArray(); kdfParams = "rk".toByteArray(); recoveryAuthTag = "rec-tag".toByteArray() })
             authVerifiers.persist(AuthVerifier().apply { id = "pr-av"; userId = "pr-user"; kind = "ARGON2_PROOF"; suiteId = "v1"; verifier = "old-v".toByteArray(); createdAt = now })
             // a non-recoverable account: PASSWORD only, no RECOVERY wrap
             users.persist(User().apply { id = "pr-norec"; this.email = noRecEmail; displayName = "N"; serverRole = ServerRole.ServerMember; createdAt = now })
@@ -82,11 +82,12 @@ class PasswordResetSliceTest {
             .body("email", org.hamcrest.CoreMatchers.`is`(email))
             .body("recoveryWrap.unlockMethod", org.hamcrest.CoreMatchers.`is`("RECOVERY"))
 
-        // confirm swaps the PASSWORD wrap + verifier
+        // confirm swaps the PASSWORD wrap + verifier (with the Secret-Key proof = the stored recovery commitment)
         val newPwWrap = enc.encodeToString("new-pw".toByteArray())
         val newVerifier = enc.encodeToString("new-v".toByteArray())
+        val recTag = enc.encodeToString("rec-tag".toByteArray())
         given().contentType(ContentType.JSON).body(
-            """{"token":"$token","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap","kdfParams":"$newPwWrap"},"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"$newVerifier"}}""",
+            """{"token":"$token","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap","kdfParams":"$newPwWrap"},"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"$newVerifier"},"recoveryAuthTag":"$recTag"}""",
         ).post("/api/account/password-reset/confirm").then().statusCode(204)
 
         QuarkusTransaction.requiringNew().run {
@@ -99,8 +100,35 @@ class PasswordResetSliceTest {
 
         // the token is single-use: a second confirm with it fails
         given().contentType(ContentType.JSON).body(
-            """{"token":"$token","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"$newVerifier"}}""",
+            """{"token":"$token","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"$newVerifier"},"recoveryAuthTag":"$recTag"}""",
         ).post("/api/account/password-reset/confirm").then().statusCode(400)
+    }
+
+    /**
+     * The High finding: with only the email token (no Secret Key), an attacker could previously set an arbitrary
+     * PASSWORD wrap + auth verifier and hijack the SERVER account (content stays encrypted, but the session is
+     * theirs). Now confirm must reproduce the recovery commitment — which needs the master key, i.e. the Secret
+     * Key. A valid token with a wrong/absent proof is rejected, so email access alone no longer suffices.
+     */
+    @Test
+    fun rejectsConfirmWithoutSecretKeyProof() {
+        requestReset(email)
+        val token = tokenFromEmail(email)
+        val newPwWrap = enc.encodeToString("attacker-pw".toByteArray())
+        val newVerifier = enc.encodeToString("attacker-v".toByteArray())
+        val wrongTag = enc.encodeToString("wrong-tag".toByteArray())
+
+        // wrong commitment (attacker guessed without the Secret Key) → 403, account untouched
+        given().contentType(ContentType.JSON).body(
+            """{"token":"$token","masterKeyWrap":{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"$newPwWrap"},"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"$newVerifier"},"recoveryAuthTag":"$wrongTag"}""",
+        ).post("/api/account/password-reset/confirm").then().statusCode(403)
+
+        // the attacker's verifier + PASSWORD wrap were NOT applied — the takeover is blocked. (Assert "not the
+        // attacker's value" rather than an absolute, since the shared H2 may carry the happy-path's swap.)
+        QuarkusTransaction.requiringNew().run {
+            assertTrue(String(authVerifiers.findByUserId("pr-user")!!.verifier) != "attacker-v")
+            assertTrue(String(keyBlobs.findByUserIdAndUnlockMethod("pr-user", "PASSWORD").first().wrappedKey) != "attacker-pw")
+        }
     }
 
     @Test

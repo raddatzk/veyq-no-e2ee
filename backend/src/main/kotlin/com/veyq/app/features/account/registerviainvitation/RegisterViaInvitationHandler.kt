@@ -74,6 +74,9 @@ class RegisterViaInvitationHandler(
         if (req.masterKeyWraps.isEmpty()) {
             throw ApiException(400, "NO_UNLOCK_METHOD", "At least one unlock method is required")
         }
+        if (req.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && req.recoveryAuthTag.isNullOrBlank()) {
+            throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
+        }
         requireSuite(req.identityPublicKey.suiteId)
         requireSuite(req.wrappedIdentityPrivateKey.suiteId)
         requireSuite(req.authVerifier.suiteId)
@@ -110,6 +113,7 @@ class RegisterViaInvitationHandler(
                     id = newId(); userId = user.id; unlockMethod = wrap.unlockMethod.value
                     suiteId = wrap.suiteId; wrappedKey = dec.decode(wrap.wrappedKey)
                     kdfParams = wrap.kdfParams?.let { dec.decode(it) }; credentialRef = wrap.credentialRef; createdAt = now
+                    if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = req.recoveryAuthTag?.let { dec.decode(it) }
                 },
             )
         }

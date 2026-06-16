@@ -14,13 +14,16 @@ import AnyCodable
 public struct UpsertMasterKeyWrapRequest: Codable {
 
     public private(set) var masterKeyWrap: MasterKeyWrap
+    public private(set) var recoveryAuthTag: String?
 
-    public init(masterKeyWrap: MasterKeyWrap) {
+    public init(masterKeyWrap: MasterKeyWrap, recoveryAuthTag: String? = nil) {
         self.masterKeyWrap = masterKeyWrap
+        self.recoveryAuthTag = recoveryAuthTag
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case masterKeyWrap
+        case recoveryAuthTag
     }
 
     // Encodable protocol methods
@@ -28,6 +31,7 @@ public struct UpsertMasterKeyWrapRequest: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(masterKeyWrap, forKey: .masterKeyWrap)
+        try container.encodeIfPresent(recoveryAuthTag, forKey: .recoveryAuthTag)
     }
 }
 

@@ -60,6 +60,11 @@ class SetupServerHandler(
             throw ApiException(400, "NO_UNLOCK_METHOD", "At least one unlock method is required")
         }
         req.masterKeyWraps.forEach { requireSuite(it.suiteId) }
+        // A RECOVERY wrap must carry the master-key commitment, or password reset could never prove Secret-Key
+        // possession (and the reset confirm would always be rejected).
+        if (req.masterKeyWraps.any { it.unlockMethod.value == "RECOVERY" } && req.recoveryAuthTag.isNullOrBlank()) {
+            throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
+        }
 
         val now = Instant.now()
         val user = User().apply {
@@ -95,6 +100,7 @@ class SetupServerHandler(
                     wrappedKey = b64.decode(wrap.wrappedKey)
                     kdfParams = wrap.kdfParams?.let { b64.decode(it) }
                     credentialRef = wrap.credentialRef
+                    if (wrap.unlockMethod.value == "RECOVERY") recoveryAuthTag = req.recoveryAuthTag?.let { b64.decode(it) }
                     createdAt = now
                 },
             )

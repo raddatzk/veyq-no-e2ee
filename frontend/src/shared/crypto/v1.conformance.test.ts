@@ -77,6 +77,11 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.dedupToken(unhex(d.contentKey), unhex(d.content)))).toBe(d.token)
   })
 
+  it('recovery commitment (password reset)', () => {
+    const r = vectors.recovery_auth_tag
+    expect(hex(v1.recoveryAuthTag(unhex(r.masterKey)))).toBe(r.tag)
+  })
+
   it('chunked-AEAD frame (resumable upload / streaming)', () => {
     const f = vectors.chunk_frame
     const frame = v1.sealFrame(unhex(f.contentKey), f.index, f.total, unhex(f.plaintext), unhex(f.nonce))

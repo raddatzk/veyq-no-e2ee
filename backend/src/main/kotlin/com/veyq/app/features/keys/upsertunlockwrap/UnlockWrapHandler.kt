@@ -49,6 +49,12 @@ class UnlockWrapHandler(
         blob.wrappedKey = dec.decode(wrap.wrappedKey)
         blob.kdfParams = wrap.kdfParams?.let { dec.decode(it) }
         blob.credentialRef = wrap.credentialRef
+        // RECOVERY wraps carry the master-key commitment (required so a later reset can prove Secret-Key
+        // possession). Other methods never set it.
+        if (method.value == "RECOVERY") {
+            if (req.recoveryAuthTag.isNullOrBlank()) throw ApiException(400, "MISSING_RECOVERY_AUTH", "A RECOVERY wrap requires recoveryAuthTag")
+            blob.recoveryAuthTag = dec.decode(req.recoveryAuthTag)
+        }
 
         return toWrap(blob)
     }

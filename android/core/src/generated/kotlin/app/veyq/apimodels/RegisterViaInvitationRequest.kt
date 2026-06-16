@@ -48,6 +48,7 @@ import kotlinx.serialization.Contextual
  * @param wrappedPersonalScopePrivateKey 
  * @param scopePublicKey 
  * @param wrappedScopePrivateKey 
+ * @param recoveryAuthTag 
  */
 @Serializable
 
@@ -84,7 +85,10 @@ data class RegisterViaInvitationRequest (
     val scopePublicKey: KemPublicKey,
 
     @SerialName(value = "wrappedScopePrivateKey")
-    val wrappedScopePrivateKey: Blob
+    val wrappedScopePrivateKey: Blob,
+
+    @SerialName(value = "recoveryAuthTag")
+    val recoveryAuthTag: kotlin.String? = null
 
 ) {
 

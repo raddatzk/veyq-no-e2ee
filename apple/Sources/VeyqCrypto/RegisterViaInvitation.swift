@@ -15,6 +15,7 @@ public enum RegisterViaInvitation {
         let wrappedIdentityPrivateKey: BlobDTO
         let masterKeyWraps: [MasterKeyWrapDTO]
         let authVerifier: AuthVerifierDTO
+        let recoveryAuthTag: String
         let personalScopePublicKey: KemPublicKeyDTO
         let wrappedPersonalScopePrivateKey: BlobDTO
         let scopePublicKey: KemPublicKeyDTO
@@ -112,6 +113,8 @@ public enum RegisterViaInvitation {
                 MasterKeyWrapDTO(unlockMethod: "RECOVERY", suiteId: "v1", wrappedKey: SetupServer.b64url(recWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: recSalt))),
             ],
             authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
+            // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
+            recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)),
             personalScopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: SetupServer.b64url(personalPublic)),
             wrappedPersonalScopePrivateKey: BlobDTO(suiteId: "v1", bytes: SetupServer.b64url(personalGrant)),
             scopePublicKey: KemPublicKeyDTO(suiteId: "v1", kemPublicKey: scope.scopePublicKey),

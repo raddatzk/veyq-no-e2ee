@@ -138,6 +138,14 @@ public enum V1 {
         return Data(mac)
     }
 
+    /// Recovery commitment (password reset): a domain-separated hash of the master key, stored server-side when
+    /// the RECOVERY wrap is written. A reset must reproduce it — which needs the master key, i.e. the Secret Key
+    /// — so an email-token-only attacker cannot hijack the server account. Not a secret (master key is 32 random
+    /// bytes; the hash is not invertible). Must stay byte-identical across platforms.
+    public static func recoveryAuthTag(masterKey: Data) -> Data {
+        Data(SHA256.hash(data: Data("veyq/v1/recovery-auth".utf8) + masterKey))
+    }
+
     /// Chunked-AEAD frame (resumable upload + segmented streaming): nonce(12) || AEAD(contentKey, nonce,
     /// plaintextChunk, aad) with aad = u32be(index) || u32be(total) — binds the chunk position so a dropped,
     /// reordered or appended frame fails to open. Each frame is self-contained (resume / seek per frame).

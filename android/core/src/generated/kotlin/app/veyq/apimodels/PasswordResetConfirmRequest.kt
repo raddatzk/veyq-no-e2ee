@@ -37,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param token 
  * @param masterKeyWrap 
  * @param authVerifier 
+ * @param recoveryAuthTag 
  */
 @Serializable
 
@@ -49,7 +50,10 @@ data class PasswordResetConfirmRequest (
     val masterKeyWrap: MasterKeyWrap,
 
     @SerialName(value = "authVerifier")
-    val authVerifier: AuthVerifier
+    val authVerifier: AuthVerifier,
+
+    @SerialName(value = "recoveryAuthTag")
+    val recoveryAuthTag: kotlin.String
 
 ) {
 

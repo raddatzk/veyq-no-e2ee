@@ -10,7 +10,7 @@ public enum ResetPassword {
     struct MaterialResponse: Codable { let email: String; let recoveryWrap: MasterKeyWrapDTO }
     struct RequestBody: Codable { let email: String }
     struct TokenBody: Codable { let token: String }
-    struct ConfirmBody: Codable { let token: String; let masterKeyWrap: MasterKeyWrapDTO; let authVerifier: AuthVerifierDTO }
+    struct ConfirmBody: Codable { let token: String; let masterKeyWrap: MasterKeyWrapDTO; let authVerifier: AuthVerifierDTO; let recoveryAuthTag: String }
 
     /// Ask the server to email a reset token. Always succeeds (the server never reveals account existence).
     public static func requestReset(apiBase: String, email: String) async throws {
@@ -61,7 +61,9 @@ public enum ResetPassword {
         let body = ConfirmBody(
             token: token,
             masterKeyWrap: MasterKeyWrapDTO(unlockMethod: "PASSWORD", suiteId: "v1", wrappedKey: SetupServer.b64url(newWrap), kdfParams: SetupServer.b64url(V1.encodeKdfParams(SetupServer.argon, salt: newSalt))),
-            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)))
+            authVerifier: AuthVerifierDTO(kind: "ARGON2_PROOF", suiteId: "v1", verifier: SetupServer.b64url(authSalt + verifier)),
+            // prove Secret-Key possession: reproduce the commitment the server stored for this master key
+            recoveryAuthTag: SetupServer.b64url(V1.recoveryAuthTag(masterKey: masterKey)))
         var r = URLRequest(url: URL(string: "\(apiBase)/api/account/password-reset/confirm")!)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")

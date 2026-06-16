@@ -18,6 +18,7 @@ export type CreateServerOwnerRequest = {
   wrappedIdentityPrivateKey: { suiteId: string; bytes: string }
   masterKeyWraps: Array<{ unlockMethod: string; suiteId: string; wrappedKey: string; kdfParams?: string }>
   authVerifier: { kind: string; suiteId: string; verifier: string }
+  recoveryAuthTag?: string
   personalScopePublicKey: { suiteId: string; kemPublicKey: string }
   wrappedPersonalScopePrivateKey: { suiteId: string; bytes: string }
 }
@@ -76,6 +77,8 @@ export function buildCreateServerOwnerRequest(
       { unlockMethod: 'RECOVERY', suiteId: 'v1', wrappedKey: b64url(recWrap), kdfParams: b64url(v1.encodeKdfParams(ARGON, recSalt)) },
     ],
     authVerifier: { kind: 'ARGON2_PROOF', suiteId: 'v1', verifier: b64url(v1.concat(authSalt, verifier)) },
+    // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
+    recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
     personalScopePublicKey: { suiteId: 'v1', kemPublicKey: b64url(personalPublic) },
     wrappedPersonalScopePrivateKey: { suiteId: 'v1', bytes: b64url(personalGrant) },
   }

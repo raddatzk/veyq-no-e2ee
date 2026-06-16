@@ -185,8 +185,12 @@ components:
         recoveryWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
     PasswordResetConfirmRequest:
       type: object
-      required: [token, masterKeyWrap, authVerifier]
+      required: [token, masterKeyWrap, authVerifier, recoveryAuthTag]
       properties:
         token: { type: string }
         masterKeyWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
+        # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url. Must match the commitment stored at
+        # registration — proves the client recovered the real master key with the Secret Key. Without it,
+        # an email-token-only attacker could reset the password verifier and hijack the server account.
+        recoveryAuthTag: { type: string }

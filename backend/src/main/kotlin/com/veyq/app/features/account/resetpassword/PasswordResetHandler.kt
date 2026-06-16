@@ -97,6 +97,20 @@ class PasswordResetHandler(
         requireSuite(req.authVerifier.suiteId)
         val userId = token.userId
 
+        // Enforce Secret-Key possession: the client must reproduce the recovery commitment
+        // (SHA-256("veyq/v1/recovery-auth" || masterKey)) stored at registration. It can only do so after
+        // unwrapping the RECOVERY wrap with the Secret Key — so an email-token-only attacker cannot reset the
+        // verifier and hijack the server account. Mismatch ⇒ reject (the master-key wrap they'd submit is junk).
+        val recovery = keyBlobs.findByUserIdAndUnlockMethod(userId, "RECOVERY").firstOrNull()
+            ?: throw ApiException(400, "NO_RECOVERY", "This account has no recovery wrap")
+        val expectedTag = recovery.recoveryAuthTag
+            ?: throw ApiException(400, "NO_RECOVERY_AUTH", "This account has no recovery commitment")
+        val providedTag = runCatching { dec.decode(req.recoveryAuthTag) }.getOrNull()
+            ?: throw ApiException(400, "BAD_RECOVERY_AUTH", "Malformed recoveryAuthTag")
+        if (!MessageDigest.isEqual(expectedTag, providedTag)) {
+            throw ApiException(403, "RECOVERY_AUTH_MISMATCH", "Secret Key proof failed")
+        }
+
         // swap the PASSWORD wrap (re-keyed under the new password) and the auth verifier
         val passwordBlob = keyBlobs.findByUserIdAndUnlockMethod(userId, "PASSWORD").firstOrNull()
             ?: KeyBlob().apply {
