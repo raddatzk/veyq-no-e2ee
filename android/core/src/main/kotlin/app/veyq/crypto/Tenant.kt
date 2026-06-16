@@ -33,7 +33,7 @@ object Tenant {
         // A tenant is domain-scoped (domain required + unique). The UI passes a real domain; tests/owner-claim
         // omit it → derive a unique one from the (unique) handle so the request still validates.
         val dom = domain?.takeIf { it.isNotEmpty() } ?: "$name.local"
-        return JSONObject(send(apiBase, "/api/tenants", token, "POST", """{"name":"$name","displayName":"$displayName","domain":"$dom"}"""))
+        return JSONObject(send(apiBase, "/api/tenants", token, "POST", """{"name":${JSONObject.quote(name)},"displayName":${JSONObject.quote(displayName)},"domain":${JSONObject.quote(dom)}}"""))
     }
 
     fun issueOwnerInvite(apiBase: String, token: String, tenantId: String): JSONObject =

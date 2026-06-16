@@ -18,7 +18,7 @@ object ResetPassword {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val client = HttpClient.newHttpClient()
-    private val argon = V1.ArgonParams(t = 3, m = 8192, p = 1, dkLen = 32)
+    private val argon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
 
     private fun post(apiBase: String, path: String, json: String): Pair<Int, String> {
         val req = HttpRequest.newBuilder(URI.create("$apiBase$path"))

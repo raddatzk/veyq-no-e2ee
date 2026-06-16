@@ -1,5 +1,6 @@
 package app.veyq.crypto
 
+import org.json.JSONObject
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -11,7 +12,7 @@ import java.util.Base64
  * All key material is generated here; the server only ever receives ciphertext + public keys.
  */
 object SetupServer {
-    private val argon = V1.ArgonParams(t = 3, m = 8192, p = 1, dkLen = 32)
+    private val argon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private fun b64url(b: ByteArray): String = b64.encodeToString(b)
 
@@ -45,8 +46,8 @@ object SetupServer {
             id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(personal), "personal-scope-grant", V1.randomBytes(12),
         )
 
-        // base64url and the simple ASCII inputs need no JSON escaping in this flow.
-        val json = """{"email":"$email","displayName":"$displayName",""" +
+        // base64url fields are JSON-safe; free text (email, displayName) is escaped via JSONObject.quote.
+        val json = """{"email":${JSONObject.quote(email)},"displayName":${JSONObject.quote(displayName)},""" +
             """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
             """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +

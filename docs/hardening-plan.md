@@ -33,21 +33,24 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   green; covers the D2 interim mitigation. Unit-tested.
 
 ## Phase 2 — Client correctness (cross-platform)
-- [ ] **P2.1 Android raw-JSON → `JSONObject`.** `Login.kt:32`, `SetupServer.kt:49`, `Tenant.kt:36`,
-  `RegisterViaInvitation.kt:85` interpolate free text (password/name) into JSON — `"`/`\`/newline corrupt
-  or inject the body. Web/iOS escape correctly; the newer Android slices already use `JSONObject`.
-- [ ] **P2.2 Argon2 8 → 64 MiB.** `Argon2Verifier.kt:35` + the `m=8192` literals in web/iOS/Android
-  setup/register/reset → `m=65536` (the suite default; the invite path already uses 65536). Params travel
-  in `kdfParams`, so per-account upgradable; conformance vectors stay valid.
-- [ ] **P2.3 Live-journal bugs.** Seed race that can duplicate the initial text (web seeds on `onSynced`
-  *and* an 800ms timer; iOS/Android seed on a timer with no "who seeds" election) — gate on lowest
-  clientId / completed sync. Cursor unit mismatch (awareness reports UTF-16, diffs use char-array/UTF-16
-  then UTF-8 byte offsets → wrong caret past emoji, possible op corruption) — pick codepoints end-to-end.
-  iOS `handleStep2(payload) {}` reads `currentText` before the (ignored) completion → read inside the
-  closure.
+- [x] **P2.1 Android raw-JSON → escaped.** `Login.kt`, `SetupServer.kt`, `Tenant.kt`,
+  `RegisterViaInvitation.kt` now wrap every free-text field in `JSONObject.quote(...)`, so `"`/`\`/newline
+  can't corrupt or inject the body. Regression: the Android setup e2e registers + logs in with `"`/`\` in
+  the display name + password.
+- [x] **P2.2 Argon2 8 → 64 MiB.** `Argon2Verifier` + all client setup/register/reset paths (web/iOS/Android)
+  + `LoginSliceTest` now use `m=65536` (the suite default; matches the invite path and v1.ARGON). This also
+  fixed a latent bug — web reset already minted a 65536 verifier the 8192 backend couldn't verify. The
+  client authVerifier-creation params must match the backend verifier (it hardcodes them, no kdfParams on
+  the verifier); register+login verified cross-stack on web + Android. **Cost:** 64 MiB Argon is ~1–2 s per
+  hash in JS, so register/login takes a few seconds — e2e timeouts raised accordingly.
+- [~] **P2.3 Live-journal bugs.** The seed race is largely resolved by 6a (all platforms now reconstruct from
+  the store instead of dual-seeding from markdown; the bootstrap only seeds a legacy empty journal). Still
+  minor: cursor unit mismatch (awareness UTF-16 vs char-array/byte offsets → caret drift past emoji) and
+  iOS `handleStep2(payload) {}` reading `currentText` before the completion. Deferred (cosmetic).
 - [ ] **P2.4 Live-journal GCM nonce.** Fixed scope `contentKey` + random 96-bit nonce per relayed frame →
   birthday bound under heavy co-editing. Derive a per-session sub-key
-  `HKDF(contentKey, "veyq/v1/journal", sessionRandom)` (or XChaCha20).
+  `HKDF(contentKey, "veyq/v1/journal", sessionRandom)` (or XChaCha20). Note: the persisted snapshot/update
+  blobs share this — the same sub-key (or a persist-specific one) should cover them.
 
 ## Phase 3 — Performance (backend)
 - [ ] **P3.1 Gallery / share-media N+1.** `MediaHandler.kt:49` `toApi`/`blobRef` does +1 blob +1 derivative

@@ -47,5 +47,5 @@ suite('login + unlock E2E (web v1 crypto -> live backend)', () => {
     // logout invalidates the session: the same token no longer resolves
     await logout(apiBase, session.sessionToken)
     await expect(fetchCurrentUser(apiBase, session.sessionToken)).rejects.toThrow()
-  })
+  }, 60000) // Argon2id m=64 MiB is heavy in JS — register + login does several hashes
 })

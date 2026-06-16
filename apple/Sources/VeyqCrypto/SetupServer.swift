@@ -3,7 +3,7 @@ import Foundation
 /// uc.admin.setup-server (Apple) — cold E2EE registration of the first Server Owner.
 /// All key material is generated here; the server only ever receives ciphertext + public keys.
 public enum SetupServer {
-    static let argon = V1.ArgonParams(t: 3, m: 8192, p: 1, dkLen: 32)
+    static let argon = V1.ArgonParams(t: 3, m: 65536, p: 1, dkLen: 32)
 
     static func b64url(_ d: Data) -> String {
         d.base64EncodedString()

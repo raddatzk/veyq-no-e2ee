@@ -29,7 +29,7 @@ object Login {
     fun login(apiBase: String, email: String, password: String, secretKeyB64: String): UnlockedSession {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/login"))
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("""{"email":"$email","password":"$password"}"""))
+            .POST(HttpRequest.BodyPublishers.ofString("""{"email":${JSONObject.quote(email)},"password":${JSONObject.quote(password)}}"""))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() != 200) throw RuntimeException("login failed: ${resp.statusCode()} ${resp.body()}")

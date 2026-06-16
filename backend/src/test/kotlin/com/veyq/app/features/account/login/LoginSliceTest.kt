@@ -49,7 +49,7 @@ class LoginSliceTest {
         gen.init(
             Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)
-                .withIterations(3).withMemoryAsKB(8192).withParallelism(1).withSalt(salt).build(),
+                .withIterations(3).withMemoryAsKB(65536).withParallelism(1).withSalt(salt).build(),
         )
         val proof = ByteArray(32).also { gen.generateBytes(nfc, it) }
         return salt + proof

@@ -14,7 +14,7 @@ import java.util.Base64
  * returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
  */
 object RegisterViaInvitation {
-    private val argon = V1.ArgonParams(t = 3, m = 8192, p = 1, dkLen = 32)
+    private val argon = V1.ArgonParams(t = 3, m = 65536, p = 1, dkLen = 32)
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val client = HttpClient.newHttpClient()
     private fun b64url(b: ByteArray): String = enc.encodeToString(b)
@@ -38,7 +38,7 @@ object RegisterViaInvitation {
     fun getInviteMaterial(apiBase: String, inviteId: String, bootstrapSecret: String): JSONObject {
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/material"))
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("""{"bootstrapSecret":"$bootstrapSecret"}"""))
+            .POST(HttpRequest.BodyPublishers.ofString("""{"bootstrapSecret":${JSONObject.quote(bootstrapSecret)}}"""))
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
         if (resp.statusCode() != 200) throw RuntimeException("invite material failed: ${resp.statusCode()} ${resp.body()}")
@@ -81,8 +81,8 @@ object RegisterViaInvitation {
         // the tenant scope grant — minted (owner) or temp-unwrapped + re-wrapped (member)
         val (scopePublic, grant) = tenantScope.grant(id.pubKemX, id.pubKemM)
 
-        // base64url and the simple ASCII inputs need no JSON escaping in this flow.
-        val json = """{"bootstrapSecret":"$bootstrapSecret","email":"$email","displayName":"$displayName",""" +
+        // base64url fields are JSON-safe; free text (bootstrapSecret, email, displayName) via JSONObject.quote.
+        val json = """{"bootstrapSecret":${JSONObject.quote(bootstrapSecret)},"email":${JSONObject.quote(email)},"displayName":${JSONObject.quote(displayName)},""" +
             """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
             """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
             """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +

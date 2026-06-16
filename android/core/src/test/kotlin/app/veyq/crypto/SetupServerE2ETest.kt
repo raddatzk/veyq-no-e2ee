@@ -23,12 +23,20 @@ class SetupServerE2ETest {
 
         assertEquals(true, JSONObject(get("/api/setup")).getBoolean("setupRequired"))
 
-        val (body, kit) = SetupServer.registerServerOwner(apiBase, "owner@example.com", "Owner", "correct horse battery staple")
+        // free text with JSON metacharacters (", \) must be escaped, not corrupt the request body
+        val displayName = """Owner "Q" \back"""
+        val password = """corr"ect\horse battery"""
+        val (body, kit) = SetupServer.registerServerOwner(apiBase, "owner@example.com", displayName, password)
         val user = JSONObject(body)
         assertEquals("owner@example.com", user.getString("email"))
+        assertEquals(displayName, user.getString("displayName"))
         assertEquals("ServerOwner", user.getString("serverRole"))
         assertTrue(kit.secretKey.isNotEmpty())
 
         assertEquals(false, JSONObject(get("/api/setup")).getBoolean("setupRequired"))
+
+        // login with the metacharacter password works (exercises Login's JSON escaping too)
+        val session = Login.login(apiBase, "owner@example.com", password, kit.secretKey)
+        assertTrue(session.sessionToken.isNotEmpty())
     }
 }

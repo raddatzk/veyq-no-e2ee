@@ -9,7 +9,7 @@ import java.text.Normalizer
 /**
  * Verifies an ARGON2_PROOF auth verifier. This is the *only* crypto the server runs on auth material —
  * it validates a password proof and never derives a content key. Params are fixed by suite "v1" and must
- * match the clients' kekRecovery (Argon2id, v1.3, t=3, m=8 MiB, p=1, 32-byte output, salt = first 16
+ * match the clients' kekRecovery (Argon2id, v1.3, t=3, m=64 MiB, p=1, 32-byte output, salt = first 16
  * bytes of the stored verifier). See docs/wiki/crosscutting/crypto-spec.md.
  */
 @ApplicationScoped
@@ -32,7 +32,7 @@ class Argon2Verifier {
             Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)
                 .withIterations(3)
-                .withMemoryAsKB(8192)
+                .withMemoryAsKB(65536)
                 .withParallelism(1)
                 .withSalt(salt)
                 .build(),
