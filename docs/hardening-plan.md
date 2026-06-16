@@ -85,7 +85,10 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   `suites.isKnown(...)`; the upload now records its frames' `suite_id` (V26) and the finalized blob + chunk
   reads carry the real suite (no more hardcoded `"v1"`). Remaining: centralize `toWrap`/`requireSuite`/Base64/
   `unauthorized()` (cosmetic, deferred — folded into P4.4).
-- [ ] **P4.3 String → typed enums** for roles/status/scope-kind in entities (`Tenancy.kt:21`).
+- [→] **P4.3 String → typed enums** for roles/status/scope-kind in entities (`Tenancy.kt:21`). **Deferred to
+  backlog** — pure type hygiene (`@Enumerated(EnumType.STRING)` stores identical values, zero behavior/security
+  change) but ~60 touch points across the membership guard, invite redemption and scope/tenant lifecycle, all
+  needing the full 4-platform E2E matrix to re-verify. Not worth the regression risk vs. Phase 5.
 - [x] **P4.4 Base64 decode → 400 `INVALID_BLOB`** centrally. Added `MalformedInputMapper`
   (`ExceptionMapper<IllegalArgumentException>` in `platform/error`) → 400 `INVALID_BLOB`, logged at WARN.
   Safe because deliberate validation always throws `ApiException`; the only raw IAEs are bad base64 / enum
@@ -94,8 +97,10 @@ Legend: `[x]` done · `[ ]` open · `[~]` partially done / queued.
   `scripts/validate-feature-coverage.mjs` still runs green.
 
 ## Phase 5 — Tests / CI
-- [ ] **P5.1 Fix `HomeView.test.ts`.** `.memory-name`/`.folder-card` exist in `HomeView.vue:361/372`, so the
-  failure is a rendering/setup break — diagnose, then fix.
+- [x] **P5.1 Fix `HomeView.test.ts`.** Root cause: the test's `vi.mock('../../features/home/home')` omitted
+  `resolveRoute`/`ancestorChain`, which the component gained for path-URL routing — so `restoreFromUrl()` called
+  `undefined` and the grid never populated. Completed the mock (`resolveRoute → {folders:[],memory:null}`,
+  `ancestorChain → []`). Both tests + the full 62-test unit suite green.
 - [ ] **P5.2 E2E in CI.** Run the `VEYQ_E2E=1` web/Apple/Android paths against a started backend stack.
 
 ## Phase 6 — Operator-blind journal persistence (snapshot + encrypted increments)

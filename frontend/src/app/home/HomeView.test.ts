@@ -11,6 +11,10 @@ vi.mock('../../features/home/home', () => ({
   enterSpace: vi.fn(async (_a: unknown, _s: unknown, entry: { scopeId: string }) => ({ entry, scope: { scopeId: entry.scopeId }, contentKey: new Uint8Array() })),
   loadLevel: vi.fn(async () => [node('m1', 'MEMORY', 'Italien 2026'), node('f1', 'FOLDER', 'Urlaube')]),
   loadCover: vi.fn(async () => null),
+  // restoreFromUrl() resolves the path URL into a folder back-stack + memory; at the jsdom root path ('/')
+  // there is no deep link, so it lands on the bare level (openLevel then fills the grid from loadLevel).
+  resolveRoute: vi.fn(async () => ({ folders: [], memory: null })),
+  ancestorChain: vi.fn(async () => []),
 }))
 
 import HomeView from './HomeView.vue'
