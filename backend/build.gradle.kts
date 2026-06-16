@@ -30,6 +30,7 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("io.quarkus:quarkus-scheduler") // periodic GC of expired sessions
     implementation("io.quarkus:quarkus-mailer") // outbound mail: email invites (the operator supplies SMTP)
+    implementation("io.quarkus:quarkus-websockets-next") // operator-blind relay for live-journal CRDT (ciphertext only)
     implementation("org.bouncycastle:bcprov-jdk18on:1.79") // Argon2id auth-proof verification only (never content keys)
 
     testImplementation("io.quarkus:quarkus-junit5")

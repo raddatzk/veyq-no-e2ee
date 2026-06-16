@@ -209,3 +209,15 @@
   gap: 0.6rem;
 }
 .lightbox-actions .btn { padding: 0.5rem 1rem; }
+
+/* Live (collaborative) journal editor */
+.live-journal { display: flex; flex-direction: column; gap: 0.6rem; }
+.live-journal-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--app-muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--app-muted); }
+.live-dot.on { background: #10b981; }
+.live-spacer { flex: 1; }
+.live-journal-editor { border: 1px solid var(--app-line); border-radius: 10px; overflow: hidden; }
+.live-journal-editor .cm-editor { max-height: 60vh; background: var(--app-surface); color: var(--app-text); }
+.live-journal-editor .cm-editor.cm-focused { outline: none; }
+.live-journal-editor .cm-gutters { background: var(--app-surface-muted); border: none; color: var(--app-muted); }
+.live-journal-editor .cm-content { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }

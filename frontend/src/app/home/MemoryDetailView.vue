@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
+// Heavy (yjs/codemirror) — only loaded when a member opens the live editor.
+const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor.vue'))
 import { i18n, t } from '../../i18n/i18n'
 import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
 import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
@@ -37,6 +39,7 @@ const journalDraft = ref('')
 const journalEditing = ref(false)
 const journalSaving = ref(false)
 const journalLoaded = ref(false)
+const journalLive = ref(false)
 const tracks = ref<Track[]>([])
 const tracksLoaded = ref(false)
 const importing = ref(false)
@@ -109,6 +112,10 @@ async function openJournal() {
 function startEditJournal() {
   journalDraft.value = journalMarkdown.value
   journalEditing.value = true
+}
+function onLiveClosed(markdown: string) {
+  journalLive.value = false
+  journalMarkdown.value = markdown
 }
 async function saveJournal() {
   journalSaving.value = true
@@ -213,7 +220,8 @@ async function setAsCover() {
     <ShareModal v-if="shareOpen" :active="active" :memory="memory" :name="name" @close="shareOpen = false" />
 
     <section v-if="tab === 'journal'" class="journal">
-      <template v-if="journalEditing">
+      <LiveJournalEditor v-if="journalLive" :active="active" :node-id="memory.id" :initial-markdown="journalMarkdown" @close="onLiveClosed" />
+      <template v-else-if="journalEditing">
         <textarea v-model="journalDraft" class="journal-editor" :placeholder="t('journal.placeholder')"></textarea>
         <div class="journal-actions">
           <button class="btn btn-ghost" type="button" :disabled="journalSaving" @click="journalEditing = false">{{ t('common.cancel') }}</button>
@@ -223,6 +231,7 @@ async function setAsCover() {
       <template v-else>
         <div class="journal-bar">
           <button class="btn btn-ghost" type="button" @click="startEditJournal">{{ t('journal.edit') }}</button>
+          <button class="btn btn-ghost" type="button" @click="journalLive = true">{{ t('journal.live') }}</button>
         </div>
         <div v-if="journalMarkdown.trim()" class="journal-body" v-html="journalHtml"></div>
         <div v-else class="home-empty">{{ t('journal.empty') }}</div>
