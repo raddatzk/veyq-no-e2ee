@@ -15,6 +15,7 @@ import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ShareRepository
 import com.veyq.app.shared.storage.BlobStore
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.time.OffsetDateTime
@@ -53,14 +54,19 @@ class PublicShareMediaHandler(
         return MediaList(media = toApiBatch(media.listByNodeId(nodeId)))
     }
 
-    @Transactional
     fun getShareChunk(shareId: String, blobId: String, index: Int): ChunkResponse {
-        val share = shareOr404(shareId)
-        if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
-        if (!blobBacksSubtreeMedia(share, blobId)) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
-        val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
-        val frame = store.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        val suiteId = blobs.findById(blobId)?.suiteId ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
+        // Resolve the chunk's metadata (share ACL + object key + suite) in a short transaction, then read the
+        // bytes from the store OUTSIDE it — the DB connection isn't held across blob-store IO (the hot guest
+        // download path).
+        val (objectKey, suiteId) = QuarkusTransaction.requiringNew().call {
+            val share = shareOr404(shareId)
+            if (!ShareHandler.canRead(share.role)) throw ApiException(403, "SHARE_NO_READ", "This share cannot read content")
+            if (!blobBacksSubtreeMedia(share, blobId)) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
+            val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
+            val suite = blobs.findById(blobId)?.suiteId ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not in this share")
+            chunk.objectKey to suite
+        }
+        val frame = store.get(objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
         return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
     }
 

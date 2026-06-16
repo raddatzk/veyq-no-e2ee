@@ -21,6 +21,7 @@ import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.ScopeAccessGuard
 import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
+import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.transaction.Transactional
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Instant
@@ -170,14 +171,19 @@ class BlobUploadHandler(
         return CompleteBlobResponse(blobId = blob.id, totalChunks = blob.totalChunks, byteSize = blob.byteSize)
     }
 
-    @Transactional
     fun getBlobChunk(authz: String?, scopeId: String, blobId: String, index: Int): ChunkResponse {
-        requireKeyHolder(scopeId, authz)
-        val blob = blobs.findById(blobId) ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found")
-        if (blob.scopeId != scopeId) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found in this scope")
-        val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
-        val frame = store.get(chunk.objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
-        return ChunkResponse(frame = ApiBlob(suiteId = blob.suiteId, bytes = enc.encodeToString(frame)))
+        // Resolve the chunk's metadata (auth + ACL + object key + suite) in a short transaction, then read the
+        // bytes from the store OUTSIDE it — so the DB connection isn't held across blob-store IO (which becomes
+        // a network round-trip once the store is remote). This is the hot download path (every gallery tile).
+        val (objectKey, suiteId) = QuarkusTransaction.requiringNew().call {
+            requireKeyHolder(scopeId, authz)
+            val blob = blobs.findById(blobId) ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found")
+            if (blob.scopeId != scopeId) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found in this scope")
+            val chunk = chunks.findByBlob(blobId, index) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk not found")
+            chunk.objectKey to blob.suiteId
+        }
+        val frame = store.get(objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
+        return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
     }
 
     /**

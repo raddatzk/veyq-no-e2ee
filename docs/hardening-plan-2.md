@@ -105,9 +105,13 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   Backend (THUMBNAIL+PREVIEW erzeugt). iOS: App + Package kompilieren (uploadMedia-Preview-Param default-nil).
 
 ## Phase D — Backend-Performance
-- [ ] **D1 · Blob-IO aus der DB-Transaktion** *(Perf, L)* — `BlobUploadHandler.kt:106,156`, `PublicShareMediaHandler.kt:62`
-  (= verschobenes P3.2). Store-IO unter gehaltenem Row-Lock; kritisch sobald der Store remote wird. Frame
-  vor der Tx stagen (Store ist idempotent) bzw. Metadaten-Tx committen, dann IO.
+- [~] **D1 · Blob-IO aus der DB-Transaktion** *(Perf, L)* — **Lese-Pfad (hot, Downloads) erledigt:**
+  `getBlobChunk` + `getShareChunk` lösen die Metadaten (Auth/ACL/objectKey/suite) in einer kurzen
+  `QuarkusTransaction.requiringNew()` auf und lesen die Bytes danach OHNE gehaltene DB-Connection aus dem
+  Store — relevant sobald der Store remote ist. Verifiziert: media- + share-Download-E2E grün.
+  **Verschoben:** Schreib-Pfad (`putBlobChunkAs` schreibt unter Row-Lock) + complete/GC-Deletes — write-outside-tx
+  hat eine Orphan-Frame-Subtilität (über-Budget abgelehnte Frames ohne Chunk-Row würde der GC nicht aufräumen);
+  braucht Prefix-Delete bzw. Reservierungs-Logik, separat anzugehen.
 - [ ] **D2 · `MySpacesHandler` N+1** *(Perf, M)* — `MySpacesHandler.kt:58-90`. Pro Membership `findById`/`find`
   in Schleife (Tenant doppelt). Fix: Kandidaten-Scopes/Tenants + User-Grants je per IN-Query, dann im Speicher
   zusammensetzen.
