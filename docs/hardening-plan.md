@@ -103,8 +103,19 @@ compaction writes both projections atomically, so they can't diverge.
   relay (unchanged).
 - [ ] **Compaction:** after N increments / on close, write a new snapshot + Markdown projection
   (`PUT .../journal/snapshot`, coveredSeq = max applied seq).
-- [ ] Clients: web (+ e2e proving cross-session convergence), then iOS + Android. Subsumes some of the
-  P2.3 seed-race/cursor cleanup.
+**6a — member editor on the CRDT model** (web + e2e proving cross-session convergence, then iOS + Android).
+Subsumes some of the P2.3 seed-race/cursor cleanup.
+- [x] Web: `journalPersistence.ts` (load `journal/live` into a Y.Doc, append coalesced sealed increments,
+  compact on close); the live editor + the plain draft save both go through it; the Markdown reader path
+  (detail view) stays. e2e proves non-overlapping sessions converge via snapshot+increments and the Markdown
+  projection follows. The removed Markdown PUT is fully off the web.
+- [ ] iOS + Android: same (mechanical port, identical wire format).
+
+**6b — live read in shares** (so readers/shares are always current, not just at compaction).
+- [ ] Relay `onOpen` also accepts a share token gated by `canRead` + subtree; share connections are
+  receive-only (no broadcast — journal editing stays member-only).
+- [ ] `GET /public/shares/{id}/nodes/{n}/journal/live` (snapshot + updates) so a guest reconstructs the
+  current state client-side (Yjs), then subscribes to the relay for live deltas. Operator-blind throughout.
 
 ---
 

@@ -10,7 +10,7 @@ import { login } from '../../account/login/login'
 import { getOrCreateContentKey, openPersonalScope } from '../../content/scopeContent'
 import { createNode } from '../createTree/memoryTree'
 import { uploadMedia } from '../../uploads/media/media'
-import { updateJournal } from '../journal/journal'
+import { saveJournalMarkdown } from '../journalLive/journalPersistence'
 import { listMySpaces } from '../../spaces/switchActiveSpace/switchActiveSpace'
 import { createShare, downloadShareBlob, getShareJournal, listShareMedia, resolvePublicShare, SharePasswordRequired, updateShare, uploadShareMedia } from './share'
 
@@ -54,7 +54,7 @@ run('share e2e', () => {
 
     // the owner's gallery now holds both media; the owner's journal is READ-ONLY to the contributor
     expect(await listShareMedia(cCtx, cCtx.rootNodeId)).toHaveLength(2)
-    await updateJournal(apiBase, session, active, memory.id, '# Unser Trip\n\nDanke fürs Mitmachen!')
+    await saveJournalMarkdown(apiBase, session, active.scope.scopeId, memory.id, active.contentKey, '# Unser Trip\n\nDanke fürs Mitmachen!')
     expect(await getShareJournal(cCtx)).toContain('Danke fürs Mitmachen')
 
     // (3) UPLOADER — a blind drop-off: can add media, but reads are denied

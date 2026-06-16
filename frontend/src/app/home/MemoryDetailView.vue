@@ -11,7 +11,8 @@ import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
 import { deleteMedia } from '../../features/uploads/media/media'
-import { getJournal, updateJournal } from '../../features/memory/journal/journal'
+import { getJournal } from '../../features/memory/journal/journal'
+import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
 import { createTrack, deleteTrack, getTracks, type Track } from '../../features/memory/track/track'
 import { parseGpx } from '../../features/memory/track/gpx'
@@ -120,7 +121,8 @@ function onLiveClosed(markdown: string) {
 async function saveJournal() {
   journalSaving.value = true
   try {
-    journalMarkdown.value = (await updateJournal(session.apiBase, session.unlocked!, props.active, props.memory.id, journalDraft.value)).markdown
+    await saveJournalMarkdown(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, props.active.contentKey, journalDraft.value)
+    journalMarkdown.value = journalDraft.value
     journalEditing.value = false
   } finally {
     journalSaving.value = false
