@@ -8,6 +8,7 @@ import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
 import com.veyq.app.shared.identity.ServerRole
+import com.veyq.app.shared.security.ServerSetupRepository
 import com.veyq.app.shared.security.SetupGate
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -20,6 +21,7 @@ class SetupServerHandler(
     private val accounts: AccountFactory,
     private val suites: CryptoSuiteRegistry,
     private val setupGate: SetupGate,
+    private val serverSetup: ServerSetupRepository,
     @param:org.eclipse.microprofile.config.inject.ConfigProperty(name = "veyq.app.base-url")
     private val appBaseUrl: String,
 ) {
@@ -29,6 +31,9 @@ class SetupServerHandler(
 
     @Transactional
     fun createServerOwner(req: CreateServerOwnerRequest): UserSummary {
+        // Serialize concurrent setups on the singleton lock row, THEN check — closes the TOCTOU where two
+        // racing requests both read "no owner yet" and each create one.
+        serverSetup.lockForSetup()
         if (setupGate.isComplete()) {
             throw ApiException(409, "ALREADY_SETUP", "The server is already set up")
         }

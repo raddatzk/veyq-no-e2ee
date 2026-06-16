@@ -29,9 +29,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   von einem COMPLETED-Upload **dieses** Shares stammen (`createdBy == "share:<id>"`, via
   `BlobUploadRepository.existsCompletedBy` — dedup-sicher, da die abgeschlossene Upload-Row die Attribution
   hält). E2E erweitert: Legit-Contribution grün, Forge eines fremden Blobs → 403 `BLOB_NOT_FROM_SHARE`.
-- [ ] **A4 · Single-Server-Owner-Setup TOCTOU** *(Security, S)* — `SetupServerHandler.kt:32` + `SetupGate.kt:9`.
-  Zwei parallele `POST /api/setup/owner` können beide durchkommen. Fix: Partial-Unique-Index/Lock-Row auf die
-  ServerOwner-Rolle (Migration V27).
+- [x] **A4 · Single-Server-Owner-Setup TOCTOU** *(Security, S)* — `createServerOwner` row-lockt jetzt eine
+  geseedete Singleton-Row (`veyq_server_setup`, V27, `ServerSetupRepository.lockForSetup`,
+  `PESSIMISTIC_WRITE`) **vor** der `isComplete()`-Prüfung, sodass parallele Setups serialisieren und der
+  Verlierer ein sauberes 409 statt eines 500 bekommt. Direkt verifiziert: zwei gleichzeitige
+  `POST /api/setup/owner` → genau ein 200 + ein 409 `ALREADY_SETUP`.
 - [ ] **A5 · Android: rohe Response-Bodies in Exceptions + ungeescapte JSON-Interpolation** *(Security, Android, M)* —
   `Media.kt`, `InviteMembers.kt`, `MemoryTree.kt:31`, `ScopeContent.kt:78`, `Groups.kt` u. a.
   `throw …${resp.body()}` schleppt Payloads in Crash-Logs; mehrere Bodies via `"""{…}"""` statt `JSONObject`.
