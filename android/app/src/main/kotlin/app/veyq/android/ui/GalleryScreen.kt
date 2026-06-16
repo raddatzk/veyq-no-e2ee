@@ -68,6 +68,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.DisposableEffect
 import app.veyq.crypto.Journal
 import app.veyq.crypto.JournalLiveProvider
+import app.veyq.crypto.JournalPersistence
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media
 import app.veyq.crypto.Share
@@ -129,15 +130,17 @@ class GalleryController(
 
     suspend fun saveJournal(markdown: String) {
         journalSaving = true
-        runCatching { withContext(Dispatchers.IO) { Journal.updateJournal(apiBase, session, scopeId, contentKey, nodeId, markdown) } }
+        runCatching { withContext(Dispatchers.IO) { JournalPersistence.saveJournalMarkdown(apiBase, session, scopeId, nodeId, contentKey, markdown) } }
             .onSuccess { journalMarkdown = markdown }
         journalSaving = false
     }
 
-    /** A live-journal client for this memory (native Yrs over the operator-blind relay). */
+    /** A live-journal client for this memory (native Yrs over the operator-blind relay + CRDT store). */
     fun newLiveProvider(): JournalLiveProvider {
         val wsBase = apiBase.replace("http", "ws")
-        return JournalLiveProvider("$wsBase/ws/journal/$scopeId/$nodeId?token=${session.sessionToken}", contentKey)
+        return JournalLiveProvider("$wsBase/ws/journal/$scopeId/$nodeId?token=${session.sessionToken}", contentKey).also {
+            it.configurePersistence(apiBase, session, scopeId, nodeId)
+        }
     }
 
     suspend fun deleteMedia(mediaId: String) {
@@ -505,7 +508,8 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
     LaunchedEffect(Unit) { controller.loadJournal() }
 
     if (live) {
-        LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false; scope.launch { controller.saveJournal(md) } }
+        // The live section persists via the CRDT store (compaction on close); just reflect the text + exit.
+        LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false }
     } else if (editing) {
         OutlinedTextField(
             value = draft,
@@ -550,14 +554,32 @@ private fun LiveJournalSection(controller: GalleryController, onClose: (String) 
     val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
     val provider = remember { controller.newLiveProvider() }
     val palette = remember { listOf("#5b4df5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6") }
+    val flushHolder = remember { arrayOfNulls<Runnable>(1) }
+    // Coalesce local edits into a debounced append to the store (the live relay broadcast is immediate).
+    fun scheduleFlush() {
+        flushHolder[0]?.let { main.removeCallbacks(it) }
+        val r = Runnable { Thread { provider.flushPersist() }.start() }
+        flushHolder[0] = r
+        main.postDelayed(r, 1200)
+    }
     DisposableEffect(Unit) {
         provider.onStatus = { c -> main.post { connected = c } }
         provider.onText = { s -> main.post { if (value.text != s) value = value.copy(text = s, selection = androidx.compose.ui.text.TextRange(minOf(value.selection.start, s.length))) } }
         provider.onPeers = { list -> main.post { peers = list } }
         provider.setUser(controller.displayName, palette[(controller.displayName.hashCode() and 0x7fffffff) % palette.size])
         val initial = controller.journalMarkdown
-        main.postDelayed({ provider.seedIfEmpty(initial); value = value.copy(text = provider.currentText); ready = true }, 800)
-        onDispose { provider.destroy() }
+        // Reconstruct from the operator-blind store (blocking HTTP), then bootstrap a legacy Markdown-only journal.
+        Thread {
+            provider.loadPersisted()
+            if (provider.currentText.isEmpty() && initial.isNotEmpty()) provider.applyLocalText(initial)
+            main.post { value = value.copy(text = provider.currentText); ready = true }
+        }.start()
+        onDispose {
+            flushHolder[0]?.let { main.removeCallbacks(it) }
+            // flush + compact (refresh snapshot + Markdown projection, prune the log) then close — on a thread
+            // that survives the composable's disposal.
+            Thread { provider.flushPersist(); provider.compactPersisted(); provider.destroy() }.start()
+        }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(if (connected) Color(0xFF10B981) else Veyq.Muted))
@@ -581,7 +603,7 @@ private fun LiveJournalSection(controller: GalleryController, onClose: (String) 
             onValueChange = { v ->
                 val textChanged = v.text != value.text
                 value = v
-                if (ready && textChanged) provider.applyLocalText(v.text)
+                if (ready && textChanged) { provider.applyLocalText(v.text); scheduleFlush() }
                 if (ready) provider.setCursor(v.selection.start)
             },
             modifier = Modifier.fillMaxSize(),

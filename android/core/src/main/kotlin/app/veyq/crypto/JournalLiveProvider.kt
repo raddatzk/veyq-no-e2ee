@@ -41,6 +41,15 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
     var onStatus: ((Boolean) -> Unit)? = null
     var onPeers: ((List<Peer>) -> Unit)? = null
 
+    // Operator-blind persistence (the CRDT store: sealed snapshot + sealed update log). Load reconstructs the
+    // doc; flush appends edits since the last persist; compact writes a fresh snapshot + Markdown projection.
+    private var persistApiBase: String? = null
+    private var persistSession: Login.UnlockedSession? = null
+    private var persistScopeId = ""
+    private var persistNodeId = ""
+    private var lastPersistedSV: ByteArray = ByteArray(0)
+    @Volatile var persistMaxSeq = 0; private set
+
     init { connect() }
 
     val currentText: String get() = tx { text.getString(it) }
@@ -132,6 +141,39 @@ class JournalLiveProvider(private val url: String, private val contentKey: ByteA
                 onText?.invoke(currentText)
             }
         }
+    }
+
+    // --- operator-blind persistence ---
+
+    fun configurePersistence(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String) {
+        persistApiBase = apiBase; persistSession = session; persistScopeId = scopeId; persistNodeId = nodeId
+    }
+
+    /** Reconstruct the doc from the store (snapshot + update log); returns the max seq applied. Blocking. */
+    fun loadPersisted(): Int {
+        val api = persistApiBase ?: return 0
+        val s = persistSession ?: return 0
+        persistMaxSeq = runCatching { JournalPersistence.loadJournalDoc(api, s, persistScopeId, persistNodeId, contentKey, doc, lock) }.getOrDefault(0)
+        lastPersistedSV = stateVector()
+        onText?.invoke(currentText)
+        return persistMaxSeq
+    }
+
+    /** Append the edits since the last persist as one sealed update (local + any relay-applied; idempotent). */
+    fun flushPersist() {
+        val api = persistApiBase ?: return
+        val s = persistSession ?: return
+        val diff = tx { it.transactionEncodeStateAsUpdateFromSv(lastPersistedSV.toUByteList()).toByteArray() }
+        if (diff.isEmpty()) return
+        runCatching { JournalPersistence.appendJournalUpdate(api, s, persistScopeId, persistNodeId, contentKey, diff) }
+            .onSuccess { persistMaxSeq = maxOf(persistMaxSeq, it); lastPersistedSV = stateVector() }
+    }
+
+    /** Compact: write a fresh snapshot + the Markdown reader projection and prune the folded-in updates. */
+    fun compactPersisted() {
+        val api = persistApiBase ?: return
+        val s = persistSession ?: return
+        runCatching { JournalPersistence.compactJournal(api, s, persistScopeId, persistNodeId, contentKey, doc, lock, currentText, persistMaxSeq) }
     }
 
     private fun broadcastUpdate() {
