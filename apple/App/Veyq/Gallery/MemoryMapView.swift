@@ -9,8 +9,26 @@ struct MemoryMapView: View {
     let points: [Point]
     var tracks: [Track.TrackItem] = []
     var onSelect: (String) -> Void = { _ in }
+    // The map (Apple Maps) reveals the decrypted coordinates to a third party, so it loads only after consent.
+    // Stored locally (per device), revocable in Settings — never synced to the operator-blind server.
+    @AppStorage("veyq.privacy.mapTiles") private var mapConsent = false
 
     var body: some View {
+        if mapConsent { mapBody } else { consentPlaceholder }
+    }
+
+    private var consentPlaceholder: some View {
+        VStack(spacing: 16) {
+            Text(T("map.consentText")).foregroundStyle(VeyqStyle.muted).multilineTextAlignment(.center)
+            Button(T("map.consentEnable")) { mapConsent = true }.buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 420)
+        .padding()
+        .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line, style: StrokeStyle(lineWidth: 1, dash: [6])))
+    }
+
+    private var mapBody: some View {
         Map(initialPosition: .region(region)) {
             ForEach(tracks) { t in
                 MapPolyline(coordinates: t.points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) })

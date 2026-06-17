@@ -53,6 +53,15 @@ fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: Strin
             SelectorRow(L10n.t("settings.appearance"), theme, listOf("system" to L10n.t("settings.system"), "light" to L10n.t("settings.light"), "dark" to L10n.t("settings.dark")), onTheme)
             SelectorRow(L10n.t("settings.language"), L10n.locale, listOf("de" to "Deutsch", "en" to "English"), onLocale)
 
+            Section(L10n.t("settings.privacy"))
+            val privacyCtx = androidx.compose.ui.platform.LocalContext.current
+            val mapPrefs = remember { privacyCtx.getSharedPreferences("veyq", android.content.Context.MODE_PRIVATE) }
+            var mapTiles by remember { mutableStateOf(mapPrefs.getBoolean("veyq.privacy.mapTiles", false)) }
+            SelectorRow(L10n.t("settings.mapTiles"), if (mapTiles) "on" else "off", listOf("on" to L10n.t("settings.on"), "off" to L10n.t("settings.off"))) { sel ->
+                mapTiles = sel == "on"
+                mapPrefs.edit().putBoolean("veyq.privacy.mapTiles", mapTiles).apply()
+            }
+
             Section(L10n.t("settings.account"))
             SettingRow(L10n.t("common.email"), session.email)
 

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { t } from '../../i18n/i18n'
+import { mapTilesConsent } from '../../features/account/privacy/mapConsent'
 
 const props = defineProps<{
   points: { id: string; lat: number; lng: number }[]
@@ -33,19 +35,47 @@ function render() {
   else if (latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
 }
 
-onMounted(() => {
-  map = L.map(el.value!, { attributionControl: true }).setView([20, 0], 2)
+// The Leaflet map + tile layer are created ONLY after consent — so no tile request (and thus no location
+// disclosure to OpenStreetMap) happens until the user opts in. referrerPolicy keeps our URL out of the Referer.
+function initMap() {
+  if (map || !el.value) return
+  map = L.map(el.value, { attributionControl: true }).setView([20, 0], 2)
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap',
+    referrerPolicy: 'no-referrer',
   }).addTo(map)
   render()
-})
+}
+function teardown() { map?.remove(); map = null; layer = null }
+function enable() { mapTilesConsent.value = true }
 
-watch([() => props.points, () => props.tracks], render, { deep: true })
-onBeforeUnmount(() => { map?.remove(); map = null })
+onMounted(async () => { if (mapTilesConsent.value) { await nextTick(); initMap() } })
+watch(mapTilesConsent, async (on) => { if (on) { await nextTick(); initMap() } else teardown() })
+watch([() => props.points, () => props.tracks], () => { if (map) render() }, { deep: true })
+onBeforeUnmount(teardown)
 </script>
 
 <template>
-  <div ref="el" class="memory-map"></div>
+  <div v-if="mapTilesConsent" ref="el" class="memory-map"></div>
+  <div v-else class="map-consent">
+    <p class="map-consent-text">{{ t('map.consentText') }}</p>
+    <button class="btn btn-primary" type="button" @click="enable">{{ t('map.consentEnable') }}</button>
+  </div>
 </template>
+
+<style scoped>
+.map-consent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 240px;
+  padding: 2rem;
+  text-align: center;
+  border: 1px dashed var(--app-border, #3a3a3a);
+  border-radius: 12px;
+}
+.map-consent-text { max-width: 32rem; color: var(--app-muted, #999); }
+</style>

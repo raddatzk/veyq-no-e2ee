@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("veyq.theme") private var theme = "system"
     @AppStorage("veyq.locale") private var locale = "de"
+    @AppStorage("veyq.privacy.mapTiles") private var mapTiles = false
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,13 @@ struct SettingsView: View {
                         Text("Deutsch").tag("de")
                         Text("English").tag("en")
                     }
+                }
+                Section {
+                    Toggle(T("settings.mapTiles"), isOn: $mapTiles)
+                } header: {
+                    Text(T("settings.privacy"))
+                } footer: {
+                    Text(T("settings.mapTilesHint"))
                 }
                 Section(T("settings.account")) {
                     if let user = app.session?.user {

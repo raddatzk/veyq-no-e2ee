@@ -65,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
@@ -535,6 +536,24 @@ private fun inlineMd(text: String): androidx.compose.ui.text.AnnotatedString = a
 /** An osmdroid (OpenStreetMap) map with a marker per geotagged medium and a polyline per GPX track. */
 @Composable
 private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List<Track.TrackItem>, onSelect: (String) -> Unit) {
+    // The osmdroid tiles reveal the decrypted coordinates to OpenStreetMap, so the map loads only after consent.
+    // Stored locally (per device), revocable in Settings — never synced to the operator-blind server.
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("veyq", android.content.Context.MODE_PRIVATE) }
+    var consent by remember { mutableStateOf(prefs.getBoolean("veyq.privacy.mapTiles", false)) }
+    if (!consent) {
+        Column(
+            modifier = Modifier.fillMaxWidth().height(420.dp).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(L10n.t("map.consentText"), color = Veyq.Muted, fontSize = 14.sp, textAlign = TextAlign.Center)
+            TextButton(onClick = { prefs.edit().putBoolean("veyq.privacy.mapTiles", true).apply(); consent = true }) {
+                Text(L10n.t("map.consentEnable"), color = Veyq.Accent)
+            }
+        }
+        return
+    }
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(Veyq.Radius)),
         factory = { ctx ->

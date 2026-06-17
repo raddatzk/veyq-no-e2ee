@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { applyTheme, session, setUnlocked } from '../session'
 import { logout } from '../../features/account/login/login'
 import { deviceUnlockEnabled, disableDeviceUnlock } from '../../features/account/deviceUnlock/deviceUnlock'
+import { mapTilesConsent } from '../../features/account/privacy/mapConsent'
 import { i18n, setLocale, t } from '../../i18n/i18n'
 
 const emit = defineEmits<{ close: [] }>()
@@ -44,6 +45,15 @@ async function signOut() {
         <div class="seg">
           <button :class="{ active: i18n.locale === 'de' }" @click="setLocale('de')">Deutsch</button>
           <button :class="{ active: i18n.locale === 'en' }" @click="setLocale('en')">English</button>
+        </div>
+      </div>
+
+      <div class="settings-section">{{ t('settings.privacy') }}</div>
+      <div class="settings-row">
+        <span :title="t('settings.mapTilesHint')">{{ t('settings.mapTiles') }}</span>
+        <div class="seg">
+          <button :class="{ active: mapTilesConsent }" @click="mapTilesConsent = true">{{ t('settings.on') }}</button>
+          <button :class="{ active: !mapTilesConsent }" @click="mapTilesConsent = false">{{ t('settings.off') }}</button>
         </div>
       </div>
 

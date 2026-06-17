@@ -70,7 +70,14 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   sich mit Web/Android (die werfen). iOS `VeyqCrypto` baut.
 
 ## Phase C — Operator-blind-Privacy vervollständigen
-- [ ] **C1 · Map-Tiles: externe Tiles als akzeptierter, Consent-gegateter Tradeoff** *(Privacy/Consent, Medium, M)* —
+- [x] **C1 · Map-Tiles: externe Tiles als akzeptierter, Consent-gegateter Tradeoff** *(Privacy/Consent, Medium, M)* —
+  **Umgesetzt:** globales, lokal gespeichertes Consent-Flag `veyq.privacy.mapTiles` (Default false, kein Backend-
+  Sync) auf allen drei Plattformen. Map-View instanziiert Tiles/Karte erst nach Zustimmung → null externe Requests
+  vorher; Aktivierung direkt im Platzhalter, Deaktivierung in den User-Einstellungen. Web: Leaflet-Gate +
+  `referrerPolicy: 'no-referrer'` am Tile-Layer + Settings-Toggle. iOS: `@AppStorage`-Gate (MapKit erst bei
+  Consent) + Settings-Toggle. Android: SharedPreferences-Gate (osmdroid erst bei Consent) + Settings-Toggle.
+  Apple Maps = OSM gleichbehandelt. i18n de+en je Plattform. Verifiziert: vue-tsc, Android `:app`, iOS-App bauen.
+  *(Ursprünglicher Text unten als Entscheidungsgrundlage erhalten.)*
   **Entscheidung (User):** der Tile-Fetch an OSM ist OK, MUSS aber vom User über die **Datenschutz-Einstellungen
   aktiv akzeptiert** werden, bevor die Karte lädt (informiertes Opt-in). `MemoryMap.vue` lädt sonst
   `tile.openstreetmap.org/{z}/{x}/{y}` direkt → `{z}/{x}/{y}` = Funktion der entschlüsselten Koordinaten, also
