@@ -2,6 +2,11 @@ services:
   traefik:
     image: traefik:v3.3
     container_name: veyq-traefik
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"] # bind :80/:443 only
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -23,6 +28,13 @@ services:
   veyq-db:
     image: mariadb:10.11
     container_name: veyq-db
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    # max-allowed-packet headroom over the app's HTTP body limit so journal-compaction row writes never hit
+    # "packet too large"; pin charset for deterministic unique-constraint case-folding on text columns.
+    command: ["--max-allowed-packet=64M", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     environment:
       MARIADB_DATABASE: ${DB_NAME:-veyq}
       MARIADB_USER: ${DB_USER:-veyq}
@@ -30,44 +42,38 @@ services:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
     volumes:
       - veyq-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
   veyq:
     image: ${VEYQ_IMAGE:?Set VEYQ_IMAGE}
     container_name: veyq
+    restart: unless-stopped
+    # Highest-value target (internet-facing, processes user uploads): drop all caps (binds 8080, needs none),
+    # block privilege escalation, read-only rootfs with a tmpfs for the JVM's scratch. The media volume mount
+    # stays writable. NOTE: verify with a deploy smoke-test — read_only can surface a missed writable path.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    # Cap memory so a JVM/upload spike is OOM-killed inside its own cgroup instead of the host picking a victim
+    # (e.g. MariaDB). Pair with -XX:MaxRAMPercentage in the image ENTRYPOINT (MaxRAMPercentage is a % of THIS
+    # limit; without a limit the JVM sizes the heap off host RAM).
+    mem_limit: 1500m
+    memswap_limit: 1500m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
     environment:
       DB_KIND: mariadb
       DB_URL: jdbc:mariadb://veyq-db:3306/${DB_NAME:-veyq}
       DB_USER: ${DB_USER:-veyq}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
-      COOKIE_ACCESS_TOKEN_NAME: ${COOKIE_ACCESS_TOKEN_NAME:-VEYQ_ACCESS_TOKEN}
-      COOKIE_REFRESH_TOKEN_NAME: ${COOKIE_REFRESH_TOKEN_NAME:-VEYQ_REFRESH_TOKEN}
-      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
-      REFRESH_TOKEN_TTL_MINUTES: ${REFRESH_TOKEN_TTL_MINUTES:-43200}
-      ACCESS_TOKEN_AUDIT_TTL_DAYS: ${ACCESS_TOKEN_AUDIT_TTL_DAYS:-30}
-      REFRESH_TOKEN_AUDIT_TTL_DAYS: ${REFRESH_TOKEN_AUDIT_TTL_DAYS:-90}
-      TOKEN_CLEANUP_CRON: "${TOKEN_CLEANUP_CRON:-0 0 0 * * ?}"
-      INVITATION_TTL_DAYS: ${INVITATION_TTL_DAYS:-7}
-      EMAIL_CHANGE_TTL_HOURS: ${EMAIL_CHANGE_TTL_HOURS:-24}
-      RESET_PASSWORD_TTL_HOURS: ${RESET_PASSWORD_TTL_HOURS:-2}
-      USER_CLEANUP_CRON: "${USER_CLEANUP_CRON:-0 0 0 * * ?}"
-      USER_CLEANUP_RETENTION_DAYS: ${USER_CLEANUP_RETENTION_DAYS:-30}
-      ARGON2_TARGET_MS: ${ARGON2_TARGET_MS:-500}
-      ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-65536}
-      ARGON2_MIN_ITERATIONS: ${ARGON2_MIN_ITERATIONS:-2}
-      ARGON2_MAX_ITERATIONS: ${ARGON2_MAX_ITERATIONS:-10}
-      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
-      ARGON2_BENCHMARK_SAMPLES: ${ARGON2_BENCHMARK_SAMPLES:-2}
-      PWNED_PASSWORDS_ENABLED: ${PWNED_PASSWORDS_ENABLED:-true}
-      PWNED_PASSWORDS_ENDPOINT: ${PWNED_PASSWORDS_ENDPOINT:-https://api.pwnedpasswords.com/range}
-      PWNED_PASSWORDS_TIMEOUT_MS: ${PWNED_PASSWORDS_TIMEOUT_MS:-2000}
-      PWNED_PASSWORDS_FAIL_CLOSED: ${PWNED_PASSWORDS_FAIL_CLOSED:-false}
-      PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_PER_IP: ${PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_PER_IP:-2}
-      PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_TOTAL: ${PUBLIC_SHARE_UPDATES_MAX_CONCURRENT_TOTAL:-64}
-      MEMORY_UPDATES_MAX_CONCURRENT_PER_USER: ${MEMORY_UPDATES_MAX_CONCURRENT_PER_USER:-4}
-      MEMORY_UPDATES_MAX_CONCURRENT_TOTAL: ${MEMORY_UPDATES_MAX_CONCURRENT_TOTAL:-128}
-      WEBAUTHN_RELYING_PARTY_NAME: ${WEBAUTHN_RELYING_PARTY_NAME:-veyq}
-      QUARKUS_HTTP_AUTH_SESSION_ENCRYPTION_KEY: ${WEBAUTHN_SESSION_ENCRYPTION_KEY:?Set WEBAUTHN_SESSION_ENCRYPTION_KEY}
+      # NOTE: the auth/token/argon2/pwned-passwords/webauthn/concurrency-cap env that used to live here is
+      # gone — those are features of the legacy backend that the current backend does not implement, so the
+      # vars were dead config (false operator confidence). Re-add them ONLY alongside the code that reads them.
       PROXY_ADDRESS_FORWARDING: ${PROXY_ADDRESS_FORWARDING:-true}
       PROXY_ALLOW_X_FORWARDED: ${PROXY_ALLOW_X_FORWARDED:-true}
       PROXY_ENABLE_FORWARDED_HOST: ${PROXY_ENABLE_FORWARDED_HOST:-true}
@@ -76,15 +82,11 @@ services:
       # X-Forwarded-For instead of collapsing every client into Traefik's single bucket. (Untrusted peers'
       # XFF is still ignored — see RateLimitFilter.resolveClientIp.)
       VEYQ_RATELIMIT_TRUSTED_PROXIES: ${VEYQ_RATELIMIT_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      # MEDIA_STORAGE_DIR feeds veyq.blob-store.dir (the volume the blobs actually land on); MEDIA_MAX_UPLOAD_SIZE
+      # feeds quarkus.http.limits.max-body-size. (Chunk size is a client concern; upload-session TTL/cleanup,
+      # ffmpeg and server-side preview generation are legacy-backend features not implemented here → removed.)
       MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
-      MEDIA_CHUNK_SIZE: ${MEDIA_CHUNK_SIZE:-16M}
-      MEDIA_UPLOAD_SESSION_TTL_HOURS: ${MEDIA_UPLOAD_SESSION_TTL_HOURS:-24}
-      MEDIA_UPLOAD_SESSION_CLEANUP_CRON: "${MEDIA_UPLOAD_SESSION_CLEANUP_CRON:-0 0 * * * ?}"
       MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
-      FFMPEG_PATH: ${FFMPEG_PATH:-ffmpeg}
-      MEDIA_PREVIEW_TIMEOUT_SECONDS: ${MEDIA_PREVIEW_TIMEOUT_SECONDS:-15}
-      VEYQ_SOURCE_URL: ${VEYQ_SOURCE_URL:-https://github.com/raddatzk/veyq}
-      VEYQ_MOBILE_IOS_APP_STORE_ID: ${VEYQ_MOBILE_IOS_APP_STORE_ID:-}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
       MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT}
@@ -99,25 +101,32 @@ services:
         source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
         target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
     depends_on:
-      - veyq-db
+      veyq-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 120s # cold JVM + first Flyway migration on slow disks
     labels:
       - traefik.enable=true
       - traefik.http.routers.veyq.rule=${VEYQ_TRAEFIK_RULE:?Set VEYQ_TRAEFIK_RULE}
       - traefik.http.routers.veyq.entrypoints=websecure
       - traefik.http.routers.veyq.tls.certresolver=letsencrypt
       - traefik.http.services.veyq.loadbalancer.server.port=8080
+      # Withhold traffic from an instance until readiness passes (avoids 503s during the redeploy window).
+      - traefik.http.services.veyq.loadbalancer.healthcheck.path=/q/health/ready
+      - traefik.http.services.veyq.loadbalancer.healthcheck.interval=10s
 
   veyq-reset:
     profiles: ["reset"]
     build:
       context: ./reset
     container_name: veyq-reset
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
     environment:
       RESET_USERNAME: ${RESET_USERNAME:-}
       RESET_PASSWORD: ${RESET_PASSWORD:-}
@@ -136,7 +145,8 @@ services:
         target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - veyq-db
+      veyq-db:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.veyq-reset.rule=${RESET_TRAEFIK_RULE:-}
@@ -148,6 +158,9 @@ services:
     profiles: ["updater"]
     image: alpine:3.22
     container_name: veyq-updater
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
     working_dir: /veyq
     environment:
       VEYQ_AUTO_UPDATE_ENABLED: ${VEYQ_AUTO_UPDATE_ENABLED:-false}
