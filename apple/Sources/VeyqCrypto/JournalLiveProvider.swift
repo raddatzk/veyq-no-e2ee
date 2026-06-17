@@ -14,9 +14,18 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     // Called on EVERY (re)connect so each handshake gets a fresh single-use relay ticket (a baked-in URL would
     // break reconnection once its ticket is consumed). Share connections return a constant URL.
     private let urlFactory: () async -> URL?
+    // The one monitor. YSwift's transactSync already serializes doc ops; this lock guards every shared Swift
+    // field below (task, lastSentSV, the awareness maps, local* presence state), which are otherwise mutated
+    // from the URLSession delegate queue AND the editor/persistence callers concurrently. Compute outgoing
+    // bytes under the lock, then send()/invoke callbacks OUTSIDE it (no network/UI while holding the monitor).
+    private let lock = NSRecursiveLock()
+    private func sync<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
     private var task: URLSessionWebSocketTask?
     private var lastSentSV: [UInt8] = []
     private var closed = false
+    // Bumped at the start of every connect(); a superseded connect bails after its await, and a superseded
+    // socket's delegate callbacks are ignored (task !== self.task), so overlapping retries can't leak a socket.
+    private var generation = 0
 
     // Awareness (presence + cursor) — the y-protocols/awareness wire format, so co-editors and their cursor
     // positions sync across web/iOS/Android. The cursor is a plain UTF-16 char index (`cursorIndex`); the web's
@@ -57,20 +66,25 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     /// Apply the editor's new value as minimal insert/remove ops (UTF-8 offsets, as YText expects) and
     /// broadcast the resulting CRDT update. No-op if unchanged.
     public func applyLocalText(_ newText: String) {
-        let oldChars = Array(currentText), newChars = Array(newText)
-        if oldChars == newChars { return }
-        var p = 0
-        while p < oldChars.count, p < newChars.count, oldChars[p] == newChars[p] { p += 1 }
-        var s = 0
-        while s < (oldChars.count - p), s < (newChars.count - p), oldChars[oldChars.count - 1 - s] == newChars[newChars.count - 1 - s] { s += 1 }
-        let prefixBytes = String(oldChars[0 ..< p]).utf8.count
-        let removedBytes = String(oldChars[p ..< (oldChars.count - s)]).utf8.count
-        let inserted = String(newChars[p ..< (newChars.count - s)])
-        doc.transactSync { txn in
-            if removedBytes > 0 { self.text.removeRange(start: UInt32(prefixBytes), length: UInt32(removedBytes), in: txn) }
-            if !inserted.isEmpty { self.text.insert(inserted, at: UInt32(prefixBytes), in: txn) }
+        // The read-diff-apply must be atomic: a concurrent edit (remote apply) between reading the old text and
+        // the mutation would otherwise make the offsets stale and corrupt the text. Hold the lock across all three.
+        let changed: Bool = sync {
+            let oldChars = Array(self.currentText), newChars = Array(newText)
+            if oldChars == newChars { return false }
+            var p = 0
+            while p < oldChars.count, p < newChars.count, oldChars[p] == newChars[p] { p += 1 }
+            var s = 0
+            while s < (oldChars.count - p), s < (newChars.count - p), oldChars[oldChars.count - 1 - s] == newChars[newChars.count - 1 - s] { s += 1 }
+            let prefixBytes = String(oldChars[0 ..< p]).utf8.count
+            let removedBytes = String(oldChars[p ..< (oldChars.count - s)]).utf8.count
+            let inserted = String(newChars[p ..< (newChars.count - s)])
+            self.doc.transactSync { txn in
+                if removedBytes > 0 { self.text.removeRange(start: UInt32(prefixBytes), length: UInt32(removedBytes), in: txn) }
+                if !inserted.isEmpty { self.text.insert(inserted, at: UInt32(prefixBytes), in: txn) }
+            }
+            return true
         }
-        broadcastUpdate()
+        if changed { broadcastUpdate() }
     }
 
     /// Seed an empty shared doc from the sealed journal (call once after a short sync settle, like the web).
@@ -80,54 +94,78 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
 
     /// Publish this editor's identity (name + colour) to co-editors.
     public func setUser(name: String, color: String) {
-        localUser = ["name": name, "color": color, "colorLight": color + "33"]
-        bumpAwareness()
+        let data: Data? = sync {
+            self.localUser = ["name": name, "color": color, "colorLight": color + "33"]
+            return self.bumpAwarenessLocked()
+        }
+        if let data { send(data) }
     }
     /// Publish this editor's caret position (char index) so others can draw it.
     public func setCursor(_ index: Int?) {
-        if localCursor == index { return }
-        localCursor = index
-        bumpAwareness()
+        let data: Data? = sync {
+            if self.localCursor == index { return nil }
+            self.localCursor = index
+            return self.bumpAwarenessLocked()
+        }
+        if let data { send(data) }
     }
 
     public func destroy() {
-        closed = true
-        task?.cancel(with: .normalClosure, reason: nil)
+        let t: URLSessionWebSocketTask? = sync { self.closed = true; return self.task }
+        t?.cancel(with: .normalClosure, reason: nil)
     }
 
     // MARK: - websocket
 
     private func connect() {
+        let gen: Int = sync { generation += 1; return generation }
         Task { [weak self] in
-            guard let self, !self.closed else { return }
+            guard let self else { return }
+            if self.sync({ self.closed || gen != self.generation }) { return }
             guard let url = await self.urlFactory() else { // ticket fetch failed — retry the whole connect
-                if !self.closed { try? await Task.sleep(nanoseconds: 1_500_000_000); self.connect() }
+                self.scheduleReconnect(gen)
                 return
             }
-            if self.closed { return }
+            if self.sync({ self.closed || gen != self.generation }) { return }
             let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
             let t = session.webSocketTask(with: url)
-            self.task = t
+            self.sync { self.task = t }
             t.resume()
             self.receive()
         }
     }
 
+    /// Reconnect after a delay, but only if this generation is still current and we aren't torn down.
+    private func scheduleReconnect(_ gen: Int) {
+        if sync({ closed || gen != generation }) { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self, self.sync({ gen == self.generation && !self.closed }) else { return }
+            self.connect()
+        }
+    }
+
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol proto: String?) {
+        if sync({ webSocketTask !== self.task || self.closed }) { return } // superseded/closing socket
         onStatus?(true)
-        let s1 = self.proto.handleConnectionStarted() // STEP_1 (our state vector) → peers send what we miss
-        send(encode(sync: 0, payload: s1.buffer))
-        lastSentSV = stateVector()
-        if !localUser.isEmpty { send(encodeAwareness()) } // announce presence/cursor
+        let (s1data, awData): (Data, Data?) = sync {
+            let s1 = self.proto.handleConnectionStarted() // STEP_1 (our state vector) → peers send what we miss
+            self.lastSentSV = self.stateVector()
+            return (self.encode(sync: 0, payload: s1.buffer), self.localUser.isEmpty ? nil : self.encodeAwareness())
+        }
+        send(s1data)
+        if let awData { send(awData) } // announce presence/cursor
     }
 
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        // Only the CURRENT socket closing triggers a reconnect — a superseded socket's close is ignored.
+        let gen: Int? = sync { (webSocketTask === self.task && !self.closed) ? self.generation : nil }
         onStatus?(false)
-        if !closed { DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.connect() } }
+        if let gen { scheduleReconnect(gen) }
     }
 
     private func receive() {
-        task?.receive { [weak self] result in
+        let t: URLSessionWebSocketTask? = sync { self.task }
+        t?.receive { [weak self] result in
             guard let self else { return }
             if case let .success(message) = result {
                 if case let .data(data) = message { self.handle(data) }
@@ -150,11 +188,13 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         guard let payload = readVarUint8Array(bytes, &pos) else { return }
         switch syncKind {
         case 0: // step1 → reply with step2 (the update covering what the peer is missing)
-            let reply = proto.handleStep1(payload)
-            send(encode(sync: 1, payload: reply.buffer))
+            let reply: Data = sync { self.encode(sync: 1, payload: self.proto.handleStep1(payload).buffer) }
+            send(reply)
         case 1, 2: // step2 / update → apply, then push the merged text to the editor
-            proto.handleStep2(payload) {}
-            lastSentSV = stateVector()
+            sync {
+                self.proto.handleStep2(payload) {}
+                self.lastSentSV = self.stateVector()
+            }
             onText?(currentText)
         default: break
         }
@@ -170,37 +210,42 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     @discardableResult
     public func loadPersisted() async -> Int {
         guard let api = persistApiBase, let s = persistSession else { return 0 }
-        persistMaxSeq = (try? await JournalPersistence.loadJournalDoc(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc)) ?? 0
-        lastPersistedSV = stateVector()
+        let seq = (try? await JournalPersistence.loadJournalDoc(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc)) ?? 0
+        sync { self.persistMaxSeq = seq; self.lastPersistedSV = self.stateVector() }
         onText?(currentText)
-        return persistMaxSeq
+        return seq
     }
 
     /// Append the edits made since the last persist as one sealed update (local + any relay-applied; idempotent).
     public func flushPersist() async {
         guard let api = persistApiBase, let s = persistSession else { return }
-        let diff = doc.transactSync { (try? $0.transactionEncodeStateAsUpdateFromSv(stateVector: self.lastPersistedSV)) ?? [] }
+        let diff: [UInt8] = sync { self.doc.transactSync { (try? $0.transactionEncodeStateAsUpdateFromSv(stateVector: self.lastPersistedSV)) ?? [] } }
         guard !diff.isEmpty else { return }
         if let seq = try? await JournalPersistence.appendJournalUpdate(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, update: diff) {
-            persistMaxSeq = max(persistMaxSeq, seq)
-            lastPersistedSV = stateVector()
+            sync { self.persistMaxSeq = max(self.persistMaxSeq, seq); self.lastPersistedSV = self.stateVector() }
         }
     }
 
     /// Compact: write a fresh snapshot + the Markdown reader projection and prune the folded-in updates.
     public func compactPersisted() async {
         guard let api = persistApiBase, let s = persistSession else { return }
-        try? await JournalPersistence.compactJournal(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc, markdown: currentText, coveredSeq: persistMaxSeq)
+        let seq = sync { self.persistMaxSeq }
+        try? await JournalPersistence.compactJournal(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc, markdown: currentText, coveredSeq: seq)
     }
 
     private func broadcastUpdate() {
-        let update = doc.transactSync { txn in self.doc.diff(txn: txn, from: self.lastSentSV) }
-        if !update.isEmpty { send(encode(sync: 2, payload: update)); lastSentSV = stateVector() }
+        let data: Data? = sync {
+            let update = self.doc.transactSync { txn in self.doc.diff(txn: txn, from: self.lastSentSV) }
+            if update.isEmpty { return nil }
+            self.lastSentSV = self.stateVector()
+            return self.encode(sync: 2, payload: update)
+        }
+        if let data { send(data) }
     }
 
     private func stateVector() -> [UInt8] { doc.transactSync { $0.transactionStateVector() } }
 
-    private func send(_ data: Data) { task?.send(.data(data)) { _ in } }
+    private func send(_ data: Data) { let t: URLSessionWebSocketTask? = sync { self.task }; t?.send(.data(data)) { _ in } }
 
     // MARK: - framing + AEAD (matches the web EncryptedRelayProvider)
 
@@ -224,26 +269,31 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
         writeVarUint(&enc, 1); writeVarUint8Array(&enc, aw)
         return seal(enc)
     }
-    private func bumpAwareness() { localClock += 1; if task != nil { send(encodeAwareness()) } }
+    /// Bump the awareness clock and return the encoded presence frame to send (or nil if not connected). Caller
+    /// MUST hold the lock (mutates localClock, reads localUser/localCursor/task); send the result outside the lock.
+    private func bumpAwarenessLocked() -> Data? { localClock += 1; return task != nil ? encodeAwareness() : nil }
     private func applyAwareness(_ update: [UInt8]) {
-        var p = 0
-        let count = readVarUint(update, &p)
-        var i: UInt = 0
-        while i < count {
-            i += 1
-            let clientId = readVarUint(update, &p)
-            let clock = readVarUint(update, &p)
-            guard let jsonBytes = readVarUint8Array(update, &p) else { break }
-            if clientId == localClientId { continue }
-            if let prev = peerClocks[clientId], prev >= clock { continue }
-            peerClocks[clientId] = clock
-            if let obj = try? JSONSerialization.jsonObject(with: Data(jsonBytes)) as? [String: Any], let user = obj["user"] as? [String: Any] {
-                peers[clientId] = Peer(clientId: clientId, name: (user["name"] as? String) ?? "?", color: (user["color"] as? String) ?? "#888888", cursor: obj["cursorIndex"] as? Int)
-            } else {
-                peers.removeValue(forKey: clientId)
+        let snapshot: [Peer] = sync {
+            var p = 0
+            let count = readVarUint(update, &p)
+            var i: UInt = 0
+            while i < count {
+                i += 1
+                let clientId = readVarUint(update, &p)
+                let clock = readVarUint(update, &p)
+                guard let jsonBytes = readVarUint8Array(update, &p) else { break }
+                if clientId == localClientId { continue }
+                if let prev = peerClocks[clientId], prev >= clock { continue }
+                peerClocks[clientId] = clock
+                if let obj = try? JSONSerialization.jsonObject(with: Data(jsonBytes)) as? [String: Any], let user = obj["user"] as? [String: Any] {
+                    peers[clientId] = Peer(clientId: clientId, name: (user["name"] as? String) ?? "?", color: (user["color"] as? String) ?? "#888888", cursor: obj["cursorIndex"] as? Int)
+                } else {
+                    peers.removeValue(forKey: clientId)
+                }
             }
+            return Array(peers.values)
         }
-        onPeers?(Array(peers.values))
+        onPeers?(snapshot)
     }
     private func open(_ data: Data) -> Data? { V1.journalOpen(contentKey: contentKey, blob: data) }
 

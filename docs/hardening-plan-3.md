@@ -44,14 +44,17 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   Tests; App bootet (HealthTest); Share-E2E grün. *(Request-Flood-Throttle für Metadaten-GETs = kleiner Folgepunkt.)*
 
 ## Phase B — Korrektheit / Concurrency
-- [ ] **B1 · `JournalLiveProvider` Cross-Thread-Datarace (iOS + Android)** *(Correctness, High, M)* — geteilter
-  veränderlicher State (`peers`/`peerClocks`/`lastSentSV`/`ws`/Clocks/Cursor) wird ohne Sync aus
-  WS-Listener-Thread, Editor-Thread und Persist-Threads gelesen/geschrieben. iOS: `final class` ganz ohne
-  Lock/Actor; Android: nur `doc` unter `lock`, Felder nicht `@Volatile`. (Web ist Single-Thread-Eventloop →
-  ok.) Risiko: torn reads, verlorene/duplizierte Sync-Frames, Presence-Glitches, selten Korruption/Crash. Fix:
-  State auf einen Serial-Executor konfinieren bzw. iOS→`actor` / Android→`@Volatile ws` + alle Mutationen unter
-  `lock`; dabei auch **B1b** (Doppel-Sockets bei überlappendem Reconnect) entschärfen (Generations-Guard, alten
-  `ws` vor Reassign schließen; `onError` verlässt sich auf `onClose`).
+- [x] **B1 · `JournalLiveProvider` Cross-Thread-Datarace (iOS + Android)** *(Correctness, High, M)* — beide
+  Provider routen jetzt **jeden** Zugriff auf geteilten Mutable-State (`lastSentSV`, Awareness-Maps,
+  local*-Presence, Persist-SVs) durch das eine Monitor (Android: bestehendes `lock`; iOS: neuer
+  `NSRecursiveLock` + `sync{}`). Muster überall: Bytes **unter** dem Lock berechnen, `send()`/Callbacks
+  **außerhalb** ausführen (kein Netzwerk/UI unter dem Monitor). `applyLocalText` hält den Lock über
+  read-diff-apply (sonst korrumpiert ein paralleler Remote-Apply die Offsets). Socket-Ref abgesichert
+  (Android `@Volatile ws`; iOS task-Identitäts-Check). **B1b:** Generations-Zähler — ein überholter
+  Connect/Listener installiert weder seinen Socket noch plant er einen Reconnect (Android `generation` +
+  superseded-`sendClose`; iOS `webSocketTask === self.task`-Guard in didOpen/didClose) → keine Doppel-Sockets.
+  Verifiziert: Android `:core` + `:app` kompilieren, iOS `VeyqCrypto`-Package baut (swift build). (Web
+  unverändert — single-threaded Eventloop. Multi-Client-Runtime weiter via Plan-2-F1/CI.)
 - [ ] **B2 · Journal-Compaction prune-vs-snapshot unter Concurrency** *(Correctness, Low-Med, S)* —
   `compactJournal` prunet Updates `<= coveredSeq` und setzt `baseSeq = coveredSeq`, ohne zu erzwingen, dass der
   client-seitige Snapshot wirklich alle Updates bis `nextSeq` faltet. Append im Fenster → stiller Verlust

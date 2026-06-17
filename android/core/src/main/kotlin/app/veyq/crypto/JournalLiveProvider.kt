@@ -23,10 +23,18 @@ import java.util.concurrent.CompletionStage
 class JournalLiveProvider(private val urlFactory: () -> String?, private val contentKey: ByteArray) {
     private val doc = YrsDoc()
     private val text: YrsText = doc.getText("journal")
+    // The one monitor. It already serialized doc transactions (tx{}); it now ALSO guards every shared field
+    // below (lastSentSV, the awareness maps, local* presence state), which are otherwise written from the
+    // websocket-listener thread AND the editor/persistence threads concurrently. Compute outgoing bytes under
+    // the lock, then send()/invoke callbacks OUTSIDE it (network/UI must not run while holding the monitor).
     private val lock = Any()
-    private var ws: WebSocket? = null
+    @Volatile private var ws: WebSocket? = null
     private var lastSentSV: ByteArray = ByteArray(0)
     @Volatile private var closed = false
+    // Bumped at the start of every connect(); a stale connect/listener (superseded by a newer one) sees a
+    // mismatch and neither installs its socket nor schedules a reconnect — so overlapping retries can't leak
+    // a second live socket.
+    @Volatile private var generation = 0
 
     // Awareness (presence + cursor) — the y-protocols/awareness wire format, byte-identical to web/iOS, so
     // co-editors and their caret positions sync across all three platforms. The cursor is a plain UTF-16 char
@@ -59,18 +67,22 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
 
     /** Apply the editor's new value as minimal insert/remove ops (UTF-8 offsets) and broadcast the update. */
     fun applyLocalText(newText: String) {
-        val old = currentText
-        if (old == newText) return
-        var p = 0
-        while (p < old.length && p < newText.length && old[p] == newText[p]) p++
-        var s = 0
-        while (s < old.length - p && s < newText.length - p && old[old.length - 1 - s] == newText[newText.length - 1 - s]) s++
-        val prefixBytes = old.substring(0, p).toByteArray(Charsets.UTF_8).size.toUInt()
-        val removedBytes = old.substring(p, old.length - s).toByteArray(Charsets.UTF_8).size.toUInt()
-        val inserted = newText.substring(p, newText.length - s)
-        tx { txn ->
-            if (removedBytes > 0u) text.removeRange(txn, prefixBytes, removedBytes)
-            if (inserted.isNotEmpty()) text.insert(txn, prefixBytes, inserted)
+        // The read-diff-apply must be atomic: a concurrent edit (remote apply) between reading `old` and the
+        // mutation would otherwise make the offsets stale and corrupt the text. Hold the lock across all three.
+        synchronized(lock) {
+            val old = currentText
+            if (old == newText) return
+            var p = 0
+            while (p < old.length && p < newText.length && old[p] == newText[p]) p++
+            var s = 0
+            while (s < old.length - p && s < newText.length - p && old[old.length - 1 - s] == newText[newText.length - 1 - s]) s++
+            val prefixBytes = old.substring(0, p).toByteArray(Charsets.UTF_8).size.toUInt()
+            val removedBytes = old.substring(p, old.length - s).toByteArray(Charsets.UTF_8).size.toUInt()
+            val inserted = newText.substring(p, newText.length - s)
+            tx { txn ->
+                if (removedBytes > 0u) text.removeRange(txn, prefixBytes, removedBytes)
+                if (inserted.isNotEmpty()) text.insert(txn, prefixBytes, inserted)
+            }
         }
         broadcastUpdate()
     }
@@ -80,14 +92,20 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
 
     /** Publish this editor's identity (name + colour) to co-editors. */
     fun setUser(name: String, color: String) {
-        localUser = JSONObject().put("name", name).put("color", color).put("colorLight", color + "33")
-        bumpAwareness()
+        val bytes = synchronized(lock) {
+            localUser = JSONObject().put("name", name).put("color", color).put("colorLight", color + "33")
+            bumpAwarenessLocked()
+        }
+        bytes?.let { send(it) }
     }
     /** Publish this editor's caret position (char index) so others can draw it. */
     fun setCursor(index: Int?) {
-        if (localCursor == index) return
-        localCursor = index
-        bumpAwareness()
+        val bytes = synchronized(lock) {
+            if (localCursor == index) return
+            localCursor = index
+            bumpAwarenessLocked()
+        }
+        bytes?.let { send(it) }
     }
 
     fun destroy() { closed = true; ws?.sendClose(WebSocket.NORMAL_CLOSURE, "") }
@@ -95,26 +113,36 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
     // --- websocket ---
 
     private fun connect() {
+        val gen = synchronized(lock) { ++generation } // supersede any in-flight connect/listener
         // Off-thread: fetch a fresh ticket (blocking) then open the socket; init/reconnect never block the caller.
         Thread {
-            if (closed) return@Thread
+            if (closed || gen != generation) return@Thread
             val u = runCatching { urlFactory() }.getOrNull()
-            if (u == null) { reconnectAfterDelay(); return@Thread }
+            if (closed || gen != generation) return@Thread
+            if (u == null) { reconnectAfterDelay(gen); return@Thread }
             HttpClient.newHttpClient().newWebSocketBuilder()
-                .buildAsync(URI.create(u), Listener())
-                .whenComplete { socket, err -> if (err == null) { ws = socket; onStatus?.invoke(true); onOpen() } else reconnectAfterDelay() }
+                .buildAsync(URI.create(u), Listener(gen))
+                .whenComplete { socket, err ->
+                    if (closed || gen != generation) { socket?.sendClose(WebSocket.NORMAL_CLOSURE, ""); return@whenComplete }
+                    if (err == null) { ws = socket; onStatus?.invoke(true); onOpen() } else reconnectAfterDelay(gen)
+                }
         }.start()
     }
 
-    private fun reconnectAfterDelay() { if (!closed) Thread { Thread.sleep(1500); connect() }.start() }
+    private fun reconnectAfterDelay(gen: Int) { if (!closed && gen == generation) Thread { Thread.sleep(1500); connect() }.start() }
 
     private fun onOpen() {
-        val sv = stateVector() // STEP_1 (our state vector) so peers send what we're missing
-        send(encode(0, sv)); lastSentSV = sv
-        if (localUser != null) send(encodeAwareness()) // announce presence/cursor
+        // STEP_1 (our state vector) so peers send what we're missing, plus our presence — built under the lock.
+        val (s1, aw) = synchronized(lock) {
+            val sv = stateVector()
+            lastSentSV = sv
+            encode(0, sv) to (if (localUser != null) encodeAwareness() else null)
+        }
+        send(s1)
+        aw?.let { send(it) }
     }
 
-    private inner class Listener : WebSocket.Listener {
+    private inner class Listener(private val gen: Int) : WebSocket.Listener {
         private var acc = ByteArray(0)
         override fun onBinary(webSocket: WebSocket, data: ByteBuffer, last: Boolean): CompletionStage<*>? {
             val chunk = ByteArray(data.remaining()); data.get(chunk); acc += chunk
@@ -124,7 +152,7 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
         }
         override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
             onStatus?.invoke(false)
-            reconnectAfterDelay()
+            reconnectAfterDelay(gen)
             return null
         }
         override fun onError(webSocket: WebSocket, error: Throwable?) { onStatus?.invoke(false) }
@@ -143,12 +171,14 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
         val payload = readVarUint8Array(plain, pos) ?: return
         when (syncKind) {
             0L -> { // step1 → reply step2 (the update covering what the peer is missing)
-                val update = tx { it.transactionEncodeStateAsUpdateFromSv(payload.toUByteList()).toByteArray() }
-                send(encode(1, update))
+                val reply = synchronized(lock) { encode(1, tx { it.transactionEncodeStateAsUpdateFromSv(payload.toUByteList()).toByteArray() }) }
+                send(reply)
             }
             1L, 2L -> { // step2 / update → apply, then push the merged text up
-                tx { it.transactionApplyUpdate(payload.toUByteList()) }
-                lastSentSV = stateVector()
+                synchronized(lock) {
+                    tx { it.transactionApplyUpdate(payload.toUByteList()) }
+                    lastSentSV = stateVector()
+                }
                 onText?.invoke(currentText)
             }
         }
@@ -165,7 +195,7 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
         val api = persistApiBase ?: return 0
         val s = persistSession ?: return 0
         persistMaxSeq = runCatching { JournalPersistence.loadJournalDoc(api, s, persistScopeId, persistNodeId, contentKey, doc, lock) }.getOrDefault(0)
-        lastPersistedSV = stateVector()
+        synchronized(lock) { lastPersistedSV = stateVector() }
         onText?.invoke(currentText)
         return persistMaxSeq
     }
@@ -174,10 +204,10 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
     fun flushPersist() {
         val api = persistApiBase ?: return
         val s = persistSession ?: return
-        val diff = tx { it.transactionEncodeStateAsUpdateFromSv(lastPersistedSV.toUByteList()).toByteArray() }
+        val diff = synchronized(lock) { tx { it.transactionEncodeStateAsUpdateFromSv(lastPersistedSV.toUByteList()).toByteArray() } }
         if (diff.isEmpty()) return
         runCatching { JournalPersistence.appendJournalUpdate(api, s, persistScopeId, persistNodeId, contentKey, diff) }
-            .onSuccess { persistMaxSeq = maxOf(persistMaxSeq, it); lastPersistedSV = stateVector() }
+            .onSuccess { synchronized(lock) { persistMaxSeq = maxOf(persistMaxSeq, it); lastPersistedSV = stateVector() } }
     }
 
     /** Compact: write a fresh snapshot + the Markdown reader projection and prune the folded-in updates. */
@@ -188,8 +218,13 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
     }
 
     private fun broadcastUpdate() {
-        val update = tx { it.transactionEncodeStateAsUpdateFromSv(lastSentSV.toUByteList()).toByteArray() }
-        if (update.isNotEmpty()) { send(encode(2, update)); lastSentSV = stateVector() }
+        val bytes = synchronized(lock) {
+            val update = tx { it.transactionEncodeStateAsUpdateFromSv(lastSentSV.toUByteList()).toByteArray() }
+            if (update.isEmpty()) return
+            lastSentSV = stateVector()
+            encode(2, update)
+        }
+        send(bytes)
     }
 
     private fun <T> tx(block: (YrsTransaction) -> T): T = synchronized(lock) { doc.transact(null).use { block(it) } }
@@ -219,30 +254,35 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
         writeVarUint(enc, 1); writeVarUint8Array(enc, aw.toByteArray())
         return seal(enc.toByteArray())
     }
-    private fun bumpAwareness() { localClock++; if (ws != null) send(encodeAwareness()) }
+    /** Bump the awareness clock and return the encoded presence frame to send (or null if not connected). Caller
+     * MUST hold [lock] (it mutates localClock and reads localUser/localCursor); send the result outside the lock. */
+    private fun bumpAwarenessLocked(): ByteArray? { localClock++; return if (ws != null) encodeAwareness() else null }
     private fun applyAwareness(update: ByteArray) {
-        val p = intArrayOf(0)
-        val count = readVarUint(update, p)
-        var i = 0L
-        while (i < count) {
-            i++
-            val clientId = readVarUint(update, p)
-            val clock = readVarUint(update, p)
-            val jsonBytes = readVarUint8Array(update, p) ?: break
-            if (clientId == localClientId) continue
-            val prev = peerClocks[clientId]
-            if (prev != null && prev >= clock) continue
-            peerClocks[clientId] = clock
-            val obj = runCatching { JSONObject(String(jsonBytes, Charsets.UTF_8)) }.getOrNull()
-            val user = obj?.optJSONObject("user")
-            if (user != null) {
-                val cursor = if (obj.has("cursorIndex")) obj.optInt("cursorIndex") else null
-                peers[clientId] = Peer(clientId, user.optString("name", "?"), user.optString("color", "#888888"), cursor)
-            } else {
-                peers.remove(clientId)
+        val snapshot = synchronized(lock) {
+            val p = intArrayOf(0)
+            val count = readVarUint(update, p)
+            var i = 0L
+            while (i < count) {
+                i++
+                val clientId = readVarUint(update, p)
+                val clock = readVarUint(update, p)
+                val jsonBytes = readVarUint8Array(update, p) ?: break
+                if (clientId == localClientId) continue
+                val prev = peerClocks[clientId]
+                if (prev != null && prev >= clock) continue
+                peerClocks[clientId] = clock
+                val obj = runCatching { JSONObject(String(jsonBytes, Charsets.UTF_8)) }.getOrNull()
+                val user = obj?.optJSONObject("user")
+                if (user != null) {
+                    val cursor = if (obj.has("cursorIndex")) obj.optInt("cursorIndex") else null
+                    peers[clientId] = Peer(clientId, user.optString("name", "?"), user.optString("color", "#888888"), cursor)
+                } else {
+                    peers.remove(clientId)
+                }
             }
+            peers.values.toList()
         }
-        onPeers?.invoke(peers.values.toList())
+        onPeers?.invoke(snapshot)
     }
     private fun open(data: ByteArray): ByteArray? = V1.journalOpen(contentKey, data)
 
