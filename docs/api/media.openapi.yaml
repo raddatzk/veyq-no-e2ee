@@ -241,7 +241,7 @@ components:
       type: object
       required: [dedupToken, totalChunks, byteSize]
       properties:
-        dedupToken: { type: string }
+        dedupToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         totalChunks: { type: integer, minimum: 1, maximum: 10000 }
         byteSize: { type: integer, format: int64, minimum: 0, maximum: 10737418240 }
     BlobTicket:
@@ -302,7 +302,7 @@ components:
       properties:
         originalBlobId: { type: string }
         sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        mimeType: { type: string }
+        mimeType: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeInput' }
@@ -314,7 +314,7 @@ components:
         scopeId: { type: string }
         nodeId: { type: string }
         sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        mimeType: { type: string }
+        mimeType: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
         original: { $ref: '#/components/schemas/BlobRef' }
         derivatives:
           type: array

@@ -10,7 +10,7 @@ components:
       required: [code, message]
       properties:
         code: { type: string }
-        message: { type: string }
+        message: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2000)'] }
     ServerRole:
       type: string
       enum: [ServerOwner, ServerMember]
@@ -24,8 +24,8 @@ components:
       required: [id, email, displayName, serverRole]
       properties:
         id: { type: string }
-        email: { type: string }
-        displayName: { type: string }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         serverRole: { $ref: '#/components/schemas/ServerRole' }
     IdentityPublicKey:
       type: object

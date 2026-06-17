@@ -382,7 +382,7 @@ components:
       type: object
       properties:
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
-        slugToken: { type: string, description: 'Recomputed blinded slug token (required with a rename or a move).' }
+        slugToken: { type: string, description: 'Recomputed blinded slug token (required with a rename or a move).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         newParentId: { type: string, description: 'Move target: a node id, or "root" for the scope root. Omit to keep the parent.' }
         orderIndex: { type: integer }
         coverMediaId: { type: string, description: 'A media id of this node to pin as its cover.' }
@@ -394,7 +394,7 @@ components:
         parentId: { type: string, description: 'The parent node id, or null for a root-level node.' }
         scopeId: { type: string }
         type: { $ref: '#/components/schemas/NodeType' }
-        slugToken: { type: string }
+        slugToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         orderIndex: { type: integer }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         coverMediaId: { type: string, description: 'The pinned cover media id, if any.' }
@@ -479,14 +479,14 @@ components:
         role: { $ref: '#/components/schemas/ShareRole' }
         passwordSalt: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         expiresAt: { type: string, format: date-time, description: 'When the link stops working (omit for never).' }
-        label: { type: string, description: 'An owner-facing label for the link (not shown to guests).' }
-        noticeMarkdown: { type: string, description: 'Extra terms a guest must accept for THIS share (markdown).' }
+        label: { type: string, description: 'An owner-facing label for the link (not shown to guests).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        noticeMarkdown: { type: string, description: 'Extra terms a guest must accept for THIS share (markdown).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
     UpdateShareRequest:
       type: object
       properties:
         expiresAt: { type: string, format: date-time, description: 'New expiry; omit to deactivate it.' }
-        label: { type: string }
-        noticeMarkdown: { type: string }
+        label: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        noticeMarkdown: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
     ShareSummary:
       type: object
       required: [shareId, nodeId, role, passwordProtected, label, createdAt]
@@ -496,8 +496,8 @@ components:
         role: { $ref: '#/components/schemas/ShareRole' }
         passwordProtected: { type: boolean }
         expiresAt: { type: string, format: date-time }
-        label: { type: string }
-        noticeMarkdown: { type: string }
+        label: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        noticeMarkdown: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
         createdAt: { type: string, format: date-time }
     ShareList:
       type: object
@@ -512,7 +512,7 @@ components:
       properties:
         scope: { type: string, enum: [TENANT, SHARE] }
         version: { type: integer }
-        markdown: { type: string }
+        markdown: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
     PublicShare:
       type: object
       # `root` (the shared node, incl. its sealed name) is returned ONLY to roles that can read content.

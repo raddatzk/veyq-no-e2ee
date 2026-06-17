@@ -17,6 +17,20 @@ class ApiExceptionMapper : ExceptionMapper<ApiException> {
 }
 
 /**
+ * Bean-validation failures — the `@Valid`-cascaded `@field:…` constraints declared via the OpenAPI
+ * `x-field-extra-annotation` extension — surface as a ConstraintViolationException. Map them to the shared
+ * ErrorResponse shape (a stable 400) instead of Quarkus' default violation report, so every 400 the client
+ * sees carries the same `{code, message}` body.
+ */
+@Provider
+class ConstraintViolationMapper : ExceptionMapper<jakarta.validation.ConstraintViolationException> {
+    override fun toResponse(ex: jakarta.validation.ConstraintViolationException): Response =
+        Response.status(400)
+            .entity(ErrorResponse(code = "VALIDATION_ERROR", message = ex.constraintViolations.firstOrNull()?.message ?: "Invalid request"))
+            .build()
+}
+
+/**
  * Malformed client input — a bad base64 frame, an out-of-range enum value — surfaces from the JDK as a raw
  * IllegalArgumentException. Deliberate validation in handlers always throws [ApiException], so the only IAEs
  * that reach here come from decoding untrusted request data: map them to 400 instead of a generic 500. Still

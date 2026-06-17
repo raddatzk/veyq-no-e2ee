@@ -110,7 +110,7 @@ components:
         masterKeyWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         # Only for unlockMethod=RECOVERY: SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — stores
         # the recovery commitment so a later password reset can prove Secret-Key possession (see auth spec).
-        recoveryAuthTag: { type: string }
+        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
     RewrapMyScopeGrantRequest:
       type: object
       required: [wrappedScopePrivateKey]

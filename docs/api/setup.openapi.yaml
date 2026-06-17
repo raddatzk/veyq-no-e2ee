@@ -70,6 +70,6 @@ components:
         # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url. Required when a RECOVERY wrap is included:
         # the server stores it as the recovery commitment, so a password reset must later prove the client
         # recovered the real master key with the Secret Key (not email-token possession alone).
-        recoveryAuthTag: { type: string }
+        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }

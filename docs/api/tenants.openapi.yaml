@@ -521,27 +521,27 @@ components:
       required: [tenantId, version]
       properties:
         tenantId: { type: string }
-        termsMarkdown: { type: string }
+        termsMarkdown: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
         version: { type: integer }
     UpdateTenantTermsRequest:
       type: object
       properties:
-        termsMarkdown: { type: string, description: 'Markdown ToS; empty/omitted clears it.' }
+        termsMarkdown: { type: string, description: 'Markdown ToS; empty/omitted clears it.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 200000)'] }
     CreateTenantRequest:
       type: object
       required: [name, displayName, domain]
       properties:
-        name: { type: string, description: Unique slug-like tenant name. }
-        displayName: { type: string }
-        domain: { type: string, description: 'Required + unique: the host that resolves to this tenant (e.g. acme.veyq.app).' }
+        name: { type: string, description: Unique slug-like tenant name., x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        domain: { type: string, description: 'Required + unique: the host that resolves to this tenant (e.g. acme.veyq.app).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
     TenantSummary:
       type: object
       required: [id, name, displayName, status]
       properties:
         id: { type: string }
-        name: { type: string }
-        displayName: { type: string }
-        domain: { type: string }
+        name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        domain: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
         status: { type: string, enum: [PENDING, ACTIVE] }
     CreateGroupRequest:
       type: object
@@ -582,7 +582,7 @@ components:
       required: [userId, displayName, role]
       properties:
         userId: { type: string }
-        displayName: { type: string }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string }
     GroupMemberList:
       type: object
@@ -594,7 +594,7 @@ components:
       required: [inviteId, bootstrapSecret, expiresAt]
       properties:
         inviteId: { type: string }
-        bootstrapSecret: { type: string, description: One-time secret (base64url); goes in the URL fragment. }
+        bootstrapSecret: { type: string, description: One-time secret (base64url); goes in the URL fragment., x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         expiresAt: { type: string, format: date-time }
     MembershipSummary:
       type: object
@@ -608,7 +608,7 @@ components:
       type: object
       required: [bootstrapSecret, wrappedScopePrivateKey]
       properties:
-        bootstrapSecret: { type: string }
+        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         wrappedScopePrivateKey:
           $ref: './common.openapi.yaml#/components/schemas/Blob'
           description: The scope private key re-wrapped to the caller's own identity public key.
@@ -617,7 +617,7 @@ components:
       required: [userId, displayName, role, status, identityPublicKey]
       properties:
         userId: { type: string }
-        displayName: { type: string }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string }
         status: { type: string }
         identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
@@ -645,7 +645,7 @@ components:
       required: [id, slugToken, sealedContent]
       properties:
         id: { type: string }
-        slugToken: { type: string, description: 'The blinded slug token recomputed under the fresh content key.' }
+        slugToken: { type: string, description: 'The blinded slug token recomputed under the fresh content key.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         sealedContent: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     ScopeGrantInput:
       type: object
@@ -703,7 +703,7 @@ components:
       type: object
       required: [bootstrapSecret]
       properties:
-        bootstrapSecret: { type: string }
+        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
     TenantInviteMaterial:
       type: object
       description: >
@@ -724,14 +724,14 @@ components:
       type: object
       required: [email, inviteId, link]
       properties:
-        email: { type: string }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
         inviteId: { type: string, description: 'A pending member invite of this tenant.' }
-        link: { type: string, description: 'The client-assembled invite URL (must point at this instance''s app origin).' }
+        link: { type: string, description: 'The client-assembled invite URL (must point at this instance''s app origin).', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 2048)'] }
     ClaimTenantOwnershipRequest:
       type: object
       required: [bootstrapSecret, scopePublicKey, wrappedScopePrivateKey]
       properties:
-        bootstrapSecret: { type: string }
+        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     MyScopeGrant:
@@ -748,9 +748,9 @@ components:
          masterKeyWraps, authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey,
          scopePublicKey, wrappedScopePrivateKey]
       properties:
-        bootstrapSecret: { type: string }
-        email: { type: string }
-        displayName: { type: string }
+        bootstrapSecret: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 256)'] }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
         wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         masterKeyWraps:
@@ -759,7 +759,7 @@ components:
           items: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
         # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url — the recovery commitment (see setup spec).
-        recoveryAuthTag: { type: string }
+        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         personalScopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
         wrappedPersonalScopePrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }

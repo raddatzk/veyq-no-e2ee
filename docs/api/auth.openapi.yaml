@@ -141,8 +141,8 @@ components:
       type: object
       required: [email, password]
       properties:
-        email: { type: string }
-        password: { type: string }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        password: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 1024)'] }
     LoginResponse:
       type: object
       required: [sessionToken, user, keyBag]
@@ -171,26 +171,26 @@ components:
       type: object
       required: [email]
       properties:
-        email: { type: string }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
     PasswordResetTokenRequest:
       type: object
       required: [token]
       properties:
-        token: { type: string }
+        token: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 512)'] }
     PasswordResetMaterial:
       type: object
       required: [email, recoveryWrap]
       properties:
-        email: { type: string, description: 'The account email (so the reset screen can show whose account).' }
+        email: { type: string, description: 'The account email (so the reset screen can show whose account).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
         recoveryWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
     PasswordResetConfirmRequest:
       type: object
       required: [token, masterKeyWrap, authVerifier, recoveryAuthTag]
       properties:
-        token: { type: string }
+        token: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 512)'] }
         masterKeyWrap: { $ref: './common.openapi.yaml#/components/schemas/MasterKeyWrap' }
         authVerifier: { $ref: './common.openapi.yaml#/components/schemas/AuthVerifier' }
         # SHA-256("veyq/v1/recovery-auth" || masterKey), base64url. Must match the commitment stored at
         # registration — proves the client recovered the real master key with the Secret Key. Without it,
         # an email-token-only attacker could reset the password verifier and hijack the server account.
-        recoveryAuthTag: { type: string }
+        recoveryAuthTag: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }

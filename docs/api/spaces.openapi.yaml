@@ -50,8 +50,8 @@ components:
       required: [tenantId, name, displayName, role, scopeId, scopePublicKey]
       properties:
         tenantId: { type: string }
-        name: { type: string }
-        displayName: { type: string }
+        name: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string, description: 'The caller''s role in the tenant (membership authority, not content access).' }
         scopeId: { type: string }
         scopePublicKey: { $ref: './common.openapi.yaml#/components/schemas/KemPublicKey' }
@@ -72,9 +72,9 @@ components:
       properties:
         kind: { type: string, enum: [PERSONAL, TENANT, GROUP] }
         tenantId: { type: string, description: 'TENANT/GROUP — the backing tenant.' }
-        name: { type: string, description: 'TENANT — the tenant name (slug).' }
-        domain: { type: string, description: 'TENANT/GROUP — the tenant''s domain (the host that resolves to it). The client routes/switches by it.' }
-        displayName: { type: string, description: 'PERSONAL: the user''s display name; TENANT: the tenant display name; GROUP: empty (use sealedName).' }
+        name: { type: string, description: 'TENANT — the tenant name (slug).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
+        domain: { type: string, description: 'TENANT/GROUP — the tenant''s domain (the host that resolves to it). The client routes/switches by it.', x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 253)'] }
+        displayName: { type: string, description: 'PERSONAL: the user''s display name; TENANT: the tenant display name; GROUP: empty (use sealedName).', x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         role: { type: string, description: 'TENANT: tenant role; GROUP: group role; absent for PERSONAL.' }
         sealedName: { $ref: './common.openapi.yaml#/components/schemas/Blob', description: 'GROUP only — the group name sealed under its content key.' }
         scheduledDeletionAt: { type: string, format: date-time, description: 'TENANT only — set when the tenant is scheduled for deletion (in-app warning + cancel).' }
