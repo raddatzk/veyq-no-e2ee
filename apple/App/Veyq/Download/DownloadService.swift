@@ -7,6 +7,12 @@ import VeyqCrypto
 enum DownloadService {
     struct Item { let name: String; let data: Data }
 
+    /// Temp subdir for ALL decrypted media exports (single originals + zips) handed to the activity sheet, so one
+    /// launch sweep wipes every plaintext-at-rest artifact (mirrors the Emergency-Kit cleanup). These files contain
+    /// decrypted, GPS-bearing originals — they must not linger in the container.
+    static var exportDir: URL { FileManager.default.temporaryDirectory.appendingPathComponent("veyq-export", isDirectory: true) }
+    static func cleanupExports() { try? FileManager.default.removeItem(at: exportDir) }
+
     static func buildZip(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, name: String, withChapters: Bool) async throws -> URL {
         var files: [Item] = []
         try await gather(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, prefix: "", withChapters: withChapters, into: &files)
@@ -30,9 +36,10 @@ enum DownloadService {
 
     private static func zipToTemp(_ files: [Item], name: String) throws -> URL {
         let fm = FileManager.default
-        let parent = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let parent = exportDir.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let dir = parent.appendingPathComponent(name, isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: parent) } // drop the decrypted-originals staging dir as soon as it's zipped
         for f in files {
             let url = dir.appendingPathComponent(f.name)
             try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -41,7 +48,7 @@ enum DownloadService {
         var result: URL?
         var coordError: NSError?
         NSFileCoordinator().coordinate(readingItemAt: dir, options: .forUploading, error: &coordError) { zipped in
-            let dest = fm.temporaryDirectory.appendingPathComponent("\(name).zip")
+            let dest = exportDir.appendingPathComponent("\(name).zip")
             try? fm.removeItem(at: dest)
             try? fm.copyItem(at: zipped, to: dest)
             result = dest

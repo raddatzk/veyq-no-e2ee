@@ -369,7 +369,9 @@ struct MemoryDetailView: View {
             defer { savingOriginal = false }
             guard let data = await store.loadOriginalData(tile) else { return }
             let ext = (tile.mimeType.split(separator: "/").last.map(String.init) ?? "bin").replacingOccurrences(of: "jpeg", with: "jpg")
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(tile.id.prefix(8)).\(ext)")
+            // Under the export dir (not bare temp) so the launch sweep wipes this decrypted original too.
+            try? FileManager.default.createDirectory(at: DownloadService.exportDir, withIntermediateDirectories: true)
+            let url = DownloadService.exportDir.appendingPathComponent("\(name)-\(tile.id.prefix(8)).\(ext)")
             guard (try? data.write(to: url)) != nil else { return }
             shareItem = ShareItem(url: url)
         }

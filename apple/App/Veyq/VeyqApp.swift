@@ -4,7 +4,7 @@ import SwiftUI
 /// on top of the `apple/` VeyqCrypto package; this is the bootable shell that proves the wiring.
 @main
 struct VeyqApp: App {
-    init() { Self.cleanupKitTemp() }
+    init() { Self.cleanupSharedTemp() }
 
     var body: some Scene {
         WindowGroup {
@@ -12,12 +12,14 @@ struct VeyqApp: App {
         }
     }
 
-    /// Wipe any leftover Emergency Kit PDFs from the temp dir on launch. The kit embeds the plaintext Secret
-    /// Key and is shared out via the activity sheet; none can be mid-share at a cold start, so deleting it here
-    /// bounds its lifetime to one session instead of letting it linger. Targets only the kit files by name.
-    private static func cleanupKitTemp() {
+    /// Wipe leftover plaintext-at-rest artifacts from the temp dir on launch: the Emergency Kit PDF (plaintext
+    /// Secret Key) and the media-export dir (decrypted, GPS-bearing originals + zips). All are shared out via the
+    /// activity sheet and none can be mid-share at a cold start, so deleting them here bounds their lifetime to one
+    /// session instead of letting them linger in the container.
+    private static func cleanupSharedTemp() {
         let tmp = FileManager.default.temporaryDirectory
         let files = (try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []
         for f in files where f.lastPathComponent.hasPrefix("veyq-emergency-kit") { try? FileManager.default.removeItem(at: f) }
+        DownloadService.cleanupExports()
     }
 }

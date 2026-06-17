@@ -11,7 +11,7 @@ enum EmergencyKitPdf {
         let qr = qrImage(payload)
         let bounds = CGRect(x: 0, y: 0, width: 595, height: 842) // A4 @ 72dpi
         // Fixed (non-identifying) name: no email in the temp filename, and each new kit overwrites the previous
-        // Secret-Key-bearing PDF instead of leaving one per email. cleanupSharedTemp() wipes it on app launch.
+        // Secret-Key-bearing PDF instead of leaving one per email. VeyqApp.cleanupSharedTemp() wipes it on launch.
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("veyq-emergency-kit.pdf")
         let renderer = UIGraphicsPDFRenderer(bounds: bounds)
         let dark = UIColor(white: 0.08, alpha: 1)
