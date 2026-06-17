@@ -64,7 +64,7 @@ object Media {
 
     /** Begin (or dedup) storing a blob. READY → already stored (attach blobId); UPLOADING → push the frames. */
     fun startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Long): BlobTicket {
-        val body = """{"dedupToken":"$dedupToken","totalChunks":$totalChunks,"byteSize":$byteSize}"""
+        val body = JSONObject().put("dedupToken", dedupToken).put("totalChunks", totalChunks).put("byteSize", byteSize).toString()
         val resp = send("$apiBase/api/scopes/$scopeId/blobs", session.sessionToken, "POST", body)
         if (resp.statusCode() != 200) throw RuntimeException("start blob failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
@@ -74,7 +74,7 @@ object Media {
     /** Seal one plaintext chunk into a frame and PUT it (idempotent — re-PUT is the basis of resume). */
     fun putChunk(apiBase: String, session: Login.UnlockedSession, scopeId: String, uploadId: String, index: Int, total: Int, contentKey: ByteArray, plain: ByteArray) {
         val frame = V1.sealFrame(contentKey, index, total, plain, V1.randomBytes(12))
-        val body = """{"frame":{"suiteId":"v1","bytes":"${enc.encodeToString(frame)}"}}"""
+        val body = JSONObject().put("frame", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(frame))).toString()
         val resp = send("$apiBase/api/scopes/$scopeId/blob-uploads/$uploadId/chunks/$index", session.sessionToken, "PUT", body)
         if (resp.statusCode() != 204) throw RuntimeException("put chunk $index failed: ${resp.statusCode()}")
     }

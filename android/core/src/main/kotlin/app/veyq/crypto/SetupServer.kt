@@ -1,9 +1,7 @@
 package app.veyq.crypto
 
+import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
@@ -14,6 +12,7 @@ object SetupServer {
     private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private val b64 = Base64.getUrlEncoder().withoutPadding()
     private fun b64url(b: ByteArray): String = b64.encodeToString(b)
+    private fun blob(bytes: ByteArray): JSONObject = JSONObject().put("suiteId", "v1").put("bytes", b64url(bytes))
 
     data class EmergencyKit(val secretKey: String)
 
@@ -45,30 +44,29 @@ object SetupServer {
             id.pubKemX, id.pubKemM, V1.serializeIdentityPrivate(personal), "personal-scope-grant", V1.randomBytes(12),
         )
 
-        // base64url fields are JSON-safe; free text (email, displayName) is escaped via JSONObject.quote.
-        val json = """{"email":${JSONObject.quote(email)},"displayName":${JSONObject.quote(displayName)},""" +
-            """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
-            """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
-            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +
-            """{"unlockMethod":"RECOVERY","suiteId":"v1","wrappedKey":"${b64url(recWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, recSalt))}"}],""" +
-            """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
+        val masterKeyWraps = JSONArray()
+            .put(JSONObject().put("unlockMethod", "PASSWORD").put("suiteId", "v1").put("wrappedKey", b64url(masterWrap)).put("kdfParams", b64url(V1.encodeKdfParams(argon, salt))))
+            // RECOVERY wrap: master key under the Secret Key alone — released only via the email-token-gated reset.
+            .put(JSONObject().put("unlockMethod", "RECOVERY").put("suiteId", "v1").put("wrappedKey", b64url(recWrap)).put("kdfParams", b64url(V1.encodeKdfParams(argon, recSalt))))
+        val json = JSONObject()
+            .put("email", email)
+            .put("displayName", displayName)
+            .put("identityPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(id.pubKemX + id.pubKemM)).put("signPublicKey", b64url(id.pubSign)))
+            .put("wrappedIdentityPrivateKey", blob(wrappedPriv))
+            .put("masterKeyWraps", masterKeyWraps)
+            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", b64url(authSalt + verifier)))
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-            """"recoveryAuthTag":"${b64url(V1.recoveryAuthTag(masterKey))}",""" +
-            """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
-            """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"}}"""
+            .put("recoveryAuthTag", b64url(V1.recoveryAuthTag(masterKey)))
+            .put("personalScopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(personalPublic)))
+            .put("wrappedPersonalScopePrivateKey", blob(personalGrant))
+            .toString()
         return json to EmergencyKit(b64url(secretKey))
     }
 
     /** Returns (raw response body, emergency kit). Throws on non-200. */
     fun registerServerOwner(apiBase: String, email: String, displayName: String, password: String): Pair<String, EmergencyKit> {
         val (json, kit) = buildRequestJson(email, displayName, password)
-        val client = ApiClient.shared
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/setup/owner"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("setup/owner failed: ${resp.statusCode()}")
-        return resp.body() to kit
+        // Unauthenticated (cold setup) → null token.
+        return ApiClient.ok(apiBase, null, "/api/setup/owner", "POST", json, label = "setup/owner") to kit
     }
 }

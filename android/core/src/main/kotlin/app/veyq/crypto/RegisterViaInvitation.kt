@@ -1,9 +1,7 @@
 package app.veyq.crypto
 
+import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.text.Normalizer
 import java.util.Base64
 
@@ -15,8 +13,8 @@ import java.util.Base64
 object RegisterViaInvitation {
     private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private val enc = Base64.getUrlEncoder().withoutPadding()
-    private val client = ApiClient.shared
     private fun b64url(b: ByteArray): String = enc.encodeToString(b)
+    private fun blob(bytes: ByteArray): JSONObject = JSONObject().put("suiteId", "v1").put("bytes", b64url(bytes))
 
     data class RegisterResult(
         val sessionToken: String,
@@ -26,22 +24,13 @@ object RegisterViaInvitation {
     )
 
     /** Public invite metadata — the bootstrap secret (from the URL fragment) is never sent here. */
-    fun getInviteMetadata(apiBase: String, inviteId: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId")).GET().build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("invite metadata failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
+    fun getInviteMetadata(apiBase: String, inviteId: String): JSONObject =
+        JSONObject(ApiClient.ok(apiBase, null, "/api/tenant-invites/$inviteId", "GET", label = "invite metadata"))
 
     /** Fetch the temp-wrapped onboarding material by proving the bootstrap secret (not in public metadata). */
     fun getInviteMaterial(apiBase: String, inviteId: String, bootstrapSecret: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/material"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString("""{"bootstrapSecret":${JSONObject.quote(bootstrapSecret)}}"""))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("invite material failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
+        val json = JSONObject().put("bootstrapSecret", bootstrapSecret).toString()
+        return JSONObject(ApiClient.ok(apiBase, null, "/api/tenant-invites/$inviteId/material", "POST", json, label = "invite material"))
     }
 
     /** Builds the tenant scope grant (scopePublicKey, wrappedScopePrivateKey — both base64url). */
@@ -80,19 +69,25 @@ object RegisterViaInvitation {
         // the tenant scope grant — minted (owner) or temp-unwrapped + re-wrapped (member)
         val (scopePublic, grant) = tenantScope.grant(id.pubKemX, id.pubKemM)
 
-        // base64url fields are JSON-safe; free text (bootstrapSecret, email, displayName) via JSONObject.quote.
-        val json = """{"bootstrapSecret":${JSONObject.quote(bootstrapSecret)},"email":${JSONObject.quote(email)},"displayName":${JSONObject.quote(displayName)},""" +
-            """"identityPublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(id.pubKemX + id.pubKemM)}","signPublicKey":"${b64url(id.pubSign)}"},""" +
-            """"wrappedIdentityPrivateKey":{"suiteId":"v1","bytes":"${b64url(wrappedPriv)}"},""" +
-            """"masterKeyWraps":[{"unlockMethod":"PASSWORD","suiteId":"v1","wrappedKey":"${b64url(masterWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, salt))}"},""" +
-            """{"unlockMethod":"RECOVERY","suiteId":"v1","wrappedKey":"${b64url(recWrap)}","kdfParams":"${b64url(V1.encodeKdfParams(argon, recSalt))}"}],""" +
-            """"authVerifier":{"kind":"ARGON2_PROOF","suiteId":"v1","verifier":"${b64url(authSalt + verifier)}"},""" +
+        val masterKeyWraps = JSONArray()
+            .put(JSONObject().put("unlockMethod", "PASSWORD").put("suiteId", "v1").put("wrappedKey", b64url(masterWrap)).put("kdfParams", b64url(V1.encodeKdfParams(argon, salt))))
+            .put(JSONObject().put("unlockMethod", "RECOVERY").put("suiteId", "v1").put("wrappedKey", b64url(recWrap)).put("kdfParams", b64url(V1.encodeKdfParams(argon, recSalt))))
+        val json = JSONObject()
+            .put("bootstrapSecret", bootstrapSecret)
+            .put("email", email)
+            .put("displayName", displayName)
+            .put("identityPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(id.pubKemX + id.pubKemM)).put("signPublicKey", b64url(id.pubSign)))
+            .put("wrappedIdentityPrivateKey", blob(wrappedPriv))
+            .put("masterKeyWraps", masterKeyWraps)
+            .put("authVerifier", JSONObject().put("kind", "ARGON2_PROOF").put("suiteId", "v1").put("verifier", b64url(authSalt + verifier)))
             // commitment to the master key — lets password reset prove Secret-Key possession (the RECOVERY wrap above)
-            """"recoveryAuthTag":"${b64url(V1.recoveryAuthTag(masterKey))}",""" +
-            """"personalScopePublicKey":{"suiteId":"v1","kemPublicKey":"${b64url(personalPublic)}"},""" +
-            """"wrappedPersonalScopePrivateKey":{"suiteId":"v1","bytes":"${b64url(personalGrant)}"},""" +
-            """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"$scopePublic"},""" +
-            """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"$grant"}}"""
+            .put("recoveryAuthTag", b64url(V1.recoveryAuthTag(masterKey)))
+            .put("personalScopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", b64url(personalPublic)))
+            .put("wrappedPersonalScopePrivateKey", blob(personalGrant))
+            // scopePublic + grant are already base64url strings from the TenantScopeProvider
+            .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", scopePublic))
+            .put("wrappedScopePrivateKey", JSONObject().put("suiteId", "v1").put("bytes", grant))
+            .toString()
         return json to SetupServer.EmergencyKit(b64url(secretKey))
     }
 
@@ -111,13 +106,7 @@ object RegisterViaInvitation {
         tenantScope: TenantScopeProvider,
     ): RegisterResult {
         val (json, kit) = buildRequestJson(bootstrapSecret, email, displayName, password, tenantScope)
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/register"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("register failed: ${resp.statusCode()}")
-        val body = JSONObject(resp.body())
+        val body = JSONObject(ApiClient.ok(apiBase, null, "/api/tenant-invites/$inviteId/register", "POST", json, label = "register"))
         return RegisterResult(
             sessionToken = body.getString("sessionToken"),
             user = body.getJSONObject("user"),

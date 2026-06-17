@@ -2,9 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
@@ -15,15 +12,12 @@ import java.util.Base64
 object InviteMembers {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = ApiClient.shared
+
+    private fun blob(bytes: ByteArray): JSONObject = JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(bytes))
 
     /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
     fun listTenantMembers(apiBase: String, token: String, tenantId: String): JSONArray {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members"))
-            .header("Authorization", "Bearer $token").GET().build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list members failed: ${resp.statusCode()}")
-        return JSONObject(resp.body()).getJSONArray("members")
+        return JSONObject(ApiClient.ok(apiBase, token, "/api/tenants/$tenantId/members", "GET", label = "list members")).getJSONArray("members")
     }
 
     /**
@@ -34,22 +28,22 @@ object InviteMembers {
         val members = listTenantMembers(apiBase, owner.sessionToken, tenantId)
         val newScope = V1.generateIdentity()
         val newScopePrivate = V1.serializeIdentityPrivate(newScope)
-        val grantParts = mutableListOf<String>()
+        val grants = JSONArray()
         for (i in 0 until members.length()) {
             val m = members.getJSONObject(i)
             if (m.getString("status") != "ACTIVE") continue
             val kem = dec.decode(m.getJSONObject("identityPublicKey").getString("kemPublicKey"))
             val wrapped = V1.asymWrap(kem.copyOfRange(0, 32), kem.copyOfRange(32, kem.size), newScopePrivate, "scope-grant", V1.randomBytes(12))
-            grantParts.add("""{"userId":"${m.getString("userId")}","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"}}""")
+            grants.put(JSONObject().put("userId", m.getString("userId")).put("wrappedScopePrivateKey", blob(wrapped)))
         }
+        val body = JSONObject()
+            .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(newScope.pubKemX + newScope.pubKemM)))
+            .put("grants", grants)
         // Forward secrecy: if the scope has content, mint a FRESH content key (not a re-wrap) and re-seal
         // every item under it. A removed member who cached the OLD content key cannot read content written
         // after the rotation, and the old ciphertext is overwritten — so the cached key opens nothing.
         val myGrant = Tenant.getMyScopeGrant(apiBase, owner.sessionToken, tenantId)
-        val ckReq = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/${myGrant.getString("scopeId")}/content-key"))
-            .header("Authorization", "Bearer ${owner.sessionToken}").GET().build()
-        val ckResp = client.send(ckReq, HttpResponse.BodyHandlers.ofString())
-        var ckPart = ""
+        val ckResp = ApiClient.send(apiBase, owner.sessionToken, "/api/scopes/${myGrant.getString("scopeId")}/content-key", "GET")
         if (ckResp.statusCode() == 200) {
             val oldScopePriv = Tenant.openScopeGrant(myGrant, owner.identity, owner.kemPublicKey)
             val oldKem = dec.decode(myGrant.getJSONObject("scopePublicKey").getString("kemPublicKey"))
@@ -58,71 +52,45 @@ object InviteMembers {
             val newCk = V1.randomBytes(32)
             val rewrapped = V1.asymWrap(newScope.pubKemX, newScope.pubKemM, newCk, "content-key", V1.randomBytes(12))
 
-            val itemsReq = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/${myGrant.getString("scopeId")}/items"))
-                .header("Authorization", "Bearer ${owner.sessionToken}").GET().build()
-            val itemsResp = client.send(itemsReq, HttpResponse.BodyHandlers.ofString())
-            if (itemsResp.statusCode() != 200) throw RuntimeException("item list failed: ${itemsResp.statusCode()}")
-            val itemsArr = JSONObject(itemsResp.body()).getJSONArray("items")
-            val reSealedParts = mutableListOf<String>()
+            val itemsArr = JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/scopes/${myGrant.getString("scopeId")}/items", "GET", label = "item list")).getJSONArray("items")
+            val reSealedItems = JSONArray()
             for (i in 0 until itemsArr.length()) {
                 val it = itemsArr.getJSONObject(i)
                 val sealed = dec.decode(it.getJSONObject("sealedContent").getString("bytes"))
                 val pt = V1.aeadOpen(oldCk, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), ByteArray(0))
                 val nonce = V1.randomBytes(12)
                 val resealed = nonce + V1.aeadSeal(newCk, nonce, pt, ByteArray(0))
-                reSealedParts.add("""{"id":"${it.getString("id")}","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
+                reSealedItems.put(JSONObject().put("id", it.getString("id")).put("sealedContent", blob(resealed)))
             }
 
             // Memory-tree nodes are sealed under the content key too — re-seal each + recompute its slug token
             val nodesArr = MemoryTree.listNodes(apiBase, owner, myGrant.getString("scopeId"))
-            val reSealedNodeParts = mutableListOf<String>()
+            val reSealedNodes = JSONArray()
             for (i in 0 until nodesArr.length()) {
                 val n = nodesArr.getJSONObject(i)
                 val content = MemoryTree.decodeNode(oldCk, n)
                 val resealed = MemoryTree.resealNode(newCk, content)
                 val parentSlot = if (n.isNull("parentId")) myGrant.getString("scopeId") else n.getString("parentId")
                 val token = MemoryTree.slugTokenFor(newCk, parentSlot, content.getString("slug"))
-                reSealedNodeParts.add("""{"id":"${n.getString("id")}","slugToken":"$token","sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(resealed)}"}}""")
+                reSealedNodes.put(JSONObject().put("id", n.getString("id")).put("slugToken", token).put("sealedContent", blob(resealed)))
             }
-            ckPart = ""","wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"},""" +
-                """"reSealedItems":[${reSealedParts.joinToString(",")}],""" +
-                """"reSealedNodes":[${reSealedNodeParts.joinToString(",")}]"""
+            body.put("wrappedContentKey", blob(rewrapped)).put("reSealedItems", reSealedItems).put("reSealedNodes", reSealedNodes)
         } else if (ckResp.statusCode() != 404) {
             throw RuntimeException("content-key fetch failed: ${ckResp.statusCode()}")
         }
 
-        val json = """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(newScope.pubKemX + newScope.pubKemM)}"},""" +
-            """"grants":[${grantParts.joinToString(",")}]$ckPart}"""
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/scope/rotate"))
-            .header("Authorization", "Bearer ${owner.sessionToken}")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("rotate scope failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
+        return JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenants/$tenantId/scope/rotate", "POST", body.toString(), label = "rotate scope"))
     }
 
     /** Change a member's role (membership/settings authority only — not content access, ADR 0005). No crypto. */
     fun changeMemberRole(apiBase: String, ownerToken: String, tenantId: String, userId: String, role: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId/role"))
-            .header("Authorization", "Bearer $ownerToken")
-            .header("Content-Type", "application/json")
-            .method("PUT", HttpRequest.BodyPublishers.ofString("""{"role":"$role"}"""))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("change role failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
+        val json = JSONObject().put("role", role).toString()
+        return JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenants/$tenantId/members/$userId/role", "PUT", json, label = "change role"))
     }
 
     /** Remove a member (instant layer of AD-24): revoke the member's scope grant + sessions. No crypto. */
-    fun removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/members/$userId"))
-            .header("Authorization", "Bearer $ownerToken").DELETE().build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("remove member failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
+    fun removeMember(apiBase: String, ownerToken: String, tenantId: String, userId: String): JSONObject =
+        JSONObject(ApiClient.ok(apiBase, ownerToken, "/api/tenants/$tenantId/members/$userId", "DELETE", label = "remove member"))
 
     data class MemberInvite(val inviteId: String, val bootstrapSecret: String, val tempPrivateKey: String)
 
@@ -141,17 +109,12 @@ object InviteMembers {
         val temp = V1.generateIdentity()
         val tempWrapped = V1.asymWrap(temp.pubKemX, temp.pubKemM, scopePrivateBytes, "scope-grant", V1.randomBytes(12))
 
-        val json = """{"role":"$role",""" +
-            """"tempPublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(temp.pubKemX + temp.pubKemM)}"},""" +
-            """"tempWrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(tempWrapped)}"}}"""
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/member-invites"))
-            .header("Authorization", "Bearer ${owner.sessionToken}")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("member-invite failed: ${resp.statusCode()}")
-        val body = JSONObject(resp.body())
+        val json = JSONObject()
+            .put("role", role)
+            .put("tempPublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(temp.pubKemX + temp.pubKemM)))
+            .put("tempWrappedScopePrivateKey", blob(tempWrapped))
+            .toString()
+        val body = JSONObject(ApiClient.ok(apiBase, owner.sessionToken, "/api/tenants/$tenantId/member-invites", "POST", json, label = "member-invite"))
         return MemberInvite(
             inviteId = body.getString("inviteId"),
             bootstrapSecret = body.getString("bootstrapSecret"),
@@ -199,15 +162,8 @@ object InviteMembers {
         )
         val ownKem = session.kemPublicKey
         val rewrapped = V1.asymWrap(ownKem.copyOfRange(0, 32), ownKem.copyOfRange(32, ownKem.size), scopePrivateBytes, "scope-grant", V1.randomBytes(12))
-        val json = """{"bootstrapSecret":"$bootstrapSecret","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(rewrapped)}"}}"""
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenant-invites/$inviteId/accept"))
-            .header("Authorization", "Bearer ${session.sessionToken}")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("accept failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
+        val json = JSONObject().put("bootstrapSecret", bootstrapSecret).put("wrappedScopePrivateKey", blob(rewrapped)).toString()
+        return JSONObject(ApiClient.ok(apiBase, session.sessionToken, "/api/tenant-invites/$inviteId/accept", "POST", json, label = "accept"))
     }
 
     // A passphrase that protects an invite's temp key is folded into a KEK via Argon2id. The params are NOT
@@ -237,12 +193,7 @@ object InviteMembers {
      */
     fun emailMemberInvite(apiBase: String, token: String, tenantId: String, email: String, inviteId: String, link: String) {
         val json = JSONObject().put("email", email.trim()).put("inviteId", inviteId).put("link", link).toString()
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/tenants/$tenantId/member-invites/email"))
-            .header("Authorization", "Bearer $token")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        val resp = ApiClient.send(apiBase, token, "/api/tenants/$tenantId/member-invites/email", "POST", json)
         if (resp.statusCode() != 204) throw RuntimeException("email invite failed: ${resp.statusCode()}")
     }
 }

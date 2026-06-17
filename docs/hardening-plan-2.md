@@ -37,11 +37,12 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   `PESSIMISTIC_WRITE`) **vor** der `isComplete()`-Prüfung, sodass parallele Setups serialisieren und der
   Verlierer ein sauberes 409 statt eines 500 bekommt. Direkt verifiziert: zwei gleichzeitige
   `POST /api/setup/owner` → genau ein 200 + ein 409 `ALREADY_SETUP`.
-- [~] **A5 · Android: rohe Response-Bodies in Exceptions + ungeescapte JSON-Interpolation** *(Security, Android, M)* —
-  **Teil 1 erledigt:** alle 44 `${resp.body()}`-Interpolationen aus den Throws über 18 `:core`-Dateien entfernt
-  (nur noch der Statuscode — keine Server-Payloads mehr in Crash-Logs); `:core` kompiliert.
-  **Teil 2 verschoben nach E3:** die 56 Triple-Quote-JSON-Bodies (10 Dateien) → `JSONObject`/`JSONArray`
-  migrieren beim zentralen `ApiClient`-Refactor (riskanter: Wire-Format, per Android-E2E zu verifizieren).
+- [x] **A5 · Android: rohe Response-Bodies in Exceptions + ungeescapte JSON-Interpolation** *(Security, Android)* —
+  **Teil 1:** alle 44 `${resp.body()}`-Interpolationen aus den Throws entfernt (+ die `$body`/`$resp`-Reste aus
+  den Pair-Helfern). **Teil 2:** ALLE Triple-Quote-JSON-Bodies (`""" … """`) auf `JSONObject`/`JSONArray`
+  umgestellt — keine ungeescapte Interpolation mehr (inkl. der tief verschachtelten Onboarding-Payloads
+  SetupServer/RegisterViaInvitation + der Rotation-Re-Seal-Arrays). Per-Datei `blob()`-Helfer für die
+  `{suiteId,bytes}`-Wire-Form. Verifiziert: 12 Android-E2E grün (Wire-Format byte-äquivalent).
 
 ## Phase B — Crypto-/Interop-Korrektheit
 - [x] **B1 · Invite-Passphrase Argon2-Parameter angeglichen** *(Security/Interop, M)* — **Echter Interop-Bug
@@ -137,13 +138,12 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
 - [x] **E2 · `toApiBatch` geteilt** *(Maintainability, S)* — die byte-identische Batch-Mapper-Kopie aus
   `MediaHandler` + `PublicShareMediaHandler` in einen gemeinsamen `MediaApiMapper` (`shared/content`) gezogen;
   beide delegieren. Verifiziert: media- + share-E2E grün (identische Ausgabe).
-- [~] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* —
-  **Web erledigt:** `b64url`/`fromB64url` (~30 Module) → `shared/base64.ts`. **Backend erledigt:**
-  `CryptoSuiteRegistry.require()` ersetzt 11× lokales `requireSuite`; top-level `unauthorized()`/`notFound()`
-  in `platform/error/ApiErrors.kt` ersetzen die ~19 trivialen Handler-Helfer. Verifiziert: 28 Web-E2E +
-  Backend-Tests + share-E2E grün.
-  **Offen (Android):** zentraler `ApiClient` (9× `HttpClient` + Send/Fehler-Handling) **+ A5 Teil 2** (56
-  Triple-Quote-JSON-Bodies → `JSONObject`/`JSONArray`), per Android-E2E zu verifizieren.
+- [x] **E3 · Zentralisierungen (P4.2-Reste + Clients)** *(Maintainability, M)* —
+  **Web:** `b64url`/`fromB64url` (~30 Module) → `shared/base64.ts`. **Backend:** `CryptoSuiteRegistry.require()`
+  ersetzt 11× `requireSuite`; top-level `unauthorized()`/`notFound()` in `platform/error/ApiErrors.kt` ersetzen
+  ~19 Handler-Helfer. **Android:** zentraler `ApiClient` (eine geteilte `HttpClient`-Instanz statt 22 + `ok()`/
+  `send()` mit nullable Token für die unauth Flows) — Helfer-Dateien delegieren, Inline-Dateien teilen den
+  Client. Verifiziert: 28 Web-E2E + Backend-Tests + 12 Android-E2E.
 - [ ] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — Roles/Status/Scope-Kind in Entities
   (`Tenancy.kt:21` u. a.). War bewusst zurückgestellt; jetzt mit **E1** koppeln (Guard + Enums zusammen).
 - [x] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView` reißt jetzt bei JEDEM

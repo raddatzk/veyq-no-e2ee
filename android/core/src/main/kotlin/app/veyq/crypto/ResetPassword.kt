@@ -22,12 +22,12 @@ object ResetPassword {
     /** Ask the server to email a reset token. Always succeeds (the server never reveals account existence). */
     fun requestReset(apiBase: String, email: String) {
         val (code, body) = post(apiBase, "/api/account/password-reset/request", JSONObject().put("email", email.trim()).toString())
-        if (code != 204) throw RuntimeException("reset request failed: $code $body")
+        if (code != 204) throw RuntimeException("reset request failed: $code")
     }
 
     private fun material(apiBase: String, token: String): JSONObject {
         val (code, body) = post(apiBase, "/api/account/password-reset/material", JSONObject().put("token", token).toString())
-        if (code != 200) throw RuntimeException("reset material failed: $code $body")
+        if (code != 200) throw RuntimeException("reset material failed: $code")
         return JSONObject(body)
     }
 
@@ -60,7 +60,7 @@ object ResetPassword {
             .put("recoveryAuthTag", enc.encodeToString(V1.recoveryAuthTag(masterKey)))
             .toString()
         val (code, resp) = post(apiBase, "/api/account/password-reset/confirm", body)
-        if (code != 204) throw RuntimeException("reset confirm failed: $code $resp")
+        if (code != 204) throw RuntimeException("reset confirm failed: $code")
         return mat.getString("email")
     }
 

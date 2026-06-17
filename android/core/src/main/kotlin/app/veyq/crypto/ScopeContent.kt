@@ -22,7 +22,7 @@ object ScopeContent {
     /** Fetch + open the caller's personal scope: unwrap its private key with the user's identity. */
     fun openPersonalScope(apiBase: String, session: Login.UnlockedSession): OpenScope {
         val (code, body) = req(apiBase, "/api/me/personal-scope", session.sessionToken)
-        if (code != 200) throw RuntimeException("personal-scope failed: $code $body")
+        if (code != 200) throw RuntimeException("personal-scope failed: $code")
         val g = JSONObject(body)
         val idKem = session.kemPublicKey
         val scopePrivBytes = V1.asymUnwrap(
@@ -44,7 +44,7 @@ object ScopeContent {
     /** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope — no tenant path). */
     fun openScopeById(apiBase: String, session: Login.UnlockedSession, scopeId: String): OpenScope {
         val (code, body) = req(apiBase, "/api/scopes/$scopeId/grants/me", session.sessionToken)
-        if (code != 200) throw RuntimeException("scope grant failed: $code $body")
+        if (code != 200) throw RuntimeException("scope grant failed: $code")
         val g = JSONObject(body)
         val scopePriv = Tenant.openScopeGrant(g, session.identity, session.kemPublicKey)
         val scopeKem = dec.decode(g.getJSONObject("scopePublicKey").getString("kemPublicKey"))
@@ -62,10 +62,10 @@ object ScopeContent {
         if (code != 404) throw RuntimeException("content-key fetch failed: $code")
         val ck = V1.randomBytes(32)
         val wrapped = V1.asymWrap(scope.scopePkX, scope.scopePkM, ck, "content-key", V1.randomBytes(12))
-        val json = """{"wrappedContentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"}}"""
-        val (pCode, pBody) = req(apiBase, path, session.sessionToken, "PUT", json)
+        val json = JSONObject().put("wrappedContentKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(wrapped))).toString()
+        val (pCode, _) = req(apiBase, path, session.sessionToken, "PUT", json)
         if (pCode == 409) return getOrCreateContentKey(apiBase, session, scope)
-        if (pCode != 200) throw RuntimeException("content-key provision failed: $pCode $pBody")
+        if (pCode != 200) throw RuntimeException("content-key provision failed: $pCode")
         return ck
     }
 
@@ -75,9 +75,9 @@ object ScopeContent {
         // NFC-normalize so the same logical string seals identically across platforms (web normalizes too)
         val normalized = Normalizer.normalize(plaintext, Normalizer.Form.NFC).toByteArray(Charsets.UTF_8)
         val sealed = nonce + V1.aeadSeal(contentKey, nonce, normalized, EMPTY)
-        val json = """{"sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(sealed)}"}}"""
+        val json = JSONObject().put("sealedContent", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(sealed))).toString()
         val (code, body) = req(apiBase, "/api/scopes/${scope.scopeId}/items", session.sessionToken, "POST", json)
-        if (code != 200) throw RuntimeException("item create failed: $code $body")
+        if (code != 200) throw RuntimeException("item create failed: $code")
         return JSONObject(body).getString("id")
     }
 

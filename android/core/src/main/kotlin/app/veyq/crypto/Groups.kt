@@ -37,18 +37,23 @@ object Groups {
         val nn = V1.randomBytes(12)
         val sealedName = nn + V1.aeadSeal(ck, nn, Normalizer.normalize(name.trim(), Normalizer.Form.NFC).toByteArray(Charsets.UTF_8), EMPTY)
 
-        val json = """{"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(scopePublic)}"},""" +
-            """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(grant)}"},""" +
-            """"contentKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrappedCk)}"},""" +
-            """"sealedName":{"suiteId":"v1","bytes":"${enc.encodeToString(sealedName)}"}}"""
+        val json = JSONObject()
+            .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(scopePublic)))
+            .put("wrappedScopePrivateKey", blob(grant))
+            .put("contentKey", blob(wrappedCk))
+            .put("sealedName", blob(sealedName))
+            .toString()
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups", session.sessionToken, "POST", json)
-        if (code != 200) throw RuntimeException("create group failed: $code $body")
+        if (code != 200) throw RuntimeException("create group failed: $code")
         return JSONObject(body)
     }
 
+    /** The recurring `{"suiteId":"v1","bytes":<base64url>}` sealed-blob wire shape. */
+    private fun blob(bytes: ByteArray): JSONObject = JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(bytes))
+
     fun listGroupMembers(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String): JSONArray {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId/members", session.sessionToken)
-        if (code != 200) throw RuntimeException("list group members failed: $code $body")
+        if (code != 200) throw RuntimeException("list group members failed: $code")
         return JSONObject(body).getJSONArray("members")
     }
 
@@ -56,55 +61,56 @@ object Groups {
      *  scope private bytes, then re-wraps them to the target's identity — the server never sees the key. */
     fun addGroupMember(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String, userId: String, targetKemPublicKeyB64: String, role: String = "GroupMember"): JSONObject {
         val (gCode, gBody) = send(apiBase, "/api/scopes/$scopeId/grants/me", session.sessionToken)
-        if (gCode != 200) throw RuntimeException("group grant failed: $gCode $gBody")
+        if (gCode != 200) throw RuntimeException("group grant failed: $gCode")
         val g = JSONObject(gBody)
         val myKem = session.kemPublicKey
         val scopePrivBytes = V1.asymUnwrap(session.identity.kemX, session.identity.mlkemSeed, myKem.copyOfRange(0, 32), myKem.copyOfRange(32, myKem.size), dec.decode(g.getJSONObject("wrappedScopePrivateKey").getString("bytes")), "scope-grant")
         val tKem = dec.decode(targetKemPublicKeyB64)
         val wrapped = V1.asymWrap(tKem.copyOfRange(0, 32), tKem.copyOfRange(32, tKem.size), scopePrivBytes, "scope-grant", V1.randomBytes(12))
 
-        val json = """{"userId":"$userId","wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(wrapped)}"},"role":"$role"}"""
+        val json = JSONObject().put("userId", userId).put("wrappedScopePrivateKey", blob(wrapped)).put("role", role).toString()
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId/members", session.sessionToken, "POST", json)
-        if (code != 200) throw RuntimeException("add group member failed: $code $body")
+        if (code != 200) throw RuntimeException("add group member failed: $code")
         return JSONObject(body)
     }
 
     fun setGroupMemberRole(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String, userId: String, role: String): JSONObject {
-        val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId/members/$userId", session.sessionToken, "PATCH", """{"role":"$role"}""")
-        if (code != 200) throw RuntimeException("set group role failed: $code $body")
+        val json = JSONObject().put("role", role).toString()
+        val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId/members/$userId", session.sessionToken, "PATCH", json)
+        if (code != 200) throw RuntimeException("set group role failed: $code")
         return JSONObject(body)
     }
 
     fun removeGroupMember(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String, userId: String) {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId/members/$userId", session.sessionToken, "DELETE")
-        if (code != 204) throw RuntimeException("remove group member failed: $code $body")
+        if (code != 204) throw RuntimeException("remove group member failed: $code")
     }
 
     fun deleteGroup(apiBase: String, session: Login.UnlockedSession, tenantId: String, scopeId: String) {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/groups/$scopeId", session.sessionToken, "DELETE")
-        if (code != 204) throw RuntimeException("delete group failed: $code $body")
+        if (code != 204) throw RuntimeException("delete group failed: $code")
     }
 
     fun deleteNode(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String) {
         val (code, body) = send(apiBase, "/api/scopes/$scopeId/nodes/$nodeId", session.sessionToken, "DELETE")
-        if (code != 204) throw RuntimeException("delete node failed: $code $body")
+        if (code != 204) throw RuntimeException("delete node failed: $code")
     }
 
     fun deleteMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String) {
         val (code, body) = send(apiBase, "/api/scopes/$scopeId/nodes/$nodeId/media/$mediaId", session.sessionToken, "DELETE")
-        if (code != 204) throw RuntimeException("delete media failed: $code $body")
+        if (code != 204) throw RuntimeException("delete media failed: $code")
     }
 
     /** Schedule a tenant for deletion after a grace period (owner only). It stays usable until the deadline,
      *  then the server GC purges it. Idempotent. */
     fun deleteTenant(apiBase: String, session: Login.UnlockedSession, tenantId: String) {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId", session.sessionToken, "DELETE")
-        if (code != 204) throw RuntimeException("delete tenant failed: $code $body")
+        if (code != 204) throw RuntimeException("delete tenant failed: $code")
     }
 
     /** Cancel a scheduled tenant deletion — clears the deadline (owner only). */
     fun cancelTenantDeletion(apiBase: String, session: Login.UnlockedSession, tenantId: String) {
         val (code, body) = send(apiBase, "/api/tenants/$tenantId/cancel-deletion", session.sessionToken, "POST")
-        if (code != 204) throw RuntimeException("cancel tenant deletion failed: $code $body")
+        if (code != 204) throw RuntimeException("cancel tenant deletion failed: $code")
     }
 }
