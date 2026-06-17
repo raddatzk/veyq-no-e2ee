@@ -62,11 +62,11 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
   Compaction. Fix: synchroner Teardown zuerst, Compaction detached; Reorder-Guard + Snapshot.
 
 ## Phase D — Crypto-Drift-Proofing (Vektoren)
-- [ ] **D1 · `encodeKdfParams`/`decodeKdfParams`-Wire-Format ungepinnt** *(Crypto/Tests, Medium, S)* — die EINZIGE
+- [x] **D1 · `encodeKdfParams`/`decodeKdfParams`-Wire-Format ungepinnt** *(Crypto/Tests, Medium, S)* — die EINZIGE
   Fixed-Layout-Cross-Platform-Serialisierung (web *encodet* bei Setup/Reset, Mobile *decodet* bei Login) ohne KAT.
   Ein Endianness-/Offset-/Feldreihenfolge-Edit bräche web-mint→mobile-login lautlos. Fix: `kdf_params`-Vektor
   (`{t:3,m:32768,p:1,dkLen:32,salt}` → fixe Hex) + encode/round-trip-Assertion in allen drei Suiten.
-- [ ] **D2 · NFC-Normalisierung wird vakuös getestet** *(Crypto/Tests, Medium, S)* — alle byte-sensitiven
+- [x] **D2 · NFC-Normalisierung wird vakuös getestet** *(Crypto/Tests, Medium, S)* — alle byte-sensitiven
   Vektor-Inputs sind bereits NFC/ASCII (`slug_token`-Slug `italien-2026-café` ist schon NFC), also würde eine
   Plattform, die Normalisierung WEGLÄSST, trotzdem alle Vektoren bestehen. Fix: `slug_token`-Slug auf **NFD**
   (`café`) ändern, erwarteter Token über die NFC-Form — macht den Normalisierungs-Schritt load-bearing.

@@ -50,6 +50,14 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.shareWrapKey(unhex(s.share_key), s.password_utf8, unhex(s.salt)))).toBe(s.wrap_key)
   })
 
+  it('kdfParams wire format (encode + decode round-trip)', () => {
+    const k = vectors.kdf_params
+    expect(hex(v1.encodeKdfParams(k.params, unhex(k.salt)))).toBe(k.encoded)
+    const d = v1.decodeKdfParams(unhex(k.encoded))
+    expect(d.params).toEqual(k.params)
+    expect(hex(d.salt)).toBe(k.salt)
+  })
+
   it('passkey PRF KEK (HKDF)', () => {
     const k = vectors.kek.passkey_prf_hkdf
     expect(hex(v1.kekPasskey(unhex(k.prf_output)))).toBe(k.kek)

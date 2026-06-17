@@ -56,6 +56,13 @@ class V1ConformanceTest {
         // Production-param (m=32 MiB) recovery KEK — pins the invite-temp-key KDF (the B1-class param bug).
         val recProd = kek.getJSONObject("recovery_argon2id_m32768")
         assertEquals(recProd.getString("kek"), hex(V1.kekRecovery(unhex(recProd.getString("recovery_code")), unhex(recProd.getString("salt")), argon(recProd))))
+
+        // kdfParams wire format — the one fixed-layout cross-platform serialization (web encodes, mobile decodes).
+        val kp = v.getJSONObject("kdf_params")
+        assertEquals(kp.getString("encoded"), hex(V1.encodeKdfParams(argon(kp), unhex(kp.getString("salt")))))
+        val (kpParams, kpSalt) = V1.decodeKdfParams(unhex(kp.getString("encoded")))
+        assertEquals(argon(kp), kpParams)
+        assertEquals(kp.getString("salt"), hex(kpSalt))
         val pk = kek.getJSONObject("passkey_prf_hkdf")
         assertEquals(pk.getString("kek"), hex(V1.kekPasskey(unhex(pk.getString("prf_output")))))
 

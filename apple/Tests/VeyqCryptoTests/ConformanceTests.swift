@@ -70,6 +70,15 @@ final class ConformanceTests: XCTestCase {
                                      salt: hex(recProd["salt"] as! String), params: params(recProd))),
             recProd["kek"] as! String, "recovery KEK @ m=32768")
 
+        // kdfParams wire format — the one fixed-layout cross-platform serialization (web encodes, mobile decodes).
+        let kp = v["kdf_params"] as! [String: Any]
+        let kpP = params(kp)
+        XCTAssertEqual(toHex(V1.encodeKdfParams(kpP, salt: hex(kp["salt"] as! String))), kp["encoded"] as! String, "kdfParams encode")
+        let kpDec = V1.decodeKdfParams(hex(kp["encoded"] as! String))
+        XCTAssertEqual(kpDec.params.t, kpP.t, "kdfParams t"); XCTAssertEqual(kpDec.params.m, kpP.m, "kdfParams m")
+        XCTAssertEqual(kpDec.params.p, kpP.p, "kdfParams p"); XCTAssertEqual(kpDec.params.dkLen, kpP.dkLen, "kdfParams dkLen")
+        XCTAssertEqual(toHex(kpDec.salt), kp["salt"] as! String, "kdfParams decode salt")
+
         let pk = kek["passkey_prf_hkdf"] as! [String: String]
         XCTAssertEqual(toHex(V1.kekPasskey(prfOutput: hex(pk["prf_output"]!))), pk["kek"]!, "passkey KEK")
 
