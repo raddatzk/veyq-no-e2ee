@@ -78,7 +78,7 @@ class MySpacesHandler(
                 name = tenant.name,
                 displayName = tenant.displayName,
                 domain = tenant.domain,
-                role = m.role,
+                role = m.role.name,
                 scheduledDeletionAt = tenant.scheduledDeletionAt?.let { OffsetDateTime.ofInstant(it, ZoneOffset.UTC) },
                 scopeId = scope.id,
                 scopePublicKey = scope.toPublicKey(),

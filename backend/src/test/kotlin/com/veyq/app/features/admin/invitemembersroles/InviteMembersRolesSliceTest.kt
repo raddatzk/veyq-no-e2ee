@@ -30,6 +30,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class InviteMembersRolesSliceTest {
@@ -74,11 +78,11 @@ class InviteMembersRolesSliceTest {
 
             if (tenants.findById(tenantId) == null) {
                 tenants.persist(Tenant().apply {
-                    id = tenantId; name = "im-acme"; displayName = "Acme"; domain = "im-acme.test"; status = "ACTIVE"
+                    id = tenantId; name = "im-acme"; displayName = "Acme"; domain = "im-acme.test"; status = TenantStatus.ACTIVE
                     createdBy = "im-owner"; createdAt = now
                 })
                 scopes.persist(Scope().apply {
-                    id = scopeId; this.tenantId = this@InviteMembersRolesSliceTest.tenantId; kind = "TENANT_ROOT"
+                    id = scopeId; this.tenantId = this@InviteMembersRolesSliceTest.tenantId; kind = ScopeKind.TENANT_ROOT
                     suiteId = "v1"; kemPublicKey = "scope-pub".toByteArray(); createdAt = now
                 })
                 // the owner is the first key-holder; the no-key owner has the role but no grant
@@ -98,11 +102,11 @@ class InviteMembersRolesSliceTest {
 
                 // dedicated rotation tenant: stable active members {im-owner Owner, im-member Member}
                 tenants.persist(Tenant().apply {
-                    id = rotTenantId; name = "im-rot-acme"; displayName = "RotAcme"; domain = "im-rot-acme.test"; status = "ACTIVE"
+                    id = rotTenantId; name = "im-rot-acme"; displayName = "RotAcme"; domain = "im-rot-acme.test"; status = TenantStatus.ACTIVE
                     createdBy = "im-owner"; createdAt = now
                 })
                 scopes.persist(Scope().apply {
-                    id = rotScopeId; tenantId = rotTenantId; kind = "TENANT_ROOT"
+                    id = rotScopeId; tenantId = rotTenantId; kind = ScopeKind.TENANT_ROOT
                     suiteId = "v1"; kemPublicKey = "rot-pub".toByteArray(); createdAt = now
                 })
                 grants.persist(ScopeGrant().apply {
@@ -114,10 +118,10 @@ class InviteMembersRolesSliceTest {
                     suiteId = "v1"; wrappedPrivateKey = "rot-member".toByteArray(); createdAt = now
                 })
                 memberships.persist(Membership().apply {
-                    id = "im-rot-m-owner"; tenantId = rotTenantId; userId = "im-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now
+                    id = "im-rot-m-owner"; tenantId = rotTenantId; userId = "im-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now
                 })
                 memberships.persist(Membership().apply {
-                    id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
+                    id = "im-rot-m-member"; tenantId = rotTenantId; userId = "im-member"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now
                 })
                 // two Memory-tree nodes (same parent = root) in the rotation scope — rotation must re-seal both
                 nodes.persist(Node().apply {
@@ -131,14 +135,14 @@ class InviteMembersRolesSliceTest {
 
                 // dedicated role-change tenant: one Owner + one Member, no grants (role ≠ access)
                 tenants.persist(Tenant().apply {
-                    id = roleTenantId; name = "im-role-acme"; displayName = "RoleAcme"; domain = "im-role-acme.test"; status = "ACTIVE"
+                    id = roleTenantId; name = "im-role-acme"; displayName = "RoleAcme"; domain = "im-role-acme.test"; status = TenantStatus.ACTIVE
                     createdBy = "im-owner"; createdAt = now
                 })
                 memberships.persist(Membership().apply {
-                    id = "im-role-m-owner"; tenantId = roleTenantId; userId = "im-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now
+                    id = "im-role-m-owner"; tenantId = roleTenantId; userId = "im-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now
                 })
                 memberships.persist(Membership().apply {
-                    id = "im-role-m-member"; tenantId = roleTenantId; userId = "im-member"; role = "Member"; status = "ACTIVE"; createdAt = now
+                    id = "im-role-m-member"; tenantId = roleTenantId; userId = "im-member"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now
                 })
             }
         }
@@ -215,7 +219,7 @@ class InviteMembersRolesSliceTest {
         val revokedInviteId = revokedInvite.path<String>("inviteId")
         val revokedSecret = revokedInvite.path<String>("bootstrapSecret")
         QuarkusTransaction.requiringNew().run {
-            invites.findById(revokedInviteId)!!.status = InviteStatus.REVOKED.name
+            invites.findById(revokedInviteId)!!.status = InviteStatus.REVOKED
         }
         given().contentType(ContentType.JSON).body("""{"bootstrapSecret":"$revokedSecret"}""")
             .post("/api/tenant-invites/$revokedInviteId/material").then().statusCode(409)
@@ -229,7 +233,7 @@ class InviteMembersRolesSliceTest {
 
         // the tenant still has exactly one TENANT_ROOT scope (the invite did not mint a new one)
         val scopeCount = QuarkusTransaction.requiringNew().call {
-            scopes.count("tenantId = ?1 and kind = ?2", tenantId, "TENANT_ROOT")
+            scopes.count("tenantId = ?1 and kind = ?2", tenantId, ScopeKind.TENANT_ROOT)
         }
         kotlin.test.assertEquals(1L, scopeCount)
     }
@@ -254,7 +258,7 @@ class InviteMembersRolesSliceTest {
     private fun seedMembership(id: String, userId: String, role: String) {
         memberships.persist(Membership().apply {
             this.id = id; tenantId = this@InviteMembersRolesSliceTest.tenantId; this.userId = userId
-            this.role = role; status = "ACTIVE"; createdAt = Instant.now()
+            this.role = MemberRole.valueOf(role); status = MembershipStatus.ACTIVE; createdAt = Instant.now()
         })
     }
 

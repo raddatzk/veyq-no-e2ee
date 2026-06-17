@@ -22,6 +22,7 @@ import org.hamcrest.Matchers.notNullValue
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.memory.track — list / add / remove a Memory's sealed GPX tracks, with the key-holder + node checks. */
 @QuarkusTest
@@ -45,7 +46,7 @@ class TrackSliceTest {
             if (users.findByEmail("trk-owner@example.com") != null) return@run
             users.persist(User().apply { id = "trk-owner"; email = "trk-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "trk-out"; email = "trk-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "trk-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "trk-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "trk-grant"; this.scopeId = this@TrackSliceTest.scopeId; userId = "trk-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "trk-ck"; this.scopeId = this@TrackSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             node("trk-folder", scopeId, "FOLDER", "s-tf", 0)

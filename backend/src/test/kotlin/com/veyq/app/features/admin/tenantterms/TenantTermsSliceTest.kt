@@ -25,6 +25,10 @@ import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.share.terms — a Tenant Owner sets ToS; guests see it as a TENANT notice on any share of the group. */
 @QuarkusTest
@@ -51,10 +55,10 @@ class TenantTermsSliceTest {
             if (users.findByEmail("tt-owner@example.com") != null) return@run
             users.persist(User().apply { id = "tt-owner"; email = "tt-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "tt-member"; email = "tt-member@example.com"; displayName = "M"; serverRole = ServerRole.ServerMember; createdAt = now })
-            tenants.persist(Tenant().apply { id = tenantId; name = "tt-acme"; domain = "tt-acme.test"; displayName = "Acme"; status = "ACTIVE"; createdBy = "tt-owner"; createdAt = now })
-            memberships.persist(Membership().apply { id = "tt-m-o"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
-            memberships.persist(Membership().apply { id = "tt-m-m"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; tenantId = this@TenantTermsSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "tt-acme"; domain = "tt-acme.test"; displayName = "Acme"; status = TenantStatus.ACTIVE; createdBy = "tt-owner"; createdAt = now })
+            memberships.persist(Membership().apply { id = "tt-m-o"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
+            memberships.persist(Membership().apply { id = "tt-m-m"; this.tenantId = this@TenantTermsSliceTest.tenantId; userId = "tt-member"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; tenantId = this@TenantTermsSliceTest.tenantId; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "tt-grant"; this.scopeId = this@TenantTermsSliceTest.scopeId; userId = "tt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "tt-ck"; this.scopeId = this@TenantTermsSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             nodes.persist(Node().apply { id = "tt-mem"; scopeId = "tt-scope"; parentId = "tt-scope"; type = "MEMORY"; slugToken = "s-m"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })

@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.uploads (GC) — a scheduled sweep reclaims abandoned OPEN uploads; fresh OPEN + COMPLETED survive. */
 @QuarkusTest
@@ -40,7 +41,7 @@ class BlobUploadGcSliceTest {
         QuarkusTransaction.requiringNew().run {
             if (users.findByEmail("gc-bl@example.com") != null) return@run
             users.persist(User().apply { id = "gc-bl-user"; email = "gc-bl@example.com"; displayName = "U"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = "gc-bl-scope"; ownerUserId = "gc-bl-user"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = "gc-bl-scope"; ownerUserId = "gc-bl-user"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             session("gc-stale", UploadStatus.OPEN, now.minus(48, ChronoUnit.HOURS))    // abandoned → purged
             session("gc-fresh", UploadStatus.OPEN, now)                                 // still in progress → kept
             session("gc-done", UploadStatus.COMPLETED, now.minus(48, ChronoUnit.HOURS)) // finalized blob → kept

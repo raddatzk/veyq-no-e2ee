@@ -34,8 +34,8 @@ class MemberListHandler(
             TenantMember(
                 userId = user.id,
                 displayName = user.displayName,
-                role = membership.role,
-                status = membership.status,
+                role = membership.role.name,
+                status = membership.status.name,
                 identityPublicKey = IdentityPublicKey(
                     suiteId = identity.suiteId,
                     kemPublicKey = enc.encodeToString(identity.kemPublicKey),

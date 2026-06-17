@@ -22,6 +22,7 @@ import org.hamcrest.CoreMatchers.nullValue
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class MemoryTreeSliceTest {
@@ -45,16 +46,16 @@ class MemoryTreeSliceTest {
                 users.persist(User().apply { id = "mt-owner"; email = "mt-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
                 users.persist(User().apply { id = "mt-outsider"; email = "mt-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
                 // a personal scope (no tenant → no membership gate) the owner holds the key for
-                scopes.persist(Scope().apply { id = scopeId; ownerUserId = "mt-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = scopeId; ownerUserId = "mt-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "mt-grant"; this.scopeId = this@MemoryTreeSliceTest.scopeId; userId = "mt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 // nodes are sealed under the content key, so the scope must have one before any node exists
                 contentKeys.persist(ScopeContentKey().apply { id = "mt-ck"; this.scopeId = this@MemoryTreeSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
                 // a scope the owner holds the key for but with NO content key — node creation must be refused there
                 users.persist(User().apply { id = "mt-third"; email = "mt-third@example.com"; displayName = "Third"; serverRole = ServerRole.ServerMember; createdAt = now })
-                scopes.persist(Scope().apply { id = "mt-nokey"; ownerUserId = "mt-third"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "nk".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = "mt-nokey"; ownerUserId = "mt-third"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "nk".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "mt-grant-nokey"; scopeId = "mt-nokey"; userId = "mt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 // a foreign scope (owned by someone else) + a node in it, to prove cross-scope parents are rejected
-                scopes.persist(Scope().apply { id = "mt-other"; ownerUserId = "mt-outsider"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "o".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = "mt-other"; ownerUserId = "mt-outsider"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "o".toByteArray(); createdAt = now })
                 nodes.persist(Node().apply { id = "mt-foreign-node"; this.scopeId = "mt-other"; parentId = "mt-other"; type = "FOLDER"; slugToken = "tok-x"; orderIndex = 0; suiteId = "v1"; sealedContent = "s".toByteArray(); createdAt = now })
             }
         }

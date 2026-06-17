@@ -14,12 +14,14 @@ import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeKind
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
 import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
@@ -61,7 +63,7 @@ class RegisterViaInvitationHandler(
     @Transactional
     fun registerViaInvitation(inviteId: String, req: RegisterViaInvitationRequest): RegisterViaInvitationResponse {
         val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
-        if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
+        if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
@@ -95,7 +97,7 @@ class RegisterViaInvitationHandler(
         )
 
         // 3. the tenant scope grant — born here for an owner claim, or re-wrapped from a temp invite
-        if (invite.kind == InviteKind.MEMBER.name) {
+        if (invite.kind == InviteKind.MEMBER) {
             // MEMBER: the scope already exists. The invitee unwrapped it with the temp key (from the URL
             // fragment) and re-wrapped it to their own identity — add their grant only. No new scope, no
             // re-activation. The posted scope public key must match the existing scope (integrity).
@@ -113,7 +115,7 @@ class RegisterViaInvitationHandler(
             // OWNER: an empty tenant — the scope keypair is born here (self grant) and the tenant activates.
             if (scopes.findByTenantId(tenant.id) != null) throw ApiException(409, "TENANT_ALREADY_CLAIMED", "Tenant already has an owner")
             val scope = Scope().apply {
-                id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
+                id = newId(); tenantId = tenant.id; kind = ScopeKind.TENANT_ROOT
                 suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
             }
             scopes.persist(scope)
@@ -123,17 +125,17 @@ class RegisterViaInvitationHandler(
                     suiteId = req.wrappedScopePrivateKey.suiteId; wrappedPrivateKey = dec.decode(req.wrappedScopePrivateKey.bytes); createdAt = now
                 },
             )
-            tenant.status = TenantStatus.ACTIVE.name
+            tenant.status = TenantStatus.ACTIVE
         }
 
         memberships.persist(
             Membership().apply {
-                id = newId(); tenantId = tenant.id; userId = user.id; role = invite.role; status = "ACTIVE"; createdAt = now
+                id = newId(); tenantId = tenant.id; userId = user.id; role = invite.role; status = MembershipStatus.ACTIVE; createdAt = now
             },
         )
 
         // 4. consume the invite, hand back a session
-        invite.status = InviteStatus.CONSUMED.name
+        invite.status = InviteStatus.CONSUMED
         invite.consumedBy = user.id
 
         return RegisterViaInvitationResponse(
@@ -147,7 +149,7 @@ class RegisterViaInvitationHandler(
         UserSummary(id = id, email = email, displayName = displayName, serverRole = ApiServerRole.decode(serverRole.name))
 
     private fun Tenant.toSummary(): TenantSummary =
-        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status), domain = domain)
+        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain)
 
 
     private fun sha256(b: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(b)

@@ -19,6 +19,7 @@ import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class ScopeGrantRewrapSliceTest {
@@ -51,7 +52,7 @@ class ScopeGrantRewrapSliceTest {
             }
             if (scopes.findById("rewrap-scope") == null) {
                 scopes.persist(Scope().apply {
-                    id = "rewrap-scope"; ownerUserId = "rewrap-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"
+                    id = "rewrap-scope"; ownerUserId = "rewrap-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"
                     kemPublicKey = "scope-public".toByteArray(); createdAt = now
                 })
             }

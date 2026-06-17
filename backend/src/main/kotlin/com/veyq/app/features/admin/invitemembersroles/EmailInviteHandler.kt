@@ -32,7 +32,7 @@ class EmailInviteHandler(
         guard.requireOwner(auth, tenantId)
         val tenant = tenants.findById(tenantId) ?: throw ApiException(404, "NOT_FOUND", "Tenant not found")
         val invite = invites.findById(req.inviteId) ?: throw ApiException(404, "NOT_FOUND", "Invite not found")
-        if (invite.tenantId != tenantId || invite.status != InviteStatus.PENDING.name) {
+        if (invite.tenantId != tenantId || invite.status != InviteStatus.PENDING) {
             throw ApiException(400, "INVALID_INVITE", "Invite is not pending for this tenant")
         }
         val to = req.email.trim()

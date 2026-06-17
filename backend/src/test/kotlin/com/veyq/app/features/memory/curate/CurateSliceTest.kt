@@ -25,6 +25,7 @@ import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.memory.curate — rename / move / reorder / cover with the structural re-checks. */
 @QuarkusTest
@@ -50,7 +51,7 @@ class CurateSliceTest {
             if (users.findByEmail("cur-owner@example.com") != null) return@run
             users.persist(User().apply { id = "cur-owner"; email = "cur-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "cur-out"; email = "cur-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "cur-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "cur-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "cur-grant"; this.scopeId = this@CurateSliceTest.scopeId; userId = "cur-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "cur-ck"; this.scopeId = this@CurateSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             // folderA(root) > folderA2(folder), memoryM(memory) > chapterC(chapter) ; folderB(root)

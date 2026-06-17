@@ -21,6 +21,7 @@ import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class MediaSliceTest {
@@ -43,7 +44,7 @@ class MediaSliceTest {
             if (users.findByEmail("me-owner@example.com") != null) return@run
             users.persist(User().apply { id = "me-owner"; email = "me-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "me-outsider"; email = "me-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "me-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "me-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "me-grant"; this.scopeId = this@MediaSliceTest.scopeId; userId = "me-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             nodes.persist(Node().apply { id = "me-mem"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = "MEMORY"; slugToken = "tm"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
             nodes.persist(Node().apply { id = "me-folder"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = "FOLDER"; slugToken = "tf"; orderIndex = 1; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })

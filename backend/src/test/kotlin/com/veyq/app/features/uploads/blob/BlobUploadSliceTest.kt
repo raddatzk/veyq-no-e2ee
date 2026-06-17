@@ -20,6 +20,7 @@ import org.hamcrest.Matchers.containsInAnyOrder
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class BlobUploadSliceTest {
@@ -41,7 +42,7 @@ class BlobUploadSliceTest {
             if (users.findByEmail("bl-owner@example.com") != null) return@run
             users.persist(User().apply { id = "bl-owner"; email = "bl-owner@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "bl-outsider"; email = "bl-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "bl-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "bl-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "bl-grant"; this.scopeId = this@BlobUploadSliceTest.scopeId; userId = "bl-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "bl-ck"; this.scopeId = this@BlobUploadSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
         }

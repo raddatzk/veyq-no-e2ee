@@ -20,6 +20,10 @@ import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class MyGroupsSliceTest {
@@ -45,17 +49,17 @@ class MyGroupsSliceTest {
             // a user who is an active member but holds NO grant (removed-but-not-rotated) — must not see the group
             users.persist(User().apply { id = "grp-ghost"; email = "grp-ghost@example.com"; displayName = "Ghost"; serverRole = ServerRole.ServerMember; createdAt = now })
 
-            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; domain = "grp-acme.test"; displayName = "Acme Group"; status = "ACTIVE"; createdBy = "grp-owner"; createdAt = now })
-            scopes.persist(Scope().apply { id = "grp-scope"; tenantId = "grp-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "grp-pub".toByteArray(); createdAt = now })
+            tenants.persist(Tenant().apply { id = "grp-tenant"; name = "grp-acme"; domain = "grp-acme.test"; displayName = "Acme Group"; status = TenantStatus.ACTIVE; createdBy = "grp-owner"; createdAt = now })
+            scopes.persist(Scope().apply { id = "grp-scope"; tenantId = "grp-tenant"; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "grp-pub".toByteArray(); createdAt = now })
             // a second tenant the owner is NOT a member of — must not leak into the owner's roster
-            tenants.persist(Tenant().apply { id = "grp-other"; name = "grp-other"; domain = "grp-other.test"; displayName = "Other"; status = "ACTIVE"; createdBy = "grp-member"; createdAt = now })
-            scopes.persist(Scope().apply { id = "grp-other-scope"; tenantId = "grp-other"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "oth-pub".toByteArray(); createdAt = now })
+            tenants.persist(Tenant().apply { id = "grp-other"; name = "grp-other"; domain = "grp-other.test"; displayName = "Other"; status = TenantStatus.ACTIVE; createdBy = "grp-member"; createdAt = now })
+            scopes.persist(Scope().apply { id = "grp-other-scope"; tenantId = "grp-other"; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "oth-pub".toByteArray(); createdAt = now })
 
             grants.persist(ScopeGrant().apply { id = "grp-g-owner"; scopeId = "grp-scope"; userId = "grp-owner"; suiteId = "v1"; wrappedPrivateKey = "o".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "grp-g-member"; scopeId = "grp-scope"; userId = "grp-member"; suiteId = "v1"; wrappedPrivateKey = "m".toByteArray(); createdAt = now })
-            memberships.persist(Membership().apply { id = "grp-m-owner"; tenantId = "grp-tenant"; userId = "grp-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
-            memberships.persist(Membership().apply { id = "grp-m-member"; tenantId = "grp-tenant"; userId = "grp-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
-            memberships.persist(Membership().apply { id = "grp-m-ghost"; tenantId = "grp-tenant"; userId = "grp-ghost"; role = "Member"; status = "ACTIVE"; createdAt = now })
+            memberships.persist(Membership().apply { id = "grp-m-owner"; tenantId = "grp-tenant"; userId = "grp-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
+            memberships.persist(Membership().apply { id = "grp-m-member"; tenantId = "grp-tenant"; userId = "grp-member"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
+            memberships.persist(Membership().apply { id = "grp-m-ghost"; tenantId = "grp-tenant"; userId = "grp-ghost"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("grp-owner")}"
         memberToken = "Bearer ${sessions.issue("grp-member")}"

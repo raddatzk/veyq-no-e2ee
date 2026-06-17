@@ -25,6 +25,9 @@ import java.time.Instant
 import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class AcceptMemberInviteSliceTest {
@@ -54,11 +57,11 @@ class AcceptMemberInviteSliceTest {
                     wrappedPrivateKey = "priv".toByteArray(); wrappedPrivateSuiteId = "v1"; createdAt = now
                 })
                 tenants.persist(Tenant().apply {
-                    id = "acc-tenant"; name = "acc-acme"; displayName = "AccAcme"; domain = "acc-acme.test"; status = "ACTIVE"
+                    id = "acc-tenant"; name = "acc-acme"; displayName = "AccAcme"; domain = "acc-acme.test"; status = TenantStatus.ACTIVE
                     createdBy = "acc-user"; createdAt = now
                 })
                 scopes.persist(Scope().apply {
-                    id = "acc-scope"; tenantId = "acc-tenant"; kind = "TENANT_ROOT"
+                    id = "acc-scope"; tenantId = "acc-tenant"; kind = ScopeKind.TENANT_ROOT
                     suiteId = "v1"; kemPublicKey = "scope-pub".toByteArray(); createdAt = now
                 })
                 val hash = sha256(Base64.getUrlDecoder().decode(secretB64))
@@ -66,8 +69,8 @@ class AcceptMemberInviteSliceTest {
                 invites.persist(memberInvite("acc-invite-2", hash, now))
                 // an owner invite cannot be accepted onto an existing account
                 invites.persist(TenantInvite().apply {
-                    id = "acc-owner-invite"; tenantId = "acc-tenant"; role = "Owner"
-                    secretHash = hash; status = InviteStatus.PENDING.name; kind = InviteKind.OWNER.name
+                    id = "acc-owner-invite"; tenantId = "acc-tenant"; role = MemberRole.Owner
+                    secretHash = hash; status = InviteStatus.PENDING; kind = InviteKind.OWNER
                     createdBy = "acc-user"; createdAt = now; expiresAt = now.plusSeconds(3600)
                 })
             }
@@ -105,8 +108,8 @@ class AcceptMemberInviteSliceTest {
     }
 
     private fun memberInvite(id: String, hash: ByteArray, now: Instant) = TenantInvite().apply {
-        this.id = id; tenantId = "acc-tenant"; role = "Member"
-        secretHash = hash; status = InviteStatus.PENDING.name; kind = InviteKind.MEMBER.name
+        this.id = id; tenantId = "acc-tenant"; role = MemberRole.Member
+        secretHash = hash; status = InviteStatus.PENDING; kind = InviteKind.MEMBER
         scopeId = "acc-scope"; tempPublicKey = "tp".toByteArray(); tempWrappedScopePrivateKey = "tw".toByteArray()
         tempWrapSuiteId = "v1"; createdBy = "acc-user"; createdAt = now; expiresAt = now.plusSeconds(3600)
     }

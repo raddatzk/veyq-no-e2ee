@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach
 import java.text.Normalizer
 import java.time.Instant
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class LoginSliceTest {
@@ -87,7 +88,7 @@ class LoginSliceTest {
             )
             scopes.persist(
                 Scope().apply {
-                    id = "login-personal-scope"; ownerUserId = user.id; kind = "PERSONAL_ROOT"; suiteId = "v1"
+                    id = "login-personal-scope"; ownerUserId = user.id; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"
                     kemPublicKey = "personal".toByteArray(); createdAt = now
                 },
             )

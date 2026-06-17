@@ -25,6 +25,7 @@ import org.hamcrest.CoreMatchers.`is`
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.memory.share — create a read-only share, resolve it + its subtree as an unauthenticated guest. */
 @QuarkusTest
@@ -50,7 +51,7 @@ class ShareSliceTest {
             if (users.findByEmail("shr-owner@example.com") != null) return@run
             users.persist(User().apply { id = "shr-owner"; email = "shr-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "shr-out"; email = "shr-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "shr-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "shr-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "shr-grant"; this.scopeId = this@ShareSliceTest.scopeId; userId = "shr-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "shr-ck"; this.scopeId = this@ShareSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             // memory mem with a chapter chap (a subtree) + a sibling other memory; mem has a medium

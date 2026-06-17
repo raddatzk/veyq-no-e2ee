@@ -23,6 +23,7 @@ import org.hamcrest.Matchers.nullValue
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.memory.journal — read/replace a Memory's sealed journal, with the key-holder + node-type checks. */
 @QuarkusTest
@@ -46,7 +47,7 @@ class JournalSliceTest {
             if (users.findByEmail("jnl-owner@example.com") != null) return@run
             users.persist(User().apply { id = "jnl-owner"; email = "jnl-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "jnl-out"; email = "jnl-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "jnl-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "jnl-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "jnl-grant"; this.scopeId = this@JournalSliceTest.scopeId; userId = "jnl-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "jnl-ck"; this.scopeId = this@JournalSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             node("jfolder", scopeId, "FOLDER", "s-jf", 0)

@@ -38,7 +38,7 @@ class MyGrantsHandler(
             if (!guard.isActiveMember(userId, scope.tenantId)) return@mapNotNull null
             OwnedGrant(
                 scopeId = scope.id,
-                kind = scope.kind,
+                kind = scope.kind.name,
                 scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
                 wrappedScopePrivateKey = Blob(suiteId = grant.suiteId, bytes = enc.encodeToString(grant.wrappedPrivateKey)),
             )

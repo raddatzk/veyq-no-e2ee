@@ -25,6 +25,10 @@ import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 @QuarkusTest
 class RotateIdentitySliceTest {
@@ -51,20 +55,20 @@ class RotateIdentitySliceTest {
                     kemPublicKey = "oldkem".toByteArray(); signPublicKey = "oldsign".toByteArray()
                     wrappedPrivateKey = "oldpriv".toByteArray(); wrappedPrivateSuiteId = "v1"; createdAt = now
                 })
-                tenants.persist(Tenant().apply { id = "ri-tenant"; name = "ri-acme"; domain = "ri-acme.test"; displayName = "RiAcme"; status = "ACTIVE"; createdBy = "ri-user"; createdAt = now })
-                scopes.persist(Scope().apply { id = "ri-personal"; ownerUserId = "ri-user"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "ppub".toByteArray(); createdAt = now })
-                scopes.persist(Scope().apply { id = "ri-tscope"; tenantId = "ri-tenant"; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "tpub".toByteArray(); createdAt = now })
+                tenants.persist(Tenant().apply { id = "ri-tenant"; name = "ri-acme"; domain = "ri-acme.test"; displayName = "RiAcme"; status = TenantStatus.ACTIVE; createdBy = "ri-user"; createdAt = now })
+                scopes.persist(Scope().apply { id = "ri-personal"; ownerUserId = "ri-user"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "ppub".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = "ri-tscope"; tenantId = "ri-tenant"; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "tpub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-pg"; scopeId = "ri-personal"; userId = "ri-user"; suiteId = "v1"; wrappedPrivateKey = "pg".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-tg"; scopeId = "ri-tscope"; userId = "ri-user"; suiteId = "v1"; wrappedPrivateKey = "tg".toByteArray(); createdAt = now })
                 // a tenant-scope grant only stands behind active membership (the guard filters stale grants)
-                memberships.persist(Membership().apply { id = "ri-mb"; tenantId = "ri-tenant"; userId = "ri-user"; role = "Member"; status = "ACTIVE"; createdAt = now })
+                memberships.persist(Membership().apply { id = "ri-mb"; tenantId = "ri-tenant"; userId = "ri-user"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
 
                 // a REMOVED member: still has a (stale) grant on the tenant scope, but membership is revoked
                 users.persist(User().apply { id = "ri-removed"; email = "ri-removed@example.com"; displayName = "RIR"; serverRole = ServerRole.ServerMember; createdAt = now })
-                scopes.persist(Scope().apply { id = "ri-removed-personal"; ownerUserId = "ri-removed"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "rpub".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = "ri-removed-personal"; ownerUserId = "ri-removed"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "rpub".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-rpg"; scopeId = "ri-removed-personal"; userId = "ri-removed"; suiteId = "v1"; wrappedPrivateKey = "rpg".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "ri-rtg"; scopeId = "ri-tscope"; userId = "ri-removed"; suiteId = "v1"; wrappedPrivateKey = "rtg".toByteArray(); createdAt = now })
-                memberships.persist(Membership().apply { id = "ri-rmb"; tenantId = "ri-tenant"; userId = "ri-removed"; role = "Member"; status = "REVOKED"; createdAt = now })
+                memberships.persist(Membership().apply { id = "ri-rmb"; tenantId = "ri-tenant"; userId = "ri-removed"; role = MemberRole.Member; status = MembershipStatus.REMOVED; createdAt = now })
             }
         }
         token = "Bearer ${sessions.issue("ri-user")}"

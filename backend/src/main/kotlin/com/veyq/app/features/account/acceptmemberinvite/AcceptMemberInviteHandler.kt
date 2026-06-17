@@ -12,6 +12,7 @@ import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
 import com.veyq.app.shared.tenancy.TenantInviteRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -44,12 +45,12 @@ class AcceptMemberInviteHandler(
     fun acceptMemberInvite(auth: String?, inviteId: String, req: AcceptMemberInviteRequest): MembershipSummary {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
-        if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
+        if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
         }
-        if (invite.kind != InviteKind.MEMBER.name) {
+        if (invite.kind != InviteKind.MEMBER) {
             throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites can be accepted onto an existing account")
         }
         suites.require(req.wrappedScopePrivateKey.suiteId)
@@ -73,12 +74,12 @@ class AcceptMemberInviteHandler(
             memberships.persist(this)
         }
         membership.role = invite.role
-        membership.status = "ACTIVE"
+        membership.status = MembershipStatus.ACTIVE
 
-        invite.status = InviteStatus.CONSUMED.name
+        invite.status = InviteStatus.CONSUMED
         invite.consumedBy = userId
 
-        return MembershipSummary(tenantId = invite.tenantId, userId = userId, role = membership.role, status = membership.status)
+        return MembershipSummary(tenantId = invite.tenantId, userId = userId, role = membership.role.name, status = membership.status.name)
     }
 
 

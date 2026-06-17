@@ -26,6 +26,10 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.spaces.groups — create a group sub-space within a tenant; it surfaces as a GROUP space in the roster. */
 @QuarkusTest
@@ -60,10 +64,10 @@ class GroupSliceTest {
             users.persist(User().apply { id = "gsl-owner"; email = "gsl-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "gsl-out"; email = "gsl-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "gsl-member"; email = "gsl-member@example.com"; displayName = "M"; serverRole = ServerRole.ServerMember; createdAt = now })
-            tenants.persist(Tenant().apply { id = tenantId; name = "gsl-t"; domain = "gsl-t.test"; displayName = "T"; status = "ACTIVE"; termsVersion = 0; createdBy = "gsl-owner"; createdAt = now })
-            memberships.persist(Membership().apply { id = "gsl-mb"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
-            memberships.persist(Membership().apply { id = "gsl-mb2"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-member"; role = "Member"; status = "ACTIVE"; createdAt = now })
-            scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@GroupSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "gsl-t"; domain = "gsl-t.test"; displayName = "T"; status = TenantStatus.ACTIVE; termsVersion = 0; createdBy = "gsl-owner"; createdAt = now })
+            memberships.persist(Membership().apply { id = "gsl-mb"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
+            memberships.persist(Membership().apply { id = "gsl-mb2"; this.tenantId = this@GroupSliceTest.tenantId; userId = "gsl-member"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
+            scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@GroupSliceTest.tenantId; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "gsl-tg"; scopeId = tenantScopeId; userId = "gsl-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("gsl-owner")}"
@@ -153,7 +157,7 @@ class GroupSliceTest {
 
         // the group scope, self-grant, content key and GroupOwner membership all exist
         QuarkusTransaction.requiringNew().run {
-            assertEquals("GROUP_ROOT", scopes.findById(scopeId)?.kind)
+            assertEquals(ScopeKind.GROUP_ROOT, scopes.findById(scopeId)?.kind)
             assertNotNull(grants.find(scopeId, "gsl-owner"))
             assertNotNull(contentKeys.findByScopeId(scopeId))
             assertEquals("GroupOwner", groupMembers.find(scopeId, "gsl-owner")?.role)

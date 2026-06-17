@@ -4,6 +4,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
 import jakarta.enterprise.context.ApplicationScoped
 
 /**
@@ -48,5 +49,5 @@ class ScopeAccessGuard(
 
     /** Membership layer only: personal scopes (no tenant) pass; tenant scopes require ACTIVE membership. */
     fun isActiveMember(userId: String, tenantId: String?): Boolean =
-        tenantId == null || memberships.find(tenantId, userId)?.status == "ACTIVE"
+        tenantId == null || memberships.find(tenantId, userId)?.status == MembershipStatus.ACTIVE
 }

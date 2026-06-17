@@ -4,6 +4,7 @@ import com.veyq.app.generated.model.ChangeMemberRoleRequest
 import com.veyq.app.generated.model.MembershipSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.security.TenantAdminGuard
+import com.veyq.app.shared.tenancy.MemberRole
 import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -24,16 +25,16 @@ class ChangeMemberRoleHandler(
         guard.requireOwner(auth, tenantId)
 
         val membership = memberships.find(tenantId, userId) ?: throw notFound("Membership")
-        val newRole = req.role.value
+        val newRole = MemberRole.valueOf(req.role.value)
 
         // never demote the last remaining Owner — the tenant must keep an owner
-        if (membership.role == "Owner" && newRole != "Owner") {
-            val activeOwners = memberships.listActive(tenantId).count { it.role == "Owner" }
+        if (membership.role == MemberRole.Owner && newRole != MemberRole.Owner) {
+            val activeOwners = memberships.listActive(tenantId).count { it.role == MemberRole.Owner }
             if (activeOwners <= 1) throw ApiException(409, "LAST_OWNER", "Cannot demote the last Owner")
         }
         membership.role = newRole
 
-        return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
+        return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role.name, status = membership.status.name)
     }
 
 }

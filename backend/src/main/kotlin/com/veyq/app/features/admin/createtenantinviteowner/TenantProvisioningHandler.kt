@@ -20,6 +20,7 @@ import com.veyq.app.shared.identity.UserRepository
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeKind
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.security.TenantAdminGuard
@@ -28,6 +29,8 @@ import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
 import com.veyq.app.shared.tenancy.Tenant
 import com.veyq.app.shared.tenancy.TenantInvite
 import com.veyq.app.shared.tenancy.TenantInviteRepository
@@ -83,7 +86,7 @@ class TenantProvisioningHandler(
         if (tenants.findByDomain(domain) != null) throw ApiException(409, "DOMAIN_TAKEN", "That domain is already in use")
         val tenant = Tenant().apply {
             id = newId(); name = req.name; displayName = req.displayName; this.domain = domain
-            status = TenantStatus.PENDING.name; createdBy = owner.id; createdAt = Instant.now()
+            status = TenantStatus.PENDING; createdBy = owner.id; createdAt = Instant.now()
         }
         tenants.persist(tenant)
         return tenant.toSummary()
@@ -141,8 +144,8 @@ class TenantProvisioningHandler(
         val now = Instant.now()
         val expires = now.plus(inviteTtl)
         val invite = TenantInvite().apply {
-            id = newId(); this.tenantId = tenant.id; role = "Owner"
-            secretHash = sha256(secret); status = InviteStatus.PENDING.name
+            id = newId(); this.tenantId = tenant.id; role = MemberRole.Owner
+            secretHash = sha256(secret); status = InviteStatus.PENDING
             createdBy = owner.id; createdAt = now; expiresAt = expires
         }
         invites.persist(invite)
@@ -163,9 +166,9 @@ class TenantProvisioningHandler(
         return TenantInviteInfo(
             inviteId = invite.id,
             tenant = tenant.toSummary(),
-            role = invite.role,
-            status = TenantInviteInfo.Status.valueOf(invite.status),
-            kind = TenantInviteInfo.Kind.valueOf(invite.kind),
+            role = invite.role.name,
+            status = TenantInviteInfo.Status.valueOf(invite.status.name),
+            kind = TenantInviteInfo.Kind.valueOf(invite.kind.name),
             scopePublicKey = scope?.let { KemPublicKey(suiteId = it.suiteId, kemPublicKey = enc.encodeToString(it.kemPublicKey)) },
         )
     }
@@ -174,9 +177,9 @@ class TenantProvisioningHandler(
     @Transactional
     fun getInviteMaterial(inviteId: String, req: GetInviteMaterialRequest): TenantInviteMaterial {
         val invite = invites.findById(inviteId) ?: throw notFound("Invite")
-        if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
+        if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
-        if (invite.kind != InviteKind.MEMBER.name) {
+        if (invite.kind != InviteKind.MEMBER) {
             throw ApiException(400, "NOT_A_MEMBER_INVITE", "Only member invites expose temp-wrapped onboarding material")
         }
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
@@ -195,7 +198,7 @@ class TenantProvisioningHandler(
     fun claimTenantOwnership(auth: String?, inviteId: String, req: ClaimTenantOwnershipRequest): TenantSummary {
         val user = requireUser(auth)
         val invite = invites.findByIdForUpdate(inviteId) ?: throw notFound("Invite")
-        if (invite.status != InviteStatus.PENDING.name) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
+        if (invite.status != InviteStatus.PENDING) throw ApiException(409, "INVITE_NOT_PENDING", "Invite is not claimable")
         if (invite.expiresAt.isBefore(Instant.now())) throw ApiException(409, "INVITE_EXPIRED", "Invite has expired")
         if (!MessageDigest.isEqual(sha256(dec.decode(req.bootstrapSecret)), invite.secretHash)) {
             throw ApiException(400, "BAD_BOOTSTRAP_SECRET", "Invalid bootstrap secret")
@@ -208,7 +211,7 @@ class TenantProvisioningHandler(
         val now = Instant.now()
 
         val scope = Scope().apply {
-            id = newId(); tenantId = tenant.id; kind = "TENANT_ROOT"
+            id = newId(); tenantId = tenant.id; kind = ScopeKind.TENANT_ROOT
             suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey); createdAt = now
         }
         scopes.persist(scope)
@@ -220,12 +223,12 @@ class TenantProvisioningHandler(
         )
         memberships.persist(
             Membership().apply {
-                id = newId(); tenantId = tenant.id; userId = user.id; role = "Owner"; status = "ACTIVE"; createdAt = now
+                id = newId(); tenantId = tenant.id; userId = user.id; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now
             },
         )
 
-        tenant.status = TenantStatus.ACTIVE.name
-        invite.status = InviteStatus.CONSUMED.name
+        tenant.status = TenantStatus.ACTIVE
+        invite.status = InviteStatus.CONSUMED
         invite.consumedBy = user.id
         return tenant.toSummary()
     }
@@ -243,7 +246,7 @@ class TenantProvisioningHandler(
     }
 
     private fun Tenant.toSummary(): TenantSummary =
-        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status), domain = domain)
+        TenantSummary(id = id, name = name, displayName = displayName, status = TenantSummary.Status.valueOf(status.name), domain = domain)
 
     private fun requireUser(auth: String?): User {
         val userId = sessions.resolve(auth) ?: throw unauthorized()

@@ -22,6 +22,11 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.tenancy.InviteStatus
+import com.veyq.app.shared.tenancy.InviteKind
 
 /** uc.admin.email-invite — the server relays a pending member-invite link to an email (captured by the mock mailbox). */
 @QuarkusTest
@@ -47,11 +52,11 @@ class EmailInviteSliceTest {
             val now = Instant.now()
             users.persist(User().apply { id = "eml-owner"; email = "eml-owner@example.com"; displayName = "O"; serverRole = ServerRole.ServerMember; createdAt = now })
             users.persist(User().apply { id = "eml-out"; email = "eml-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
-            tenants.persist(Tenant().apply { id = tenantId; name = "eml-t"; domain = "eml-t.test"; displayName = "Acme"; status = "ACTIVE"; termsVersion = 0; createdBy = "eml-owner"; createdAt = now })
-            memberships.persist(Membership().apply { id = "eml-mb"; this.tenantId = this@EmailInviteSliceTest.tenantId; userId = "eml-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "eml-t"; domain = "eml-t.test"; displayName = "Acme"; status = TenantStatus.ACTIVE; termsVersion = 0; createdBy = "eml-owner"; createdAt = now })
+            memberships.persist(Membership().apply { id = "eml-mb"; this.tenantId = this@EmailInviteSliceTest.tenantId; userId = "eml-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
             invites.persist(TenantInvite().apply {
-                id = inviteId; this.tenantId = this@EmailInviteSliceTest.tenantId; role = "Member"; secretHash = "h".toByteArray()
-                status = "PENDING"; kind = "MEMBER"; createdBy = "eml-owner"; createdAt = now; expiresAt = now.plusSeconds(86400)
+                id = inviteId; this.tenantId = this@EmailInviteSliceTest.tenantId; role = MemberRole.Member; secretHash = "h".toByteArray()
+                status = InviteStatus.PENDING; kind = InviteKind.MEMBER; createdBy = "eml-owner"; createdAt = now; expiresAt = now.plusSeconds(86400)
             })
         }
         ownerToken = "Bearer ${sessions.issue("eml-owner")}"

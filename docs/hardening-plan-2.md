@@ -144,8 +144,16 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   ~19 Handler-Helfer. **Android:** zentraler `ApiClient` (eine geteilte `HttpClient`-Instanz statt 22 + `ok()`/
   `send()` mit nullable Token für die unauth Flows) — Helfer-Dateien delegieren, Inline-Dateien teilen den
   Client. Verifiziert: 28 Web-E2E + Backend-Tests + 12 Android-E2E.
-- [ ] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — Roles/Status/Scope-Kind in Entities
-  (`Tenancy.kt:21` u. a.). War bewusst zurückgestellt; jetzt mit **E1** koppeln (Guard + Enums zusammen).
+- [x] **E4 · P4.3 String → typisierte Enums** *(Maintainability, L)* — neue `MemberRole {Owner,Member}` +
+  `MembershipStatus {ACTIVE,REMOVED}` (Tenancy.kt) + `ScopeKind {PERSONAL_ROOT,TENANT_ROOT,GROUP_ROOT}`
+  (ScopeStore.kt). Sechs Entity-Felder auf `@Enumerated(EnumType.STRING)`-Enums umgestellt (Tenant.status,
+  TenantInvite.{status,kind,role}, Membership.{role,status}, Scope.kind) — Konstanten-Namen == persistierte
+  Strings, also **keine Migration** (Spalte bleibt VARCHAR, Werte byte-identisch). Enums durch alle Repo-Queries,
+  ~14 Handler (Tenant/Register/Accept/Email/Member-Invite, ChangeRole, RemoveMember, MemberList, MySpaces,
+  MyGroups, GroupProvisioning, MyGrants) + die Security-Guards (`TenantAdminGuard`, `ScopeAccessGuard`) gezogen;
+  API-Boundary mappt mit `.name`/`valueOf` (Wire-Format unverändert). Compiler als Sicherheitsnetz, ~92 Test-
+  Sites scripted konvertiert + 2 untypisierte Panache-Args (`count(... kind=?)`) und ein inkonsistentes
+  `"REVOKED"`→`REMOVED` per Hand. Verifiziert: 55 Backend-Slice-Tests grün + tenancy/membership/scope-E2E grün.
 - [x] **E5 · iOS Live-Journal-Teardown auf Dismiss** *(Quality, S)* — `LiveJournalView` reißt jetzt bei JEDEM
   Verschwinden ab (`.onDisappear → model.stop`), nicht nur am Done-Button — sonst leakt der Websocket und Edits
   im Debounce-Fenster gehen verloren. `stop()` ist idempotent (`stopped`-Guard, in `start()` re-armed), sodass

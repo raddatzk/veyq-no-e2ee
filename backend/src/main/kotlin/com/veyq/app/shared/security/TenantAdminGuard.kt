@@ -3,6 +3,8 @@ package com.veyq.app.shared.security
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
 import jakarta.enterprise.context.ApplicationScoped
 
 /**
@@ -26,7 +28,7 @@ class TenantAdminGuard(
     /** Assert an already-resolved [userId] is an ACTIVE Owner of [tenantId]. Returns their membership. */
     fun requireOwner(userId: String, tenantId: String): Membership {
         val m = memberships.find(tenantId, userId)
-        if (m == null || m.role != "Owner" || m.status != "ACTIVE") {
+        if (m == null || m.role != MemberRole.Owner || m.status != MembershipStatus.ACTIVE) {
             throw ApiException(403, "FORBIDDEN", "Tenant Owner role required")
         }
         return m
@@ -36,7 +38,7 @@ class TenantAdminGuard(
     fun requireActiveMember(auth: String?, tenantId: String): String {
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
         val m = memberships.find(tenantId, userId)
-        if (m == null || m.status != "ACTIVE") throw ApiException(403, "FORBIDDEN", "Tenant membership required")
+        if (m == null || m.status != MembershipStatus.ACTIVE) throw ApiException(403, "FORBIDDEN", "Tenant membership required")
         return userId
     }
 }

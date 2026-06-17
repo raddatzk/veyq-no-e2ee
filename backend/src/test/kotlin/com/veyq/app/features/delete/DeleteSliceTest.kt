@@ -39,6 +39,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import com.veyq.app.shared.tenancy.TenantStatus
+import com.veyq.app.shared.tenancy.MembershipStatus
+import com.veyq.app.shared.tenancy.MemberRole
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /** uc.delete — recursive cascade delete of a node subtree, a single medium, and a whole group (tenant). */
 @QuarkusTest
@@ -74,7 +78,7 @@ class DeleteSliceTest {
             users.persist(User().apply { id = "del-out"; email = "del-out@example.com"; displayName = "X"; serverRole = ServerRole.ServerMember; createdAt = now })
 
             // --- personal scope with a subtree: fa(folder) > mm(memory) > cc(chapter); media/journal/track/share hang off it
-            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "del-owner"; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            scopes.persist(Scope().apply { id = scopeId; ownerUserId = "del-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "del-grant"; this.scopeId = this@DeleteSliceTest.scopeId; userId = "del-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "del-ck"; this.scopeId = this@DeleteSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             node("fa", scopeId, "FOLDER", "s-fa", scopeId)
@@ -94,10 +98,10 @@ class DeleteSliceTest {
             derivatives.persist(MediaDerivative().apply { id = "derx"; mediaId = "medx"; kind = "THUMBNAIL"; blobId = "b" })
 
             // --- a group (tenant) with its own scope + a node, an Owner and a plain Member
-            tenants.persist(Tenant().apply { id = tenantId; name = "del-grp"; domain = "del-grp.test"; displayName = "G"; status = "ACTIVE"; termsVersion = 0; createdBy = "del-owner"; createdAt = now })
-            memberships.persist(Membership().apply { id = "mb-o"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-owner"; role = "Owner"; status = "ACTIVE"; createdAt = now })
-            memberships.persist(Membership().apply { id = "mb-m"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-out"; role = "Member"; status = "ACTIVE"; createdAt = now })
-            scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@DeleteSliceTest.tenantId; kind = "TENANT_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+            tenants.persist(Tenant().apply { id = tenantId; name = "del-grp"; domain = "del-grp.test"; displayName = "G"; status = TenantStatus.ACTIVE; termsVersion = 0; createdBy = "del-owner"; createdAt = now })
+            memberships.persist(Membership().apply { id = "mb-o"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-owner"; role = MemberRole.Owner; status = MembershipStatus.ACTIVE; createdAt = now })
+            memberships.persist(Membership().apply { id = "mb-m"; this.tenantId = this@DeleteSliceTest.tenantId; userId = "del-out"; role = MemberRole.Member; status = MembershipStatus.ACTIVE; createdAt = now })
+            scopes.persist(Scope().apply { id = tenantScopeId; this.tenantId = this@DeleteSliceTest.tenantId; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "del-tgrant"; this.scopeId = tenantScopeId; userId = "del-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             node("tn", tenantScopeId, "FOLDER", "s-tn", tenantScopeId)
         }

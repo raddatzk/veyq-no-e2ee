@@ -7,6 +7,7 @@ import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import com.veyq.app.platform.error.notFound
@@ -39,9 +40,9 @@ class RemoveMemberHandler(
         // instant token revocation
         sessions.invalidateAll(userId)
         // soft removal — rejoinable; content + attribution are preserved
-        membership.status = "REMOVED"
+        membership.status = MembershipStatus.REMOVED
 
-        return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role, status = membership.status)
+        return MembershipSummary(tenantId = tenantId, userId = userId, role = membership.role.name, status = membership.status.name)
     }
 
 }

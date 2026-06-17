@@ -9,6 +9,7 @@ import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.TenantAdminGuard
 import com.veyq.app.shared.tenancy.InviteKind
 import com.veyq.app.shared.tenancy.InviteStatus
+import com.veyq.app.shared.tenancy.MemberRole
 import com.veyq.app.shared.tenancy.TenantInvite
 import com.veyq.app.shared.tenancy.TenantInviteRepository
 import jakarta.enterprise.context.ApplicationScoped
@@ -55,8 +56,8 @@ class MemberInviteHandler(
         val now = Instant.now()
         val expires = now.plus(inviteTtl)
         val invite = TenantInvite().apply {
-            id = UUID.randomUUID().toString(); this.tenantId = tenantId; role = req.role.value
-            secretHash = sha256(secret); status = InviteStatus.PENDING.name; kind = InviteKind.MEMBER.name
+            id = UUID.randomUUID().toString(); this.tenantId = tenantId; role = MemberRole.valueOf(req.role.value)
+            secretHash = sha256(secret); status = InviteStatus.PENDING; kind = InviteKind.MEMBER
             scopeId = scope.id
             tempPublicKey = dec.decode(req.tempPublicKey.kemPublicKey)
             tempWrappedScopePrivateKey = dec.decode(req.tempWrappedScopePrivateKey.bytes)

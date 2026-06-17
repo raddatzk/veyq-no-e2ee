@@ -41,7 +41,7 @@ class MyGroupsHandler(
                 tenantId = tenant.id,
                 name = tenant.name,
                 displayName = tenant.displayName,
-                role = m.role,
+                role = m.role.name,
                 scopeId = scope.id,
                 scopePublicKey = KemPublicKey(suiteId = scope.suiteId, kemPublicKey = enc.encodeToString(scope.kemPublicKey)),
             )

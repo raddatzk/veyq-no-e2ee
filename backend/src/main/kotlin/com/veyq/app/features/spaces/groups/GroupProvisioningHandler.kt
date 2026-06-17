@@ -18,12 +18,14 @@ import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeKind
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.tenancy.GroupMembership
 import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.GroupRole
 import com.veyq.app.shared.tenancy.MembershipRepository
+import com.veyq.app.shared.tenancy.MembershipStatus
 import com.veyq.app.shared.tenancy.TenantRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -64,7 +66,7 @@ class GroupProvisioningHandler(
         val now = Instant.now()
 
         val scope = Scope().apply {
-            id = newId(); this.tenantId = tenantId; kind = "GROUP_ROOT"
+            id = newId(); this.tenantId = tenantId; kind = ScopeKind.GROUP_ROOT
             suiteId = req.scopePublicKey.suiteId; kemPublicKey = dec.decode(req.scopePublicKey.kemPublicKey)
             sealedName = dec.decode(req.sealedName.bytes); nameSuiteId = req.sealedName.suiteId; createdAt = now
         }
@@ -113,7 +115,7 @@ class GroupProvisioningHandler(
     fun addGroupMember(auth: String?, tenantId: String, scopeId: String, req: AddGroupMemberRequest): ApiGroupMember {
         requireGroupOwner(tenantId, scopeId, auth)
         val target = memberships.find(tenantId, req.userId)
-        if (target == null || target.status != "ACTIVE") throw ApiException(400, "NOT_A_TENANT_MEMBER", "Target is not an active tenant member")
+        if (target == null || target.status != MembershipStatus.ACTIVE) throw ApiException(400, "NOT_A_TENANT_MEMBER", "Target is not an active tenant member")
         if (groupMembers.find(scopeId, req.userId) != null) throw ApiException(409, "ALREADY_GROUP_MEMBER", "Already a member of this group")
         suites.require(req.wrappedScopePrivateKey.suiteId)
         val role = normalizeRole(req.role ?: GroupRole.GroupMember.name)
@@ -162,7 +164,7 @@ class GroupProvisioningHandler(
     /** The GROUP_ROOT scope, validated to live under this tenant. */
     private fun requireGroupScope(tenantId: String, scopeId: String): Scope {
         val scope = scopes.findById(scopeId) ?: throw ApiException(404, "GROUP_NOT_FOUND", "Group not found")
-        if (scope.kind != "GROUP_ROOT" || scope.tenantId != tenantId) throw ApiException(404, "GROUP_NOT_FOUND", "Group not found in this tenant")
+        if (scope.kind != ScopeKind.GROUP_ROOT || scope.tenantId != tenantId) throw ApiException(404, "GROUP_NOT_FOUND", "Group not found in this tenant")
         return scope
     }
 
@@ -179,7 +181,7 @@ class GroupProvisioningHandler(
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
         tenants.findById(tenantId) ?: throw ApiException(404, "TENANT_NOT_FOUND", "Tenant not found")
         val m = memberships.find(tenantId, userId)
-        if (m == null || m.status != "ACTIVE") throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
+        if (m == null || m.status != MembershipStatus.ACTIVE) throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
         return userId
     }
 

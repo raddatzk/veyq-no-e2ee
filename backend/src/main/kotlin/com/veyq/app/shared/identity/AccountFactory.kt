@@ -16,6 +16,7 @@ import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.keymgmt.Scope
 import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
+import com.veyq.app.shared.keymgmt.ScopeKind
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
@@ -112,7 +113,7 @@ class AccountFactory(
         )
 
         val personalScope = Scope().apply {
-            id = newId(); ownerUserId = user.id; kind = "PERSONAL_ROOT"
+            id = newId(); ownerUserId = user.id; kind = ScopeKind.PERSONAL_ROOT
             suiteId = spec.personalScopePublicKey.suiteId
             kemPublicKey = dec.decode(spec.personalScopePublicKey.kemPublicKey); createdAt = now
         }

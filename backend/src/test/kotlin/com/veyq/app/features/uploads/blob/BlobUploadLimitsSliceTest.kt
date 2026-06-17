@@ -22,6 +22,7 @@ import java.time.Instant
 import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import com.veyq.app.shared.keymgmt.ScopeKind
 
 /**
  * uc.uploads (limits) — the server bounds chunk counts, declared sizes, single-frame sizes, cumulative frame
@@ -62,7 +63,7 @@ class BlobUploadLimitsSliceTest {
             if (users.findByEmail("lim-owner@example.com") != null) return@run
             for ((uid, sid) in listOf("lim-owner" to scopeId, "lim-cap-owner" to capScopeId)) {
                 users.persist(User().apply { id = uid; email = "$uid@example.com"; displayName = "Owner"; serverRole = ServerRole.ServerMember; createdAt = now })
-                scopes.persist(Scope().apply { id = sid; ownerUserId = uid; kind = "PERSONAL_ROOT"; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
+                scopes.persist(Scope().apply { id = sid; ownerUserId = uid; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
                 grants.persist(ScopeGrant().apply { id = "$sid-grant"; this.scopeId = sid; userId = uid; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 contentKeys.persist(ScopeContentKey().apply { id = "$sid-ck"; this.scopeId = sid; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
             }
