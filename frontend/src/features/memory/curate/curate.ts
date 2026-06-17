@@ -4,6 +4,7 @@
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { createNode, decodeNode, resealNode, slugTokenFor, type MemoryNode, type NodeType } from '../createTree/memoryTree'
+import { invalidateNodeGraph } from '../../home/nodeGraph'
 import { b64url } from '../../../shared/base64'
 
 const parentSlot = (active: ActiveSpace, parentId: string | null | undefined) => parentId ?? active.scope.scopeId
@@ -15,6 +16,7 @@ async function patchNode(apiBase: string, session: UnlockedSession, scopeId: str
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`update node failed: ${res.status} ${await res.text()}`)
+  invalidateNodeGraph(scopeId) // rename/move/cover/reorder changed the graph — drop the per-scope cache
   return res.json()
 }
 
@@ -44,7 +46,9 @@ export async function createChild(
   for (let attempt = 0; attempt < 25; attempt++) {
     const slug = attempt === 0 ? base : `${base}-${attempt + 1}`
     try {
-      return await createNode(apiBase, session, active.scope.scopeId, active.contentKey, { type, name: name.trim(), slug, orderIndex, parentId })
+      const created = await createNode(apiBase, session, active.scope.scopeId, active.contentKey, { type, name: name.trim(), slug, orderIndex, parentId })
+      invalidateNodeGraph(active.scope.scopeId) // a new node — drop the per-scope cache so reads see it
+      return created
     } catch (e) {
       const msg = String(e)
       if (!msg.includes('SLUG_EXISTS') && !msg.includes('409')) throw e
@@ -108,4 +112,5 @@ export async function deleteNode(apiBase: string, session: UnlockedSession, acti
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
   if (!res.ok) throw new Error(`delete node failed: ${res.status} ${await res.text()}`)
+  invalidateNodeGraph(active.scope.scopeId) // the subtree is gone — drop the per-scope cache
 }

@@ -6,7 +6,7 @@ import { t } from '../../i18n/i18n'
 import { getOrCreateContentKey, openScopeById, type OpenScope } from '../content/scopeContent'
 import { openSealedName } from '../spaces/groups/groupSpaces'
 import { decodeNode, listChildren, resolvePath, type MemoryNode } from '../memory/browse/browse'
-import { listNodes } from '../memory/createTree/memoryTree'
+import { listNodesCached } from './nodeGraph'
 import { listMySpaces, openSpace, type SpaceEntry } from '../spaces/switchActiveSpace/switchActiveSpace'
 import { downloadBlob, listMedia } from '../uploads/media/media'
 
@@ -65,7 +65,7 @@ export async function resolveRoute(apiBase: string, session: UnlockedSession, ac
 
 /** Valid move targets for a node: the root + every folder that isn't the node or in its own subtree. */
 export async function moveDestinations(apiBase: string, session: UnlockedSession, active: ActiveSpace, node: MemoryNode): Promise<{ id: string; name: string }[]> {
-  const all = await listNodes(apiBase, session, active.scope.scopeId)
+  const all = await listNodesCached(apiBase, session, active.scope.scopeId)
   const root = active.scope.scopeId
   const childrenOf = (id: string) => all.filter((n) => (n.parentId ?? root) === id)
   const banned = new Set<string>([node.id])
@@ -81,7 +81,7 @@ export async function moveDestinations(apiBase: string, session: UnlockedSession
 
 /** Resolve a single node by id (with its decrypted name) — used to deep-link into a memory from a share. */
 export async function loadMemoryById(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<LevelEntry | null> {
-  const all = await listNodes(apiBase, session, active.scope.scopeId)
+  const all = await listNodesCached(apiBase, session, active.scope.scopeId)
   const node = all.find((n) => n.id === nodeId)
   if (!node) return null
   const c = decodeNode(active.contentKey, node)
@@ -90,7 +90,7 @@ export async function loadMemoryById(apiBase: string, session: UnlockedSession, 
 
 /** Build the node-id chain (root→…→nodeId) for a node, so a deep link can carry the full folder back-stack. */
 export async function ancestorChain(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<LevelEntry[]> {
-  const all = await listNodes(apiBase, session, active.scope.scopeId)
+  const all = await listNodesCached(apiBase, session, active.scope.scopeId)
   const byId = new Map(all.map((n) => [n.id, n]))
   const root = active.scope.scopeId
   const chain: LevelEntry[] = []

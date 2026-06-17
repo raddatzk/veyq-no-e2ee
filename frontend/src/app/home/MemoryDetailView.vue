@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { session } from '../session'
 // Heavy (yjs/codemirror) — only loaded when a member opens the live editor.
 const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor.vue'))
-import { i18n, t } from '../../i18n/i18n'
-import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
-import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
-import { loadGalleryTiles, loadOriginal, loadPreview, type GalleryTile } from '../../features/gallery/gallery'
+import { t } from '../../i18n/i18n'
+import { loadGalleryTiles, loadOriginal, loadPreview } from '../../features/gallery/gallery'
+import { useGallery } from '../../features/gallery/useGallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
@@ -24,12 +23,7 @@ import type { ActiveSpace, MemoryNode } from '../../features/home/home'
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
 const emit = defineEmits<{ back: [] }>()
 
-const tiles = ref<GalleryTile[]>([])
 const loading = ref(true)
-const containerWidth = ref(0)
-const galleryEl = ref<HTMLElement | null>(null)
-const lightbox = ref<string | null>(null)
-const lightboxTile = ref<GalleryTile | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const downloadOpen = ref(false)
@@ -46,23 +40,17 @@ const tracksLoaded = ref(false)
 const importing = ref(false)
 const gpxInput = ref<HTMLInputElement | null>(null)
 const error = ref('')
-let ro: ResizeObserver | null = null
+const mediaDelArm = ref(false)
 
-// Group the (takenAt-ordered) tiles into day buckets, each with its own justified layout — a dated timeline.
-const buckets = computed(() =>
-  groupByDay(tiles.value).map((b) => ({
-    key: b.key,
-    label: formatDayLabel(b.key, i18n.locale),
-    layout: calculateJustifiedLayout({
-      items: b.items.map((t) => ({ id: t.id, aspectRatio: t.aspectRatio })),
-      containerWidth: containerWidth.value,
-      targetHeight: 220,
-      gap: 6,
-    }),
-  })),
-)
-const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
-const tileById = computed(() => Object.fromEntries(tiles.value.map((t) => [t.id, t])))
+// Shared gallery state (tiles, justified buckets, lightbox preview/original, object-URL lifecycle).
+const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, revokeTiles, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
+  loadPreview: (tile) => loadPreview(session.apiBase, session.unlocked!, props.active, tile),
+  loadOriginal: (tile) => loadOriginal(session.apiBase, session.unlocked!, props.active, tile),
+  downloadFileName: (tile, ext) => `${props.name}-${tile.id.slice(0, 8)}.${ext}`,
+  onLightboxClose: () => { mediaDelArm.value = false },
+  onError: (e) => { error.value = e.message },
+})
+
 const journalHtml = computed(() => renderMarkdown(journalMarkdown.value))
 const geoPoints = computed(() =>
   tiles.value.filter((t) => t.lat != null && t.lng != null).map((t) => ({ id: t.id, lat: t.lat!, lng: t.lng! })),
@@ -130,8 +118,7 @@ async function saveJournal() {
 }
 
 onMounted(async () => {
-  ro = new ResizeObserver((entries) => { containerWidth.value = entries[0].contentRect.width })
-  if (galleryEl.value) ro.observe(galleryEl.value)
+  // The gallery (v-show) is already in the DOM, so useGallery's ResizeObserver is attached — just load tiles.
   try {
     tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
   } finally {
@@ -139,14 +126,8 @@ onMounted(async () => {
   }
 })
 
-onBeforeUnmount(() => {
-  ro?.disconnect()
-  tiles.value.forEach((t) => URL.revokeObjectURL(t.url))
-  if (lightbox.value) URL.revokeObjectURL(lightbox.value)
-})
-
 async function refresh() {
-  tiles.value.forEach((t) => URL.revokeObjectURL(t.url))
+  revokeTiles()
   tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
 }
 
@@ -166,48 +147,12 @@ async function onFilesPicked(event: Event) {
   }
 }
 
-async function openLightbox(tile: GalleryTile) {
-  lightboxTile.value = tile
-  // Show the PREVIEW (≈2048px) — full-res originals are only fetched on an explicit download.
-  lightbox.value = await loadPreview(session.apiBase, session.unlocked!, props.active, tile)
-}
-
-const downloading = ref(false)
-/** Fetch THIS medium's full-resolution original and save it to disk (the only path that pulls full-res). */
-async function downloadThisOriginal() {
-  if (!lightboxTile.value || downloading.value) return
-  downloading.value = true
-  let url: string | null = null
-  try {
-    url = await loadOriginal(session.apiBase, session.unlocked!, props.active, lightboxTile.value)
-    const ext = (lightboxTile.value.mimeType.split('/')[1] || 'bin').replace('jpeg', 'jpg')
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${name}-${lightboxTile.value.id.slice(0, 8)}.${ext}`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  } catch (e) {
-    error.value = (e as Error).message
-  } finally {
-    if (url) URL.revokeObjectURL(url)
-    downloading.value = false
-  }
-}
-function closeLightbox() {
-  if (lightbox.value) URL.revokeObjectURL(lightbox.value)
-  lightbox.value = null
-  lightboxTile.value = null
-  mediaDelArm.value = false
-}
-const mediaDelArm = ref(false)
 async function deleteThisMedia() {
   if (!lightboxTile.value) return
-  const id = lightboxTile.value.id
   try {
-    await deleteMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, id)
+    await deleteMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, lightboxTile.value.id)
     closeLightbox()
-    tiles.value.forEach((t) => t.id === id && URL.revokeObjectURL(t.url))
+    revokeTiles()
     tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
   } catch (e) {
     error.value = (e as Error).message

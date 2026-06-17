@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { session } from '../session'
-import { i18n, t } from '../../i18n/i18n'
-import { calculateJustifiedLayout } from '../../features/gallery/justifiedLayout'
-import { formatDateRange, formatDayLabel, groupByDay } from '../../features/gallery/dateBuckets'
-import type { GalleryTile } from '../../features/gallery/gallery'
+import { t } from '../../i18n/i18n'
+import { useGallery } from '../../features/gallery/useGallery'
 import * as Y from 'yjs'
 import { loadShareOriginal, loadSharePreview, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
 import { loadShareJournalDoc, subscribeShareJournal } from '../../features/memory/journalLive/shareJournalLive'
@@ -18,12 +16,8 @@ const emit = defineEmits<{ internal: [target: { scopeId: string; nodeId: string 
 
 const ctx = ref<ShareContext | null>(null)
 const title = ref('')
-const tiles = ref<GalleryTile[]>([])
 const loading = ref(true)
 const error = ref('')
-const containerWidth = ref(0)
-const galleryEl = ref<HTMLElement | null>(null)
-const lightbox = ref<string | null>(null)
 const journal = ref('')
 const uploading = ref(false)
 const needPassword = ref(false)
@@ -36,9 +30,15 @@ const isContributor = computed(() => ctx.value?.role === 'CONTRIBUTOR')
 const canRead = computed(() => ctx.value?.role !== 'UPLOADER')
 const canUpload = computed(() => ctx.value?.role === 'CONTRIBUTOR' || ctx.value?.role === 'UPLOADER')
 const journalHtml = computed(() => renderMarkdown(journal.value))
-let ro: ResizeObserver | null = null
 let journalDoc: Y.Doc | null = null
 let journalProvider: EncryptedRelayProvider | null = null
+
+// Shared gallery state (tiles, justified buckets, lightbox preview/original, object-URL lifecycle).
+// The loaders use the resolved share capability (ctx is always present once tiles can be opened).
+const { tiles, galleryEl, lightbox, downloading, buckets, dateRange, tileById, observe, revokeTiles, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
+  loadPreview: (tile) => loadSharePreview(ctx.value!, tile),
+  loadOriginal: (tile) => loadShareOriginal(ctx.value!, tile),
+})
 
 /** Operator-blind live read: reconstruct from the store, then subscribe to the relay for owner edits. */
 async function startLiveJournal(c: ShareContext) {
@@ -51,19 +51,7 @@ async function startLiveJournal(c: ShareContext) {
   journalProvider = subscribeShareJournal(c.apiBase, c.scopeId, c.rootNodeId, c.shareId, c.contentKey, doc)
 }
 
-const buckets = computed(() =>
-  groupByDay(tiles.value).map((b) => ({
-    key: b.key,
-    label: formatDayLabel(b.key, i18n.locale),
-    layout: calculateJustifiedLayout({ items: b.items.map((tt) => ({ id: tt.id, aspectRatio: tt.aspectRatio })), containerWidth: containerWidth.value, targetHeight: 220, gap: 6 }),
-  })),
-)
-const dateRange = computed(() => formatDateRange(tiles.value, i18n.locale))
-const tileById = computed(() => Object.fromEntries(tiles.value.map((tt) => [tt.id, tt])))
-
 onMounted(async () => {
-  ro = new ResizeObserver((entries) => { containerWidth.value = entries[0].contentRect.width })
-  if (galleryEl.value) ro.observe(galleryEl.value)
   try {
     // A logged-in member who already holds this scope gets the FULL internal memory (not the guest view).
     if (session.unlocked) {
@@ -127,7 +115,7 @@ async function loadContent() {
     tiles.value = await loadShareTiles(c, c.rootNodeId)
     await startLiveJournal(c)
     await nextTick()
-    if (galleryEl.value && ro) ro.observe(galleryEl.value) // the gallery only renders after content loads
+    observe() // the gallery only renders after content loads (v-if), so attach the ResizeObserver now
   }
 }
 const noticesHtml = computed(() => pendingNotices.value.map((n) => renderMarkdown(n.markdown)).join('<hr class="notice-sep">'))
@@ -138,7 +126,7 @@ async function onFilesPicked(event: Event) {
   uploading.value = true
   try {
     for (const file of files) await uploadShareMedia(ctx.value, await fileToNewMedia(file))
-    tiles.value.forEach((tt) => URL.revokeObjectURL(tt.url))
+    revokeTiles()
     tiles.value = await loadShareTiles(ctx.value, ctx.value.rootNodeId)
   } finally {
     uploading.value = false
@@ -146,47 +134,11 @@ async function onFilesPicked(event: Event) {
   }
 }
 
+// useGallery owns the gallery teardown (ResizeObserver + tile/lightbox object URLs); tear the journal down here.
 onBeforeUnmount(() => {
-  ro?.disconnect()
   journalProvider?.destroy()
   journalDoc?.destroy()
-  tiles.value.forEach((tt) => URL.revokeObjectURL(tt.url))
-  if (lightbox.value) URL.revokeObjectURL(lightbox.value)
 })
-
-const lightboxTile = ref<GalleryTile | null>(null)
-async function openLightbox(tile: GalleryTile) {
-  if (!ctx.value) return
-  lightboxTile.value = tile
-  // Show the PREVIEW (≈2048px); the full-res original is only fetched on an explicit download.
-  lightbox.value = await loadSharePreview(ctx.value, tile)
-}
-function closeLightbox() {
-  if (lightbox.value) URL.revokeObjectURL(lightbox.value)
-  lightbox.value = null
-  lightboxTile.value = null
-}
-
-const downloading = ref(false)
-/** Fetch this medium's full-resolution original and save it to disk (the only path that pulls full-res). */
-async function downloadThisOriginal() {
-  if (!ctx.value || !lightboxTile.value || downloading.value) return
-  downloading.value = true
-  let url: string | null = null
-  try {
-    url = await loadShareOriginal(ctx.value, lightboxTile.value)
-    const ext = (lightboxTile.value.mimeType.split('/')[1] || 'bin').replace('jpeg', 'jpg')
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${lightboxTile.value.id.slice(0, 8)}.${ext}`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  } finally {
-    if (url) URL.revokeObjectURL(url)
-    downloading.value = false
-  }
-}
 </script>
 
 <template>

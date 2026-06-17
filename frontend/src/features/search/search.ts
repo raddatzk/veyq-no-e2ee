@@ -2,7 +2,8 @@
 // operation: load the active space's node graph once, decode the names, and substring-match locally.
 import type { UnlockedSession } from '../account/login/login'
 import type { ActiveSpace } from '../home/home'
-import { decodeNode, listNodes, type MemoryNode } from '../memory/createTree/memoryTree'
+import { decodeNode, type MemoryNode } from '../memory/createTree/memoryTree'
+import { listNodesCached } from '../home/nodeGraph'
 
 export type SearchHit = { id: string; name: string; type: MemoryNode['type']; node: MemoryNode }
 
@@ -10,7 +11,7 @@ export type SearchHit = { id: string; name: string; type: MemoryNode['type']; no
 export async function searchNodes(apiBase: string, session: UnlockedSession, active: ActiveSpace, query: string): Promise<SearchHit[]> {
   const q = query.trim().toLowerCase()
   if (!q) return []
-  const nodes = await listNodes(apiBase, session, active.scope.scopeId)
+  const nodes = await listNodesCached(apiBase, session, active.scope.scopeId)
   return nodes
     .map((node) => ({ id: node.id, type: node.type, node, name: decodeNode(active.contentKey, node).name }))
     .filter((hit) => hit.name.toLowerCase().includes(q))
