@@ -109,12 +109,21 @@ async function onReorderDrop(target: LevelEntry, section: 'M' | 'F') {
   if (!d || d.section !== section || d.entry.node.id === target.node.id || !active.value) return
   const listRef = section === 'M' ? memories : folders
   const arr = [...listRef.value]
+  const oldIndex = new Map(arr.map((e, i) => [e.node.id, i]))
   const from = arr.findIndex((e) => e.node.id === d.entry.node.id)
   const to = arr.findIndex((e) => e.node.id === target.node.id)
   if (from < 0 || to < 0) return
   arr.splice(to, 0, arr.splice(from, 1)[0])
   listRef.value = arr
-  for (let i = 0; i < arr.length; i++) await reorderNode(apiBase, session.unlocked!, active.value, arr[i].node.id, i)
+  // Snapshot the space + a navigation token: persist only the indices that actually moved, and bail if the
+  // user switched space/folder mid-write (so we never reorder against a now-different active space).
+  const space = active.value
+  const seq = loadSeq
+  for (let i = 0; i < arr.length; i++) {
+    if (oldIndex.get(arr[i].node.id) === i) continue
+    if (seq !== loadSeq) return
+    await reorderNode(apiBase, session.unlocked!, space, arr[i].node.id, i)
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -354,7 +363,9 @@ const groupSpaces = () => spaces.value.filter((s) => s.kind === 'GROUP')
         <span class="deletion-banner-text">{{ t('delete.scheduledBanner', { date: new Date(active.entry.scheduledDeletionAt).toLocaleDateString() }) }}</span>
         <button v-if="active.entry.role === 'Owner'" class="btn btn-ghost deletion-banner-cancel" type="button" @click="cancelDeletion">{{ t('delete.cancelDeletion') }}</button>
       </div>
-      <MemoryDetailView v-if="selectedMemory && active" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="closeMemory" />
+      <!-- :key forces a remount when the memory changes (e.g. search-selecting a different one without going
+           through openLevel), so the gallery/journal/tracks reload instead of showing the previous memory's. -->
+      <MemoryDetailView v-if="selectedMemory && active" :key="selectedMemory.node.id" :active="active" :memory="selectedMemory.node" :name="selectedMemory.name" @back="closeMemory" />
       <template v-else>
         <div v-if="error" class="home-empty">{{ error }}</div>
 

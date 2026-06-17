@@ -95,22 +95,30 @@ onMounted(async () => {
   })
 })
 
-onBeforeUnmount(async () => {
+onBeforeUnmount(() => {
+  // Vue does not await async lifecycle hooks, so tear down synchronously FIRST: stop the editor + the relay
+  // socket immediately rather than holding them alive across the persist round-trips below. The persist runs
+  // detached on the (still-alive) doc — HTTP-only (append/compact), so it doesn't need the relay.
   window.clearTimeout(flushTimer)
   doc.off('update', onLocalUpdate)
-  await flush()
-  // Compaction refreshes the snapshot + the Markdown reader projection and prunes the folded-in updates.
-  // Reload the full log into the doc FIRST so the snapshot covers every update <= coveredSeq — otherwise a
-  // seq another editor appended that this doc never folded in (e.g. an HTTP append while our relay lagged)
-  // would be pruned but missing from the snapshot, losing that content.
-  try {
-    const coveredSeq = await loadJournalDoc(...ctx(), doc)
-    await compactJournal(...ctx(), doc, ytext.toString(), coveredSeq)
-  } catch { /* best-effort; updates persist */ }
   view?.destroy()
   provider.value?.destroy()
-  doc.destroy()
+  void persistThenDestroy()
 })
+
+/** Best-effort: flush pending edits, reload the log so the snapshot is gap-free, compact, then free the doc. */
+async function persistThenDestroy() {
+  try {
+    await flush()
+    // Reload the full log into the doc FIRST so the snapshot covers every update <= coveredSeq — otherwise a
+    // seq another editor appended that this doc never folded in (e.g. an HTTP append while our relay lagged)
+    // would be pruned but missing from the snapshot, losing that content.
+    const coveredSeq = await loadJournalDoc(...ctx(), doc)
+    await compactJournal(...ctx(), doc, ytext.toString(), coveredSeq)
+  } catch { /* best-effort; updates persist */ } finally {
+    doc.destroy()
+  }
+}
 
 function close() {
   emit('close', ytext.toString())

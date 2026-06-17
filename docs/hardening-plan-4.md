@@ -50,12 +50,12 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
   per-IP-Request-Bucket für unauth Metadaten-GETs (der „Folgepunkt" aus Runde 3 A4).
 
 ## Phase C — Korrektheit
-- [ ] **C1 · Web: stale Galerie/Journal/Tracks beim Memory-Wechsel via Suche** *(Correctness, Medium, S)* —
+- [x] **C1 · Web: stale Galerie/Journal/Tracks beim Memory-Wechsel via Suche** *(Correctness, Medium, S)* — FIX:
   `<MemoryDetailView v-if="selectedMemory…">` hat KEIN `:key`. `onSearchSelect` (MEMORY) setzt `selectedMemory`
   direkt (nicht über `openLevel`, das es erst nullt) → Vue reused die Instanz, `onMounted` lief nur einmal, kein
   `watch(props.memory)` → Titel/Count aktualisieren, aber Tiles/Journal/Tracks bleiben vom vorherigen Memory.
   Fix: `:key="selectedMemory.node.id"` (oder `watch(() => props.memory.id)` mit Reload + Reset der Tab-Flags).
-- [ ] **C2 · Web: kleinere Race-/Konsistenz-Nits** *(Correctness, Low, S)* — `onReorderDrop` schreibt seriell ohne
+- [x] **C2 · Web: kleinere Race-/Konsistenz-Nits** *(Correctness, Low, S)* — FIX: `onReorderDrop` snapshotted `active` + `loadSeq`-Guard + schreibt nur geänderte Indizes; `LiveJournalEditor` onBeforeUnmount synchron (view/provider sofort destroy), Persist+compact detached auf dem doc, dann `doc.destroy()`. (`onSearchSelect`-crumbs/ancestorChain = kosmetischer Folgepunkt.) Verifiziert: vue-tsc + journalLive/persistence/browse-E2E. ORIG: `onReorderDrop` schreibt seriell ohne
   `loadSeq`-Guard gegen `active.value` (kann nach Space-Wechsel mitten reinschreiben) + re-PUTet jeden Index;
   `onSearchSelect`-MEMORY setzt `crumbs` nicht auf die echte Parent-Kette (`ancestorChain`); `LiveJournalEditor`
   `async onBeforeUnmount` awaitet 3 Round-Trips vor den `destroy()`s (Vue awaitet Hooks nicht) → Teardown erst nach
