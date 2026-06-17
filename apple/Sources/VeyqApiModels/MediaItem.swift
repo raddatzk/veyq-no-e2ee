@@ -20,9 +20,10 @@ public struct MediaItem: Codable {
     public private(set) var mimeType: String
     public private(set) var original: BlobRef
     public private(set) var derivatives: [MediaDerivativeOut]
+    public private(set) var highlighted: Bool
     public private(set) var createdAt: Date
 
-    public init(id: String, scopeId: String, nodeId: String, sealedMeta: Blob, mimeType: String, original: BlobRef, derivatives: [MediaDerivativeOut], createdAt: Date) {
+    public init(id: String, scopeId: String, nodeId: String, sealedMeta: Blob, mimeType: String, original: BlobRef, derivatives: [MediaDerivativeOut], highlighted: Bool, createdAt: Date) {
         self.id = id
         self.scopeId = scopeId
         self.nodeId = nodeId
@@ -30,6 +31,7 @@ public struct MediaItem: Codable {
         self.mimeType = mimeType
         self.original = original
         self.derivatives = derivatives
+        self.highlighted = highlighted
         self.createdAt = createdAt
     }
 
@@ -41,6 +43,7 @@ public struct MediaItem: Codable {
         case mimeType
         case original
         case derivatives
+        case highlighted
         case createdAt
     }
 
@@ -55,6 +58,7 @@ public struct MediaItem: Codable {
         try container.encode(mimeType, forKey: .mimeType)
         try container.encode(original, forKey: .original)
         try container.encode(derivatives, forKey: .derivatives)
+        try container.encode(highlighted, forKey: .highlighted)
         try container.encode(createdAt, forKey: .createdAt)
     }
 }

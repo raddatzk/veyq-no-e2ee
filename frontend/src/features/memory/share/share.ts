@@ -7,6 +7,7 @@ import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { decodeNode, type MemoryNode } from '../createTree/memoryTree'
+import type { Track } from '../track/track'
 import { chunkBytes, decodeMediaMeta, dedupTokenFor, sealMediaMeta, DEFAULT_CHUNK_SIZE, type BlobRef, type DerivativeKind, type MediaItem, type NewMedia } from '../../uploads/media/media'
 import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
@@ -145,6 +146,18 @@ export async function listShareMedia(ctx: ShareContext, nodeId: string): Promise
   return (await res.json()).media
 }
 
+/** A shared node's GPX tracks (ciphertext), decrypted to {name, points} routes. Read-only over a share. */
+export async function getShareTracks(ctx: ShareContext, nodeId: string): Promise<Track[]> {
+  const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/nodes/${nodeId}/tracks`)
+  if (!res.ok) throw await apiError(res, 'share tracks')
+  const { tracks } = await res.json()
+  return tracks.map((t: { id: string; sealedContent: { bytes: string } }) => {
+    const sealed = fromB64url(t.sealedContent.bytes)
+    const route = JSON.parse(new TextDecoder().decode(v1.aeadOpen(ctx.contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY)))
+    return { id: t.id, name: route.name, points: route.points }
+  })
+}
+
 /** Download + open a shared blob through the public share endpoint (frame by frame, AAD checks position). */
 export async function downloadShareBlob(ctx: ShareContext, ref: BlobRef): Promise<Uint8Array> {
   // Frames are AAD-position-bound, so fetch bound-parallel and reassemble in order (bandwidth- not RTT-bound).
@@ -178,7 +191,7 @@ export async function loadShareTiles(ctx: ShareContext, nodeId: string): Promise
     const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
     const bytes = await downloadShareBlob(ctx, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview, original: m.original }
+    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original }
   })
 }
 
@@ -238,9 +251,9 @@ export async function uploadShareMedia(ctx: ShareContext, m: NewMedia): Promise<
   if (!res.ok) throw await apiError(res, 'contribute media')
 }
 
-/** Read the shared memory's journal Markdown ('' when none). Read-only over a share — only the owner edits. */
-export async function getShareJournal(ctx: ShareContext): Promise<string> {
-  const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/journal`)
+/** Read a shared node's journal Markdown ('' when none). Read-only over a share — only the owner edits. */
+export async function getShareJournal(ctx: ShareContext, nodeId: string = ctx.rootNodeId): Promise<string> {
+  const res = await fetch(`${sp(ctx)}/nodes/${nodeId}/journal`)
   if (!res.ok) throw await apiError(res, 'share journal')
   const body = await res.json()
   if (!body.sealedContent) return ''

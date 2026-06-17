@@ -28,11 +28,34 @@ struct MemoryMapView: View {
         .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line, style: StrokeStyle(lineWidth: 1, dash: [6])))
     }
 
+    // A small palette so multiple tracks are visually distinguishable (mirrors web TRACK_COLORS).
+    static let trackColors: [Color] = [
+        Color(red: 0.61, green: 0.55, blue: 1.0),   // accent violet
+        Color(red: 0.20, green: 0.78, blue: 0.60),  // teal-green
+        Color(red: 0.97, green: 0.58, blue: 0.27),  // orange
+        Color(red: 0.40, green: 0.67, blue: 0.98),  // blue
+        Color(red: 0.94, green: 0.45, blue: 0.64),  // pink
+        Color(red: 0.85, green: 0.78, blue: 0.27),  // amber
+    ]
+    private func trackColor(_ i: Int) -> Color { Self.trackColors[i % Self.trackColors.count] }
+
     private var mapBody: some View {
         Map(initialPosition: .region(region)) {
-            ForEach(tracks) { t in
+            ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
+                let color = trackColor(idx)
                 MapPolyline(coordinates: t.points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) })
-                    .stroke(VeyqStyle.accent, lineWidth: 4)
+                    .stroke(color, lineWidth: 4)
+                // Start (green) and end (red) markers per track, like the web map.
+                if let first = t.points.first {
+                    Annotation("", coordinate: CLLocationCoordinate2D(latitude: first.lat, longitude: first.lng)) {
+                        Circle().fill(.green).overlay(Circle().strokeBorder(.white, lineWidth: 2)).frame(width: 12, height: 12)
+                    }
+                }
+                if let last = t.points.last, t.points.count > 1 {
+                    Annotation("", coordinate: CLLocationCoordinate2D(latitude: last.lat, longitude: last.lng)) {
+                        Circle().fill(.red).overlay(Circle().strokeBorder(.white, lineWidth: 2)).frame(width: 12, height: 12)
+                    }
+                }
             }
             ForEach(points) { p in
                 Annotation("", coordinate: CLLocationCoordinate2D(latitude: p.lat, longitude: p.lng)) {

@@ -42,6 +42,18 @@ def rewrite_refs(node):
     return node
 
 
+def strip_server_annotations(node):
+    """Drop backend-only vendor extensions (x-*-extra-annotation) — e.g. `x-field-extra-annotation` carries
+    Quarkus/jakarta Bean-Validation annotations the jaxrs-spec backend emits. The Kotlin generator honours
+    them and would inject `@field:jakarta.validation…` into the mobile models, which don't depend on jakarta.
+    The clients validate nothing server-side, so these are noise on mobile."""
+    if isinstance(node, dict):
+        return {k: strip_server_annotations(v) for k, v in node.items() if not (isinstance(k, str) and k.endswith("-extra-annotation"))}
+    if isinstance(node, list):
+        return [strip_server_annotations(x) for x in node]
+    return node
+
+
 def bundle_specs() -> dict:
     """Merge all domain specs + common components into a single OpenAPI doc (names preserved)."""
     common = yaml.safe_load(COMMON.read_text())
@@ -62,7 +74,7 @@ def bundle_specs() -> dict:
         for kind in COMPONENT_KINDS:
             for name, comp in (spec.get("components", {}).get(kind, {}) or {}).items():
                 merged["components"][kind].setdefault(name, comp)
-    return merged
+    return strip_server_annotations(merged)
 
 SWIFT_OUT = ROOT / "apple" / "Sources" / "VeyqApiModels"
 KOTLIN_PKG = "app.veyq.apimodels"

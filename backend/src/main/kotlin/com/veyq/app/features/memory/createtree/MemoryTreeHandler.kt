@@ -38,6 +38,7 @@ class MemoryTreeHandler(
     private val journals: MemoryJournalRepository,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val content: com.veyq.app.shared.config.ContentConfig,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -86,7 +87,7 @@ class MemoryTreeHandler(
         val node = Node().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.parentId = parentId
             type = req.type; slugToken = req.slugToken; orderIndex = req.orderIndex
-            suiteId = req.sealedContent.suiteId; sealedContent = dec.decode(req.sealedContent.bytes); createdAt = Instant.now()
+            suiteId = req.sealedContent.suiteId; sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedContent.bytes, content.maxSealedBytes(), dec); createdAt = Instant.now()
         }
         nodes.persist(node)
         // Pre-create the (empty) journal row for a Memory/Chapter at birth, so the first live append never

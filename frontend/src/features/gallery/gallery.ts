@@ -9,7 +9,7 @@ import { galleryDisplayAspectRatio } from './justifiedLayout'
 
 // `preview` (≈2048px) backs the lightbox; `original` (full-res) is only fetched on an explicit download.
 // Both fall back to the original when a medium has no such derivative (older media, videos).
-export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; lat?: number; lng?: number; preview: BlobRef; original: BlobRef }
+export type GalleryTile = { id: string; url: string; aspectRatio: number; mimeType: string; takenAt: string; lat?: number; lng?: number; highlighted: boolean; preview: BlobRef; original: BlobRef }
 
 function imageAspectRatio(url: string): Promise<number> {
   return new Promise((resolve) => {
@@ -32,7 +32,7 @@ export async function loadGalleryTiles(apiBase: string, session: UnlockedSession
     const preview = m.derivatives.find((d) => d.kind === 'PREVIEW')?.blob ?? m.original
     const bytes = await downloadBlob(apiBase, session, active.scope.scopeId, active.contentKey, ref)
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: m.mimeType }))
-    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview, original: m.original }
+    return { id: m.id, url, aspectRatio: await imageAspectRatio(url), mimeType: m.mimeType, takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, highlighted: m.highlighted, preview, original: m.original }
   })
 }
 

@@ -21,7 +21,7 @@ export const DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024
 export type DerivativeKind = 'THUMBNAIL' | 'PREVIEW'
 export type BlobRef = { blobId: string; totalChunks: number; byteSize: number }
 export type BlobTicket = { status: 'READY' | 'UPLOADING'; blobId?: string; uploadId?: string; totalChunks: number }
-export type UploadProgress = { uploadId: string; totalChunks: number; receivedChunks: number[]; status: 'OPEN' | 'COMPLETED' }
+export type UploadProgress = { uploadId: string; totalChunks: number; receivedChunks: number[]; status: 'OPEN' | 'COMPLETED'; presignedPuts?: { index: number; url: string }[] }
 export type MediaItem = {
   id: string
   scopeId: string
@@ -30,6 +30,7 @@ export type MediaItem = {
   mimeType: string
   original: BlobRef
   derivatives: { kind: DerivativeKind; blob: BlobRef }[]
+  highlighted: boolean
   createdAt: string
 }
 /** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
@@ -64,7 +65,7 @@ export function dedupTokenFor(contentKey: Uint8Array, content: Uint8Array): stri
 }
 
 /** Begin (or dedup) storing a blob. READY → already stored, attach blobId directly; UPLOADING → push frames. */
-export async function startBlob(apiBase: string, session: UnlockedSession, scopeId: string, req: { dedupToken: string; totalChunks: number; byteSize: number }): Promise<BlobTicket> {
+export async function startBlob(apiBase: string, session: UnlockedSession, scopeId: string, req: { dedupToken: string; totalChunks: number; byteSize: number; suiteId?: string }): Promise<BlobTicket> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...auth(session) },
@@ -106,12 +107,27 @@ export async function completeBlob(apiBase: string, session: UnlockedSession, sc
  */
 export async function uploadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, bytes: Uint8Array, chunkSize: number = DEFAULT_CHUNK_SIZE): Promise<BlobRef> {
   const chunks = chunkBytes(bytes, chunkSize)
-  const ticket = await startBlob(apiBase, session, scopeId, { dedupToken: dedupTokenFor(contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length })
+  // Declare the suite up front so the server can finalize a presigned (direct-to-store) upload, whose raw
+  // frames carry no per-frame suite metadata.
+  const ticket = await startBlob(apiBase, session, scopeId, { dedupToken: dedupTokenFor(contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length, suiteId: 'v1' })
   if (ticket.status === 'READY') return { blobId: ticket.blobId!, totalChunks: ticket.totalChunks, byteSize: bytes.length }
   const uploadId = ticket.uploadId!
-  const have = new Set((await getProgress(apiBase, session, scopeId, uploadId)).receivedChunks)
+  const progress = await getProgress(apiBase, session, scopeId, uploadId)
+  const have = new Set(progress.receivedChunks)
+  // Fast path: when the server offers presigned PUT URLs (S3 backend), seal each frame and PUT it DIRECTLY to
+  // the object store — no backend hop, no base64, no credentials on the client (ADR 0021). Otherwise (or for any
+  // chunk without a URL) fall back to the proxied chunk endpoint, so the in-memory dev backend still works.
+  const presigned = new Map((progress.presignedPuts ?? []).map((p) => [p.index, p.url]))
   for (let i = 0; i < chunks.length; i++) {
-    if (!have.has(i)) await putChunk(apiBase, session, scopeId, uploadId, i, chunks.length, contentKey, chunks[i])
+    if (have.has(i)) continue
+    const url = presigned.get(i)
+    if (url) {
+      const frame = v1.sealFrame(contentKey, i, chunks.length, chunks[i], v1.randomBytes(12))
+      const res = await fetch(url, { method: 'PUT', body: frame as BodyInit })
+      if (!res.ok) throw new Error(`presigned put chunk ${i} failed: ${res.status}`)
+    } else {
+      await putChunk(apiBase, session, scopeId, uploadId, i, chunks.length, contentKey, chunks[i])
+    }
   }
   return completeBlob(apiBase, session, scopeId, uploadId)
 }
@@ -140,6 +156,17 @@ export async function createMedia(apiBase: string, session: UnlockedSession, sco
     body: JSON.stringify(req),
   })
   if (!res.ok) throw await apiError(res, 'create media')
+  return res.json()
+}
+
+/** Toggle a medium's highlight (favourite) and/or replace its re-sealed metadata (e.g. an edited capture date). */
+export async function updateMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string, req: { highlighted?: boolean; sealedMeta?: { suiteId: string; bytes: string } }): Promise<MediaItem> {
+  const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...auth(session) },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw await apiError(res, 'update media')
   return res.json()
 }
 

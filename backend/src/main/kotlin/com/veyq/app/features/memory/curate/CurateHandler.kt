@@ -31,6 +31,7 @@ class CurateHandler(
     private val purge: ContentPurge,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val content: com.veyq.app.shared.config.ContentConfig,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -67,7 +68,7 @@ class CurateHandler(
                 val slugToken = req.slugToken ?: throw ApiException(400, "SLUG_TOKEN_REQUIRED", "A rename needs a recomputed slug token")
                 val clash = nodes.findByParentAndSlug(node.parentId, slugToken)
                 if (clash != null && clash.id != node.id) throw ApiException(409, "SLUG_EXISTS", "A sibling already uses that slug")
-                node.sealedContent = dec.decode(req.sealedContent.bytes)
+                node.sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedContent.bytes, content.maxSealedBytes(), dec)
                 node.suiteId = req.sealedContent.suiteId
                 node.slugToken = slugToken
                 req.orderIndex?.let { node.orderIndex = it }

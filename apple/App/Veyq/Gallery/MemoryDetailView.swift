@@ -11,7 +11,7 @@ import VeyqCrypto
 final class GalleryStore: ObservableObject {
     // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
     // an explicit save. Both refs fall back to the original for media without that derivative.
-    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?; let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String }
+    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?; let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String; var highlighted: Bool }
 
     let apiBase: String
     let session: Login.UnlockedSession
@@ -48,10 +48,24 @@ final class GalleryStore: ObservableObject {
             guard let bytes = bytesByIndex[i], let img = UIImage(data: bytes) else { continue }
             let preview = m.derivatives.first(where: { $0.kind == "PREVIEW" })?.blob ?? m.original
             result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height),
-                               takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType))
+                               takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType, highlighted: m.highlighted))
         }
         tiles = result
         loading = false
+    }
+
+    /// Toggle a medium's highlight flag (server-visible benign metadata) and patch the local tile in place.
+    func toggleHighlight(_ tile: Tile) async {
+        let next = !tile.highlighted
+        guard (try? await Media.updateMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, mediaId: tile.id, highlighted: next)) != nil else { return }
+        if let i = tiles.firstIndex(where: { $0.id == tile.id }) { tiles[i].highlighted = next }
+    }
+
+    /// Re-seal a medium's capture date (keeping its location) and patch sealedMeta, then reload to re-sort.
+    func updateTakenAt(_ tile: Tile, _ iso: String) async {
+        guard let sealed = try? Media.sealMediaMeta(contentKey: contentKey, meta: Media.MediaMeta(takenAt: iso, lat: tile.lat, lng: tile.lng)) else { return }
+        guard (try? await Media.updateMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, mediaId: tile.id, sealedMeta: sealed)) != nil else { return }
+        await load()
     }
 
     /// Fetch thumbnail bytes for the given refs, at most 6 in flight, returned keyed by their input index.
@@ -174,6 +188,33 @@ final class GalleryStore: ObservableObject {
         tracks.removeAll { $0.id == id }
     }
 
+    /// Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info.
+    struct Child: Identifiable { let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?; var id: String { node.id }; var type: String { node.type } }
+    @Published var children: [Child] = []
+    private var childrenLoaded = false
+    var chapterCount: Int { children.filter { $0.type == "CHAPTER" }.count }
+
+    func loadChildren() async {
+        guard !childrenLoaded else { return }
+        childrenLoaded = true
+        guard let nodes = try? await Browse.listChildren(apiBase: apiBase, session: session, scopeId: scopeId, parentId: nodeId) else { return }
+        var out: [Child] = []
+        for n in nodes {
+            let name = (try? MemoryTree.decodeNodeName(contentKey: contentKey, node: n)) ?? "—"
+            let cover = await Self.childCover(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: n.id, coverMediaId: n.coverMediaId)
+            out.append(Child(node: n, name: name, cover: cover.flatMap(UIImage.init)))
+        }
+        children = out
+    }
+
+    private nonisolated static func childCover(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, coverMediaId: String?) async -> Data? {
+        guard let media = try? await Media.listMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId) else { return nil }
+        let chosen = (coverMediaId.flatMap { cid in media.first { $0.id == cid } }) ?? media.first
+        guard let item = chosen else { return nil }
+        let ref = item.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? item.original
+        return try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)
+    }
+
     /// Downscale to fit `maxDim` (longest edge) as JPEG at `quality`; nil for non-images.
     static func downscale(_ data: Data, maxDim: CGFloat, quality: CGFloat) -> Data? {
         guard let img = UIImage(data: data) else { return nil }
@@ -190,10 +231,14 @@ final class GalleryStore: ObservableObject {
 struct MemoryDetailView: View {
     @StateObject private var store: GalleryStore
     let name: String
-    @State private var lightboxTile: GalleryStore.Tile?
+    @State private var showLightbox = false
+    @State private var lightboxIndex = 0              // index into orderedTiles
     @State private var lightboxImage: UIImage?   // the preview, loaded async; the thumbnail shows meanwhile
     @State private var savingOriginal = false
     @State private var mediaDelArm = false
+    @State private var showHighlightsOnly = false   // gallery filter (favourites)
+    @State private var lightboxInfo = false          // info panel toggle in the lightbox
+    @State private var editingDate = false           // capture-date editor toggle in the lightbox
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showDownload = false
     @State private var downloading = false
@@ -213,16 +258,25 @@ struct MemoryDetailView: View {
             let contentWidth = min(geo.size.width, 1024)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    // Cover hero: the first (earliest) photo, like the web detail header.
+                    if let hero = store.tiles.first {
+                        Image(uiImage: hero.image).resizable().scaledToFill()
+                            .frame(height: 180).frame(maxWidth: .infinity).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+                    }
                     Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
                     Picker("", selection: $tab) {
                         Text(T("detail.gallery")).tag(0)
-                        Text(T("detail.journal")).tag(1)
                         Text(T("detail.map")).tag(2)
+                        Text(T("detail.journal")).tag(1)
+                        Text(T("detail.info")).tag(3)
                     }
                     .pickerStyle(.segmented)
 
-                    if tab == 1 {
-                        JournalView(store: store)
+                    if tab == 3 {
+                        infoTab
+                    } else if tab == 1 {
+                        JournalView(store: store, onOpenMedia: openLightbox)
                     } else if tab == 2 {
                         let pts = store.tiles.compactMap { t -> MemoryMapView.Point? in
                             guard let lat = t.lat, let lng = t.lng else { return nil }
@@ -241,24 +295,46 @@ struct MemoryDetailView: View {
                             }
                         }
                         ForEach(store.tracks) { tr in
-                            HStack {
-                                Text("🛤 \(tr.name)").font(.system(size: 14)).foregroundStyle(VeyqStyle.text)
+                            HStack(alignment: .top) {
+                                TrackStatsRow(route: tr)
                                 Spacer()
                                 Button(T("track.delete")) { let id = tr.id; Task { await store.deleteTrack(id) } }.tint(VeyqStyle.danger)
                             }
                         }
                     } else {
-                    Text("\(store.tiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                    HStack {
+                        Text("\(displayTiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        Spacer()
+                        if store.tiles.contains(where: { $0.highlighted }) {
+                            Button { showHighlightsOnly.toggle() } label: {
+                                Label(T("detail.highlights"), systemImage: showHighlightsOnly ? "star.fill" : "star")
+                                    .font(.footnote)
+                            }
+                            .tint(showHighlightsOnly ? VeyqStyle.accent : VeyqStyle.muted)
+                        }
+                    }
+                    if !store.children.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(store.children) { child in
+                                    NavigationLink {
+                                        MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
+                                    } label: { childCard(child) }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
                     if store.loading {
                         Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
-                    } else if store.tiles.isEmpty {
+                    } else if displayTiles.isEmpty {
                         Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                     } else {
-                        let range = DateBuckets.dateRange(store.tiles) { $0.takenAt }
+                        let range = DateBuckets.dateRange(displayTiles) { $0.takenAt }
                         if !range.isEmpty {
                             Text(range).font(.footnote).foregroundStyle(VeyqStyle.muted)
                         }
-                        ForEach(DateBuckets.groupByDay(store.tiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
+                        ForEach(DateBuckets.groupByDay(displayTiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
                                 gallery(bucket.items, width: contentWidth - 32)
@@ -312,8 +388,11 @@ struct MemoryDetailView: View {
                 await store.upload(datas)
             }
         }
-        .task { await store.load() }
-        .onChange(of: tab) { _, t in if t == 2 { Task { await store.loadTracks() } } }
+        .task { await store.load(); await store.loadChildren() }
+        .onChange(of: tab) { _, t in
+            if t == 2 { Task { await store.loadTracks() } }
+            if t == 3 { Task { await store.loadTracks(); await store.loadChildren() } }
+        }
         .fileImporter(isPresented: $showGpxImporter, allowedContentTypes: [.xml, UTType(filenameExtension: "gpx") ?? .data]) { result in
             guard case let .success(url) = result else { return }
             Task {
@@ -322,44 +401,148 @@ struct MemoryDetailView: View {
                 if let data = try? Data(contentsOf: url) { await store.importTrack(data) }
             }
         }
-        .fullScreenCover(item: $lightboxTile) { tile in
-            ZStack {
-                Color.black.ignoresSafeArea()
-                VStack(spacing: 16) {
-                    Image(uiImage: lightboxImage ?? tile.image).resizable().scaledToFit()
-                    HStack(spacing: 12) {
-                        Button(T("cover.setAsCover")) {
-                            Task { await store.setCover(tile.id) }
-                            closeLightbox()
-                        }
-                        .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
-                        Button(savingOriginal ? T("detail.uploading") : T("detail.download")) { saveOriginal(tile) }
-                            .tint(.white).disabled(savingOriginal)
-                        if !mediaDelArm {
-                            Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
-                        } else {
-                            Button(T("delete.confirm")) {
-                                Task { await store.deleteMedia(tile.id) }
-                                closeLightbox()
-                            }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
-                        }
-                        Button(T("common.close")) { closeLightbox() }.tint(.white)
-                    }
-                }
-                .padding()
+        .fullScreenCover(isPresented: $showLightbox) {
+            if let tile = currentTile {
+                lightbox(tile)
+            } else {
+                Color.black.ignoresSafeArea().onAppear { closeLightbox() }
             }
         }
     }
 
-    /// Open the lightbox on `tile`: show its thumbnail instantly, then swap in the higher-res preview.
-    private func openLightbox(_ tile: GalleryStore.Tile) {
-        lightboxTile = tile
-        lightboxImage = nil
-        Task {
-            if let img = await store.loadPreviewImage(tile), lightboxTile?.id == tile.id { lightboxImage = img }
+    // Tiles in capture-time order — the lightbox pages through these.
+    private var orderedTiles: [GalleryStore.Tile] { store.tiles.sorted { $0.takenAt < $1.takenAt } }
+    // The gallery grid honours the favourites filter.
+    private var displayTiles: [GalleryStore.Tile] { showHighlightsOnly ? store.tiles.filter { $0.highlighted } : store.tiles }
+    private var currentTile: GalleryStore.Tile? { orderedTiles.indices.contains(lightboxIndex) ? orderedTiles[lightboxIndex] : nil }
+
+    @ViewBuilder private var infoTab: some View {
+        VStack(spacing: 0) {
+            infoRow(T("detail.gallery"), "\(store.tiles.count)")
+            let range = DateBuckets.dateRange(store.tiles) { $0.takenAt }
+            if !range.isEmpty { infoRow(T("info.dateRange"), range) }
+            infoRow(T("detail.map"), "\(store.tracks.count)")
+            infoRow(T("info.chapters"), "\(store.chapterCount)")
+        }
+        .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+    }
+
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack { Text(label).foregroundStyle(VeyqStyle.muted); Spacer(); Text(value).foregroundStyle(VeyqStyle.text).font(.body.weight(.semibold)) }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+
+    private func childCard(_ child: GalleryStore.Child) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                if let cover = child.cover {
+                    Image(uiImage: cover).resizable().scaledToFill()
+                } else {
+                    VeyqStyle.surface
+                    Text(child.type == "CHAPTER" ? "📖" : child.type == "FOLDER" ? "🗂" : "🖼").font(.largeTitle)
+                }
+            }
+            .frame(width: 132, height: 92).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+            Text(child.name).font(.caption).foregroundStyle(VeyqStyle.text).lineLimit(1).frame(width: 132, alignment: .leading)
         }
     }
-    private func closeLightbox() { lightboxTile = nil; lightboxImage = nil; mediaDelArm = false }
+
+    @ViewBuilder private func lightbox(_ tile: GalleryStore.Tile) -> some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 16) {
+                ZStack {
+                    Image(uiImage: lightboxImage ?? tile.image).resizable().scaledToFit()
+                    HStack {
+                        Button { page(-1) } label: { Image(systemName: "chevron.left.circle.fill").font(.largeTitle) }
+                            .tint(.white).opacity(lightboxIndex > 0 ? 0.9 : 0.2).disabled(lightboxIndex == 0)
+                        Spacer()
+                        Button { page(1) } label: { Image(systemName: "chevron.right.circle.fill").font(.largeTitle) }
+                            .tint(.white).opacity(lightboxIndex < orderedTiles.count - 1 ? 0.9 : 0.2).disabled(lightboxIndex >= orderedTiles.count - 1)
+                    }
+                    .padding(.horizontal, 8)
+                }
+                if lightboxInfo { lightboxInfoPanel(tile) }
+                if editingDate { lightboxDateEditor(tile) }
+                HStack(spacing: 12) {
+                    Button { Task { await store.toggleHighlight(tile) } } label: {
+                        Image(systemName: tile.highlighted ? "star.fill" : "star")
+                    }.tint(tile.highlighted ? VeyqStyle.accent : .white)
+                    Button { lightboxInfo.toggle() } label: { Image(systemName: "info.circle") }.tint(.white)
+                    Button { editingDate.toggle() } label: { Image(systemName: "calendar") }.tint(.white)
+                    Button(T("cover.setAsCover")) {
+                        Task { await store.setCover(tile.id) }
+                        closeLightbox()
+                    }
+                    .buttonStyle(.borderedProminent).tint(VeyqStyle.accent)
+                    Button(savingOriginal ? T("detail.uploading") : T("detail.download")) { saveOriginal(tile) }
+                        .tint(.white).disabled(savingOriginal)
+                    if !mediaDelArm {
+                        Button(T("common.delete")) { mediaDelArm = true }.tint(VeyqStyle.danger)
+                    } else {
+                        Button(T("delete.confirm")) {
+                            Task { await store.deleteMedia(tile.id) }
+                            closeLightbox()
+                        }.buttonStyle(.borderedProminent).tint(VeyqStyle.danger)
+                    }
+                    Button(T("common.close")) { closeLightbox() }.tint(.white)
+                }
+            }
+            .padding()
+        }
+    }
+
+    @ViewBuilder private func lightboxInfoPanel(_ tile: GalleryStore.Tile) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            infoLine(T("info.takenAt"), DateBuckets.dayLabel(String(tile.takenAt.prefix(10))))
+            infoLine(T("info.type"), tile.mimeType)
+            if let lat = tile.lat, let lng = tile.lng {
+                infoLine(T("info.location"), String(format: "%.5f, %.5f", lat, lng))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12).background(Color.white.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func infoLine(_ label: String, _ value: String) -> some View {
+        HStack { Text(label).foregroundStyle(.white.opacity(0.6)); Text(value).foregroundStyle(.white) }.font(.footnote)
+    }
+
+    @ViewBuilder private func lightboxDateEditor(_ tile: GalleryStore.Tile) -> some View {
+        let binding = Binding<Date>(
+            get: { ISO8601DateFormatter().date(from: tile.takenAt) ?? Date() },
+            set: { newDate in Task { await store.updateTakenAt(tile, ISO8601DateFormatter().string(from: newDate)) } }
+        )
+        DatePicker(T("media.editDate"), selection: binding, displayedComponents: [.date, .hourAndMinute])
+            .datePickerStyle(.compact).tint(VeyqStyle.accent).colorScheme(.dark)
+            .padding(12).background(Color.white.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func page(_ delta: Int) {
+        let next = lightboxIndex + delta
+        guard orderedTiles.indices.contains(next) else { return }
+        lightboxIndex = next
+        loadLightboxPreview()
+    }
+
+    /// Open the lightbox on `tile`: show its thumbnail instantly, then swap in the higher-res preview.
+    private func openLightbox(_ tile: GalleryStore.Tile) {
+        guard let idx = orderedTiles.firstIndex(where: { $0.id == tile.id }) else { return }
+        lightboxIndex = idx
+        lightboxInfo = false; editingDate = false; mediaDelArm = false
+        showLightbox = true
+        loadLightboxPreview()
+    }
+
+    private func loadLightboxPreview() {
+        lightboxImage = nil
+        guard let tile = currentTile else { return }
+        Task {
+            if let img = await store.loadPreviewImage(tile), currentTile?.id == tile.id { lightboxImage = img }
+        }
+    }
+
+    private func closeLightbox() { showLightbox = false; lightboxImage = nil; mediaDelArm = false; lightboxInfo = false; editingDate = false }
 
     /// Fetch THIS medium's full-resolution original and hand it to the share sheet (save to Files/Photos).
     private func saveOriginal(_ tile: GalleryStore.Tile) {
@@ -396,6 +579,12 @@ struct MemoryDetailView: View {
                         .resizable().scaledToFill()
                         .frame(width: t.width, height: t.height).clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(alignment: .topTrailing) {
+                            if tile.highlighted {
+                                Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                                    .padding(4).background(.black.opacity(0.35), in: Circle()).padding(4)
+                            }
+                        }
                         .offset(x: t.left, y: t.top)
                         .onTapGesture { openLightbox(tile) }
                 }

@@ -7,9 +7,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 /**
- * Hourly GC of abandoned blob uploads: an OPEN session never finalized would keep its frames in the
- * BlobStore (+ manifest rows) forever. Sessions older than the TTL are purged; COMPLETED ones (whose
- * frames are now owned by a content blob) are left alone.
+ * Hourly GC of blob storage:
+ *  - abandoned OPEN uploads (never finalized) → their frames + manifest + session row.
+ *  - finalized blobs no media references anymore (a deleted medium leaves dedup'd frames behind, ADR 0007).
+ * Both are gated by the same TTL grace so in-flight work is never reaped; COMPLETED upload rows are kept.
  */
 @ApplicationScoped
 class BlobUploadGc(
@@ -18,6 +19,8 @@ class BlobUploadGc(
 ) {
     @Scheduled(every = "1h")
     fun sweep() {
-        handler.purgeStaleOpenUploads(Instant.now().minus(cfg.sessionTtlHours(), ChronoUnit.HOURS))
+        val cutoff = Instant.now().minus(cfg.sessionTtlHours(), ChronoUnit.HOURS)
+        handler.purgeStaleOpenUploads(cutoff)
+        handler.purgeUnreferencedBlobs(cutoff)
     }
 }

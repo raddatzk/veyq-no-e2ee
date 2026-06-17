@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { applyTheme, session, setUnlocked } from '../session'
 import { logout } from '../../features/account/login/login'
+import { rotateIdentity } from '../../features/keys/rotateIdentity'
 import { deviceUnlockEnabled, disableDeviceUnlock } from '../../features/account/deviceUnlock/deviceUnlock'
 import { mapTilesConsent } from '../../features/account/privacy/mapConsent'
 import { i18n, setLocale, t } from '../../i18n/i18n'
@@ -12,6 +13,25 @@ const deviceUnlock = ref(deviceUnlockEnabled())
 function forgetDevice() {
   disableDeviceUnlock()
   deviceUnlock.value = false
+}
+
+// Identity rotation: re-keys every grant to a fresh identity (auth/master key unchanged). It leaves the
+// in-memory session's identity stale, so on success we sign out — the next login re-derives the new identity.
+const rotateArmed = ref(false)
+const rotating = ref(false)
+const rotateError = ref('')
+async function rotateIdentityNow() {
+  if (!rotateArmed.value) { rotateArmed.value = true; return }
+  rotating.value = true
+  rotateError.value = ''
+  try {
+    await rotateIdentity(session.apiBase, session.unlocked!)
+    await signOut()
+  } catch (e) {
+    rotateError.value = (e as Error).message
+    rotating.value = false
+    rotateArmed.value = false
+  }
 }
 
 async function signOut() {
@@ -69,6 +89,20 @@ async function signOut() {
         <div class="settings-section">{{ t('settings.deviceUnlock') }}</div>
         <button class="btn btn-ghost settings-row" type="button" style="width: 100%; justify-content: flex-start" @click="forgetDevice">{{ t('settings.forgetDevice') }}</button>
       </template>
+
+      <div class="settings-section">{{ t('settings.security') }}</div>
+      <p class="settings-hint">{{ t('settings.rotateIdentityHint') }}</p>
+      <div v-if="rotateError" class="auth-msg auth-msg-error">{{ rotateError }}</div>
+      <button
+        class="btn btn-ghost settings-row"
+        type="button"
+        style="width: 100%; justify-content: flex-start"
+        :style="{ color: rotateArmed ? 'var(--app-danger)' : undefined }"
+        :disabled="rotating"
+        @click="rotateIdentityNow"
+      >
+        {{ rotating ? t('settings.rotating') : rotateArmed ? t('settings.rotateConfirm') : t('settings.rotateIdentity') }}
+      </button>
 
       <div class="settings-section">{{ t('settings.instance') }}</div>
       <div class="settings-row"><span>{{ host }}</span></div>

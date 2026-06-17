@@ -1,33 +1,28 @@
 import SwiftUI
+import VeyqCrypto
 
 /// A memory's journal: a rendered Markdown view with an Edit mode (plain TextEditor on the Markdown source).
 /// Inline spans (bold/italic/code/links) use SwiftUI's built-in Markdown AttributedString; block structure
 /// (headings, bullet/ordered lists, paragraphs) is handled here. Rich embed tokens are deferred.
 struct JournalView: View {
     @ObservedObject var store: GalleryStore
+    /// Open the lightbox on a tile (owned by MemoryDetailView) — wired so ::media embeds are tappable.
+    var onOpenMedia: (GalleryStore.Tile) -> Void = { _ in }
     @State private var editing = false
     @State private var live = false
-    @State private var draft = ""
+    @State private var blocks: [JournalEditBlock] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if live {
                 LiveJournalView(store: store) { markdown in store.journalMarkdown = markdown; live = false }
             } else if editing {
-                TextEditor(text: $draft)
-                    .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(VeyqStyle.text)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 280)
-                    .padding(8)
-                    .background(VeyqStyle.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-                    .overlay(RoundedRectangle(cornerRadius: VeyqStyle.radius).strokeBorder(VeyqStyle.line))
+                JournalBlockEditor(store: store, blocks: $blocks)
                 HStack {
                     Spacer()
                     Button(T("common.cancel")) { editing = false }.tint(VeyqStyle.muted)
                     Button(store.journalSaving ? T("journal.saving") : T("journal.save")) {
-                        let md = draft
+                        let md = journalMarkdown(from: blocks)
                         Task { await store.saveJournal(md); editing = false }
                     }
                     .buttonStyle(.borderedProminent).tint(VeyqStyle.accent).disabled(store.journalSaving)
@@ -36,16 +31,119 @@ struct JournalView: View {
                 HStack {
                     Spacer()
                     Button(T("journal.live")) { live = true }.tint(VeyqStyle.accent)
-                    Button(T("journal.edit")) { draft = store.journalMarkdown; editing = true }.tint(VeyqStyle.accent)
+                    Button(T("journal.edit")) { blocks = journalEditBlocks(store.journalMarkdown); Task { await store.loadTracks() }; editing = true }.tint(VeyqStyle.accent)
                 }
                 if store.journalMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(T("journal.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                 } else {
-                    MarkdownText(markdown: store.journalMarkdown)
+                    JournalBodyView(markdown: store.journalMarkdown, store: store, onOpenMedia: onOpenMedia)
                 }
             }
         }
-        .task { await store.loadJournal() }
+        .task {
+            await store.loadJournal()
+            // Track embeds in the journal need the tracks loaded to draw their inline map.
+            if JournalEmbedParser.splitBlocks(store.journalMarkdown).contains(where: { if case let .embed(e) = $0 { return e.kind == .track }; return false }) {
+                await store.loadTracks()
+            }
+        }
+    }
+}
+
+/// Read-only journal renderer with rich embeds (matches web JournalBody): Markdown text segments interleaved
+/// with ::media (thumbnail / swipeable carousel → lightbox) and ::track (inline map) blocks. ::chapter renders
+/// as a simple chip (legacy iOS did not navigate chapters from the journal).
+struct JournalBodyView: View {
+    let markdown: String
+    @ObservedObject var store: GalleryStore
+    var onOpenMedia: (GalleryStore.Tile) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(JournalEmbedParser.splitBlocks(markdown)) { block in
+                switch block {
+                case let .markdown(md, _):
+                    if !md.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { MarkdownText(markdown: md) }
+                case let .embed(e):
+                    switch e.kind {
+                    case .media: mediaEmbed(e)
+                    case .track: trackEmbed(e)
+                    case .chapter: chapterEmbed(e)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func tiles(_ e: JournalEmbed) -> [GalleryStore.Tile] {
+        e.ids.compactMap { id in store.tiles.first(where: { $0.id == id }) }
+    }
+
+    @ViewBuilder private func mediaEmbed(_ e: JournalEmbed) -> some View {
+        let items = tiles(e)
+        VStack(alignment: .leading, spacing: 6) {
+            if items.count == 1 {
+                Image(uiImage: items[0].image).resizable().scaledToFit()
+                    .frame(maxHeight: 360).clipShape(RoundedRectangle(cornerRadius: 10))
+                    .onTapGesture { onOpenMedia(items[0]) }
+            } else if items.count > 1 {
+                TabView {
+                    ForEach(items) { tile in
+                        Image(uiImage: tile.image).resizable().scaledToFit()
+                            .onTapGesture { onOpenMedia(tile) }
+                    }
+                }
+                .tabViewStyle(.page)
+                .frame(height: 320)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            } else {
+                Text(T("journal.embedMissing")).font(.footnote).italic().foregroundStyle(VeyqStyle.muted)
+            }
+            if let label = e.label { Text(label).font(.caption).foregroundStyle(VeyqStyle.muted) }
+        }
+    }
+
+    @ViewBuilder private func trackEmbed(_ e: JournalEmbed) -> some View {
+        let routes = store.tracks.filter { e.ids.contains($0.id) }
+        VStack(alignment: .leading, spacing: 6) {
+            if routes.isEmpty {
+                Text(T("journal.embedMissing")).font(.footnote).italic().foregroundStyle(VeyqStyle.muted)
+            } else {
+                MemoryMapView(points: [], tracks: routes) { _ in }
+                    .frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 10))
+                ForEach(routes) { route in TrackStatsRow(route: route) }
+            }
+            if let label = e.label { Text(label).font(.caption).foregroundStyle(VeyqStyle.muted) }
+        }
+    }
+
+    @ViewBuilder private func chapterEmbed(_ e: JournalEmbed) -> some View {
+        HStack(spacing: 6) {
+            Text("🗂")
+            Text(e.label ?? e.ids.first ?? "").foregroundStyle(VeyqStyle.text)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(VeyqStyle.surface).clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(VeyqStyle.line))
+    }
+}
+
+/// One track's derived statistics line: name + distance, elevation (when present), duration (when present).
+/// Computed client-side from the route points (the operator-blind server never sees them).
+struct TrackStatsRow: View {
+    let route: Track.TrackItem
+
+    var body: some View {
+        let stats = Track.stats(route.points)
+        let ele = Track.formatElevation(stats)
+        HStack(spacing: 10) {
+            Text("🛤 \(route.name)").font(.caption.weight(.semibold)).foregroundStyle(VeyqStyle.text)
+            Text(Track.formatDistance(stats.distanceM)).font(.caption).foregroundStyle(VeyqStyle.muted)
+            if let d = stats.durationS { Text(Track.formatDuration(d)).font(.caption).foregroundStyle(VeyqStyle.muted) }
+            if !ele.isEmpty { Text(ele).font(.caption).foregroundStyle(VeyqStyle.muted) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

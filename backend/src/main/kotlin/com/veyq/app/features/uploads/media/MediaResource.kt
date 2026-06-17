@@ -2,6 +2,7 @@ package com.veyq.app.features.uploads.media
 
 import com.veyq.app.generated.api.MediaApi
 import com.veyq.app.generated.model.CreateMediaRequest
+import com.veyq.app.generated.model.UpdateMediaRequest
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.ws.rs.core.Response
 
@@ -14,6 +15,9 @@ class MediaResource(private val handler: MediaHandler) : MediaApi {
 
     override fun createMedia(authorization: String, scopeId: String, nodeId: String, createMediaRequest: CreateMediaRequest): Response =
         Response.ok(handler.createMedia(authorization, scopeId, nodeId, createMediaRequest)).build()
+
+    override fun updateMedia(authorization: String, scopeId: String, nodeId: String, mediaId: String, updateMediaRequest: UpdateMediaRequest): Response =
+        Response.ok(handler.updateMedia(authorization, scopeId, nodeId, mediaId, updateMediaRequest)).build()
 
     override fun deleteMedia(authorization: String, scopeId: String, nodeId: String, mediaId: String): Response {
         handler.deleteMedia(authorization, scopeId, nodeId, mediaId)

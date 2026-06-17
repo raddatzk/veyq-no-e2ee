@@ -34,6 +34,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Login
+import app.veyq.crypto.RotateIdentity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +82,43 @@ fun SettingsScreen(apiBase: String, session: Login.UnlockedSession, theme: Strin
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Veyq.SurfaceMuted, contentColor = Veyq.Danger),
                 ) { Text(L10n.t("settings.forgetDevice"), fontWeight = FontWeight.SemiBold) }
+            }
+
+            // Identity rotation: re-keys every grant to a fresh identity (auth/master key unchanged). The
+            // in-memory session goes stale, so on success we sign out — the next login re-derives the identity.
+            val scope = rememberCoroutineScope()
+            var rotating by remember { mutableStateOf(false) }
+            var showRotateConfirm by remember { mutableStateOf(false) }
+            var rotateError by remember { mutableStateOf<String?>(null) }
+            Section(L10n.t("settings.security"))
+            Text(L10n.t("settings.rotateIdentityHint"), color = Veyq.Muted, fontSize = 13.sp)
+            rotateError?.let { Text(it, color = Veyq.Danger, fontSize = 13.sp) }
+            Button(
+                onClick = { showRotateConfirm = true },
+                enabled = !rotating,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Veyq.SurfaceMuted, contentColor = Veyq.Accent),
+            ) { Text(if (rotating) L10n.t("settings.rotating") else L10n.t("settings.rotateIdentity"), fontWeight = FontWeight.SemiBold) }
+            if (showRotateConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showRotateConfirm = false },
+                    containerColor = Veyq.Surface,
+                    title = { Text(L10n.t("settings.rotateIdentity"), color = Veyq.Text) },
+                    text = { Text(L10n.t("settings.rotateConfirm"), color = Veyq.Muted) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showRotateConfirm = false
+                            rotating = true
+                            rotateError = null
+                            scope.launch {
+                                val ok = runCatching { withContext(Dispatchers.IO) { RotateIdentity.rotateIdentity(apiBase, session) } }
+                                ok.onSuccess { onSignOut() }.onFailure { rotateError = it.message; rotating = false }
+                            }
+                        }) { Text(L10n.t("settings.rotateIdentity"), color = Veyq.Danger) }
+                    },
+                    dismissButton = { TextButton(onClick = { showRotateConfirm = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+                )
             }
 
             Section(L10n.t("settings.instance"))

@@ -29,6 +29,7 @@ interface UploadsConfig {
     @WithName("max-share-open-sessions") @WithDefault("10") fun maxShareOpenSessions(): Long
     @WithName("max-share-bytes") @WithDefault("2147483648") fun maxShareBytes(): Long
     @WithName("session-ttl-hours") @WithDefault("24") fun sessionTtlHours(): Long
+    @WithName("presign-ttl-seconds") @WithDefault("900") fun presignTtlSeconds(): Int // direct-to-store PUT URL lifetime
 }
 
 /** `veyq.ratelimit.*` — per-IP throttling of abuse-prone unauthenticated endpoints (see RateLimitFilter).
@@ -66,8 +67,29 @@ interface PasswordResetConfig {
     @WithDefault("PT1H") fun ttl(): Duration
 }
 
-/** `veyq.blob-store.*` — filesystem root the (already-encrypted) blobs are written to; must be a mounted volume. */
+/** `veyq.content.*` — the max size of a single sealed-content payload (node name, item, journal, track) the
+ *  server will decode into memory. Bounds a DoS via an over-large base64 string; large media goes through the
+ *  chunked blob path (bounded separately by veyq.uploads.*), not here. */
+@ConfigMapping(prefix = "veyq.content")
+interface ContentConfig {
+    @WithName("max-sealed-bytes") @WithDefault("1048576") fun maxSealedBytes(): Int
+}
+
+/**
+ * `veyq.blob-store.*` — where the (already-encrypted) blob frames live. The server is decoupled from storage:
+ * the only production backend is `s3` (an external S3-compatible store, or the bundled MinIO/Garage container).
+ * `memory` is an ephemeral in-process backend for dev/test only. The store holds AEAD ciphertext exclusively.
+ *
+ * Credentials are operator config supplied via env (never committed, never persisted to the DB, never logged or
+ * returned by any endpoint). `s3-secret-key`/`s3-access-key` are registered in `smallrye.config.secret-keys`
+ * (see application.properties) so they're masked in any config dump / dev console.
+ */
 @ConfigMapping(prefix = "veyq.blob-store")
 interface BlobStoreConfig {
-    @WithName("dir") @WithDefault("build/veyq-blobs") fun dir(): String
+    @WithName("backend") @WithDefault("s3") fun backend(): String // s3 (production) | memory (dev/test)
+    @WithName("s3-endpoint") fun s3Endpoint(): Optional<String> // e.g. https://s3.amazonaws.com or http://veyq-minio:9000
+    @WithName("s3-bucket") @WithDefault("veyq-blobs") fun s3Bucket(): String
+    @WithName("s3-region") @WithDefault("us-east-1") fun s3Region(): String
+    @WithName("s3-access-key") fun s3AccessKey(): Optional<String>
+    @WithName("s3-secret-key") fun s3SecretKey(): Optional<String>
 }

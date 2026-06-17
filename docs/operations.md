@@ -1,6 +1,6 @@
 # veyq Operations Runbook
 
-This document is for operators of self-hosted veyq instances. It covers expected failure cases for the major line 1 deployment path: Docker Compose, Traefik, MariaDB and local filesystem media storage.
+This document is for operators of self-hosted veyq instances. It covers expected failure cases for the major line 1 deployment path: Docker Compose, Traefik, MariaDB and S3-compatible object storage for media (external S3 or the bundled MinIO).
 
 Use [`docs/development.md`](development.md) for local development setup. Use this runbook when an installed server does not start, route, upgrade, back up, send mail, accept uploads or generate media previews as expected.
 
@@ -209,28 +209,34 @@ Prevention: always run backup before upgrade, pin exact build tags for real inst
 
 Symptom: uploads return errors, previews are missing, or previously uploaded media is gone after a container restart.
 
-Likely cause: the configured media storage source is missing, `MEDIA_STORAGE_DIR` changed, a host path or CIFS mount has permission problems, or the reset sidecar cleared a disposable instance.
+Likely cause: blobs live in an S3-compatible object store (ADR 0021), so this is usually a misconfigured or
+unreachable bucket — wrong `BLOB_STORE_S3_ENDPOINT`/bucket/credentials, the bundled MinIO not running, or the
+reset sidecar cleared a disposable instance.
 
 Inspect:
 
 ```bash
 cd /opt/veyq
 sudo docker compose ps
-sudo grep -E '^(MEDIA_STORAGE_MODE|MEDIA_STORAGE_MOUNT_TYPE|MEDIA_STORAGE_SOURCE|MEDIA_STORAGE_DIR|MEDIA_CIFS_DEVICE)=' .env
-sudo docker volume ls | grep veyq-media || true
-sudo docker compose exec veyq sh -lc 'echo "$MEDIA_STORAGE_DIR"; ls -la "$MEDIA_STORAGE_DIR" | head'
-sudo docker compose logs --tail=200 veyq
+sudo grep -E '^(BLOB_STORE_BACKEND|BLOB_STORE_S3_ENDPOINT|BLOB_STORE_S3_BUCKET|BLOB_STORE_S3_REGION)=' .env  # NOT the keys
+sudo docker compose logs --tail=200 veyq        # look for S3 connect/auth errors on the first upload
+# bundled MinIO only:
+sudo docker compose --profile s3 ps veyq-minio
+sudo docker compose logs --tail=100 veyq-minio
 ```
 
-Safe recovery: restore the media storage from backup that matches the database backup. If only `MEDIA_STORAGE_DIR` or the mount source changed, return it to the previous value and restart before writing new media.
+Safe recovery: restore the bucket from a backup matching the database backup. If only the endpoint/bucket/region
+changed, return it to the previous value and restart before writing new media. The stored objects are AEAD
+ciphertext — useless without the per-scope content keys, which never leave clients.
 
-Prevention: include the configured media storage in backups. For `docker-volume`, back up `infra_veyq-media`; for `cifs-volume`, back up `infra_veyq-media-cifs`; for `host-path`, back up `MEDIA_STORAGE_SOURCE`. Do not enable the reset sidecar for any environment that should preserve data.
+Prevention: back up the S3 bucket alongside the database (e.g. `mc mirror`, bucket replication, or the provider's
+snapshots). Do not enable the reset sidecar for any environment that should preserve data — it empties the bucket.
 
 ### Disk full or permission errors
 
 Symptom: uploads fail, backups fail, or logs mention no space left on device or permission denied.
 
-Likely cause: the Docker host disk is full, the backup directory is full, a host-mounted media path has incorrect ownership, or the CIFS share is unavailable or mounted with incompatible options.
+Likely cause: the Docker host disk is full, the backup directory is full, the bundled MinIO's volume is full, or an external S3 bucket is over quota / unreachable.
 
 Inspect:
 
@@ -242,7 +248,7 @@ sudo docker compose logs --tail=200 veyq
 sudo du -sh backups 2>/dev/null || true
 ```
 
-Safe recovery: free host disk space, move old backups off the server, then retry the failed operation. For host-mounted storage, fix host path ownership and restart veyq. For Docker-managed CIFS, verify `MEDIA_CIFS_DEVICE`, credentials and mount options in `.env`, then recreate the affected container.
+Safe recovery: free host disk space, move old backups off the server, then retry the failed operation. For the bundled MinIO, free space on its volume (or expand it) and restart it. For an external S3, raise the bucket quota / clear space at the provider; then verify `BLOB_STORE_S3_ENDPOINT`/bucket reachability and recreate the affected container.
 
 Prevention: monitor host disk usage and backup growth. Keep enough free space for at least one database dump and one compressed media archive.
 
@@ -350,7 +356,7 @@ Prevention: configure SMTP before inviting users and include mail delivery in th
 
 Symptom: `./veyq-server.sh backup` exits with an error, no `.sql` file is written, or the media archive fails.
 
-Likely cause: `DB_ROOT_PASSWORD` is missing or wrong, MariaDB is unavailable, Docker cannot mount the configured media storage, the host path is missing, CIFS credentials are wrong, or the host disk is full.
+Likely cause: `DB_ROOT_PASSWORD` is missing or wrong, MariaDB is unavailable, the S3 endpoint/credentials are wrong or the bucket is unreachable, or the host disk is full.
 
 Inspect:
 
@@ -359,7 +365,7 @@ cd /opt/veyq
 sudo ./veyq-server.sh doctor
 sudo docker compose ps
 sudo docker compose logs --tail=200 veyq-db
-sudo grep -E '^(MEDIA_STORAGE_MODE|MEDIA_STORAGE_SOURCE|MEDIA_CIFS_DEVICE)=' .env
+sudo grep -E '^(BLOB_STORE_BACKEND|BLOB_STORE_S3_ENDPOINT|BLOB_STORE_S3_BUCKET)=' .env  # NOT the S3 keys
 df -h
 ls -lah backups 2>/dev/null || true
 ```
@@ -458,7 +464,7 @@ Inspect:
 ```bash
 cd /opt/veyq
 sudo docker compose logs --tail=300 veyq-reset
-sudo grep -E '^(RESET_RESTART_CONTAINER|MEDIA_STORAGE_DIR)=' .env
+sudo grep -E '^(RESET_RESTART_CONTAINER|BLOB_STORE_S3_BUCKET)=' .env
 sudo docker ps --format '{{.Names}}'
 ```
 

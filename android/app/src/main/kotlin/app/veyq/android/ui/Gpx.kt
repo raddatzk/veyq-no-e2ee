@@ -6,9 +6,10 @@ import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * Parse a GPX file's XML into a {name, points} route for sealing + map rendering. Only track-point
- * coordinates (trkpt, or rtept for route files) are needed; elevation/time are ignored. Name comes from the
- * track/metadata <name>, falling back to a generic label. Returns null on malformed XML or no usable points.
+ * Parse a GPX file's XML into a {name, points} route for sealing + map rendering. Each track-point (trkpt, or
+ * rtept for route files) keeps its coordinates plus optional <ele> and <time> so track stats (distance always,
+ * ascent/descent from elevation, duration from timestamps) can be derived. Name comes from the track/metadata
+ * <name>, falling back to a generic label. Returns null on malformed XML or no usable points.
  */
 object Gpx {
     fun parse(data: ByteArray): Pair<String, List<Track.Point>>? = runCatching {
@@ -25,8 +26,18 @@ object Gpx {
             val e = nodes.item(i) as? Element ?: return@mapNotNull null
             val lat = e.getAttribute("lat").toDoubleOrNull()
             val lon = e.getAttribute("lon").toDoubleOrNull()
-            if (lat != null && lon != null) Track.Point(lat, lon) else null
+            if (lat != null && lon != null) Track.Point(lat, lon, childText(e, "ele")?.toDoubleOrNull(), childText(e, "time")) else null
         }
+
+    /** The text of the first direct child element with the given tag, trimmed; null if absent/blank. */
+    private fun childText(parent: Element, tag: String): String? {
+        val children = parent.childNodes
+        for (i in 0 until children.length) {
+            val c = children.item(i) as? Element ?: continue
+            if (c.tagName == tag) return c.textContent?.trim()?.ifEmpty { null }
+        }
+        return null
+    }
 
     /** The <name> text directly under the first <parent> element, trimmed; null if absent/blank. */
     private fun childName(doc: org.w3c.dom.Document, parent: String): String? {

@@ -1,82 +1,130 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+// Member (internal) memory view — a thin wrapper around the shared, tab-based <MemoryContent> (Legacy UI, same
+// as the guest share viewer). It supplies scope-authed loaders keyed by nodeId and the member-only actions
+// (upload, delete, set-cover, edit/live journal, GPX import, download, share) via named slots.
+import { defineAsyncComponent, ref } from 'vue'
 import { session } from '../session'
-// Heavy (yjs/codemirror) — only loaded when a member opens the live editor.
 const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor.vue'))
 import { t } from '../../i18n/i18n'
-import { loadGalleryTiles, loadOriginal, loadPreview } from '../../features/gallery/gallery'
-import { useGallery } from '../../features/gallery/useGallery'
+import { loadGalleryTiles, loadOriginal, loadPreview, type GalleryTile } from '../../features/gallery/gallery'
 import { fileToNewMedia } from '../../features/uploads/clientMedia'
-import { uploadMedia } from '../../features/uploads/media/media'
+import { deleteMedia, sealMediaMeta, updateMedia, uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
-import { deleteMedia } from '../../features/uploads/media/media'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
-import { renderMarkdown } from '../../features/memory/journal/markdown'
+import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
 import { createTrack, deleteTrack, getTracks, type Track } from '../../features/memory/track/track'
 import { parseGpx } from '../../features/memory/track/gpx'
+import { loadCover, loadLevel, loadMemoryById, type ActiveSpace, type MemoryNode } from '../../features/home/home'
 import DownloadModal from './DownloadModal.vue'
-import MemoryMap from './MemoryMap.vue'
 import ShareModal from './ShareModal.vue'
-import type { ActiveSpace, MemoryNode } from '../../features/home/home'
+import MemoryContent from './MemoryContent.vue'
 
 const props = defineProps<{ active: ActiveSpace; memory: MemoryNode; name: string }>()
 const emit = defineEmits<{ back: [] }>()
 
-const loading = ref(true)
-const fileInput = ref<HTMLInputElement | null>(null)
+const content = ref<InstanceType<typeof MemoryContent> | null>(null)
+const currentNodeId = ref(props.memory.id)
+const error = ref('')
 const uploading = ref(false)
 const downloadOpen = ref(false)
 const shareOpen = ref(false)
-const tab = ref<'gallery' | 'journal' | 'map'>('gallery')
-const journalMarkdown = ref('')
-const journalDraft = ref('')
-const journalEditing = ref(false)
-const journalSaving = ref(false)
-const journalLoaded = ref(false)
-const journalLive = ref(false)
-const tracks = ref<Track[]>([])
-const tracksLoaded = ref(false)
-const importing = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 const gpxInput = ref<HTMLInputElement | null>(null)
-const error = ref('')
+const importing = ref(false)
 const mediaDelArm = ref(false)
+// Journal editing (member only): a plain textarea draft, or the heavy live CodeMirror editor.
+const journalEditing = ref(false)
+const journalLive = ref(false)
+const journalDraft = ref('')
+const journalSaving = ref(false)
 
-// Shared gallery state (tiles, justified buckets, lightbox preview/original, object-URL lifecycle).
-const { tiles, galleryEl, lightbox, lightboxTile, downloading, buckets, dateRange, tileById, revokeTiles, openLightbox, closeLightbox, downloadThisOriginal } = useGallery({
-  loadPreview: (tile) => loadPreview(session.apiBase, session.unlocked!, props.active, tile),
-  loadOriginal: (tile) => loadOriginal(session.apiBase, session.unlocked!, props.active, tile),
-  downloadFileName: (tile, ext) => `${props.name}-${tile.id.slice(0, 8)}.${ext}`,
-  onLightboxClose: () => { mediaDelArm.value = false },
-  onError: (e) => { error.value = e.message },
-})
+const s = () => session.unlocked!
 
-const journalHtml = computed(() => renderMarkdown(journalMarkdown.value))
-const geoPoints = computed(() =>
-  tiles.value.filter((t) => t.lat != null && t.lng != null).map((t) => ({ id: t.id, lat: t.lat!, lng: t.lng! })),
-)
-function openMapPin(id: string) {
-  const tile = tileById.value[id]
-  if (tile) openLightbox(tile)
+// ---- loaders (scope-authed), keyed by node ----
+const loadTiles = (nodeId: string) => loadGalleryTiles(session.apiBase, s(), props.active, nodeId)
+const loadJournalMarkdown = async (nodeId: string) => (await getJournal(session.apiBase, s(), props.active, nodeId)).markdown
+const loadTracks = (nodeId: string) => getTracks(session.apiBase, s(), props.active, nodeId)
+const loadChildNodes = async (nodeId: string) =>
+  (await loadLevel(session.apiBase, s(), props.active, nodeId)).map((e) => ({ id: e.node.id, type: e.node.type, name: e.name }))
+const loadChildCover = async (nodeId: string): Promise<string | null> => {
+  const entry = await loadMemoryById(session.apiBase, s(), props.active, nodeId)
+  return entry ? loadCover(session.apiBase, s(), props.active, entry.node) : null
+}
+async function resolveChapterNames(markdown: string): Promise<Record<string, { name: string }>> {
+  const ids = parseJournalEmbeds(markdown).filter((e) => e.kind === 'chapter').map((e) => e.ids[0])
+  const out: Record<string, { name: string }> = {}
+  for (const id of new Set(ids)) {
+    const entry = await loadMemoryById(session.apiBase, s(), props.active, id)
+    if (entry) out[id] = { name: entry.name }
+  }
+  return out
 }
 
-async function openMap() {
-  tab.value = 'map'
-  if (tracksLoaded.value) return
+function onNodeChanged(nodeId: string) {
+  currentNodeId.value = nodeId
+  journalEditing.value = false
+  journalLive.value = false
+  mediaDelArm.value = false
+}
+
+async function onFilesPicked(event: Event) {
+  const files = Array.from((event.target as HTMLInputElement).files ?? [])
+  if (!files.length) return
+  uploading.value = true
   try {
-    tracks.value = await getTracks(session.apiBase, session.unlocked!, props.active, props.memory.id)
+    for (const file of files) await uploadMedia(session.apiBase, s(), props.active.scope.scopeId, props.active.contentKey, currentNodeId.value, await fileToNewMedia(file))
+    await content.value?.reloadTiles()
   } finally {
-    tracksLoaded.value = true
+    uploading.value = false
+    if (fileInput.value) fileInput.value.value = ''
   }
 }
+
+async function deleteThisMedia(tile: GalleryTile | null) {
+  if (!tile) return
+  try {
+    await deleteMedia(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, tile.id)
+    content.value?.closeLightbox()
+    mediaDelArm.value = false
+    await content.value?.reloadTiles()
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+async function setAsCover(tile: GalleryTile | null) {
+  if (!tile) return
+  await setCover(session.apiBase, s(), props.active, currentNodeId.value, tile.id)
+  content.value?.closeLightbox()
+}
+async function toggleFavorite(tile: GalleryTile | null) {
+  if (!tile) return
+  const next = !tile.highlighted
+  try {
+    await updateMedia(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, tile.id, { highlighted: next })
+    content.value?.setTileHighlighted(tile.id, next)
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+async function onDateChange(tile: GalleryTile | null, value: string) {
+  if (!tile || !value) return
+  try {
+    const sealedMeta = sealMediaMeta(props.active.contentKey, { takenAt: new Date(value).toISOString(), lat: tile.lat, lng: tile.lng })
+    await updateMedia(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, tile.id, { sealedMeta })
+    await content.value?.reloadTiles()
+  } catch (e) {
+    error.value = (e as Error).message
+  }
+}
+
 async function onGpxPicked(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   importing.value = true
   try {
-    const route = parseGpx(await file.text())
-    await createTrack(session.apiBase, session.unlocked!, props.active, props.memory.id, route)
-    tracks.value = await getTracks(session.apiBase, session.unlocked!, props.active, props.memory.id)
+    await createTrack(session.apiBase, s(), props.active, currentNodeId.value, parseGpx(await file.text()))
+    await content.value?.reloadTracks()
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -85,181 +133,109 @@ async function onGpxPicked(event: Event) {
   }
 }
 async function removeTrack(id: string) {
-  await deleteTrack(session.apiBase, session.unlocked!, props.active, props.memory.id, id)
-  tracks.value = tracks.value.filter((t) => t.id !== id)
+  await deleteTrack(session.apiBase, s(), props.active, currentNodeId.value, id)
+  await content.value?.reloadTracks()
 }
 
-async function openJournal() {
-  tab.value = 'journal'
-  if (journalLoaded.value) return
-  try {
-    journalMarkdown.value = (await getJournal(session.apiBase, session.unlocked!, props.active, props.memory.id)).markdown
-  } finally {
-    journalLoaded.value = true
-  }
-}
-function startEditJournal() {
-  journalDraft.value = journalMarkdown.value
+function startEditJournal(markdown: string) {
+  journalDraft.value = markdown
   journalEditing.value = true
-}
-function onLiveClosed(markdown: string) {
-  journalLive.value = false
-  journalMarkdown.value = markdown
 }
 async function saveJournal() {
   journalSaving.value = true
   try {
-    await saveJournalMarkdown(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, props.active.contentKey, journalDraft.value)
-    journalMarkdown.value = journalDraft.value
+    await saveJournalMarkdown(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, props.active.contentKey, journalDraft.value)
     journalEditing.value = false
+    await content.value?.reloadJournal()
   } finally {
     journalSaving.value = false
   }
 }
-
-onMounted(async () => {
-  // The gallery (v-show) is already in the DOM, so useGallery's ResizeObserver is attached — just load tiles.
-  try {
-    tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
-  } finally {
-    loading.value = false
-  }
-})
-
-async function refresh() {
-  revokeTiles()
-  tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
-}
-
-async function onFilesPicked(event: Event) {
-  const files = Array.from((event.target as HTMLInputElement).files ?? [])
-  if (!files.length) return
-  uploading.value = true
-  try {
-    for (const file of files) {
-      const media = await fileToNewMedia(file)
-      await uploadMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.active.contentKey, props.memory.id, media)
-    }
-    await refresh()
-  } finally {
-    uploading.value = false
-    if (fileInput.value) fileInput.value.value = ''
-  }
-}
-
-async function deleteThisMedia() {
-  if (!lightboxTile.value) return
-  try {
-    await deleteMedia(session.apiBase, session.unlocked!, props.active.scope.scopeId, props.memory.id, lightboxTile.value.id)
-    closeLightbox()
-    revokeTiles()
-    tiles.value = await loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.memory.id)
-  } catch (e) {
-    error.value = (e as Error).message
-  }
-}
-async function setAsCover() {
-  if (!lightboxTile.value) return
-  await setCover(session.apiBase, session.unlocked!, props.active, props.memory.id, lightboxTile.value.id)
-  closeLightbox()
+async function onLiveClosed() {
+  journalLive.value = false
+  await content.value?.reloadJournal()
 }
 </script>
 
 <template>
-  <div class="memory-detail">
-    <div class="detail-head">
-      <button class="crumb" @click="emit('back')">{{ t('common.back') }}</button>
-      <h1 class="detail-title">{{ name }}</h1>
-      <span class="content-count">{{ t('detail.mediaCount', { n: tiles.length }) }}</span>
-      <button class="btn btn-ghost detail-share" type="button" @click="shareOpen = true">{{ t('share.share') }}</button>
-      <template v-if="tab === 'gallery'">
-        <button class="btn btn-ghost detail-download" type="button" :disabled="!tiles.length" @click="downloadOpen = true">{{ t('detail.download') }}</button>
-        <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
-          {{ uploading ? t('detail.uploading') : t('detail.upload') }}
-        </button>
-      </template>
-      <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
-    </div>
-
-    <div class="detail-tabs">
-      <button class="detail-tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">{{ t('detail.gallery') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openJournal">{{ t('detail.journal') }}</button>
-      <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openMap">{{ t('detail.map') }}</button>
-    </div>
-
+  <div>
     <DownloadModal v-if="downloadOpen" :active="active" :memory="memory" :name="name" @close="downloadOpen = false" />
     <ShareModal v-if="shareOpen" :active="active" :memory="memory" :name="name" @close="shareOpen = false" />
 
-    <section v-if="tab === 'journal'" class="journal">
-      <LiveJournalEditor v-if="journalLive" :active="active" :node-id="memory.id" :initial-markdown="journalMarkdown" @close="onLiveClosed" />
-      <template v-else-if="journalEditing">
-        <textarea v-model="journalDraft" class="journal-editor" :placeholder="t('journal.placeholder')"></textarea>
-        <div class="journal-actions">
-          <button class="btn btn-ghost" type="button" :disabled="journalSaving" @click="journalEditing = false">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" type="button" :disabled="journalSaving" @click="saveJournal">{{ journalSaving ? t('journal.saving') : t('journal.save') }}</button>
+    <MemoryContent
+      ref="content"
+      :root-node-id="memory.id"
+      :root-name="name"
+      show-back
+      :journal-editing="journalEditing || journalLive"
+      :load-tiles="loadTiles"
+      :load-journal-markdown="loadJournalMarkdown"
+      :load-tracks="loadTracks"
+      :load-child-nodes="loadChildNodes"
+      :resolve-chapter-names="resolveChapterNames"
+      :load-child-cover="loadChildCover"
+      :load-preview="(tile) => loadPreview(session.apiBase, s(), active, tile)"
+      :load-original="(tile) => loadOriginal(session.apiBase, s(), active, tile)"
+      :download-file-name="(tile, ext) => `${name}-${tile.id.slice(0, 8)}.${ext}`"
+      @back="emit('back')"
+      @node-changed="onNodeChanged"
+      @error="error = $event"
+    >
+      <template #head-actions="{ tab }">
+        <button class="btn btn-ghost detail-share" type="button" @click="shareOpen = true">{{ t('share.share') }}</button>
+        <template v-if="tab === 'gallery'">
+          <button class="btn btn-ghost detail-download" type="button" @click="downloadOpen = true">{{ t('detail.download') }}</button>
+          <button class="btn btn-primary detail-upload" type="button" :disabled="uploading" @click="fileInput?.click()">
+            {{ uploading ? t('detail.uploading') : t('detail.upload') }}
+          </button>
+        </template>
+        <input ref="fileInput" type="file" accept="image/*,video/*" multiple hidden @change="onFilesPicked" />
+      </template>
+
+      <template #map-toolbar>
+        <div class="map-bar">
+          <button class="btn btn-ghost" type="button" :disabled="importing" @click="gpxInput?.click()">
+            {{ importing ? t('track.importing') : t('track.import') }}
+          </button>
+          <input ref="gpxInput" type="file" accept=".gpx,application/gpx+xml,application/xml" hidden @change="onGpxPicked" />
         </div>
       </template>
-      <template v-else>
+      <template #track-actions="{ track }">
+        <button class="btn btn-ghost track-del" type="button" @click="removeTrack(track.id)">{{ t('track.delete') }}</button>
+      </template>
+
+      <template #journal-bar="{ markdown }">
         <div class="journal-bar">
-          <button class="btn btn-ghost" type="button" @click="startEditJournal">{{ t('journal.edit') }}</button>
+          <button class="btn btn-ghost" type="button" @click="startEditJournal(markdown)">{{ t('journal.edit') }}</button>
           <button class="btn btn-ghost" type="button" @click="journalLive = true">{{ t('journal.live') }}</button>
         </div>
-        <div v-if="journalMarkdown.trim()" class="journal-body" v-html="journalHtml"></div>
-        <div v-else class="home-empty">{{ t('journal.empty') }}</div>
       </template>
-    </section>
+      <template #journal-edit="{ nodeId, markdown }">
+        <LiveJournalEditor v-if="journalLive" :active="active" :node-id="nodeId" :initial-markdown="markdown" @close="onLiveClosed" />
+        <template v-else>
+          <textarea v-model="journalDraft" class="journal-editor" :placeholder="t('journal.placeholder')"></textarea>
+          <div class="journal-actions">
+            <button class="btn btn-ghost" type="button" :disabled="journalSaving" @click="journalEditing = false">{{ t('common.cancel') }}</button>
+            <button class="btn btn-primary" type="button" :disabled="journalSaving" @click="saveJournal">{{ journalSaving ? t('journal.saving') : t('journal.save') }}</button>
+          </div>
+        </template>
+      </template>
 
-    <section v-if="tab === 'map'" class="memory-map-wrap">
-      <div class="map-bar">
-        <button class="btn btn-ghost" type="button" :disabled="importing" @click="gpxInput?.click()">
-          {{ importing ? t('track.importing') : t('track.import') }}
-        </button>
-        <input ref="gpxInput" type="file" accept=".gpx,application/gpx+xml,application/xml" hidden @change="onGpxPicked" />
-      </div>
-      <div v-if="error" class="home-empty">{{ error }}</div>
-      <MemoryMap v-if="geoPoints.length || tracks.length" :points="geoPoints" :tracks="tracks" @select="openMapPin" />
-      <div v-else class="home-empty">{{ t('map.empty') }}</div>
-      <ul v-if="tracks.length" class="track-list">
-        <li v-for="tr in tracks" :key="tr.id" class="track-row">
-          <span class="track-name">🛤 {{ tr.name }}</span>
-          <button class="btn btn-ghost track-del" type="button" @click="removeTrack(tr.id)">{{ t('track.delete') }}</button>
-        </li>
-      </ul>
-    </section>
-
-    <div v-if="tab === 'gallery' && dateRange" class="detail-daterange">{{ dateRange }}</div>
-
-    <div v-show="tab === 'gallery'" ref="galleryEl" class="gallery-buckets">
-      <section v-for="b in buckets" :key="b.key" class="gallery-bucket">
-        <h2 class="bucket-date">{{ b.label }}</h2>
-        <div class="gallery" :style="{ height: b.layout.height + 'px' }">
-          <button
-            v-for="tile in b.layout.tiles"
-            :key="tile.id"
-            class="gallery-tile"
-            :style="{ left: tile.left + 'px', top: tile.top + 'px', width: tile.renderedWidth + 'px', height: tile.renderedHeight + 'px' }"
-            @click="openLightbox(tileById[tile.id])"
-          >
-            <img :src="tileById[tile.id].url" alt="" />
-          </button>
-        </div>
-      </section>
-    </div>
-
-    <template v-if="tab === 'gallery'">
-      <div v-if="loading" class="home-empty">{{ t('detail.loadingGallery') }}</div>
-      <div v-else-if="!tiles.length" class="home-empty">{{ t('detail.noMedia') }}</div>
-    </template>
-
-    <div v-if="lightbox" class="lightbox" @click="closeLightbox">
-      <img :src="lightbox" alt="" @click.stop />
-      <div class="lightbox-actions" @click.stop>
-        <button class="btn btn-primary" type="button" @click="setAsCover">{{ t('cover.setAsCover') }}</button>
-        <button class="btn btn-ghost" type="button" :disabled="downloading" @click="downloadThisOriginal">{{ t('detail.download') }}</button>
+      <template #lightbox-actions="{ tile }">
+        <button class="btn btn-ghost lightbox-fav" type="button" :title="t('media.favorite')" @click="toggleFavorite(tile)">{{ tile?.highlighted ? '★' : '☆' }}</button>
+        <label class="lightbox-date" :title="t('media.editDate')">
+          <input
+            type="datetime-local"
+            :value="tile?.takenAt?.slice(0, 16)"
+            @change="onDateChange(tile, ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <button class="btn btn-primary" type="button" @click="setAsCover(tile)">{{ t('cover.setAsCover') }}</button>
         <button v-if="!mediaDelArm" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="mediaDelArm = true">{{ t('common.delete') }}</button>
-        <button v-else class="btn btn-danger" type="button" @click="deleteThisMedia">{{ t('delete.confirm') }}</button>
-        <button class="btn btn-ghost" type="button" @click="closeLightbox">{{ t('common.close') }}</button>
-      </div>
-    </div>
+        <button v-else class="btn btn-danger" type="button" @click="deleteThisMedia(tile)">{{ t('delete.confirm') }}</button>
+      </template>
+    </MemoryContent>
+
+    <div v-if="error" class="home-empty">{{ error }}</div>
   </div>
 </template>

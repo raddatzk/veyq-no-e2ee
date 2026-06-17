@@ -13,7 +13,7 @@ The defining property is that the backend is **operator-blind (a "blind store")*
 - Flyway manages the schema through versioned migrations (`backend/src/main/resources/db/migration/`), applied at startup.
 - Docker Compose (`infra/docker-compose.yml`) starts Traefik, MariaDB and the app, plus optional `reset` and `updater` sidecars.
 - The OpenAPI specs under `docs/api` are the public API target contract; backend and frontend both generate artifacts from them.
-- Encrypted media bytes live on a filesystem blob store (`veyq.blob-store.dir`, a mounted volume), never in the database.
+- Encrypted media bytes live in an S3-compatible object store (external S3 or the bundled MinIO; `veyq.blob-store.*`), never in the database. The server is decoupled from storage and may hand clients presigned URLs to transfer ciphertext directly (ADR 0021).
 
 ## Crypto Suite
 

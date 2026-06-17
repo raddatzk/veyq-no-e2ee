@@ -5,6 +5,7 @@ import com.veyq.app.generated.model.BlobTicket
 import com.veyq.app.generated.model.BlobUploadProgress
 import com.veyq.app.generated.model.ChunkResponse
 import com.veyq.app.generated.model.CompleteBlobResponse
+import com.veyq.app.generated.model.PresignedPut
 import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import com.veyq.app.platform.error.ApiException
@@ -14,6 +15,8 @@ import com.veyq.app.shared.content.BlobChunkRepository
 import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.BlobUpload
 import com.veyq.app.shared.content.BlobUploadRepository
+import com.veyq.app.shared.content.MediaDerivativeRepository
+import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.ScopeContentKeyRepository
 import com.veyq.app.shared.content.UploadStatus
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
@@ -41,6 +44,8 @@ class BlobUploadHandler(
     private val blobs: BlobRepository,
     private val uploads: BlobUploadRepository,
     private val chunks: BlobChunkRepository,
+    private val media: MediaRepository,
+    private val derivatives: MediaDerivativeRepository,
     private val store: BlobStore,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
@@ -53,6 +58,7 @@ class BlobUploadHandler(
     // Guest (public-share) write quotas — tighter than the per-scope caps, since a share link is unauthenticated.
     private val maxShareOpenSessions = cfg.maxShareOpenSessions()
     private val maxShareBytes = cfg.maxShareBytes()
+    private val presignTtl = cfg.presignTtlSeconds()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val maxEncodedFrameChars = ((maxFrameBytes + 2) / 3) * 4
@@ -87,10 +93,13 @@ class BlobUploadHandler(
                 throw ApiException(429, "SHARE_QUOTA_EXCEEDED", "This share has reached its upload quota")
             }
         }
+        // A presigned (direct-to-store) upload declares its frame suite up front (raw frames carry none); a
+        // proxied upload leaves it null and derives it from the frame bodies. Validate if present.
+        req.suiteId?.let { if (!suites.isKnown(it)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite") }
         val u = BlobUpload().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = req.dedupToken
             totalChunks = req.totalChunks; byteSize = req.byteSize; status = UploadStatus.OPEN.name
-            createdBy = writerId; createdAt = Instant.now()
+            createdBy = writerId; createdAt = Instant.now(); suiteId = req.suiteId
         }
         uploads.persist(u)
         return BlobTicket(status = BlobTicket.Status.UPLOADING, uploadId = u.id, totalChunks = u.totalChunks)
@@ -140,10 +149,25 @@ class BlobUploadHandler(
     @Transactional
     fun getBlobUploadAs(scopeId: String, uploadId: String, expectedOwner: String? = null): BlobUploadProgress {
         val u = requireUploadInScope(scopeId, uploadId, expectedOwner = expectedOwner)
+        val have = chunks.listByUploadId(uploadId).map { it.chunkIndex }.toMutableSet()
+        // Presigned (direct-to-store) chunks have NO manifest row until complete — stat the store so resume
+        // counts chunks already PUT directly to S3 as received (and we only presign the truly-missing ones).
+        if (store.supportsPresign() && u.status == UploadStatus.OPEN.name) {
+            for (i in 0 until u.totalChunks) if (i !in have && store.stat("$uploadId/$i") != null) have.add(i)
+        }
+        // Direct-to-store fast path: a presigned PUT URL per still-missing chunk (ADR 0021). Empty when the
+        // store can't presign (in-memory dev backend) → the client falls back to the proxied chunk endpoint.
+        val presigned = if (u.status == UploadStatus.OPEN.name) {
+            (0 until u.totalChunks).filter { it !in have }
+                .mapNotNull { i -> store.presignPut("$uploadId/$i", presignTtl)?.let { PresignedPut(index = i, url = it) } }
+        } else {
+            emptyList()
+        }
         return BlobUploadProgress(
             uploadId = u.id, totalChunks = u.totalChunks,
-            receivedChunks = chunks.listByUploadId(uploadId).map { it.chunkIndex },
+            receivedChunks = have.toList().sorted(),
             status = BlobUploadProgress.Status.valueOf(u.status),
+            presignedPuts = presigned,
         )
     }
 
@@ -160,6 +184,7 @@ class BlobUploadHandler(
             val b = blobs.findById(u.blobId!!)!!
             return CompleteBlobResponse(blobId = b.id, totalChunks = b.totalChunks, byteSize = b.byteSize)
         }
+        reconcileDirectUploads(u) // presigned frames land in S3 without a manifest row — stat + record them first
         val staged = chunks.listByUploadId(uploadId)
         if (staged.size != u.totalChunks || staged.map { it.chunkIndex }.toSet() != (0 until u.totalChunks).toSet()) {
             throw ApiException(409, "INCOMPLETE_UPLOAD", "Not all chunks have been uploaded")
@@ -219,6 +244,58 @@ class BlobUploadHandler(
             uploads.deleteById(u.id)
         }
         return stale.size
+    }
+
+    /**
+     * Scheduled GC: reclaim finalized blobs no media (original or derivative) references anymore — the frames
+     * a deleted medium left behind (blobs are dedup'd, so deleting media only drops the reference, ADR 0007).
+     * Gated by a grace [cutoff] on the blob's own createdAt so a just-finalized blob whose media isn't attached
+     * yet is never reaped. Per blob: lock its scope + re-check the reference count (serializes against the
+     * dedup-at-finalize path, which also locks the scope), then delete frames + chunk rows + the blob row.
+     */
+    @Transactional
+    fun purgeUnreferencedBlobs(cutoff: Instant): Int {
+        var removed = 0
+        for (b in blobs.listUnreferencedOlderThan(cutoff)) {
+            scopes.lockById(b.scopeId)
+            if (media.countByOriginalBlobId(b.id) > 0 || derivatives.countByBlobId(b.id) > 0) continue // attached since
+            chunks.listByBlobId(b.id).forEach { store.delete(it.objectKey) }
+            chunks.deleteByBlobId(b.id)
+            blobs.deleteById(b.id)
+            removed++
+        }
+        return removed
+    }
+
+    /**
+     * Presigned (direct-to-store) frames are PUT straight to S3 by the client, so no manifest row exists at
+     * complete time. For each missing chunk, stat its object: if present record a manifest row (size from the
+     * stat) so the existing completeness check + finalize work unchanged. Enforce the per-frame and cumulative
+     * caps here (the proxied per-PUT checks never ran), purging the staged objects on abuse. A no-op for a
+     * fully-proxied upload (every chunk already has a row).
+     */
+    private fun reconcileDirectUploads(u: BlobUpload) {
+        val have = chunks.listByUploadId(u.id).map { it.chunkIndex }.toMutableSet()
+        for (i in 0 until u.totalChunks) {
+            if (i in have) continue
+            val key = "${u.id}/$i"
+            val size = store.stat(key) ?: continue // still missing → caught by the completeness check
+            if (size > maxFrameBytes) { store.delete(key); throw ApiException(400, "FRAME_TOO_LARGE", "Uploaded frame exceeds the limit") }
+            chunks.persist(
+                BlobChunk().apply {
+                    id = UUID.randomUUID().toString(); uploadId = u.id; chunkIndex = i; objectKey = key; byteSize = size; createdAt = Instant.now()
+                },
+            )
+            u.stagedBytes += size
+            have.add(i)
+        }
+        try {
+            ensureBudget(u, u.stagedBytes)
+        } catch (e: ApiException) {
+            chunks.listByUploadId(u.id).forEach { store.delete(it.objectKey) }
+            chunks.deleteByUploadId(u.id)
+            throw e
+        }
     }
 
     private fun ensureBudget(u: BlobUpload, newStagedBytes: Long) {

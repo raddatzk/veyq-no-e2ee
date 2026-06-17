@@ -16,17 +16,20 @@ public struct StartBlobRequest: Codable {
     public private(set) var dedupToken: String
     public private(set) var totalChunks: Int
     public private(set) var byteSize: Int64
+    public private(set) var suiteId: String?
 
-    public init(dedupToken: String, totalChunks: Int, byteSize: Int64) {
+    public init(dedupToken: String, totalChunks: Int, byteSize: Int64, suiteId: String? = nil) {
         self.dedupToken = dedupToken
         self.totalChunks = totalChunks
         self.byteSize = byteSize
+        self.suiteId = suiteId
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case dedupToken
         case totalChunks
         case byteSize
+        case suiteId
     }
 
     // Encodable protocol methods
@@ -36,6 +39,7 @@ public struct StartBlobRequest: Codable {
         try container.encode(dedupToken, forKey: .dedupToken)
         try container.encode(totalChunks, forKey: .totalChunks)
         try container.encode(byteSize, forKey: .byteSize)
+        try container.encodeIfPresent(suiteId, forKey: .suiteId)
     }
 }
 

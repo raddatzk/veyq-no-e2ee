@@ -21,12 +21,14 @@ public struct BlobUploadProgress: Codable {
     public private(set) var totalChunks: Int
     public private(set) var receivedChunks: [Int]
     public private(set) var status: Status
+    public private(set) var presignedPuts: [PresignedPut]?
 
-    public init(uploadId: String, totalChunks: Int, receivedChunks: [Int], status: Status) {
+    public init(uploadId: String, totalChunks: Int, receivedChunks: [Int], status: Status, presignedPuts: [PresignedPut]? = nil) {
         self.uploadId = uploadId
         self.totalChunks = totalChunks
         self.receivedChunks = receivedChunks
         self.status = status
+        self.presignedPuts = presignedPuts
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -34,6 +36,7 @@ public struct BlobUploadProgress: Codable {
         case totalChunks
         case receivedChunks
         case status
+        case presignedPuts
     }
 
     // Encodable protocol methods
@@ -44,6 +47,7 @@ public struct BlobUploadProgress: Codable {
         try container.encode(totalChunks, forKey: .totalChunks)
         try container.encode(receivedChunks, forKey: .receivedChunks)
         try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(presignedPuts, forKey: .presignedPuts)
     }
 }
 

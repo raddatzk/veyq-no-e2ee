@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param dedupToken 
  * @param totalChunks 
  * @param byteSize 
+ * @param suiteId 
  */
 @Serializable
 
@@ -47,7 +48,10 @@ data class StartBlobRequest (
     val totalChunks: kotlin.Int,
 
     @SerialName(value = "byteSize")
-    val byteSize: kotlin.Long
+    val byteSize: kotlin.Long,
+
+    @SerialName(value = "suiteId")
+    val suiteId: kotlin.String? = null
 
 ) {
 

@@ -15,10 +15,63 @@ import { session } from '../session'
 import { t } from '../../i18n/i18n'
 import { appendJournalUpdate, compactJournal, fetchJournalLiveTicket, loadJournalDoc, PERSISTENCE_ORIGIN } from '../../features/memory/journalLive/journalPersistence'
 import { EncryptedRelayProvider } from '../../features/memory/journalLive/encryptedProvider'
-import type { ActiveSpace } from '../../features/home/home'
+import { journalEmbedEditing, refreshChips, replaceEmbed, type EmbedRange } from '../../features/memory/journalLive/journalEmbedEditor'
+import { journalEmbedMarkdown, type JournalEmbed, type JournalEmbedKind } from '../../features/memory/journal/journalEmbed'
+import { loadGalleryTiles, type GalleryTile } from '../../features/gallery/gallery'
+import { getTracks, type Track } from '../../features/memory/track/track'
+import { loadLevel, type ActiveSpace } from '../../features/home/home'
+import JournalMediaPicker from './JournalMediaPicker.vue'
+import JournalEmbedPicker from './JournalEmbedPicker.vue'
 
 const props = defineProps<{ active: ActiveSpace; nodeId: string; initialMarkdown: string }>()
 const emit = defineEmits<{ close: [markdown: string]; }>()
+
+// ---- embed resolution data (for chip labels + pickers), loaded once after mount -------------------------
+const tiles = ref<GalleryTile[]>([])
+const tracks = ref<Track[]>([])
+const chapters = ref<{ id: string; name: string }[]>([])
+const trackName = (id: string) => tracks.value.find((tr) => tr.id === id)?.name
+const chapterName = (id: string) => chapters.value.find((c) => c.id === id)?.name
+
+// ---- picker state ---------------------------------------------------------------------------------------
+const picker = ref<{ kind: JournalEmbedKind; range: { from: number; to: number }; editing: boolean; ids: string[]; label: string } | null>(null)
+const embedMenuOpen = ref(false)
+
+function chipText(e: JournalEmbed): string {
+  if (e.kind === 'media') return `🖼 ${e.label || t('journal.chipMediaCount', { n: e.ids.length })}`
+  if (e.kind === 'track') {
+    const fallback = e.ids.length > 1 ? t('journal.chipTrackCount', { n: e.ids.length }) : (trackName(e.ids[0]) ?? e.ids[0])
+    return `🛤 ${e.label || fallback}`
+  }
+  return `🗂 ${e.label || chapterName(e.ids[0]) || e.ids[0]}`
+}
+function typeLabels(): Record<JournalEmbedKind, string> {
+  return { media: t('journal.embedKind.media'), track: t('journal.embedKind.track'), chapter: t('journal.embedKind.chapter') }
+}
+function openInsert(kind: JournalEmbedKind, from: number, to: number) {
+  embedMenuOpen.value = false
+  picker.value = { kind, range: { from, to }, editing: false, ids: [], label: '' }
+}
+function openEdit(range: EmbedRange) {
+  picker.value = { kind: range.kind, range: { from: range.start, to: range.end }, editing: true, ids: range.ids, label: range.label ?? '' }
+}
+/** Toolbar menu: insert an embed at the current cursor (no `::` typed). */
+function insertAtCursor(kind: JournalEmbedKind) {
+  const at = view?.state.selection.main.head ?? 0
+  openInsert(kind, at, at)
+}
+function applyPicker(ids: string[], label: string) {
+  if (!picker.value || !view) return
+  const { kind, range } = picker.value
+  replaceEmbed(view, range.from, range.to, journalEmbedMarkdown(kind, ids, label))
+  picker.value = null
+}
+function removePicker() {
+  if (!picker.value || !view) return
+  const { range } = picker.value
+  replaceEmbed(view, range.from, range.to, '')
+  picker.value = null
+}
 
 const editorEl = ref<HTMLElement | null>(null)
 const connected = ref(false)
@@ -86,6 +139,8 @@ onMounted(async () => {
       extensions: [
         lineNumbers(),
         history(),
+        // Before the default keymap so its atomic-delete Backspace/Delete handlers win at a chip boundary.
+        journalEmbedEditing({ chipText, typeLabels, onInsert: openInsert, onEdit: openEdit }),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown(),
         EditorView.lineWrapping,
@@ -93,7 +148,23 @@ onMounted(async () => {
       ],
     }),
   })
+  void loadEmbedData()
 })
+
+/** Load this memory's media/tracks/chapters for chip labels + pickers, then refresh the rendered chips. */
+async function loadEmbedData() {
+  try {
+    const [t1, t2, lvl] = await Promise.all([
+      loadGalleryTiles(session.apiBase, session.unlocked!, props.active, props.nodeId),
+      getTracks(session.apiBase, session.unlocked!, props.active, props.nodeId),
+      loadLevel(session.apiBase, session.unlocked!, props.active, props.nodeId),
+    ])
+    tiles.value = t1
+    tracks.value = t2
+    chapters.value = lvl.filter((e) => e.node.type === 'CHAPTER').map((e) => ({ id: e.node.id, name: e.name }))
+    view?.dispatch({ effects: refreshChips.of() })
+  } catch { /* labels fall back to ids; pickers show empty states */ }
+}
 
 onBeforeUnmount(() => {
   // Vue does not await async lifecycle hooks, so tear down synchronously FIRST: stop the editor + the relay
@@ -103,6 +174,7 @@ onBeforeUnmount(() => {
   doc.off('update', onLocalUpdate)
   view?.destroy()
   provider.value?.destroy()
+  tiles.value.forEach((t) => URL.revokeObjectURL(t.url)) // picker/chip thumbnails are object URLs
   void persistThenDestroy()
 })
 
@@ -132,8 +204,49 @@ function close() {
       <span class="live-status">{{ connected ? t('journal.live') : t('journal.connecting') }}</span>
       <span v-if="peers > 0" class="live-peers">· {{ t('journal.peers', { n: peers }) }}</span>
       <span class="live-spacer" />
+      <div class="journal-embed-menu">
+        <button class="btn btn-ghost" type="button" @click="embedMenuOpen = !embedMenuOpen">＋ {{ t('journal.embed') }}</button>
+        <div v-if="embedMenuOpen" class="journal-embed-menu-pop" @click.self="embedMenuOpen = false">
+          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('media')">🖼 {{ t('journal.embedKind.media') }}</button>
+          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('track')">🛤 {{ t('journal.embedKind.track') }}</button>
+          <button class="btn btn-ghost action-row" type="button" @click="insertAtCursor('chapter')">🗂 {{ t('journal.embedKind.chapter') }}</button>
+        </div>
+      </div>
       <button class="btn btn-ghost" type="button" @click="close">{{ t('journal.done') }}</button>
     </div>
     <div ref="editorEl" class="live-journal-editor"></div>
+
+    <JournalMediaPicker
+      v-if="picker && picker.kind === 'media'"
+      :tiles="tiles"
+      :selected-ids="picker.ids"
+      :caption="picker.label"
+      :editing="picker.editing"
+      @confirm="applyPicker"
+      @remove="removePicker"
+      @cancel="picker = null"
+    />
+    <JournalEmbedPicker
+      v-else-if="picker && picker.kind === 'track'"
+      kind="track"
+      :items="tracks.map((tr) => ({ id: tr.id, name: tr.name }))"
+      :selected-ids="picker.ids"
+      :label="picker.label"
+      :editing="picker.editing"
+      @confirm="applyPicker"
+      @remove="removePicker"
+      @cancel="picker = null"
+    />
+    <JournalEmbedPicker
+      v-else-if="picker && picker.kind === 'chapter'"
+      kind="chapter"
+      :items="chapters"
+      :selected-ids="picker.ids"
+      :label="picker.label"
+      :editing="picker.editing"
+      @confirm="applyPicker"
+      @remove="removePicker"
+      @cancel="picker = null"
+    />
   </div>
 </template>

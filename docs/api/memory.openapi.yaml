@@ -360,6 +360,22 @@ paths:
         '200': { description: The CRDT state., content: { application/json: { schema: { $ref: '#/components/schemas/JournalLiveState' } } } }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/public/shares/{shareId}/nodes/{nodeId}/tracks:
+    get:
+      tags: [PublicShareTree]
+      operationId: listShareTracks
+      summary: A shared node's GPX tracks — READ-ONLY (ciphertext, no auth; gated to the share's subtree).
+      description: >
+        Returns a node's sealed tracks for a read-capable share guest. Each route is sealed under the scope
+        content key (the guest unwraps it with the share key); the server stores ciphertext only. Gated to the
+        shared subtree (siblings 404) and to VIEWER/CONTRIBUTOR roles (a blind UPLOADER cannot read).
+      parameters:
+        - { name: shareId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The node's tracks., content: { application/json: { schema: { $ref: '#/components/schemas/MemoryTrackList' } } } }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
 components:
   schemas:
     NodeType:

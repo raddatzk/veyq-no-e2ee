@@ -57,6 +57,28 @@
 .share-notice-body { border: 1px solid var(--app-line); border-radius: var(--app-radius); padding: 1.1rem 1.3rem; max-height: 55vh; overflow-y: auto; }
 .share-notice-body .notice-sep { border: none; border-top: 1px solid var(--app-line); margin: 1.1rem 0; }
 .share-accept { margin-top: 1rem; }
+.detail-crumbs { flex-wrap: wrap; }
+.memory-children { margin: 0 0 1.2rem; }
+.detail-hero { display: block; width: 100%; max-height: 240px; object-fit: cover; border-radius: var(--app-radius); margin-bottom: 1rem; }
+.memory-info { max-width: 480px; display: flex; flex-direction: column; gap: 0.5rem; }
+.memory-info .info-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.85rem; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); background: var(--app-surface); }
+.memory-info .info-row span { color: var(--app-muted); }
+.lightbox-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 2.6rem; height: 2.6rem; border: none; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15); color: #fff; font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.lightbox-prev { left: 1rem; }
+.lightbox-next { right: 1rem; }
+.lightbox-info {
+  position: absolute; top: 1rem; left: 1rem; max-width: 70vw;
+  display: flex; flex-direction: column; gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.6); color: #fff; padding: 0.6rem 0.85rem; border-radius: var(--app-radius-sm); font-size: 0.85rem;
+}
+.lightbox-info span { color: rgba(255, 255, 255, 0.6); margin-right: 0.5rem; }
+.detail-gallery-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.4rem; }
+.gallery-filter.active { color: #f59e0b; border-color: #f59e0b; }
+.gallery-tile .tile-star { position: absolute; top: 4px; right: 6px; color: #f59e0b; font-size: 1rem; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); pointer-events: none; }
 
 .dl-option {
   display: flex;
@@ -157,6 +179,98 @@
   z-index: 0;
 }
 
+/* Atomic embed chips inside the CodeMirror live editor */
+.journal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.05rem 0.45rem;
+  margin: 0 1px;
+  font-family: var(--app-font, inherit);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--app-text);
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.journal-chip:hover { border-color: var(--app-accent); }
+.journal-chip-edit { opacity: 0.55; font-size: 0.78rem; }
+.journal-chip-pending {
+  border-color: var(--app-danger);
+  background: color-mix(in srgb, var(--app-danger) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-danger) 20%, transparent);
+}
+
+/* "Embed" toolbar menu in the live editor bar */
+.journal-embed-menu { position: relative; }
+.journal-embed-menu-pop {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  margin-top: 4px;
+  padding: 4px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.journal-embed-menu-pop .action-row { justify-content: flex-start; text-align: left; }
+
+/* Embed pickers */
+.journal-picker { max-width: 640px; width: 92vw; }
+.journal-picker-field { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.6rem 0; font-size: 0.85rem; color: var(--app-muted); }
+.journal-picker-field input {
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius-sm);
+  outline: none;
+}
+.journal-picker-field input:focus { border-color: var(--app-accent); }
+.journal-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.journal-picker-thumb {
+  position: relative;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--app-radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 1;
+}
+.journal-picker-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.journal-picker-thumb.selected { border-color: var(--app-accent); }
+.journal-picker-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 1.2rem;
+  height: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #fff;
+  background: var(--app-accent);
+  border-radius: 999px;
+}
+.search-hit.selected { background: color-mix(in srgb, var(--app-accent) 14%, transparent); }
+.journal-picker-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
+
 .gallery-buckets { width: 100%; }
 .gallery-bucket { margin-bottom: 1.6rem; }
 .bucket-date {
@@ -209,6 +323,16 @@
   gap: 0.6rem;
 }
 .lightbox-actions .btn { padding: 0.5rem 1rem; }
+.lightbox-fav { font-size: 1.1rem; line-height: 1; min-width: 2.4rem; }
+.lightbox-date input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--app-radius-sm, 6px);
+  color: #fff;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  color-scheme: dark;
+}
 
 /* Live (collaborative) journal editor */
 .live-journal { display: flex; flex-direction: column; gap: 0.6rem; }

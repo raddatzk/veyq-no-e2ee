@@ -28,6 +28,7 @@ class ScopeItemsHandler(
     private val contentKeys: ScopeContentKeyRepository,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val content: com.veyq.app.shared.config.ContentConfig,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -47,7 +48,7 @@ class ScopeItemsHandler(
         contentKeys.findByScopeId(scopeId) ?: throw ApiException(409, "CONTENT_KEY_REQUIRED", "Provision the scope content key before storing items")
         val item = ScopeItem().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId
-            suiteId = req.sealedContent.suiteId; sealedContent = dec.decode(req.sealedContent.bytes); createdAt = Instant.now()
+            suiteId = req.sealedContent.suiteId; sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedContent.bytes, content.maxSealedBytes(), dec); createdAt = Instant.now()
         }
         items.persist(item)
         return toApi(item)

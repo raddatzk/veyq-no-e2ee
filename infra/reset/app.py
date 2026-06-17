@@ -7,7 +7,6 @@ import json
 import os
 import posixpath
 import secrets
-import shutil
 import socket
 import sys
 from http import HTTPStatus
@@ -36,9 +35,13 @@ class ResetConfig:
         self.db_name = os.environ.get("DB_NAME", "veyq")
         self.db_user = os.environ.get("DB_USER", "veyq")
         self.db_password = required_env("DB_PASSWORD")
-        self.media_storage_dir = safe_storage_root(
-            os.environ.get("MEDIA_STORAGE_DIR", "/data/veyq-media")
-        )
+        # Media lives in S3 (ADR 0021/0022), not on a local volume — a disposable-instance reset must clear the
+        # bucket, or blobs (ciphertext) survive the wipe and leak into the next tenant of the disposable instance.
+        self.s3_endpoint = required_env("BLOB_STORE_S3_ENDPOINT")
+        self.s3_bucket = os.environ.get("BLOB_STORE_S3_BUCKET", "veyq-blobs")
+        self.s3_access_key = required_env("BLOB_STORE_S3_ACCESS_KEY")
+        self.s3_secret_key = required_env("BLOB_STORE_S3_SECRET_KEY")
+        self.s3_region = os.environ.get("BLOB_STORE_S3_REGION", "us-east-1")
         self.restart_container = os.environ.get("RESET_RESTART_CONTAINER", "veyq").strip()
         self.docker_socket = Path(os.environ.get("DOCKER_SOCKET", "/var/run/docker.sock"))
         self.restart_timeout_seconds = int(os.environ.get("RESET_RESTART_TIMEOUT_SECONDS", "10"))
@@ -49,13 +52,6 @@ def required_env(name: str) -> str:
     if not value:
         raise ConfigError(f"{name} must be set")
     return value
-
-
-def safe_storage_root(value: str) -> Path:
-    root = Path(value).expanduser().resolve()
-    if str(root) in {"", "/", "."}:
-        raise ConfigError("MEDIA_STORAGE_DIR must not resolve to the filesystem root")
-    return root
 
 
 def db_connection(config: ResetConfig) -> pymysql.Connection:
@@ -101,24 +97,23 @@ def reset_database(config: ResetConfig) -> list[str]:
             return table_names
 
 
-def reset_storage(root: Path) -> list[str]:
-    root.mkdir(parents=True, exist_ok=True)
-    resolved_root = root.resolve()
-    if resolved_root != root:
-        raise ConfigError("MEDIA_STORAGE_DIR changed while resolving")
-    deleted: list[str] = []
-    for child in sorted(root.iterdir(), key=lambda path: path.name):
-        child_resolved = child.resolve() if not child.is_symlink() else child.absolute()
-        try:
-            child_resolved.relative_to(root)
-        except ValueError:
-            raise ConfigError(f"Refusing to delete path outside storage root: {child}")
-        deleted.append(child.name)
-        if child.is_symlink() or child.is_file():
-            child.unlink()
-        else:
-            shutil.rmtree(child)
-    return deleted
+def reset_storage(config: ResetConfig) -> list[str]:
+    """Empty the S3 blob bucket — every object is AEAD ciphertext, so this is the media wipe. Returns the keys
+    removed. A no-op if the bucket doesn't exist (nothing was ever uploaded)."""
+    from minio import Minio
+    from minio.deleteobjects import DeleteObject
+
+    secure = config.s3_endpoint.startswith("https://")
+    host = config.s3_endpoint.split("://", 1)[-1]
+    client = Minio(host, access_key=config.s3_access_key, secret_key=config.s3_secret_key, secure=secure, region=config.s3_region)
+    if not client.bucket_exists(config.s3_bucket):
+        return []
+    names = [obj.object_name for obj in client.list_objects(config.s3_bucket, recursive=True)]
+    if names:
+        errors = list(client.remove_objects(config.s3_bucket, [DeleteObject(name) for name in names]))
+        if errors:
+            raise ConfigError(f"Failed to delete {len(errors)} object(s) from bucket {config.s3_bucket}")
+    return names
 
 
 class DockerUnixConnection(http.client.HTTPConnection):
@@ -161,7 +156,7 @@ def restart_container(config: ResetConfig) -> Optional[str]:
 
 def perform_reset(config: ResetConfig) -> dict[str, Any]:
     tables = reset_database(config)
-    storage_entries = reset_storage(config.media_storage_dir)
+    storage_entries = reset_storage(config)
     restarted_container = restart_container(config)
     return {
         "tables": tables,

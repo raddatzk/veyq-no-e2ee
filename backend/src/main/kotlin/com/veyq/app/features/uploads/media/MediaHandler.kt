@@ -89,8 +89,23 @@ class MediaHandler(
             derivatives = derivatives.listByMediaId(m.id).map {
                 MediaDerivativeOut(kind = MediaDerivativeOut.Kind.valueOf(it.kind), blob = blobRef(it.blobId))
             },
+            highlighted = m.highlighted,
             createdAt = OffsetDateTime.ofInstant(m.createdAt, ZoneOffset.UTC),
         )
+
+    /** Toggle the highlight flag and/or replace the (re-sealed) metadata of a medium — any scope key holder. */
+    @Transactional
+    fun updateMedia(auth: String?, scopeId: String, nodeId: String, mediaId: String, req: com.veyq.app.generated.model.UpdateMediaRequest): MediaItem {
+        requireKeyHolder(scopeId, auth)
+        val item = media.findById(mediaId) ?: throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found")
+        if (item.scopeId != scopeId || item.nodeId != nodeId) throw ApiException(404, "MEDIA_NOT_FOUND", "Media not found here")
+        req.highlighted?.let { item.highlighted = it }
+        req.sealedMeta?.let {
+            if (!suites.isKnown(it.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
+            item.sealedMeta = dec.decode(it.bytes); item.suiteId = it.suiteId
+        }
+        return toApi(item)
+    }
 
     /** Remove a single medium and its derivatives; un-pin it as a cover wherever it was used. */
     @Transactional

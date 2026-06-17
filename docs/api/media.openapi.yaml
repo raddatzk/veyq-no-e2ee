@@ -125,6 +125,28 @@ paths:
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/media/{mediaId}:
+    patch:
+      tags: [Media]
+      operationId: updateMedia
+      summary: Update a medium's highlight flag and/or its sealed metadata (e.g. an edited capture date).
+      description: >
+        Toggle the server-visible `highlighted` flag (a favourite/star, filterable; never content) and/or
+        replace the sealed metadata blob (the client re-seals {takenAt, lat?, lng?} under the content key to
+        edit, say, the capture date — the server stays blind to the values). Any scope key holder may update.
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: mediaId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateMediaRequest' } } }
+      responses:
+        '200': { description: The updated media., content: { application/json: { schema: { $ref: '#/components/schemas/MediaItem' } } } }
+        '400': { $ref: './common.openapi.yaml#/components/responses/BadRequest' }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
     delete:
       tags: [Media]
       operationId: deleteMedia
@@ -244,6 +266,10 @@ components:
         dedupToken: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 128)'] }
         totalChunks: { type: integer, minimum: 1, maximum: 10000 }
         byteSize: { type: integer, format: int64, minimum: 0, maximum: 10737418240 }
+        # Declared up front for a presigned (direct-to-store) upload: raw frames PUT straight to S3 carry no
+        # per-frame suite metadata, so the client states the frames' crypto suite here. Optional — a proxied
+        # upload still derives it from the frame bodies.
+        suiteId: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 32)'] }
     BlobTicket:
       type: object
       required: [status]
@@ -265,6 +291,16 @@ components:
         totalChunks: { type: integer }
         receivedChunks: { type: array, items: { type: integer } }
         status: { type: string, enum: [OPEN, COMPLETED] }
+        # Direct-to-store fast path (ADR 0021): when the backend can presign, a short-lived PUT URL per still-
+        # missing chunk. The client PUTs the raw sealed frame straight to S3 and skips the proxied chunk endpoint.
+        # Absent/empty when the store can't presign (the in-memory dev backend) → client uses the proxied path.
+        presignedPuts: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
+    PresignedPut:
+      type: object
+      required: [index, url]
+      properties:
+        index: { type: integer }
+        url: { type: string }
     CompleteBlobResponse:
       type: object
       required: [blobId, totalChunks, byteSize]
@@ -306,9 +342,14 @@ components:
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeInput' }
+    UpdateMediaRequest:
+      type: object
+      properties:
+        highlighted: { type: boolean }
+        sealedMeta: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
     MediaItem:
       type: object
-      required: [id, scopeId, nodeId, sealedMeta, mimeType, original, derivatives, createdAt]
+      required: [id, scopeId, nodeId, sealedMeta, mimeType, original, derivatives, highlighted, createdAt]
       properties:
         id: { type: string }
         scopeId: { type: string }
@@ -319,6 +360,7 @@ components:
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeOut' }
+        highlighted: { type: boolean }
         createdAt: { type: string, format: date-time }
     MediaList:
       type: object

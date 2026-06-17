@@ -153,6 +153,19 @@ object Media {
         return createMedia(apiBase, session, scopeId, nodeId, original.blobId, sealedMeta, mimeType, derivatives)
     }
 
+    /**
+     * Patch a media item's server-visible highlight flag and/or its (re-sealed) sealedMeta. Both optional;
+     * omitted fields are left unchanged. Backs the lightbox favourite toggle + capture-date edit.
+     */
+    fun updateMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String, highlighted: Boolean? = null, sealedMeta: JSONObject? = null): JSONObject {
+        val json = JSONObject()
+        if (highlighted != null) json.put("highlighted", highlighted)
+        if (sealedMeta != null) json.put("sealedMeta", sealedMeta)
+        val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media/$mediaId", session.sessionToken, "PATCH", json.toString())
+        if (resp.statusCode() != 200) throw RuntimeException("update media failed: ${resp.statusCode()}")
+        return JSONObject(resp.body())
+    }
+
     /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
     fun listMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String): List<JSONObject> {
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media", session.sessionToken, "GET")

@@ -65,6 +65,7 @@ class Media {
     @Column(name = "sealed_meta", nullable = false) var sealedMeta: ByteArray = ByteArray(0)
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""
     @Column(name = "mime_type", nullable = false) var mimeType: String = ""
+    @Column(nullable = false) var highlighted: Boolean = false // server-visible favourite/star (not content)
     @Column(name = "created_at", nullable = false) var createdAt: Instant = Instant.EPOCH
 }
 
@@ -82,9 +83,17 @@ enum class DerivativeKind { THUMBNAIL, PREVIEW }
 
 @ApplicationScoped
 class BlobRepository : PanacheRepositoryBase<Blob, String> {
+    fun lockById(id: String): Blob? = find("id", id).withLock(LockModeType.PESSIMISTIC_WRITE).firstResult()
     fun findByScopeAndToken(scopeId: String, dedupToken: String): Blob? =
         find("scopeId = ?1 and dedupToken = ?2", scopeId, dedupToken).firstResult()
     fun listByIds(ids: Collection<String>): List<Blob> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
+
+    /** Reclaimable blobs: older than [cutoff] (grace) and referenced by no media original nor derivative. */
+    fun listUnreferencedOlderThan(cutoff: Instant): List<Blob> =
+        list(
+            "createdAt < ?1 and id not in (select m.originalBlobId from Media m) and id not in (select d.blobId from MediaDerivative d)",
+            cutoff,
+        )
 }
 
 @ApplicationScoped
@@ -117,7 +126,9 @@ class BlobChunkRepository : PanacheRepositoryBase<BlobChunk, String> {
         find("uploadId = ?1 and chunkIndex = ?2", uploadId, chunkIndex).firstResult()
     fun findByBlob(blobId: String, chunkIndex: Int): BlobChunk? =
         find("blobId = ?1 and chunkIndex = ?2", blobId, chunkIndex).firstResult()
+    fun listByBlobId(blobId: String): List<BlobChunk> = list("blobId", blobId)
     fun deleteByUploadId(uploadId: String): Long = delete("uploadId", uploadId)
+    fun deleteByBlobId(blobId: String): Long = delete("blobId", blobId)
 }
 
 @ApplicationScoped
@@ -125,6 +136,7 @@ class MediaRepository : PanacheRepositoryBase<Media, String> {
     fun listByNodeId(nodeId: String): List<Media> = list("nodeId = ?1 order by createdAt", nodeId)
     fun listByNodeIds(nodeIds: Collection<String>): List<Media> = if (nodeIds.isEmpty()) emptyList() else list("nodeId in ?1", nodeIds)
     fun listByScopeId(scopeId: String): List<Media> = list("scopeId", scopeId)
+    fun countByOriginalBlobId(blobId: String): Long = count("originalBlobId", blobId)
     fun deleteByNodeIds(nodeIds: Collection<String>): Long = if (nodeIds.isEmpty()) 0 else delete("nodeId in ?1", nodeIds)
     fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
 }
@@ -133,5 +145,6 @@ class MediaRepository : PanacheRepositoryBase<Media, String> {
 class MediaDerivativeRepository : PanacheRepositoryBase<MediaDerivative, String> {
     fun listByMediaId(mediaId: String): List<MediaDerivative> = list("mediaId", mediaId)
     fun listByMediaIds(mediaIds: Collection<String>): List<MediaDerivative> = if (mediaIds.isEmpty()) emptyList() else list("mediaId in ?1", mediaIds)
+    fun countByBlobId(blobId: String): Long = count("blobId", blobId)
     fun deleteByMediaIds(mediaIds: Collection<String>): Long = if (mediaIds.isEmpty()) 0 else delete("mediaId in ?1", mediaIds)
 }

@@ -42,6 +42,7 @@ import kotlinx.serialization.Contextual
  * @param mimeType 
  * @param original 
  * @param derivatives 
+ * @param highlighted 
  * @param createdAt 
  */
 @Serializable
@@ -68,6 +69,9 @@ data class MediaItem (
 
     @SerialName(value = "derivatives")
     val derivatives: kotlin.collections.List<MediaDerivativeOut>,
+
+    @SerialName(value = "highlighted")
+    val highlighted: kotlin.Boolean,
 
     @Contextual @SerialName(value = "createdAt")
     val createdAt: java.time.OffsetDateTime

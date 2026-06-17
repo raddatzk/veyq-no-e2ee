@@ -1,4 +1,5 @@
 import SwiftUI
+import VeyqCrypto
 
 /// Settings sheet — account, the connected instance, and disconnect. Theme/language are shown to match the
 /// reference; full theming + i18n are their own later passes.
@@ -8,6 +9,25 @@ struct SettingsView: View {
     @AppStorage("veyq.theme") private var theme = "system"
     @AppStorage("veyq.locale") private var locale = "de"
     @AppStorage("veyq.privacy.mapTiles") private var mapTiles = false
+    @State private var rotating = false
+    @State private var showRotateConfirm = false
+    @State private var rotateError: String?
+
+    /// Re-key every grant to a fresh identity (auth unchanged). The in-memory session's identity goes stale,
+    /// so on success we sign out — the next login re-derives the new identity from the unchanged master key.
+    private func rotateIdentity() {
+        guard let session = app.session, !rotating else { return }
+        rotating = true
+        Task {
+            do {
+                _ = try await RotateIdentity.rotateIdentity(apiBase: app.apiBase, session: session)
+                app.signOut(); dismiss()
+            } catch {
+                rotateError = error.localizedDescription
+                rotating = false
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,6 +63,14 @@ struct SettingsView: View {
                         Button(T("settings.forgetDevice"), role: .destructive) { DeviceUnlock.forget() }
                     }
                 }
+                Section {
+                    Button(rotating ? T("settings.rotating") : T("settings.rotateIdentity")) { showRotateConfirm = true }
+                        .disabled(rotating)
+                } header: {
+                    Text(T("settings.security"))
+                } footer: {
+                    Text(T("settings.rotateIdentityHint"))
+                }
                 Section(T("settings.instance")) {
                     Text(app.apiBase).foregroundStyle(VeyqStyle.text)
                 }
@@ -55,6 +83,13 @@ struct SettingsView: View {
             .navigationTitle(T("settings.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(T("common.done")) { dismiss() } } }
+            .confirmationDialog(T("settings.rotateConfirm"), isPresented: $showRotateConfirm, titleVisibility: .visible) {
+                Button(T("settings.rotateIdentity"), role: .destructive) { rotateIdentity() }
+                Button(T("common.cancel"), role: .cancel) {}
+            }
+            .alert(T("common.error"), isPresented: .constant(rotateError != nil)) {
+                Button(T("common.close")) { rotateError = nil }
+            } message: { Text(rotateError ?? "") }
         }
         .tint(VeyqStyle.accent)
     }

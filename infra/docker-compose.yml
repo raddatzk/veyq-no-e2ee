@@ -82,11 +82,20 @@ services:
       # X-Forwarded-For instead of collapsing every client into Traefik's single bucket. (Untrusted peers'
       # XFF is still ignored — see RateLimitFilter.resolveClientIp.)
       VEYQ_RATELIMIT_TRUSTED_PROXIES: ${VEYQ_RATELIMIT_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
-      # MEDIA_STORAGE_DIR feeds veyq.blob-store.dir (the volume the blobs actually land on); MEDIA_MAX_UPLOAD_SIZE
-      # feeds quarkus.http.limits.max-body-size. (Chunk size is a client concern; upload-session TTL/cleanup,
-      # ffmpeg and server-side preview generation are legacy-backend features not implemented here → removed.)
-      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
-      MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M}
+      MEDIA_MAX_UPLOAD_SIZE: ${MEDIA_MAX_UPLOAD_SIZE:-32M} # feeds quarkus.http.limits.max-body-size
+      # Blob storage is S3-only — the server never stores blobs locally (already-encrypted frames go to an
+      # S3-compatible object store, which therefore learns nothing). Two ways to provision it:
+      #   (a) EXTERNAL S3: set BLOB_STORE_S3_ENDPOINT to your provider (+ bucket/region) and the access/secret.
+      #   (b) BUNDLED store: run `docker compose --profile s3 up` to start the veyq-minio container below; the
+      #       default endpoint already points at it. The same access/secret seed MinIO's root credentials.
+      # Credential hygiene: the keys are REQUIRED (no committed default), supplied via a non-committed .env or a
+      # secrets manager; they're never persisted to the DB, never logged, and masked in any config dump.
+      BLOB_STORE_BACKEND: ${BLOB_STORE_BACKEND:-s3}
+      BLOB_STORE_S3_ENDPOINT: ${BLOB_STORE_S3_ENDPOINT:-http://veyq-minio:9000}
+      BLOB_STORE_S3_BUCKET: ${BLOB_STORE_S3_BUCKET:-veyq-blobs}
+      BLOB_STORE_S3_REGION: ${BLOB_STORE_S3_REGION:-us-east-1}
+      BLOB_STORE_S3_ACCESS_KEY: ${BLOB_STORE_S3_ACCESS_KEY:?Set BLOB_STORE_S3_ACCESS_KEY}
+      BLOB_STORE_S3_SECRET_KEY: ${BLOB_STORE_S3_SECRET_KEY:?Set BLOB_STORE_S3_SECRET_KEY}
       MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
       MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
       MAIL_PORT: ${MAIL_PORT:?Set MAIL_PORT}
@@ -96,10 +105,7 @@ services:
       MAIL_TLS: ${MAIL_TLS:-true}
     expose:
       - "8080"
-    volumes:
-      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
-        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
-        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
+    # No media volume: blobs live in S3 (external or the bundled veyq-minio), never on the container/host.
     depends_on:
       veyq-db:
         condition: service_healthy
@@ -136,13 +142,15 @@ services:
       DB_NAME: ${DB_NAME:-veyq}
       DB_USER: ${DB_USER:-veyq}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      MEDIA_STORAGE_DIR: ${MEDIA_STORAGE_DIR:-/data/veyq-media}
+      # Media lives in S3, so a reset clears the bucket (ciphertext) — same store the backend uses.
+      BLOB_STORE_S3_ENDPOINT: ${BLOB_STORE_S3_ENDPOINT:-http://veyq-minio:9000}
+      BLOB_STORE_S3_BUCKET: ${BLOB_STORE_S3_BUCKET:-veyq-blobs}
+      BLOB_STORE_S3_REGION: ${BLOB_STORE_S3_REGION:-us-east-1}
+      BLOB_STORE_S3_ACCESS_KEY: ${BLOB_STORE_S3_ACCESS_KEY:?Set BLOB_STORE_S3_ACCESS_KEY}
+      BLOB_STORE_S3_SECRET_KEY: ${BLOB_STORE_S3_SECRET_KEY:?Set BLOB_STORE_S3_SECRET_KEY}
     expose:
       - "8081"
     volumes:
-      - type: ${MEDIA_STORAGE_MOUNT_TYPE:-volume}
-        source: ${MEDIA_STORAGE_SOURCE:-veyq-media}
-        target: ${MEDIA_STORAGE_MOUNT_TARGET:-/data/veyq-media}
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       veyq-db:
@@ -218,13 +226,34 @@ services:
           sleep "$$(( interval_hours * 3600 ))"
         done
 
+  # Bundled S3-compatible object store. OPTIONAL — only starts with `docker compose --profile s3 up`. Point the
+  # backend at it with BLOB_STORE_BACKEND=s3 + BLOB_STORE_S3_ENDPOINT=http://veyq-minio:9000 and the same
+  # access/secret keys. It stores only AEAD ciphertext. (An external managed S3 needs no container — just set
+  # the backend's BLOB_STORE_S3_* env.) The bucket is auto-created by the backend on first use.
+  veyq-minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: veyq-minio
+    profiles: ["s3"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${BLOB_STORE_S3_ACCESS_KEY:?Set BLOB_STORE_S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${BLOB_STORE_S3_SECRET_KEY:?Set BLOB_STORE_S3_SECRET_KEY}
+    volumes:
+      - veyq-minio:/data
+    expose:
+      - "9000"
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   veyq-db:
-  veyq-media:
-  veyq-media-cifs:
-    driver: local
-    driver_opts:
-      type: cifs
-      o: ${MEDIA_CIFS_OPTIONS:-}
-      device: ${MEDIA_CIFS_DEVICE:-//example.invalid/veyq-media}
+  veyq-minio: # only used with `--profile s3` (the bundled object store); external S3 needs no local volume
   traefik-letsencrypt:

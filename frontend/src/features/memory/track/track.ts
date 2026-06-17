@@ -10,7 +10,7 @@ import { b64url, fromB64url } from '../../../shared/base64'
 
 const EMPTY = new Uint8Array(0)
 
-export type Track = { id: string; name: string; points: { lat: number; lng: number }[] }
+export type Track = { id: string; name: string; points: { lat: number; lng: number; ele?: number; time?: string }[] }
 
 /** List + decrypt a memory's tracks. */
 export async function getTracks(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<Track[]> {

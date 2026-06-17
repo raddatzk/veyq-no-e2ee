@@ -279,55 +279,37 @@ Manual install:
 7. Start with `docker compose up -d` from `infra/`.
 8. Open the configured host, create the first admin and create the first tenant.
 
-### Media Storage Options
+### Media Storage (S3)
 
-The default media storage mode is a Compose-managed Docker volume:
+Media (already-encrypted blob frames) lives in an S3-compatible object store — the server keeps no blobs
+locally. Provide one of:
 
-```env
-MEDIA_STORAGE_MODE=docker-volume
-MEDIA_STORAGE_MOUNT_TYPE=volume
-MEDIA_STORAGE_SOURCE=veyq-media
-```
-
-To use a local path, including a CIFS share already mounted by the host OS, bind-mount an absolute host directory:
+**External S3** (AWS S3, Cloudflare R2, Backblaze B2, Wasabi, …) — point veyq at your provider:
 
 ```env
-MEDIA_STORAGE_MODE=host-path
-MEDIA_STORAGE_MOUNT_TYPE=bind
-MEDIA_STORAGE_SOURCE=/mnt/veyq-media
+BLOB_STORE_S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com
+BLOB_STORE_S3_BUCKET=veyq-blobs
+BLOB_STORE_S3_REGION=eu-central-1
+BLOB_STORE_S3_ACCESS_KEY=...
+BLOB_STORE_S3_SECRET_KEY=...
 ```
 
-To let Docker mount CIFS directly, use the CIFS volume source:
+**Bundled MinIO** (no external S3) — run the included container; the default endpoint already targets it:
+
+```bash
+docker compose --profile s3 up -d
+```
 
 ```env
-MEDIA_STORAGE_MODE=cifs-volume
-MEDIA_STORAGE_MOUNT_TYPE=volume
-MEDIA_STORAGE_SOURCE=veyq-media-cifs
-MEDIA_CIFS_DEVICE=//nas.example.com/veyq-media
-MEDIA_CIFS_OPTIONS=username=veyq,password=change-me,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
+# BLOB_STORE_S3_ENDPOINT defaults to http://veyq-minio:9000
+BLOB_STORE_S3_ACCESS_KEY=...   # also seeds MinIO's root user
+BLOB_STORE_S3_SECRET_KEY=...   # also seeds MinIO's root password
 ```
 
-Alternatively, keep the CIFS username and password in a root-readable credentials file on the Docker host and reference it from `.env`:
-
-```env
-MEDIA_CIFS_OPTIONS=credentials=/root/veyq-cifs.creds,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
-```
-
-If the CIFS share already contains unrelated data, use `prefixpath` to make an existing subdirectory the veyq storage root:
-
-```env
-MEDIA_CIFS_OPTIONS=credentials=/root/veyq-cifs.creds,vers=3.0,prefixpath=veyq,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
-```
-
-If the subdirectory should be created automatically by veyq, mount the CIFS share one level higher and put `MEDIA_STORAGE_DIR` inside that mount:
-
-```env
-MEDIA_STORAGE_MOUNT_TARGET=/data
-MEDIA_STORAGE_DIR=/data/veyq-media
-MEDIA_CIFS_OPTIONS=credentials=/root/veyq-cifs.creds,vers=3.0,uid=1000,gid=1000,file_mode=0660,dir_mode=0770
-```
-
-Uploaded originals, previews and Memory covers are mounted at `/data/veyq-media` inside the veyq containers by default. Override `MEDIA_STORAGE_DIR` only for unusual container layouts. Keep `.env` at `chmod 600` when it contains CIFS credentials. Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
+The bucket is created automatically on first use. The store only ever holds AEAD ciphertext, so it cannot read
+your media. Keep the keys in a non-committed `.env` (`chmod 600`) or a secrets manager — the backend reads them,
+never logs them, and never returns them to clients (direct client transfers use short-lived presigned URLs,
+ADR 0021). Run `./veyq-server.sh doctor` or `docker compose config` after changing storage settings.
 
 Upgrade with the helper script:
 
@@ -362,7 +344,7 @@ The auto-updater uses the `VEYQ_IMAGE` digest as the update trigger. It reconcil
 Back up at least these state locations before upgrading or testing destructive flows:
 
 - `infra_veyq-db`: MariaDB data.
-- media storage: `infra_veyq-media` for `docker-volume`, `infra_veyq-media-cifs` for `cifs-volume`, or the configured `MEDIA_STORAGE_SOURCE` host path for `host-path`.
+- media storage: the S3 bucket (`BLOB_STORE_S3_BUCKET`). For the bundled MinIO that is the `infra_veyq-minio` volume; for an external S3 use the provider's backup/replication.
 - `infra_traefik-letsencrypt`: ACME certificates and account state.
 
 Example backup commands from the `infra/` directory:
@@ -370,10 +352,11 @@ Example backup commands from the `infra/` directory:
 ```bash
 cp .env "veyq-env-$(date -u +%Y%m%dT%H%M%SZ)"
 docker compose exec veyq-db mariadb-dump -u root -p"${DB_ROOT_PASSWORD}" "${DB_NAME:-veyq}" > veyq-db.sql
-docker run --rm -v infra_veyq-media:/data -v "$PWD":/backup alpine tar czf /backup/veyq-media.tgz -C /data .
+# media: back up the S3 bucket. Bundled MinIO → tar its volume; external S3 → use the provider's backup.
+docker run --rm -v infra_veyq-minio:/data -v "$PWD":/backup alpine tar czf /backup/veyq-media.tgz -C /data .
 ```
 
-For `cifs-volume`, replace `infra_veyq-media` with `infra_veyq-media-cifs`. For `host-path`, mount the configured host path instead, for example `-v /mnt/veyq-media:/data:ro`.
+For an external S3, back up the bucket with the provider's tooling (e.g. `mc mirror`, versioning or replication) instead of the local volume tar above.
 
 The helper script writes all three backup artifacts together:
 
@@ -478,7 +461,7 @@ When enabled, the reset service:
 Reset behavior:
 
 - Truncates all veyq database tables except `flyway_schema_history`.
-- Deletes all entries below `MEDIA_STORAGE_DIR`, default `/data/veyq-media`.
+- Empties the S3 blob bucket (`BLOB_STORE_S3_BUCKET`) — every object is ciphertext, so this is the media wipe.
 - Restarts `RESET_RESTART_CONTAINER`.
 - Keeps database schema, Docker volumes and Flyway migration history.
 - Returns the app to the initial setup flow.

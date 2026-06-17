@@ -16,6 +16,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,10 +25,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,8 +47,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,8 +72,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import app.veyq.crypto.Browse
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
+import app.veyq.crypto.MemoryTree
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.DisposableEffect
 import app.veyq.crypto.Journal
@@ -99,7 +106,7 @@ class GalleryController(
 ) {
     // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
     // an explicit download. Both refs fall back to the original for media without that derivative.
-    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?, val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String)
+    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?, val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String, val highlighted: Boolean)
 
     /** A short label for live-presence (the session carries no display name yet — use the email local-part). */
     val displayName: String get() = session.email.substringBefore("@")
@@ -167,6 +174,53 @@ class GalleryController(
 
     suspend fun setCover(mediaId: String) {
         runCatching { withContext(Dispatchers.IO) { Curate.setCover(apiBase, session, scopeId, nodeId, mediaId) } }
+    }
+
+    /** Toggle a medium's highlight flag (server-visible benign metadata) and patch the local tile in place. */
+    suspend fun toggleHighlight(tile: Tile) {
+        val next = !tile.highlighted
+        runCatching { withContext(Dispatchers.IO) { Media.updateMedia(apiBase, session, scopeId, nodeId, tile.id, highlighted = next) } }
+            .onSuccess { tiles = tiles.map { if (it.id == tile.id) it.copy(highlighted = next) else it } }
+    }
+
+    /** Re-seal a medium's capture date (keeping its location) and patch sealedMeta, then reload to re-sort. */
+    suspend fun updateTakenAt(tile: Tile, iso: String) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val sealed = Media.sealMediaMeta(contentKey, iso, tile.lat, tile.lng)
+                Media.updateMedia(apiBase, session, scopeId, nodeId, tile.id, sealedMeta = sealed)
+            }
+        }.onSuccess { load() }
+    }
+
+    /** Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info. */
+    data class Child(val id: String, val type: String, val name: String, val cover: ImageBitmap?)
+    var children by mutableStateOf<List<Child>>(emptyList())
+    private var childrenLoaded = false
+    val chapterCount: Int get() = children.count { it.type == "CHAPTER" }
+
+    suspend fun loadChildren() {
+        if (childrenLoaded) return
+        childrenLoaded = true
+        runCatching {
+            withContext(Dispatchers.IO) {
+                Browse.listChildren(apiBase, session, scopeId, nodeId).map { node ->
+                    val id = node.getString("id")
+                    val type = node.getString("type")
+                    val nm = runCatching { MemoryTree.decodeNodeName(contentKey, node) }.getOrDefault("—")
+                    val cover = runCatching { childCover(id, node.optString("coverMediaId", null)) }.getOrNull()
+                    Child(id, type, nm, cover)
+                }
+            }
+        }.onSuccess { children = it }
+    }
+
+    private fun childCover(childNodeId: String, coverMediaId: String?): ImageBitmap? {
+        val media = runCatching { Media.listMedia(apiBase, session, scopeId, childNodeId) }.getOrNull() ?: return null
+        val chosen = (coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } }) ?: media.firstOrNull() ?: return null
+        val ref = derivativeRef(chosen, "THUMBNAIL")
+        val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, ref) }.getOrNull() ?: return null
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
     }
 
     /** Mint a public share link for this memory (origin = the instance serving the web viewer). */
@@ -244,7 +298,7 @@ class GalleryController(
                                 val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, derivativeRef(m, "THUMBNAIL")) }.getOrNull() ?: return@async null
                                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@async null
                                 Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()),
-                                    meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"))
+                                    meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"), m.optBoolean("highlighted", false))
                             }
                         }
                     }.awaitAll().filterNotNull()
@@ -282,9 +336,13 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var savingOriginal by remember { mutableStateOf(false) }
     var showShareRole by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
+    var showHighlightsOnly by remember { mutableStateOf(false) }
+    var lightboxInfo by remember { mutableStateOf(false) }
+    var editingDate by remember { mutableStateOf(false) }
+    var childNav by remember { mutableStateOf<GalleryController.Child?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { controller.load() }
+    LaunchedEffect(Unit) { controller.load(); controller.loadChildren() }
     // When the lightbox opens on a tile, show its thumbnail instantly then swap in the higher-res preview.
     LaunchedEffect(lightboxTile?.id) {
         lightboxPreview = null
@@ -354,6 +412,13 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         }
     }
 
+    // Navigate into a child chapter/folder/memory by recursively rendering its own gallery screen.
+    childNav?.let { child ->
+        GalleryScreen(apiBase, session, scopeId, contentKey, child.id, child.name, onBack = { childNav = null })
+        return
+    }
+    fun onOpenChild(child: GalleryController.Child) { childNav = child }
+
     Scaffold(
         containerColor = Veyq.Bg,
         topBar = {
@@ -374,13 +439,21 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Cover hero: the first (earliest) photo, like the web detail header.
+            controller.tiles.firstOrNull()?.let { hero ->
+                Image(hero.image, null, modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
-                TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
                 TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
+                TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+                TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
             }
-            if (tab == 1) {
-                JournalTab(controller, scope)
+            if (tab == 3) {
+                LaunchedEffect(Unit) { controller.loadTracks(); controller.loadChildren() }
+                InfoTab(controller)
+            } else if (tab == 1) {
+                JournalTab(controller, scope) { tile -> lightboxTile = tile }
             } else if (tab == 2) {
                 LaunchedEffect(Unit) { controller.loadTracks() }
                 val points = controller.tiles.mapNotNull { t -> if (t.lat != null && t.lng != null) Triple(t.id, t.lat, t.lng) else null }
@@ -393,23 +466,36 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 else MemoryMap(points, controller.tracks) { id -> controller.tiles.firstOrNull { it.id == id }?.let { lightboxTile = it } }
                 controller.tracks.forEach { tr ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🛤 ${tr.name}", color = Veyq.Text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Box(Modifier.weight(1f)) { TrackStatsRow(tr) }
                         TextButton(onClick = { val id = tr.id; scope.launch { controller.deleteTrack(id) } }) { Text(L10n.t("track.delete"), color = Color(0xFFF87171)) }
                     }
                 }
             } else {
-                Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
+                val displayTiles = if (showHighlightsOnly) controller.tiles.filter { it.highlighted } else controller.tiles
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${displayTiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    if (controller.tiles.any { it.highlighted }) {
+                        TextButton(onClick = { showHighlightsOnly = !showHighlightsOnly }) {
+                            Text((if (showHighlightsOnly) "★ " else "☆ ") + L10n.t("detail.highlights"), color = if (showHighlightsOnly) Veyq.Accent else Veyq.Muted, fontSize = 13.sp)
+                        }
+                    }
+                }
+                if (controller.children.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        controller.children.forEach { child -> ChildCard(child) { onOpenChild(child) } }
+                    }
+                }
                 when {
                     controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
                     controller.loadFailed -> {
                         Text(L10n.t("detail.loadFailed"), color = Veyq.Muted, fontSize = 14.sp)
                         TextButton(onClick = { scope.launch { controller.loading = true; controller.load() } }) { Text(L10n.t("common.retry"), color = Veyq.Accent) }
                     }
-                    controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
+                    displayTiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
                     else -> {
-                        val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
+                        val range = DateBuckets.dateRange(displayTiles) { it.takenAt }
                         if (range.isNotEmpty()) Text(range, color = Veyq.Muted, fontSize = 13.sp)
-                        DateBuckets.groupByDay(controller.tiles) { it.takenAt }.forEach { (key, items) ->
+                        DateBuckets.groupByDay(displayTiles) { it.takenAt }.forEach { (key, items) ->
                             Text(DateBuckets.dayLabel(key), color = Veyq.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             Gallery(items) { lightboxTile = it }
                         }
@@ -419,11 +505,29 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
         }
     }
 
-    lightboxTile?.let { tile ->
+    lightboxTile?.let { opened ->
+        // Re-derive the live tile from the (observable) list so the favourite star updates after a toggle.
+        val tile = controller.tiles.firstOrNull { it.id == opened.id } ?: opened
+        val idx = controller.tiles.indexOfFirst { it.id == tile.id }
+        fun goto(i: Int) { if (i in controller.tiles.indices) { lightboxTile = controller.tiles[i]; lightboxInfo = false; editingDate = false; mediaDelArm = false } }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Image(lightboxPreview ?: tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(16.dp)) {
+                Box(Modifier.fillMaxWidth()) {
+                    Image(lightboxPreview ?: tile.image, null, modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                    if (idx > 0) TextButton(onClick = { goto(idx - 1) }, modifier = Modifier.align(Alignment.CenterStart)) { Text("‹", color = Color.White, fontSize = 34.sp) }
+                    if (idx < controller.tiles.size - 1) TextButton(onClick = { goto(idx + 1) }, modifier = Modifier.align(Alignment.CenterEnd)) { Text("›", color = Color.White, fontSize = 34.sp) }
+                }
+                if (lightboxInfo) {
+                    Column(Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        InfoLine(L10n.t("info.takenAt"), DateBuckets.dayLabel(tile.takenAt.take(10)))
+                        InfoLine(L10n.t("info.type"), tile.mimeType)
+                        if (tile.lat != null && tile.lng != null) InfoLine(L10n.t("info.location"), String.format(java.util.Locale.US, "%.5f, %.5f", tile.lat, tile.lng))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(onClick = { scope.launch { controller.toggleHighlight(tile) } }) { Text(if (tile.highlighted) "★" else "☆", color = if (tile.highlighted) Veyq.Accent else Color.White, fontSize = 18.sp) }
+                    TextButton(onClick = { lightboxInfo = !lightboxInfo }) { Text("ⓘ", color = Color.White, fontSize = 18.sp) }
+                    TextButton(onClick = { editingDate = true }) { Text("📅", fontSize = 16.sp) }
                     TextButton(onClick = { val id = tile.id; lightboxTile = null; scope.launch { controller.setCover(id) } }) { Text(L10n.t("cover.setAsCover"), color = Veyq.Accent) }
                     TextButton(enabled = !savingOriginal, onClick = { saveOriginal(tile) }) { Text(L10n.t("detail.download"), color = Color.White) }
                     if (!mediaDelArm) {
@@ -431,8 +535,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                     } else {
                         TextButton(onClick = { val id = tile.id; lightboxTile = null; mediaDelArm = false; scope.launch { controller.deleteMedia(id) } }) { Text(L10n.t("delete.confirm"), color = Veyq.Danger) }
                     }
-                    TextButton(onClick = { lightboxTile = null; mediaDelArm = false }) { Text(L10n.t("common.close"), color = Color.White) }
+                    TextButton(onClick = { lightboxTile = null; mediaDelArm = false; lightboxInfo = false }) { Text(L10n.t("common.close"), color = Color.White) }
                 }
+            }
+        }
+        if (editingDate) {
+            DateEditDialog(tile.takenAt, onDismiss = { editingDate = false }) { iso ->
+                editingDate = false
+                scope.launch { controller.updateTakenAt(tile, iso) }
             }
         }
     }
@@ -563,13 +673,23 @@ private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List
                 setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
                 val geo = mutableListOf<org.osmdroid.util.GeoPoint>()
-                tracks.forEach { t ->
+                // A small palette so multiple tracks are visually distinguishable (mirrors web TRACK_COLORS).
+                val trackColors = longArrayOf(0xFF9B8CFF, 0xFF34C796, 0xFFF7944A, 0xFF66AAFA, 0xFFF073A3, 0xFFD9C746)
+                tracks.forEachIndexed { i, t ->
                     val line = t.points.map { org.osmdroid.util.GeoPoint(it.lat, it.lng) }
                     if (line.size > 1) {
                         val poly = org.osmdroid.views.overlay.Polyline().apply {
-                            setPoints(line); title = t.name; outlinePaint.color = 0xFF9B8CFF.toInt(); outlinePaint.strokeWidth = 8f
+                            setPoints(line); title = t.name; outlinePaint.color = trackColors[i % trackColors.size].toInt(); outlinePaint.strokeWidth = 8f
                         }
                         overlays.add(poly)
+                        // Start (green) and end (red) endpoint dots per track, like the web map.
+                        fun endpoint(p: org.osmdroid.util.GeoPoint, argb: Int) {
+                            overlays.add(org.osmdroid.views.overlay.Polyline().apply {
+                                setPoints(listOf(p, p)); outlinePaint.color = argb; outlinePaint.strokeWidth = 18f; outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                            })
+                        }
+                        endpoint(line.first(), 0xFF2ECC71.toInt())
+                        endpoint(line.last(), 0xFFE74C3C.toInt())
                     }
                     geo.addAll(line)
                 }
@@ -605,43 +725,76 @@ private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope) {
+private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope, onOpenMedia: (GalleryController.Tile) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     var live by remember { mutableStateOf(false) }
-    var draft by remember { mutableStateOf("") }
+    val blocks = remember { mutableStateListOf<EditBlock>() }
     LaunchedEffect(Unit) { controller.loadJournal() }
+    // Track embeds in the journal need the tracks loaded to draw their inline map.
+    LaunchedEffect(controller.journalMarkdown) {
+        if (JournalEmbedParser.splitBlocks(controller.journalMarkdown).any { it is JournalContentBlock.Embed && it.embed.kind == JournalEmbedKind.TRACK }) controller.loadTracks()
+    }
 
     if (live) {
         // The live section persists via the CRDT store (compaction on close); just reflect the text + exit.
         LiveJournalSection(controller) { md -> controller.journalMarkdown = md; live = false }
     } else if (editing) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            placeholder = { Text(L10n.t("journal.placeholder"), color = Veyq.Muted) },
-            modifier = Modifier.fillMaxWidth().height(280.dp),
-            shape = RoundedCornerShape(Veyq.Radius),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
-                focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
-                focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
-            ),
-        )
+        JournalBlockEditor(controller, blocks, scope)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { editing = false }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) }
-            TextButton(onClick = { val md = draft; scope.launch { controller.saveJournal(md); editing = false } }, enabled = !controller.journalSaving) {
+            TextButton(onClick = { val md = journalMarkdownFrom(blocks); scope.launch { controller.saveJournal(md); editing = false } }, enabled = !controller.journalSaving) {
                 Text(if (controller.journalSaving) L10n.t("journal.saving") else L10n.t("journal.save"), color = Veyq.Accent)
             }
         }
     } else {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { live = true }) { Text(L10n.t("journal.live"), color = Veyq.Accent) }
-            TextButton(onClick = { draft = controller.journalMarkdown; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
+            TextButton(onClick = { blocks.clear(); blocks.addAll(journalEditBlocks(controller.journalMarkdown)); scope.launch { controller.loadTracks() }; editing = true }) { Text(L10n.t("journal.edit"), color = Veyq.Accent) }
         }
         if (controller.journalMarkdown.isBlank()) {
             Text(L10n.t("journal.empty"), color = Veyq.Muted, fontSize = 14.sp)
         } else {
-            MarkdownText(controller.journalMarkdown)
+            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, onOpenMedia)
+        }
+    }
+}
+
+/** Read-only journal renderer with rich embeds (matches web/iOS): Markdown text interleaved with ::media
+ *  (thumbnail / horizontal carousel → lightbox) and ::track (inline map). ::chapter renders as a simple chip. */
+@Composable
+private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, tracks: List<Track.TrackItem>, onOpenMedia: (GalleryController.Tile) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        JournalEmbedParser.splitBlocks(markdown).forEach { block ->
+            when (block) {
+                is JournalContentBlock.Markdown -> if (block.text.isNotBlank()) MarkdownText(block.text)
+                is JournalContentBlock.Embed -> {
+                    val e = block.embed
+                    when (e.kind) {
+                        JournalEmbedKind.MEDIA -> {
+                            val items = e.ids.mapNotNull { id -> tiles.firstOrNull { it.id == id } }
+                            if (items.isEmpty()) Text(L10n.t("journal.embedMissing"), color = Veyq.Muted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            else if (items.size == 1) Image(items[0].image, null, modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(RoundedCornerShape(10.dp)).clickable { onOpenMedia(items[0]) }, contentScale = ContentScale.Fit)
+                            else Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items.forEach { tile -> Image(tile.image, null, modifier = Modifier.height(180.dp).clip(RoundedCornerShape(8.dp)).clickable { onOpenMedia(tile) }, contentScale = ContentScale.Fit) }
+                            }
+                            e.label?.let { Text(it, color = Veyq.Muted, fontSize = 12.sp) }
+                        }
+                        JournalEmbedKind.TRACK -> {
+                            val routes = tracks.filter { e.ids.contains(it.id) }
+                            if (routes.isEmpty()) Text(L10n.t("journal.embedMissing"), color = Veyq.Muted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            else {
+                                MemoryMap(emptyList(), routes) {}
+                                routes.forEach { TrackStatsRow(it) }
+                            }
+                            e.label?.let { Text(it, color = Veyq.Muted, fontSize = 12.sp) }
+                        }
+                        JournalEmbedKind.CHAPTER -> Row(
+                            Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) { Text("🗂"); Text(e.label ?: e.ids.firstOrNull() ?: "", color = Veyq.Text) }
+                    }
+                }
+            }
         }
     }
 }
@@ -764,6 +917,239 @@ private fun MarkdownText(markdown: String) {
     }
 }
 
+// ---- block-based journal editor (mobile parity with iOS) ----------------------------------------------------
+// The journal is a vertical list of editable text blocks interleaved with embed CHIPS. Tapping a chip opens a
+// picker to re-select or delete it; the embed buttons append a new embed. Embeds sit on their own line, so the
+// Markdown round-trips with the web format. Android authors ::media / ::track (legacy had no ::chapter).
+
+data class EmbedData(val kind: JournalEmbedKind, val ids: List<String>, val label: String?)
+
+class EditBlock(initialText: String = "", val embed: EmbedData? = null) {
+    val id: String = java.util.UUID.randomUUID().toString()
+    var text by mutableStateOf(initialText)
+}
+
+fun journalEditBlocks(markdown: String): List<EditBlock> {
+    val list = JournalEmbedParser.splitBlocks(markdown).mapNotNull { b ->
+        when (b) {
+            is JournalContentBlock.Markdown -> b.text.trim().ifEmpty { null }?.let { EditBlock(initialText = it) }
+            is JournalContentBlock.Embed -> EditBlock(embed = EmbedData(b.embed.kind, b.embed.ids, b.embed.label))
+        }
+    }.toMutableList()
+    if (list.isEmpty() || list.last().embed != null) list.add(EditBlock(initialText = ""))
+    return list
+}
+
+fun journalMarkdownFrom(blocks: List<EditBlock>): String =
+    blocks.mapNotNull { b ->
+        if (b.embed != null) JournalEmbedParser.embedMarkdown(b.embed.kind, b.embed.ids, b.embed.label)
+        else b.text.trim().ifEmpty { null }
+    }.joinToString("\n\n")
+
+private sealed interface PickerState {
+    data class Insert(val kind: JournalEmbedKind) : PickerState
+    data class Edit(val index: Int) : PickerState
+}
+private data class PickerResult(val ids: List<String>, val label: String?, val delete: Boolean = false)
+
+private fun chipLabel(e: EmbedData, controller: GalleryController): String {
+    if (!e.label.isNullOrEmpty()) return e.label
+    return when (e.kind) {
+        JournalEmbedKind.MEDIA -> "${e.ids.size} ${L10n.t("detail.media")}"
+        JournalEmbedKind.TRACK -> controller.tracks.firstOrNull { it.id == e.ids.firstOrNull() }?.name ?: "${e.ids.size}"
+        JournalEmbedKind.CHAPTER -> e.ids.firstOrNull() ?: ""
+    }
+}
+
+@Composable
+private fun JournalBlockEditor(controller: GalleryController, blocks: SnapshotStateList<EditBlock>, scope: kotlinx.coroutines.CoroutineScope) {
+    var picker by remember { mutableStateOf<PickerState?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { picker = PickerState.Insert(JournalEmbedKind.MEDIA) }) { Text("🖼 ${L10n.t("journal.embedKind.media")}", color = Veyq.Accent) }
+            TextButton(onClick = { scope.launch { controller.loadTracks() }; picker = PickerState.Insert(JournalEmbedKind.TRACK) }) { Text("🛤 ${L10n.t("journal.embedKind.track")}", color = Veyq.Accent) }
+        }
+        blocks.forEachIndexed { idx, block ->
+            val e = block.embed
+            if (e != null) {
+                Row(
+                    Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape).clickable { picker = PickerState.Edit(idx) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(if (e.kind == JournalEmbedKind.MEDIA) "🖼" else if (e.kind == JournalEmbedKind.TRACK) "🛤" else "🗂")
+                    Text(chipLabel(e, controller), color = Veyq.Text)
+                    Text("✎", color = Veyq.Muted, fontSize = 12.sp)
+                }
+            } else {
+                OutlinedTextField(
+                    value = block.text, onValueChange = { block.text = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp), shape = RoundedCornerShape(Veyq.Radius),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Veyq.Surface, unfocusedContainerColor = Veyq.Surface,
+                        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                    ),
+                )
+            }
+        }
+    }
+    picker?.let { st ->
+        val kind = when (st) { is PickerState.Insert -> st.kind; is PickerState.Edit -> blocks[st.index].embed!!.kind }
+        val initial = (st as? PickerState.Edit)?.let { blocks[it.index].embed }
+        EmbedPickerDialog(kind, controller, initial, onDismiss = { picker = null }) { result ->
+            when (st) {
+                is PickerState.Insert -> if (result != null && !result.delete && result.ids.isNotEmpty()) {
+                    blocks.add(EditBlock(embed = EmbedData(kind, result.ids, result.label)))
+                    blocks.add(EditBlock(initialText = ""))
+                }
+                is PickerState.Edit -> if (result != null) {
+                    if (result.delete || result.ids.isEmpty()) blocks.removeAt(st.index)
+                    else blocks[st.index] = EditBlock(embed = EmbedData(kind, result.ids, result.label))
+                }
+            }
+            picker = null
+        }
+    }
+}
+
+@Composable
+private fun EmbedPickerDialog(kind: JournalEmbedKind, controller: GalleryController, initial: EmbedData?, onDismiss: () -> Unit, onResult: (PickerResult?) -> Unit) {
+    var selected by remember { mutableStateOf(initial?.ids ?: emptyList()) }
+    var label by remember { mutableStateOf(initial?.label ?: "") }
+    LaunchedEffect(Unit) { if (kind == JournalEmbedKind.TRACK) controller.loadTracks() }
+    fun toggle(id: String) { selected = if (selected.contains(id)) selected - id else selected + id }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Veyq.Surface,
+        title = { Text(if (kind == JournalEmbedKind.MEDIA) L10n.t("journal.mediaPickerTitle") else L10n.t("journal.trackPickerTitle"), color = Veyq.Text) },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = label, onValueChange = { label = it }, modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(if (kind == JournalEmbedKind.MEDIA) L10n.t("journal.caption") else L10n.t("journal.label"), color = Veyq.Muted) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+                        focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                        focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                    ),
+                )
+                if (kind == JournalEmbedKind.MEDIA) {
+                    if (controller.tiles.isEmpty()) Text(L10n.t("journal.mediaPickerEmpty"), color = Veyq.Muted, fontSize = 13.sp)
+                    else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        controller.tiles.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { tile ->
+                                    Box(
+                                        Modifier.size(92.dp).clip(RoundedCornerShape(8.dp)).clickable { toggle(tile.id) }
+                                            .border(3.dp, if (selected.contains(tile.id)) Veyq.Accent else Color.Transparent, RoundedCornerShape(8.dp)),
+                                    ) { Image(tile.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if (controller.tracks.isEmpty()) Text(L10n.t("journal.pickerEmpty"), color = Veyq.Muted, fontSize = 13.sp)
+                    else Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        controller.tracks.forEach { tr ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { toggle(tr.id) }.background(Veyq.Bg).padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("🛤 ${tr.name}", color = Veyq.Text, modifier = Modifier.weight(1f))
+                                if (selected.contains(tr.id)) Text("✓", color = Veyq.Accent)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(enabled = selected.isNotEmpty(), onClick = { onResult(PickerResult(selected, label.ifEmpty { null })) }) { Text(L10n.t("journal.insert"), color = Veyq.Accent) } },
+        dismissButton = {
+            Row {
+                if (initial != null) TextButton(onClick = { onResult(PickerResult(emptyList(), null, delete = true)) }) { Text(L10n.t("common.delete"), color = Veyq.Danger) }
+                TextButton(onClick = { onResult(null) }) { Text(L10n.t("common.cancel"), color = Veyq.Muted) }
+            }
+        },
+    )
+}
+
+/** One track's derived statistics line: name + distance, duration (when present), elevation (when present).
+ *  Computed client-side from the route points (the operator-blind server never sees them). */
+@Composable
+private fun TrackStatsRow(route: Track.TrackItem) {
+    val stats = remember(route.id) { Track.stats(route.points) }
+    val ele = Track.formatElevation(stats)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("🛤 ${route.name}", color = Veyq.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(Track.formatDistance(stats.distanceM), color = Veyq.Muted, fontSize = 13.sp)
+        stats.durationS?.let { Text(Track.formatDuration(it), color = Veyq.Muted, fontSize = 13.sp) }
+        if (ele.isNotEmpty()) Text(ele, color = Veyq.Muted, fontSize = 13.sp)
+    }
+}
+
+/** The Info tab: media count, date range, track count, chapter count (matches web/iOS). */
+@Composable
+private fun InfoTab(controller: GalleryController) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Veyq.Radius)).background(Veyq.Surface)) {
+        InfoTabRow(L10n.t("detail.gallery"), "${controller.tiles.size}")
+        val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }
+        if (range.isNotEmpty()) InfoTabRow(L10n.t("info.dateRange"), range)
+        InfoTabRow(L10n.t("detail.map"), "${controller.tracks.size}")
+        InfoTabRow(L10n.t("info.chapters"), "${controller.chapterCount}")
+    }
+}
+
+@Composable
+private fun InfoTabRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Veyq.Muted, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Veyq.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun InfoLine(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        Text(value, color = Color.White, fontSize = 13.sp)
+    }
+}
+
+/** A child chapter/folder/memory shown as a tappable cover card (cover thumbnail or an emoji fallback). */
+@Composable
+private fun ChildCard(child: GalleryController.Child, onClick: () -> Unit) {
+    Column(Modifier.width(132.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(132.dp, 92.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Surface), contentAlignment = Alignment.Center) {
+            if (child.cover != null) Image(child.cover, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else Text(if (child.type == "CHAPTER") "📖" else if (child.type == "FOLDER") "🗂" else "🖼", fontSize = 28.sp)
+        }
+        Text(child.name, color = Veyq.Text, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+/** A capture-date editor: pick a new date, keeping the original time-of-day; re-seals sealedMeta on confirm. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateEditDialog(currentIso: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    val origMillis = runCatching { java.time.Instant.parse(currentIso).toEpochMilli() }.getOrDefault(System.currentTimeMillis())
+    val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = origMillis)
+    androidx.compose.material3.DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                val sel = state.selectedDateMillis
+                if (sel != null) {
+                    val orig = java.time.Instant.ofEpochMilli(origMillis).atZone(java.time.ZoneOffset.UTC)
+                    val chosen = java.time.Instant.ofEpochMilli(sel).atZone(java.time.ZoneOffset.UTC)
+                    val merged = orig.withYear(chosen.year).withDayOfYear(chosen.dayOfYear).toInstant()
+                    onConfirm(merged.toString())
+                } else onDismiss()
+            }) { Text(L10n.t("journal.save"), color = Veyq.Accent) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+    ) { androidx.compose.material3.DatePicker(state = state) }
+}
+
 @Composable
 private fun Gallery(tiles: List<GalleryController.Tile>, onTap: (GalleryController.Tile) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -774,16 +1160,19 @@ private fun Gallery(tiles: List<GalleryController.Tile>, onTap: (GalleryControll
         Box(Modifier.fillMaxWidth().height(height.dp)) {
             laid.forEach { t ->
                 tiles.firstOrNull { it.id == t.id }?.let { tile ->
-                    Image(
-                        tile.image,
-                        null,
-                        modifier = Modifier
-                            .offset(t.left.dp, t.top.dp)
-                            .size(t.width.dp, t.height.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onTap(tile) },
-                        contentScale = ContentScale.Crop,
-                    )
+                    Box(Modifier.offset(t.left.dp, t.top.dp).size(t.width.dp, t.height.dp)) {
+                        Image(
+                            tile.image,
+                            null,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)).clickable { onTap(tile) },
+                            contentScale = ContentScale.Crop,
+                        )
+                        if (tile.highlighted) {
+                            Box(Modifier.align(Alignment.TopEnd).padding(4.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(3.dp)) {
+                                Text("★", color = Color(0xFFFFD23F), fontSize = 11.sp)
+                            }
+                        }
+                    }
                 }
             }
         }

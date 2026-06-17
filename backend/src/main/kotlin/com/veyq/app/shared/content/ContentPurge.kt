@@ -9,8 +9,9 @@ import jakarta.enterprise.context.ApplicationScoped
  * hangs off it — media + derivatives, journal, tracks, shares — so no orphan ciphertext rows are left behind.
  * The server only ever drops opaque rows; it never reads plaintext. Shared by node-delete and group-delete.
  *
- * Note: blob rows (deduplicated content) and their stored chunks are intentionally left in place for now —
- * they are reference-counted ciphertext and need a separate garbage-collection pass to remove safely.
+ * Note: blob rows (deduplicated content) + their stored frames are NOT deleted here — they are dedup'd
+ * ciphertext that other media may still reference. Removing a node/scope only drops the references; the
+ * unreferenced blobs are reclaimed by BlobUploadGc.purgeUnreferencedBlobs (ADR 0007), grace-gated by TTL.
  */
 @ApplicationScoped
 class ContentPurge(

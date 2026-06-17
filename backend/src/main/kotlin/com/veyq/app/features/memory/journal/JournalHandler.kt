@@ -41,6 +41,7 @@ class JournalHandler(
     private val updates: MemoryJournalUpdateRepository,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val content: com.veyq.app.shared.config.ContentConfig,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -97,7 +98,7 @@ class JournalHandler(
         updates.persist(
             MemoryJournalUpdate().apply {
                 id = UUID.randomUUID().toString(); this.nodeId = nodeId; this.scopeId = scopeId
-                this.seq = seq; suiteId = req.sealedUpdate.suiteId; sealedUpdate = dec.decode(req.sealedUpdate.bytes)
+                this.seq = seq; suiteId = req.sealedUpdate.suiteId; sealedUpdate = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedUpdate.bytes, content.maxSealedBytes(), dec)
                 authorId = userId; createdAt = Instant.now()
             },
         )
@@ -117,9 +118,9 @@ class JournalHandler(
         // snapshot has no gaps. The server only bounds coveredSeq to a real seq (a too-high value is a client bug).
         if (req.coveredSeq > journal.nextSeq) throw ApiException(400, "BAD_SEQ", "coveredSeq exceeds the latest update")
         journal.suiteId = req.markdown.suiteId
-        journal.sealedContent = dec.decode(req.markdown.bytes)
+        journal.sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.markdown.bytes, content.maxSealedBytes(), dec)
         journal.snapshotSuiteId = req.snapshot.suiteId
-        journal.sealedSnapshot = dec.decode(req.snapshot.bytes)
+        journal.sealedSnapshot = com.veyq.app.shared.content.SealedContent.decodeCapped(req.snapshot.bytes, content.maxSealedBytes(), dec)
         journal.baseSeq = req.coveredSeq
         journal.updatedAt = Instant.now()
         updates.deleteUpToSeq(nodeId, req.coveredSeq)

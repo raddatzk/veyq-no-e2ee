@@ -4,12 +4,80 @@ import Foundation
 /// key (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only;
 /// we seal before POST and open after GET. Route location data never leaves the client in the clear.
 public enum Track {
-    public struct Point: Codable, Sendable { public let lat, lng: Double; public init(lat: Double, lng: Double) { self.lat = lat; self.lng = lng } }
+    public struct Point: Codable, Sendable {
+        public let lat, lng: Double
+        public let ele: Double?
+        public let time: String?
+        public init(lat: Double, lng: Double, ele: Double? = nil, time: String? = nil) { self.lat = lat; self.lng = lng; self.ele = ele; self.time = time }
+    }
     public struct Route: Codable, Sendable {
         public let name: String; public let points: [Point]
         public init(name: String, points: [Point]) { self.name = name; self.points = points }
     }
     public struct TrackItem: Identifiable, Sendable { public let id: String; public let name: String; public let points: [Point] }
+
+    /// Track statistics derived from a route's points: distance always; ascent/descent when elevations are
+    /// present; duration when timestamps are present. Missing fields → that stat is omitted, never wrong.
+    /// Mirrored on web/Android.
+    public struct Stats: Sendable {
+        public let distanceM: Double
+        public let ascentM: Double?
+        public let descentM: Double?
+        public let durationS: Int?
+    }
+
+    private static let earthRadiusM = 6_371_000.0
+
+    private static func haversine(_ a: Point, _ b: Point) -> Double {
+        let toRad = { (d: Double) in d * Double.pi / 180 }
+        let dLat = toRad(b.lat - a.lat)
+        let dLng = toRad(b.lng - a.lng)
+        let h = pow(sin(dLat / 2), 2) + cos(toRad(a.lat)) * cos(toRad(b.lat)) * pow(sin(dLng / 2), 2)
+        return 2 * earthRadiusM * asin(min(1, sqrt(h)))
+    }
+
+    public static func stats(_ points: [Point]) -> Stats {
+        var distanceM = 0.0, ascentM = 0.0, descentM = 0.0, haveEle = false
+        for i in 1..<max(points.count, 1) {
+            distanceM += haversine(points[i - 1], points[i])
+            if let a = points[i - 1].ele, let b = points[i].ele {
+                haveEle = true
+                let d = b - a
+                if d > 0 { ascentM += d } else { descentM -= d }
+            }
+        }
+        let times = points.compactMap { $0.time }
+        var durationS: Int? = nil
+        if let first = times.first, let last = times.last, let start = parseIso(first), let end = parseIso(last), end > start {
+            durationS = Int((end.timeIntervalSince1970 - start.timeIntervalSince1970).rounded())
+        }
+        return Stats(distanceM: distanceM, ascentM: haveEle ? ascentM : nil, descentM: haveEle ? descentM : nil, durationS: durationS)
+    }
+
+    private static func parseIso(_ s: String) -> Date? {
+        let withFrac = ISO8601DateFormatter()
+        withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return withFrac.date(from: s) ?? ISO8601DateFormatter().date(from: s)
+    }
+
+    /// "850 m" under 1 km, otherwise "12.3 km".
+    public static func formatDistance(_ meters: Double) -> String {
+        meters < 1000 ? "\(Int(meters.rounded())) m" : String(format: "%.1f km", meters / 1000)
+    }
+
+    /// "1 h 23 min" / "23 min" / "45 s".
+    public static func formatDuration(_ seconds: Int) -> String {
+        let h = seconds / 3600, m = (seconds % 3600) / 60
+        if h > 0 { return "\(h) h \(m) min" }
+        if m > 0 { return "\(m) min" }
+        return "\(seconds) s"
+    }
+
+    /// "↑120 m ↓95 m" (rounded), or empty when no elevation data.
+    public static func formatElevation(_ s: Stats) -> String {
+        guard let ascent = s.ascentM else { return "" }
+        return "↑\(Int(ascent.rounded())) m ↓\(Int((s.descentM ?? 0).rounded())) m"
+    }
 
     private struct Blob: Codable { let suiteId, bytes: String }
     private struct TrackDTO: Decodable { let id: String; let sealedContent: Blob }

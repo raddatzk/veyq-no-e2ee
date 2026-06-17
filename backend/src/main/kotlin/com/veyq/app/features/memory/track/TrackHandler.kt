@@ -30,6 +30,7 @@ class TrackHandler(
     private val tracks: MemoryTrackRepository,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
+    private val content: com.veyq.app.shared.config.ContentConfig,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -48,7 +49,7 @@ class TrackHandler(
         if (!suites.isKnown(req.sealedContent.suiteId)) throw ApiException(400, "UNKNOWN_SUITE", "Unknown crypto suite")
         val track = MemoryTrack().apply {
             id = UUID.randomUUID().toString(); this.nodeId = nodeId; this.scopeId = scopeId
-            suiteId = req.sealedContent.suiteId; sealedContent = dec.decode(req.sealedContent.bytes); createdAt = Instant.now()
+            suiteId = req.sealedContent.suiteId; sealedContent = com.veyq.app.shared.content.SealedContent.decodeCapped(req.sealedContent.bytes, content.maxSealedBytes(), dec); createdAt = Instant.now()
         }
         tracks.persist(track)
         return toApi(track)

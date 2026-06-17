@@ -5,6 +5,8 @@ import com.veyq.app.shared.content.Blob
 import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.Media
 import com.veyq.app.shared.content.MediaRepository
+import com.veyq.app.shared.content.MemoryTrack
+import com.veyq.app.shared.content.MemoryTrackRepository
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKey
@@ -39,6 +41,7 @@ class ShareSliceTest {
     @Inject lateinit var nodes: NodeRepository
     @Inject lateinit var blobs: BlobRepository
     @Inject lateinit var medias: MediaRepository
+    @Inject lateinit var tracks: MemoryTrackRepository
     @Inject lateinit var sessions: SessionService
 
     private lateinit var ownerToken: String
@@ -67,6 +70,8 @@ class ShareSliceTest {
             // a medium on the sibling memory (must NOT be reachable through the share)
             blobs.persist(Blob().apply { id = "shr-b2"; this.scopeId = this@ShareSliceTest.scopeId; dedupToken = "d2"; totalChunks = 1; byteSize = 9; suiteId = "v1"; createdAt = now })
             medias.persist(Media().apply { id = "shr-med2"; this.scopeId = this@ShareSliceTest.scopeId; nodeId = "shr-other"; originalBlobId = "shr-b2"; sealedMeta = "m".toByteArray(); suiteId = "v1"; mimeType = "image/png"; createdAt = now })
+            // a sealed track on the shared memory (must be readable by a guest) — none on the sibling
+            tracks.persist(MemoryTrack().apply { id = "shr-trk1"; nodeId = "shr-mem"; this.scopeId = this@ShareSliceTest.scopeId; suiteId = "v1"; sealedContent = "t".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("shr-owner")}"
         outsiderToken = "Bearer ${sessions.issue("shr-out")}"
@@ -118,6 +123,11 @@ class ShareSliceTest {
             .body("baseSeq", `is`(0)).body("updates.size()", `is`(0))
         // a node outside the shared subtree is 404 even for the live state
         given().get("/api/public/shares/$shareId/nodes/shr-other/journal/live").then().statusCode(404)
+
+        // a guest reads the shared memory's sealed tracks, gated to the subtree (sibling 404)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem/tracks").then().statusCode(200)
+            .body("tracks.size()", `is`(1)).body("tracks[0].id", `is`("shr-trk1"))
+        given().get("/api/public/shares/$shareId/nodes/shr-other/tracks").then().statusCode(404)
 
         // revoke; the share (and guest access) is gone
         given().header("Authorization", ownerToken).delete("/api/scopes/$scopeId/nodes/shr-mem/shares/$shareId").then().statusCode(204)
@@ -235,6 +245,7 @@ class ShareSliceTest {
         given().get("/api/public/shares/$shareId/nodes").then().statusCode(403).body("code", `is`("SHARE_NO_READ"))
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/media").then().statusCode(403)
         given().get("/api/public/shares/$shareId/nodes/shr-mem3/journal").then().statusCode(403)
+        given().get("/api/public/shares/$shareId/nodes/shr-mem3/tracks").then().statusCode(403)
 
         // but uploading a blob + attaching media works
         val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"up-1","totalChunks":1,"byteSize":6}""")

@@ -24,6 +24,7 @@
 
 package app.veyq.apimodels
 
+import app.veyq.apimodels.PresignedPut
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -36,6 +37,7 @@ import kotlinx.serialization.Contextual
  * @param totalChunks 
  * @param receivedChunks 
  * @param status 
+ * @param presignedPuts 
  */
 @Serializable
 
@@ -51,7 +53,10 @@ data class BlobUploadProgress (
     val receivedChunks: kotlin.collections.List<kotlin.Int>,
 
     @SerialName(value = "status")
-    val status: BlobUploadProgress.Status
+    val status: BlobUploadProgress.Status,
+
+    @SerialName(value = "presignedPuts")
+    val presignedPuts: kotlin.collections.List<PresignedPut>? = null
 
 ) {
 
