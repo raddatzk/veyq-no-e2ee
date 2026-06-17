@@ -6,6 +6,7 @@ import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
 import com.veyq.app.shared.security.TenantAdminGuard
+import com.veyq.app.shared.tenancy.GroupMembershipRepository
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.MembershipStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -23,6 +24,7 @@ class RemoveMemberHandler(
     private val memberships: MembershipRepository,
     private val scopes: ScopeRepository,
     private val grants: ScopeGrantRepository,
+    private val groupMembers: GroupMembershipRepository,
     private val sessions: SessionService,
     private val guard: TenantAdminGuard,
 ) {
@@ -37,6 +39,11 @@ class RemoveMemberHandler(
         scopes.findByTenantId(tenantId)?.let { scope ->
             grants.find(scope.id, userId)?.let { grants.delete(it) }
         }
+        // also strip GROUP access: drop every group-scope grant + GroupMembership this user holds in the tenant,
+        // so a removed member can't keep exercising GroupOwner powers (re-granting a group key to a confederate).
+        val groupScopeIds = scopes.listGroupsByTenantId(tenantId).map { it.id }
+        grants.deleteByUserIdAndScopeIds(userId, groupScopeIds)
+        groupMembers.deleteByUserIdAndScopeIds(userId, groupScopeIds)
         // instant token revocation
         sessions.invalidateAll(userId)
         // soft removal — rejoinable; content + attribution are preserved

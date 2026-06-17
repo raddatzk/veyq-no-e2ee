@@ -75,4 +75,8 @@ class ScopeGrantRepository : PanacheRepositoryBase<ScopeGrant, String> {
     fun listByUserId(userId: String): List<ScopeGrant> = list("userId", userId)
 
     fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
+
+    /** Drop a user's grants across the given scopes (used when removing a tenant member from its groups). */
+    fun deleteByUserIdAndScopeIds(userId: String, scopeIds: Collection<String>): Long =
+        if (scopeIds.isEmpty()) 0 else delete("userId = ?1 and scopeId in ?2", userId, scopeIds)
 }

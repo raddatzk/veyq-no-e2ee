@@ -37,4 +37,8 @@ class GroupMembershipRepository : PanacheRepositoryBase<GroupMembership, String>
     fun countOwners(scopeId: String): Long = count("scopeId = ?1 and role = ?2", scopeId, GroupRole.GroupOwner.name)
 
     fun deleteByScopeId(scopeId: String): Long = delete("scopeId", scopeId)
+
+    /** Drop a user's group memberships across the given group scopes (used when removing a tenant member). */
+    fun deleteByUserIdAndScopeIds(userId: String, scopeIds: Collection<String>): Long =
+        if (scopeIds.isEmpty()) 0 else delete("userId = ?1 and scopeId in ?2", userId, scopeIds)
 }

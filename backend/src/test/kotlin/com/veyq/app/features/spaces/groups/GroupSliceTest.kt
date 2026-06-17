@@ -9,7 +9,9 @@ import com.veyq.app.shared.keymgmt.ScopeGrant
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.GroupMembership
 import com.veyq.app.shared.tenancy.GroupMembershipRepository
+import com.veyq.app.shared.tenancy.GroupRole
 import com.veyq.app.shared.tenancy.Membership
 import com.veyq.app.shared.tenancy.MembershipRepository
 import com.veyq.app.shared.tenancy.Tenant
@@ -86,6 +88,46 @@ class GroupSliceTest {
     private fun setRole(scopeId: String, userId: String, role: String) =
         given().header("Authorization", ownerToken).contentType(ContentType.JSON).body("""{"role":"$role"}""")
             .patch("/api/tenants/$tenantId/groups/$scopeId/members/$userId").then()
+
+    @Test
+    fun removingTenantMemberStripsGroupAccessAndAdminPower() {
+        val scopeId = createGroup() // gsl-owner is the GroupOwner
+        addMember(ownerToken, scopeId, "gsl-member").statusCode(200)
+        setRole(scopeId, "gsl-member", "GroupOwner").statusCode(200) // gsl-member is now a GroupOwner too
+        QuarkusTransaction.requiringNew().run {
+            assertNotNull(grants.find(scopeId, "gsl-member"))
+            assertNotNull(groupMembers.find(scopeId, "gsl-member"))
+        }
+        try {
+            // the tenant Owner removes gsl-member from the tenant
+            given().header("Authorization", ownerToken).delete("/api/tenants/$tenantId/members/gsl-member").then().statusCode(200)
+
+            // PART 1 (cleanup): their group grant + GroupMembership are gone — no lingering group access/admin
+            QuarkusTransaction.requiringNew().run {
+                assertEquals(null, grants.find(scopeId, "gsl-member"))
+                assertEquals(null, groupMembers.find(scopeId, "gsl-member"))
+            }
+
+            // PART 2 (defense in depth): re-seed a STALE GroupOwner row (as if cleanup had missed it) and confirm
+            // the guard still refuses the removed member even after they RE-AUTHENTICATE (removal killed their old
+            // session, but a removed user can still log in) — so a lingering row can never be exercised.
+            QuarkusTransaction.requiringNew().run {
+                groupMembers.persist(GroupMembership().apply { id = "gsl-stale"; this.scopeId = scopeId; userId = "gsl-member"; role = GroupRole.GroupOwner.name; createdAt = Instant.now() })
+            }
+            val freshToken = "Bearer ${sessions.issue("gsl-member")}"
+            given().header("Authorization", freshToken).get("/api/tenants/$tenantId/groups/$scopeId/members")
+                .then().statusCode(403).body("code", `is`("NOT_A_MEMBER"))
+            addMember(freshToken, scopeId, "gsl-out").statusCode(403).body("code", `is`("NOT_A_MEMBER"))
+            given().header("Authorization", freshToken).delete("/api/tenants/$tenantId/groups/$scopeId")
+                .then().statusCode(403).body("code", `is`("NOT_A_MEMBER"))
+        } finally {
+            // restore shared state for sibling tests: gsl-member ACTIVE again, stale row dropped
+            QuarkusTransaction.requiringNew().run {
+                memberships.find(tenantId, "gsl-member")?.status = MembershipStatus.ACTIVE
+                groupMembers.find(scopeId, "gsl-member")?.let { groupMembers.delete(it) }
+            }
+        }
+    }
 
     @Test
     fun deletesGroupAsGroupOwnerOnly() {

@@ -1,0 +1,123 @@
+# Härtungsrunde 3 — Ablaufplan
+
+Folge-Review nach Abschluss von `hardening-plan-2.md` (A–F inkl. E4/E6). Sechs parallele Review-Subagenten
+(Backend-Security, Backend-Qualität, Web, iOS, Android, Cross-Platform-Crypto) gegen die 6 Dimensionen
+(sicher? gut geschrieben? wartbar? verbesserbar? performant? menschlich verständlich?). Bereits in Runde 1+2
+gefixte Punkte sind ausgeschlossen. Findings dedupliziert (Live-Journal-Race trifft iOS **und** Android;
+Map-Tile-Leak trifft Web+Mobile).
+
+**Reihenfolge-Prinzip** (wie Runde 2): erst Sicherheits-/AuthZ-Lücken (billig, hoher Wert) → dann
+Korrektheit/Concurrency → dann Operator-blind-Privacy-Vervollständigung → dann Crypto-Conformance-Härtung →
+dann Performance → dann Wartbarkeit → zuletzt Backlog.
+
+Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+ / mehrere Plattformen.
+Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
+
+---
+
+## Phase A — Sicherheit / AuthZ (zuerst)
+- [x] **A1 · Entfernter Tenant-Member behält Gruppen-Admin-Rechte** *(Security, High, M)* — zwei Schichten:
+  (1) `RemoveMemberHandler` löscht jetzt auch **alle Gruppen-Scope-Grants + GroupMemberships** des Users im
+  Tenant (`scopes.listGroupsByTenantId` → neue `deleteByUserIdAndScopeIds` auf ScopeGrant + GroupMembership).
+  (2) Defense-in-depth: `requireGroupOwner` + `listGroupMembers` erzwingen jetzt `requireActiveMembership`
+  (ACTIVE-Tenant-Member), so dass selbst eine übersehene/stale GroupOwner-Zeile inert ist — gespiegelt aus
+  `ScopeAccessGuard.isActiveMember`, geteilter Helper. Verifiziert: neuer GroupSliceTest
+  (`removingTenantMemberStripsGroupAccessAndAdminPower`: Cleanup + stale-row-Guard nach Re-Auth) + 56 Backend-
+  Tests grün + removeMember/groups/groupSpaces/useGroup-E2E grün.
+- [ ] **A2 · Cross-Share Upload-Session-Hijack (unauth IDOR auf In-Flight-Uploads)** *(Security, Medium, S)* —
+  der Guest-Contribute-Pfad keyt `putShareChunk`/`getShareUpload`/`completeShareBlob` nur auf `share.scopeId`
+  (`requireUploadInScope`), nicht auf den Share-Owner. Zwei Shares auf denselben Scope (oder zwei Gäste eines
+  CONTRIBUTOR-Shares) → wer eine `uploadId` errät, überschreibt/liest/finalisiert fremde Staging-Chunks.
+  `createShareMedia` ist via `wasUploadedBy` schon sicher; das Anhängen forgieren geht NICHT — aber Korruption/
+  DoS einer fremden In-Flight-Contribution schon. Fix: `requireUploadOwnedBy(scopeId, uploadId, "share:<id>")`.
+- [ ] **A3 · E-Mail-Invite als Open-Relay/Phishing via schwachem `startsWith`** *(Security, Medium, S)* —
+  `EmailInviteHandler` mailt `req.link` verbatim an beliebige `req.email`, validiert nur
+  `req.link.startsWith(appBaseUrl)` (umgehbar: `…example.com.evil.com`, `…@evil.com`). Owner-gated, aber
+  Empfänger unbeschränkt → Versand attacker-kontrollierter Links unter der Instanz-Reputation. Fix: Link
+  **server-seitig** aus `appBaseUrl` + `inviteId` rekonstruieren (nur ein Client-Fragment nach `#` anhängen),
+  oder als URI parsen und **Origin** exakt vergleichen (nicht `startsWith`).
+- [ ] **A4 · Public-Share-Reads/Downloads ungedrosselt (unauth DoS/Egress)** *(Security, Medium, M)* —
+  `RateLimitFilter` springt bei `method != POST` früh raus; alle Share-GETs (`getShareChunk` = Bandbreiten-Pfad)
+  sind ungedrosselt. War im Runde-2-Backlog; jetzt einplanen: per-IP (+ per-Share) Rate-Limit-Bucket **inkl.**
+  GET auf `/api/public/shares/`, plus Byte-Quota.
+
+## Phase B — Korrektheit / Concurrency
+- [ ] **B1 · `JournalLiveProvider` Cross-Thread-Datarace (iOS + Android)** *(Correctness, High, M)* — geteilter
+  veränderlicher State (`peers`/`peerClocks`/`lastSentSV`/`ws`/Clocks/Cursor) wird ohne Sync aus
+  WS-Listener-Thread, Editor-Thread und Persist-Threads gelesen/geschrieben. iOS: `final class` ganz ohne
+  Lock/Actor; Android: nur `doc` unter `lock`, Felder nicht `@Volatile`. (Web ist Single-Thread-Eventloop →
+  ok.) Risiko: torn reads, verlorene/duplizierte Sync-Frames, Presence-Glitches, selten Korruption/Crash. Fix:
+  State auf einen Serial-Executor konfinieren bzw. iOS→`actor` / Android→`@Volatile ws` + alle Mutationen unter
+  `lock`; dabei auch **B1b** (Doppel-Sockets bei überlappendem Reconnect) entschärfen (Generations-Guard, alten
+  `ws` vor Reassign schließen; `onError` verlässt sich auf `onClose`).
+- [ ] **B2 · Journal-Compaction prune-vs-snapshot unter Concurrency** *(Correctness, Low-Med, S)* —
+  `compactJournal` prunet Updates `<= coveredSeq` und setzt `baseSeq = coveredSeq`, ohne zu erzwingen, dass der
+  client-seitige Snapshot wirklich alle Updates bis `nextSeq` faltet. Append im Fenster → stiller Verlust
+  versiegelter Inkremente. Fix: Client sendet den max-gefalteten Seq; unter Row-Lock `== journal.nextSeq`
+  asserten (sonst `BAD_SEQ`), bzw. nur bis zum nachweislich abgedeckten Seq prunen.
+- [ ] **B3 · iOS `journalSeal` schluckt AEAD-Seal-Fehler** *(Correctness, Low, S)* — `(try? aeadSeal) ?? Data()`
+  erzeugt `salt||nonce` mit leerem Ciphertext/Tag → später still nicht-öffenbar (verlorener Edit). Android/Web
+  werfen. Fix: `journalSeal` `throws` und propagieren (Divergenz beseitigen).
+
+## Phase C — Operator-blind-Privacy vervollständigen
+- [ ] **C1 · Map-Tiles: externe Tiles als akzeptierter, Consent-gegateter Tradeoff** *(Privacy/Consent, Medium, M)* —
+  **Entscheidung (User):** der Tile-Fetch an OSM ist OK, MUSS aber vom User über die **Datenschutz-Einstellungen
+  aktiv akzeptiert** werden, bevor die Karte lädt (informiertes Opt-in). `MemoryMap.vue` lädt sonst
+  `tile.openstreetmap.org/{z}/{x}/{y}` direkt → `{z}/{x}/{y}` = Funktion der entschlüsselten Koordinaten, also
+  lernt OSM den Aufnahmeort. Fix: Map-Tab/`MemoryMap` hinter ein persistiertes Datenschutz-Consent-Flag stellen
+  (vor Akzeptanz Platzhalter + Hinweis statt Tiles); `referrerPolicy: 'no-referrer'` am Tile-Layer; Tradeoff in
+  den Einstellungen erklären. **Kein** Proxy/Self-Host nötig. Mobile (native Map-SDKs) analog hinter dasselbe
+  Consent stellen.
+- [ ] **C2 · Android Emergency-Kit-PDF (Secret Key) bleibt im Cache** *(Security, Medium, S)* — `EmergencyKitPdf`
+  schreibt den Plaintext-Secret-Key (Text + QR) nach `cacheDir/shared/veyq-emergency-kit-<email>.pdf` und löscht
+  ihn nie (Dateiname enthält auch die E-Mail). Fix: nach dem Share löschen bzw. `cacheDir/shared` bei App-Start
+  sweepen; iOS/Web auf äquivalente Artefakte prüfen.
+
+## Phase D — Crypto-Conformance-Härtung (drift-proofing)
+- [ ] **D1 · Passwort-abgeleitete KEKs durch Vektoren pinnen** *(Crypto/Tests, Medium, S)* — `invite-temp-key`-KEK
+  (Produktions-Argon m=32768 + Wrap-Context) und `share-pw`/`shareWrapKey` (`veyq/v1/share-pw`) sind durch KEIN
+  Conformance-Vektor gepinnt — genau die Blindstelle, die den B1-Bug (m=65536 vs 32768) durchrutschen ließ.
+  Fix: KAT-Vektoren für `kekRecovery@m=32768`, `symWrap(context="invite-temp-key")` und `shareWrapKey` in
+  `v1.json` + alle drei Conformance-Suiten. (`share-pw` ist derzeit web-only — entweder Mobile-Create nachziehen
+  oder „web-only by design" dokumentieren.)
+- [ ] **D2 · iOS Argon2id ignoriert `p` still** *(Crypto, Low, S)* — libsodium fixiert p=1; aktuell unsichtbar
+  (alle Uses p=1, gepinnt), aber bei künftigem `p>1` divergieren Web/Android lautlos. Fix: in iOS `argon2id`
+  `require(params.p == 1)` (werfen) oder `p=2`-KAT ergänzen.
+
+## Phase E — Performance
+- [ ] **E1 · Backend-N+1-Restkehrwisch** *(Perf, Medium, M)* — `MemberListHandler` (`users`/`identityKeys` pro
+  Zeile), `GroupProvisioningHandler.listGroupMembers` (`users.findById` pro Zeile), `MyGrantsHandler`
+  (`scopes.findById` + `isActiveMember` pro Grant). Auf IN-Query-Batching umstellen (analog D2/E2/`MediaApiMapper`).
+- [ ] **E2 · Web Bulk-ZIP-Download puffert alles im RAM** *(Perf, Medium, M)* — `download.ts` entschlüsselt jedes
+  Original komplett in `files[]`, baut dann ein In-Memory-ZIP + Blob → Peak ~2–3× Gesamtgröße, OOM bei großen
+  Memories. Fix: zur Platte streamen (File System Access API + Streaming-ZIP) oder zumindest cappen/warnen.
+- [ ] **E3 · Sequenzielle Chunk-/Cover-Loads parallelisieren** *(Perf, Low-Med, S)* — `downloadBlob`/
+  `downloadShareBlob` (Web) holen Chunks strikt seriell (Zeit ~ chunks×RTT); iOS `HomeStore.openLevel` lädt
+  Cover seriell; Android-Rotation seriell. Frames sind AAD-Index-gebunden → `mapPool`/`TaskGroup`/`Semaphore`
+  (~4–6) + in Index-Reihenfolge zusammensetzen.
+
+## Phase F — Wartbarkeit / Klarheit
+- [ ] **F1 · E4-Rest + Struktur-Duplikate** *(Maintainability, Low, S)* — `MediaHandler.requireMemoryNode` nutzt
+  noch `node.type != "MEMORY"`-Strings statt `NodeType.valueOf` (E4-Leftover); `requireContainment` ist in
+  `MemoryTreeHandler` + `CurateHandler` doppelt; `isInSubtree` macht O(Tiefe) Einzel-Lookups statt den schon
+  geladenen Subtree zu nutzen. In geteilte `NodeStructure`-Helfer ziehen (wie Guards-Konsolidierung).
+- [ ] **F2 · Web ShareView Race-Härtung** *(Correctness/Maintainability, Low, S)* — `load()`/`loadContent()` ohne
+  `loadSeq`-Guard (anders als `HomeView` nach C3); zweites `startLiveJournal` verwaist den alten
+  Provider/Doc. `restoreFromUrl` lässt bei `resolveRoute`-Fehler einen halb-applizierten View stehen → Fallback.
+- [ ] **F3 · Android Gallery silent-empty + Socket-Dedup** *(Quality, Low, S)* — `GalleryScreen.load()` fängt alle
+  Exceptions in „leeres Grid" (kein Retry/Signal); Error-State + Retry analog `HomeController`. (Socket-Dedup
+  siehe B1b.)
+
+### Backlog (nicht eingeplant)
+- **Per-Account-Login-Backoff** (L1) — zusätzlich zum per-IP-Bucket ein per-E-Mail-Fehlzähler/Exponential-Backoff.
+- **`tileById` als `Map`** (Web, Mikro-Opt im Render-Hot-Path).
+- **iOS Live-Cursor auf UTF-16-Offsets vereinheitlichen** (lange bekannt, kosmetisch; Emoji/Astral-Drift).
+- **Developer-Styleguide** (aus Runde 2, noch zu refinen).
+- **Offen aus Runde 2:** F1 Apple/Android-E2E in CI (macOS/Android-Runner), F2 web-e2e-Job in Actions verifizieren
+  (braucht Push) · Android Yrs-AAR · Mobile Share-Live-Read · D1-Write-Path (blob-IO-out-of-tx).
+
+---
+
+### Empfohlener Einstieg
+**Phase A** (A1 ist das einzige High mit echter Privilege-Persistenz; A2/A3 je S). Dann **B1** (Cross-Platform-
+Datarace) als zweitwichtigster Punkt. C/D/E/F danach nach Wert.

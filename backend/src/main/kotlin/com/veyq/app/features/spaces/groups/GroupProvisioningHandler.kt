@@ -107,6 +107,7 @@ class GroupProvisioningHandler(
     fun listGroupMembers(auth: String?, tenantId: String, scopeId: String): GroupMemberList {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         requireGroupScope(tenantId, scopeId)
+        requireActiveMembership(tenantId, userId) // a removed tenant member loses group visibility too
         groupMembers.find(scopeId, userId) ?: throw ApiException(403, "NOT_A_GROUP_MEMBER", "You are not a member of this group")
         return GroupMemberList(members = groupMembers.listByScopeId(scopeId).map(::toApiMember))
     }
@@ -171,17 +172,24 @@ class GroupProvisioningHandler(
     private fun requireGroupOwner(tenantId: String, scopeId: String, auth: String?): String {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
         requireGroupScope(tenantId, scopeId)
+        // A tenant member removed via RemoveMemberHandler must lose group-admin power even if a stale
+        // GroupMembership row lingers — otherwise an ex-member GroupOwner could re-grant the group key.
+        requireActiveMembership(tenantId, userId)
         val gm = groupMembers.find(scopeId, userId)
         if (gm == null || gm.role != GroupRole.GroupOwner.name) throw ApiException(403, "NOT_A_GROUP_OWNER", "GroupOwner role required")
         return userId
     }
 
+    /** Assert an already-resolved user is an ACTIVE member of the tenant (mirrors ScopeAccessGuard's layer). */
+    private fun requireActiveMembership(tenantId: String, userId: String) {
+        val m = memberships.find(tenantId, userId)
+        if (m == null || m.status != MembershipStatus.ACTIVE) throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
+    }
 
     private fun requireTenantMember(tenantId: String, auth: String?): String {
         val userId = sessions.resolve(auth) ?: throw ApiException(401, "UNAUTHORIZED", "Missing or invalid session")
         tenants.findById(tenantId) ?: throw ApiException(404, "TENANT_NOT_FOUND", "Tenant not found")
-        val m = memberships.find(tenantId, userId)
-        if (m == null || m.status != MembershipStatus.ACTIVE) throw ApiException(403, "NOT_A_MEMBER", "Not an active member of this tenant")
+        requireActiveMembership(tenantId, userId)
         return userId
     }
 
