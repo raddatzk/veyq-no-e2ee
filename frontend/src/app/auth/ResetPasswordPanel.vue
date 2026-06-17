@@ -6,6 +6,7 @@ import { confirmPasswordReset, getResetMaterial } from '../../features/account/r
 import { login } from '../../features/account/login/login'
 import { parseKit } from '../../features/account/emergencyKit/emergencyKit'
 import { usePwnedWarning } from '../../features/account/passwordWarning'
+import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../../shared/passwordPolicy'
 
 const props = defineProps<{ token: string }>()
 const emit = defineEmits<{ done: [] }>()
@@ -39,6 +40,7 @@ function importKit(e: Event) {
 
 /** Reset the password with the Secret Key, then sign in with the new password + Secret Key. */
 async function submit() {
+  if (password.value.length < MIN_PASSWORD_LENGTH) return
   error.value = ''
   busy.value = true
   try {
@@ -71,8 +73,9 @@ async function submit() {
             {{ t('reset.newPassword') }}
             <input v-model="password" type="password" autocomplete="new-password" required />
             <p v-if="breachCount > 0" class="auth-msg auth-msg-warn">{{ t('password.pwnedWarning', { count: breachCount }) }}</p>
+            <p v-if="passwordHintKey(password)" class="field-hint">{{ t(passwordHintKey(password)!) }}</p>
           </label>
-          <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? t('login.submitting') : t('reset.setPassword') }}</button>
+          <button class="btn btn-primary" type="submit" :disabled="busy || password.length < MIN_PASSWORD_LENGTH">{{ busy ? t('login.submitting') : t('reset.setPassword') }}</button>
         </form>
         <label class="kit-import">
           <span>{{ t('kit.import') }}</span>

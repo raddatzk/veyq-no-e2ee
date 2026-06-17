@@ -9,6 +9,7 @@ import { login } from '../../features/account/login/login'
 import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
 import { isProtectedInvite, type ParsedInvite } from '../../features/spaces/invite/inviteLink'
 import { usePwnedWarning } from '../../features/account/passwordWarning'
+import { MIN_PASSWORD_LENGTH, passwordHintKey } from '../../shared/passwordPolicy'
 import LoginPanel from './LoginPanel.vue'
 import OpenInApp from './OpenInApp.vue'
 
@@ -64,6 +65,7 @@ async function join() {
 
 /** Brand-new invitee → create the account (this also joins the group), then show the Emergency Kit. */
 async function register() {
+  if (password.value.length < MIN_PASSWORD_LENGTH) return
   busy.value = true
   error.value = ''
   try {
@@ -135,7 +137,8 @@ async function proceed() {
             <label>{{ t('common.email') }}<input v-model="email" type="email" autocomplete="username" required /></label>
             <label>{{ t('common.password') }}<input v-model="password" type="password" autocomplete="new-password" required /></label>
             <p v-if="breachCount > 0" class="auth-msg auth-msg-warn">{{ t('password.pwnedWarning', { count: breachCount }) }}</p>
-            <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? t('accept.joining') : t('accept.register') }}</button>
+            <p v-if="passwordHintKey(password)" class="field-hint">{{ t(passwordHintKey(password)!) }}</p>
+            <button class="btn btn-primary" type="submit" :disabled="busy || password.length < MIN_PASSWORD_LENGTH">{{ busy ? t('accept.joining') : t('accept.register') }}</button>
           </form>
           <LoginPanel v-else embedded />
         </template>
