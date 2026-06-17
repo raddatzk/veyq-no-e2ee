@@ -125,4 +125,9 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(frame)).toBe(f.frame)
     expect(hex(v1.openFrame(unhex(f.contentKey), f.index, f.total, unhex(f.frame)))).toBe(f.plaintext)
   })
+
+  it('identity fingerprint / safety number', () => {
+    const f = vectors.fingerprint
+    expect(v1.fingerprint({ kemX: unhex(f.kem_x), kemM: unhex(f.kem_m), sign: unhex(f.sign) })).toBe(f.digits)
+  })
 })

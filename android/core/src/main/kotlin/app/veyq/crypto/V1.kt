@@ -257,6 +257,25 @@ object V1 {
 
     fun serializeIdentityPrivate(id: Identity): ByteArray = lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
 
+    /** Canonical identity PUBLIC serialization: lp(kemX) + lp(kemM) + lp(sign) — mirrors the private form. */
+    fun serializeIdentityPublic(kemX: ByteArray, kemM: ByteArray, sign: ByteArray): ByteArray =
+        lp(kemX) + lp(kemM) + lp(sign)
+
+    /**
+     * Identity fingerprint ("safety number"): a deterministic, human-readable digest of a user's full identity
+     * public key, so two users can compare it out-of-band and detect an active-operator key-substitution.
+     * sha256("veyq/v1/fingerprint" || lp(kemX) || lp(kemM) || lp(sign)) -> 6 groups of 5 decimal digits, each a
+     * 40-bit big-endian hash chunk mod 100000. Conformance: docs/api/crypto-vectors/v1.json#fingerprint.
+     */
+    fun fingerprint(kemX: ByteArray, kemM: ByteArray, sign: ByteArray): String {
+        val h = sha256("veyq/v1/fingerprint".toByteArray(Charsets.UTF_8) + serializeIdentityPublic(kemX, kemM, sign))
+        return (0 until 6).joinToString(" ") { i ->
+            var v = 0L
+            for (j in 0 until 5) v = v * 256 + (h[i * 5 + j].toLong() and 0xff)
+            (v % 100000).toString().padStart(5, '0')
+        }
+    }
+
     data class IdentityPrivate(val kemX: ByteArray, val mlkemSeed: ByteArray, val sign: ByteArray)
 
     /** Inverse of serializeIdentityPrivate: read three length-prefixed fields. */

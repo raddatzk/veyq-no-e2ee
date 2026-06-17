@@ -241,6 +241,26 @@ public enum V1 {
         lp(id.privKemX) + lp(id.mlkemSeed) + lp(id.privSign)
     }
 
+    /// Canonical identity PUBLIC serialization: lp(kemX) + lp(kemM) + lp(sign) — mirrors the private form.
+    public static func serializeIdentityPublic(_ kemX: Data, _ kemM: Data, _ sign: Data) -> Data {
+        lp(kemX) + lp(kemM) + lp(sign)
+    }
+
+    /// Identity fingerprint ("safety number"): a deterministic, human-readable digest of a user's full identity
+    /// public key, so two users can compare it out-of-band and detect an active-operator key-substitution.
+    /// sha256("veyq/v1/fingerprint" || lp(kemX) || lp(kemM) || lp(sign)) -> 6 groups of 5 decimal digits, each a
+    /// 40-bit big-endian hash chunk mod 100000. Conformance: docs/api/crypto-vectors/v1.json#fingerprint.
+    public static func fingerprint(_ kemX: Data, _ kemM: Data, _ sign: Data) -> String {
+        let h = Data(SHA256.hash(data: Data("veyq/v1/fingerprint".utf8) + serializeIdentityPublic(kemX, kemM, sign)))
+        var groups: [String] = []
+        for i in 0..<6 {
+            var v: UInt64 = 0
+            for j in 0..<5 { v = v * 256 + UInt64(h[h.startIndex + i * 5 + j]) }
+            groups.append(String(format: "%05d", Int(v % 100000)))
+        }
+        return groups.joined(separator: " ")
+    }
+
     public struct IdentityPrivate: Sendable { public let kemX: Data; public let mlkemSeed: Data; public let sign: Data }
 
     /// Inverse of serializeIdentityPrivate: read three length-prefixed fields.

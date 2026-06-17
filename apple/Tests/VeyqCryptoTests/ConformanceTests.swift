@@ -137,5 +137,10 @@ final class ConformanceTests: XCTestCase {
             toHex(try V1.openFrame(contentKey: hex(f["contentKey"] as! String), index: f["index"] as! Int, total: f["total"] as! Int,
                                    frame: hex(f["frame"] as! String))),
             f["plaintext"] as! String, "chunked-AEAD frame open")
+
+        let fp = v["fingerprint"] as! [String: String]
+        XCTAssertEqual(
+            V1.fingerprint(hex(fp["kem_x"]!), hex(fp["kem_m"]!), hex(fp["sign"]!)),
+            fp["digits"]!, "identity fingerprint / safety number")
     }
 }

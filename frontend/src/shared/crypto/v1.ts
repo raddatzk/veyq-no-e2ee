@@ -237,6 +237,33 @@ export function generateIdentity(): Identity {
   }
 }
 
+/** Canonical identity PUBLIC serialization: lp(kemX) || lp(kemM) || lp(sign) — mirrors the private form. */
+export const serializeIdentityPublic = (pub: Identity['pub']): Uint8Array =>
+  concat(lp(pub.kemX), lp(pub.kemM), lp(pub.sign))
+
+/**
+ * Identity fingerprint ("safety number"): a deterministic, human-readable digest of a user's FULL identity
+ * public key (hybrid KEM + signing), so two users can compare it out-of-band (read aloud / QR) and detect an
+ * active-operator key-substitution — a swapped kemX, kemM or sign changes the digits. All three components are
+ * covered via the length-prefixed canonical serialization (no field-boundary ambiguity). The digest is sha256
+ * over a domain-separated input, rendered as 6 groups of 5 decimal digits (Signal-parity, language-neutral):
+ * each group is a 40-bit big-endian hash chunk mod 100000. 30 digits carry ~99 bits, so grinding a substitute
+ * key whose fingerprint matches the display is infeasible.
+ *
+ * This is VERIFICATION only — the trust anchor stays a client-pinned key; full Key Transparency is the later
+ * end-state. Conformance: docs/api/crypto-vectors/v1.json#fingerprint.
+ */
+export function fingerprint(pub: Identity['pub']): string {
+  const h = sha256(concat(utf8('veyq/v1/fingerprint'), serializeIdentityPublic(pub)))
+  const groups: string[] = []
+  for (let i = 0; i < 6; i++) {
+    let v = 0
+    for (let j = 0; j < 5; j++) v = v * 256 + h[i * 5 + j] // 40-bit big-endian, exact in JS (< 2^53)
+    groups.push(String(v % 100000).padStart(5, '0'))
+  }
+  return groups.join(' ')
+}
+
 /** Serialize the identity private bundle (wrapped under the master key). */
 export const serializeIdentityPrivate = (id: Identity): Uint8Array =>
   concat(lp(id.priv.kemX), lp(id.priv.mlkemSeed), lp(id.priv.sign))

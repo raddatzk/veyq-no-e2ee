@@ -115,5 +115,10 @@ class V1ConformanceTest {
             f.getString("plaintext"),
             hex(V1.openFrame(unhex(f.getString("contentKey")), f.getInt("index"), f.getInt("total"), unhex(f.getString("frame")))),
         )
+        val fp = v.getJSONObject("fingerprint")
+        assertEquals(
+            fp.getString("digits"),
+            V1.fingerprint(unhex(fp.getString("kem_x")), unhex(fp.getString("kem_m")), unhex(fp.getString("sign"))),
+        )
     }
 }
