@@ -14,6 +14,7 @@
 **Cross-cutting**
 
 - [Security Model](crosscutting/security-model)
+- [Your Privacy, in Plain Language](crosscutting/privacy-in-plain-language)
 - [Account Keys & Recovery (illustrated)](crosscutting/account-key-model)
 - [Crypto Wire-Format Spec](crosscutting/crypto-spec)
 - [Agent Mode](crosscutting/agent-mode)

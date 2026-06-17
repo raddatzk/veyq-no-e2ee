@@ -5,8 +5,8 @@
 > and an opaque job queue. Every other concept (processing, search, sharing, deletion) is designed
 > around this. The paramount invariant lives in [Goals & Quality](../overview/goals-stakeholders-quality.md).
 >
-> **New to this?** Start with the plain-language, illustrated companion:
-> [Account keys, devices & recovery](account-key-model.md).
+> **New to this?** Start with the plain-language companions: [Your privacy, in plain language](privacy-in-plain-language.md)
+> (what we can and can't see, sharing, the honest limits) and [Account keys, devices & recovery](account-key-model.md).
 
 > **Implementation status (2026-06) — read this first.** This document is partly target-state. To keep
 > intentions from reading as guarantees, claims are tagged **[Built]** (implemented and, for crypto,
