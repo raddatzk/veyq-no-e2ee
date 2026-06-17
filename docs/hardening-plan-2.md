@@ -150,9 +150,16 @@ Diese Phase fixt zugleich H4/H5/M11 aus der Review, weil sie denselben Galerie-C
   Verschwinden ab (`.onDisappear → model.stop`), nicht nur am Done-Button — sonst leakt der Websocket und Edits
   im Debounce-Fenster gehen verloren. `stop()` ist idempotent (`stopped`-Guard, in `start()` re-armed), sodass
   Done + onDisappear nicht doppelt laufen. iOS-App kompiliert. (Android via `DisposableEffect` bereits korrekt.)
-- [ ] **E6 · Web/Mobile Galerie-Duplikate** *(Maintainability, M)* — `useGallery`-Composable (Web: ShareView ↔
-  MemoryDetailView ~60 Zeilen identisch); Node-Graph pro Scope cachen (`home.ts`/`search.ts` re-listen sonst
-  pro Aktion). Teils schon in Phase C berührt.
+- [x] **E6 · Web-Galerie-Duplikate + Node-Graph-Cache** *(Maintainability, M)* — `useGallery`-Composable
+  (`features/gallery/useGallery.ts`) zieht die ~60 identischen Galerie-Zeilen aus ShareView + MemoryDetailView
+  zusammen (Tiles, justified Buckets, ResizeObserver, Lightbox Preview/Original, Object-URL-Lifecycle; die Views
+  geben nur ihre Preview/Original-Loader rein). Drive-by: der Member-Download-Dateiname nutzte bare `name`
+  (= `window.name`, immer "") statt des Memory-Namens → via `downloadFileName`-Option gefixt; + Leak beim
+  Delete-then-Reload geschlossen (`revokeTiles`). Node-Graph: neuer per-Scope-Cache (`features/home/nodeGraph.ts`,
+  10s-TTL) ersetzt das Pro-Aktion-Re-Listen in `home.ts` (moveDestinations/loadMemoryById/ancestorChain) +
+  `search.ts`; Invalidierung an allen Mutationen via curate (create/rename/move/cover/reorder/delete). Verifiziert:
+  vue-tsc clean, 68 Unit-Tests (inkl. 5 neue Cache-/Invalidierungs-Tests), memoryTree+browse+media+share E2E grün.
+  *(Mobile-Galerie-Dedup bleibt offen — marginal, eigener Pass.)*
 
 ## Phase F — CI / Tests / Backlog
 - [ ] **F1 · Apple/Android E2E in CI** *(CI, L)* — macOS-Xcode- / Android-SDK+Emulator-Runner gegen Live-Backend
