@@ -58,15 +58,19 @@
 
 The mechanism is already wired; the **convention is to actually use it**.
 
-- **The OpenAPI schema is the single source of validation truth.** Declare constraints on every request field —
-  `maxLength`/`minLength` on strings, `pattern`, `format` (`uuid`, `email`, `date-time`), `minimum`/`maximum`
-  on numbers, `required`. The generator (`useBeanValidation=true`) emits Bean Validation annotations, the
-  generated interface already carries `@Valid @NotNull` on bodies, and `quarkus-hibernate-validator` rejects a
-  bad request with **400 before the handler runs**. Exemplar to copy: `media.openapi.yaml`
-  (`totalChunks: { minimum: 1, maximum: 10000 }`, `byteSize: { maximum: 10737418240 }`).
-  **Do not** hand-validate in a handler what a schema constraint can express. *(Current gap: only
-  `media.openapi.yaml` declares constraints — adding them to the other specs is the standing task this rule
-  drives.)*
+- **The OpenAPI schema is the contract source of truth for input shape and limits.** Declare constraints on
+  request fields — `maxLength`/`minLength` on strings, `pattern`, `format`, `minimum`/`maximum` on numbers,
+  `required`. The generated JAX-RS interface carries `@Valid @NotNull`, so `quarkus-hibernate-validator`
+  enforces **required fields + structure** (a missing/extra-shaped body → 400 before the handler).
+- **But field-level constraints are NOT auto-enforced today** — a real toolchain limitation: the model
+  generator is `kotlin` (openapi-generator 7.21.0), which silently ignores `useBeanValidation` and emits no
+  `@get:Size`/`@get:Min`/`@get:Pattern` on the Kotlin models. So `maxLength`/`min`/`max`/`pattern` are
+  **contract documentation** (and drive client SDKs / future enforcement), not server enforcement. Declare them
+  anyway — the shared crypto types in `common.openapi.yaml` are constrained — but **security-relevant field
+  bounds must also be enforced imperatively** in the handler/guard, close to the invariant. Existing exemplars:
+  `BlobUploadHandler` (`totalChunks`/`byteSize`/frame-size checks → `400`), `CryptoSuiteRegistry.require`.
+  *(Activating real annotation validation needs a generator that emits Kotlin jakarta constraints — a tracked
+  follow-up.)*
 - **Domain checks beyond the schema stay imperative, in a guard/handler, close to the invariant** — and small,
   named, fail-closed. Good existing examples: `CryptoSuiteRegistry.require(suiteId)` (suite allow-list),
   `BlobStore` path-traversal guard (`require(!key.contains(".."))` + `require(p.startsWith(root))`), the

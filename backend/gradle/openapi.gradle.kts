@@ -164,6 +164,11 @@ tasks.register("openApiGenerateSpecs") {
                     "serializationLibrary" to "jackson",
                     "enumPropertyNaming" to "original",
                     "collectionType" to "list",
+                    // NOTE: the `kotlin` generator (7.21.0) does NOT support useBeanValidation — it silently emits
+                    // no jakarta constraints on the models. So OpenAPI field constraints (maxLength/min/max/pattern)
+                    // are CONTRACT documentation only; required/structure is still enforced via @Valid+@NotNull on
+                    // the generated JAX-RS interface, and security-relevant field bounds are enforced imperatively
+                    // in handlers. See docs/wiki/crosscutting/developer-styleguide.md §4.
                 ),
                 packageName = invokerPackageName,
                 modelPackage = modelPackageName,

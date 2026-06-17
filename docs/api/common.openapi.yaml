@@ -17,6 +17,8 @@ components:
     CryptoSuiteId:
       type: string
       description: Versioned crypto-suite identifier, e.g. "v1".
+      maxLength: 16
+      pattern: '^[a-z][a-z0-9-]*$'
     UserSummary:
       type: object
       required: [id, email, displayName, serverRole]
@@ -31,22 +33,24 @@ components:
       required: [suiteId, kemPublicKey, signPublicKey]
       properties:
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
-        kemPublicKey: { type: string }
-        signPublicKey: { type: string }
+        kemPublicKey: { type: string, maxLength: 8192 }
+        signPublicKey: { type: string, maxLength: 512 }
     Blob:
       type: object
       description: An opaque, self-describing ciphertext blob (base64url bytes + its suite id).
       required: [suiteId, bytes]
       properties:
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
-        bytes: { type: string }
+        # base64url ciphertext; bounded well above the largest single frame (~32 MiB → ~43M chars), the real
+        # cap being quarkus.http.limits.max-body-size.
+        bytes: { type: string, maxLength: 46000000 }
     KemPublicKey:
       type: object
       description: A hybrid KEM public key (X25519 || ML-KEM-768), base64url. Used as a scope/recipient key.
       required: [suiteId, kemPublicKey]
       properties:
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
-        kemPublicKey: { type: string }
+        kemPublicKey: { type: string, maxLength: 8192 }
     MasterKeyWrap:
       type: object
       description: One wrapped copy of the master key, openable by a single unlock method.
@@ -54,9 +58,9 @@ components:
       properties:
         unlockMethod: { type: string, enum: [PASSWORD, PASSKEY, RECOVERY, DEVICE] }
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
-        wrappedKey: { type: string }
-        kdfParams: { type: string }
-        credentialRef: { type: string }
+        wrappedKey: { type: string, maxLength: 16384 }
+        kdfParams: { type: string, maxLength: 4096 }
+        credentialRef: { type: string, maxLength: 1024 }
     AuthVerifier:
       type: object
       description: Proves an unlock to the server without revealing the master key.
@@ -64,7 +68,7 @@ components:
       properties:
         kind: { type: string, enum: [ARGON2_PROOF, WEBAUTHN] }
         suiteId: { $ref: '#/components/schemas/CryptoSuiteId' }
-        verifier: { type: string }
+        verifier: { type: string, maxLength: 8192 }
   responses:
     BadRequest:
       description: Bad request
