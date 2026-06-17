@@ -5,6 +5,7 @@ import { t } from '../../i18n/i18n'
 import { confirmPasswordReset, getResetMaterial } from '../../features/account/resetPassword/resetPassword'
 import { login } from '../../features/account/login/login'
 import { parseKit } from '../../features/account/emergencyKit/emergencyKit'
+import { usePwnedWarning } from '../../features/account/passwordWarning'
 
 const props = defineProps<{ token: string }>()
 const emit = defineEmits<{ done: [] }>()
@@ -12,6 +13,7 @@ const emit = defineEmits<{ done: [] }>()
 const email = ref('')
 const secretKey = ref('')
 const password = ref('')
+const { breachCount } = usePwnedWarning(password)
 const busy = ref(false)
 const error = ref('')
 const ready = ref(false)
@@ -68,6 +70,7 @@ async function submit() {
           <label>
             {{ t('reset.newPassword') }}
             <input v-model="password" type="password" autocomplete="new-password" required />
+            <p v-if="breachCount > 0" class="auth-msg auth-msg-warn">{{ t('password.pwnedWarning', { count: breachCount }) }}</p>
           </label>
           <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? t('login.submitting') : t('reset.setPassword') }}</button>
         </form>

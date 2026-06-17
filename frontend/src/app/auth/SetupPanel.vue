@@ -4,11 +4,13 @@ import { registerServerOwner } from '../../features/admin/setupServer/setupServe
 import { t } from '../../i18n/i18n'
 import { session } from '../session'
 import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
+import { usePwnedWarning } from '../../features/account/passwordWarning'
 
 const emit = defineEmits<{ done: [email: string, secretKey: string] }>()
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
+const { breachCount } = usePwnedWarning(password)
 const busy = ref(false)
 const error = ref('')
 const kit = ref<string | null>(null)
@@ -50,6 +52,7 @@ async function submit() {
             {{ t('common.password') }}
             <input v-model="password" type="password" autocomplete="new-password" required />
           </label>
+          <p v-if="breachCount > 0" class="auth-msg auth-msg-warn">{{ t('password.pwnedWarning', { count: breachCount }) }}</p>
           <button class="btn btn-primary" type="submit" :disabled="busy">
             {{ busy ? t('setup.submitting') : t('setup.submit') }}
           </button>

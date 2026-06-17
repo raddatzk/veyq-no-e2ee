@@ -134,6 +134,13 @@
   color: var(--app-danger);
 }
 
+/* Soft, non-blocking warning (e.g. the HIBP breached-password notice). Amber, theme-blended for contrast. */
+.auth-msg-warn {
+  background: color-mix(in srgb, #e0a83d 16%, transparent);
+  border: 1px solid color-mix(in srgb, #e0a83d 45%, transparent);
+  color: color-mix(in srgb, #e0a83d 80%, var(--app-control-text));
+}
+
 .auth-msg-success {
   background: var(--app-success-soft);
   color: var(--app-success);

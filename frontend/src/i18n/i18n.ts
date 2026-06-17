@@ -7,6 +7,7 @@ type Dict = Record<string, string>
 const de: Dict = {
   'common.email': 'E-Mail',
   'common.password': 'Passwort',
+  'password.pwnedWarning': 'Dieses Passwort taucht in {count} bekannten Datenlecks auf — wähle besser ein anderes.',
   'common.secretKey': 'Secret Key',
   'common.back': '← Zurück',
   'common.close': 'Schließen',
@@ -236,6 +237,7 @@ const de: Dict = {
 const en: Dict = {
   'common.email': 'Email',
   'common.password': 'Password',
+  'password.pwnedWarning': 'This password appeared in {count} known data breaches — consider a different one.',
   'common.secretKey': 'Secret Key',
   'common.back': '← Back',
   'common.close': 'Close',

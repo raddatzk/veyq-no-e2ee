@@ -8,6 +8,7 @@ import { unprotectTempKey } from '../../features/spaces/invite/groups'
 import { login } from '../../features/account/login/login'
 import { downloadKitPdf } from '../../features/account/emergencyKit/emergencyKit'
 import { isProtectedInvite, type ParsedInvite } from '../../features/spaces/invite/inviteLink'
+import { usePwnedWarning } from '../../features/account/passwordWarning'
 import LoginPanel from './LoginPanel.vue'
 import OpenInApp from './OpenInApp.vue'
 
@@ -33,6 +34,7 @@ const mode = ref<'register' | 'signin'>('register')
 const email = ref('')
 const displayName = ref('')
 const password = ref('')
+const { breachCount } = usePwnedWarning(password)
 const kit = ref<string | null>(null) // the Emergency Kit secret to show after registering
 
 onMounted(async () => {
@@ -132,6 +134,7 @@ async function proceed() {
             <label>{{ t('setup.displayName') }}<input v-model="displayName" type="text" required autofocus /></label>
             <label>{{ t('common.email') }}<input v-model="email" type="email" autocomplete="username" required /></label>
             <label>{{ t('common.password') }}<input v-model="password" type="password" autocomplete="new-password" required /></label>
+            <p v-if="breachCount > 0" class="auth-msg auth-msg-warn">{{ t('password.pwnedWarning', { count: breachCount }) }}</p>
             <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? t('accept.joining') : t('accept.register') }}</button>
           </form>
           <LoginPanel v-else embedded />
