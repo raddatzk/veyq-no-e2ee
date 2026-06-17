@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONObject
 import java.net.URI
 import java.net.URLEncoder
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
@@ -12,7 +11,7 @@ import java.nio.charset.StandardCharsets
  * uc.keys.rewrap-scope-grant (Android) — replace only this user's existing wrapped grant.
  */
 object Keys {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     fun upsertMyMasterKeyWrap(apiBase: String, sessionToken: String, masterKeyWrap: JSONObject): JSONObject {
         val unlockMethod = URLEncoder.encode(masterKeyWrap.getString("unlockMethod"), StandardCharsets.UTF_8)

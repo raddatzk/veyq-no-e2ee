@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
@@ -13,7 +12,7 @@ import java.net.http.HttpResponse
  * reuse the scope-generic content slice (ScopeContent) — this only adds the group roster.
  */
 object UseGroup {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     /** List the group spaces the caller can enter (active member + holds the scope key). */
     fun listMyGroups(apiBase: String, session: Login.UnlockedSession): JSONArray {

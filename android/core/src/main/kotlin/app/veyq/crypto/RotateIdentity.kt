@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -14,7 +13,7 @@ import java.util.Base64
 object RotateIdentity {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     private fun context(kind: String) = if (kind == "PERSONAL_ROOT") "personal-scope-grant" else "scope-grant"
 

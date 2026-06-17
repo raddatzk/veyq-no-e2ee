@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
@@ -11,7 +10,7 @@ import java.net.http.HttpResponse
  * instance still needs first-run setup (which is web-only) and the suites it advertises.
  */
 object Instance {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     /** appBaseUrl = the instance's public app origin (for assembling invite links); null on older instances. */
     data class SetupStatus(val setupRequired: Boolean, val suites: List<String>, val appBaseUrl: String?)

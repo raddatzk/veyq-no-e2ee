@@ -2,10 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.text.Normalizer
 import java.util.Base64
 
@@ -16,22 +12,12 @@ import java.util.Base64
  * scope key to their identity. The server stays blind to the name and the content.
  */
 object Groups {
-    private val client = HttpClient.newHttpClient()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val EMPTY = ByteArray(0)
 
-    private fun send(apiBase: String, path: String, token: String, method: String = "GET", body: String? = null): Pair<Int, String> {
-        var b = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer $token")
-        b = when (method) {
-            "POST" -> b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body ?: ""))
-            "PATCH" -> b.header("Content-Type", "application/json").method("PATCH", HttpRequest.BodyPublishers.ofString(body ?: ""))
-            "DELETE" -> b.DELETE()
-            else -> b.GET()
-        }
-        val resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString())
-        return resp.statusCode() to resp.body()
-    }
+    private fun send(apiBase: String, path: String, token: String, method: String = "GET", body: String? = null): Pair<Int, String> =
+        ApiClient.send(apiBase, token, path, method, body).let { it.statusCode() to it.body() }
 
     /** Decrypt a group's sealed name with its content key. */
     fun openSealedName(contentKey: ByteArray, sealedB64: String): String {

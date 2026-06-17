@@ -2,10 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
@@ -16,7 +12,6 @@ import java.util.Base64
 object MemoryTree {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
     private val EMPTY = ByteArray(0)
 
     /** Create one node: the name is sealed under the content key, the slug becomes a blinded token. */
@@ -27,25 +22,19 @@ object MemoryTree {
         val sealed = sealContent(contentKey, name, slug)
         // the slug token's parent slot is the parent node id, or the scope id at the root (the server's sentinel)
         val parentSlot = parentId ?: scopeId
-        val parentPart = if (parentId == null) "" else """"parentId":"$parentId","""
-        val json = """{$parentPart"type":"$type","slugToken":"${enc.encodeToString(V1.slugToken(contentKey, parentSlot, slug))}",""" +
-            """"orderIndex":$orderIndex,"sealedContent":{"suiteId":"v1","bytes":"${enc.encodeToString(sealed)}"}}"""
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
-            .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json)).build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("create node failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
+        val json = JSONObject()
+            .apply { if (parentId != null) put("parentId", parentId) }
+            .put("type", type)
+            .put("slugToken", enc.encodeToString(V1.slugToken(contentKey, parentSlot, slug)))
+            .put("orderIndex", orderIndex)
+            .put("sealedContent", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(sealed)))
+            .toString()
+        return JSONObject(ApiClient.ok(apiBase, session.sessionToken, "/api/scopes/$scopeId/nodes", "POST", json, label = "create node"))
     }
 
     /** List the scope's node graph (flat). The client reconstructs the tree + decrypts names locally. */
-    fun listNodes(apiBase: String, session: Login.UnlockedSession, scopeId: String): JSONArray {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/scopes/$scopeId/nodes"))
-            .header("Authorization", "Bearer ${session.sessionToken}").GET().build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("list nodes failed: ${resp.statusCode()}")
-        return JSONObject(resp.body()).getJSONArray("nodes")
-    }
+    fun listNodes(apiBase: String, session: Login.UnlockedSession, scopeId: String): JSONArray =
+        JSONObject(ApiClient.ok(apiBase, session.sessionToken, "/api/scopes/$scopeId/nodes", "GET", label = "list nodes")).getJSONArray("nodes")
 
     /** Seal a node's {name, slug} metadata under the content key (nonce || AEAD). */
     private fun sealContent(contentKey: ByteArray, name: String, slug: String): ByteArray {

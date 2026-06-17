@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -63,7 +62,7 @@ object SetupServer {
     /** Returns (raw response body, emergency kit). Throws on non-200. */
     fun registerServerOwner(apiBase: String, email: String, displayName: String, password: String): Pair<String, EmergencyKit> {
         val (json, kit) = buildRequestJson(email, displayName, password)
-        val client = HttpClient.newHttpClient()
+        val client = ApiClient.shared
         val req = HttpRequest.newBuilder(URI.create("$apiBase/api/setup/owner"))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(json))

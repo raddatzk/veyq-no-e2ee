@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.text.Normalizer
@@ -16,7 +15,7 @@ import java.util.Base64
 object RegisterViaInvitation {
     private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
     private val enc = Base64.getUrlEncoder().withoutPadding()
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
     private fun b64url(b: ByteArray): String = enc.encodeToString(b)
 
     data class RegisterResult(

@@ -2,9 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
 
@@ -19,7 +16,6 @@ import java.util.Base64
 object Media {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
 
     // 4 MiB plaintext frames: small files stay one frame, large ones chunk transparently.
     const val DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024
@@ -50,15 +46,8 @@ object Media {
         return MediaMeta(obj.getString("takenAt"), if (obj.has("lat")) obj.getDouble("lat") else null, if (obj.has("lng")) obj.getDouble("lng") else null)
     }
 
-    private fun send(uri: String, token: String, method: String, body: String? = null): HttpResponse<String> {
-        var b = HttpRequest.newBuilder(URI.create(uri)).header("Authorization", "Bearer $token")
-        b = when (method) {
-            "GET" -> b.GET()
-            "PUT" -> b.header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(body ?: ""))
-            else -> b.header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body ?: ""))
-        }
-        return client.send(b.build(), HttpResponse.BodyHandlers.ofString())
-    }
+    private fun send(uri: String, token: String, method: String, body: String? = null): HttpResponse<String> =
+        ApiClient.send("", token, uri, method, body)
 
     // ---- blob layer (the single upload/download path) ---------------------------------------------------
 

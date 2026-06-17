@@ -2,10 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import uniffi.yniffi.YrsDoc
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
@@ -16,7 +12,6 @@ import java.util.Base64
  * compacts (a fresh snapshot + the Markdown reader projection) which prunes the folded-in updates.
  */
 object JournalPersistence {
-    private val client = HttpClient.newHttpClient()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
 
@@ -28,34 +23,18 @@ object JournalPersistence {
     private fun seal(key: ByteArray, inner: ByteArray): ByteArray = V1.journalSeal(key, inner)
     private fun open(key: ByteArray, blob: ByteArray): ByteArray? = V1.journalOpen(key, blob)
 
-    private fun get(apiBase: String, session: Login.UnlockedSession, path: String): JSONObject {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer ${session.sessionToken}").GET().build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("journal GET failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
+    private fun get(apiBase: String, session: Login.UnlockedSession, path: String): JSONObject =
+        JSONObject(ApiClient.ok(apiBase, session.sessionToken, path, "GET", label = "journal GET"))
 
     /**
      * Exchange the Bearer session for a short-lived single-use relay ticket, so the live-journal WebSocket
      * authenticates via `?ticket=` instead of putting the session token in the URL (proxy logs / history).
      */
-    fun fetchLiveTicket(apiBase: String, session: Login.UnlockedSession): String {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase/api/journal-live/ticket"))
-            .header("Authorization", "Bearer ${session.sessionToken}")
-            .POST(HttpRequest.BodyPublishers.noBody()).build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("journal-live ticket failed: ${resp.statusCode()}")
-        return JSONObject(resp.body()).getString("ticket")
-    }
-    private fun send(apiBase: String, session: Login.UnlockedSession, path: String, method: String, body: String): JSONObject {
-        val b = HttpRequest.BodyPublishers.ofString(body)
-        val req = HttpRequest.newBuilder(URI.create("$apiBase$path"))
-            .header("Authorization", "Bearer ${session.sessionToken}").header("Content-Type", "application/json")
-            .method(method, b).build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("journal $method failed: ${resp.statusCode()}")
-        return JSONObject(resp.body())
-    }
+    fun fetchLiveTicket(apiBase: String, session: Login.UnlockedSession): String =
+        JSONObject(ApiClient.ok(apiBase, session.sessionToken, "/api/journal-live/ticket", "POST", label = "journal-live ticket")).getString("ticket")
+
+    private fun send(apiBase: String, session: Login.UnlockedSession, path: String, method: String, body: String): JSONObject =
+        JSONObject(ApiClient.ok(apiBase, session.sessionToken, path, method, body, label = "journal $method"))
 
     /** Reconstruct the journal into `doc` (caller holds `lock`); returns the max seq applied. */
     fun loadJournalDoc(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, contentKey: ByteArray, doc: YrsDoc, lock: Any): Int {

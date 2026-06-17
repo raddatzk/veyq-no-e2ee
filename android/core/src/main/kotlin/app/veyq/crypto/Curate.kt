@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.text.Normalizer
@@ -14,7 +13,7 @@ import java.util.Base64
  * stays blind to names.
  */
 object Curate {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
     fun renameNode(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, node: JSONObject, newName: String): JSONObject {

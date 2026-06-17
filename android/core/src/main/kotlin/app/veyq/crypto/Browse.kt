@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONObject
 import java.net.URI
 import java.net.URLEncoder
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
@@ -14,7 +13,7 @@ import java.net.http.HttpResponse
  * not the URL — so /urlaube/italien-2026 stays clean and the client learns folder/memory/chapter per step.
  */
 object Browse {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     /** List the direct children of a level: a node id, or the scope root when parentId is null. */
     fun listChildren(apiBase: String, session: Login.UnlockedSession, scopeId: String, parentId: String? = null): List<JSONObject> {

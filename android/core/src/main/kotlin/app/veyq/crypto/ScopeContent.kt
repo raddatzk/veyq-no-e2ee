@@ -1,10 +1,6 @@
 package app.veyq.crypto
 
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.text.Normalizer
 import java.util.Base64
 
@@ -16,21 +12,12 @@ import java.util.Base64
 object ScopeContent {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
     private val EMPTY = ByteArray(0)
 
     data class OpenScope(val scopeId: String, val scopePkX: ByteArray, val scopePkM: ByteArray, val scopePriv: V1.IdentityPrivate)
 
-    private fun req(apiBase: String, path: String, token: String, method: String = "GET", body: String? = null): Pair<Int, String> {
-        val b = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer $token")
-        when (method) {
-            "PUT" -> { b.header("Content-Type", "application/json"); b.PUT(HttpRequest.BodyPublishers.ofString(body!!)) }
-            "POST" -> { b.header("Content-Type", "application/json"); b.POST(HttpRequest.BodyPublishers.ofString(body!!)) }
-            else -> b.GET()
-        }
-        val resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString())
-        return resp.statusCode() to resp.body()
-    }
+    private fun req(apiBase: String, path: String, token: String, method: String = "GET", body: String? = null): Pair<Int, String> =
+        ApiClient.send(apiBase, token, path, method, body).let { it.statusCode() to it.body() }
 
     /** Fetch + open the caller's personal scope: unwrap its private key with the user's identity. */
     fun openPersonalScope(apiBase: String, session: Login.UnlockedSession): OpenScope {

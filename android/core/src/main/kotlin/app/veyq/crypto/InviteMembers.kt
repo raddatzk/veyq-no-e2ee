@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -16,7 +15,7 @@ import java.util.Base64
 object InviteMembers {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
     fun listTenantMembers(apiBase: String, token: String, tenantId: String): JSONArray {

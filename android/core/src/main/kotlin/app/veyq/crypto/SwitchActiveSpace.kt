@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
@@ -13,7 +12,7 @@ import java.net.http.HttpResponse
  * it opens the chosen scope with the wrap the client already holds. Content ops reuse ScopeContent.
  */
 object SwitchActiveSpace {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     /** List every space the caller can enter (personal + every group they hold the scope key for). */
     fun listMySpaces(apiBase: String, session: Login.UnlockedSession): JSONArray {

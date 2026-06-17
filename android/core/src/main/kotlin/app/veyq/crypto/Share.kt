@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -13,7 +12,7 @@ import java.util.Base64
  * reaches the server. The web viewer at the instance origin opens it; the server stays blind to the content.
  */
 object Share {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val EMPTY = ByteArray(0)
 

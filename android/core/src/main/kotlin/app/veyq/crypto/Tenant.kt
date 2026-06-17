@@ -1,10 +1,6 @@
 package app.veyq.crypto
 
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
@@ -14,26 +10,16 @@ import java.util.Base64
 object Tenant {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
 
-    private fun send(apiBase: String, path: String, token: String, method: String, body: String? = null): String {
-        val b = HttpRequest.newBuilder(URI.create("$apiBase$path")).header("Authorization", "Bearer $token")
-        if (method == "POST") {
-            b.header("Content-Type", "application/json")
-            b.POST(if (body != null) HttpRequest.BodyPublishers.ofString(body) else HttpRequest.BodyPublishers.noBody())
-        } else {
-            b.GET()
-        }
-        val resp = client.send(b.build(), HttpResponse.BodyHandlers.ofString())
-        if (resp.statusCode() != 200) throw RuntimeException("$method $path failed: ${resp.statusCode()}")
-        return resp.body()
-    }
+    private fun send(apiBase: String, path: String, token: String, method: String, body: String? = null): String =
+        ApiClient.ok(apiBase, token, path, method, body, label = "$method $path")
 
     fun createTenant(apiBase: String, token: String, name: String, displayName: String, domain: String?): JSONObject {
         // A tenant is domain-scoped (domain required + unique). The UI passes a real domain; tests/owner-claim
         // omit it → derive a unique one from the (unique) handle so the request still validates.
         val dom = domain?.takeIf { it.isNotEmpty() } ?: "$name.local"
-        return JSONObject(send(apiBase, "/api/tenants", token, "POST", """{"name":${JSONObject.quote(name)},"displayName":${JSONObject.quote(displayName)},"domain":${JSONObject.quote(dom)}}"""))
+        val json = JSONObject().put("name", name).put("displayName", displayName).put("domain", dom).toString()
+        return JSONObject(send(apiBase, "/api/tenants", token, "POST", json))
     }
 
     fun issueOwnerInvite(apiBase: String, token: String, tenantId: String): JSONObject =
@@ -51,9 +37,11 @@ object Tenant {
         val scopePublic = scope.pubKemX + scope.pubKemM
         val scopePrivate = V1.serializeIdentityPrivate(scope)
         val grant = V1.asymWrap(pkX, pkM, scopePrivate, "scope-grant", V1.randomBytes(12))
-        val json = """{"bootstrapSecret":"$bootstrapSecret",""" +
-            """"scopePublicKey":{"suiteId":"v1","kemPublicKey":"${enc.encodeToString(scopePublic)}"},""" +
-            """"wrappedScopePrivateKey":{"suiteId":"v1","bytes":"${enc.encodeToString(grant)}"}}"""
+        val json = JSONObject()
+            .put("bootstrapSecret", bootstrapSecret)
+            .put("scopePublicKey", JSONObject().put("suiteId", "v1").put("kemPublicKey", enc.encodeToString(scopePublic)))
+            .put("wrappedScopePrivateKey", JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(grant)))
+            .toString()
         return JSONObject(send(apiBase, "/api/tenant-invites/$inviteId/claim", token, "POST", json))
     }
 

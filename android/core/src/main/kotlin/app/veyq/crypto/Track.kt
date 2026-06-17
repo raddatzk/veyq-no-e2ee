@@ -3,7 +3,6 @@ package app.veyq.crypto
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -14,7 +13,7 @@ import java.util.Base64
  * we seal before POST and open after GET. Route location data never leaves the client in the clear.
  */
 object Track {
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val EMPTY = ByteArray(0)

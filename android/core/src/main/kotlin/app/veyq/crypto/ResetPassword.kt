@@ -1,10 +1,6 @@
 package app.veyq.crypto
 
 import org.json.JSONObject
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.text.Normalizer
 import java.util.Base64
 
@@ -17,16 +13,11 @@ import java.util.Base64
 object ResetPassword {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
     private val argon = V1.ArgonParams(t = 3, m = 32768, p = 1, dkLen = 32)
 
-    private fun post(apiBase: String, path: String, json: String): Pair<Int, String> {
-        val req = HttpRequest.newBuilder(URI.create("$apiBase$path"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json)).build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
-        return resp.statusCode() to resp.body()
-    }
+    // Unauthenticated endpoints (the caller has no session yet) → null token, no Authorization header.
+    private fun post(apiBase: String, path: String, json: String): Pair<Int, String> =
+        ApiClient.send(apiBase, null, path, "POST", json).let { it.statusCode() to it.body() }
 
     /** Ask the server to email a reset token. Always succeeds (the server never reveals account existence). */
     fun requestReset(apiBase: String, email: String) {

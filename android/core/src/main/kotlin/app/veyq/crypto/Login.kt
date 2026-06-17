@@ -2,7 +2,6 @@ package app.veyq.crypto
 
 import org.json.JSONObject
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.Base64
@@ -13,7 +12,7 @@ import java.util.Base64
  */
 object Login {
     private val b64d = Base64.getUrlDecoder()
-    private val client = HttpClient.newHttpClient()
+    private val client = ApiClient.shared
 
     private fun b64url(s: String): ByteArray = b64d.decode(s)
 
