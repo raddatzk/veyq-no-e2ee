@@ -63,6 +63,10 @@ Feature → Use-case → Coverage file → Acceptance criteria → Positive/nega
 
 ## Code conventions
 
+The full code-level styleguide (layering, naming, comments, input validation, error handling, testing,
+cross-platform parity) lives in the [Developer Styleguide](../wiki/crosscutting/developer-styleguide.md).
+Highlights:
+
 - Backend: model project-owned `veyq.*` properties with complete `@ConfigMapping` classes (not
   per-value `@ConfigProperty`); internal `quarkus.*` may use direct injection.
 - Use domain-scoped **Conventional Commits** (see `docs/development.md`). Database/migration changes

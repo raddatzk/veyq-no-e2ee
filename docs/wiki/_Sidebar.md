@@ -13,6 +13,7 @@
 
 **Cross-cutting**
 
+- [Developer Styleguide](crosscutting/developer-styleguide)
 - [Security Model](crosscutting/security-model)
 - [Your Privacy, in Plain Language](crosscutting/privacy-in-plain-language)
 - [Account Keys & Recovery (illustrated)](crosscutting/account-key-model)

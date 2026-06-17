@@ -5,9 +5,9 @@
 > documented here; the code is the source of truth for that. Document a pattern here only when it is a
 > rule, not an implementation detail.
 
-> Code-level conventions (config mapping, commit format, terminology) live in
-> [`docs/ai/working-methodology.md`](../../ai/working-methodology.md); this page is for
-> *architectural* patterns.
+> Code-level conventions (layering, naming, comments, validation, error handling, config, testing) live in
+> the [Developer Styleguide](developer-styleguide.md); project rules (invariants, commits, terminology) in
+> [`docs/ai/working-methodology.md`](../../ai/working-methodology.md). This page is for *architectural* patterns.
 
 ## Rules (seed — fill as they are decided)
 
