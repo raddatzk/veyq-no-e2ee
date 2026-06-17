@@ -85,4 +85,22 @@ class SetupServerSliceTest {
             .then().statusCode(409)
             .body("code", `is`("ALREADY_SETUP"))
     }
+
+    // Annotation-driven validation (custom @Constraint via the OpenAPI x-field-extra-annotation extension) is
+    // enforced at the @Valid boundary → 400 BEFORE the handler runs, independent of setup state.
+    @Test
+    fun rejectsBlankDisplayName() {
+        val bad = request.replace(""""displayName": "Owner"""", """"displayName": """"")
+        given().contentType(ContentType.JSON).body(bad)
+            .post("/api/setup/owner")
+            .then().statusCode(400)
+    }
+
+    @Test
+    fun rejectsMalformedEmail() {
+        val bad = request.replace(""""email": "owner@example.com"""", """"email": "not-an-email"""")
+        given().contentType(ContentType.JSON).body(bad)
+            .post("/api/setup/owner")
+            .then().statusCode(400)
+    }
 }

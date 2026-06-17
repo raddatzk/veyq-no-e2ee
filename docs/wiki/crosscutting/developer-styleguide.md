@@ -62,15 +62,17 @@ The mechanism is already wired; the **convention is to actually use it**.
   request fields — `maxLength`/`minLength` on strings, `pattern`, `format`, `minimum`/`maximum` on numbers,
   `required`. The generated JAX-RS interface carries `@Valid @NotNull`, so `quarkus-hibernate-validator`
   enforces **required fields + structure** (a missing/extra-shaped body → 400 before the handler).
-- **But field-level constraints are NOT auto-enforced today** — a real toolchain limitation: the model
-  generator is `kotlin` (openapi-generator 7.21.0), which silently ignores `useBeanValidation` and emits no
-  `@get:Size`/`@get:Min`/`@get:Pattern` on the Kotlin models. So `maxLength`/`min`/`max`/`pattern` are
-  **contract documentation** (and drive client SDKs / future enforcement), not server enforcement. Declare them
-  anyway — the shared crypto types in `common.openapi.yaml` are constrained — but **security-relevant field
-  bounds must also be enforced imperatively** in the handler/guard, close to the invariant. Existing exemplars:
-  `BlobUploadHandler` (`totalChunks`/`byteSize`/frame-size checks → `400`), `CryptoSuiteRegistry.require`.
-  *(Activating real annotation validation needs a generator that emits Kotlin jakarta constraints — a tracked
-  follow-up.)*
+- **Field-level validation IS enforced — via the `x-field-extra-annotation` vendor extension.** The `kotlin`
+  model generator (7.21.0) ignores standard `maxLength`/`pattern` (and `useBeanValidation`), but it DOES emit
+  `x-field-extra-annotation` onto the model field. So put the *enforcing* annotation there: a jakarta built-in
+  for plain bounds — `x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = N)']` — or a
+  custom `@Constraint` for semantic rules — `'@field:com.veyq.app.shared.validation.Email'` / `DisplayName`
+  (in `shared/validation/`). `@Valid` on the generated interface then enforces it → **400 before the handler**
+  (proven by `SetupServerSliceTest.rejectsBlankDisplayName`/`rejectsMalformedEmail`). Keep the standard
+  `maxLength` alongside as human-readable contract; the vendor extension is what actually enforces.
+- **Beyond-schema / stateful checks stay imperative** in the handler/guard, close to the invariant —
+  `CryptoSuiteRegistry.require`, scope-grant checks, `BlobUploadHandler`'s per-scope/quota logic. Annotations
+  cover per-field shape; anything needing DB state or cross-field logic does not belong in a `@Constraint`.
 - **Domain checks beyond the schema stay imperative, in a guard/handler, close to the invariant** — and small,
   named, fail-closed. Good existing examples: `CryptoSuiteRegistry.require(suiteId)` (suite allow-list),
   `BlobStore` path-traversal guard (`require(!key.contains(".."))` + `require(p.startsWith(root))`), the

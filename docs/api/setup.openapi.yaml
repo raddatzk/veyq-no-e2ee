@@ -58,8 +58,8 @@ components:
         [email, displayName, identityPublicKey, wrappedIdentityPrivateKey, masterKeyWraps,
          authVerifier, personalScopePublicKey, wrappedPersonalScopePrivateKey]
       properties:
-        email: { type: string }
-        displayName: { type: string }
+        email: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.Email'] }
+        displayName: { type: string, x-field-extra-annotation: ['@field:com.veyq.app.shared.validation.DisplayName'] }
         identityPublicKey: { $ref: './common.openapi.yaml#/components/schemas/IdentityPublicKey' }
         wrappedIdentityPrivateKey: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         masterKeyWraps:
