@@ -28,9 +28,14 @@ class MemberListHandler(
     fun listTenantMembers(auth: String?, tenantId: String): TenantMemberList {
         guard.requireActiveMember(auth, tenantId)
 
-        val members = memberships.listByTenant(tenantId).mapNotNull { membership ->
-            val user = users.findById(membership.userId) ?: return@mapNotNull null
-            val identity = identityKeys.findByUserId(user.id) ?: return@mapNotNull null
+        // Batch the user + identity lookups (one IN-query each) instead of an N+1 per member row.
+        val rows = memberships.listByTenant(tenantId)
+        val userIds = rows.map { it.userId }
+        val usersById = users.listByIds(userIds).associateBy { it.id }
+        val identityByUserId = identityKeys.listByUserIds(userIds).associateBy { it.userId }
+        val members = rows.mapNotNull { membership ->
+            val user = usersById[membership.userId] ?: return@mapNotNull null
+            val identity = identityByUserId[user.id] ?: return@mapNotNull null
             TenantMember(
                 userId = user.id,
                 displayName = user.displayName,

@@ -39,6 +39,9 @@ class User {
 class UserRepository : PanacheRepositoryBase<User, String> {
     fun findByEmail(email: String): User? = find("email", email).firstResult()
 
+    /** Batch lookup by id (one IN-query) — used by roster listings to avoid an N+1 per member. */
+    fun listByIds(ids: Collection<String>): List<User> = if (ids.isEmpty()) emptyList() else list("id in ?1", ids)
+
     fun countServerOwners(): Long =
         count("serverRole = ?1 and systemAccount = false", ServerRole.ServerOwner)
 }

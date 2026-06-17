@@ -54,6 +54,10 @@ class AuthVerifier {
 @ApplicationScoped
 class IdentityKeyRepository : PanacheRepositoryBase<IdentityKey, String> {
     fun findByUserId(userId: String): IdentityKey? = find("userId", userId).firstResult()
+
+    /** Batch lookup by user id (one IN-query) — used by the member roster to avoid an N+1 per member. */
+    fun listByUserIds(userIds: Collection<String>): List<IdentityKey> =
+        if (userIds.isEmpty()) emptyList() else list("userId in ?1", userIds)
 }
 
 @ApplicationScoped

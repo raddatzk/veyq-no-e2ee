@@ -109,7 +109,10 @@ class GroupProvisioningHandler(
         requireGroupScope(tenantId, scopeId)
         requireActiveMembership(tenantId, userId) // a removed tenant member loses group visibility too
         groupMembers.find(scopeId, userId) ?: throw ApiException(403, "NOT_A_GROUP_MEMBER", "You are not a member of this group")
-        return GroupMemberList(members = groupMembers.listByScopeId(scopeId).map(::toApiMember))
+        // Batch the display-name lookup (one IN-query) instead of users.findById per group member.
+        val gms = groupMembers.listByScopeId(scopeId)
+        val nameById = users.listByIds(gms.map { it.userId }).associate { it.id to it.displayName }
+        return GroupMemberList(members = gms.map { ApiGroupMember(userId = it.userId, displayName = nameById[it.userId] ?: "", role = it.role) })
     }
 
     @Transactional

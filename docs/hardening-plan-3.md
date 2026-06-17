@@ -101,9 +101,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   iOS-Conformance-Tests grün (p=1-Vektoren).
 
 ## Phase E — Performance
-- [ ] **E1 · Backend-N+1-Restkehrwisch** *(Perf, Medium, M)* — `MemberListHandler` (`users`/`identityKeys` pro
-  Zeile), `GroupProvisioningHandler.listGroupMembers` (`users.findById` pro Zeile), `MyGrantsHandler`
-  (`scopes.findById` + `isActiveMember` pro Grant). Auf IN-Query-Batching umstellen (analog D2/E2/`MediaApiMapper`).
+- [x] **E1 · Backend-N+1-Restkehrwisch** *(Perf, Medium, M)* — drei Listings auf feste Query-Zahl umgestellt:
+  `MemberListHandler` (neue `users.listByIds` + `identityKeys.listByUserIds`, in-memory zusammengesetzt),
+  `GroupProvisioningHandler.listGroupMembers` (Namen per `users.listByIds` statt findById/Member),
+  `MyGrantsHandler` (Scopes per `scopes.listByIds` + Active-Tenant-Set per `listActiveByUserId` statt
+  `scopes.findById` + `guard.isActiveMember` pro Grant). Verifiziert: 60 Backend-Tests grün.
 - [ ] **E2 · Web Bulk-ZIP-Download puffert alles im RAM** *(Perf, Medium, M)* — `download.ts` entschlüsselt jedes
   Original komplett in `files[]`, baut dann ein In-Memory-ZIP + Blob → Peak ~2–3× Gesamtgröße, OOM bei großen
   Memories. Fix: zur Platte streamen (File System Access API + Streaming-ZIP) oder zumindest cappen/warnen.

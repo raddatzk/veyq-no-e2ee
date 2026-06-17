@@ -7,8 +7,8 @@ import com.veyq.app.generated.model.OwnedGrant
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.keymgmt.ScopeGrantRepository
 import com.veyq.app.shared.keymgmt.ScopeRepository
-import com.veyq.app.shared.security.ScopeAccessGuard
 import com.veyq.app.shared.security.SessionService
+import com.veyq.app.shared.tenancy.MembershipRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
 import java.util.Base64
@@ -26,16 +26,22 @@ class MyGrantsHandler(
     private val grants: ScopeGrantRepository,
     private val scopes: ScopeRepository,
     private val sessions: SessionService,
-    private val guard: ScopeAccessGuard,
+    private val memberships: MembershipRepository,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
 
     @Transactional
     fun listMyGrants(auth: String?): MyGrantList {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
-        val owned = grants.listByUserId(userId).mapNotNull { grant ->
-            val scope = scopes.findById(grant.scopeId) ?: return@mapNotNull null
-            if (!guard.isActiveMember(userId, scope.tenantId)) return@mapNotNull null
+        // Fixed query count instead of O(grants): all grants, their scopes (one IN-query), and the caller's
+        // active-tenant set — then filter in memory (a tenant-scope grant requires active membership; personal
+        // scopes have no tenant and always pass), mirroring ScopeAccessGuard.isActiveMember.
+        val held = grants.listByUserId(userId)
+        val scopesById = scopes.listByIds(held.map { it.scopeId }).associateBy { it.id }
+        val activeTenantIds = memberships.listActiveByUserId(userId).map { it.tenantId }.toSet()
+        val owned = held.mapNotNull { grant ->
+            val scope = scopesById[grant.scopeId] ?: return@mapNotNull null
+            if (scope.tenantId != null && scope.tenantId !in activeTenantIds) return@mapNotNull null
             OwnedGrant(
                 scopeId = scope.id,
                 kind = scope.kind.name,
