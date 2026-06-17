@@ -15,9 +15,10 @@ import com.veyq.app.shared.keymgmt.KeyBlobRepository
 import com.veyq.app.shared.security.SessionService
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
+import com.veyq.app.shared.config.AppConfig
+import com.veyq.app.shared.config.PasswordResetConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
@@ -40,9 +41,11 @@ class PasswordResetHandler(
     private val sessions: SessionService,
     private val suites: CryptoSuiteRegistry,
     private val mailer: Mailer,
-    @param:ConfigProperty(name = "veyq.app.base-url") private val appBaseUrl: String,
-    @param:ConfigProperty(name = "veyq.password-reset.ttl", defaultValue = "PT1H") private val ttl: Duration,
+    app: AppConfig,
+    resetCfg: PasswordResetConfig,
 ) {
+    private val appBaseUrl: String = app.baseUrl()
+    private val ttl: Duration = resetCfg.ttl()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val rng = SecureRandom()

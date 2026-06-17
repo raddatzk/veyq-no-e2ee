@@ -8,9 +8,9 @@ import com.veyq.app.shared.tenancy.TenantInviteRepository
 import com.veyq.app.shared.tenancy.TenantRepository
 import io.quarkus.mailer.Mail
 import io.quarkus.mailer.Mailer
+import com.veyq.app.shared.config.AppConfig
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
 
 /**
  * uc.admin.email-invite — relay an already-issued member-invite link to an email address. The link is
@@ -25,8 +25,10 @@ class EmailInviteHandler(
     private val invites: TenantInviteRepository,
     private val guard: TenantAdminGuard,
     private val mailer: Mailer,
-    @param:ConfigProperty(name = "veyq.app.base-url") private val appBaseUrl: String,
+    app: AppConfig,
 ) {
+    private val appBaseUrl: String = app.baseUrl()
+
     @Transactional
     fun emailMemberInvite(auth: String?, tenantId: String, req: EmailInviteRequest) {
         guard.requireOwner(auth, tenantId)

@@ -4,6 +4,7 @@ import com.veyq.app.generated.model.CreateServerOwnerRequest
 import com.veyq.app.generated.model.SetupStatus
 import com.veyq.app.generated.model.UserSummary
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.config.AppConfig
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.identity.AccountFactory
 import com.veyq.app.shared.identity.NewAccount
@@ -22,9 +23,10 @@ class SetupServerHandler(
     private val suites: CryptoSuiteRegistry,
     private val setupGate: SetupGate,
     private val serverSetup: ServerSetupRepository,
-    @param:org.eclipse.microprofile.config.inject.ConfigProperty(name = "veyq.app.base-url")
-    private val appBaseUrl: String,
+    app: AppConfig,
 ) {
+    private val appBaseUrl: String = app.baseUrl()
+
     @Transactional
     fun status(): SetupStatus =
         SetupStatus(setupRequired = !setupGate.isComplete(), suites = suites.supported(), appBaseUrl = appBaseUrl)

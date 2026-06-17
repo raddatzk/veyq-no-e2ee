@@ -23,7 +23,7 @@ import com.veyq.app.shared.storage.BlobStore
 import jakarta.enterprise.context.ApplicationScoped
 import io.quarkus.narayana.jta.QuarkusTransaction
 import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import com.veyq.app.shared.config.UploadsConfig
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
@@ -44,14 +44,15 @@ class BlobUploadHandler(
     private val store: BlobStore,
     private val guard: ScopeAccessGuard,
     private val suites: CryptoSuiteRegistry,
-    @param:ConfigProperty(name = "veyq.uploads.max-chunks", defaultValue = "10000") private val maxChunks: Int,
-    @param:ConfigProperty(name = "veyq.uploads.max-upload-bytes", defaultValue = "10737418240") private val maxUploadBytes: Long,
-    @param:ConfigProperty(name = "veyq.uploads.max-frame-bytes", defaultValue = "16777244") private val maxFrameBytes: Int,
-    @param:ConfigProperty(name = "veyq.uploads.max-open-sessions", defaultValue = "100") private val maxOpenSessions: Long,
-    // Guest (public-share) write quotas — tighter than the per-scope caps, since a share link is unauthenticated.
-    @param:ConfigProperty(name = "veyq.uploads.max-share-open-sessions", defaultValue = "10") private val maxShareOpenSessions: Long,
-    @param:ConfigProperty(name = "veyq.uploads.max-share-bytes", defaultValue = "2147483648") private val maxShareBytes: Long,
+    cfg: UploadsConfig,
 ) {
+    private val maxChunks = cfg.maxChunks()
+    private val maxUploadBytes = cfg.maxUploadBytes()
+    private val maxFrameBytes = cfg.maxFrameBytes()
+    private val maxOpenSessions = cfg.maxOpenSessions()
+    // Guest (public-share) write quotas — tighter than the per-scope caps, since a share link is unauthenticated.
+    private val maxShareOpenSessions = cfg.maxShareOpenSessions()
+    private val maxShareBytes = cfg.maxShareBytes()
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val maxEncodedFrameChars = ((maxFrameBytes + 2) / 3) * 4

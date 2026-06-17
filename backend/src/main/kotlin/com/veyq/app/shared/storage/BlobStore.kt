@@ -1,7 +1,7 @@
 package com.veyq.app.shared.storage
 
+import com.veyq.app.shared.config.BlobStoreConfig
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -24,9 +24,9 @@ interface BlobStore {
  */
 @ApplicationScoped
 class FilesystemBlobStore(
-    @ConfigProperty(name = "veyq.blob-store.dir", defaultValue = "build/veyq-blobs") private val rootDir: String,
+    config: BlobStoreConfig,
 ) : BlobStore {
-    private val root: Path = Path.of(rootDir).toAbsolutePath().normalize()
+    private val root: Path = Path.of(config.dir()).toAbsolutePath().normalize()
 
     private fun resolve(key: String): Path {
         require(!key.contains("..")) { "invalid blob key" }

@@ -11,9 +11,9 @@ import com.veyq.app.generated.model.TenantInviteInfo
 import com.veyq.app.generated.model.TenantInviteMaterial
 import com.veyq.app.generated.model.TenantSummary
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.config.TenantConfig
 import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import com.veyq.app.shared.identity.ServerRole
 import com.veyq.app.shared.identity.User
 import com.veyq.app.shared.identity.UserRepository
@@ -67,8 +67,10 @@ class TenantProvisioningHandler(
     private val sessions: SessionService,
     private val guard: TenantAdminGuard,
     private val suites: CryptoSuiteRegistry,
-    @param:ConfigProperty(name = "veyq.tenant.deletion-grace", defaultValue = "P30D") private val deletionGrace: Duration,
+    tenantCfg: TenantConfig,
 ) {
+    private val deletionGrace: Duration = tenantCfg.deletionGrace()
+
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
     private val rng = SecureRandom()

@@ -1,8 +1,8 @@
 package com.veyq.app.features.uploads.blob
 
+import com.veyq.app.shared.config.UploadsConfig
 import io.quarkus.scheduler.Scheduled
 import jakarta.enterprise.context.ApplicationScoped
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -14,10 +14,10 @@ import java.time.temporal.ChronoUnit
 @ApplicationScoped
 class BlobUploadGc(
     private val handler: BlobUploadHandler,
-    @param:ConfigProperty(name = "veyq.uploads.session-ttl-hours", defaultValue = "24") private val ttlHours: Long,
+    private val cfg: UploadsConfig,
 ) {
     @Scheduled(every = "1h")
     fun sweep() {
-        handler.purgeStaleOpenUploads(Instant.now().minus(ttlHours, ChronoUnit.HOURS))
+        handler.purgeStaleOpenUploads(Instant.now().minus(cfg.sessionTtlHours(), ChronoUnit.HOURS))
     }
 }

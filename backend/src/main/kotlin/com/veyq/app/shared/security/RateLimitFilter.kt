@@ -1,15 +1,15 @@
 package com.veyq.app.shared.security
 
 import com.veyq.app.generated.model.ErrorResponse
+import com.veyq.app.shared.config.RateLimitConfig
 import io.vertx.ext.web.RoutingContext
+import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import jakarta.ws.rs.container.ContainerRequestContext
 import jakarta.ws.rs.container.ContainerRequestFilter
 import jakarta.ws.rs.core.Response
 import jakarta.ws.rs.ext.Provider
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import java.net.InetAddress
-import java.util.Optional
 
 /**
  * Per-IP rate limiting for the abuse-prone unauthenticated endpoints. A request over its bucket's limit is
@@ -17,14 +17,15 @@ import java.util.Optional
  * slice + e2e suites, which hammer these paths from one host, stay green.
  */
 @Provider
+@ApplicationScoped // lazy: resolve the @ConfigMapping at first request, not during early-boot provider wiring
 class RateLimitFilter(
     private val limiter: RateLimiter,
-    @param:ConfigProperty(name = "veyq.ratelimit.enabled", defaultValue = "true") private val enabled: Boolean,
-    // Optional<String> because SmallRye converts an empty config value to "absent" (the default deployment).
-    @param:ConfigProperty(name = "veyq.ratelimit.trusted-proxies") trustedProxies: Optional<String>,
-    // Per-IP per-minute egress budget for unauthenticated public-share GETs (default 500 MiB).
-    @param:ConfigProperty(name = "veyq.ratelimit.share-egress-bytes-per-min", defaultValue = "524288000") private val shareEgressBytesPerMin: Long,
+    config: RateLimitConfig,
 ) : ContainerRequestFilter {
+
+    private val enabled: Boolean = config.enabled()
+    // Per-IP per-minute egress budget for unauthenticated public-share GETs (default 500 MiB).
+    private val shareEgressBytesPerMin: Long = config.shareEgressBytesPerMin()
 
     @Inject
     lateinit var routingContext: RoutingContext
@@ -36,7 +37,7 @@ class RateLimitFilter(
 
     /** Proxy IPs/CIDRs whose appended X-Forwarded-For we may trust (empty = trust none, key on the socket). */
     private val trusted: List<CidrMatcher> =
-        trustedProxies.orElse("").split(",").map(String::trim).filter(String::isNotEmpty).mapNotNull(CidrMatcher::parseOrNull)
+        config.trustedProxies().orElse("").split(",").map(String::trim).filter(String::isNotEmpty).mapNotNull(CidrMatcher::parseOrNull)
 
     /** (path-substring, limit, windowMs) — only POSTs to these paths are throttled. Generous vs real use. */
     private data class Bucket(val name: String, val match: String, val limit: Int, val windowMs: Long)
