@@ -88,12 +88,13 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   App-Cache-Artefakt). Verifiziert: Android `:app` + iOS-App (xcodebuild) bauen.
 
 ## Phase D — Crypto-Conformance-Härtung (drift-proofing)
-- [ ] **D1 · Passwort-abgeleitete KEKs durch Vektoren pinnen** *(Crypto/Tests, Medium, S)* — `invite-temp-key`-KEK
-  (Produktions-Argon m=32768 + Wrap-Context) und `share-pw`/`shareWrapKey` (`veyq/v1/share-pw`) sind durch KEIN
-  Conformance-Vektor gepinnt — genau die Blindstelle, die den B1-Bug (m=65536 vs 32768) durchrutschen ließ.
-  Fix: KAT-Vektoren für `kekRecovery@m=32768`, `symWrap(context="invite-temp-key")` und `shareWrapKey` in
-  `v1.json` + alle drei Conformance-Suiten. (`share-pw` ist derzeit web-only — entweder Mobile-Create nachziehen
-  oder „web-only by design" dokumentieren.)
+- [x] **D1 · Passwort-abgeleitete KEKs durch Vektoren pinnen** *(Crypto/Tests, Medium, S)* — drei neue KAT-Vektoren
+  in `v1.json`: `kek.recovery_argon2id_m32768` (kekRecovery @ Produktions-m=32768 — exakt der B1-Param),
+  `wrap.sym_invite_temp_key` (symWrap-Context `invite-temp-key`), `kek.share_pw` (`shareWrapKey`/`veyq/v1/share-pw`).
+  Werte aus der Web-Impl generiert. Cross-Platform asserted in allen drei Conformance-Suiten (Web/iOS/Android) für
+  die ersten beiden; `share_pw` nur in der Web-Suite (iOS/Android implementieren keine passwortgeschützten Share-
+  Creates → „web-only by design", im Vektor dokumentiert). Verifiziert: Web (17 Tests) + iOS + Android
+  Conformance grün.
 - [x] **D2 · iOS Argon2id ignoriert `p` still** *(Crypto, Low, S)* — iOS `argon2id` wirft jetzt bei
   `params.p != 1` (libsodium fixiert Parallelität auf 1) statt lautlos divergierende Bytes zu erzeugen. Alle
   aktuellen Uses sind p=1 → unverändert; ein künftiger p>1-Caller scheitert laut statt still. Verifiziert:

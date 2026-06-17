@@ -40,6 +40,16 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
     expect(hex(v1.kekRecovery(unhex(k.recovery_code), unhex(k.salt), k.params))).toBe(k.kek)
   })
 
+  it('recovery KEK at PRODUCTION Argon2 params m=32 MiB (pins the invite-temp-key KEK)', () => {
+    const k = vectors.kek.recovery_argon2id_m32768
+    expect(hex(v1.kekRecovery(unhex(k.recovery_code), unhex(k.salt), k.params))).toBe(k.kek)
+  })
+
+  it('password-protected share wrap key (web-only by design)', () => {
+    const s = vectors.kek.share_pw
+    expect(hex(v1.shareWrapKey(unhex(s.share_key), s.password_utf8, unhex(s.salt)))).toBe(s.wrap_key)
+  })
+
   it('passkey PRF KEK (HKDF)', () => {
     const k = vectors.kek.passkey_prf_hkdf
     expect(hex(v1.kekPasskey(unhex(k.prf_output)))).toBe(k.kek)
@@ -57,6 +67,11 @@ describe('v1 crypto conformance (web TS vs shared vectors)', () => {
 
   it('symmetric master-key wrap', () => {
     const w = vectors.wrap.sym_master_key
+    expect(hex(v1.symWrap(unhex(w.kek), unhex(w.plaintext), w.context, unhex(w.nonce)))).toBe(w.blob)
+  })
+
+  it('symmetric wrap with the invite-temp-key context', () => {
+    const w = vectors.wrap.sym_invite_temp_key
     expect(hex(v1.symWrap(unhex(w.kek), unhex(w.plaintext), w.context, unhex(w.nonce)))).toBe(w.blob)
   })
 

@@ -63,6 +63,13 @@ final class ConformanceTests: XCTestCase {
                                      salt: hex(rec["salt"] as! String), params: params(rec))),
             rec["kek"] as! String, "recovery KEK")
 
+        // Production-param (m=32 MiB) recovery KEK — pins the invite-temp-key KDF (the B1-class param bug).
+        let recProd = kek["recovery_argon2id_m32768"] as! [String: Any]
+        XCTAssertEqual(
+            toHex(try V1.kekRecovery(recoveryCode: hex(recProd["recovery_code"] as! String),
+                                     salt: hex(recProd["salt"] as! String), params: params(recProd))),
+            recProd["kek"] as! String, "recovery KEK @ m=32768")
+
         let pk = kek["passkey_prf_hkdf"] as! [String: String]
         XCTAssertEqual(toHex(V1.kekPasskey(prfOutput: hex(pk["prf_output"]!))), pk["kek"]!, "passkey KEK")
 
@@ -78,6 +85,13 @@ final class ConformanceTests: XCTestCase {
             toHex(try V1.symWrap(kek: hex(sym["kek"]!), targetKey: hex(sym["plaintext"]!),
                                  context: sym["context"]!, nonce: hex(sym["nonce"]!))),
             sym["blob"]!, "sym wrap")
+
+        // Pins the invite-temp-key wrap context across platforms.
+        let symInvite = wrap["sym_invite_temp_key"] as! [String: String]
+        XCTAssertEqual(
+            toHex(try V1.symWrap(kek: hex(symInvite["kek"]!), targetKey: hex(symInvite["plaintext"]!),
+                                 context: symInvite["context"]!, nonce: hex(symInvite["nonce"]!))),
+            symInvite["blob"]!, "sym wrap invite-temp-key")
 
         let asym = wrap["asym_scope_grant"] as! [String: String]
         XCTAssertEqual(

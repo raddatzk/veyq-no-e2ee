@@ -1,6 +1,6 @@
 {
   "suite": "v1",
-  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Argon2 here uses light params (m=8 MiB) for fast conformance; production uses 64 MiB (see crypto-spec.md). ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
+  "note": "Conformance vectors for the veyq v1 crypto suite. Bytes are lowercase hex. Most Argon2 vectors use light params (m=8 MiB) for fast conformance; recovery_argon2id_m32768 + share_pw deliberately pin the PRODUCTION param (m=32 MiB) to drift-proof the password-derived KEKs; production uses 64 MiB (see crypto-spec.md). ML-KEM/X25519 encapsulation is randomized in practice, so the KEM is conformance-tested via the deterministic Decap KAT plus client-internal encap->decap round-trips.",
   "primitives": {
     "hkdf_sha256_rfc5869_case1": {
       "ikm": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
@@ -44,6 +44,25 @@
     "passkey_prf_hkdf": {
       "prf_output": "3333333333333333333333333333333333333333333333333333333333333333",
       "kek": "148f9195f1b9d54a01d868d0ac56d4481f8d049c20c308beabe701c4f06f557a"
+    },
+    "recovery_argon2id_m32768": {
+      "note": "kekRecovery at PRODUCTION Argon2 params (m=32 MiB) \u2014 pins the invite-temp-key KEK so the B1-class param mismatch (m=65536 vs 32768) cannot silently recur. Same inputs as recovery_argon2id, only m differs.",
+      "params": {
+        "t": 3,
+        "m": 32768,
+        "p": 1,
+        "dkLen": 32
+      },
+      "recovery_code": "22222222222222222222222222222222",
+      "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "kek": "ccddfe96872cf9e46c3ea4ba109b12f48b6690ffd7bf9b7a77b7748314f15381"
+    },
+    "share_pw": {
+      "note": "shareWrapKey = HKDF(shareKey, kekRecovery(NFC(password),salt @ m=32768), \"veyq/v1/share-pw\", 32). WEB-ONLY by design: iOS/Android do not create password-protected shares, so this vector is asserted only in the web suite.",
+      "share_key": "3333333333333333333333333333333333333333333333333333333333333333",
+      "password_utf8": "correct horse battery staple",
+      "salt": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "wrap_key": "93c10dfa6a4cd58681183b063f0aa514ab354d12445395fa4600fc273a97b75d"
     }
   },
   "kem_v1": {
@@ -73,6 +92,14 @@
       "context": "scope-grant",
       "plaintext": "4444444444444444444444444444444444444444444444444444444444444444",
       "blob": "015dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef229989c14cb67677682d7e4d292ffde065c076e5b9f36e4b67060f3d7fb61d393a5e9dd29682abbf1d1d105c813e2629d5a651c674a5e5b8b58616e2d7a3efd5d4cccc36587351c10778ff00787ea67c9ecf36bd1d357ae7af8d3d7218bb6d86c5401a54b11217925d4b03d56ea0f249931125549f924103de4d458009e9da2679c32bddc6f61e216f7046b679e41527307698ca5fbc49384c9e664d35bf8470b339a1de477cab9634d10b68e959950a8acb9695c33c672b9a83617c158f69179b3358dc5bb7b82832c7b539879c8f7b76403f45658ddcb500bc33c3e5931cbec8d05a08f136c15d16c86ab96b7ada9ea047107f3032c5660ae1f5e4ecda32e621deb71132cf6c5b8d8942e2a38b0e51133a2556fc23f3f6918ef4e3a6776bf389523e5345aa125b7876651198204bbeaa153416e63a760919c7758091399ea66d4495857e99c4039f6c026be304c8837ffb547ffd6fdc32cd3dd4d836d6f49095d6906d50b9c49604eed9efab38ea039f4f2803835bd5781ad896c36a47d494c98e51d7a53f8003ce4fe75d4ca46726c511c4eb321c777683d3a26a935f39604c30f273993d8920ca81548c904feaad74d0a2a969e437c1fcef619e2a698b9ac0298a615b4442730d9146a5d9917ccb0b70d7a38b89232a57ba00f3d1e28cb99623afcbe44617dd84529425ec024f4bcd7036db3fcc2d9da8cf2f32b49e75eb8cf0703e120c95d7d38d13589e8fcc3ccb1a5add906003011671a0e4bbeb622f2617ffdc7a43a3a17def509253e86a5c2206384ff83f294380d3611bbcb68f0173899c0ea9ace6bf2c75ef5a007860b048eec46a2f20492d7650ff9b0fc86567d23032c8cb1171b2efcf8b9ef74c83d7224f73307060b30f25cbae8c4396e664a291ac7fce9a28cddcf827db8e2382fa40a95e3faed4b0df5029738a89396d13f75fffa55601c6a7c8c4aebe384c2964774361cc22fc3e3385b2c8a68254625f9a862bf10a536c3e62a8f9cdb7be19ca64f8caad433d6f131fffa500eb68163824ad2a09f66aa6bb32b53297ef48f2d479fc167e1b27bcddb8651d6055c0931c33e389d908356236fc75dd5a95db99cdac35948167c73f47448427e5c534323d7a5d59cdd642852a203a7870d0969ff86e60fe5c68de2a582943dda170fb2fd6d5129ca990305e5c76133dc6f372bb9e8b91e8400d88014685701a3b2779474f20caa20e4fc6de123dd81ebbeb66dbf8baff173ed004d1d3f73b750c3fdfff047737873cc063aaa4058875a745b7b04750e2e99a002420535bf17b41712f039a514e293d0ed638fdda5f8fc79b56fd411267af6e5845009fdf16f1dbb2bdc11120fc41a2367bff30da8bcde464d2d26d2a1f9d21ee2ff1245de5bb6faef860f158b6d31232cca302b04f01b874847c318714727ac8ff74e6c10600c38250108a9b3747fa411fbedbb0553754e0e5e61e1c176bf6db67df2f7c032437cad490f37b82f8f4b40108c4e0312c93ddedfad497d90610f01de7413cf36cbd889ffae3be0a0b0c0d0e0f10111213141597700094c2f28baafe627d4a2bbc7e537f566b231d49b4eb0a296d6f524623e12742763805750d4b9da7b83547733f8c"
+    },
+    "sym_invite_temp_key": {
+      "note": "symWrap with the invite-temp-key context \u2014 pins the wrap-context string across platforms. kek = recovery_argon2id_m32768.kek.",
+      "kek": "ccddfe96872cf9e46c3ea4ba109b12f48b6690ffd7bf9b7a77b7748314f15381",
+      "context": "invite-temp-key",
+      "nonce": "0a0b0c0d0e0f101112131415",
+      "plaintext": "4444444444444444444444444444444444444444444444444444444444444444",
+      "blob": "020a0b0c0d0e0f101112131415e099b49334619c29aa4be5cde8d07c3f386b4704ed053fa586fe6b88b148b6afc95b660bee6d39526d490ba090bc50d6"
     }
   },
   "slug_token": {

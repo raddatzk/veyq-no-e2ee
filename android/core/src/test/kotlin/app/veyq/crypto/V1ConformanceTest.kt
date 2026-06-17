@@ -53,6 +53,9 @@ class V1ConformanceTest {
         )
         val rec = kek.getJSONObject("recovery_argon2id")
         assertEquals(rec.getString("kek"), hex(V1.kekRecovery(unhex(rec.getString("recovery_code")), unhex(rec.getString("salt")), argon(rec))))
+        // Production-param (m=32 MiB) recovery KEK — pins the invite-temp-key KDF (the B1-class param bug).
+        val recProd = kek.getJSONObject("recovery_argon2id_m32768")
+        assertEquals(recProd.getString("kek"), hex(V1.kekRecovery(unhex(recProd.getString("recovery_code")), unhex(recProd.getString("salt")), argon(recProd))))
         val pk = kek.getJSONObject("passkey_prf_hkdf")
         assertEquals(pk.getString("kek"), hex(V1.kekPasskey(unhex(pk.getString("prf_output")))))
 
@@ -67,6 +70,12 @@ class V1ConformanceTest {
         assertEquals(
             sym.getString("blob"),
             hex(V1.symWrap(unhex(sym.getString("kek")), unhex(sym.getString("plaintext")), sym.getString("context"), unhex(sym.getString("nonce")))),
+        )
+        // Pins the invite-temp-key wrap context across platforms.
+        val symInvite = wrap.getJSONObject("sym_invite_temp_key")
+        assertEquals(
+            symInvite.getString("blob"),
+            hex(V1.symWrap(unhex(symInvite.getString("kek")), unhex(symInvite.getString("plaintext")), symInvite.getString("context"), unhex(symInvite.getString("nonce")))),
         )
         val asym = wrap.getJSONObject("asym_scope_grant")
         assertEquals(
