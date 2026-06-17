@@ -168,10 +168,11 @@ now and upgraded later.
 
 ## Streaming & segmented media — [Roadmap]
 
-> **Not yet built.** Today a video is a single encrypted blob plus client-generated derivative blobs
-> (thumbnail/preview); there is no segmented streaming rendition. The design below is the target. Note the
-> blind server **cannot** transcode (it holds only ciphertext) — segmentation/transcoding happens on the
-> **client** at upload, on plaintext, and each segment is encrypted before upload (the original stays one blob).
+> **Not yet built — slated for the agent pipeline/queue.** Today a video is a single encrypted blob plus
+> client-generated derivative blobs (thumbnail/preview); there is no segmented streaming rendition. The design
+> below is the target. Note the blind server **cannot** transcode (it holds only ciphertext) —
+> segmentation/transcoding happens on the **client** (or a user-side agent) at upload, on plaintext, and each
+> segment is encrypted before upload (the original stays one blob).
 
 A large video cannot be served as one AES-GCM blob — seeking would need the whole file and its tag.
 Instead the **transcode derivative is segmented** (HLS/DASH-style: short segments, optionally several
@@ -326,8 +327,11 @@ sealed behind the Secret Key. This is a deliberate trade-off: keeping login a pl
 preserves a simple, operator-blind sign-in (the server never sees the Secret Key) and means password
 *reset* can be email-gated without weakening content secrecy. The Argon2id cost (m=32768, t=3) is what
 makes the login-password brute-force expensive; raising it is the lever if the threat model tightens.
-Closing this fully would bind the Secret Key into the verifier too (`Argon2(secretKey ‖ password)`),
-which we deliberately deferred to keep the login path unchanged across all clients.
+Hardening this further (e.g. also binding the Secret Key into the verifier) is a **deliberate non-goal**, not
+a deferred item: it would trade usability and cross-stack complexity for a *bounded* exposure — the login
+password, which never unlocks content (the Secret Key does) — and in a self-host deployment the operator is
+the user, so it is moot. The lever, if the threat model ever tightens, is the Argon2id cost, not a protocol
+change.
 
 > **Deferred hardening (tracked):** public-share *upload* (CONTRIBUTOR/UPLOADER) is authorized by the
 > `shareId` alone — link possession lets a guest append (sealed) junk, a storage/DoS vector but not a
