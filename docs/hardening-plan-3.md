@@ -55,14 +55,19 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   superseded-`sendClose`; iOS `webSocketTask === self.task`-Guard in didOpen/didClose) → keine Doppel-Sockets.
   Verifiziert: Android `:core` + `:app` kompilieren, iOS `VeyqCrypto`-Package baut (swift build). (Web
   unverändert — single-threaded Eventloop. Multi-Client-Runtime weiter via Plan-2-F1/CI.)
-- [ ] **B2 · Journal-Compaction prune-vs-snapshot unter Concurrency** *(Correctness, Low-Med, S)* —
-  `compactJournal` prunet Updates `<= coveredSeq` und setzt `baseSeq = coveredSeq`, ohne zu erzwingen, dass der
-  client-seitige Snapshot wirklich alle Updates bis `nextSeq` faltet. Append im Fenster → stiller Verlust
-  versiegelter Inkremente. Fix: Client sendet den max-gefalteten Seq; unter Row-Lock `== journal.nextSeq`
-  asserten (sonst `BAD_SEQ`), bzw. nur bis zum nachweislich abgedeckten Seq prunen.
-- [ ] **B3 · iOS `journalSeal` schluckt AEAD-Seal-Fehler** *(Correctness, Low, S)* — `(try? aeadSeal) ?? Data()`
-  erzeugt `salt||nonce` mit leerem Ciphertext/Tag → später still nicht-öffenbar (verlorener Edit). Android/Web
-  werfen. Fix: `journalSeal` `throws` und propagieren (Divergenz beseitigen).
+- [x] **B2 · Journal-Compaction prune-vs-snapshot unter Concurrency** *(Correctness, Low-Med, S)* — die echte
+  Invariante ist „Snapshot deckt JEDES Update <= coveredSeq" — server-seitig operator-blind **nicht** prüfbar
+  (`==nextSeq` wäre weder hinreichend gegen Lücken *unter* coveredSeq noch nicht-brechend, da
+  `saveJournalMarkdown` nur via Compact persistiert). Fix client-seitig: **Reload-before-Compact** auf dem
+  Live-Pfad (Web `LiveJournalEditor` onBeforeUnmount, iOS/Android `compactPersisted` rufen `loadJournalDoc`/
+  `loadPersisted` vor dem Compact) → der frisch geladene Log füllt jede Lücke, also ist der Snapshot
+  garantiert lückenlos. `saveJournalMarkdown` lädt ohnehin schon vorher (unverändert). Backend: Invariante als
+  Kommentar dokumentiert. Verifiziert: vue-tsc + journal/journalLive/journalPersistence-E2E grün; iOS/Android
+  kompilieren.
+- [x] **B3 · iOS `journalSeal` schluckt AEAD-Seal-Fehler** *(Correctness, Low, S)* — `(try? aeadSeal) ?? Data()`
+  → `try! aeadSeal(...)`. Subkey (32B) + Nonce (12B) sind hier immer gültig, GCM-Seal kann nicht fehlschlagen;
+  ein leeres Ciphertext (un-öffenbarer Frame, stiller Edit-Verlust) wird so durch Fail-Fast ersetzt — deckt
+  sich mit Web/Android (die werfen). iOS `VeyqCrypto` baut.
 
 ## Phase C — Operator-blind-Privacy vervollständigen
 - [ ] **C1 · Map-Tiles: externe Tiles als akzeptierter, Consent-gegateter Tradeoff** *(Privacy/Consent, Medium, M)* —

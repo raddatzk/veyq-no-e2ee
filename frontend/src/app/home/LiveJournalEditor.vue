@@ -100,7 +100,13 @@ onBeforeUnmount(async () => {
   doc.off('update', onLocalUpdate)
   await flush()
   // Compaction refreshes the snapshot + the Markdown reader projection and prunes the folded-in updates.
-  try { await compactJournal(...ctx(), doc, ytext.toString(), maxSeq) } catch { /* best-effort; updates persist */ }
+  // Reload the full log into the doc FIRST so the snapshot covers every update <= coveredSeq — otherwise a
+  // seq another editor appended that this doc never folded in (e.g. an HTTP append while our relay lagged)
+  // would be pruned but missing from the snapshot, losing that content.
+  try {
+    const coveredSeq = await loadJournalDoc(...ctx(), doc)
+    await compactJournal(...ctx(), doc, ytext.toString(), coveredSeq)
+  } catch { /* best-effort; updates persist */ }
   view?.destroy()
   provider.value?.destroy()
   doc.destroy()

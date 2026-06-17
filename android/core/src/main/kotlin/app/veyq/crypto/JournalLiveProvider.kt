@@ -214,6 +214,9 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
     fun compactPersisted() {
         val api = persistApiBase ?: return
         val s = persistSession ?: return
+        // Reload the full log into the doc first so the snapshot covers every update <= coveredSeq (a seq another
+        // editor appended that this doc never folded in would otherwise be pruned but missing from the snapshot).
+        loadPersisted()
         runCatching { JournalPersistence.compactJournal(api, s, persistScopeId, persistNodeId, contentKey, doc, lock, currentText, persistMaxSeq) }
     }
 

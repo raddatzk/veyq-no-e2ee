@@ -229,6 +229,9 @@ public final class JournalLiveProvider: NSObject, URLSessionWebSocketDelegate {
     /// Compact: write a fresh snapshot + the Markdown reader projection and prune the folded-in updates.
     public func compactPersisted() async {
         guard let api = persistApiBase, let s = persistSession else { return }
+        // Reload the full log into the doc first so the snapshot covers every update <= coveredSeq (a seq another
+        // editor appended that this doc never folded in would otherwise be pruned but missing from the snapshot).
+        _ = await loadPersisted()
         let seq = sync { self.persistMaxSeq }
         try? await JournalPersistence.compactJournal(apiBase: api, session: s, scopeId: persistScopeId, nodeId: persistNodeId, contentKey: contentKey, doc: doc, markdown: currentText, coveredSeq: seq)
     }

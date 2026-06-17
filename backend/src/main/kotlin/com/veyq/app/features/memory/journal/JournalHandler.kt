@@ -107,6 +107,10 @@ class JournalHandler(
         suites.require(req.snapshot.suiteId)
         suites.require(req.markdown.suiteId)
         val journal = lockedJournal(scopeId, nodeId, req.markdown.suiteId)
+        // INVARIANT (client-enforced, operator-blind so unverifiable here): the sealed snapshot MUST fold in
+        // every update with seq <= coveredSeq, or pruning them below loses content the snapshot doesn't carry.
+        // Clients guarantee this by reloading the full log into the doc immediately before compacting, so the
+        // snapshot has no gaps. The server only bounds coveredSeq to a real seq (a too-high value is a client bug).
         if (req.coveredSeq > journal.nextSeq) throw ApiException(400, "BAD_SEQ", "coveredSeq exceeds the latest update")
         journal.suiteId = req.markdown.suiteId
         journal.sealedContent = dec.decode(req.markdown.bytes)

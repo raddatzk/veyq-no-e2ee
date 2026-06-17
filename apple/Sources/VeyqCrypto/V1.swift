@@ -154,7 +154,10 @@ public enum V1 {
         let salt = randomBytes(16)
         let subkey = hkdf(ikm: contentKey, salt: salt, info: Data("veyq/v1/journal".utf8), len: 32)
         let nonce = randomBytes(12)
-        return salt + nonce + ((try? aeadSeal(key: subkey, nonce: nonce, plaintext: plaintext, aad: Data())) ?? Data())
+        // Fail-fast (try!) rather than swallowing into an empty ciphertext: the subkey (32B) and nonce (12B) are
+        // always valid, so GCM seal cannot fail here — a `?? Data()` would have written an un-openable frame and
+        // silently lost the edit (web/Android propagate the throw; this matches that intent).
+        return salt + nonce + (try! aeadSeal(key: subkey, nonce: nonce, plaintext: plaintext, aad: Data()))
     }
     public static func journalOpen(contentKey: Data, blob: Data) -> Data? {
         guard blob.count > 28 else { return nil }
