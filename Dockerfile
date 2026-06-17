@@ -37,12 +37,24 @@ ARG VEYQ_REVISION=""
 ENV VEYQ_VERSION="${VEYQ_VERSION}"
 ENV VEYQ_REVISION="${VEYQ_REVISION}"
 WORKDIR /work/
+# curl: container healthcheck only. ffmpeg removed — the operator-blind backend never transcodes (thumbnails/
+# previews are client-generated blobs), so no server-side media binary is ever invoked. Create a non-root user
+# and the default media dir owned by it: an empty named volume mounted there inherits this 10001 ownership, so
+# the unprivileged process can write blobs. (Bind/CIFS media mounts must be chown'd to 10001 by the operator.)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-COPY --from=backend-build-jvm /code/backend/build/quarkus-app /work/quarkus-app
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r -g 10001 veyq \
+    && useradd -r -u 10001 -g veyq -s /usr/sbin/nologin veyq \
+    && mkdir -p /data/veyq-media \
+    && chown -R 10001:10001 /work /data/veyq-media
+COPY --from=backend-build-jvm --chown=10001:10001 /code/backend/build/quarkus-app /work/quarkus-app
+USER 10001
 EXPOSE 8080
-ENTRYPOINT ["java", "-Dquarkus.http.host=0.0.0.0", "-jar", "/work/quarkus-app/quarkus-run.jar"]
+# MaxRAMPercentage is a percentage of the CONTAINER memory limit (set via compose mem_limit) — without that
+# limit the JVM would size the heap off host RAM. ExitOnOutOfMemoryError lets the orchestrator restart a
+# wedged JVM instead of it limping on in an undefined state.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60.0", "-XX:InitialRAMPercentage=40.0", "-XX:+ExitOnOutOfMemoryError", "-Dquarkus.http.host=0.0.0.0", "-jar", "/work/quarkus-app/quarkus-run.jar"]
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5 AS runtime-native
 ARG VEYQ_VERSION=""
@@ -50,8 +62,11 @@ ARG VEYQ_REVISION=""
 ENV VEYQ_VERSION="${VEYQ_VERSION}"
 ENV VEYQ_REVISION="${VEYQ_REVISION}"
 WORKDIR /work/
-RUN (microdnf install -y curl ffmpeg-free || microdnf install -y curl ffmpeg) && microdnf clean all
-COPY --from=backend-build-native /code/backend/build/*-runner /work/application
-RUN chmod 775 /work /work/application
+# curl: healthcheck only; ffmpeg removed (see runtime-jvm — no server-side transcode in an operator-blind core).
+RUN microdnf install -y curl && microdnf clean all \
+    && mkdir -p /data/veyq-media
+COPY --from=backend-build-native --chown=10001:10001 /code/backend/build/*-runner /work/application
+RUN chmod 0755 /work/application && chown -R 10001:10001 /work /data/veyq-media
+USER 10001
 EXPOSE 8080
 ENTRYPOINT ["./application", "-Dquarkus.http.host=0.0.0.0"]
