@@ -25,6 +25,7 @@ dependencies {
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-smallrye-health")
+    implementation("io.quarkus:quarkus-micrometer-registry-prometheus") // /q/metrics: JVM/GC/pool/HTTP gauges (counts+timings only, operator-blind) — keep on the internal network
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
     implementation("io.quarkus:quarkus-jdbc-h2") // dev/slice store (DB_KIND=h2, the default)
     implementation("io.quarkus:quarkus-jdbc-mariadb") // production store (DB_KIND=mariadb, see infra/docker-compose.yml)
