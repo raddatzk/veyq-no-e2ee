@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@intlify/devtools-types": "^10.0.8",
-    "@openapitools/openapi-generator-cli": "^2.34.0",
+    "@openapitools/openapi-generator-cli": "^2.38.0",
     "@playwright/test": "^1.60.0",
     "@types/leaflet": "^1.9.21",
     "@types/markdown-it": "^14.1.2",
@@ -56,7 +56,7 @@
     "js-yaml": "^4.1.1",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14",
+    "vite": "^8.0.16",
     "vitest": "^4.1.7",
     "vue-tsc": "^3.3.2"
   },
