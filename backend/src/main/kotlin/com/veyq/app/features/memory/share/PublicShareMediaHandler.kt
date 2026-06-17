@@ -84,6 +84,13 @@ class PublicShareMediaHandler(
         return blobId in ids
     }
 
+    /** Drop expired allowed-blob sets so the cache can't grow unbounded across every share ever served. */
+    @io.quarkus.scheduler.Scheduled(every = "5m")
+    fun sweepAllowedCache() {
+        val now = System.nanoTime()
+        allowedCache.entries.removeIf { it.value.expiresAtNanos < now }
+    }
+
     /** The set of blob ids (originals + derivatives) backing the share subtree — two IN queries. */
     private fun computeAllowedBlobIds(share: com.veyq.app.shared.content.Share): Set<String> {
         val nodeIds = ShareHandler.subtreeIds(nodes.listByScopeId(share.scopeId), share.nodeId)

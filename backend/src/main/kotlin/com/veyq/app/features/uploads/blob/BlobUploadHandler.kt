@@ -48,6 +48,9 @@ class BlobUploadHandler(
     @param:ConfigProperty(name = "veyq.uploads.max-upload-bytes", defaultValue = "10737418240") private val maxUploadBytes: Long,
     @param:ConfigProperty(name = "veyq.uploads.max-frame-bytes", defaultValue = "16777244") private val maxFrameBytes: Int,
     @param:ConfigProperty(name = "veyq.uploads.max-open-sessions", defaultValue = "100") private val maxOpenSessions: Long,
+    // Guest (public-share) write quotas — tighter than the per-scope caps, since a share link is unauthenticated.
+    @param:ConfigProperty(name = "veyq.uploads.max-share-open-sessions", defaultValue = "10") private val maxShareOpenSessions: Long,
+    @param:ConfigProperty(name = "veyq.uploads.max-share-bytes", defaultValue = "2147483648") private val maxShareBytes: Long,
 ) {
     private val enc = Base64.getUrlEncoder().withoutPadding()
     private val dec = Base64.getUrlDecoder()
@@ -72,6 +75,16 @@ class BlobUploadHandler(
         }
         if (uploads.countOpenByScope(scopeId) >= maxOpenSessions) {
             throw ApiException(429, "TOO_MANY_OPEN_UPLOADS", "Too many in-progress uploads — finish or abandon some first")
+        }
+        // Unauthenticated guest (CONTRIBUTOR/UPLOADER share) writes get a tighter per-SHARE cap so one link can't
+        // open up to maxOpenSessions × maxUploadBytes of staged junk (the per-scope cap is shared with the owner).
+        if (writerId.startsWith("share:")) {
+            if (uploads.countOpenByCreatedBy(writerId) >= maxShareOpenSessions) {
+                throw ApiException(429, "TOO_MANY_OPEN_UPLOADS", "Too many in-progress uploads for this share")
+            }
+            if (uploads.sumByteSizeByCreatedBy(writerId) + req.byteSize > maxShareBytes) {
+                throw ApiException(429, "SHARE_QUOTA_EXCEEDED", "This share has reached its upload quota")
+            }
         }
         val u = BlobUpload().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; dedupToken = req.dedupToken

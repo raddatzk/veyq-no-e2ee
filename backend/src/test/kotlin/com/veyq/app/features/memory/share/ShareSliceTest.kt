@@ -157,6 +157,20 @@ class ShareSliceTest {
     }
 
     @Test
+    fun guestUploadsAreCappedPerShare() {
+        val share = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .post("/api/scopes/$scopeId/nodes/shr-mem2/shares").then().statusCode(200).extract().path<String>("shareId")
+        // open the per-share guest session cap (default 10) with distinct dedup tokens; the 11th is refused 429
+        repeat(10) { i ->
+            given().contentType(ContentType.JSON).body("""{"dedupToken":"quota-$i","totalChunks":1,"byteSize":6}""")
+                .post("/api/public/shares/$share/blobs").then().statusCode(200)
+        }
+        given().contentType(ContentType.JSON).body("""{"dedupToken":"quota-over","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$share/blobs").then().statusCode(429).body("code", `is`("TOO_MANY_OPEN_UPLOADS"))
+    }
+
+    @Test
     fun guestCannotTouchAnotherSharesInFlightUpload() {
         // two CONTRIBUTOR shares on the SAME scope (different memories) — distinct guests
         fun contributorShareOn(node: String) = given().header("Authorization", ownerToken).contentType(ContentType.JSON)

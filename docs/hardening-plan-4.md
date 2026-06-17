@@ -34,17 +34,17 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
   fähig. Verifiziert: `:app` kompiliert.
 
 ## Phase B — Backend Resource / DoS
-- [ ] **B1 · Per-Share Guest-Upload ohne Aggregat-Byte/Session-Quota** *(Security/DoS, Medium, M)* — ein
+- [x] **B1 · Per-Share Guest-Upload ohne Aggregat-Byte/Session-Quota** *(Security/DoS, Medium, M)* — ein
   unauth CONTRIBUTOR/UPLOADER-Link kann bis `maxOpenSessions` (100) Uploads/Scope × `maxUploadBytes` (10 GiB) =
   ~1 TB sealed Junk schreiben; der Open-Session-Cap ist per-Scope (mit dem Owner geteilt), nicht per-Share. War als
   D2-Interim-Mitigation notiert, nur der Request-Count-Limiter landete. Fix: Bytes/Sessions je `createdBy=
   "share:<id>"` zählen + per-Share-Ceiling in `startBlobAs`/`putBlobChunkAs` durchsetzen; Guest-`maxOpenSessions`
   senken.
-- [ ] **B2 · `PublicShareMediaHandler.allowedCache` wächst unbegrenzt** *(Perf/Memory, Medium, S)* — die
+- [x] **B2 · `PublicShareMediaHandler.allowedCache` wächst unbegrenzt** *(Perf/Memory, Medium, S)* — die
   `ConcurrentHashMap<shareId, AllowedBlobs>` wird nur geschrieben/gelesen, nie evictet (TTL steuert nur Frische).
   Jeder Share, der je einen Chunk liefert, lässt einen permanenten `Set<blobId>` zurück → monotones Leck. Fix:
   `@Scheduled`-Sweep (wie `RateLimiter.sweep`) der abgelaufenen Einträge bzw. size-bounded Cache.
-- [ ] **B3 · Unauth Invite-Metadaten-GET ungedrosselt** *(Security, Low, S)* — `GET /api/tenant-invites/{id}`
+- [x] **B3 · Unauth Invite-Metadaten-GET ungedrosselt** *(Security, Low, S)* — `GET /api/tenant-invites/{id}`
   (+ Public-Share-Metadaten-GETs) sind nicht im RateLimitFilter (nur POST + Share-Egress-Bytes). UUIDs nicht
   enumerierbar, nur Public-Metadaten — aber ein unbegrenzter unauth DB-Read/Tenant-Existenz-Oracle. Fix: großzügiger
   per-IP-Request-Bucket für unauth Metadaten-GETs (der „Folgepunkt" aus Runde 3 A4).

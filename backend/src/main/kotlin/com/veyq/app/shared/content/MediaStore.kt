@@ -94,6 +94,14 @@ class BlobUploadRepository : PanacheRepositoryBase<BlobUpload, String> {
     fun listStaleOpen(cutoff: Instant): List<BlobUpload> =
         list("status = ?1 and createdAt < ?2", UploadStatus.OPEN.name, cutoff)
 
+    /** Open uploads attributed to one writer (e.g. "share:<id>") — guest open-session quota. */
+    fun countOpenByCreatedBy(createdBy: String): Long = count("createdBy = ?1 and status = ?2", createdBy, UploadStatus.OPEN.name)
+
+    /** Total declared byteSize across a writer's uploads (open + completed) — guest per-share byte quota. */
+    fun sumByteSizeByCreatedBy(createdBy: String): Long =
+        getEntityManager().createQuery("select coalesce(sum(u.byteSize), 0) from BlobUpload u where u.createdBy = ?1", java.lang.Long::class.java)
+            .setParameter(1, createdBy).singleResult.toLong()
+
     /** True if a COMPLETED upload in this scope produced [blobId] under [createdBy] — gates share contributions. */
     fun existsCompletedBy(scopeId: String, blobId: String, createdBy: String): Boolean =
         count(

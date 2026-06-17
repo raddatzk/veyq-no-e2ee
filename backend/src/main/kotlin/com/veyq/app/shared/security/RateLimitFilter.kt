@@ -59,6 +59,12 @@ class RateLimitFilter(
         // than its per-minute byte budget, refuse further GETs until the window rolls. A byte quota (not a
         // request count) avoids 429-ing a legitimate large-gallery viewer, which makes many small chunk GETs.
         if (ctx.method == "GET") {
+            // Unauthenticated invite-metadata GET: a per-IP request-count cap (UUIDs aren't enumerable, but it's
+            // an otherwise-unthrottled DB read + tenant-existence oracle). Generous — a guest opens an invite once.
+            if (path.contains("/api/tenant-invites/") && !limiter.tryAcquire("invite-read|$ip", 60, 60_000)) {
+                reject(ctx, 60_000)
+                return
+            }
             if (path.contains("/api/public/shares/") && limiter.isOverByteBudget("share-egress|$ip", shareEgressBytesPerMin, 60_000)) {
                 reject(ctx, 60_000)
             }
