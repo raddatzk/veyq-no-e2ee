@@ -8,6 +8,20 @@
 > **New to this?** Start with the plain-language, illustrated companion:
 > [Account keys, devices & recovery](account-key-model.md).
 
+> **Implementation status (2026-06) — read this first.** This document is partly target-state. To keep
+> intentions from reading as guarantees, claims are tagged **[Built]** (implemented and, for crypto,
+> conformance-pinned in [`v1.json`](../../api/crypto-vectors/v1.json)) or **[Roadmap]** (designed, not yet
+> built) where it matters.
+>
+> - **[Built]:** full E2EE / blind store; the envelope key hierarchy; the **post-quantum hybrid KEM
+>   (X25519 + ML-KEM-768)**; Argon2id + **Secret Key (2SKD)**; per-scope **blinded dedup & slug tokens**;
+>   key recovery (device / Emergency Kit / recovery code); and the **identity fingerprint / safety number**
+>   for *manual* out-of-band key verification.
+> - **[Roadmap]:** automatic key-pinning / **TOFU**; **Key Transparency**; segmented / streaming media; and
+>   the *convergent-encryption* form of shared dedup. Until the first two ship, the **fingerprint is the only
+>   active-operator check, and it is manual** — only users who actually compare it are protected. We say so
+>   plainly rather than imply automatic protection.
+
 ## Threat model & trust boundaries
 
 | We protect against | How |
@@ -16,7 +30,7 @@
 | **Passive operator** (reads the DB) | Cannot recover content — every blob/valuable metadata field is encrypted |
 | Post-breach offline brute-force → **content** | **Secret Key (2SKD)** — the content KEK folds in the Secret Key, so a cracked password alone unlocks nothing |
 | Post-breach offline brute-force → **server login** | Argon2id (m=32768) only — *not* covered by 2SKD; cracking the password yields a server session + operational metadata, **never content** (see *Secret Key (2SKD)*) |
-| **Active operator** doing key-substitution during a key-exchange | Mitigated now by client-side **key-pinning/TOFU**; fully addressed later by **Key Transparency** |
+| **Active operator** doing key-substitution during a key-exchange | **Partly.** Today only the **identity fingerprint** (safety number) lets users verify a key out-of-band **[Built]** — *manual*, so it protects only those who compare. Automatic **key-pinning/TOFU** and **Key Transparency** are **[Roadmap]** |
 
 What we do **not** claim: we are not immune to an *actively malicious* operator before Key
 Transparency ships — we say so honestly (see [Risks](../overview/risks.md)). In a **self-host**
@@ -133,9 +147,10 @@ The envelope above uses **standard, well-reviewed primitives** — no home-grown
 `age` / PGP / JWE / HPKE do internally. Exotic broadcast / attribute-based schemes are **not** used
 (heavier, less mature, more risk).
 
-**Post-quantum from the start (key wraps).** Memories are long-lived (decades), so
+**Post-quantum from the start (key wraps). [Built]** Memories are long-lived (decades), so
 **harvest-now-decrypt-later** is a real threat. Keys are therefore wrapped with a **hybrid KEM (X25519 +
-ML-KEM-768)** from v1 — secure if *either* component holds (PQC schemes are young, so we hedge — like
+ML-KEM-768)** from v1 — implemented and conformance-pinned in all three client stacks (web `@noble/post-quantum`,
+iOS CryptoKit `MLKEM768`, Android BouncyCastle) — secure if *either* component holds (PQC schemes are young, so we hedge — like
 Signal PQXDH / Apple PQ3 / TLS 1.3). Symmetric content needs no change (AES-256). Signatures are less
 HNDL-urgent and move to hybrid **ML-DSA** later.
 
@@ -151,7 +166,12 @@ now and upgraded later.
 > The exact byte formats (suite `v1`, the KEM combiner, wrap layouts) live in the
 > [Crypto Wire-Format Spec](crypto-spec.md) — the contract every client stack implements identically.
 
-## Streaming & segmented media
+## Streaming & segmented media — [Roadmap]
+
+> **Not yet built.** Today a video is a single encrypted blob plus client-generated derivative blobs
+> (thumbnail/preview); there is no segmented streaming rendition. The design below is the target. Note the
+> blind server **cannot** transcode (it holds only ciphertext) — segmentation/transcoding happens on the
+> **client** at upload, on plaintext, and each segment is encrypted before upload (the original stays one blob).
 
 A large video cannot be served as one AES-GCM blob — seeking would need the whole file and its tag.
 Instead the **transcode derivative is segmented** (HLS/DASH-style: short segments, optionally several
@@ -212,19 +232,25 @@ Wrapping a content key to "Bob" requires Bob's public key from the server's key 
 malicious server could serve an attacker's key instead (key-substitution / MITM) and gain access to
 **future** wraps.
 
-- **Now:** client-side **key-pinning / TOFU** — clients remember keys and warn on change.
-- **Later (core hardening):** **Key Transparency** — an append-only, verifiable key log so the server
-  cannot equivocate undetectably. With E2EE everywhere and pervasive sharing, this is core, not optional.
-- **The first-use gap (stated honestly):** TOFU only catches a key that *changes*. If the operator
+- **Built now — manual only:** the **identity fingerprint / safety number** (a deterministic digest of a
+  contact's full identity public key: hybrid KEM + signing, suite v1, conformance-pinned). Two users compare
+  it out-of-band (read aloud / QR); a mismatch reveals a substituted key. It is the building block — but it
+  is **manual**, so it protects only users who actually compare. See [account-key-model](account-key-model.md).
+- **[Roadmap] — automatic key-pinning / TOFU:** clients remember a contact's key and **warn on change**,
+  without anyone having to compare a number. This is the automation the fingerprint enables; **it is not yet
+  built**, so until it ships there is no automatic warning on a key change.
+- **[Roadmap] — Key Transparency (core hardening):** an append-only, verifiable key log so the server cannot
+  equivocate undetectably. With E2EE everywhere and pervasive sharing, this is core, not optional.
+- **The first-use gap (stated honestly):** even once TOFU ships, it only catches a key that *changes*. If the operator
   substitutes Bob's key **before** Alice ever saw the real one — and then **re-wraps the content to
   Bob's genuine key too** — Bob keeps normal access and *nothing looks wrong*, while the operator
   silently holds a copy. There is **no functional symptom** to notice (a removed user *would* notice;
   this attacker does not remove anyone). Only Key Transparency (or out-of-band **manual verification**)
   makes the substitution itself detectable.
 - **Trust anchors live client-side:** a client uses its **own locally-held** identity public key for
-  verification/signing (never the server's copy), and keeps **pinned contact keys** in protected local
-  state — the server distributes keys but is never the trust anchor. **Manual verification** (Signal-style
-  fingerprints) and **identity-key rotation** are later hardenings (see [design notes](../design-notes.md)).
+  verification/signing (never the server's copy) — the server distributes keys but is never the trust anchor.
+  **Manual verification** (Signal-style fingerprints) is **[Built]** (the safety number above); a local
+  **pinned-contact-key store** that warns on change is **[Roadmap]** (see [design notes](../design-notes.md)).
 
 ## Key provisioning & onboarding
 
@@ -317,6 +343,14 @@ is impossible. Strategy is **shared-state-based**:
 |---|---|
 | **Unshared** | **Client source-dedup** (the client skips re-uploading its own duplicates; the plaintext hash **never leaves the client**). |
 | **Shared** | **Convergent encryption + a per-scope secret**: the blob is encrypted with a key derived from `hash(content + scope-secret)`, so identical plaintext among members yields identical ciphertext and the server can dedup on ciphertext equality — **without** computing the key (the secret is client-held, so the operator cannot run a confirmation-of-file attack). |
+
+> **As-built [Built] vs. the table.** Today **both** rows are served by **one** simpler mechanism: a per-scope
+> **blinded dedup token** `token = HMAC(HKDF(scopeContentKey,"veyq/v1/media-dedup"), SHA256(content))`
+> (`dedupToken`, conformance-pinned). Members share the scope content key, so identical bytes produce an
+> identical token and the blind server dedups on the token — never seeing content or the key, and unable to
+> compute tokens itself (so no confirmation-of-file attack). This already achieves shared dedup, so the
+> **convergent-encryption** construction described in the Shared row is an alternative design kept as
+> **[Roadmap]** and is not currently needed.
 
 The classic weakness of convergent encryption (confirming you hold a known file) is **moot in a
 shared scope**, because members already see all shared content. Residual leaks are small: the server
