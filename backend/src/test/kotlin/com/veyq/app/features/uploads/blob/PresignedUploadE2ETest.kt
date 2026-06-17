@@ -98,6 +98,16 @@ class PresignedUploadE2ETest {
         // 5. the bytes really landed in S3 via the presigned PUTs, intact
         assertTrue(frames[0].contentEquals(store.get("$uploadId/0")), "chunk 0 mismatch in store")
         assertTrue(frames[1].contentEquals(store.get("$uploadId/1")), "chunk 1 mismatch in store")
+
+        // 6. download fast path: the backend hands out a presigned GET per chunk and the raw frames come back
+        //    DIRECTLY from S3, byte-for-byte (the client opens them with openFrame).
+        val gets = handler.getBlobPresignedChunksAs(scopeId, done.blobId)
+        assertEquals(2, gets.chunks.size, "expected a presigned GET per chunk")
+        gets.chunks.sortedBy { it.index }.forEach { c ->
+            val res = http.send(HttpRequest.newBuilder(URI.create(c.url)).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
+            assertTrue(res.statusCode() in 200..299, "presigned GET failed: ${res.statusCode()}")
+            assertTrue(frames[c.index].contentEquals(res.body()), "chunk ${c.index} mismatch via presigned GET")
+        }
     }
 
     @Test

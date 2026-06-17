@@ -61,8 +61,21 @@ operator-blind model.
      JSON) straight to S3. `complete` then **stats each expected object** in S3 to confirm presence and size,
      writes the chunk manifest from those sizes, enforces the cumulative byte budget, and promotes the frames
      to a blob — deleting the objects and rejecting the upload if verification fails.
-   - **Download:** the backend returns a **presigned `GET` URL per chunk**; the client fetches the raw frames
-     directly from S3 and `openFrame`s them (the AAD position check still applies).
+   - **Download:** `GET .../blobs/{blobId}/presigned-chunks` returns a **presigned `GET` URL per chunk**
+     (empty when the store can't presign); the client fetches the raw frames directly from S3 and
+     `openFrame`s them (the AAD position check still applies).
+
+   **Upload presigns everything; download presigns only multi-frame blobs (`totalChunks > 1`) — the asymmetry
+   is intentional.** On upload the presigned `PUT` URLs ride along in the `getBlobUpload` (resume) response the
+   client must fetch anyway to learn which frames are still missing — so presigning every chunk, even a
+   single-frame thumbnail, costs **no extra round-trip**. On download there is no such piggyback request: the
+   client already knows `totalChunks` from the `BlobRef`, so fetching presigned `GET` URLs is a **dedicated
+   extra request**. For a one-frame thumbnail/preview (the hot gallery path, many in parallel) that doubles the
+   round-trips for no bandwidth win, so the client stays on the proxied chunk endpoint for single-frame blobs
+   and only takes the direct-from-store path for large multi-frame originals. The **client** makes this call;
+   the backend simply offers presigned URLs whenever the store supports it. Rule of thumb: *presign when there
+   is already a request to carry the URLs, or when the payload is big enough that one extra round-trip pays for
+   itself.*
 
 3. **Anti-abuse moves to declare-then-verify.** The backend cannot see bytes mid-PUT, so per-frame size is no
    longer rejected at PUT time. Instead: the declared `byteSize`/`totalChunks` are bounded at `start` (as

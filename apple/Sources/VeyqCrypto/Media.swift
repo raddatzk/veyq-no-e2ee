@@ -14,7 +14,11 @@ public enum Media {
     public struct BlobDTO: Codable, Sendable { public let suiteId, bytes: String }
     public struct BlobRef: Codable, Sendable { public let blobId: String; public let totalChunks: Int; public let byteSize: Int64 }
     public struct BlobTicket: Codable, Sendable { public let status: String; public let blobId: String?; public let uploadId: String?; public let totalChunks: Int }
-    public struct UploadProgress: Codable, Sendable { public let uploadId: String; public let totalChunks: Int; public let receivedChunks: [Int]; public let status: String }
+    public struct PresignedPut: Codable, Sendable { public let index: Int; public let url: String }
+    public struct UploadProgress: Codable, Sendable {
+        public let uploadId: String; public let totalChunks: Int; public let receivedChunks: [Int]; public let status: String
+        public let presignedPuts: [PresignedPut]?
+    }
     public struct Derivative: Codable, Sendable { public let kind: String; public let blob: BlobRef }
     public struct MediaItem: Codable, Sendable {
         public let id, scopeId, nodeId, mimeType: String
@@ -30,7 +34,7 @@ public enum Media {
         public init(takenAt: String, lat: Double? = nil, lng: Double? = nil) { self.takenAt = takenAt; self.lat = lat; self.lng = lng }
     }
     struct MediaListDTO: Codable { let media: [MediaItem] }
-    struct StartBlobRequest: Codable { let dedupToken: String; let totalChunks: Int; let byteSize: Int64 }
+    struct StartBlobRequest: Codable { let dedupToken: String; let totalChunks: Int; let byteSize: Int64; let suiteId: String }
     struct PutChunkRequest: Codable { let frame: BlobDTO }
     struct ChunkResponse: Codable { let frame: BlobDTO }
     struct DerivativeInput: Codable { let kind, blobId: String }
@@ -74,8 +78,8 @@ public enum Media {
     }
 
     /// Begin (or dedup) storing a blob. READY → already stored (attach blobId); UPLOADING → push the frames.
-    public static func startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Int64) async throws -> BlobTicket {
-        let body = try JSONEncoder().encode(StartBlobRequest(dedupToken: dedupToken, totalChunks: totalChunks, byteSize: byteSize))
+    public static func startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Int64, suiteId: String = "v1") async throws -> BlobTicket {
+        let body = try JSONEncoder().encode(StartBlobRequest(dedupToken: dedupToken, totalChunks: totalChunks, byteSize: byteSize, suiteId: suiteId))
         let (data, resp) = try await URLSession.shared.data(for: authed("\(apiBase)/api/scopes/\(scopeId)/blobs", session, method: "POST", body: body))
         try ok(resp, data, "start blob")
         return try JSONDecoder().decode(BlobTicket.self, from: data)
@@ -111,21 +115,67 @@ public enum Media {
         let ticket = try await startBlob(apiBase: apiBase, session: session, scopeId: scopeId, dedupToken: dedupTokenFor(contentKey: contentKey, content: bytes), totalChunks: chunks.count, byteSize: Int64(bytes.count))
         if ticket.status == "READY" { return BlobRef(blobId: ticket.blobId!, totalChunks: ticket.totalChunks, byteSize: Int64(bytes.count)) }
         let uploadId = ticket.uploadId!
-        let have = Set(try await getProgress(apiBase: apiBase, session: session, scopeId: scopeId, uploadId: uploadId).receivedChunks)
+        let progress = try await getProgress(apiBase: apiBase, session: session, scopeId: scopeId, uploadId: uploadId)
+        let have = Set(progress.receivedChunks)
+        // Fast path: when the server offers presigned PUT URLs (S3 backend), seal each frame and PUT it DIRECTLY to
+        // the object store — no backend hop, no base64, no credentials on the client (ADR 0021). Any chunk without a
+        // URL (or the in-memory dev backend) falls back to the proxied chunk endpoint.
+        let presigned = Dictionary(uniqueKeysWithValues: (progress.presignedPuts ?? []).map { ($0.index, $0.url) })
         for i in 0..<chunks.count where !have.contains(i) {
-            try await putChunk(apiBase: apiBase, session: session, scopeId: scopeId, uploadId: uploadId, index: i, total: chunks.count, contentKey: contentKey, plain: chunks[i])
+            if let url = presigned[i] {
+                let frame = try V1.sealFrame(contentKey: contentKey, index: i, total: chunks.count, plaintext: chunks[i], nonce: V1.randomBytes(12))
+                try await putPresigned(url: url, frame: frame, index: i)
+            } else {
+                try await putChunk(apiBase: apiBase, session: session, scopeId: scopeId, uploadId: uploadId, index: i, total: chunks.count, contentKey: contentKey, plain: chunks[i])
+            }
         }
         return try await completeBlob(apiBase: apiBase, session: session, scopeId: scopeId, uploadId: uploadId)
     }
 
+    /// PUT a sealed frame's raw bytes straight to a presigned object-store URL (no auth header, no JSON wrapper).
+    private static func putPresigned(url: String, frame: Data, index: Int) async throws {
+        var r = URLRequest(url: URL(string: url)!)
+        r.httpMethod = "PUT"
+        r.httpBody = frame
+        let (_, resp) = try await URLSession.shared.data(for: r)
+        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw NSError(domain: "veyq.media", code: 1, userInfo: [NSLocalizedDescriptionKey: "presigned put chunk \(index) failed"])
+        }
+    }
+
+    struct PresignedChunksDTO: Codable { let suiteId: String; let chunks: [PresignedPut] }
+
     /// Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext.
+    /// Large (multi-frame) blobs download DIRECTLY from the object store via presigned GET when the S3 backend
+    /// offers it (ADR 0021); small single-frame blobs (thumbnails/previews) stay on the cheap proxied path so
+    /// the hot gallery download isn't penalised by an extra presign round-trip.
     public static func downloadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, ref: BlobRef) async throws -> Data {
+        if ref.totalChunks > 1, let direct = try? await downloadPresigned(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref) {
+            return direct
+        }
         var out = Data()
         for i in 0..<ref.totalChunks {
             let (data, resp) = try await URLSession.shared.data(for: authed("\(apiBase)/api/scopes/\(scopeId)/blobs/\(ref.blobId)/chunks/\(i)", session))
             try ok(resp, data, "get chunk \(i)")
             let frame = Login.b64urlDecode(try JSONDecoder().decode(ChunkResponse.self, from: data).frame.bytes)
             out.append(try V1.openFrame(contentKey: contentKey, index: i, total: ref.totalChunks, frame: frame))
+        }
+        return out
+    }
+
+    /// Attempt a direct-from-store download via presigned GET URLs. Returns nil if the store can't presign or
+    /// doesn't cover every chunk, so the caller falls back to the proxied path.
+    private static func downloadPresigned(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, ref: BlobRef) async throws -> Data? {
+        let (data, resp) = try await URLSession.shared.data(for: authed("\(apiBase)/api/scopes/\(scopeId)/blobs/\(ref.blobId)/presigned-chunks", session))
+        try ok(resp, data, "presigned chunks")
+        let urls = Dictionary(uniqueKeysWithValues: (try JSONDecoder().decode(PresignedChunksDTO.self, from: data)).chunks.map { ($0.index, $0.url) })
+        guard urls.count == ref.totalChunks else { return nil }
+        var out = Data()
+        for i in 0..<ref.totalChunks {
+            guard let url = urls[i] else { return nil }
+            let (raw, gresp) = try await URLSession.shared.data(for: URLRequest(url: URL(string: url)!))
+            guard let http = gresp as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return nil }
+            out.append(try V1.openFrame(contentKey: contentKey, index: i, total: ref.totalChunks, frame: raw))
         }
         return out
     }

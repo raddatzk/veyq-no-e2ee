@@ -41,6 +41,24 @@ Analogy: we see the **labelled boxes on the shelf and who holds a key** — neve
 deliberate trade-off: those few facts are what let the server be useful without ever decrypting. (A stricter
 "hide even those" mode is possible, at the cost of those conveniences.)
 
+## Where your files actually travel
+
+Your photos and videos are kept in a **storage locker** (an object store). When you add or open a big file, it
+can take one of two routes — and **both are equally private**, because the file is already locked before it
+leaves your device:
+
+- **Straight to the locker.** For large files (full-size photos, videos) your device talks **directly** to the
+  storage locker using a **one-time pass** we hand it — good for a few minutes, for that one file only. The
+  file skips our app servers entirely. It's faster for you and lighter for us, and we still **never see inside**
+  — the locker only ever receives the already-locked box.
+- **Through us.** For tiny files — the little thumbnail previews in your gallery — the file rides through our
+  app server. For something that small, a quick hop through us is actually faster than fetching a separate pass
+  first. Same lock, same blindness: a box passing through our hands is still sealed shut.
+
+Your device decides which route fits, automatically. The honest takeaway: **the route changes the speed, never
+the privacy.** Whether a file goes direct to the locker or via us, it's encrypted with your key the whole way,
+and the one-time pass only ever lets someone move that single sealed box — never open it.
+
 ## When you share
 
 Sharing is the one moment you **choose** to lower the wall — and it's always your explicit action:

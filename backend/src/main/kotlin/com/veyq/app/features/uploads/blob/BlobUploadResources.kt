@@ -1,6 +1,7 @@
 package com.veyq.app.features.uploads.blob
 
 import com.veyq.app.generated.api.BlobChunkDownloadApi
+import com.veyq.app.generated.api.BlobChunkPresignApi
 import com.veyq.app.generated.api.BlobChunkUploadApi
 import com.veyq.app.generated.api.BlobCompleteApi
 import com.veyq.app.generated.api.BlobStartApi
@@ -44,4 +45,10 @@ class BlobChunkUploadResource(private val handler: BlobUploadHandler) : BlobChun
 class BlobChunkDownloadResource(private val handler: BlobUploadHandler) : BlobChunkDownloadApi {
     override fun getBlobChunk(authorization: String, scopeId: String, blobId: String, index: Int): Response =
         Response.ok(handler.getBlobChunk(authorization, scopeId, blobId, index)).build()
+}
+
+@ApplicationScoped
+class BlobChunkPresignResource(private val handler: BlobUploadHandler) : BlobChunkPresignApi {
+    override fun getBlobPresignedChunks(authorization: String, scopeId: String, blobId: String): Response =
+        Response.ok(handler.getBlobPresignedChunks(authorization, scopeId, blobId)).build()
 }

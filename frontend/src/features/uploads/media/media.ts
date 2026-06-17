@@ -134,9 +134,16 @@ export async function uploadBlob(apiBase: string, session: UnlockedSession, scop
 
 /** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
 export async function downloadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
+  const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
+  // Large (multi-frame) blobs download DIRECTLY from the object store via presigned GET when the S3 backend
+  // offers it (ADR 0021); small single-frame blobs (thumbnails/previews) stay on the cheap proxied path so the
+  // hot gallery download isn't penalised by an extra presign round-trip.
+  if (ref.totalChunks > 1) {
+    const direct = await downloadPresigned(apiBase, session, scopeId, contentKey, ref, indices)
+    if (direct) return direct
+  }
   // Frames are independent and AAD-position-bound (openFrame checks index+total), so fetch them bound-parallel
   // and reassemble in order — a multi-chunk download is then bandwidth-bound, not totalChunks × round-trips.
-  const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
   const parts = await mapPool(indices, 4, async (i) => {
     const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/chunks/${i}`, { headers: auth(session) })
     if (!res.ok) throw await apiError(res, `get chunk ${i}`)
@@ -144,6 +151,26 @@ export async function downloadBlob(apiBase: string, session: UnlockedSession, sc
     return v1.openFrame(contentKey, i, ref.totalChunks, frame)
   })
   return v1.concat(...parts)
+}
+
+/** Try a direct-from-store download via presigned GET URLs; null if the store can't presign every chunk. */
+async function downloadPresigned(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef, indices: number[]): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/presigned-chunks`, { headers: auth(session) })
+    if (!res.ok) return null
+    const urls = new Map<number, string>(((await res.json()).chunks as { index: number; url: string }[]).map((c) => [c.index, c.url]))
+    if (urls.size !== ref.totalChunks) return null
+    const parts = await mapPool(indices, 4, async (i) => {
+      const url = urls.get(i)
+      if (!url) throw new Error('missing presigned url')
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(`presigned get chunk ${i} failed: ${r.status}`)
+      return v1.openFrame(contentKey, i, ref.totalChunks, new Uint8Array(await r.arrayBuffer()))
+    })
+    return v1.concat(...parts)
+  } catch {
+    return null
+  }
 }
 
 // ---- media layer (attach blobs to a Memory) -------------------------------------------------------------

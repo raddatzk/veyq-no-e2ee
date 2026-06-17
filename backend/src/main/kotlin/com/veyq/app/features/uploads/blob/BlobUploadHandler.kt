@@ -5,6 +5,7 @@ import com.veyq.app.generated.model.BlobTicket
 import com.veyq.app.generated.model.BlobUploadProgress
 import com.veyq.app.generated.model.ChunkResponse
 import com.veyq.app.generated.model.CompleteBlobResponse
+import com.veyq.app.generated.model.PresignedChunks
 import com.veyq.app.generated.model.PresignedPut
 import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
@@ -223,6 +224,27 @@ class BlobUploadHandler(
         }
         val frame = store.get(objectKey) ?: throw ApiException(404, "CHUNK_NOT_FOUND", "Chunk bytes missing")
         return ChunkResponse(frame = ApiBlob(suiteId = suiteId, bytes = enc.encodeToString(frame)))
+    }
+
+    /**
+     * Presigned GET URLs for every frame of a finalized blob — the direct-from-store download fast path (ADR
+     * 0021). The client GETs each raw sealed frame straight from S3 and opens it with openFrame, skipping the
+     * proxied chunk endpoint. Empty `chunks` when the store can't presign (in-memory dev backend) → the client
+     * falls back to the proxied path. Frames are AEAD ciphertext, so a presigned URL discloses no content.
+     */
+    fun getBlobPresignedChunks(authz: String?, scopeId: String, blobId: String): PresignedChunks {
+        requireKeyHolder(scopeId, authz)
+        return getBlobPresignedChunksAs(scopeId, blobId)
+    }
+
+    @Transactional
+    fun getBlobPresignedChunksAs(scopeId: String, blobId: String): PresignedChunks {
+        val blob = blobs.findById(blobId) ?: throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found")
+        if (blob.scopeId != scopeId) throw ApiException(404, "BLOB_NOT_FOUND", "Blob not found in this scope")
+        if (!store.supportsPresign()) return PresignedChunks(suiteId = blob.suiteId, chunks = emptyList())
+        val urls = chunks.listByBlobId(blobId).sortedBy { it.chunkIndex }
+            .mapNotNull { c -> store.presignGet(c.objectKey, presignTtl)?.let { PresignedPut(index = c.chunkIndex, url = it) } }
+        return PresignedChunks(suiteId = blob.suiteId, chunks = urls)
     }
 
     /**

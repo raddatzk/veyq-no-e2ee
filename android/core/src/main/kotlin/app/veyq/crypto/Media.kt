@@ -63,8 +63,8 @@ object Media {
     fun dedupTokenFor(contentKey: ByteArray, content: ByteArray): String = enc.encodeToString(V1.dedupToken(contentKey, content))
 
     /** Begin (or dedup) storing a blob. READY → already stored (attach blobId); UPLOADING → push the frames. */
-    fun startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Long): BlobTicket {
-        val body = JSONObject().put("dedupToken", dedupToken).put("totalChunks", totalChunks).put("byteSize", byteSize).toString()
+    fun startBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, dedupToken: String, totalChunks: Int, byteSize: Long, suiteId: String = "v1"): BlobTicket {
+        val body = JSONObject().put("dedupToken", dedupToken).put("totalChunks", totalChunks).put("byteSize", byteSize).put("suiteId", suiteId).toString()
         val resp = send("$apiBase/api/scopes/$scopeId/blobs", session.sessionToken, "POST", body)
         if (resp.statusCode() != 200) throw RuntimeException("start blob failed: ${resp.statusCode()}")
         val j = JSONObject(resp.body())
@@ -104,14 +104,45 @@ object Media {
         val ticket = startBlob(apiBase, session, scopeId, dedupTokenFor(contentKey, bytes), chunks.size, bytes.size.toLong())
         if (ticket.status == "READY") return BlobRef(ticket.blobId!!, ticket.totalChunks, bytes.size.toLong())
         val uploadId = ticket.uploadId!!
-        val arr = getProgress(apiBase, session, scopeId, uploadId).getJSONArray("receivedChunks")
+        val progress = getProgress(apiBase, session, scopeId, uploadId)
+        val arr = progress.getJSONArray("receivedChunks")
         val have = (0 until arr.length()).map { arr.getInt(it) }.toSet()
-        for (i in chunks.indices) if (i !in have) putChunk(apiBase, session, scopeId, uploadId, i, chunks.size, contentKey, chunks[i])
+        // Fast path: when the server offers presigned PUT URLs (S3 backend), seal each frame and PUT it DIRECTLY to
+        // the object store — no backend hop, no base64, no credentials on the client (ADR 0021). Any chunk without a
+        // URL (or the in-memory dev backend) falls back to the proxied chunk endpoint.
+        val presigned = HashMap<Int, String>()
+        if (progress.has("presignedPuts")) {
+            val pa = progress.getJSONArray("presignedPuts")
+            for (j in 0 until pa.length()) pa.getJSONObject(j).let { presigned[it.getInt("index")] = it.getString("url") }
+        }
+        for (i in chunks.indices) if (i !in have) {
+            val url = presigned[i]
+            if (url != null) putPresigned(url, V1.sealFrame(contentKey, i, chunks.size, chunks[i], V1.randomBytes(12)), i)
+            else putChunk(apiBase, session, scopeId, uploadId, i, chunks.size, contentKey, chunks[i])
+        }
         return completeBlob(apiBase, session, scopeId, uploadId)
     }
 
-    /** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
+    private val rawClient = java.net.http.HttpClient.newHttpClient()
+
+    /** PUT a sealed frame's raw bytes straight to a presigned object-store URL (no auth header, no JSON wrapper). */
+    private fun putPresigned(url: String, frame: ByteArray, index: Int) {
+        val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+            .PUT(java.net.http.HttpRequest.BodyPublishers.ofByteArray(frame)).build()
+        val resp = rawClient.send(req, HttpResponse.BodyHandlers.discarding())
+        if (resp.statusCode() !in 200..299) throw RuntimeException("presigned put chunk $index failed: ${resp.statusCode()}")
+    }
+
+    /**
+     * Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext.
+     * Large (multi-frame) blobs download DIRECTLY from the object store via presigned GET when the S3 backend
+     * offers it (ADR 0021); small single-frame blobs (thumbnails/previews) stay on the cheap proxied path so
+     * the hot gallery download isn't penalised by an extra presign round-trip.
+     */
     fun downloadBlob(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray {
+        if (ref.totalChunks > 1) {
+            downloadPresigned(apiBase, session, scopeId, contentKey, ref)?.let { return it }
+        }
         val out = java.io.ByteArrayOutputStream() // accumulate into a growable buffer, not `out += frame` (O(n^2) copying)
         for (i in 0 until ref.totalChunks) {
             val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/chunks/$i", session.sessionToken, "GET")
@@ -121,6 +152,25 @@ object Media {
         }
         return out.toByteArray()
     }
+
+    /** Try a direct-from-store download via presigned GET URLs; null if the store can't presign every chunk. */
+    private fun downloadPresigned(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, ref: BlobRef): ByteArray? = runCatching {
+        val resp = send("$apiBase/api/scopes/$scopeId/blobs/${ref.blobId}/presigned-chunks", session.sessionToken, "GET")
+        if (resp.statusCode() != 200) return@runCatching null
+        val arr = JSONObject(resp.body()).getJSONArray("chunks")
+        if (arr.length() != ref.totalChunks) return@runCatching null
+        val urls = HashMap<Int, String>()
+        for (j in 0 until arr.length()) arr.getJSONObject(j).let { urls[it.getInt("index")] = it.getString("url") }
+        val out = java.io.ByteArrayOutputStream()
+        for (i in 0 until ref.totalChunks) {
+            val url = urls[i] ?: return@runCatching null
+            val req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).GET().build()
+            val r = rawClient.send(req, HttpResponse.BodyHandlers.ofByteArray())
+            if (r.statusCode() !in 200..299) return@runCatching null
+            out.write(V1.openFrame(contentKey, i, ref.totalChunks, r.body()))
+        }
+        out.toByteArray()
+    }.getOrNull()
 
     // ---- media layer (attach blobs to a Memory) ---------------------------------------------------------
 

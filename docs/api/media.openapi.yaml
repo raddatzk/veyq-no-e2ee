@@ -93,6 +93,20 @@ paths:
         '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
         '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
         '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
+  /api/scopes/{scopeId}/blobs/{blobId}/presigned-chunks:
+    get:
+      tags: [BlobChunkPresign]
+      operationId: getBlobPresignedChunks
+      summary: Short-lived presigned GET URLs for a finalized blob's frames (direct-from-store download, ADR 0021).
+      parameters:
+        - $ref: './common.openapi.yaml#/components/parameters/AuthHeader'
+        - { name: scopeId, in: path, required: true, schema: { type: string } }
+        - { name: blobId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Per-chunk presigned GET URLs (empty when the store can't presign)., content: { application/json: { schema: { $ref: '#/components/schemas/PresignedChunks' } } } }
+        '401': { $ref: './common.openapi.yaml#/components/responses/Unauthorized' }
+        '403': { $ref: './common.openapi.yaml#/components/responses/Forbidden' }
+        '404': { $ref: './common.openapi.yaml#/components/responses/NotFound' }
   /api/scopes/{scopeId}/nodes/{nodeId}/media:
     get:
       tags: [Media]
@@ -301,6 +315,15 @@ components:
       properties:
         index: { type: integer }
         url: { type: string }
+    PresignedChunks:
+      type: object
+      required: [suiteId, chunks]
+      properties:
+        suiteId: { type: string }
+        # Direct-from-store download fast path (ADR 0021): a short-lived GET URL per chunk. The client GETs the
+        # raw sealed frame straight from S3 and opens it with openFrame. Empty when the store can't presign (the
+        # in-memory dev backend) → client falls back to the proxied chunk endpoint.
+        chunks: { type: array, items: { $ref: '#/components/schemas/PresignedPut' } }
     CompleteBlobResponse:
       type: object
       required: [blobId, totalChunks, byteSize]
