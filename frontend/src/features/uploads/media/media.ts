@@ -8,6 +8,7 @@
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
+import { mapPool } from '../../../shared/pool'
 
 const EMPTY = new Uint8Array(0)
 
@@ -116,13 +117,15 @@ export async function uploadBlob(apiBase: string, session: UnlockedSession, scop
 
 /** Download a finalized blob: pull each frame, open it (AAD checks position), concatenate the plaintext. */
 export async function downloadBlob(apiBase: string, session: UnlockedSession, scopeId: string, contentKey: Uint8Array, ref: BlobRef): Promise<Uint8Array> {
-  const parts: Uint8Array[] = []
-  for (let i = 0; i < ref.totalChunks; i++) {
+  // Frames are independent and AAD-position-bound (openFrame checks index+total), so fetch them bound-parallel
+  // and reassemble in order — a multi-chunk download is then bandwidth-bound, not totalChunks × round-trips.
+  const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
+  const parts = await mapPool(indices, 4, async (i) => {
     const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/chunks/${i}`, { headers: auth(session) })
     if (!res.ok) throw new Error(`get chunk ${i} failed: ${res.status} ${await res.text()}`)
     const frame = fromB64url((await res.json()).frame.bytes)
-    parts.push(v1.openFrame(contentKey, i, ref.totalChunks, frame))
-  }
+    return v1.openFrame(contentKey, i, ref.totalChunks, frame)
+  })
   return v1.concat(...parts)
 }
 

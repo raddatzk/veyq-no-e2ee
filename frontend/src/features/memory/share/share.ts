@@ -146,13 +146,14 @@ export async function listShareMedia(ctx: ShareContext, nodeId: string): Promise
 
 /** Download + open a shared blob through the public share endpoint (frame by frame, AAD checks position). */
 export async function downloadShareBlob(ctx: ShareContext, ref: BlobRef): Promise<Uint8Array> {
-  const parts: Uint8Array[] = []
-  for (let i = 0; i < ref.totalChunks; i++) {
+  // Frames are AAD-position-bound, so fetch bound-parallel and reassemble in order (bandwidth- not RTT-bound).
+  const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
+  const parts = await mapPool(indices, 4, async (i) => {
     const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/blobs/${ref.blobId}/chunks/${i}`)
     if (!res.ok) throw new Error(`share chunk ${i} failed: ${res.status} ${await res.text()}`)
     const frame = fromB64url((await res.json()).frame.bytes)
-    parts.push(v1.openFrame(ctx.contentKey, i, ref.totalChunks, frame))
-  }
+    return v1.openFrame(ctx.contentKey, i, ref.totalChunks, frame)
+  })
   return v1.concat(...parts)
 }
 

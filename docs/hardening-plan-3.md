@@ -106,13 +106,16 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   `GroupProvisioningHandler.listGroupMembers` (Namen per `users.listByIds` statt findById/Member),
   `MyGrantsHandler` (Scopes per `scopes.listByIds` + Active-Tenant-Set per `listActiveByUserId` statt
   `scopes.findById` + `guard.isActiveMember` pro Grant). Verifiziert: 60 Backend-Tests grün.
-- [ ] **E2 · Web Bulk-ZIP-Download puffert alles im RAM** *(Perf, Medium, M)* — `download.ts` entschlüsselt jedes
-  Original komplett in `files[]`, baut dann ein In-Memory-ZIP + Blob → Peak ~2–3× Gesamtgröße, OOM bei großen
-  Memories. Fix: zur Platte streamen (File System Access API + Streaming-ZIP) oder zumindest cappen/warnen.
-- [ ] **E3 · Sequenzielle Chunk-/Cover-Loads parallelisieren** *(Perf, Low-Med, S)* — `downloadBlob`/
-  `downloadShareBlob` (Web) holen Chunks strikt seriell (Zeit ~ chunks×RTT); iOS `HomeStore.openLevel` lädt
-  Cover seriell; Android-Rotation seriell. Frames sind AAD-Index-gebunden → `mapPool`/`TaskGroup`/`Semaphore`
-  (~4–6) + in Index-Reihenfolge zusammensetzen.
+- [x] **E2 · Web Bulk-ZIP-Download puffert alles im RAM** *(Perf, Medium, M)* — `zipStore` in einen inkrementellen
+  `ZipStreamWriter` refaktoriert (byte-identisches Layout, Unit-Test grün). `downloadMemoryZip` streamt jetzt
+  jedes Entry direkt auf die Platte über die File System Access API (`showSaveFilePicker`, Chromium) — `await`
+  pro Write = Backpressure, Peak-RAM ~ein Original statt das ganze Archiv. Fallback (Firefox/Safari) =
+  bisheriger In-Memory-Pfad. Verifiziert: vue-tsc + download-Unit-Test grün.
+- [x] **E3 · Sequenzielle Chunk-/Cover-Loads parallelisieren** *(Perf, Low-Med, S)* — Web `downloadBlob` +
+  `downloadShareBlob` holen Chunks jetzt `mapPool(4)`-parallel + in Index-Reihenfolge zusammengesetzt (Frames
+  sind AAD-Index-gebunden) → bandbreiten- statt RTT-gebunden. iOS `HomeStore.openLevel` lädt Cover via
+  `withTaskGroup` (~6 in flight, Decode auf MainActor) statt seriell (spiegelt das C6-Gallery-Muster). Verifiziert:
+  vue-tsc + media/share-E2E grün; iOS-App baut. *(Android-Rotation-Seriell bleibt — selten, niedriger Wert.)*
 
 ## Phase F — Wartbarkeit / Klarheit
 - [ ] **F1 · E4-Rest + Struktur-Duplikate** *(Maintainability, Low, S)* — `MediaHandler.requireMemoryNode` nutzt

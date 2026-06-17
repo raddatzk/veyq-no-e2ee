@@ -342,23 +342,35 @@ final class HomeStore: ObservableObject {
             // navigating back/forward doesn't re-download them; prune the rest and fetch only what's missing.
             let visible = Set(memories.map { $0.node.id })
             covers = covers.filter { visible.contains($0.key) }
-            for m in memories where covers[m.node.id] == nil { await loadCover(m, scope: scope, contentKey: contentKey) }
+            // Fetch missing covers bound-parallel (~6 in flight) instead of one round-trip after another — the
+            // home grid otherwise serialized list+download per memory. Data is Sendable → decode on the main actor.
+            let missing = memories.filter { covers[$0.node.id] == nil }
+            let apiBase = apiBase, session = session, scopeId = scope.scopeId, contentKey = contentKey
+            await withTaskGroup(of: (String, Data?).self) { group in
+                var next = 0
+                func add(_ i: Int) {
+                    let m = missing[i]
+                    group.addTask { (m.node.id, await Self.fetchCoverBytes(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: m.node.id, coverMediaId: m.node.coverMediaId)) }
+                }
+                while next < min(6, missing.count) { add(next); next += 1 }
+                for await (nodeId, data) in group {
+                    if let data, let img = UIImage(data: data) { covers[nodeId] = img }
+                    if next < missing.count { add(next); next += 1 }
+                }
+            }
         } catch {
             self.error = "Konnte Inhalte nicht laden."
         }
     }
 
-    private func loadCover(_ m: Entry, scope: ScopeContent.OpenScope, contentKey: Data) async {
-        do {
-            let media = try await Media.listMedia(apiBase: apiBase, session: session, scopeId: scope.scopeId, nodeId: m.node.id)
-            let chosen = (m.node.coverMediaId.flatMap { cid in media.first { $0.id == cid } }) ?? media.first
-            guard let item = chosen else { return }
-            let ref = item.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? item.original
-            let bytes = try await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scope.scopeId, contentKey: contentKey, ref: ref)
-            if let img = UIImage(data: bytes) { covers[m.node.id] = img }
-        } catch {
-            // no cover — leave the placeholder
-        }
+    /// Resolve a memory's cover thumbnail bytes (list its media, pick the pinned/first, download the thumbnail).
+    /// nonisolated + Sendable params so it can run off the main actor inside the bound-parallel task group.
+    private nonisolated static func fetchCoverBytes(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, coverMediaId: String?) async -> Data? {
+        guard let media = try? await Media.listMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId) else { return nil }
+        let chosen = (coverMediaId.flatMap { cid in media.first { $0.id == cid } }) ?? media.first
+        guard let item = chosen else { return nil }
+        let ref = item.derivatives.first(where: { $0.kind == "THUMBNAIL" })?.blob ?? item.original
+        return try? await Media.downloadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, ref: ref)
     }
 
     /// Valid move targets: the root + every folder not in the node's own subtree.
