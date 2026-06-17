@@ -13,10 +13,46 @@ const emit = defineEmits<{ select: [id: string] }>()
 
 const el = ref<HTMLElement | null>(null)
 let map: L.Map | null = null
-let layer: L.LayerGroup | null = null
+let layer: L.LayerGroup | null = null        // static: tracks
+let markerLayer: L.LayerGroup | null = null  // media pins, re-clustered on zoom
 
 // Each track gets a distinct colour (cycled) so overlapping routes are tellable apart, with start/end dots.
 const TRACK_COLORS = ['#9b8cff', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899']
+// Media pins within this many screen pixels (at the current zoom) collapse into one cluster marker (Legacy: 34).
+const MARKER_CLUSTER_DISTANCE_PX = 34
+
+type Cluster = { lat: number; lng: number; ids: string[] }
+
+// Group geotagged media by on-screen proximity at the current zoom (so clusters split as you zoom in).
+function clusterPoints(): Cluster[] {
+  const groups: Cluster[] = []
+  for (const p of props.points) {
+    const pt = map!.latLngToLayerPoint([p.lat, p.lng])
+    const g = groups.find((g) => map!.latLngToLayerPoint([g.lat, g.lng]).distanceTo(pt) <= MARKER_CLUSTER_DISTANCE_PX)
+    if (g) g.ids.push(p.id)
+    else groups.push({ lat: p.lat, lng: p.lng, ids: [p.id] })
+  }
+  return groups
+}
+
+// (Re)draw just the media markers from the current-zoom clustering. Single → tap opens it; cluster → tap zooms in.
+function renderMarkers() {
+  if (!map) return
+  markerLayer?.remove()
+  markerLayer = L.layerGroup().addTo(map)
+  for (const c of clusterPoints()) {
+    if (c.ids.length === 1) {
+      L.circleMarker([c.lat, c.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#9b8cff', fillOpacity: 1 })
+        .on('click', () => emit('select', c.ids[0]))
+        .addTo(markerLayer!)
+    } else {
+      const icon = L.divIcon({ className: 'map-cluster-wrap', html: `<span class="map-cluster">${c.ids.length}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] })
+      L.marker([c.lat, c.lng], { icon })
+        .on('click', () => map!.setView([c.lat, c.lng], Math.min(19, map!.getZoom() + 2)))
+        .addTo(markerLayer!)
+    }
+  }
+}
 
 function render() {
   if (!map) return
@@ -34,14 +70,10 @@ function render() {
     }
     latlngs.push(...line)
   })
-  for (const p of props.points) {
-    latlngs.push([p.lat, p.lng])
-    L.circleMarker([p.lat, p.lng], { radius: 7, color: '#fff', weight: 2, fillColor: '#9b8cff', fillOpacity: 1 })
-      .on('click', () => emit('select', p.id))
-      .addTo(layer)
-  }
+  props.points.forEach((p) => latlngs.push([p.lat, p.lng]))
   if (latlngs.length === 1) map.setView(latlngs[0], 13)
   else if (latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs).pad(0.2))
+  renderMarkers()
 }
 
 // The Leaflet map + tile layer are created ONLY after consent — so no tile request (and thus no location
@@ -54,9 +86,10 @@ function initMap() {
     attribution: '© OpenStreetMap',
     referrerPolicy: 'no-referrer',
   }).addTo(map)
+  map.on('zoomend', renderMarkers)  // re-cluster as the pixel distances between pins change
   render()
 }
-function teardown() { map?.remove(); map = null; layer = null }
+function teardown() { map?.remove(); map = null; layer = null; markerLayer = null }
 function enable() { mapTilesConsent.value = true }
 
 onMounted(async () => { if (mapTilesConsent.value) { await nextTick(); initMap() } })
@@ -87,4 +120,22 @@ onBeforeUnmount(teardown)
   border-radius: 12px;
 }
 .map-consent-text { max-width: 32rem; color: var(--app-muted, #999); }
+</style>
+
+<style>
+/* Cluster marker: a violet count badge standing in for several overlapping media pins. */
+.map-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #9b8cff;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
 </style>

@@ -703,22 +703,70 @@ private fun MemoryMap(points: List<Triple<String, Double, Double>>, tracks: List
                     }
                     geo.addAll(line)
                 }
-                points.forEach { (id, lat, lng) ->
-                    val marker = org.osmdroid.views.overlay.Marker(this)
-                    marker.position = org.osmdroid.util.GeoPoint(lat, lng)
-                    marker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
-                    marker.setOnMarkerClickListener { _, _ -> onSelect(id); true }
-                    overlays.add(marker)
-                    geo.add(org.osmdroid.util.GeoPoint(lat, lng))
+                points.forEach { (_, lat, lng) -> geo.add(org.osmdroid.util.GeoPoint(lat, lng)) }
+                // Media markers are clustered by on-screen proximity, re-clustered on every zoom/scroll (Legacy parity).
+                val mv = this
+                val clusterOverlays = mutableListOf<org.osmdroid.views.overlay.Overlay>()
+                val clusterPx = 60.0
+                fun rebuildClusters() {
+                    clusterOverlays.forEach { mv.overlays.remove(it) }
+                    clusterOverlays.clear()
+                    val proj = mv.projection ?: return
+                    data class G(val px: android.graphics.Point, val pts: MutableList<Triple<String, Double, Double>>)
+                    val groups = mutableListOf<G>()
+                    points.sortedBy { it.first }.forEach { p ->
+                        val pt = proj.toPixels(org.osmdroid.util.GeoPoint(p.second, p.third), null)
+                        val g = groups.firstOrNull { kotlin.math.hypot((it.px.x - pt.x).toDouble(), (it.px.y - pt.y).toDouble()) <= clusterPx }
+                        if (g != null) g.pts.add(p) else groups.add(G(pt, mutableListOf(p)))
+                    }
+                    groups.forEach { g ->
+                        val lat = g.pts.map { it.second }.average(); val lng = g.pts.map { it.third }.average()
+                        val m = org.osmdroid.views.overlay.Marker(mv)
+                        m.position = org.osmdroid.util.GeoPoint(lat, lng)
+                        m.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, if (g.pts.size == 1) org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM else org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                        if (g.pts.size == 1) {
+                            val id = g.pts[0].first
+                            m.setOnMarkerClickListener { _, _ -> onSelect(id); true }
+                        } else {
+                            m.icon = clusterIconDrawable(mv.resources, g.pts.size)
+                            m.setOnMarkerClickListener { _, _ -> mv.controller.setZoom(mv.zoomLevelDouble + 2.0); mv.controller.animateTo(m.position); true }
+                        }
+                        mv.overlays.add(m); clusterOverlays.add(m)
+                    }
+                    mv.invalidate()
                 }
+                addMapListener(object : org.osmdroid.events.MapListener {
+                    override fun onScroll(e: org.osmdroid.events.ScrollEvent?): Boolean { rebuildClusters(); return false }
+                    override fun onZoom(e: org.osmdroid.events.ZoomEvent?): Boolean { rebuildClusters(); return false }
+                })
                 if (geo.size == 1) {
                     controller.setCenter(geo[0]); controller.setZoom(13.0)
+                    post { rebuildClusters() }
                 } else if (geo.size > 1) {
-                    post { zoomToBoundingBox(org.osmdroid.util.BoundingBox.fromGeoPoints(geo).increaseByScale(1.4f), false) }
+                    post { zoomToBoundingBox(org.osmdroid.util.BoundingBox.fromGeoPoints(geo).increaseByScale(1.4f), false); rebuildClusters() }
+                } else {
+                    post { rebuildClusters() }
                 }
             }
         },
     )
+}
+
+/** A violet count-badge drawable for a cluster of overlapping media markers. */
+private fun clusterIconDrawable(resources: android.content.res.Resources, count: Int): android.graphics.drawable.Drawable {
+    val dp = resources.displayMetrics.density
+    val sz = (30 * dp).toInt().coerceAtLeast(1)
+    val bmp = android.graphics.Bitmap.createBitmap(sz, sz, android.graphics.Bitmap.Config.ARGB_8888)
+    val cv = android.graphics.Canvas(bmp)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.color = 0xFF9B8CFF.toInt()
+    cv.drawCircle(sz / 2f, sz / 2f, sz / 2f - 2 * dp, paint)
+    paint.color = android.graphics.Color.WHITE; paint.style = android.graphics.Paint.Style.STROKE; paint.strokeWidth = 2 * dp
+    cv.drawCircle(sz / 2f, sz / 2f, sz / 2f - 2 * dp, paint)
+    paint.style = android.graphics.Paint.Style.FILL; paint.textAlign = android.graphics.Paint.Align.CENTER; paint.textSize = 12 * dp; paint.isFakeBoldText = true
+    val fm = paint.fontMetrics
+    cv.drawText(count.toString(), sz / 2f, sz / 2f - (fm.ascent + fm.descent) / 2, paint)
+    return android.graphics.drawable.BitmapDrawable(resources, bmp)
 }
 
 @Composable
