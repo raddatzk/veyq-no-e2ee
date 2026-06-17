@@ -50,10 +50,15 @@ struct RegisterView: View {
                             .font(.system(size: 12)).foregroundStyle(.orange)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    if let hint = PasswordPolicy.hintKey(password) {
+                        Text(T(hint)).font(.system(size: 12)).foregroundStyle(VeyqStyle.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if parts.isProtected {
                         VeyqField(label: T("accept.passphrase"), text: $passphrase, secure: true)
                     }
                     PrimaryButton(title: T("accept.register"), busy: busy) { register() }
+                        .disabled(password.count < PasswordPolicy.minLength)
                     Button(T("common.cancel")) { app.cancelRegister() }
                         .font(.system(size: 13)).foregroundStyle(VeyqStyle.muted)
                 }

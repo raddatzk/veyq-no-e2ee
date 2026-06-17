@@ -40,6 +40,7 @@ import androidx.compose.foundation.clickable
 import app.veyq.crypto.EmergencyKit
 import app.veyq.crypto.Instance
 import app.veyq.crypto.Login
+import app.veyq.crypto.PasswordPolicy
 import app.veyq.crypto.Pwned
 import app.veyq.crypto.ResetPassword
 import com.journeyapps.barcodescanner.ScanContract
@@ -102,10 +103,10 @@ fun VeyqField(label: String, value: String, onValueChange: (String) -> Unit, sec
 }
 
 @Composable
-fun PrimaryButton(title: String, busy: Boolean = false, onClick: () -> Unit) {
+fun PrimaryButton(title: String, busy: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        enabled = !busy,
+        enabled = enabled && !busy,
         modifier = Modifier.fillMaxWidth().height(48.dp),
         shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Veyq.Accent, contentColor = Color.White),
@@ -290,7 +291,8 @@ fun ResetPasswordScreen(apiBase: String, prefillEmail: String, onBack: () -> Uni
         VeyqField(L10n.t("common.secretKey"), secretKey, { secretKey = it }, secure = true, hint = L10n.t("login.secretHint"))
         VeyqField(L10n.t("reset.newPassword"), newPassword, { newPassword = it }, secure = true)
         if (breachCount > 0) Text(String.format(L10n.t("password.pwnedWarning"), breachCount), fontSize = 12.sp, color = Color(0xFFE0A83D), modifier = Modifier.fillMaxWidth())
-        PrimaryButton(L10n.t("reset.setPassword"), busy) {
+        PasswordPolicy.hintKey(newPassword)?.let { Text(L10n.t(it), fontSize = 12.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth()) }
+        PrimaryButton(L10n.t("reset.setPassword"), busy, enabled = newPassword.length >= PasswordPolicy.MIN_LENGTH) {
             val token = ResetPassword.parseToken(link)
             if (token == null || secretKey.isBlank() || newPassword.isBlank()) { error = L10n.t("reset.failed"); return@PrimaryButton }
             busy = true; error = ""
@@ -353,8 +355,9 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
             VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
             VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
             if (breachCount > 0) Text(String.format(L10n.t("password.pwnedWarning"), breachCount), fontSize = 12.sp, color = Color(0xFFE0A83D), modifier = Modifier.fillMaxWidth())
+            PasswordPolicy.hintKey(password)?.let { Text(L10n.t(it), fontSize = 12.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth()) }
             if (parts.isProtected) VeyqField(L10n.t("accept.passphrase"), passphrase, { passphrase = it }, secure = true)
-            PrimaryButton(L10n.t("accept.register"), busy) {
+            PrimaryButton(L10n.t("accept.register"), busy, enabled = password.length >= PasswordPolicy.MIN_LENGTH) {
                 busy = true; error = ""
                 scope.launch {
                     try {

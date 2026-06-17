@@ -16,6 +16,7 @@ let L10nStrings: [String: [String: String]] = [
     "de": [
         "common.email": "E-Mail", "common.password": "Passwort", "common.secretKey": "Secret Key",
         "password.pwnedWarning": "Dieses Passwort taucht in %d bekannten Datenlecks auf — wähle besser ein anderes.",
+        "password.minLength": "Mindestens 10 Zeichen.", "password.strong": "Starkes Passwort.",
         "common.cancel": "Abbrechen", "common.done": "Fertig", "common.name": "Name", "common.create": "Erstellen",
         "common.rename": "Umbenennen", "common.close": "Schließen", "common.move": "Verschieben", "cover.setAsCover": "Als Cover",
         "move.title": "Verschieben nach", "move.toRoot": "Hauptebene",
@@ -95,6 +96,7 @@ let L10nStrings: [String: [String: String]] = [
     "en": [
         "common.email": "Email", "common.password": "Password", "common.secretKey": "Secret Key",
         "password.pwnedWarning": "This password appeared in %d known data breaches — consider a different one.",
+        "password.minLength": "At least 10 characters.", "password.strong": "Strong password.",
         "common.cancel": "Cancel", "common.done": "Done", "common.name": "Name", "common.create": "Create",
         "common.rename": "Rename", "common.close": "Close", "common.move": "Move", "cover.setAsCover": "Set as cover",
         "move.title": "Move to", "move.toRoot": "Top level",

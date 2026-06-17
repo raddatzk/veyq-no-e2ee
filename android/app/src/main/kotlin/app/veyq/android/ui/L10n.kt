@@ -17,6 +17,7 @@ object L10n {
         "de" to mapOf(
             "common.email" to "E-Mail", "common.password" to "Passwort", "common.secretKey" to "Secret Key",
             "password.pwnedWarning" to "Dieses Passwort taucht in %d bekannten Datenlecks auf — wähle besser ein anderes.",
+            "password.minLength" to "Mindestens 10 Zeichen.", "password.strong" to "Starkes Passwort.",
             "common.name" to "Name", "common.create" to "Erstellen", "common.cancel" to "Abbrechen",
             "common.rename" to "Umbenennen", "common.close" to "Schließen", "common.move" to "Verschieben", "cover.setAsCover" to "Als Cover",
             "move.title" to "Verschieben nach", "move.toRoot" to "Hauptebene",
@@ -91,6 +92,7 @@ object L10n {
         "en" to mapOf(
             "common.email" to "Email", "common.password" to "Password", "common.secretKey" to "Secret Key",
             "password.pwnedWarning" to "This password appeared in %d known data breaches — consider a different one.",
+            "password.minLength" to "At least 10 characters.", "password.strong" to "Strong password.",
             "common.name" to "Name", "common.create" to "Create", "common.cancel" to "Cancel",
             "common.rename" to "Rename", "common.close" to "Close", "common.move" to "Move", "cover.setAsCover" to "Set as cover",
             "move.title" to "Move to", "move.toRoot" to "Top level",

@@ -41,8 +41,11 @@ struct ResetPasswordView: View {
                     if breachCount > 0 {
                         Text(T("password.pwnedWarning", breachCount)).font(.system(size: 12)).foregroundStyle(.orange)
                     }
+                    if let hint = PasswordPolicy.hintKey(newPassword) {
+                        Text(T(hint)).font(.system(size: 12)).foregroundStyle(VeyqStyle.muted)
+                    }
                     PrimaryButton(title: T("reset.setPassword"), busy: busy) { confirm() }
-                        .disabled(token == nil || secretKey.isEmpty || newPassword.isEmpty)
+                        .disabled(token == nil || secretKey.isEmpty || newPassword.count < PasswordPolicy.minLength)
 
                     if !error.isEmpty { MessageBox(text: error) }
                 }
