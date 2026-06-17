@@ -31,13 +31,27 @@ interface UploadsConfig {
     @WithName("session-ttl-hours") @WithDefault("24") fun sessionTtlHours(): Long
 }
 
-/** `veyq.ratelimit.*` — per-IP throttling of abuse-prone unauthenticated endpoints (see RateLimitFilter). */
+/** `veyq.ratelimit.*` — per-IP throttling of abuse-prone unauthenticated endpoints (see RateLimitFilter).
+ *  The per-bucket limits are operator-tunable; all windows are one minute. */
 @ConfigMapping(prefix = "veyq.ratelimit")
 interface RateLimitConfig {
     @WithDefault("true") fun enabled(): Boolean
     // Optional because SmallRye maps an empty config value to "absent" (the default deployment — trust none).
     @WithName("trusted-proxies") fun trustedProxies(): Optional<String>
     @WithName("share-egress-bytes-per-min") @WithDefault("524288000") fun shareEgressBytesPerMin(): Long
+    @WithName("login-per-min") @WithDefault("10") fun loginPerMin(): Int
+    @WithName("reset-request-per-min") @WithDefault("5") fun resetRequestPerMin(): Int
+    @WithName("reset-per-min") @WithDefault("15") fun resetPerMin(): Int
+    @WithName("invite-per-min") @WithDefault("30") fun invitePerMin(): Int
+    @WithName("invite-read-per-min") @WithDefault("60") fun inviteReadPerMin(): Int
+    @WithName("share-upload-per-min") @WithDefault("60") fun shareUploadPerMin(): Int
+    @WithName("share-chunk-per-min") @WithDefault("600") fun shareChunkPerMin(): Int
+}
+
+/** `veyq.session.*` — opaque Bearer-session lifetime. */
+@ConfigMapping(prefix = "veyq.session")
+interface SessionConfig {
+    @WithDefault("P30D") fun ttl(): Duration
 }
 
 /** `veyq.tenant.*` — grace window before a soft-deleted tenant is hard-purged. */

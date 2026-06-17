@@ -40,10 +40,10 @@ class SessionRepository : PanacheRepositoryBase<Session, String> {
 }
 
 @ApplicationScoped
-class SessionService(private val sessions: SessionRepository) {
+class SessionService(private val sessions: SessionRepository, config: com.veyq.app.shared.config.SessionConfig) {
     private val rng = SecureRandom()
     private val b64 = Base64.getUrlEncoder().withoutPadding()
-    private val ttl: Duration = Duration.ofDays(30)
+    private val ttl: Duration = config.ttl()
 
     /** SHA-256(token), base64url — what we persist and look up by. The raw token never touches the DB. */
     private fun hash(token: String): String =

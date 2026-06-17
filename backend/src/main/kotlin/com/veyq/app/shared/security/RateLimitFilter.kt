@@ -26,6 +26,8 @@ class RateLimitFilter(
     private val enabled: Boolean = config.enabled()
     // Per-IP per-minute egress budget for unauthenticated public-share GETs (default 500 MiB).
     private val shareEgressBytesPerMin: Long = config.shareEgressBytesPerMin()
+    private val inviteReadPerMin: Int = config.inviteReadPerMin()
+    private val shareChunkPerMin: Int = config.shareChunkPerMin()
 
     @Inject
     lateinit var routingContext: RoutingContext
@@ -43,11 +45,11 @@ class RateLimitFilter(
     private data class Bucket(val name: String, val match: String, val limit: Int, val windowMs: Long)
 
     private val buckets = listOf(
-        Bucket("login", "/api/login", 10, 60_000),
-        Bucket("reset-request", "/api/account/password-reset/request", 5, 60_000),
-        Bucket("reset", "/api/account/password-reset/", 15, 60_000), // material + confirm
-        Bucket("invite", "/api/tenant-invites/", 30, 60_000),
-        Bucket("share-upload", "/api/public/shares/", 60, 60_000),
+        Bucket("login", "/api/login", config.loginPerMin(), 60_000),
+        Bucket("reset-request", "/api/account/password-reset/request", config.resetRequestPerMin(), 60_000),
+        Bucket("reset", "/api/account/password-reset/", config.resetPerMin(), 60_000), // material + confirm
+        Bucket("invite", "/api/tenant-invites/", config.invitePerMin(), 60_000),
+        Bucket("share-upload", "/api/public/shares/", config.shareUploadPerMin(), 60_000),
     )
 
     override fun filter(ctx: ContainerRequestContext) {
@@ -62,7 +64,7 @@ class RateLimitFilter(
         if (ctx.method == "GET") {
             // Unauthenticated invite-metadata GET: a per-IP request-count cap (UUIDs aren't enumerable, but it's
             // an otherwise-unthrottled DB read + tenant-existence oracle). Generous — a guest opens an invite once.
-            if (path.contains("/api/tenant-invites/") && !limiter.tryAcquire("invite-read|$ip", 60, 60_000)) {
+            if (path.contains("/api/tenant-invites/") && !limiter.tryAcquire("invite-read|$ip", inviteReadPerMin, 60_000)) {
                 reject(ctx, 60_000)
                 return
             }
@@ -77,7 +79,7 @@ class RateLimitFilter(
         // per-share byte cap in BlobUploadHandler. Without this a guest could hammer the chunk endpoint
         // (e.g. idempotent re-PUTs of one index) entirely unthrottled.
         if (ctx.method == "PUT") {
-            if (path.contains("/api/public/shares/") && !limiter.tryAcquire("share-chunk|$ip", 600, 60_000)) {
+            if (path.contains("/api/public/shares/") && !limiter.tryAcquire("share-chunk|$ip", shareChunkPerMin, 60_000)) {
                 reject(ctx, 60_000)
             }
             return

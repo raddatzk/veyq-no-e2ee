@@ -14,6 +14,13 @@ class RateLimitFilterTest {
         override fun enabled() = true
         override fun trustedProxies(): Optional<String> = Optional.of(trusted)
         override fun shareEgressBytesPerMin() = 524_288_000L
+        override fun loginPerMin() = 10
+        override fun resetRequestPerMin() = 5
+        override fun resetPerMin() = 15
+        override fun invitePerMin() = 30
+        override fun inviteReadPerMin() = 60
+        override fun shareUploadPerMin() = 60
+        override fun shareChunkPerMin() = 600
     }
 
     private fun filter(trustedProxies: String) = RateLimitFilter(RateLimiter(), cfg(trustedProxies))
