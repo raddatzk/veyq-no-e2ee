@@ -105,6 +105,7 @@ class GalleryController(
 
     var tiles by mutableStateOf<List<Tile>>(emptyList())
     var loading by mutableStateOf(true)
+    var loadFailed by mutableStateOf(false) // a systemic load failure vs. a genuinely empty memory (offer a retry)
     var uploading by mutableStateOf(false)
     var journalMarkdown by mutableStateOf("")
     var journalSaving by mutableStateOf(false)
@@ -226,6 +227,7 @@ class GalleryController(
     }
 
     suspend fun load() {
+        loadFailed = false
         try {
             val media = withContext(Dispatchers.IO) { Media.listMedia(apiBase, session, scopeId, nodeId) }
             // Sort by decrypted capture time (the server lists in upload order, blind to takenAt).
@@ -248,7 +250,8 @@ class GalleryController(
                 }
             }
         } catch (e: Exception) {
-            // leave empty
+            // systemic failure (network/auth) — not an empty memory; surface a retry rather than a silent blank grid
+            loadFailed = true
         }
         loading = false
     }
@@ -397,6 +400,10 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 Text("${controller.tiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp)
                 when {
                     controller.loading -> Text(L10n.t("detail.loadingGallery"), color = Veyq.Muted, fontSize = 14.sp)
+                    controller.loadFailed -> {
+                        Text(L10n.t("detail.loadFailed"), color = Veyq.Muted, fontSize = 14.sp)
+                        TextButton(onClick = { scope.launch { controller.loading = true; controller.load() } }) { Text(L10n.t("common.retry"), color = Veyq.Accent) }
+                    }
                     controller.tiles.isEmpty() -> Text(L10n.t("detail.noMedia"), color = Veyq.Muted, fontSize = 14.sp)
                     else -> {
                         val range = DateBuckets.dateRange(controller.tiles) { it.takenAt }

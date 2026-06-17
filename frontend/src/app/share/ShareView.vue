@@ -32,6 +32,7 @@ const canUpload = computed(() => ctx.value?.role === 'CONTRIBUTOR' || ctx.value?
 const journalHtml = computed(() => renderMarkdown(journal.value))
 let journalDoc: Y.Doc | null = null
 let journalProvider: EncryptedRelayProvider | null = null
+let loadSeq = 0 // generation guard: only the latest load() may apply its result (mirrors HomeView's C3 fix)
 
 // Shared gallery state (tiles, justified buckets, lightbox preview/original, object-URL lifecycle).
 // The loaders use the resolved share capability (ctx is always present once tiles can be opened).
@@ -42,6 +43,10 @@ const { tiles, galleryEl, lightbox, downloading, buckets, dateRange, tileById, o
 
 /** Operator-blind live read: reconstruct from the store, then subscribe to the relay for owner edits. */
 async function startLiveJournal(c: ShareContext) {
+  // Tear down any prior provider/doc first — a re-load (password resubmit, accept-notices) must not orphan
+  // the previous relay subscription + Yjs doc (they'd leak until unmount).
+  journalProvider?.destroy()
+  journalDoc?.destroy()
   const doc = new Y.Doc()
   journalDoc = doc
   try { await loadShareJournalDoc(c.apiBase, c.shareId, c.rootNodeId, c.contentKey, doc) } catch { /* none written yet */ }
@@ -74,9 +79,11 @@ onMounted(async () => {
 })
 
 async function load(password?: string) {
+  const seq = ++loadSeq // guard against an out-of-order resolve overwriting fresh state (e.g. fast password re-submit)
   loading.value = true
   try {
     const c = await resolvePublicShare(session.apiBase, props.shareId, props.shareKey, password)
+    if (seq !== loadSeq) return // a newer load() superseded this one
     ctx.value = c
     title.value = c.rootName || t('share.uploadOnlyTitle') // uploader gets no album name (blind drop-off)
     needPassword.value = false
@@ -85,6 +92,7 @@ async function load(password?: string) {
     if (pendingNotices.value.length) { loading.value = false; return }
     await loadContent()
   } catch (e) {
+    if (seq !== loadSeq) return
     if (e instanceof SharePasswordRequired) {
       needPassword.value = true
       passwordWrong.value = e.wrong
@@ -92,7 +100,7 @@ async function load(password?: string) {
       error.value = t('share.notFound')
     }
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 function submitPassword() {

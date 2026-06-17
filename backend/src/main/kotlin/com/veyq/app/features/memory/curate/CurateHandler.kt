@@ -8,6 +8,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.Node
+import com.veyq.app.shared.content.NodeStructure
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
 import com.veyq.app.shared.security.ScopeAccessGuard
@@ -49,7 +50,7 @@ class CurateHandler(
                     if (parent.scopeId != scopeId) throw ApiException(400, "CROSS_SCOPE_PARENT", "Parent belongs to another scope")
                     NodeType.valueOf(parent.type)
                 }
-                requireContainment(parentType, NodeType.valueOf(node.type))
+                NodeStructure.requireContainment(parentType, NodeType.valueOf(node.type), "live under")
                 if (isInSubtree(root = node.id, candidate = newParentId, scopeId = scopeId)) {
                     throw ApiException(409, "NODE_CYCLE", "Cannot move a node into its own subtree")
                 }
@@ -123,17 +124,6 @@ class CurateHandler(
             current = nodes.findById(current)?.parentId
         }
         return false
-    }
-
-    private fun requireContainment(parentType: NodeType?, childType: NodeType) {
-        val allowed = when (parentType) {
-            null, NodeType.FOLDER -> childType == NodeType.FOLDER || childType == NodeType.MEMORY
-            NodeType.MEMORY, NodeType.CHAPTER -> childType == NodeType.CHAPTER
-        }
-        if (!allowed) {
-            val where = parentType?.value ?: "the scope root"
-            throw ApiException(400, "INVALID_CONTAINMENT", "A ${childType.value} cannot live under $where")
-        }
     }
 
     private fun toApi(node: Node, scopeId: String): MemoryNode =

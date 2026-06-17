@@ -1,6 +1,7 @@
 package com.veyq.app.features.uploads.media
 
 import com.veyq.app.generated.model.BlobRef
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.generated.model.CreateMediaRequest
 import com.veyq.app.generated.model.MediaDerivativeOut
 import com.veyq.app.generated.model.MediaItem
@@ -116,7 +117,8 @@ class MediaHandler(
     private fun requireMemoryNode(scopeId: String, nodeId: String) {
         val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
         if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
-        if (node.type != "MEMORY" && node.type != "CHAPTER") {
+        val type = NodeType.valueOf(node.type) // typed compare instead of raw strings (consistent with siblings)
+        if (type != NodeType.MEMORY && type != NodeType.CHAPTER) {
             throw ApiException(400, "NOT_A_MEMORY", "Media can only be attached to a Memory or Chapter")
         }
     }

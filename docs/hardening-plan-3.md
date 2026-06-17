@@ -118,16 +118,18 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   vue-tsc + media/share-E2E grün; iOS-App baut. *(Android-Rotation-Seriell bleibt — selten, niedriger Wert.)*
 
 ## Phase F — Wartbarkeit / Klarheit
-- [ ] **F1 · E4-Rest + Struktur-Duplikate** *(Maintainability, Low, S)* — `MediaHandler.requireMemoryNode` nutzt
-  noch `node.type != "MEMORY"`-Strings statt `NodeType.valueOf` (E4-Leftover); `requireContainment` ist in
-  `MemoryTreeHandler` + `CurateHandler` doppelt; `isInSubtree` macht O(Tiefe) Einzel-Lookups statt den schon
-  geladenen Subtree zu nutzen. In geteilte `NodeStructure`-Helfer ziehen (wie Guards-Konsolidierung).
-- [ ] **F2 · Web ShareView Race-Härtung** *(Correctness/Maintainability, Low, S)* — `load()`/`loadContent()` ohne
-  `loadSeq`-Guard (anders als `HomeView` nach C3); zweites `startLiveJournal` verwaist den alten
-  Provider/Doc. `restoreFromUrl` lässt bei `resolveRoute`-Fehler einen halb-applizierten View stehen → Fallback.
-- [ ] **F3 · Android Gallery silent-empty + Socket-Dedup** *(Quality, Low, S)* — `GalleryScreen.load()` fängt alle
-  Exceptions in „leeres Grid" (kein Retry/Signal); Error-State + Retry analog `HomeController`. (Socket-Dedup
-  siehe B1b.)
+- [x] **F1 · E4-Rest + Struktur-Duplikate** *(Maintainability, Low, S)* — `MediaHandler.requireMemoryNode` nutzt
+  jetzt `NodeType.valueOf` statt roher Strings (E4-Leftover); das doppelte `requireContainment` aus
+  `MemoryTreeHandler` + `CurateHandler` in einen geteilten `NodeStructure.requireContainment(parent,child,verb)`
+  gezogen (eine Quelle für die Containment-Matrix, wie die Guard-Konsolidierung). Verifiziert: 60 Backend-Tests.
+  *(`isInSubtree` O(Tiefe) bleibt — Mikro-Opt, niedriger Wert.)*
+- [x] **F2 · Web ShareView Race-Härtung** *(Correctness/Maintainability, Low, S)* — `load()` hat jetzt einen
+  `loadSeq`-Generations-Guard (nur der jüngste Load applied sein Ergebnis, gegen schnelles Passwort-Resubmit,
+  spiegelt HomeViews C3); `startLiveJournal` zerstört den vorherigen Provider/Doc vor dem Neu-Subscribe (kein
+  Leak mehr bis Unmount). Verifiziert: vue-tsc. *(`restoreFromUrl`-Fallback = kleiner Folgepunkt.)*
+- [x] **F3 · Android Gallery silent-empty** *(Quality, Low, S)* — `GalleryScreen.load()` setzt bei systemischem
+  Fehler jetzt `loadFailed` (statt stillem leeren Grid); die UI zeigt Fehlertext + „Erneut versuchen"-Retry.
+  Verifiziert: `:app` kompiliert. (Socket-Dedup war bereits Teil von B1b.)
 
 ### Backlog (nicht eingeplant)
 - **Per-Account-Login-Backoff** (L1) — zusätzlich zum per-IP-Bucket ein per-E-Mail-Fehlzähler/Exponential-Backoff.
