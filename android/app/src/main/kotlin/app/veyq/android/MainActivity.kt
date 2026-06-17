@@ -33,6 +33,16 @@ class MainActivity : FragmentActivity() {
     private val deepLink = mutableStateOf<InviteLink.DeepLink?>(null)
     private val openLink = mutableStateOf<HomeRoute.DeepOpen?>(null)
 
+    /**
+     * On launch, wipe the FileProvider share staging dir (cacheDir/shared). It holds only transient artifacts
+     * shared out via the system share sheet — the Emergency Kit PDF (which embeds the plaintext Secret Key) and
+     * media-download temp files — none of which can be mid-share at a cold start. This bounds a Secret-Key-bearing
+     * PDF's lifetime to one session instead of letting it linger in cache indefinitely.
+     */
+    private fun sweepSharedCache() {
+        runCatching { java.io.File(cacheDir, "shared").listFiles()?.forEach { it.delete() } }
+    }
+
     private fun captureDeepLink(intent: Intent?) {
         val data = intent?.data?.toString() ?: return
         InviteLink.parseDeepLink(data)?.let { deepLink.value = it; return }
@@ -46,6 +56,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sweepSharedCache()
         captureDeepLink(intent)
         val prefs = getSharedPreferences("veyq", Context.MODE_PRIVATE)
         L10n.locale = prefs.getString("veyq.locale", "de") ?: "de"

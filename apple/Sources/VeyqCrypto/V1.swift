@@ -178,7 +178,12 @@ public enum V1 {
 
     // ---- Per-method KEKs ----
     static func argon2id(input: Data, salt: Data, params: ArgonParams) throws -> Data {
-        // libsodium crypto_pwhash: opsLimit = t, memLimit = m KiB * 1024 (bytes), p is fixed at 1.
+        // libsodium crypto_pwhash: opsLimit = t, memLimit = m KiB * 1024 (bytes), p is FIXED at 1 (it has no
+        // parallelism arg). Every veyq KDF uses p=1, so this is invisible today — but fail loudly rather than
+        // silently produce bytes that diverge from web/Android (which honor p) should a p>1 caller ever appear.
+        guard params.p == 1 else {
+            throw NSError(domain: "veyq.crypto", code: 1, userInfo: [NSLocalizedDescriptionKey: "argon2id: libsodium fixes parallelism at 1; p=\(params.p) would diverge from web/Android"])
+        }
         let sodium = Sodium()
         guard let out = sodium.pwHash.hash(
             outputLength: params.dkLen,

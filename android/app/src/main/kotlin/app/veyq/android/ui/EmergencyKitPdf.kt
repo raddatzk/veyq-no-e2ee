@@ -61,7 +61,9 @@ object EmergencyKitPdf {
         doc.finishPage(page)
 
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "veyq-emergency-kit-${data.email}.pdf")
+        // Fixed (non-identifying) name: no email in the cache filename, and each new kit overwrites the previous
+        // one rather than accumulating a Secret-Key-bearing PDF per email. The launch-time sweep clears it later.
+        val file = File(dir, "veyq-emergency-kit.pdf")
         FileOutputStream(file).use { doc.writeTo(it) }
         doc.close()
         return file

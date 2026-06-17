@@ -78,10 +78,14 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   (vor Akzeptanz Platzhalter + Hinweis statt Tiles); `referrerPolicy: 'no-referrer'` am Tile-Layer; Tradeoff in
   den Einstellungen erklären. **Kein** Proxy/Self-Host nötig. Mobile (native Map-SDKs) analog hinter dasselbe
   Consent stellen.
-- [ ] **C2 · Android Emergency-Kit-PDF (Secret Key) bleibt im Cache** *(Security, Medium, S)* — `EmergencyKitPdf`
-  schreibt den Plaintext-Secret-Key (Text + QR) nach `cacheDir/shared/veyq-emergency-kit-<email>.pdf` und löscht
-  ihn nie (Dateiname enthält auch die E-Mail). Fix: nach dem Share löschen bzw. `cacheDir/shared` bei App-Start
-  sweepen; iOS/Web auf äquivalente Artefakte prüfen.
+- [x] **C2 · Emergency-Kit-PDF (Secret Key) bleibt im Cache (Android + iOS)** *(Security, Medium, S)* — Android
+  schrieb den Plaintext-Secret-Key nach `cacheDir/shared/veyq-emergency-kit-<email>.pdf`, iOS analog nach
+  `temporaryDirectory/...<email>.pdf`; beide nie aufgeräumt, E-Mail im Dateinamen. Fix: (1) generischer Dateiname
+  (`veyq-emergency-kit.pdf`, kein E-Mail, überschreibt statt zu akkumulieren); (2) Launch-Sweep — Android wischt
+  `cacheDir/shared` in `MainActivity.onCreate` (nur transiente FileProvider-Share-Artefakte: Kit + Media-Downloads,
+  keins beim Cold-Start in-flight), iOS löscht `veyq-emergency-kit*`-Dateien aus `temporaryDirectory` im
+  `VeyqApp.init`. Web ist ok (jsPDF `doc.save()` → Browser-Download in den vom User gewählten Ordner, kein
+  App-Cache-Artefakt). Verifiziert: Android `:app` + iOS-App (xcodebuild) bauen.
 
 ## Phase D — Crypto-Conformance-Härtung (drift-proofing)
 - [ ] **D1 · Passwort-abgeleitete KEKs durch Vektoren pinnen** *(Crypto/Tests, Medium, S)* — `invite-temp-key`-KEK
@@ -90,9 +94,10 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   Fix: KAT-Vektoren für `kekRecovery@m=32768`, `symWrap(context="invite-temp-key")` und `shareWrapKey` in
   `v1.json` + alle drei Conformance-Suiten. (`share-pw` ist derzeit web-only — entweder Mobile-Create nachziehen
   oder „web-only by design" dokumentieren.)
-- [ ] **D2 · iOS Argon2id ignoriert `p` still** *(Crypto, Low, S)* — libsodium fixiert p=1; aktuell unsichtbar
-  (alle Uses p=1, gepinnt), aber bei künftigem `p>1` divergieren Web/Android lautlos. Fix: in iOS `argon2id`
-  `require(params.p == 1)` (werfen) oder `p=2`-KAT ergänzen.
+- [x] **D2 · iOS Argon2id ignoriert `p` still** *(Crypto, Low, S)* — iOS `argon2id` wirft jetzt bei
+  `params.p != 1` (libsodium fixiert Parallelität auf 1) statt lautlos divergierende Bytes zu erzeugen. Alle
+  aktuellen Uses sind p=1 → unverändert; ein künftiger p>1-Caller scheitert laut statt still. Verifiziert:
+  iOS-Conformance-Tests grün (p=1-Vektoren).
 
 ## Phase E — Performance
 - [ ] **E1 · Backend-N+1-Restkehrwisch** *(Perf, Medium, M)* — `MemberListHandler` (`users`/`identityKeys` pro
