@@ -215,6 +215,16 @@ class GalleryController(
         }.onSuccess { children = it }
     }
 
+    /** Resolve a node by id (any node in the scope) into a navigable Child — backs ::chapter journal embeds. */
+    suspend fun resolveChild(id: String): Child? = withContext(Dispatchers.IO) {
+        runCatching {
+            val all = MemoryTree.listNodes(apiBase, session, scopeId)
+            val node = (0 until all.length()).map { all.getJSONObject(it) }.firstOrNull { it.getString("id") == id } ?: return@runCatching null
+            val name = runCatching { MemoryTree.decodeNodeName(contentKey, node) }.getOrDefault("—")
+            Child(id, node.getString("type"), name, null)
+        }.getOrNull()
+    }
+
     private fun childCover(childNodeId: String, coverMediaId: String?): ImageBitmap? {
         val media = runCatching { Media.listMedia(apiBase, session, scopeId, childNodeId) }.getOrNull() ?: return null
         val chosen = (coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } }) ?: media.firstOrNull() ?: return null
@@ -453,7 +463,7 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 LaunchedEffect(Unit) { controller.loadTracks(); controller.loadChildren() }
                 InfoTab(controller)
             } else if (tab == 1) {
-                JournalTab(controller, scope) { tile -> lightboxTile = tile }
+                JournalTab(controller, scope, onOpenChapter = { id -> scope.launch { controller.resolveChild(id)?.let { childNav = it } } }) { tile -> lightboxTile = tile }
             } else if (tab == 2) {
                 LaunchedEffect(Unit) { controller.loadTracks() }
                 val points = controller.tiles.mapNotNull { t -> if (t.lat != null && t.lng != null) Triple(t.id, t.lat, t.lng) else null }
@@ -725,7 +735,7 @@ private fun TabLabel(text: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope, onOpenMedia: (GalleryController.Tile) -> Unit) {
+private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.CoroutineScope, onOpenChapter: (String) -> Unit = {}, onOpenMedia: (GalleryController.Tile) -> Unit) {
     var editing by remember { mutableStateOf(false) }
     var live by remember { mutableStateOf(false) }
     val blocks = remember { mutableStateListOf<EditBlock>() }
@@ -754,7 +764,7 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
         if (controller.journalMarkdown.isBlank()) {
             Text(L10n.t("journal.empty"), color = Veyq.Muted, fontSize = 14.sp)
         } else {
-            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, onOpenMedia)
+            JournalBody(controller.journalMarkdown, controller.tiles, controller.tracks, onOpenMedia, onOpenChapter)
         }
     }
 }
@@ -762,7 +772,7 @@ private fun JournalTab(controller: GalleryController, scope: kotlinx.coroutines.
 /** Read-only journal renderer with rich embeds (matches web/iOS): Markdown text interleaved with ::media
  *  (thumbnail / horizontal carousel → lightbox) and ::track (inline map). ::chapter renders as a simple chip. */
 @Composable
-private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, tracks: List<Track.TrackItem>, onOpenMedia: (GalleryController.Tile) -> Unit) {
+private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, tracks: List<Track.TrackItem>, onOpenMedia: (GalleryController.Tile) -> Unit, onOpenChapter: (String) -> Unit = {}) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         JournalEmbedParser.splitBlocks(markdown).forEach { block ->
             when (block) {
@@ -788,10 +798,15 @@ private fun JournalBody(markdown: String, tiles: List<GalleryController.Tile>, t
                             }
                             e.label?.let { Text(it, color = Veyq.Muted, fontSize = 12.sp) }
                         }
-                        JournalEmbedKind.CHAPTER -> Row(
-                            Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape).padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) { Text("🗂"); Text(e.label ?: e.ids.firstOrNull() ?: "", color = Veyq.Text) }
+                        JournalEmbedKind.CHAPTER -> {
+                            val cid = e.ids.firstOrNull() ?: ""
+                            Row(
+                                Modifier.clip(CircleShape).background(Veyq.Surface).border(1.dp, Veyq.Line, CircleShape)
+                                    .clickable(enabled = cid.isNotEmpty()) { onOpenChapter(cid) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) { Text("📖"); Text(e.label ?: cid, color = Veyq.Accent, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline) }
+                        }
                     }
                 }
             }

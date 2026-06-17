@@ -189,7 +189,12 @@ final class GalleryStore: ObservableObject {
     }
 
     /// Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info.
-    struct Child: Identifiable { let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?; var id: String { node.id }; var type: String { node.type } }
+    struct Child: Identifiable, Hashable {
+        let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?
+        var id: String { node.id }; var type: String { node.type }
+        static func == (l: Child, r: Child) -> Bool { l.id == r.id }
+        func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    }
     @Published var children: [Child] = []
     private var childrenLoaded = false
     var chapterCount: Int { children.filter { $0.type == "CHAPTER" }.count }
@@ -205,6 +210,14 @@ final class GalleryStore: ObservableObject {
             out.append(Child(node: n, name: name, cover: cover.flatMap(UIImage.init)))
         }
         children = out
+    }
+
+    /// Resolve a node by id (any node in the scope) into a navigable Child — backs ::chapter journal embeds.
+    func resolveChild(_ id: String) async -> Child? {
+        guard let all = try? await MemoryTree.listNodes(apiBase: apiBase, session: session, scopeId: scopeId),
+              let node = all.first(where: { $0.id == id }) else { return nil }
+        let name = (try? MemoryTree.decodeNodeName(contentKey: contentKey, node: node)) ?? "—"
+        return Child(node: node, name: name, cover: nil)
     }
 
     private nonisolated static func childCover(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, coverMediaId: String?) async -> Data? {
@@ -239,6 +252,7 @@ struct MemoryDetailView: View {
     @State private var showHighlightsOnly = false   // gallery filter (favourites)
     @State private var lightboxInfo = false          // info panel toggle in the lightbox
     @State private var editingDate = false           // capture-date editor toggle in the lightbox
+    @State private var chapterNav: GalleryStore.Child?   // ::chapter embed navigation target
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showDownload = false
     @State private var downloading = false
@@ -253,118 +267,7 @@ struct MemoryDetailView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            // Cap the gallery/content to a reading width so iPad/Mac don't render one enormous justified row.
-            let contentWidth = min(geo.size.width, 1024)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Cover hero: the first (earliest) photo, like the web detail header.
-                    if let hero = store.tiles.first {
-                        Image(uiImage: hero.image).resizable().scaledToFill()
-                            .frame(height: 180).frame(maxWidth: .infinity).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
-                    }
-                    Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
-                    Picker("", selection: $tab) {
-                        Text(T("detail.gallery")).tag(0)
-                        Text(T("detail.map")).tag(2)
-                        Text(T("detail.journal")).tag(1)
-                        Text(T("detail.info")).tag(3)
-                    }
-                    .pickerStyle(.segmented)
-
-                    if tab == 3 {
-                        infoTab
-                    } else if tab == 1 {
-                        JournalView(store: store, onOpenMedia: openLightbox)
-                    } else if tab == 2 {
-                        let pts = store.tiles.compactMap { t -> MemoryMapView.Point? in
-                            guard let lat = t.lat, let lng = t.lng else { return nil }
-                            return MemoryMapView.Point(id: t.id, lat: lat, lng: lng)
-                        }
-                        HStack {
-                            Spacer()
-                            Button(store.importing ? T("track.importing") : T("track.import")) { showGpxImporter = true }
-                                .tint(VeyqStyle.accent).disabled(store.importing)
-                        }
-                        if pts.isEmpty && store.tracks.isEmpty {
-                            Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
-                        } else {
-                            MemoryMapView(points: pts, tracks: store.tracks) { id in
-                                if let tile = store.tiles.first(where: { $0.id == id }) { openLightbox(tile) }
-                            }
-                        }
-                        ForEach(store.tracks) { tr in
-                            HStack(alignment: .top) {
-                                TrackStatsRow(route: tr)
-                                Spacer()
-                                Button(T("track.delete")) { let id = tr.id; Task { await store.deleteTrack(id) } }.tint(VeyqStyle.danger)
-                            }
-                        }
-                    } else {
-                    HStack {
-                        Text("\(displayTiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
-                        Spacer()
-                        if store.tiles.contains(where: { $0.highlighted }) {
-                            Button { showHighlightsOnly.toggle() } label: {
-                                Label(T("detail.highlights"), systemImage: showHighlightsOnly ? "star.fill" : "star")
-                                    .font(.footnote)
-                            }
-                            .tint(showHighlightsOnly ? VeyqStyle.accent : VeyqStyle.muted)
-                        }
-                    }
-                    if !store.children.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) {
-                                ForEach(store.children) { child in
-                                    NavigationLink {
-                                        MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
-                                    } label: { childCard(child) }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-                    if store.loading {
-                        Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
-                    } else if displayTiles.isEmpty {
-                        Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
-                    } else {
-                        let range = DateBuckets.dateRange(displayTiles) { $0.takenAt }
-                        if !range.isEmpty {
-                            Text(range).font(.footnote).foregroundStyle(VeyqStyle.muted)
-                        }
-                        ForEach(DateBuckets.groupByDay(displayTiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
-                                gallery(bucket.items, width: contentWidth - 32)
-                            }
-                        }
-                    }
-                    }
-                }
-                .padding(16)
-                .readableWidth()
-            }
-            .background(VeyqStyle.bg)
-        }
-        .navigationTitle(name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showShareRole = true } label: { Image(systemName: "person.crop.circle.badge.plus") }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showDownload = true } label: { Image(systemName: downloading ? "ellipsis" : "square.and.arrow.down") }
-                    .disabled(downloading || store.tiles.isEmpty)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
-                    Text(store.uploading ? T("detail.uploading") : T("detail.upload")).foregroundStyle(VeyqStyle.accent)
-                }
-                .disabled(store.uploading)
-            }
-        }
+        mainScroll
         .confirmationDialog(T("download.title"), isPresented: $showDownload, titleVisibility: .visible) {
             Button(T("download.onlyThis")) { startDownload(false) }
             Button(T("download.withChapters")) { startDownload(true) }
@@ -410,11 +313,142 @@ struct MemoryDetailView: View {
         }
     }
 
+    private var mainScroll: some View {
+        GeometryReader { geo in
+            // Cap the gallery/content to a reading width so iPad/Mac don't render one enormous justified row.
+            let contentWidth = min(geo.size.width, 1024)
+            ScrollView {
+                detailContent(contentWidth: contentWidth)
+                    .padding(16)
+                    .readableWidth()
+            }
+            .background(VeyqStyle.bg)
+        }
+        .navigationTitle(name)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $chapterNav) { child in
+            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
+        }
+        .toolbar { detailToolbar }
+    }
+
+    @ToolbarContentBuilder private var detailToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showShareRole = true } label: { Image(systemName: "person.crop.circle.badge.plus") }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showDownload = true } label: { Image(systemName: downloading ? "ellipsis" : "square.and.arrow.down") }
+                .disabled(downloading || store.tiles.isEmpty)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
+                Text(store.uploading ? T("detail.uploading") : T("detail.upload")).foregroundStyle(VeyqStyle.accent)
+            }
+            .disabled(store.uploading)
+        }
+    }
+
     // Tiles in capture-time order — the lightbox pages through these.
     private var orderedTiles: [GalleryStore.Tile] { store.tiles.sorted { $0.takenAt < $1.takenAt } }
     // The gallery grid honours the favourites filter.
     private var displayTiles: [GalleryStore.Tile] { showHighlightsOnly ? store.tiles.filter { $0.highlighted } : store.tiles }
     private var currentTile: GalleryStore.Tile? { orderedTiles.indices.contains(lightboxIndex) ? orderedTiles[lightboxIndex] : nil }
+
+    @ViewBuilder private func detailContent(contentWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Cover hero: the first (earliest) photo, like the web detail header.
+            if let hero = store.tiles.first {
+                Image(uiImage: hero.image).resizable().scaledToFill()
+                    .frame(height: 180).frame(maxWidth: .infinity).clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: VeyqStyle.radius))
+            }
+            Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
+            Picker("", selection: $tab) {
+                Text(T("detail.gallery")).tag(0)
+                Text(T("detail.map")).tag(2)
+                Text(T("detail.journal")).tag(1)
+                Text(T("detail.info")).tag(3)
+            }
+            .pickerStyle(.segmented)
+
+            if tab == 3 {
+                infoTab
+            } else if tab == 1 {
+                JournalView(store: store, onOpenMedia: openLightbox, onOpenChapter: openChapter)
+            } else if tab == 2 {
+                mapTab
+            } else {
+                galleryTab(contentWidth: contentWidth)
+            }
+        }
+    }
+
+    @ViewBuilder private var mapTab: some View {
+        let pts = store.tiles.compactMap { t -> MemoryMapView.Point? in
+            guard let lat = t.lat, let lng = t.lng else { return nil }
+            return MemoryMapView.Point(id: t.id, lat: lat, lng: lng)
+        }
+        HStack {
+            Spacer()
+            Button(store.importing ? T("track.importing") : T("track.import")) { showGpxImporter = true }
+                .tint(VeyqStyle.accent).disabled(store.importing)
+        }
+        if pts.isEmpty && store.tracks.isEmpty {
+            Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+        } else {
+            MemoryMapView(points: pts, tracks: store.tracks) { id in
+                if let tile = store.tiles.first(where: { $0.id == id }) { openLightbox(tile) }
+            }
+        }
+        ForEach(store.tracks) { tr in
+            HStack(alignment: .top) {
+                TrackStatsRow(route: tr)
+                Spacer()
+                Button(T("track.delete")) { let id = tr.id; Task { await store.deleteTrack(id) } }.tint(VeyqStyle.danger)
+            }
+        }
+    }
+
+    @ViewBuilder private func galleryTab(contentWidth: CGFloat) -> some View {
+        HStack {
+            Text("\(displayTiles.count) \(T("detail.media"))").font(.footnote).foregroundStyle(VeyqStyle.muted)
+            Spacer()
+            if store.tiles.contains(where: { $0.highlighted }) {
+                Button { showHighlightsOnly.toggle() } label: {
+                    Label(T("detail.highlights"), systemImage: showHighlightsOnly ? "star.fill" : "star").font(.footnote)
+                }
+                .tint(showHighlightsOnly ? VeyqStyle.accent : VeyqStyle.muted)
+            }
+        }
+        if !store.children.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(store.children) { child in
+                        NavigationLink {
+                            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
+                        } label: { childCard(child) }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        if store.loading {
+            Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+        } else if displayTiles.isEmpty {
+            Text(T("detail.noMedia")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+        } else {
+            let range = DateBuckets.dateRange(displayTiles) { $0.takenAt }
+            if !range.isEmpty {
+                Text(range).font(.footnote).foregroundStyle(VeyqStyle.muted)
+            }
+            ForEach(DateBuckets.groupByDay(displayTiles, takenAt: { $0.takenAt }), id: \.key) { bucket in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
+                    gallery(bucket.items, width: contentWidth - 32)
+                }
+            }
+        }
+    }
 
     @ViewBuilder private var infoTab: some View {
         VStack(spacing: 0) {
@@ -523,6 +557,12 @@ struct MemoryDetailView: View {
         guard orderedTiles.indices.contains(next) else { return }
         lightboxIndex = next
         loadLightboxPreview()
+    }
+
+    /// Navigate into a chapter referenced by a ::chapter journal embed (resolve the node, then push).
+    private func openChapter(_ id: String) {
+        guard !id.isEmpty else { return }
+        Task { if let child = await store.resolveChild(id) { chapterNav = child } }
     }
 
     /// Open the lightbox on `tile`: show its thumbnail instantly, then swap in the higher-res preview.

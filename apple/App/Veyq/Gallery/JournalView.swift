@@ -8,6 +8,8 @@ struct JournalView: View {
     @ObservedObject var store: GalleryStore
     /// Open the lightbox on a tile (owned by MemoryDetailView) — wired so ::media embeds are tappable.
     var onOpenMedia: (GalleryStore.Tile) -> Void = { _ in }
+    /// Navigate into a chapter by node id (owned by MemoryDetailView) — wired so ::chapter embeds are tappable.
+    var onOpenChapter: (String) -> Void = { _ in }
     @State private var editing = false
     @State private var live = false
     @State private var blocks: [JournalEditBlock] = []
@@ -36,7 +38,7 @@ struct JournalView: View {
                 if store.journalMarkdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(T("journal.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
                 } else {
-                    JournalBodyView(markdown: store.journalMarkdown, store: store, onOpenMedia: onOpenMedia)
+                    JournalBodyView(markdown: store.journalMarkdown, store: store, onOpenMedia: onOpenMedia, onOpenChapter: onOpenChapter)
                 }
             }
         }
@@ -57,6 +59,7 @@ struct JournalBodyView: View {
     let markdown: String
     @ObservedObject var store: GalleryStore
     var onOpenMedia: (GalleryStore.Tile) -> Void
+    var onOpenChapter: (String) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -119,13 +122,18 @@ struct JournalBodyView: View {
     }
 
     @ViewBuilder private func chapterEmbed(_ e: JournalEmbed) -> some View {
-        HStack(spacing: 6) {
-            Text("🗂")
-            Text(e.label ?? e.ids.first ?? "").foregroundStyle(VeyqStyle.text)
+        let id = e.ids.first ?? ""
+        Button { onOpenChapter(id) } label: {
+            HStack(spacing: 6) {
+                Text("📖")
+                Text(e.label ?? id).foregroundStyle(VeyqStyle.accent).underline()
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(VeyqStyle.surface).clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(VeyqStyle.line))
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(VeyqStyle.surface).clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(VeyqStyle.line))
+        .buttonStyle(.plain)
+        .disabled(id.isEmpty)
     }
 }
 
