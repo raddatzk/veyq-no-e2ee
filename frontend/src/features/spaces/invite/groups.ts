@@ -1,6 +1,7 @@
 // uc.spaces.groups (web) — owner-side group management built on the existing tenant + invite slices:
 // create a shared group (a tenant the caller owns) and mint invite links to add people. The heavy crypto
 // (scope keypair, temp-wrap) lives in the tenant / inviteMembers slices; this only orchestrates them.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { claimTenantOwnership, createTenant, issueOwnerInvite, type TenantSummary } from '../../admin/createTenantInviteOwner/tenant'
@@ -96,7 +97,7 @@ export async function emailInviteToGroup(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ email: email.trim(), inviteId: invite.inviteId, link }),
   })
-  if (!res.ok) throw new Error(`email invite failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'email invite')
 }
 
 /**
@@ -106,11 +107,11 @@ export async function emailInviteToGroup(
  */
 export async function deleteTenant(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}`, { method: 'DELETE', headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`delete tenant failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'delete tenant')
 }
 
 /** Cancel a scheduled tenant deletion (clears the deadline). Owner only. */
 export async function cancelTenantDeletion(apiBase: string, session: UnlockedSession, tenantId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/cancel-deletion`, { method: 'POST', headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`cancel tenant deletion failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'cancel tenant deletion')
 }

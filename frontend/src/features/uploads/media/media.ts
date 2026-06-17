@@ -5,6 +5,7 @@
 // (thumbnail/preview), which are themselves ordinary blobs uploaded the same way. The server stays blind:
 // it sees ciphertext frames, a per-scope dedup token, blob sizes and the mime type — but NOT capture time
 // or GPS location, which are sealed per-media (sealedMeta) under the scope content key.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
@@ -69,7 +70,7 @@ export async function startBlob(apiBase: string, session: UnlockedSession, scope
     headers: { 'content-type': 'application/json', ...auth(session) },
     body: JSON.stringify(req),
   })
-  if (!res.ok) throw new Error(`start blob failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'start blob')
   return res.json()
 }
 
@@ -81,20 +82,20 @@ export async function putChunk(apiBase: string, session: UnlockedSession, scopeI
     headers: { 'content-type': 'application/json', ...auth(session) },
     body: JSON.stringify({ frame: { suiteId: 'v1', bytes: b64url(frame) } }),
   })
-  if (!res.ok) throw new Error(`put chunk ${index} failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, `put chunk ${index}`)
 }
 
 /** Which chunk indices have landed (drives resume). */
 export async function getProgress(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<UploadProgress> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}`, { headers: auth(session) })
-  if (!res.ok) throw new Error(`upload progress failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'upload progress')
   return res.json()
 }
 
 /** Finalize the upload once every chunk has landed; promotes the frames to a content blob. */
 export async function completeBlob(apiBase: string, session: UnlockedSession, scopeId: string, uploadId: string): Promise<BlobRef> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blob-uploads/${uploadId}/complete`, { method: 'POST', headers: auth(session) })
-  if (!res.ok) throw new Error(`complete blob failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'complete blob')
   return res.json()
 }
 
@@ -122,7 +123,7 @@ export async function downloadBlob(apiBase: string, session: UnlockedSession, sc
   const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
   const parts = await mapPool(indices, 4, async (i) => {
     const res = await fetch(`${apiBase}/api/scopes/${scopeId}/blobs/${ref.blobId}/chunks/${i}`, { headers: auth(session) })
-    if (!res.ok) throw new Error(`get chunk ${i} failed: ${res.status} ${await res.text()}`)
+    if (!res.ok) throw await apiError(res, `get chunk ${i}`)
     const frame = fromB64url((await res.json()).frame.bytes)
     return v1.openFrame(contentKey, i, ref.totalChunks, frame)
   })
@@ -138,14 +139,14 @@ export async function createMedia(apiBase: string, session: UnlockedSession, sco
     headers: { 'content-type': 'application/json', ...auth(session) },
     body: JSON.stringify(req),
   })
-  if (!res.ok) throw new Error(`create media failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'create media')
   return res.json()
 }
 
 /** Delete a single medium (and its derivatives) from a memory. */
 export async function deleteMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, mediaId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media/${mediaId}`, { method: 'DELETE', headers: auth(session) })
-  if (!res.ok) throw new Error(`delete media failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'delete media')
 }
 
 /**
@@ -171,6 +172,6 @@ export async function uploadMedia(apiBase: string, session: UnlockedSession, sco
 /** List a Memory's media in upload order (the client sorts by decrypted takenAt for the gallery). */
 export async function listMedia(apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string): Promise<MediaItem[]> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/media`, { headers: auth(session) })
-  if (!res.ok) throw new Error(`list media failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list media')
   return (await res.json()).media
 }

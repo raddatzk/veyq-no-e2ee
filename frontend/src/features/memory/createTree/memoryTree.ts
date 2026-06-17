@@ -2,6 +2,7 @@
 // scope. The name/title is sealed under the scope content key; the slug becomes a blinded slug token
 // (AD-26) so the server enforces per-parent uniqueness without ever seeing the name. The server holds only
 // the ID graph, types, tokens, order and ciphertext; the client reconstructs and decrypts locally.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
@@ -50,14 +51,14 @@ export async function createNode(
       sealedContent: { suiteId: 'v1', bytes: b64url(sealed) },
     }),
   })
-  if (!res.ok) throw new Error(`create node failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'create node')
   return res.json()
 }
 
 /** List the scope's node graph (flat). The client reconstructs the tree + decrypts names locally. */
 export async function listNodes(apiBase: string, session: UnlockedSession, scopeId: string): Promise<MemoryNode[]> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`list nodes failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list nodes')
   return (await res.json()).nodes
 }
 

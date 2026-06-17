@@ -1,5 +1,6 @@
 // uc.admin.setup-server (web) — cold E2EE registration of the first Server Owner.
 // All key material is generated here; the server only ever receives ciphertext + public keys.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url } from '../../../shared/base64'
 
@@ -92,6 +93,6 @@ export async function registerServerOwner(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),
   })
-  if (!res.ok) throw new Error(`setup/owner failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'setup/owner')
   return { user: await res.json(), emergencyKit }
 }

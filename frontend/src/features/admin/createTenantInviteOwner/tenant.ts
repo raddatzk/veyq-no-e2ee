@@ -1,5 +1,6 @@
 // uc.admin.create-tenant-invite-owner (web) — provision a tenant shell + owner invite, and claim
 // ownership by minting the tenant scope keypair and granting it to oneself (server stays blind).
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 
@@ -15,7 +16,7 @@ const json = (token: string) => ({ 'content-type': 'application/json', authoriza
 
 async function post<T>(apiBase: string, path: string, token: string, body?: unknown): Promise<T> {
   const res = await fetch(`${apiBase}${path}`, { method: 'POST', headers: json(token), body: body ? JSON.stringify(body) : undefined })
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, `POST ${path}`)
   return res.json()
 }
 

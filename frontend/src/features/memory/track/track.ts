@@ -1,6 +1,7 @@
 // uc.memory.track (web) — a Memory's GPX tracks are {name, points} routes sealed under the scope content key
 // (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only; we
 // seal before POST and open after GET. Route location data is sensitive, so it never leaves the client clear.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -16,7 +17,7 @@ export async function getTracks(apiBase: string, session: UnlockedSession, activ
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/tracks`, {
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
-  if (!res.ok) throw new Error(`list tracks failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list tracks')
   const { tracks } = await res.json()
   return tracks.map((t: { id: string; sealedContent: { bytes: string } }) => {
     const sealed = fromB64url(t.sealedContent.bytes)
@@ -34,7 +35,7 @@ export async function createTrack(apiBase: string, session: UnlockedSession, act
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
   })
-  if (!res.ok) throw new Error(`create track failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'create track')
 }
 
 /** Remove a track. */
@@ -43,5 +44,5 @@ export async function deleteTrack(apiBase: string, session: UnlockedSession, act
     method: 'DELETE',
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
-  if (!res.ok) throw new Error(`delete track failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'delete track')
 }

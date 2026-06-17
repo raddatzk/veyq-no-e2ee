@@ -2,6 +2,7 @@
 // email access. The email delivers a one-time token (the email factor); the Secret Key decrypts the RECOVERY
 // master-key wrap (the crypto factor). The client unwraps the master key, re-wraps it under the new password
 // and ships the new PASSWORD wrap + auth verifier. The server sees neither secret.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url, fromB64url } from '../../../shared/base64'
 
@@ -17,7 +18,7 @@ export async function requestPasswordReset(apiBase: string, email: string): Prom
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: email.trim() }),
   })
-  if (!res.ok) throw new Error(`reset request failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'reset request')
 }
 
 /** Exchange the email token for the RECOVERY wrap (the account's master key wrapped under the Secret Key). */
@@ -27,7 +28,7 @@ export async function getResetMaterial(apiBase: string, token: string): Promise<
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ token }),
   })
-  if (!res.ok) throw new Error(`reset material failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'reset material')
   return res.json()
 }
 
@@ -65,7 +66,7 @@ export async function confirmPasswordReset(apiBase: string, token: string, secre
       recoveryAuthTag: b64url(v1.recoveryAuthTag(masterKey)),
     }),
   })
-  if (!res.ok) throw new Error(`reset confirm failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'reset confirm')
   return { email: material.email }
 }
 

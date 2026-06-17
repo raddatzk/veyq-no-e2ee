@@ -1,5 +1,6 @@
 // uc.account.login (web) — authenticate, fetch the wrapped key bag, and unlock the master key locally.
 // The server returns ciphertext only; the master/identity keys are recovered here (auth != unlock).
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { fromB64url } from '../../../shared/base64'
 
@@ -41,7 +42,7 @@ export async function login(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
-  if (!res.ok) throw new Error(`login failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'login')
   const body: LoginResponse = await res.json()
 
   const wrap = body.keyBag.masterKeyWraps.find((w) => w.unlockMethod === 'PASSWORD')
@@ -63,7 +64,7 @@ export async function logout(apiBase: string, sessionToken: string): Promise<voi
     method: 'DELETE',
     headers: { authorization: `Bearer ${sessionToken}` },
   })
-  if (!res.ok) throw new Error(`logout failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'logout')
 }
 
 /** Proves the session resolves on the server. */
@@ -76,7 +77,7 @@ export async function fetchCurrentUser(apiBase: string, sessionToken: string): P
 /** Fetches the authenticated user's unshared personal scope grant. */
 export async function fetchPersonalScope(apiBase: string, sessionToken: string): Promise<PersonalScopeGrant> {
   const res = await fetch(`${apiBase}/api/me/personal-scope`, { headers: { authorization: `Bearer ${sessionToken}` } })
-  if (!res.ok) throw new Error(`personal scope failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'personal scope')
   return res.json()
 }
 

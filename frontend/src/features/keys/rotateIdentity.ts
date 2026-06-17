@@ -1,5 +1,6 @@
 // uc.keys.rotate-identity (web) — replace the account identity keypair and re-wrap every owned grant to
 // it. The master key (and its unlock wraps) are unchanged, so login still works; only the identity moves.
+import { apiError } from '../../shared/apiError'
 import * as v1 from '../../shared/crypto/v1'
 import type { UnlockedSession } from '../account/login/login'
 import { b64url, fromB64url } from '../../shared/base64'
@@ -51,6 +52,6 @@ export async function rotateIdentity(apiBase: string, session: UnlockedSession):
       grants,
     }),
   })
-  if (!res.ok) throw new Error(`rotate identity failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'rotate identity')
   return res.json()
 }

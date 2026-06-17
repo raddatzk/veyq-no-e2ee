@@ -1,6 +1,7 @@
 // uc.spaces / content (web) — the first real use of a scope: write and read encrypted content under it.
 // AD-03: a stable per-scope content key (wrapped to the scope public key) seals items; the server only
 // ever stores ciphertext. Targets the personal scope here, but the ops are scope-generic.
+import { apiError } from '../../shared/apiError'
 import * as v1 from '../../shared/crypto/v1'
 import { getMyScopeGrant, openScopeGrant } from '../admin/createTenantInviteOwner/tenant'
 import type { UnlockedSession } from '../account/login/login'
@@ -15,7 +16,7 @@ const auth = (token: string) => ({ authorization: `Bearer ${token}` })
 /** Fetch + open the caller's personal scope: unwrap its private key with the user's identity. */
 export async function openPersonalScope(apiBase: string, session: UnlockedSession): Promise<OpenScope> {
   const res = await fetch(`${apiBase}/api/me/personal-scope`, { headers: auth(session.sessionToken) })
-  if (!res.ok) throw new Error(`personal-scope failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'personal-scope')
   const g = await res.json()
   const idKem = fromB64url(session.identityPublicKey.kemPublicKey)
   const scopePrivBytes = v1.asymUnwrap(
@@ -39,7 +40,7 @@ export async function openTenantScope(apiBase: string, session: UnlockedSession,
 /** Open ANY scope the caller holds a grant for, by scope id (e.g. a group scope, which has no tenant path). */
 export async function openScopeById(apiBase: string, session: UnlockedSession, scopeId: string): Promise<OpenScope> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/grants/me`, { headers: auth(session.sessionToken) })
-  if (!res.ok) throw new Error(`scope grant failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'scope grant')
   const g = await res.json()
   const scopePriv = openScopeGrant(g, session.identity, session.identityPublicKey.kemPublicKey)
   const scopeKem = fromB64url(g.scopePublicKey.kemPublicKey)
@@ -64,7 +65,7 @@ export async function getOrCreateContentKey(apiBase: string, session: UnlockedSe
     body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) } }),
   })
   if (put.status === 409) return getOrCreateContentKey(apiBase, session, scope) // raced — adopt the existing key
-  if (!put.ok) throw new Error(`content-key provision failed: ${put.status} ${await put.text()}`)
+  if (!put.ok) throw await apiError(put, 'content-key provision')
   return ck
 }
 
@@ -77,7 +78,7 @@ export async function writeItem(apiBase: string, session: UnlockedSession, scope
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({ sealedContent: { suiteId: 'v1', bytes: b64url(sealed) } }),
   })
-  if (!res.ok) throw new Error(`item create failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'item create')
   return (await res.json()).id
 }
 

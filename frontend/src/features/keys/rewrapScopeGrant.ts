@@ -1,3 +1,4 @@
+import { apiError } from '../../shared/apiError'
 // uc.keys.rewrap-scope-grant (web) — replace only the caller's existing wrapped scope grant.
 // The scope private key is opened and re-wrapped client-side; the server stores ciphertext only.
 
@@ -25,7 +26,7 @@ export async function upsertMyMasterKeyWrap(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${sessionToken}` },
     body: JSON.stringify({ masterKeyWrap }),
   })
-  if (!res.ok) throw new Error(`master key wrap upsert failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'master key wrap upsert')
   return res.json()
 }
 
@@ -40,7 +41,7 @@ export async function removeMyMasterKeyWrap(
     method: 'DELETE',
     headers: { authorization: `Bearer ${sessionToken}` },
   })
-  if (!res.ok) throw new Error(`master key wrap removal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'master key wrap removal')
 }
 
 export async function rewrapMyScopeGrant(
@@ -54,6 +55,6 @@ export async function rewrapMyScopeGrant(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${sessionToken}` },
     body: JSON.stringify({ wrappedScopePrivateKey }),
   })
-  if (!res.ok) throw new Error(`scope grant rewrap failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'scope grant rewrap')
   return res.json()
 }

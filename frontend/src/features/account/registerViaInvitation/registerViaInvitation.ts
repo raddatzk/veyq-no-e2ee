@@ -1,6 +1,7 @@
 // uc.account.register-via-invitation (web) — a brand-new invitee accepts an owner invite. All key
 // material is born here; one POST creates the account, mints the tenant scope as a self grant, and
 // returns a session. The server only ever receives ciphertext + public keys (+ an auth verifier).
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { b64url } from '../../../shared/base64'
 
@@ -39,7 +40,7 @@ export type EmergencyKit = { secretKey: string }
 /** Public invite metadata — the bootstrap secret (from the URL fragment) is never sent here. */
 export async function getInviteMetadata(apiBase: string, inviteId: string): Promise<InviteMetadata> {
   const res = await fetch(`${apiBase}/api/tenant-invites/${inviteId}`)
-  if (!res.ok) throw new Error(`invite metadata failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'invite metadata')
   return res.json()
 }
 
@@ -50,7 +51,7 @@ export async function getInviteMaterial(apiBase: string, inviteId: string, boots
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ bootstrapSecret }),
   })
-  if (!res.ok) throw new Error(`invite material failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'invite material')
   return res.json()
 }
 
@@ -131,7 +132,7 @@ export async function registerWithScope(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),
   })
-  if (!res.ok) throw new Error(`register failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'register')
   const body = await res.json()
   return { ...body, emergencyKit: { secretKey: b64url(secretKey) } }
 }

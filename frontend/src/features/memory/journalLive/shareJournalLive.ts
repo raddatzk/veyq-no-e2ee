@@ -2,6 +2,7 @@
 // scope content key (link fragment), so it can reconstruct the journal from the operator-blind store
 // (`public/shares/.../journal/live`: sealed snapshot + update log) and then subscribe to the relay with a
 // share token to live-read owner edits. It never writes (the relay marks share connections receive-only).
+import { apiError } from '../../../shared/apiError'
 import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import { EncryptedRelayProvider } from './encryptedProvider'
@@ -12,7 +13,7 @@ const open = v1.journalOpen
 /** Reconstruct the shared journal into `doc` from the public snapshot + update log (no auth). */
 export async function loadShareJournalDoc(apiBase: string, shareId: string, nodeId: string, contentKey: Uint8Array, doc: Y.Doc): Promise<void> {
   const res = await fetch(`${apiBase}/api/public/shares/${shareId}/nodes/${nodeId}/journal/live`)
-  if (!res.ok) throw new Error(`load share journal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'load share journal')
   const body = await res.json()
   Y.transact(doc, () => {
     if (body.snapshot) Y.applyUpdate(doc, open(contentKey, fromB64url(body.snapshot.bytes)), 'share-load')

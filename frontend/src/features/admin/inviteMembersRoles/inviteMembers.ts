@@ -1,6 +1,7 @@
 // uc.admin.invite-members-roles (web) — member management for a tenant: temp-wrap invites for new
 // people (email / white-label link), listing + rotating the scope, removing members and changing roles.
 // Adding people is invite-only — there is no directory lookup of arbitrary emails. The server stays blind.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import { getMyScopeGrant, openScopeGrant } from '../createTenantInviteOwner/tenant'
 import { getInviteMetadata, getInviteMaterial, registerWithScope, type RegisterResult } from '../../account/registerViaInvitation/registerViaInvitation'
@@ -24,7 +25,7 @@ export type TenantMember = {
 /** List a tenant's members with their published identity public keys (for re-wrapping a rotated scope). */
 export async function listTenantMembers(apiBase: string, token: string, tenantId: string): Promise<TenantMember[]> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/members`, { headers: { authorization: `Bearer ${token}` } })
-  if (!res.ok) throw new Error(`list members failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list members')
   return (await res.json()).members
 }
 
@@ -104,7 +105,7 @@ export async function rotateScope(
       ...(reSealedNodes ? { reSealedNodes } : {}),
     }),
   })
-  if (!res.ok) throw new Error(`rotate scope failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'rotate scope')
   return res.json()
 }
 
@@ -122,7 +123,7 @@ export async function removeMember(
     method: 'DELETE',
     headers: { authorization: `Bearer ${ownerToken}` },
   })
-  if (!res.ok) throw new Error(`remove member failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'remove member')
   return res.json()
 }
 
@@ -139,7 +140,7 @@ export async function changeMemberRole(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ role }),
   })
-  if (!res.ok) throw new Error(`change role failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'change role')
   return res.json()
 }
 
@@ -181,7 +182,7 @@ export async function issueMemberInvite(
       tempWrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(tempWrapped) },
     }),
   })
-  if (!res.ok) throw new Error(`member-invite failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'member-invite')
   const body = await res.json()
   return {
     inviteId: body.inviteId,
@@ -254,6 +255,6 @@ export async function acceptMemberInvite(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ bootstrapSecret, wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(rewrapped) } }),
   })
-  if (!res.ok) throw new Error(`accept failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'accept')
   return res.json()
 }

@@ -2,6 +2,7 @@
 // under a random per-share key and stores the ciphertext; the share key rides the link FRAGMENT (/s/<id>#k=…)
 // and never reaches the server. A guest resolves the share, unwraps the content key client-side, and reads
 // the shared subtree's ciphertext (gated server-side to the subtree). The server stays blind throughout.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -46,7 +47,7 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ wrappedContentKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role: opts.role ?? 'VIEWER', passwordSalt, expiresAt: opts.expiresAt, label: opts.label ?? '', noticeMarkdown: opts.noticeMarkdown }),
   })
-  if (!res.ok) throw new Error(`create share failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'create share')
   const { shareId } = await res.json()
   const base = opts.origin ?? (typeof window !== 'undefined' ? window.location.origin : '')
   return { shareId, link: `${base}/s/${shareId}#k=${b64url(shareKey)}` }
@@ -55,7 +56,7 @@ export async function createShare(apiBase: string, session: UnlockedSession, act
 /** List a memory's shares. */
 export async function listShares(apiBase: string, session: UnlockedSession, active: ActiveSpace, nodeId: string): Promise<ShareSummary[]> {
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/shares`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`list shares failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list shares')
   return (await res.json()).shares
 }
 
@@ -66,7 +67,7 @@ export async function updateShare(apiBase: string, session: UnlockedSession, act
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify(edit),
   })
-  if (!res.ok) throw new Error(`update share failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'update share')
   return res.json()
 }
 
@@ -76,7 +77,7 @@ export async function revokeShare(apiBase: string, session: UnlockedSession, act
     method: 'DELETE',
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
-  if (!res.ok) throw new Error(`revoke share failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'revoke share')
 }
 
 // ---- guest side (no auth) -------------------------------------------------------------------------------
@@ -90,7 +91,7 @@ export type TenantTerms = { tenantId: string; termsMarkdown?: string; version: n
 /** Read a tenant's ToS (Owner only). */
 export async function getTenantTerms(apiBase: string, session: UnlockedSession, tenantId: string): Promise<TenantTerms> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/terms`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`get terms failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'get terms')
   return res.json()
 }
 
@@ -101,14 +102,14 @@ export async function setTenantTerms(apiBase: string, session: UnlockedSession, 
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify({ termsMarkdown }),
   })
-  if (!res.ok) throw new Error(`set terms failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'set terms')
   return res.json()
 }
 
 /** Resolve a public share: unwrap the content key with the fragment share key (+ password if protected). */
 export async function resolvePublicShare(apiBase: string, shareId: string, shareKeyB64: string, password?: string): Promise<ShareContext> {
   const res = await fetch(`${apiBase}/api/public/shares/${shareId}`)
-  if (!res.ok) throw new Error(`resolve share failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'resolve share')
   const body = await res.json()
   const fragKey = fromB64url(shareKeyB64)
   // Password-protected: fold Argon2id(password, salt) into the unwrap key. No password → prompt for one.
@@ -133,14 +134,14 @@ export async function resolvePublicShare(apiBase: string, shareId: string, share
 /** The shared subtree's nodes (ciphertext). */
 export async function listShareNodes(ctx: ShareContext): Promise<MemoryNode[]> {
   const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/nodes`)
-  if (!res.ok) throw new Error(`share nodes failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'share nodes')
   return (await res.json()).nodes
 }
 
 /** A shared node's media (ciphertext). */
 export async function listShareMedia(ctx: ShareContext, nodeId: string): Promise<MediaItem[]> {
   const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/nodes/${nodeId}/media`)
-  if (!res.ok) throw new Error(`share media failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'share media')
   return (await res.json()).media
 }
 
@@ -150,7 +151,7 @@ export async function downloadShareBlob(ctx: ShareContext, ref: BlobRef): Promis
   const indices = Array.from({ length: ref.totalChunks }, (_, i) => i)
   const parts = await mapPool(indices, 4, async (i) => {
     const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/blobs/${ref.blobId}/chunks/${i}`)
-    if (!res.ok) throw new Error(`share chunk ${i} failed: ${res.status} ${await res.text()}`)
+    if (!res.ok) throw await apiError(res, `share chunk ${i}`)
     const frame = fromB64url((await res.json()).frame.bytes)
     return v1.openFrame(ctx.contentKey, i, ref.totalChunks, frame)
   })
@@ -204,7 +205,7 @@ async function uploadShareBlob(ctx: ShareContext, bytes: Uint8Array): Promise<Bl
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ dedupToken: dedupTokenFor(ctx.contentKey, bytes), totalChunks: chunks.length, byteSize: bytes.length }),
   })
-  if (!start.ok) throw new Error(`share start blob failed: ${start.status} ${await start.text()}`)
+  if (!start.ok) throw await apiError(start, 'share start blob')
   const ticket = await start.json()
   if (ticket.status === 'READY') return { blobId: ticket.blobId, totalChunks: ticket.totalChunks, byteSize: bytes.length }
   const uploadId = ticket.uploadId
@@ -219,7 +220,7 @@ async function uploadShareBlob(ctx: ShareContext, bytes: Uint8Array): Promise<Bl
     if (!put.ok) throw new Error(`share put chunk ${i} failed: ${put.status}`)
   }
   const done = await fetch(`${sp(ctx)}/blob-uploads/${uploadId}/complete`, { method: 'POST' })
-  if (!done.ok) throw new Error(`share complete failed: ${done.status} ${await done.text()}`)
+  if (!done.ok) throw await apiError(done, 'share complete')
   return done.json()
 }
 
@@ -234,13 +235,13 @@ export async function uploadShareMedia(ctx: ShareContext, m: NewMedia): Promise<
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives }),
   })
-  if (!res.ok) throw new Error(`contribute media failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'contribute media')
 }
 
 /** Read the shared memory's journal Markdown ('' when none). Read-only over a share — only the owner edits. */
 export async function getShareJournal(ctx: ShareContext): Promise<string> {
   const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/journal`)
-  if (!res.ok) throw new Error(`share journal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'share journal')
   const body = await res.json()
   if (!body.sealedContent) return ''
   const sealed = fromB64url(body.sealedContent.bytes)

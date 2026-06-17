@@ -2,6 +2,7 @@
 // the scope content key (nonce || AEAD), the same envelope used for node names. The server stores ciphertext
 // only. Editing goes through the operator-blind CRDT store (journalLive/journalPersistence); this module is
 // the read path (detail view) that opens the compacted Markdown projection.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
@@ -16,7 +17,7 @@ export async function getJournal(apiBase: string, session: UnlockedSession, acti
   const res = await fetch(`${apiBase}/api/scopes/${active.scope.scopeId}/nodes/${nodeId}/journal`, {
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
-  if (!res.ok) throw new Error(`get journal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'get journal')
   const body = await res.json()
   if (!body.sealedContent) return { markdown: '', updatedAt: null }
   const sealed = fromB64url(body.sealedContent.bytes)

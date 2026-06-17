@@ -2,6 +2,7 @@
 // > Personal). Create one by minting a GROUP_ROOT scope keypair, self-granting it, provisioning a content
 // key, and sealing the group NAME under that content key (operator-blind). Members are added by wrapping
 // the group scope key to their identity. The server stays blind to the name and the content.
+import { apiError } from '../../../shared/apiError'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
 import { b64url, fromB64url } from '../../../shared/base64'
@@ -45,7 +46,7 @@ export async function createGroupSpace(apiBase: string, session: UnlockedSession
       sealedName: { suiteId: 'v1', bytes: b64url(sealName(ck, name.trim())) },
     }),
   })
-  if (!res.ok) throw new Error(`create group failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'create group')
   return res.json()
 }
 
@@ -54,7 +55,7 @@ export type GroupRole = 'GroupOwner' | 'GroupMember'
 /** List a group's members (any group member may). */
 export async function listGroupMembers(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<GroupMember[]> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members`, { headers: auth(session.sessionToken) })
-  if (!res.ok) throw new Error(`list group members failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list group members')
   return (await res.json()).members
 }
 
@@ -71,7 +72,7 @@ export async function addGroupMember(
   role: GroupRole = 'GroupMember',
 ): Promise<GroupMember> {
   const gRes = await fetch(`${apiBase}/api/scopes/${scopeId}/grants/me`, { headers: auth(session.sessionToken) })
-  if (!gRes.ok) throw new Error(`group grant failed: ${gRes.status} ${await gRes.text()}`)
+  if (!gRes.ok) throw await apiError(gRes, 'group grant')
   const g = await gRes.json()
   const myKem = fromB64url(session.identityPublicKey.kemPublicKey)
   const scopePrivBytes = v1.asymUnwrap(v1.hybridSecret(session.identity), { x: myKem.slice(0, 32), m: myKem.slice(32) }, fromB64url(g.wrappedScopePrivateKey.bytes), 'scope-grant')
@@ -83,7 +84,7 @@ export async function addGroupMember(
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({ userId: target.userId, wrappedScopePrivateKey: { suiteId: 'v1', bytes: b64url(wrapped) }, role }),
   })
-  if (!res.ok) throw new Error(`add group member failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'add group member')
   return res.json()
 }
 
@@ -94,18 +95,18 @@ export async function setGroupMemberRole(apiBase: string, session: UnlockedSessi
     headers: { 'content-type': 'application/json', ...auth(session.sessionToken) },
     body: JSON.stringify({ role }),
   })
-  if (!res.ok) throw new Error(`set group role failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'set group role')
   return res.json()
 }
 
 /** Remove a member from a group (GroupOwner only; the server refuses to remove the last GroupOwner). */
 export async function removeGroupMember(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string, userId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}/members/${userId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
-  if (!res.ok) throw new Error(`remove group member failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'remove group member')
 }
 
 /** Delete a group entirely (GroupOwner only). */
 export async function deleteGroup(apiBase: string, session: UnlockedSession, tenantId: string, scopeId: string): Promise<void> {
   const res = await fetch(`${apiBase}/api/tenants/${tenantId}/groups/${scopeId}`, { method: 'DELETE', headers: auth(session.sessionToken) })
-  if (!res.ok) throw new Error(`delete group failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'delete group')
 }

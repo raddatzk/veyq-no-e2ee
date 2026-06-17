@@ -4,6 +4,7 @@
 // the updates, appends a sealed update per local edit, and on close compacts (a fresh snapshot + the Markdown
 // reader projection) which prunes the folded-in updates. Cross-session edits converge without a plaintext
 // server document.
+import { apiError } from '../../../shared/apiError'
 import * as Y from 'yjs'
 import * as v1 from '../../../shared/crypto/v1'
 import type { UnlockedSession } from '../../account/login/login'
@@ -28,7 +29,7 @@ function auth(session: UnlockedSession) {
  */
 export async function fetchJournalLiveTicket(apiBase: string, session: UnlockedSession): Promise<string> {
   const res = await fetch(`${apiBase}/api/journal-live/ticket`, { method: 'POST', headers: auth(session) })
-  if (!res.ok) throw new Error(`journal-live ticket failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'journal-live ticket')
   return (await res.json()).ticket
 }
 
@@ -37,7 +38,7 @@ export async function loadJournalDoc(
   apiBase: string, session: UnlockedSession, scopeId: string, nodeId: string, contentKey: Uint8Array, doc: Y.Doc,
 ): Promise<number> {
   const res = await fetch(`${apiBase}/api/scopes/${scopeId}/nodes/${nodeId}/journal/live`, { headers: auth(session) })
-  if (!res.ok) throw new Error(`load journal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'load journal')
   const body = await res.json()
   let maxSeq = Number(body.baseSeq ?? 0)
   Y.transact(doc, () => {
@@ -59,7 +60,7 @@ export async function appendJournalUpdate(
     headers: { 'content-type': 'application/json', ...auth(session) },
     body: JSON.stringify({ sealedUpdate: { suiteId: 'v1', bytes: b64url(seal(contentKey, update)) } }),
   })
-  if (!res.ok) throw new Error(`append journal update failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'append journal update')
   return Number((await res.json()).seq)
 }
 
@@ -98,5 +99,5 @@ export async function compactJournal(
       coveredSeq,
     }),
   })
-  if (!res.ok) throw new Error(`compact journal failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'compact journal')
 }

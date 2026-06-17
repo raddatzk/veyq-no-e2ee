@@ -1,6 +1,7 @@
 // uc.memory.curate (web) — create a folder/memory in the tree. The name is sealed and a per-parent slug
 // token is derived (the server stays blind); a clean slug is generated from the name, with a numeric suffix
 // on collision. Rename/move/reorder need new backend endpoints (only createNode exists today).
+import { apiError } from '../../../shared/apiError'
 import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { createNode, decodeNode, resealNode, slugTokenFor, type MemoryNode, type NodeType } from '../createTree/memoryTree'
@@ -15,7 +16,7 @@ async function patchNode(apiBase: string, session: UnlockedSession, scopeId: str
     headers: { 'content-type': 'application/json', authorization: `Bearer ${session.sessionToken}` },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`update node failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'update node')
   invalidateNodeGraph(scopeId) // rename/move/cover/reorder changed the graph — drop the per-scope cache
   return res.json()
 }
@@ -111,6 +112,6 @@ export async function deleteNode(apiBase: string, session: UnlockedSession, acti
     method: 'DELETE',
     headers: { authorization: `Bearer ${session.sessionToken}` },
   })
-  if (!res.ok) throw new Error(`delete node failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'delete node')
   invalidateNodeGraph(active.scope.scopeId) // the subtree is gone — drop the per-scope cache
 }

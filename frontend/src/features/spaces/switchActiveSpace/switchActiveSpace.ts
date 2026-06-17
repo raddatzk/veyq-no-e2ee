@@ -1,6 +1,7 @@
 // uc.spaces.switch-active-space (web) — the unified space switcher: list every space the caller can enter
 // (personal + groups) and switch the active context into any of them. Switching fetches no secrets — it
 // opens the chosen scope with the wrap the client already holds. Content ops reuse the content slice.
+import { apiError } from '../../../shared/apiError'
 import type { UnlockedSession } from '../../account/login/login'
 import { openPersonalScope, openScopeById, openTenantScope, type OpenScope } from '../../content/scopeContent'
 
@@ -23,7 +24,7 @@ export type SpaceEntry = {
 /** List every space the caller can enter (personal + every group they hold the scope key for). */
 export async function listMySpaces(apiBase: string, session: UnlockedSession): Promise<SpaceEntry[]> {
   const res = await fetch(`${apiBase}/api/me/spaces`, { headers: { authorization: `Bearer ${session.sessionToken}` } })
-  if (!res.ok) throw new Error(`list spaces failed: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw await apiError(res, 'list spaces')
   return (await res.json()).spaces
 }
 

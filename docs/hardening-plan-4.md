@@ -88,7 +88,7 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
   (Re)Connect statt `ApiClient.shared` (E3-Muster); `peers`/`peerClocks` wachsen unbegrenzt (Ghost-Peers ohne
   Timeout-Eviction); `seedIfEmpty` tot (Call-Site inlined). Fix: shared Client, Peer-Eviction (y-protocols
   outdatedTime), Dead-Code raus.
-- [ ] **E6 · Web: rohe Server-Response-Bodies in ~70 Throws** *(DEFERRED — 70 Sites, Low-Wert/hohe Churn; eigener Pass)*  ORIG: *(Security/Clarity, Low, S)* — `throw new
+- [x] **E6 · Web: rohe Server-Response-Bodies in ~70 Throws** — FIX: zentraler `shared/apiError.ts`-Helfer (`<label> failed: <status>`, Body nur in `import.meta.env.DEV`); 74 Sites über 23 Dateien per Codemod auf `throw await apiError(res, '<label>')` umgestellt (Labels mit `${}` als Template-Literal erhalten). Verifiziert: vue-tsc + 72 Unit + e2e. ORIG: *(Security/Clarity, Low, S)* — `throw new
   Error(\`…${await res.text()}\`)` überall (Web-Pendant zu Android A5). Zentraler `apiError(res)`-Helfer
   (Status + stabiler Code; Body nur in dev). Defense-in-depth.
 - [x] **E7 · Doku-Drift** *(Docs, Low, S)* — `security-model.md` nennt Login-Argon `m=65536`, Code nutzt `m=32768`
