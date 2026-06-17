@@ -6,7 +6,7 @@ create table veyq_memory_track (
     node_id        varchar(64)         not null,
     scope_id       varchar(64)         not null,
     suite_id       varchar(32)         not null,
-    sealed_content varbinary(16777216) not null,  -- nonce || AEAD(content key, {name, points})
+    sealed_content longblob not null,  -- nonce || AEAD(content key, {name, points})
     created_at     timestamp           not null
 );
 

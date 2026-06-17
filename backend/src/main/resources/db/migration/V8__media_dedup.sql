@@ -9,7 +9,7 @@ create table veyq_media_blob (
     scope_id     varchar(64)        not null references veyq_scope (id),
     dedup_token  varchar(255)       not null,  -- blinded: HMAC(dedupKey, SHA256(content)), base64url
     suite_id     varchar(64)        not null,
-    sealed_blob  varbinary(67108864) not null, -- nonce || AEAD(content key, media bytes)
+    sealed_blob  longblob not null, -- nonce || AEAD(content key, media bytes)
     byte_size    bigint             not null,
     created_at   timestamp          not null,
     constraint uq_media_blob unique (scope_id, dedup_token)

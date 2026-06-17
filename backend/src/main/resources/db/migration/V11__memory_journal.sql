@@ -5,7 +5,7 @@ create table veyq_memory_journal (
     node_id        varchar(64)        not null primary key,
     scope_id       varchar(64)        not null,
     suite_id       varchar(32)        not null,
-    sealed_content varbinary(8388608) not null,  -- nonce || AEAD(content key, markdown body)
+    sealed_content longblob not null,  -- nonce || AEAD(content key, markdown body)
     updated_at     timestamp          not null
 );
 

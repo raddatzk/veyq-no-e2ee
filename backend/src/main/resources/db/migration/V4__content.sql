@@ -14,7 +14,7 @@ create table veyq_scope_item (
     id              varchar(64)      primary key,
     scope_id        varchar(64)      not null references veyq_scope (id),
     suite_id        varchar(64)      not null,
-    sealed_content  varbinary(1048576) not null,  -- nonce || AEAD(content key, plaintext)
+    sealed_content  longblob not null,  -- nonce || AEAD(content key, plaintext)
     created_at      timestamp        not null
 );
 

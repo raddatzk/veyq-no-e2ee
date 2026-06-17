@@ -13,8 +13,8 @@ create table veyq_media (
     mime_type       varchar(128)       not null,  -- server-visible: image/jpeg, video/mp4, …
     byte_size       bigint             not null,  -- server-visible: plaintext size
     suite_id        varchar(64)        not null,
-    sealed_blob     varbinary(67108864) not null, -- nonce || AEAD(content key, media bytes)
-    sealed_thumb    varbinary(1048576),           -- nonce || AEAD(content key, light thumbnail) — optional
+    sealed_blob     longblob not null, -- nonce || AEAD(content key, media bytes)
+    sealed_thumb    longblob,           -- nonce || AEAD(content key, light thumbnail) — optional
     created_at      timestamp          not null
 );
 

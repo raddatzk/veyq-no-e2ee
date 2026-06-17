@@ -70,6 +70,17 @@ class RateLimitFilter(
             }
             return
         }
+        // Guest share uploads PUT each chunk (only the session start/complete are POST), so the POST buckets
+        // below never see them. Throttle chunk PUTs to the public-share path per IP — generous (600/min ≈
+        // 10/s) so a real multi-chunk upload sails through, while total stored volume stays bounded by the
+        // per-share byte cap in BlobUploadHandler. Without this a guest could hammer the chunk endpoint
+        // (e.g. idempotent re-PUTs of one index) entirely unthrottled.
+        if (ctx.method == "PUT") {
+            if (path.contains("/api/public/shares/") && !limiter.tryAcquire("share-chunk|$ip", 600, 60_000)) {
+                reject(ctx, 60_000)
+            }
+            return
+        }
         if (ctx.method != "POST") return
         val bucket = buckets.firstOrNull { path.contains(it.match) } ?: return
         if (!limiter.tryAcquire("${bucket.name}|$ip", bucket.limit, bucket.windowMs)) {
@@ -134,8 +145,21 @@ class RateLimitFilter(
                 val addr = InetAddress.getByName(ip).address
                 val prefix = if (hasPrefix) spec.substringAfter("/").toInt() else addr.size * 8
                 require(prefix in 0..(addr.size * 8))
-                CidrMatcher(addr, prefix)
+                // Canonicalize: zero the host bits so the stored network is the true prefix regardless of what
+                // the operator wrote (e.g. "10.0.0.5/24" → 10.0.0.0/24). matches() then compares like-for-like.
+                CidrMatcher(maskToPrefix(addr, prefix), prefix)
             }.getOrNull()
+
+            /** Return a copy of [addr] with every bit beyond [prefixBits] cleared (the canonical network). */
+            private fun maskToPrefix(addr: ByteArray, prefixBits: Int): ByteArray {
+                val out = addr.copyOf()
+                for (i in out.indices) {
+                    val keep = (prefixBits - i * 8).coerceIn(0, 8) // bits to retain in this byte
+                    val mask = if (keep == 0) 0x00 else (0xFF shl (8 - keep)) and 0xFF
+                    out[i] = (out[i].toInt() and mask).toByte()
+                }
+                return out
+            }
         }
     }
 }

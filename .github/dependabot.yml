@@ -20,6 +20,17 @@ updates:
     multi-ecosystem-group: "app-runtime"
     open-pull-requests-limit: 1
 
+  # Android app — a separate release train from the server runtime, so its own schedule/group.
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "daily"
+    groups:
+      android:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 1
+
   - package-ecosystem: "docker"
     directory: "/"
     patterns:

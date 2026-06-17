@@ -47,6 +47,18 @@ class RateLimitFilterTest {
     }
 
     @Test
+    fun `non-canonical CIDR (host bits set) still trusts the whole subnet`() {
+        // operator wrote "10.0.0.5/24" — host bits must be masked so the trusted network is 10.0.0.0/24,
+        // not just the single host. Any 10.0.0.x peer is then a trusted proxy.
+        val f = filter("10.0.0.5/24")
+        assertEquals("198.51.100.23", f.resolveClientIp("10.0.0.5", "198.51.100.23"))
+        assertEquals("198.51.100.23", f.resolveClientIp("10.0.0.99", "198.51.100.23"))
+        assertEquals("198.51.100.23", f.resolveClientIp("10.0.0.1", "198.51.100.23"))
+        // outside the /24 → untrusted, its XFF claim is ignored
+        assertEquals("10.0.1.1", f.resolveClientIp("10.0.1.1", "198.51.100.23"))
+    }
+
+    @Test
     fun `exact-IP and IPv6 trusted-proxy specs`() {
         val f = filter("::1, 192.168.1.1")
         assertEquals("198.51.100.23", f.resolveClientIp("192.168.1.1", "198.51.100.23"))

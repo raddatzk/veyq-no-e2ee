@@ -26,7 +26,8 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
-    implementation("io.quarkus:quarkus-jdbc-h2") // dev/slice store; MariaDB swapped in for deployment
+    implementation("io.quarkus:quarkus-jdbc-h2") // dev/slice store (DB_KIND=h2, the default)
+    implementation("io.quarkus:quarkus-jdbc-mariadb") // production store (DB_KIND=mariadb, see infra/docker-compose.yml)
     implementation("io.quarkus:quarkus-flyway")
     implementation("io.quarkus:quarkus-scheduler") // periodic GC of expired sessions
     implementation("io.quarkus:quarkus-mailer") // outbound mail: email invites (the operator supplies SMTP)

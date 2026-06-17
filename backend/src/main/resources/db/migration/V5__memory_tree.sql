@@ -15,7 +15,7 @@ create table veyq_node (
     slug_token      varchar(255)       not null,  -- blinded: HMAC(slugKey, normalized slug), base64url
     order_index     int                not null,
     suite_id        varchar(64)        not null,
-    sealed_content  varbinary(1048576) not null,  -- nonce || AEAD(content key, name/title/metadata)
+    sealed_content  longblob not null,  -- nonce || AEAD(content key, name/title/metadata)
     created_at      timestamp          not null,
     constraint uq_node_parent_slug unique (parent_id, slug_token)
 );
