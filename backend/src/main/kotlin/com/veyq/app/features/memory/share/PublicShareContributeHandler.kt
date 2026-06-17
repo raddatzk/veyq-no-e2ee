@@ -28,17 +28,19 @@ class PublicShareContributeHandler(
     private val blobUploads: BlobUploadHandler,
     private val media: MediaHandler,
 ) {
+    // Every guest upload op is bound to THIS share's owner tag, so a guest who learns another guest's uploadId
+    // (a second share on the same scope, or a co-guest of one CONTRIBUTOR link) can't read/overwrite/finalize it.
     fun startShareBlob(shareId: String, req: StartBlobRequest): BlobTicket =
         uploader(shareId).let { blobUploads.startBlobAs(it.scopeId, "share:${it.id}", req) }
 
     fun putShareChunk(shareId: String, uploadId: String, index: Int, req: PutChunkRequest) =
-        blobUploads.putBlobChunkAs(uploader(shareId).scopeId, uploadId, index, req)
+        uploader(shareId).let { blobUploads.putBlobChunkAs(it.scopeId, uploadId, index, req, "share:${it.id}") }
 
     fun getShareUpload(shareId: String, uploadId: String): BlobUploadProgress =
-        blobUploads.getBlobUploadAs(uploader(shareId).scopeId, uploadId)
+        uploader(shareId).let { blobUploads.getBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
 
     fun completeShareBlob(shareId: String, uploadId: String): CompleteBlobResponse =
-        blobUploads.completeBlobUploadAs(uploader(shareId).scopeId, uploadId)
+        uploader(shareId).let { blobUploads.completeBlobUploadAs(it.scopeId, uploadId, "share:${it.id}") }
 
     fun createShareMedia(shareId: String, nodeId: String, req: CreateMediaRequest): MediaItem {
         val share = uploader(shareId)

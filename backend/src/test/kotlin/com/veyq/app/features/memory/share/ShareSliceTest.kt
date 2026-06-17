@@ -157,6 +157,31 @@ class ShareSliceTest {
     }
 
     @Test
+    fun guestCannotTouchAnotherSharesInFlightUpload() {
+        // two CONTRIBUTOR shares on the SAME scope (different memories) — distinct guests
+        fun contributorShareOn(node: String) = given().header("Authorization", ownerToken).contentType(ContentType.JSON)
+            .body("""{"wrappedContentKey":{"suiteId":"v1","bytes":"d2Nr"},"role":"CONTRIBUTOR"}""")
+            .post("/api/scopes/$scopeId/nodes/$node/shares").then().statusCode(200).extract().path<String>("shareId")
+        val shareA = contributorShareOn("shr-mem2")
+        val shareB = contributorShareOn("shr-mem3")
+
+        // guest A starts an upload under share A
+        val uploadId = given().contentType(ContentType.JSON).body("""{"dedupToken":"a2-guest","totalChunks":1,"byteSize":6}""")
+            .post("/api/public/shares/$shareA/blobs").then().statusCode(200).extract().path<String>("uploadId")
+
+        // guest B (share B, same scope) knows A's uploadId but must NOT read/overwrite/finalize it — 404, not a hit
+        given().get("/api/public/shares/$shareB/blob-uploads/$uploadId").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
+        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+            .put("/api/public/shares/$shareB/blob-uploads/$uploadId/chunks/0").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
+        given().post("/api/public/shares/$shareB/blob-uploads/$uploadId/complete").then().statusCode(404).body("code", `is`("UPLOAD_NOT_FOUND"))
+
+        // the rightful owner (share A) still operates on it normally
+        given().contentType(ContentType.JSON).body("""{"frame":{"suiteId":"v1","bytes":"ZnJhbWUh"}}""")
+            .put("/api/public/shares/$shareA/blob-uploads/$uploadId/chunks/0").then().statusCode(204)
+        given().get("/api/public/shares/$shareA/blob-uploads/$uploadId").then().statusCode(200)
+    }
+
+    @Test
     fun passwordExpiryAndLabel() {
         // a password-protected, labelled share with a per-share notice (guests must accept it)
         val shareId = given().header("Authorization", ownerToken).contentType(ContentType.JSON)

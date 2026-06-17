@@ -34,10 +34,46 @@ class RateLimiter {
         }
     }
 
-    /** Drop windows untouched for a while so the map can't grow unbounded across many client IPs. */
+    // Byte-quota windows: a separate accumulator keyed independently from the request-count windows. Used to
+    // bound unauthenticated public-share download egress — the response is accounted AFTER it is served, so a
+    // scraper is cut off on its NEXT request once it has pulled more than the budget within the window. A byte
+    // quota (not a request count) is right here: a legitimate large-gallery viewer makes many small chunk GETs.
+    private class ByteWindow {
+        var startNanos: Long = System.nanoTime()
+        var bytes: Long = 0
+    }
+
+    private val byteWindows = ConcurrentHashMap<String, ByteWindow>()
+
+    private fun rollByteWindow(w: ByteWindow, windowMs: Long) {
+        val now = System.nanoTime()
+        if (now - w.startNanos > windowMs * 1_000_000L) { w.startNanos = now; w.bytes = 0 }
+    }
+
+    /** True if [key] has already accumulated more than [budgetBytes] within [windowMs] (window auto-resets). */
+    fun isOverByteBudget(key: String, budgetBytes: Long, windowMs: Long): Boolean {
+        val w = byteWindows.computeIfAbsent(key) { ByteWindow() }
+        synchronized(w) {
+            rollByteWindow(w, windowMs)
+            return w.bytes > budgetBytes
+        }
+    }
+
+    /** Account [bytes] served for [key] in its current window (no-op for non-positive byte counts). */
+    fun recordBytes(key: String, bytes: Long, windowMs: Long) {
+        if (bytes <= 0) return
+        val w = byteWindows.computeIfAbsent(key) { ByteWindow() }
+        synchronized(w) {
+            rollByteWindow(w, windowMs)
+            w.bytes += bytes
+        }
+    }
+
+    /** Drop windows untouched for a while so the maps can't grow unbounded across many client IPs. */
     @Scheduled(every = "10m")
     fun sweep() {
         val now = System.nanoTime()
         windows.entries.removeIf { (_, w) -> synchronized(w) { now - w.startNanos > 600_000_000_000L } } // 10 min
+        byteWindows.entries.removeIf { (_, w) -> synchronized(w) { now - w.startNanos > 600_000_000_000L } }
     }
 }

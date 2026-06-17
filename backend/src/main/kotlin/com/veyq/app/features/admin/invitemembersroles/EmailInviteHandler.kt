@@ -37,8 +37,10 @@ class EmailInviteHandler(
         }
         val to = req.email.trim()
         if (!to.contains("@") || to.contains(" ")) throw ApiException(400, "INVALID_EMAIL", "Invalid email address")
-        // Anti-abuse: only relay links that point at this instance's own app origin.
-        if (!req.link.startsWith(appBaseUrl)) throw ApiException(400, "BAD_LINK", "Invite link must point at this instance")
+        // Anti-abuse: only relay links whose ORIGIN exactly matches this instance — a prefix check (startsWith)
+        // is bypassable (`https://veyq.example.com.evil.com/…`, `https://veyq.example.com@evil.com/…`), which
+        // would turn this Owner-gated endpoint into a phishing/spam relay sending attacker links from our domain.
+        if (!sameOrigin(req.link, appBaseUrl)) throw ApiException(400, "BAD_LINK", "Invite link must point at this instance")
 
         val subject = "You've been invited to ${tenant.displayName} on veyq"
         val body = buildString {
@@ -48,4 +50,18 @@ class EmailInviteHandler(
         }
         mailer.send(Mail.withText(to, subject, body))
     }
+
+    /** True iff [link] and [base] share an exact origin (scheme + host + effective port). Any parse failure = false. */
+    private fun sameOrigin(link: String, base: String): Boolean = try {
+        val l = java.net.URI(link)
+        val b = java.net.URI(base)
+        val scheme = l.scheme?.lowercase()
+        scheme != null && scheme in setOf("http", "https") && scheme == b.scheme?.lowercase() &&
+            l.host != null && l.host.equals(b.host, ignoreCase = true) && port(l) == port(b)
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun port(u: java.net.URI): Int =
+        if (u.port != -1) u.port else when (u.scheme?.lowercase()) { "https" -> 443; "http" -> 80; else -> -1 }
 }

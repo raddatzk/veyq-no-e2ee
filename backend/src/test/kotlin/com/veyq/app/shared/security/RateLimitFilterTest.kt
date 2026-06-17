@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
  */
 class RateLimitFilterTest {
     private fun filter(trustedProxies: String) =
-        RateLimitFilter(RateLimiter(), enabled = true, trustedProxies = Optional.of(trustedProxies))
+        RateLimitFilter(RateLimiter(), enabled = true, trustedProxies = Optional.of(trustedProxies), shareEgressBytesPerMin = 524_288_000L)
 
     @Test
     fun `no trusted proxies — XFF is ignored, socket peer is the key`() {

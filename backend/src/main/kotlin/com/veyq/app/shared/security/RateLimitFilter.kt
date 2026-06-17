@@ -22,10 +22,17 @@ class RateLimitFilter(
     @param:ConfigProperty(name = "veyq.ratelimit.enabled", defaultValue = "true") private val enabled: Boolean,
     // Optional<String> because SmallRye converts an empty config value to "absent" (the default deployment).
     @param:ConfigProperty(name = "veyq.ratelimit.trusted-proxies") trustedProxies: Optional<String>,
+    // Per-IP per-minute egress budget for unauthenticated public-share GETs (default 500 MiB).
+    @param:ConfigProperty(name = "veyq.ratelimit.share-egress-bytes-per-min", defaultValue = "524288000") private val shareEgressBytesPerMin: Long,
 ) : ContainerRequestFilter {
 
     @Inject
     lateinit var routingContext: RoutingContext
+
+    companion object {
+        /** Request property carrying the resolved client IP, set here and read by ShareEgressAccountingFilter. */
+        const val CLIENT_IP_PROP = "veyq.clientIp"
+    }
 
     /** Proxy IPs/CIDRs whose appended X-Forwarded-For we may trust (empty = trust none, key on the socket). */
     private val trusted: List<CidrMatcher> =
@@ -43,17 +50,34 @@ class RateLimitFilter(
     )
 
     override fun filter(ctx: ContainerRequestContext) {
-        if (!enabled || ctx.method != "POST") return
+        if (!enabled) return
+        val ip = clientIp(ctx)
+        ctx.setProperty(CLIENT_IP_PROP, ip) // ShareEgressAccountingFilter reads this to attribute bytes served
         val path = "/" + ctx.uriInfo.path.trimStart('/')
-        val bucket = buckets.firstOrNull { path.contains(it.match) } ?: return
-        if (!limiter.tryAcquire("${bucket.name}|${clientIp(ctx)}", bucket.limit, bucket.windowMs)) {
-            ctx.abortWith(
-                Response.status(429)
-                    .header("Retry-After", bucket.windowMs / 1000)
-                    .entity(ErrorResponse(code = "RATE_LIMITED", message = "Too many requests — please slow down"))
-                    .build(),
-            )
+
+        // Unauthenticated public-share GET egress (gallery/journal/chunk downloads): once an IP has pulled more
+        // than its per-minute byte budget, refuse further GETs until the window rolls. A byte quota (not a
+        // request count) avoids 429-ing a legitimate large-gallery viewer, which makes many small chunk GETs.
+        if (ctx.method == "GET") {
+            if (path.contains("/api/public/shares/") && limiter.isOverByteBudget("share-egress|$ip", shareEgressBytesPerMin, 60_000)) {
+                reject(ctx, 60_000)
+            }
+            return
         }
+        if (ctx.method != "POST") return
+        val bucket = buckets.firstOrNull { path.contains(it.match) } ?: return
+        if (!limiter.tryAcquire("${bucket.name}|$ip", bucket.limit, bucket.windowMs)) {
+            reject(ctx, bucket.windowMs)
+        }
+    }
+
+    private fun reject(ctx: ContainerRequestContext, windowMs: Long) {
+        ctx.abortWith(
+            Response.status(429)
+                .header("Retry-After", windowMs / 1000)
+                .entity(ErrorResponse(code = "RATE_LIMITED", message = "Too many requests — please slow down"))
+                .build(),
+        )
     }
 
     private fun clientIp(ctx: ContainerRequestContext): String {

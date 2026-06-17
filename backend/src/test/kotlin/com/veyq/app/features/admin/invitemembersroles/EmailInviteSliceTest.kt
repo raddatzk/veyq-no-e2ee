@@ -74,6 +74,10 @@ class EmailInviteSliceTest {
         emailReq(outsiderToken, "bob@example.com", link).statusCode(403)
         emailReq(ownerToken, "bob@example.com", "https://evil.example/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
         emailReq(ownerToken, "not-an-email", link).statusCode(400).body("code", `is`("INVALID_EMAIL"))
+        // origin (not prefix) check: these all `startsWith(appBaseUrl)` but resolve to a different origin → rejected
+        emailReq(ownerToken, "bob@example.com", "http://localhost:5173@evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
+        emailReq(ownerToken, "bob@example.com", "http://localhost:5173.evil.com/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
+        emailReq(ownerToken, "bob@example.com", "http://localhost:51730/#invite=x").statusCode(400).body("code", `is`("BAD_LINK"))
 
         emailReq(ownerToken, "bob@example.com", link).statusCode(204)
 

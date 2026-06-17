@@ -24,22 +24,24 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt.
   `ScopeAccessGuard.isActiveMember`, geteilter Helper. Verifiziert: neuer GroupSliceTest
   (`removingTenantMemberStripsGroupAccessAndAdminPower`: Cleanup + stale-row-Guard nach Re-Auth) + 56 Backend-
   Tests grün + removeMember/groups/groupSpaces/useGroup-E2E grün.
-- [ ] **A2 · Cross-Share Upload-Session-Hijack (unauth IDOR auf In-Flight-Uploads)** *(Security, Medium, S)* —
-  der Guest-Contribute-Pfad keyt `putShareChunk`/`getShareUpload`/`completeShareBlob` nur auf `share.scopeId`
-  (`requireUploadInScope`), nicht auf den Share-Owner. Zwei Shares auf denselben Scope (oder zwei Gäste eines
-  CONTRIBUTOR-Shares) → wer eine `uploadId` errät, überschreibt/liest/finalisiert fremde Staging-Chunks.
-  `createShareMedia` ist via `wasUploadedBy` schon sicher; das Anhängen forgieren geht NICHT — aber Korruption/
-  DoS einer fremden In-Flight-Contribution schon. Fix: `requireUploadOwnedBy(scopeId, uploadId, "share:<id>")`.
-- [ ] **A3 · E-Mail-Invite als Open-Relay/Phishing via schwachem `startsWith`** *(Security, Medium, S)* —
-  `EmailInviteHandler` mailt `req.link` verbatim an beliebige `req.email`, validiert nur
-  `req.link.startsWith(appBaseUrl)` (umgehbar: `…example.com.evil.com`, `…@evil.com`). Owner-gated, aber
-  Empfänger unbeschränkt → Versand attacker-kontrollierter Links unter der Instanz-Reputation. Fix: Link
-  **server-seitig** aus `appBaseUrl` + `inviteId` rekonstruieren (nur ein Client-Fragment nach `#` anhängen),
-  oder als URI parsen und **Origin** exakt vergleichen (nicht `startsWith`).
-- [ ] **A4 · Public-Share-Reads/Downloads ungedrosselt (unauth DoS/Egress)** *(Security, Medium, M)* —
-  `RateLimitFilter` springt bei `method != POST` früh raus; alle Share-GETs (`getShareChunk` = Bandbreiten-Pfad)
-  sind ungedrosselt. War im Runde-2-Backlog; jetzt einplanen: per-IP (+ per-Share) Rate-Limit-Bucket **inkl.**
-  GET auf `/api/public/shares/`, plus Byte-Quota.
+- [x] **A2 · Cross-Share Upload-Session-Hijack (unauth IDOR auf In-Flight-Uploads)** *(Security, Medium, S)* —
+  `requireUploadInScope` nimmt jetzt einen optionalen `expectedOwner`; `putBlobChunkAs`/`getBlobUploadAs`/
+  `completeBlobUploadAs` reichen ihn durch. Der Guest-Pfad (`PublicShareContributeHandler`) übergibt
+  `"share:<id>"`, sodass ein Gast eine fremde `uploadId` (zweiter Share / Co-Gast) NICHT lesen/überschreiben/
+  finalisieren kann (404, nicht 403 → kein Existenz-Probe). Member übergeben `null` (sind ohnehin Scope-Key-
+  Holder). Verifiziert: neuer ShareSliceTest `guestCannotTouchAnotherSharesInFlightUpload`.
+- [x] **A3 · E-Mail-Invite als Open-Relay/Phishing via schwachem `startsWith`** *(Security, Medium, S)* —
+  `EmailInviteHandler` vergleicht jetzt die **Origin** (Schema+Host+Effektiv-Port) von `req.link` exakt gegen
+  `appBaseUrl` (`sameOrigin`, `java.net.URI`), statt `startsWith`. Blockt `…@evil.com`, `…example.com.evil.com`,
+  abweichende Ports. (Server-Reconstruct unnötig, da das Fragment Client-Crypto trägt.) Verifiziert:
+  EmailInviteSliceTest um drei Bypass-Vektoren erweitert (alle → 400 BAD_LINK, gültiger Link weiter 204).
+- [x] **A4 · Public-Share-Reads/Downloads ungedrosselt (unauth DoS/Egress)** *(Security, Medium, M)* —
+  `RateLimitFilter` verarbeitet jetzt auch GET: für `/api/public/shares/` wird ein **per-IP-Byte-Quota**
+  (Default 500 MiB/min, konfigurierbar) geprüft; der neue `ShareEgressAccountingFilter` (Response-Filter)
+  bucht die ausgelieferten Bytes nach. Byte-Quota statt Request-Count, damit ein legitimer Großgalerie-Viewer
+  (viele kleine Chunk-GETs) nicht ge-429-t wird; ein Scraper wird nach Überschreiten gekappt. `RateLimiter` um
+  `isOverByteBudget`/`recordBytes` + eigenes ByteWindow-Sweep erweitert. Verifiziert: 4 neue RateLimiter-Unit-
+  Tests; App bootet (HealthTest); Share-E2E grün. *(Request-Flood-Throttle für Metadaten-GETs = kleiner Folgepunkt.)*
 
 ## Phase B — Korrektheit / Concurrency
 - [ ] **B1 · `JournalLiveProvider` Cross-Thread-Datarace (iOS + Android)** *(Correctness, High, M)* — geteilter
