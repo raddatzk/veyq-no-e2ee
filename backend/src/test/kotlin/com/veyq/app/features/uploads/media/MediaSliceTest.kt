@@ -1,5 +1,6 @@
 package com.veyq.app.features.uploads.media
 
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.shared.content.Blob
 import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.Node
@@ -46,8 +47,8 @@ class MediaSliceTest {
             users.persist(User().apply { id = "me-outsider"; email = "me-outsider@example.com"; displayName = "Outsider"; serverRole = ServerRole.ServerMember; createdAt = now })
             scopes.persist(Scope().apply { id = scopeId; ownerUserId = "me-owner"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "me-grant"; this.scopeId = this@MediaSliceTest.scopeId; userId = "me-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
-            nodes.persist(Node().apply { id = "me-mem"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = "MEMORY"; slugToken = "tm"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
-            nodes.persist(Node().apply { id = "me-folder"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = "FOLDER"; slugToken = "tf"; orderIndex = 1; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
+            nodes.persist(Node().apply { id = "me-mem"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = NodeType.MEMORY; slugToken = "tm"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
+            nodes.persist(Node().apply { id = "me-folder"; this.scopeId = this@MediaSliceTest.scopeId; parentId = this@MediaSliceTest.scopeId; type = NodeType.FOLDER; slugToken = "tf"; orderIndex = 1; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
             // two already-stored content blobs (the original photo + its thumbnail)
             blobs.persist(Blob().apply { id = "me-orig"; this.scopeId = this@MediaSliceTest.scopeId; dedupToken = "tok-orig"; totalChunks = 3; byteSize = 9000; suiteId = "v1"; createdAt = now })
             blobs.persist(Blob().apply { id = "me-thumb"; this.scopeId = this@MediaSliceTest.scopeId; dedupToken = "tok-thumb"; totalChunks = 1; byteSize = 80; suiteId = "v1"; createdAt = now })

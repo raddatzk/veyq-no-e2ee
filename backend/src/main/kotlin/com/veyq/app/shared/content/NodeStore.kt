@@ -1,9 +1,12 @@
 package com.veyq.app.shared.content
 
+import com.veyq.app.generated.model.NodeType
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.LockModeType
 import jakarta.persistence.Table
@@ -19,7 +22,7 @@ class Node {
     @Id var id: String = ""
     @Column(name = "scope_id", nullable = false) var scopeId: String = ""
     @Column(name = "parent_id", nullable = false) var parentId: String = ""
-    @Column(nullable = false) var type: String = ""
+    @Enumerated(EnumType.STRING) @Column(nullable = false) var type: NodeType = NodeType.FOLDER
     @Column(name = "slug_token", nullable = false) var slugToken: String = ""
     @Column(name = "order_index", nullable = false) var orderIndex: Int = 0
     @Column(name = "suite_id", nullable = false) var suiteId: String = ""

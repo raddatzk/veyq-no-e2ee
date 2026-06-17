@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.tenantterms
 
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKey
@@ -61,7 +62,7 @@ class TenantTermsSliceTest {
             scopes.persist(Scope().apply { id = scopeId; tenantId = this@TenantTermsSliceTest.tenantId; kind = ScopeKind.TENANT_ROOT; suiteId = "v1"; kemPublicKey = "p".toByteArray(); createdAt = now })
             grants.persist(ScopeGrant().apply { id = "tt-grant"; this.scopeId = this@TenantTermsSliceTest.scopeId; userId = "tt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
             contentKeys.persist(ScopeContentKey().apply { id = "tt-ck"; this.scopeId = this@TenantTermsSliceTest.scopeId; suiteId = "v1"; wrappedKey = "ck".toByteArray(); createdAt = now })
-            nodes.persist(Node().apply { id = "tt-mem"; scopeId = "tt-scope"; parentId = "tt-scope"; type = "MEMORY"; slugToken = "s-m"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
+            nodes.persist(Node().apply { id = "tt-mem"; scopeId = "tt-scope"; parentId = "tt-scope"; type = NodeType.MEMORY; slugToken = "s-m"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now })
         }
         ownerToken = "Bearer ${sessions.issue("tt-owner")}"
         memberToken = "Bearer ${sessions.issue("tt-member")}"

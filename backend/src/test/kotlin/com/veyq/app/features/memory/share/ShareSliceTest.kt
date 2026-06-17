@@ -1,5 +1,6 @@
 package com.veyq.app.features.memory.share
 
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.shared.content.Blob
 import com.veyq.app.shared.content.BlobRepository
 import com.veyq.app.shared.content.Media
@@ -73,7 +74,7 @@ class ShareSliceTest {
 
     private fun node(id: String, parentId: String, type: String, slug: String, order: Int) {
         nodes.persist(Node().apply {
-            this.id = id; scopeId = "shr-scope"; this.parentId = parentId; this.type = type
+            this.id = id; scopeId = "shr-scope"; this.parentId = parentId; this.type = NodeType.valueOf(type)
             slugToken = slug; orderIndex = order; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = Instant.now()
         })
     }

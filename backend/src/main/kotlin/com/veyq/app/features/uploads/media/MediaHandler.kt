@@ -117,7 +117,7 @@ class MediaHandler(
     private fun requireMemoryNode(scopeId: String, nodeId: String) {
         val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
         if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
-        val type = NodeType.valueOf(node.type) // typed compare instead of raw strings (consistent with siblings)
+        val type = node.type // typed compare instead of raw strings (consistent with siblings)
         if (type != NodeType.MEMORY && type != NodeType.CHAPTER) {
             throw ApiException(400, "NOT_A_MEMORY", "Media can only be attached to a Memory or Chapter")
         }

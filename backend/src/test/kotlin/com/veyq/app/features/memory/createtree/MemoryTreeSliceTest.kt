@@ -1,5 +1,6 @@
 package com.veyq.app.features.memory.createtree
 
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKey
@@ -56,7 +57,7 @@ class MemoryTreeSliceTest {
                 grants.persist(ScopeGrant().apply { id = "mt-grant-nokey"; scopeId = "mt-nokey"; userId = "mt-owner"; suiteId = "v1"; wrappedPrivateKey = "g".toByteArray(); createdAt = now })
                 // a foreign scope (owned by someone else) + a node in it, to prove cross-scope parents are rejected
                 scopes.persist(Scope().apply { id = "mt-other"; ownerUserId = "mt-outsider"; kind = ScopeKind.PERSONAL_ROOT; suiteId = "v1"; kemPublicKey = "o".toByteArray(); createdAt = now })
-                nodes.persist(Node().apply { id = "mt-foreign-node"; this.scopeId = "mt-other"; parentId = "mt-other"; type = "FOLDER"; slugToken = "tok-x"; orderIndex = 0; suiteId = "v1"; sealedContent = "s".toByteArray(); createdAt = now })
+                nodes.persist(Node().apply { id = "mt-foreign-node"; this.scopeId = "mt-other"; parentId = "mt-other"; type = NodeType.FOLDER; slugToken = "tok-x"; orderIndex = 0; suiteId = "v1"; sealedContent = "s".toByteArray(); createdAt = now })
             }
         }
         ownerToken = "Bearer ${sessions.issue("mt-owner")}"

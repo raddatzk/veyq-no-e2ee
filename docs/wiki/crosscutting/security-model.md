@@ -15,7 +15,7 @@
 | Stolen disk / DB dump / subpoena of data at rest | All content E2E-encrypted; server holds no content keys |
 | **Passive operator** (reads the DB) | Cannot recover content — every blob/valuable metadata field is encrypted |
 | Post-breach offline brute-force → **content** | **Secret Key (2SKD)** — the content KEK folds in the Secret Key, so a cracked password alone unlocks nothing |
-| Post-breach offline brute-force → **server login** | Argon2id (m=65536) only — *not* covered by 2SKD; cracking the password yields a server session + operational metadata, **never content** (see *Secret Key (2SKD)*) |
+| Post-breach offline brute-force → **server login** | Argon2id (m=32768) only — *not* covered by 2SKD; cracking the password yields a server session + operational metadata, **never content** (see *Secret Key (2SKD)*) |
 | **Active operator** doing key-substitution during a key-exchange | Mitigated now by client-side **key-pinning/TOFU**; fully addressed later by **Key Transparency** |
 
 What we do **not** claim: we are not immune to an *actively malicious* operator before Key
@@ -293,12 +293,12 @@ key-substitution (that is Key Transparency). Decision: [AD-08](../decisions/READ
 *content* key-derivation (`KEK = Argon2id(secretKey ‖ password)`), so after a DB dump an attacker who
 brute-forces a weak password still cannot derive any content key — they would also need the Secret Key,
 which the server never stores. The **server-side login verifier is a separate, password-only Argon2id
-proof** (`Argon2Verifier`, m=65536): it gates a *session* and the *server role*, and a DB dump therefore
+proof** (`Argon2Verifier`, m=32768): it gates a *session* and the *server role*, and a DB dump therefore
 *does* permit offline brute-force of the **login** password. What that buys the attacker is bounded — a
 server session plus the low-sensitivity operational metadata above — and **never content**, which stays
 sealed behind the Secret Key. This is a deliberate trade-off: keeping login a plain password proof
 preserves a simple, operator-blind sign-in (the server never sees the Secret Key) and means password
-*reset* can be email-gated without weakening content secrecy. The Argon2id cost (m=65536, t=3) is what
+*reset* can be email-gated without weakening content secrecy. The Argon2id cost (m=32768, t=3) is what
 makes the login-password brute-force expensive; raising it is the lever if the threat model tightens.
 Closing this fully would bind the Secret Key into the verifier too (`Argon2(secretKey ‖ password)`),
 which we deliberately deferred to keep the login path unchanged across all clients.

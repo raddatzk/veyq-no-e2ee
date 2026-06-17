@@ -74,7 +74,11 @@ class JournalHandler(
     fun getJournalLiveAs(scopeId: String, nodeId: String): JournalLiveState {
         requireJournalNode(scopeId, nodeId)
         val journal = journals.findById(nodeId)
-        val snapshot = journal?.sealedSnapshot?.let { Blob(suiteId = journal.snapshotSuiteId ?: "v1", bytes = enc.encodeToString(it)) }
+        // compaction writes the snapshot bytes + its suite atomically, so a snapshot without a suite is a broken
+        // invariant — fail loud rather than resurrecting a hardcoded "v1" (the literal P4.2/B4 worked to remove).
+        val snapshot = journal?.sealedSnapshot?.let {
+            Blob(suiteId = journal.snapshotSuiteId ?: error("journal snapshot has no suiteId"), bytes = enc.encodeToString(it))
+        }
         val log = updates.listByNodeId(nodeId).map {
             JournalUpdate(seq = it.seq, sealedUpdate = Blob(suiteId = it.suiteId, bytes = enc.encodeToString(it.sealedUpdate)), authorId = it.authorId)
         }
@@ -132,7 +136,7 @@ class JournalHandler(
     private fun requireJournalNode(scopeId: String, nodeId: String) {
         val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
         if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
-        if (NodeType.valueOf(node.type) == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has a journal")
+        if (node.type == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has a journal")
     }
 
 

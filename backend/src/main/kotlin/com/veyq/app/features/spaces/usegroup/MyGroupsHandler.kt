@@ -33,10 +33,17 @@ class MyGroupsHandler(
     @Transactional
     fun listMyGroups(auth: String?): MyGroupList {
         val userId = sessions.resolve(auth) ?: throw unauthorized()
-        val groups = memberships.listActiveByUserId(userId).mapNotNull { m ->
-            val tenant = tenants.findById(m.tenantId) ?: return@mapNotNull null
-            val scope = scopes.findByTenantId(m.tenantId) ?: return@mapNotNull null
-            grants.find(scope.id, userId) ?: return@mapNotNull null // hold the key or it is not a space you can enter
+        // Fixed query count (like MySpacesHandler) instead of 3 lookups per tenant: active memberships, their
+        // tenants + tenant-root scopes (one IN-query each), and the held-grant set — assembled in memory.
+        val active = memberships.listActiveByUserId(userId)
+        val tenantIds = active.map { it.tenantId }
+        val tenantsById = tenants.listByIds(tenantIds).associateBy { it.id }
+        val rootByTenantId = scopes.listTenantRootsByTenantIds(tenantIds).associateBy { it.tenantId }
+        val held = grants.listByUserId(userId).map { it.scopeId }.toSet()
+        val groups = active.mapNotNull { m ->
+            val tenant = tenantsById[m.tenantId] ?: return@mapNotNull null
+            val scope = rootByTenantId[m.tenantId] ?: return@mapNotNull null
+            if (scope.id !in held) return@mapNotNull null // hold the key or it is not a space you can enter
             GroupSpace(
                 tenantId = tenant.id,
                 name = tenant.name,

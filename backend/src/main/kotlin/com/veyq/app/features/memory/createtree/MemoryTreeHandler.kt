@@ -9,6 +9,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.MemoryJournal
 import com.veyq.app.shared.content.MemoryJournalRepository
 import com.veyq.app.shared.content.Node
+import com.veyq.app.shared.content.NodeApiMapper
 import com.veyq.app.shared.content.NodeStructure
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.ScopeContentKeyRepository
@@ -73,7 +74,7 @@ class MemoryTreeHandler(
         } else {
             val parent = nodes.findById(parentId) ?: throw ApiException(404, "PARENT_NOT_FOUND", "Parent node not found")
             if (parent.scopeId != scopeId) throw ApiException(400, "CROSS_SCOPE_PARENT", "Parent belongs to another scope")
-            NodeType.valueOf(parent.type)
+            parent.type
         }
         NodeStructure.requireContainment(parentType, req.type, "be created under")
 
@@ -84,7 +85,7 @@ class MemoryTreeHandler(
 
         val node = Node().apply {
             id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.parentId = parentId
-            type = req.type.value; slugToken = req.slugToken; orderIndex = req.orderIndex
+            type = req.type; slugToken = req.slugToken; orderIndex = req.orderIndex
             suiteId = req.sealedContent.suiteId; sealedContent = dec.decode(req.sealedContent.bytes); createdAt = Instant.now()
         }
         nodes.persist(node)
@@ -102,18 +103,7 @@ class MemoryTreeHandler(
         return toApi(node, scopeId)
     }
 
-    private fun toApi(node: Node, scopeId: String): MemoryNode =
-        MemoryNode(
-            id = node.id,
-            parentId = if (node.parentId == scopeId) null else node.parentId,
-            scopeId = node.scopeId,
-            type = NodeType.valueOf(node.type),
-            slugToken = node.slugToken,
-            orderIndex = node.orderIndex,
-            sealedContent = Blob(suiteId = node.suiteId, bytes = enc.encodeToString(node.sealedContent)),
-            coverMediaId = node.coverMediaId,
-            createdAt = OffsetDateTime.ofInstant(node.createdAt, ZoneOffset.UTC),
-        )
+    private fun toApi(node: Node, scopeId: String): MemoryNode = NodeApiMapper.toApi(node, scopeId, enc)
 
     private fun requireKeyHolder(scopeId: String, auth: String?) {
         guard.requireKeyHolder(auth, scopeId)

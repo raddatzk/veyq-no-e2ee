@@ -675,7 +675,7 @@ private fun LiveJournalSection(controller: GalleryController, onClose: (String) 
         // Reconstruct from the operator-blind store (blocking HTTP), then bootstrap a legacy Markdown-only journal.
         Thread {
             provider.loadPersisted()
-            if (provider.currentText.isEmpty() && initial.isNotEmpty()) provider.applyLocalText(initial)
+            provider.seedIfEmpty(initial) // bootstrap a legacy Markdown-only journal into the CRDT (one source of truth)
             main.post { value = value.copy(text = provider.currentText); ready = true }
         }.start()
         onDispose {

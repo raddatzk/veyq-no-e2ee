@@ -9,6 +9,7 @@ import com.veyq.app.generated.model.ShareRole
 import com.veyq.app.generated.model.ShareSummary
 import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.Node
+import com.veyq.app.shared.content.NodeApiMapper
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.Share
 import com.veyq.app.shared.content.ShareRepository
@@ -91,7 +92,7 @@ class ShareHandler(
     private fun requireShareNode(scopeId: String, nodeId: String) {
         val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
         if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
-        if (NodeType.valueOf(node.type) == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter can be shared")
+        if (node.type == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter can be shared")
     }
 
     private fun toSummary(s: Share): ShareSummary =
@@ -127,16 +128,6 @@ class ShareHandler(
         }
 
         fun nodeToApi(node: Node, scopeId: String, enc: Base64.Encoder): MemoryNode =
-            MemoryNode(
-                id = node.id,
-                parentId = if (node.parentId == scopeId) null else node.parentId,
-                scopeId = node.scopeId,
-                type = NodeType.valueOf(node.type),
-                slugToken = node.slugToken,
-                orderIndex = node.orderIndex,
-                sealedContent = Blob(suiteId = node.suiteId, bytes = enc.encodeToString(node.sealedContent)),
-                coverMediaId = node.coverMediaId,
-                createdAt = OffsetDateTime.ofInstant(node.createdAt, ZoneOffset.UTC),
-            )
+            NodeApiMapper.toApi(node, scopeId, enc)
     }
 }

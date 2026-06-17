@@ -8,6 +8,7 @@ import com.veyq.app.platform.error.ApiException
 import com.veyq.app.shared.content.ContentPurge
 import com.veyq.app.shared.content.MediaRepository
 import com.veyq.app.shared.content.Node
+import com.veyq.app.shared.content.NodeApiMapper
 import com.veyq.app.shared.content.NodeStructure
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.crypto.CryptoSuiteRegistry
@@ -48,9 +49,9 @@ class CurateHandler(
                 val parentType: NodeType? = if (newParentId == scopeId) null else {
                     val parent = nodes.findById(newParentId) ?: throw ApiException(404, "PARENT_NOT_FOUND", "Parent node not found")
                     if (parent.scopeId != scopeId) throw ApiException(400, "CROSS_SCOPE_PARENT", "Parent belongs to another scope")
-                    NodeType.valueOf(parent.type)
+                    parent.type
                 }
-                NodeStructure.requireContainment(parentType, NodeType.valueOf(node.type), "live under")
+                NodeStructure.requireContainment(parentType, node.type, "live under")
                 if (isInSubtree(root = node.id, candidate = newParentId, scopeId = scopeId)) {
                     throw ApiException(409, "NODE_CYCLE", "Cannot move a node into its own subtree")
                 }
@@ -80,7 +81,7 @@ class CurateHandler(
             if (coverId.isEmpty()) {
                 node.coverMediaId = null
             } else {
-                if (NodeType.valueOf(node.type) == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has a cover")
+                if (node.type == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has a cover")
                 val m = media.findById(coverId) ?: throw ApiException(404, "MEDIA_NOT_FOUND", "Cover media not found")
                 if (m.nodeId != node.id) throw ApiException(400, "COVER_NOT_OWN_MEDIA", "The cover must be a media of this node")
                 node.coverMediaId = coverId
@@ -126,18 +127,7 @@ class CurateHandler(
         return false
     }
 
-    private fun toApi(node: Node, scopeId: String): MemoryNode =
-        MemoryNode(
-            id = node.id,
-            parentId = if (node.parentId == scopeId) null else node.parentId,
-            scopeId = node.scopeId,
-            type = NodeType.valueOf(node.type),
-            slugToken = node.slugToken,
-            orderIndex = node.orderIndex,
-            sealedContent = Blob(suiteId = node.suiteId, bytes = enc.encodeToString(node.sealedContent)),
-            coverMediaId = node.coverMediaId,
-            createdAt = OffsetDateTime.ofInstant(node.createdAt, ZoneOffset.UTC),
-        )
+    private fun toApi(node: Node, scopeId: String): MemoryNode = NodeApiMapper.toApi(node, scopeId, enc)
 
     private fun requireKeyHolder(scopeId: String, auth: String?) {
         guard.requireKeyHolder(auth, scopeId)

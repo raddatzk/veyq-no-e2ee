@@ -72,26 +72,26 @@ Effort: **S** < 1 h · **M** ein paar Stunden · **L** Tag+. Status: `[ ]` offen
   (`café`) ändern, erwarteter Token über die NFC-Form — macht den Normalisierungs-Schritt load-bearing.
 
 ## Phase E — Wartbarkeit / Cleanup
-- [ ] **E1 · `Node.type` String → `NodeType`-Enum** *(Maintainability, Low, S)* — E4-Leftover: sechs Tenancy/Scope-
+- [x] **E1 · `Node.type` String → `NodeType`-Enum** *(Maintainability, Low, S)* — E4-Leftover: sechs Tenancy/Scope-
   Felder wurden zu `@Enumerated`-Enums, `Node.type` blieb String → verstreute `NodeType.valueOf(node.type)` in 7+
   Handlern. Genau 1 Schreibstelle (`type = req.type.value`) → winzige Migration, kein Wire-Change.
-- [ ] **E2 · `MyGroupsHandler.listMyGroups` N+1** *(Perf, Low, S)* — von D2 (nur `MySpaces`) übersehen: 3 Queries je
+- [x] **E2 · `MyGroupsHandler.listMyGroups` N+1** *(Perf, Low, S)* — von D2 (nur `MySpaces`) übersehen: 3 Queries je
   Tenant. Auf `listActiveByUserId` + `listTenantRootsByTenantIds` + `tenants.listByIds` + held-Set umbauen (wie
   `MySpacesHandler`).
-- [ ] **E3 · 3× byte-identischer `MemoryNode`-Mapper** *(Maintainability, Low, S)* — `MemoryTreeHandler.toApi` +
+- [x] **E3 · 3× byte-identischer `MemoryNode`-Mapper** *(Maintainability, Low, S)* — `MemoryTreeHandler.toApi` +
   `CurateHandler.toApi` + `ShareHandler.nodeToApi` (letzterer ist schon geteilt). Auf einen `NodeApiMapper`
   (`shared/content`, neben `MediaApiMapper`) konsolidieren.
-- [ ] **E4 · Resurrected `"v1"`-Literal + ContentPurge-Ordering** *(Clarity, Low, S)* — `getJournalLiveAs`
+- [x] **E4 · Resurrected `"v1"`-Literal + ContentPurge-Ordering** *(Clarity, Low, S)* — `getJournalLiveAs`
   `snapshotSuiteId ?: "v1"` (B4-Klasse, unerreichbar → werfen statt defaulten); `ContentPurge.purgeNodes` clear-cover
   -nach-delete mit pre-captured ids → Kommentar/Reorder.
-- [ ] **E5 · Android JournalLiveProvider-Reste** *(Maintainability, Low, S)* — `HttpClient.newHttpClient()` pro
+- [x] **E5 · Android JournalLiveProvider-Reste** *(Maintainability, Low, S)* — `HttpClient.newHttpClient()` pro
   (Re)Connect statt `ApiClient.shared` (E3-Muster); `peers`/`peerClocks` wachsen unbegrenzt (Ghost-Peers ohne
   Timeout-Eviction); `seedIfEmpty` tot (Call-Site inlined). Fix: shared Client, Peer-Eviction (y-protocols
   outdatedTime), Dead-Code raus.
-- [ ] **E6 · Web: rohe Server-Response-Bodies in ~70 Throws** *(Security/Clarity, Low, S)* — `throw new
+- [ ] **E6 · Web: rohe Server-Response-Bodies in ~70 Throws** *(DEFERRED — 70 Sites, Low-Wert/hohe Churn; eigener Pass)*  ORIG: *(Security/Clarity, Low, S)* — `throw new
   Error(\`…${await res.text()}\`)` überall (Web-Pendant zu Android A5). Zentraler `apiError(res)`-Helfer
   (Status + stabiler Code; Body nur in dev). Defense-in-depth.
-- [ ] **E7 · Doku-Drift** *(Docs, Low, S)* — `security-model.md` nennt Login-Argon `m=65536`, Code nutzt `m=32768`
+- [x] **E7 · Doku-Drift** *(Docs, Low, S)* — `security-model.md` nennt Login-Argon `m=65536`, Code nutzt `m=32768`
   (bewusste P2.2-Wahl) → Doc auf 32768 angleichen. iOS-Cursor-UTF-16-Vereinheitlichung bleibt Backlog (kosmetisch).
 
 ---

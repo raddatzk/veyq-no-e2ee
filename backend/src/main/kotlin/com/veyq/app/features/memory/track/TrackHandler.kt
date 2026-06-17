@@ -65,7 +65,7 @@ class TrackHandler(
     private fun requireTrackNode(scopeId: String, nodeId: String) {
         val node = nodes.findById(nodeId) ?: throw ApiException(404, "NODE_NOT_FOUND", "Node not found")
         if (node.scopeId != scopeId) throw ApiException(404, "NODE_NOT_FOUND", "Node not found in this scope")
-        if (NodeType.valueOf(node.type) == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has tracks")
+        if (node.type == NodeType.FOLDER) throw ApiException(400, "NOT_A_MEMORY", "Only a Memory/Chapter has tracks")
     }
 
     private fun toApi(t: MemoryTrack): ApiMemoryTrack =

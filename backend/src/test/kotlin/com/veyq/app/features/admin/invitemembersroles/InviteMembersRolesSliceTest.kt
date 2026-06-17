@@ -1,5 +1,6 @@
 package com.veyq.app.features.admin.invitemembersroles
 
+import com.veyq.app.generated.model.NodeType
 import com.veyq.app.shared.content.Node
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.identity.ServerRole
@@ -125,11 +126,11 @@ class InviteMembersRolesSliceTest {
                 })
                 // two Memory-tree nodes (same parent = root) in the rotation scope — rotation must re-seal both
                 nodes.persist(Node().apply {
-                    id = "im-rot-node"; scopeId = rotScopeId; parentId = rotScopeId; type = "MEMORY"
+                    id = "im-rot-node"; scopeId = rotScopeId; parentId = rotScopeId; type = NodeType.MEMORY
                     slugToken = "rot-tok-old"; orderIndex = 0; suiteId = "v1"; sealedContent = "n".toByteArray(); createdAt = now
                 })
                 nodes.persist(Node().apply {
-                    id = "im-rot-node2"; scopeId = rotScopeId; parentId = rotScopeId; type = "MEMORY"
+                    id = "im-rot-node2"; scopeId = rotScopeId; parentId = rotScopeId; type = NodeType.MEMORY
                     slugToken = "rot-tok2-old"; orderIndex = 1; suiteId = "v1"; sealedContent = "n2".toByteArray(); createdAt = now
                 })
 

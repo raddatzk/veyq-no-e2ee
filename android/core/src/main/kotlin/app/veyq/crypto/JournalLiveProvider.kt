@@ -5,7 +5,6 @@ import uniffi.yniffi.YrsDoc
 import uniffi.yniffi.YrsText
 import uniffi.yniffi.YrsTransaction
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.WebSocket
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletionStage
@@ -120,7 +119,9 @@ class JournalLiveProvider(private val urlFactory: () -> String?, private val con
             val u = runCatching { urlFactory() }.getOrNull()
             if (closed || gen != generation) return@Thread
             if (u == null) { reconnectAfterDelay(gen); return@Thread }
-            HttpClient.newHttpClient().newWebSocketBuilder()
+            // Reuse the shared HttpClient (one pool/executor) instead of newHttpClient() per connect — a flaky
+            // network's reconnect loop would otherwise leak a client (+ its threads) on every retry.
+            ApiClient.shared.newWebSocketBuilder()
                 .buildAsync(URI.create(u), Listener(gen))
                 .whenComplete { socket, err ->
                     if (closed || gen != generation) { socket?.sendClose(WebSocket.NORMAL_CLOSURE, ""); return@whenComplete }
