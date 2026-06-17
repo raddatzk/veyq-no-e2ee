@@ -16,6 +16,7 @@ object L10n {
     private val strings: Map<String, Map<String, String>> = mapOf(
         "de" to mapOf(
             "common.email" to "E-Mail", "common.password" to "Passwort", "common.secretKey" to "Secret Key",
+            "password.pwnedWarning" to "Dieses Passwort taucht in %d bekannten Datenlecks auf — wähle besser ein anderes.",
             "common.name" to "Name", "common.create" to "Erstellen", "common.cancel" to "Abbrechen",
             "common.rename" to "Umbenennen", "common.close" to "Schließen", "common.move" to "Verschieben", "cover.setAsCover" to "Als Cover",
             "move.title" to "Verschieben nach", "move.toRoot" to "Hauptebene",
@@ -89,6 +90,7 @@ object L10n {
         ),
         "en" to mapOf(
             "common.email" to "Email", "common.password" to "Password", "common.secretKey" to "Secret Key",
+            "password.pwnedWarning" to "This password appeared in %d known data breaches — consider a different one.",
             "common.name" to "Name", "common.create" to "Create", "common.cancel" to "Cancel",
             "common.rename" to "Rename", "common.close" to "Close", "common.move" to "Move", "cover.setAsCover" to "Set as cover",
             "move.title" to "Move to", "move.toRoot" to "Top level",

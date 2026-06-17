@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,10 +40,12 @@ import androidx.compose.foundation.clickable
 import app.veyq.crypto.EmergencyKit
 import app.veyq.crypto.Instance
 import app.veyq.crypto.Login
+import app.veyq.crypto.Pwned
 import app.veyq.crypto.ResetPassword
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -258,10 +261,16 @@ fun ResetPasswordScreen(apiBase: String, prefillEmail: String, onBack: () -> Uni
     var link by remember { mutableStateOf("") }
     var secretKey by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
+    var breachCount by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    // Debounced HIBP breach check (soft, non-blocking); LaunchedEffect(key) cancels on each password change.
+    LaunchedEffect(newPassword) {
+        breachCount = 0
+        if (newPassword.isNotEmpty()) { delay(600); breachCount = withContext(Dispatchers.IO) { Pwned.count(newPassword) } }
+    }
 
     AuthCard(L10n.t("reset.title"), apiBase) {
         Text(L10n.t("reset.requestHint"), fontSize = 13.sp, color = Veyq.Muted, modifier = Modifier.fillMaxWidth())
@@ -280,6 +289,7 @@ fun ResetPasswordScreen(apiBase: String, prefillEmail: String, onBack: () -> Uni
         VeyqField(L10n.t("reset.pasteLink"), link, { link = it })
         VeyqField(L10n.t("common.secretKey"), secretKey, { secretKey = it }, secure = true, hint = L10n.t("login.secretHint"))
         VeyqField(L10n.t("reset.newPassword"), newPassword, { newPassword = it }, secure = true)
+        if (breachCount > 0) Text(String.format(L10n.t("password.pwnedWarning"), breachCount), fontSize = 12.sp, color = Color(0xFFE0A83D), modifier = Modifier.fillMaxWidth())
         PrimaryButton(L10n.t("reset.setPassword"), busy) {
             val token = ResetPassword.parseToken(link)
             if (token == null || secretKey.isBlank() || newPassword.isBlank()) { error = L10n.t("reset.failed"); return@PrimaryButton }
@@ -312,6 +322,7 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
     var displayName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var breachCount by remember { mutableStateOf(0) }
     var passphrase by remember { mutableStateOf("") }
     var kit by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -328,6 +339,11 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
         }.onSuccess { tenantName = it.first; role = it.second }
             .onFailure { error = L10n.t("accept.failed") }
     }
+    // Debounced HIBP breach check (soft, non-blocking); LaunchedEffect(key) cancels on each password change.
+    LaunchedEffect(password) {
+        breachCount = 0
+        if (password.isNotEmpty()) { delay(600); breachCount = withContext(Dispatchers.IO) { Pwned.count(password) } }
+    }
 
     val roleLabel = if (role == "Owner") L10n.t("invite.owner") else L10n.t("invite.member")
     AuthCard(L10n.t("accept.createAccount"), if (tenantName.isNotEmpty()) String.format(L10n.t("accept.joinAs"), tenantName, roleLabel) else apiBase) {
@@ -336,6 +352,7 @@ fun RegisterScreen(apiBase: String, parts: InviteLink.Parts, onCancel: () -> Uni
             VeyqField(L10n.t("setup.displayName"), displayName, { displayName = it })
             VeyqField(L10n.t("common.email"), email, { email = it }, keyboard = KeyboardType.Email)
             VeyqField(L10n.t("common.password"), password, { password = it }, secure = true)
+            if (breachCount > 0) Text(String.format(L10n.t("password.pwnedWarning"), breachCount), fontSize = 12.sp, color = Color(0xFFE0A83D), modifier = Modifier.fillMaxWidth())
             if (parts.isProtected) VeyqField(L10n.t("accept.passphrase"), passphrase, { passphrase = it }, secure = true)
             PrimaryButton(L10n.t("accept.register"), busy) {
                 busy = true; error = ""

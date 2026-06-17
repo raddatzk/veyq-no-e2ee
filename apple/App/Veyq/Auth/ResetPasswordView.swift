@@ -17,6 +17,7 @@ struct ResetPasswordView: View {
     @State private var newPassword = ""
     @State private var busy = false
     @State private var error = ""
+    @State private var breachCount = 0
 
     private var token: String? { ResetPassword.parseToken(link) }
 
@@ -37,6 +38,9 @@ struct ResetPasswordView: View {
                     VeyqField(label: T("reset.pasteLink"), text: $link)
                     VeyqField(label: T("common.secretKey"), text: $secretKey, secure: true, hint: T("login.secretHint"))
                     VeyqField(label: T("reset.newPassword"), text: $newPassword, secure: true)
+                    if breachCount > 0 {
+                        Text(T("password.pwnedWarning", breachCount)).font(.system(size: 12)).foregroundStyle(.orange)
+                    }
                     PrimaryButton(title: T("reset.setPassword"), busy: busy) { confirm() }
                         .disabled(token == nil || secretKey.isEmpty || newPassword.isEmpty)
 
@@ -51,6 +55,13 @@ struct ResetPasswordView: View {
         }
         .tint(VeyqStyle.accent)
         .onAppear { if email.isEmpty { email = prefillEmail } }
+        // Debounced HIBP breach check (soft, non-blocking); .task(id:) auto-cancels when the password changes.
+        .task(id: newPassword) {
+            breachCount = 0
+            guard !newPassword.isEmpty else { return }
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            if !Task.isCancelled { breachCount = await Pwned.count(newPassword) }
+        }
     }
 
     private func sendRequest() {

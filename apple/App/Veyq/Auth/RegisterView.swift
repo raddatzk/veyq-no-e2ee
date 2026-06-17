@@ -17,6 +17,7 @@ struct RegisterView: View {
     @State private var busy = false
     @State private var error = ""
     @State private var shareItem: ShareItem?
+    @State private var breachCount = 0
 
     private var subtitle: String {
         guard !tenantName.isEmpty else { return app.apiBase }
@@ -44,6 +45,11 @@ struct RegisterView: View {
                     VeyqField(label: T("setup.displayName"), text: $displayName)
                     VeyqField(label: T("common.email"), text: $email, keyboard: .emailAddress)
                     VeyqField(label: T("common.password"), text: $password, secure: true)
+                    if breachCount > 0 {
+                        Text(T("password.pwnedWarning", breachCount))
+                            .font(.system(size: 12)).foregroundStyle(.orange)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     if parts.isProtected {
                         VeyqField(label: T("accept.passphrase"), text: $passphrase, secure: true)
                     }
@@ -59,6 +65,13 @@ struct RegisterView: View {
                 tenantName = m.tenant.displayName
                 role = m.role
             }
+        }
+        // Debounced HIBP breach check (soft, non-blocking): .task(id:) auto-cancels when the password changes.
+        .task(id: password) {
+            breachCount = 0
+            guard !password.isEmpty else { return }
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            if !Task.isCancelled { breachCount = await Pwned.count(password) }
         }
         .sheet(item: $shareItem) { ActivityView(url: $0.url) }
     }
