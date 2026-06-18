@@ -26,6 +26,8 @@ public enum Media {
         public let original: BlobRef
         public let derivatives: [Derivative]
         public let highlighted: Bool
+        public let createdBy: String?
+        public let bucketId: String?
         public let createdAt: String
     }
     /// Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
@@ -221,10 +223,11 @@ public enum Media {
 
     /// Patch a media item's server-visible highlight flag and/or its (re-sealed) sealedMeta. Both fields are
     /// optional; omitted fields are left unchanged. Used by the lightbox favourite toggle + capture-date edit.
-    public static func updateMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String, highlighted: Bool? = nil, sealedMeta: BlobDTO? = nil) async throws -> MediaItem {
+    public static func updateMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String, highlighted: Bool? = nil, sealedMeta: BlobDTO? = nil, bucketId: String? = nil) async throws -> MediaItem {
         var fields: [String: Any] = [:]
         if let highlighted = highlighted { fields["highlighted"] = highlighted }
         if let sealedMeta = sealedMeta { fields["sealedMeta"] = ["suiteId": sealedMeta.suiteId, "bytes": sealedMeta.bytes] }
+        if let bucketId = bucketId { fields["bucketId"] = bucketId }
         let body = try JSONSerialization.data(withJSONObject: fields)
         let (data, resp) = try await URLSession.shared.data(for: authed("\(apiBase)/api/scopes/\(scopeId)/nodes/\(nodeId)/media/\(mediaId)", session, method: "PATCH", body: body))
         try ok(resp, data, "update media")

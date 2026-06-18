@@ -14,6 +14,7 @@ final class GalleryStore: ObservableObject {
     struct Tile: Identifiable {
         let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?
         let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String; var highlighted: Bool
+        let createdBy: String?; let bucketId: String?
         let cameraMake: String?; let cameraModel: String?; let lens: String?
         let width: Int?; let height: Int?; let fileSize: Int?; let exif: [String: String]?
     }
@@ -54,6 +55,7 @@ final class GalleryStore: ObservableObject {
             let preview = m.derivatives.first(where: { $0.kind == "PREVIEW" })?.blob ?? m.original
             result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height),
                                takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType, highlighted: m.highlighted,
+                               createdBy: m.createdBy, bucketId: m.bucketId,
                                cameraMake: meta.cameraMake, cameraModel: meta.cameraModel, lens: meta.lens,
                                width: meta.width, height: meta.height, fileSize: meta.fileSize, exif: meta.exif))
         }
@@ -68,11 +70,47 @@ final class GalleryStore: ObservableObject {
         if let i = tiles.firstIndex(where: { $0.id == tile.id }) { tiles[i].highlighted = next }
     }
 
-    /// Re-seal a medium's capture date (keeping its location) and patch sealedMeta, then reload to re-sort.
+    /// Re-seal a medium's capture date, preserving its location + EXIF camera details, then reload to re-sort.
     func updateTakenAt(_ tile: Tile, _ iso: String) async {
-        guard let sealed = try? Media.sealMediaMeta(contentKey: contentKey, meta: Media.MediaMeta(takenAt: iso, lat: tile.lat, lng: tile.lng)) else { return }
+        let meta = Media.MediaMeta(takenAt: iso, lat: tile.lat, lng: tile.lng, cameraMake: tile.cameraMake, cameraModel: tile.cameraModel, lens: tile.lens, width: tile.width, height: tile.height, fileSize: tile.fileSize, exif: tile.exif)
+        guard let sealed = try? Media.sealMediaMeta(contentKey: contentKey, meta: meta) else { return }
         guard (try? await Media.updateMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, mediaId: tile.id, sealedMeta: sealed)) != nil else { return }
         await load()
+    }
+
+    // ---- contribution buckets (ADR 0023) ----
+    @Published var buckets: [Buckets.Bucket] = []
+    var ownerKey: String { "user:\(session.user.id)" }
+
+    func loadBuckets() async {
+        if let b = try? await Buckets.list(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId) { buckets = b }
+    }
+    func bucketLabel(_ b: Buckets.Bucket) -> String {
+        if b.primary && b.ownerKey == ownerKey { return session.user.displayName }
+        return Buckets.name(contentKey: contentKey, bucket: b)
+    }
+    func isOwnBucket(_ b: Buckets.Bucket) -> Bool { b.ownerKey == ownerKey }
+    /// A tile belongs to a bucket: sub-bucket matches bucketId; primary matches the contributor's un-bucketed media.
+    func tileInBucket(_ tile: Tile, _ b: Buckets.Bucket) -> Bool {
+        b.primary ? (tile.createdBy == b.ownerKey && tile.bucketId == nil) : (tile.bucketId == b.id)
+    }
+    func bucketCount(_ b: Buckets.Bucket) -> Int { tiles.filter { tileInBucket($0, b) }.count }
+
+    func createBucket(_ name: String) async {
+        try? await Buckets.create(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, name: name)
+        await loadBuckets()
+    }
+    func renameBucket(_ id: String, _ name: String) async {
+        try? await Buckets.rename(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, bucketId: id, name: name)
+        await loadBuckets()
+    }
+    func deleteBucket(_ id: String) async {
+        try? await Buckets.delete(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, bucketId: id)
+        await loadBuckets(); await load()
+    }
+    func moveMedia(_ tile: Tile, toBucket bucketId: String) async {
+        guard (try? await Media.updateMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, mediaId: tile.id, bucketId: bucketId)) != nil else { return }
+        await load(); await loadBuckets()
     }
 
     /// Fetch thumbnail bytes for the given refs, at most 6 in flight, returned keyed by their input index.
@@ -277,6 +315,11 @@ struct MemoryDetailView: View {
     @State private var savingOriginal = false
     @State private var mediaDelArm = false
     @State private var showHighlightsOnly = false   // gallery filter (favourites)
+    @State private var selectedBucketId: String?     // contributions: scope the gallery to a bucket
+    @State private var cameraFilter: String?         // contributions: narrow a bucket by EXIF camera
+    @State private var creatingBucket = false
+    @State private var renamingBucket: Buckets.Bucket?
+    @State private var bucketNameInput = ""
     @State private var lightboxInfo = false          // info panel toggle in the lightbox
     @State private var editingDate = false           // capture-date editor toggle in the lightbox
     @State private var chapterNav: GalleryStore.Child?   // ::chapter embed navigation target
@@ -357,6 +400,18 @@ struct MemoryDetailView: View {
             MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name)
         }
         .toolbar { detailToolbar }
+        .task { await store.loadBuckets() }
+        .onChange(of: tab) { _, t in if t == 4 { Task { await store.loadBuckets() } } }
+        .alert(T("contrib.newBucket"), isPresented: $creatingBucket) {
+            TextField("", text: $bucketNameInput)
+            Button(T("common.cancel"), role: .cancel) {}
+            Button(T("journal.save")) { let n = bucketNameInput; if !n.isEmpty { Task { await store.createBucket(n) } } }
+        }
+        .alert(T("common.rename"), isPresented: Binding(get: { renamingBucket != nil }, set: { if !$0 { renamingBucket = nil } })) {
+            TextField("", text: $bucketNameInput)
+            Button(T("common.cancel"), role: .cancel) { renamingBucket = nil }
+            Button(T("journal.save")) { if let b = renamingBucket { let n = bucketNameInput; if !n.isEmpty { Task { await store.renameBucket(b.id, n) } } }; renamingBucket = nil }
+        }
     }
 
     @ToolbarContentBuilder private var detailToolbar: some ToolbarContent {
@@ -375,10 +430,21 @@ struct MemoryDetailView: View {
         }
     }
 
-    // Tiles in capture-time order — the lightbox pages through these.
-    private var orderedTiles: [GalleryStore.Tile] { store.tiles.sorted { $0.takenAt < $1.takenAt } }
-    // The gallery grid honours the favourites filter.
-    private var displayTiles: [GalleryStore.Tile] { showHighlightsOnly ? store.tiles.filter { $0.highlighted } : store.tiles }
+    private var selectedBucket: Buckets.Bucket? { store.buckets.first { $0.id == selectedBucketId } }
+    // The gallery grid honours the favourites filter, the selected contribution bucket, and the camera filter.
+    private var displayTiles: [GalleryStore.Tile] {
+        var v = store.tiles
+        if showHighlightsOnly { v = v.filter { $0.highlighted } }
+        if let b = selectedBucket { v = v.filter { store.tileInBucket($0, b) } }
+        if let cam = cameraFilter { v = v.filter { [$0.cameraMake, $0.cameraModel].compactMap { $0 }.joined(separator: " ") == cam } }
+        return v
+    }
+    private var cameraOptions: [String] {
+        guard let b = selectedBucket else { return [] }
+        return Array(Set(store.tiles.filter { store.tileInBucket($0, b) }.map { [$0.cameraMake, $0.cameraModel].compactMap { $0 }.joined(separator: " ") }.filter { !$0.isEmpty })).sorted()
+    }
+    // Lightbox pages through the currently displayed (filtered) tiles, in capture-time order.
+    private var orderedTiles: [GalleryStore.Tile] { displayTiles.sorted { $0.takenAt < $1.takenAt } }
     private var currentTile: GalleryStore.Tile? { orderedTiles.indices.contains(lightboxIndex) ? orderedTiles[lightboxIndex] : nil }
 
     @ViewBuilder private func detailContent(contentWidth: CGFloat) -> some View {
@@ -394,12 +460,15 @@ struct MemoryDetailView: View {
                 Text(T("detail.gallery")).tag(0)
                 Text(T("detail.map")).tag(2)
                 Text(T("detail.journal")).tag(1)
+                Text(T("detail.contributions")).tag(4)
                 Text(T("detail.info")).tag(3)
             }
             .pickerStyle(.segmented)
 
             if tab == 3 {
                 infoTab
+            } else if tab == 4 {
+                contributionsTab
             } else if tab == 1 {
                 JournalView(store: store, onOpenMedia: openLightbox, onOpenChapter: openChapter)
             } else if tab == 2 {
@@ -445,6 +514,21 @@ struct MemoryDetailView: View {
                     Label(T("detail.highlights"), systemImage: showHighlightsOnly ? "star.fill" : "star").font(.footnote)
                 }
                 .tint(showHighlightsOnly ? VeyqStyle.accent : VeyqStyle.muted)
+            }
+        }
+        // Bucket scope chip + camera filter (Contributions). Shown when a bucket is selected.
+        if let b = selectedBucket {
+            HStack {
+                Button { selectedBucketId = nil; cameraFilter = nil } label: {
+                    Label(bucketLabelOrFallback(b), systemImage: "xmark.circle.fill").font(.footnote)
+                }.tint(VeyqStyle.accent)
+                Spacer()
+                if !cameraOptions.isEmpty {
+                    Menu {
+                        Button(T("contrib.allCameras")) { cameraFilter = nil }
+                        ForEach(cameraOptions, id: \.self) { cam in Button(cam) { cameraFilter = cam } }
+                    } label: { Label(cameraFilter ?? T("contrib.allCameras"), systemImage: "camera").font(.footnote) }
+                }
             }
         }
         if !store.children.isEmpty {
@@ -493,6 +577,40 @@ struct MemoryDetailView: View {
             .padding(.horizontal, 14).padding(.vertical, 10)
     }
 
+    private func bucketLabelOrFallback(_ b: Buckets.Bucket) -> String {
+        let l = store.bucketLabel(b)
+        return l.isEmpty ? T("contrib.member") : l
+    }
+
+    @ViewBuilder private var contributionsTab: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if store.buckets.isEmpty {
+                Text(T("contrib.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
+            }
+            ForEach(store.buckets) { b in
+                HStack(spacing: 8) {
+                    Button { selectedBucketId = b.id; cameraFilter = nil; tab = 0 } label: {
+                        HStack {
+                            Text("\(b.primary ? "👤" : "📁") \(bucketLabelOrFallback(b))").foregroundStyle(VeyqStyle.text)
+                            Spacer()
+                            Text("\(store.bucketCount(b))").font(.footnote).foregroundStyle(VeyqStyle.muted)
+                        }
+                    }.buttonStyle(.plain)
+                    if store.isOwnBucket(b) {
+                        if b.primary {
+                            Button { bucketNameInput = ""; creatingBucket = true } label: { Image(systemName: "plus.circle") }.tint(VeyqStyle.accent)
+                        } else {
+                            Button { renamingBucket = b; bucketNameInput = store.bucketLabel(b) } label: { Image(systemName: "pencil") }.tint(VeyqStyle.accent)
+                            Button { let id = b.id; Task { await store.deleteBucket(id); if selectedBucketId == id { selectedBucketId = nil } } } label: { Image(systemName: "trash") }.tint(VeyqStyle.danger)
+                        }
+                    }
+                }
+                .padding(.vertical, 8).padding(.horizontal, 10).padding(.leading, b.primary ? 0 : 16)
+                .background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
     private func childCard(_ child: GalleryStore.Child) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack {
@@ -531,6 +649,14 @@ struct MemoryDetailView: View {
                     }.tint(tile.highlighted ? VeyqStyle.accent : .white)
                     Button { lightboxInfo.toggle() } label: { Image(systemName: "info.circle") }.tint(.white)
                     Button { editingDate.toggle() } label: { Image(systemName: "calendar") }.tint(.white)
+                    // Move my own medium between my own buckets.
+                    if tile.createdBy == store.ownerKey, !store.buckets.filter(store.isOwnBucket).isEmpty {
+                        Menu {
+                            ForEach(store.buckets.filter(store.isOwnBucket)) { b in
+                                Button(b.primary ? T("contrib.moveToPrimary") : bucketLabelOrFallback(b)) { Task { await store.moveMedia(tile, toBucket: b.id) } }
+                            }
+                        } label: { Image(systemName: "folder") }.tint(.white)
+                    }
                     Button(T("cover.setAsCover")) {
                         Task { await store.setCover(tile.id) }
                         closeLightbox()
