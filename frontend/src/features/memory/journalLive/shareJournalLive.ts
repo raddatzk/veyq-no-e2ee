@@ -1,4 +1,4 @@
-// uc.memory.journal-live — the SHARE guest's read-only live view (web). A read-capable share guest holds the
+// uc.journal.live-coedit — the SHARE guest's read-only live view (web). A read-capable share guest holds the
 // scope content key (link fragment), so it can reconstruct the journal from the operator-blind store
 // (`public/shares/.../journal/live`: sealed snapshot + update log) and then subscribe to the relay with a
 // share token to live-read owner edits. It never writes (the relay marks share connections receive-only).

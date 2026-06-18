@@ -6,7 +6,7 @@ import java.text.Normalizer
 import java.util.Base64
 
 /**
- * uc.spaces.groups (Android) — a Group is a collaborative sub-space within a tenant (Tenant > Group >
+ * uc.spaces.create-group (Android) — a Group is a collaborative sub-space within a tenant (Tenant > Group >
  * Personal). Create one by minting a GROUP_ROOT scope, self-granting it, provisioning a content key, and
  * sealing the NAME under that content key (operator-blind). Members are added by re-wrapping the group
  * scope key to their identity. The server stays blind to the name and the content.

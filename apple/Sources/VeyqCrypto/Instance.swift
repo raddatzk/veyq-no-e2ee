@@ -1,6 +1,6 @@
 import Foundation
 
-/// uc.account.connect (Apple) — a mobile client points at a chosen instance; this reports whether that
+/// uc.platform.app-shell (Apple) — a mobile client points at a chosen instance; this reports whether that
 /// instance still needs first-run setup (which is web-only) and the suites it advertises.
 public enum Instance {
     public struct SetupStatus: Codable, Sendable {

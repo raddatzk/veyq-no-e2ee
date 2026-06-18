@@ -1,0 +1,33 @@
+id: uc.search.filter
+title: Filter & find
+status: partial
+documents:
+  - type: feature
+    ref: docs/wiki/features/search/_index.md
+  - type: useCase
+    ref: docs/wiki/features/search/use-cases/uc.search.filter.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/search.md
+  - type: entryPoint
+    ref: frontend/src/features/search/search.ts
+acceptanceCriteria:
+  - id: uc.search.filter.name-match
+    statement: "Nodes are filtered locally by a case-insensitive substring of their decrypted name; an empty/whitespace query yields no hits and results are capped."
+    coverage:
+      web:
+        unit:
+          - testName: "matches case-insensitively as a substring"
+            kind: positive
+            ref: frontend/src/features/search/search.test.ts
+          - testName: "returns no hits for an empty or whitespace query"
+            kind: negative
+            ref: frontend/src/features/search/search.test.ts
+          - testName: "returns no hits when nothing matches"
+            kind: negative
+            ref: frontend/src/features/search/search.test.ts
+          - testName: "caps results at 25"
+            kind: positive
+            ref: frontend/src/features/search/search.test.ts
+    gaps:
+      - reason: "The pure name filter is unit-tested on web; the iOS/Android equivalents live inline in the app UI (e.g. HomeScreen.search), and structural facets / journal-tag full-text are deferred (status: partial)."
+        followUp: "Extract the native name filter into core and mirror search.test.ts; add facets when search.filter graduates from partial."

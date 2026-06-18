@@ -1,4 +1,4 @@
-// uc.memory.share (web) — read-only public sharing, operator-blind. The owner wraps the scope content key
+// uc.sharing.share-public-viewer (web) — read-only public sharing, operator-blind. The owner wraps the scope content key
 // under a random per-share key and stores the ciphertext; the share key rides the link FRAGMENT (/s/<id>#k=…)
 // and never reaches the server. A guest resolves the share, unwraps the content key client-side, and reads
 // the shared subtree's ciphertext (gated server-side to the subtree). The server stays blind throughout.

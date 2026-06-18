@@ -1,4 +1,4 @@
-// uc.spaces.groups (web) — owner-side group management built on the existing tenant + invite slices:
+// uc.spaces.create-group (web) — owner-side group management built on the existing tenant + invite slices:
 // create a shared group (a tenant the caller owns) and mint invite links to add people. The heavy crypto
 // (scope keypair, temp-wrap) lives in the tenant / inviteMembers slices; this only orchestrates them.
 import { apiError } from '../../../shared/apiError'

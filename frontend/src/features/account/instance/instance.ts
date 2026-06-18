@@ -1,5 +1,5 @@
 import { apiError } from '../../../shared/apiError'
-// uc.account.connect (web) — the instance is the same-origin host that served the page, so all the
+// uc.platform.app-shell (web) — the instance is the same-origin host that served the page, so all the
 // client needs is its setup status: whether first-run setup is still pending, and the advertised suites.
 export type SetupStatus = { setupRequired: boolean; suites: string[] }
 

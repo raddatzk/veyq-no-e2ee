@@ -1,4 +1,4 @@
-// uc.memory.playlist (web, ADR 0010 operator-blind) — link streaming playlists to a Memory. The payload
+// uc.memory.link-playlists (web, ADR 0010 operator-blind) — link streaming playlists to a Memory. The payload
 // {provider, url, title?, note?} is sealed under the scope content key (the server is blind to it); only the
 // benign `featured` flag is server-visible. Provider is detected client-side from the URL host.
 import { apiError } from '../../../shared/apiError'

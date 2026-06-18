@@ -1,5 +1,7 @@
 # UC: Enable TOTP
 
+> **Status: Planned — not yet implemented.** Documented ahead of the code; no coverage file by design.
+
 - **ID:** uc.account.enable-totp
 - **Primary actor:** Memory Curator
 - **Goal:** Add TOTP as a second factor for the password login path.

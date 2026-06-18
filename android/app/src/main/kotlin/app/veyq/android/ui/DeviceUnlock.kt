@@ -24,7 +24,7 @@ import java.security.SecureRandom
 import kotlin.coroutines.resume
 
 /**
- * uc.account.device-unlock (Android) — "remember me" behind a biometric, crypto-bound (not a soft UI gate).
+ * uc.account.recover-keys (Android) — "remember me" behind a biometric, crypto-bound (not a soft UI gate).
  *
  * The credentials (password + Secret Key) are sealed under a random AES-GCM key, which is itself RSA-wrapped to
  * an AndroidKeyStore keypair whose PRIVATE key is `setUserAuthenticationRequired(true)`. Saving uses the public

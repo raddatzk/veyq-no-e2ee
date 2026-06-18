@@ -1,6 +1,6 @@
 import Foundation
 
-/// uc.memory.journal (Apple) — the Markdown READ projection of a Memory's journal, sealed under the scope
+/// uc.journal.write (Apple) — the Markdown READ projection of a Memory's journal, sealed under the scope
 /// content key (nonce || AEAD). The server stores ciphertext only. Editing goes through the operator-blind
 /// CRDT store (JournalPersistence); this is the read path (detail view) that opens the compacted Markdown.
 public enum Journal {

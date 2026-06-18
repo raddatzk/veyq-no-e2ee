@@ -1,6 +1,6 @@
 import Foundation
 
-/// uc.memory.track (Apple) — a Memory's GPX tracks are {name, points} routes sealed under the scope content
+/// uc.memory.add-map-tracks (Apple) — a Memory's GPX tracks are {name, points} routes sealed under the scope content
 /// key (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only;
 /// we seal before POST and open after GET. Route location data never leaves the client in the clear.
 public enum Track {

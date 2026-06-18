@@ -2,7 +2,7 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// uc.account.device-unlock (iOS) — "remember me" behind Face ID / Touch ID. The login credentials are
+/// uc.account.recover-keys (iOS) — "remember me" behind Face ID / Touch ID. The login credentials are
 /// stored in the Keychain with a biometric access control, so the Secure Enclave gates retrieval; next
 /// launch, one biometric prompt yields the credentials and we re-login. No app-side crypto — the Keychain
 /// is the secure store.

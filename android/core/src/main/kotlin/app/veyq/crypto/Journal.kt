@@ -7,7 +7,7 @@ import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
- * uc.memory.journal (Android) — the Markdown READ projection of a Memory's journal, sealed under the scope
+ * uc.journal.write (Android) — the Markdown READ projection of a Memory's journal, sealed under the scope
  * content key (nonce || AEAD). The server stores ciphertext only. Editing goes through the operator-blind
  * CRDT store (JournalPersistence); this is the read path (detail view) that opens the compacted Markdown.
  */

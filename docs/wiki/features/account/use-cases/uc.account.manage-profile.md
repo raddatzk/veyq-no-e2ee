@@ -1,5 +1,7 @@
 # UC: Manage profile & credentials
 
+> **Status: Planned — not yet implemented.** Documented ahead of the code; no coverage file by design.
+
 - **ID:** uc.account.manage-profile
 - **Primary actor:** Memory Curator
 - **Goal:** Manage profile fields and account credentials/devices.

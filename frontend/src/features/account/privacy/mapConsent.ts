@@ -5,5 +5,11 @@
 import { ref, watch } from 'vue'
 
 const KEY = 'veyq.privacy.mapTiles'
-export const mapTilesConsent = ref(localStorage.getItem(KEY) === 'true')
-watch(mapTilesConsent, (on) => localStorage.setItem(KEY, on ? 'true' : 'false'))
+
+/** Read the per-device map-tile consent; privacy-safe default of `false` when unset. */
+export function readMapTilesConsent(): boolean { return localStorage.getItem(KEY) === 'true' }
+/** Persist the per-device map-tile consent (per origin; never synced to the operator-blind server). */
+export function setMapTilesConsent(on: boolean): void { localStorage.setItem(KEY, on ? 'true' : 'false') }
+
+export const mapTilesConsent = ref(readMapTilesConsent())
+watch(mapTilesConsent, setMapTilesConsent)

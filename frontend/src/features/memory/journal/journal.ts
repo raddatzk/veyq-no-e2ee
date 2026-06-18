@@ -1,4 +1,4 @@
-// uc.memory.journal (web) — the Markdown READ projection of a Memory's journal: a Markdown body sealed under
+// uc.journal.write (web) — the Markdown READ projection of a Memory's journal: a Markdown body sealed under
 // the scope content key (nonce || AEAD), the same envelope used for node names. The server stores ciphertext
 // only. Editing goes through the operator-blind CRDT store (journalLive/journalPersistence); this module is
 // the read path (detail view) that opens the compacted Markdown projection.

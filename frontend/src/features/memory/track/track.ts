@@ -1,4 +1,4 @@
-// uc.memory.track (web) — a Memory's GPX tracks are {name, points} routes sealed under the scope content key
+// uc.memory.add-map-tracks (web) — a Memory's GPX tracks are {name, points} routes sealed under the scope content key
 // (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only; we
 // seal before POST and open after GET. Route location data is sensitive, so it never leaves the client clear.
 import { apiError } from '../../../shared/apiError'

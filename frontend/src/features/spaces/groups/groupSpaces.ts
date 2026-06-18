@@ -1,4 +1,4 @@
-// uc.spaces.groups (web) — a Group is a collaborative sub-space within a tenant (glossary: Tenant > Group
+// uc.spaces.create-group (web) — a Group is a collaborative sub-space within a tenant (glossary: Tenant > Group
 // > Personal). Create one by minting a GROUP_ROOT scope keypair, self-granting it, provisioning a content
 // key, and sealing the group NAME under that content key (operator-blind). Members are added by wrapping
 // the group scope key to their identity. The server stays blind to the name and the content.

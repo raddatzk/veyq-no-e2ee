@@ -8,7 +8,7 @@ import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
- * uc.memory.track (Android) — a Memory's GPX tracks are {name, points} routes sealed under the scope content
+ * uc.memory.add-map-tracks (Android) — a Memory's GPX tracks are {name, points} routes sealed under the scope content
  * key (nonce || AEAD), the same envelope as node names and the journal. The server stores ciphertext only;
  * we seal before POST and open after GET. Route location data never leaves the client in the clear.
  */

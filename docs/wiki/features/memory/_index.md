@@ -16,5 +16,6 @@ playlists). A second, plain file-storage model ("Drive") is planned — see [des
 - ★ [Curate a Memory](use-cases/uc.memory.curate.md) — covers, favorites, dates, highlights
 - ★ [Browse a Memory](use-cases/uc.memory.browse.md) — unified gallery, filters (all / mine / group)
 - ★ [Add map context and GPS tracks](use-cases/uc.memory.add-map-tracks.md)
+- ★ [Consent to external map tiles](use-cases/uc.memory.consent-map-tiles.md) — per-device opt-in before tiles load
 - ★ [Link external playlists](use-cases/uc.memory.link-playlists.md)
 - ★ [Download a Memory as a ZIP](use-cases/uc.memory.download-zip.md)

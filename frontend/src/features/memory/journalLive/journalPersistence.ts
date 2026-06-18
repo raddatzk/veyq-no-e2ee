@@ -1,4 +1,4 @@
-// uc.memory.journal-live persistence (web) — the operator-blind CRDT store behind the live editor. The
+// uc.journal.live-coedit persistence (web) — the operator-blind CRDT store behind the live editor. The
 // journal is a Yjs document; the server keeps a sealed Yjs *state snapshot* plus an append-only log of sealed
 // Yjs *updates* (it never decrypts either). A client reconstructs the document by applying the snapshot then
 // the updates, appends a sealed update per local edit, and on close compacts (a fresh snapshot + the Markdown

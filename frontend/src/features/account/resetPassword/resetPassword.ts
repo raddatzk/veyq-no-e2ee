@@ -1,4 +1,4 @@
-// uc.account.reset-password (web) — recover a forgotten password with the Secret Key (Emergency Kit) AND
+// uc.account.recover-keys (web) — recover a forgotten password with the Secret Key (Emergency Kit) AND
 // email access. The email delivers a one-time token (the email factor); the Secret Key decrypts the RECOVERY
 // master-key wrap (the crypto factor). The client unwraps the master key, re-wraps it under the new password
 // and ships the new PASSWORD wrap + auth verifier. The server sees neither secret.

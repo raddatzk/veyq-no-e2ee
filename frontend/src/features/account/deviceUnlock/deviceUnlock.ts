@@ -1,4 +1,4 @@
-// uc.account.device-unlock (web) — orchestrates the passkey + vault: enable it after a login, then unlock
+// uc.account.recover-keys (web) — orchestrates the passkey + vault: enable it after a login, then unlock
 // silently next time. The sealed vault + the passkey credential id live in localStorage; the device key
 // (passkey PRF) is never stored, so the vault is useless without the passkey gesture.
 import { getPasskeyDeviceKey, passkeySupported, registerPasskey } from './passkey'

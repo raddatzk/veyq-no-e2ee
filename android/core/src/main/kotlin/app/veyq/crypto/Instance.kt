@@ -6,7 +6,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 /**
- * uc.account.connect (Android) — a mobile client points at a chosen instance; this reports whether that
+ * uc.platform.app-shell (Android) — a mobile client points at a chosen instance; this reports whether that
  * instance still needs first-run setup (which is web-only) and the suites it advertises.
  */
 object Instance {

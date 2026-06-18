@@ -1,7 +1,7 @@
 import Foundation
 import YSwift
 
-/// uc.memory.journal-live persistence (Apple) — the operator-blind CRDT store behind the live editor, wire-
+/// uc.journal.live-coedit persistence (Apple) — the operator-blind CRDT store behind the live editor, wire-
 /// compatible with web/Android. The journal is a Yrs document; the server keeps a sealed Yrs *state snapshot*
 /// plus an append-only log of sealed Yrs *updates* (it never decrypts either). A client reconstructs the
 /// document by applying the snapshot then the updates, appends a sealed update per local edit, and on close

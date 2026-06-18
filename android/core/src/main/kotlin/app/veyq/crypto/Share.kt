@@ -7,7 +7,7 @@ import java.net.http.HttpResponse
 import java.util.Base64
 
 /**
- * uc.memory.share (Android) — owner side. Create a read-only public link for a Memory: the scope content key
+ * uc.sharing.share-public-viewer (Android) — owner side. Create a read-only public link for a Memory: the scope content key
  * is wrapped under a random per-share key, which rides the returned link's fragment (/s/<id>#k=…) and never
  * reaches the server. The web viewer at the instance origin opens it; the server stays blind to the content.
  */
