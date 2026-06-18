@@ -1,0 +1,117 @@
+id: uc.platform.web-views
+title: Render the web views & navigation
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/platform/_index.md
+  - type: useCase
+    ref: docs/wiki/features/platform/use-cases/uc.platform.web-views.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/platform-concepts.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/space-navigation.md
+acceptanceCriteria:
+  - id: uc.platform.web-views.routing
+    statement: "Clean space paths build and parse round-trip — tenant (no prefix, host-resolved), personal (~me) and group (@slug) — and each space kind parses back out."
+    coverage:
+      web:
+        unit:
+          - testName: "builds tenant paths with no prefix"
+            kind: positive
+            ref: frontend/src/features/home/homeRoute.test.ts
+          - testName: "prefixes personal with ~me and groups with @<name-slug>"
+            kind: positive
+            ref: frontend/src/features/home/homeRoute.test.ts
+          - testName: "parses each space kind back out"
+            kind: positive
+            ref: frontend/src/features/home/homeRoute.test.ts
+          - testName: "round-trips through build → parse → matchSpace"
+            kind: positive
+            ref: frontend/src/features/home/homeRoute.test.ts
+          - testName: "resolves the prefix-less tenant by host (multiple tenants)"
+            kind: positive
+            ref: frontend/src/features/home/homeRoute.test.ts
+  - id: uc.platform.web-views.read-cache
+    statement: "The node read-cache serves a burst of reads from one fetch and drops cached entries on create/rename/delete and explicit invalidation."
+    coverage:
+      web:
+        unit:
+          - testName: "serves a burst of reads from one fetch"
+            kind: positive
+            ref: frontend/src/features/home/nodeGraph.test.ts
+          - testName: "refetches after an explicit invalidate"
+            kind: positive
+            ref: frontend/src/features/home/nodeGraph.test.ts
+          - testName: "createChild drops the cache so the next read sees the new node"
+            kind: positive
+            ref: frontend/src/features/home/nodeGraph.test.ts
+          - testName: "renameNode drops the cache"
+            kind: positive
+            ref: frontend/src/features/home/nodeGraph.test.ts
+          - testName: "deleteNode drops the cache"
+            kind: positive
+            ref: frontend/src/features/home/nodeGraph.test.ts
+  - id: uc.platform.web-views.gallery-layout
+    statement: "The gallery justifies every full row to the container width, preserves per-tile aspect (clamped), keeps a trailing widow at target height, and groups items into date buckets; empty inputs yield empty results."
+    coverage:
+      web:
+        unit:
+          - testName: "justifies every full row flush to the container width"
+            kind: positive
+            ref: frontend/src/features/gallery/justifiedLayout.test.ts
+          - testName: "keeps the trailing incomplete row as a widow at target height"
+            kind: positive
+            ref: frontend/src/features/gallery/justifiedLayout.test.ts
+          - testName: "preserves per-tile aspect ratio within a justified row (wide tiles get more width)"
+            kind: positive
+            ref: frontend/src/features/gallery/justifiedLayout.test.ts
+          - testName: "returns empty for no items or zero container"
+            kind: negative
+            ref: frontend/src/features/gallery/justifiedLayout.test.ts
+          - testName: "clamps display aspect ratio into [3/4, 4/3] with a 4/3 fallback"
+            kind: positive
+            ref: frontend/src/features/gallery/justifiedLayout.test.ts
+          - testName: "groups consecutive items by local day, preserving order"
+            kind: positive
+            ref: frontend/src/features/gallery/dateBuckets.test.ts
+          - testName: "re-opens a bucket only for consecutive same-day runs"
+            kind: positive
+            ref: frontend/src/features/gallery/dateBuckets.test.ts
+          - testName: "falls back to a placeholder key for invalid timestamps"
+            kind: negative
+            ref: frontend/src/features/gallery/dateBuckets.test.ts
+          - testName: "formats a single date and a range"
+            kind: positive
+            ref: frontend/src/features/gallery/dateBuckets.test.ts
+          - testName: "returns empty range for no items"
+            kind: negative
+            ref: frontend/src/features/gallery/dateBuckets.test.ts
+  - id: uc.platform.web-views.memory-views
+    statement: "The home view renders the space switcher and memory/folder grids and navigates into folders; the Memory view renders the tabs, root gallery and journal (lazy, embed-aware, live-journal subscription) and navigates into chapters."
+    coverage:
+      web:
+        unit:
+          - testName: "renders the space switcher and the memory/folder grids of the active space"
+            kind: positive
+            ref: frontend/src/app/home/HomeView.test.ts
+          - testName: "navigates into a folder (breadcrumb grows)"
+            kind: positive
+            ref: frontend/src/app/home/HomeView.test.ts
+          - testName: "renders the three Legacy tabs, the root title, and loads the root gallery"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "lazily loads + renders the embed-aware journal when the Journal tab opens"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "navigates into a child chapter (loads its data, updates the breadcrumb, emits nodeChanged)"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "shows the back button only when showBack is set"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "uses the live-journal subscription instead of static load when provided, and tears it down"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts
+          - testName: "renders the journal-edit slot instead of the body when journalEditing is set"
+            kind: positive
+            ref: frontend/src/app/home/MemoryContent.test.ts

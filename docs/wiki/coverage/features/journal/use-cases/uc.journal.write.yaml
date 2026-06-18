@@ -1,0 +1,77 @@
+id: uc.journal.write
+title: Write the journal
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/journal/_index.md
+  - type: useCase
+    ref: docs/wiki/features/journal/use-cases/uc.journal.write.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/live-collaboration.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/memory/journal/JournalHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/memory/journal/journal.ts
+acceptanceCriteria:
+  - id: uc.journal.write.persist-roundtrip
+    statement: "A journal is sealed under the content key and persisted as snapshot + increments with a Markdown projection; non-overlapping sessions reload and converge, and the operator only ever holds ciphertext."
+    coverage:
+      backend:
+        integration:
+          - testName: appendsUpdatesThenCompactsOperatorBlind
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/journal/JournalSliceTest.kt
+      web:
+        e2e:
+          - testName: "seals, stores and reads back a journal body"
+            kind: positive
+            ref: frontend/src/features/memory/journal/journal.e2e.test.ts
+          - testName: "non-overlapping sessions converge via snapshot + increments; markdown projection follows"
+            kind: positive
+            ref: frontend/src/features/memory/journalLive/journalPersistence.e2e.test.ts
+        unit:
+          - testName: "journal seal (per-message sub-key)"
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts
+      apple:
+        e2e:
+          - testName: testNonOverlappingSessionsConverge
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/JournalPersistenceE2ETests.swift
+      android:
+        e2e:
+          - testName: nonOverlappingSessionsConverge
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/JournalPersistenceE2ETest.kt
+  - id: uc.journal.write.validation
+    statement: "A write is rejected when the node is not a Memory/chapter, the crypto suite is unknown, or the covered sequence is out of range."
+    coverage:
+      backend:
+        integration:
+          - testName: rejectsBadNodeSuiteAndSeq
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/journal/JournalSliceTest.kt
+  - id: uc.journal.write.safe-render
+    statement: "The reader renders Markdown through an escape-first path: HTML is escaped and only http(s) links are clickable (no javascript: URLs)."
+    coverage:
+      web:
+        unit:
+          - testName: "renders headings, paragraphs and line breaks"
+            kind: positive
+            ref: frontend/src/features/memory/journal/markdown.test.ts
+          - testName: "renders bullet and ordered lists"
+            kind: positive
+            ref: frontend/src/features/memory/journal/markdown.test.ts
+          - testName: "renders inline bold, italic, code and links"
+            kind: positive
+            ref: frontend/src/features/memory/journal/markdown.test.ts
+          - testName: "escapes HTML to prevent injection"
+            kind: negative
+            ref: frontend/src/features/memory/journal/markdown.test.ts
+          - testName: "only allows http(s) links (no javascript: urls)"
+            kind: negative
+            ref: frontend/src/features/memory/journal/markdown.test.ts

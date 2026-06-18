@@ -10,5 +10,6 @@ Multiple **tenants**, collaborative **groups** and a **personal** space, with fa
 
 ## Use-cases
 - ★ [Switch the active space](use-cases/uc.spaces.switch-active-space.md)
+- ★ [Create & administer a group](use-cases/uc.spaces.create-group.md)
 - ★ [Use a group space](use-cases/uc.spaces.use-group.md) — incl. the grant path for existing users
 - ★ [Use the personal space](use-cases/uc.spaces.use-personal.md)

@@ -49,3 +49,19 @@ acceptanceCriteria:
           - testName: testRotateIdentityKeepsAccessToScopesAndContent
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/RotateIdentityE2ETests.swift
+  - id: uc.keys.rotate-identity.stale-grant-hidden
+    statement: "After a tenant member is removed, their stale tenant grant is hidden and unreadable."
+    coverage:
+      backend:
+        integration:
+          - testName: removedMembersStaleTenantGrantIsHiddenAndUnreadable
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/keys/rotateidentity/RotateIdentitySliceTest.kt
+  - id: uc.keys.rotate-identity.fingerprint
+    statement: "The identity fingerprint / safety number is derived deterministically from the identity public keys (conformance vector)."
+    coverage:
+      web:
+        unit:
+          - testName: "identity fingerprint / safety number"
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts

@@ -1,4 +1,5 @@
 import SwiftUI
+import VeyqCrypto
 
 // Block-based journal editor for mobile (the agreed alternative to web's inline CodeMirror chips): the journal
 // is a vertical list of editable text blocks interleaved with embed CHIPS. Tapping a chip opens a picker to

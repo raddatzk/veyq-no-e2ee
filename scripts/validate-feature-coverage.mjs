@@ -266,7 +266,7 @@ const deleteCandidates = collectDeleteCandidates()
 const testFiles = [
   ...walk(path.join(root, 'backend/src/test'), (file) => /Test\.kt$/.test(file)),
   ...walk(path.join(root, 'frontend/src'), (file) => /\.test\.ts$/.test(file)),
-  ...walk(path.join(root, 'android/src/test'), (file) => /Test\.kt$/.test(file)),
+  ...walk(path.join(root, 'android/core/src/test'), (file) => /Test\.kt$/.test(file)),
   ...walk(path.join(root, 'apple/Tests'), (file) => /\.swift$/.test(file)),
 ].sort()
 

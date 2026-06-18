@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.size
 import app.veyq.crypto.Browse
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
+import app.veyq.crypto.InviteLink
 import app.veyq.crypto.InviteMembers
 import app.veyq.crypto.Login
 import app.veyq.crypto.Media

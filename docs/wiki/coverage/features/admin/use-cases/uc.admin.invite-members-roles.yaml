@@ -90,6 +90,19 @@ acceptanceCriteria:
           - testName: listsTenantMembers
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/InviteMembersRolesSliceTest.kt
+      web:
+        e2e:
+          - testName: "owner lists, re-roles, removes a member, and rotates the scope"
+            kind: positive
+            ref: frontend/src/features/admin/inviteMembersRoles/memberAdmin.e2e.test.ts
+  - id: uc.admin.invite-members-roles.email-invite
+    statement: "A Tenant Owner can email the pending invite link to the invitee."
+    coverage:
+      backend:
+        integration:
+          - testName: ownerEmailsThePendingInviteLink
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/invitemembersroles/EmailInviteSliceTest.kt
   - id: uc.admin.invite-members-roles.remove-member
     statement: A Tenant Owner can remove a member, deleting their scope grant and invalidating their sessions.
     coverage:

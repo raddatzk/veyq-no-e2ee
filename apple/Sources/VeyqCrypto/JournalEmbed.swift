@@ -3,20 +3,28 @@ import Foundation
 // Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`,
 // `::playlist:id label`. Mirrors the web `journalEmbed.ts` wire format so journals render identically across
 // platforms. A token ends at a newline, end-of-text, or the next token, so several can sit back-to-back.
+// Shared pure logic (no UI / crypto deps) — kept here in VeyqCrypto so it is unit-tested alongside the other
+// cross-platform conformance logic, byte-compatible with the web parser.
 
-enum JournalEmbedKind: String { case media, track, chapter, playlist }
+public enum JournalEmbedKind: String, Sendable { case media, track, chapter, playlist }
 
-struct JournalEmbed: Identifiable {
-    let id: Int
-    let kind: JournalEmbedKind
-    let ids: [String]
-    let label: String?
+public struct JournalEmbed: Identifiable {
+    public let id: Int
+    public let kind: JournalEmbedKind
+    public let ids: [String]
+    public let label: String?
+    public init(id: Int, kind: JournalEmbedKind, ids: [String], label: String?) {
+        self.id = id
+        self.kind = kind
+        self.ids = ids
+        self.label = label
+    }
 }
 
-enum JournalBlock: Identifiable {
+public enum JournalBlock: Identifiable {
     case markdown(String, id: Int)
     case embed(JournalEmbed)
-    var id: Int {
+    public var id: Int {
         switch self {
         case let .markdown(_, id): return id
         case let .embed(e): return e.id
@@ -24,14 +32,14 @@ enum JournalBlock: Identifiable {
     }
 }
 
-enum JournalEmbedParser {
+public enum JournalEmbedParser {
     static let maxTrackIds = 20
     private static let regex = try! NSRegularExpression(
         pattern: "::(media|track|chapter|playlist):([^\\s\\n]+)(?:[ \\t]+([^\\n]*?))?(?=\\n|$|::(?:media|track|chapter|playlist):)")
     private static let singleIdKinds: Set<JournalEmbedKind> = [.chapter, .playlist]
 
     /// Split the journal into an ordered run of Markdown segments and embed tokens for block-based rendering.
-    static func splitBlocks(_ markdown: String) -> [JournalBlock] {
+    public static func splitBlocks(_ markdown: String) -> [JournalBlock] {
         let ns = markdown as NSString
         var blocks: [JournalBlock] = []
         var cursor = 0
@@ -58,7 +66,7 @@ enum JournalEmbedParser {
     }
 
     /// Dedupe + trim track ids and cap them (one embed can carry several tracks onto one map).
-    static func normalizeTrackIds(_ ids: [String]) -> [String] {
+    public static func normalizeTrackIds(_ ids: [String]) -> [String] {
         var seen = Set<String>(); var out: [String] = []
         for raw in ids {
             let t = raw.trimmingCharacters(in: .whitespaces)
@@ -68,7 +76,7 @@ enum JournalEmbedParser {
     }
 
     /// Serialize an embed back to its token form (used by the editor pickers when inserting/editing).
-    static func embedMarkdown(_ kind: JournalEmbedKind, _ ids: [String], label: String?) -> String {
+    public static func embedMarkdown(_ kind: JournalEmbedKind, _ ids: [String], label: String?) -> String {
         let norm = kind == .track ? normalizeTrackIds(ids) : (singleIdKinds.contains(kind) ? Array(ids.prefix(1)) : ids)
         let trimmed = label?.trimmingCharacters(in: .whitespaces)
         let suffix = (trimmed?.isEmpty ?? true) ? "" : " \(trimmed!)"

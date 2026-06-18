@@ -1,7 +1,7 @@
 # Feature: Mobile
 
-Native iOS experience — deep links, resumable upload, and acting as a strong on-device processing
-worker. Android is planned.
+Native iOS **and Android** experience — deep links and resumable upload today. Acting as an on-device
+processing **worker** is its own feature — see [Agent Mode](../agent/_index.md).
 
 - **Touched contexts:** clients (native), Media, Processing — see [System Architecture](../../overview/architecture.md).
 - **Cross-cutting:** [Agent Mode](../../crosscutting/agent-mode.md) (the device as a worker),
@@ -10,6 +10,5 @@ worker. Android is planned.
 - **Decisions:** [AD-11](../../decisions/README.md) (Agent Mode), [AD-13/14](../../decisions/README.md) (search/ML on-device).
 
 ## Use-cases
-- ☐ `uc.mobile.open-in-app` — open a link in the native app
-- ☐ `uc.mobile.resumable-upload` — resumable upload from mobile
-- ☐ `uc.mobile.run-agent` — run on-device processing as a worker
+- ★ [Open a link in the native app](use-cases/uc.mobile.open-in-app.md)
+- ★ [Resumable upload from mobile](use-cases/uc.mobile.resumable-upload.md)

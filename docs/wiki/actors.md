@@ -31,11 +31,13 @@ An external visitor of a share with write access to journals/tracks/playlists an
 cannot delete.
 
 ### Public Manager
+*Planned — not yet built. The share roles implemented today are Viewer, Contributor and Uploader.*
 An external visitor of a share with expanded write access (covers, highlighting any media).
 
 ### Public Uploader
 An external visitor of an **upload-only** link. Sees a simple upload form, never the gallery.
 
 ### Depicted Person
+*Planned — part of the not-yet-built People context.*
 A person appearing in content who is not necessarily a user — a first-class privacy subject who may
 request removal of a specific medium.

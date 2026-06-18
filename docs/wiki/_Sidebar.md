@@ -37,6 +37,8 @@
 - [Account & Auth](features/account/_index)
 - [Administration & Operations](features/admin/_index)
 - [Mobile](features/mobile/_index)
+- [Agent Mode](features/agent/_index)
+- [Platform](features/platform/_index)
 
 **More**
 

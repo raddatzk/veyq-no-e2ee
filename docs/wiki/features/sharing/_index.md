@@ -10,6 +10,6 @@ Public sharing of Memory subtrees without becoming a social network — **view**
 
 ## Use-cases
 - ★ [Collect uploads via an uploader link](use-cases/uc.sharing.collect-uploads.md)
-- ☐ `uc.sharing.share-public-viewer` — publish a read-only public share
-- ☐ `uc.sharing.collaborate` — contributor / manager collaboration
-- ☐ `uc.sharing.password-protect` — password-protect a share
+- ★ [Publish a read-only public share](use-cases/uc.sharing.share-public-viewer.md)
+- ★ [Contribute to a shared Memory](use-cases/uc.sharing.collaborate.md) — contributor collaboration
+- ★ [Password-protect a share](use-cases/uc.sharing.password-protect.md)

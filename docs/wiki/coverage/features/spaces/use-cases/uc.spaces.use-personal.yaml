@@ -52,6 +52,11 @@ acceptanceCriteria:
           - testName: registersNewOwnerAndActivatesTenant
             kind: positive
             ref: backend/src/test/kotlin/com/veyq/app/features/account/registerviainvitation/RegisterViaInvitationSliceTest.kt
+      web:
+        e2e:
+          - testName: "seeds a personal space with a memory + varied images"
+            kind: positive
+            ref: frontend/src/seed.e2e.test.ts
   - id: uc.spaces.use-personal.fetches-owner-grant
     statement: An authenticated user can fetch and locally open their own personal scope grant.
     coverage:
@@ -121,3 +126,11 @@ acceptanceCriteria:
           - testName: testWriteAndReadEncryptedContentUnderPersonalScope
             kind: positive
             ref: apple/Tests/VeyqCryptoTests/ScopeContentE2ETests.swift
+  - id: uc.spaces.use-personal.content-decode-cap
+    statement: "The server rejects sealed content above the decode cap but accepts content within it."
+    coverage:
+      backend:
+        integration:
+          - testName: rejectsOverlargeSealedContentButAcceptsSmall
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/content/scopecontent/ContentDecodeCapSliceTest.kt

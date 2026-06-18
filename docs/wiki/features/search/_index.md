@@ -12,5 +12,5 @@ Find memories and media by **structure** (date/type/scope), **text** (titles/jou
   (ML on-device, deferred).
 
 ## Use-cases
-- ☐ `uc.search.filter` — structural + keyword search (filter chips + text) — **v1**
-- ☐ `uc.search.natural-language` — natural-language / semantic / "ask your memories" (deferred, on-device LLM)
+- ★ [Filter & find](use-cases/uc.search.filter.md) — client-side name search today; structural facets + journal/tag text deferred
+- `uc.search.natural-language` — natural-language / semantic / "ask your memories" (deferred, on-device LLM)

@@ -1,0 +1,107 @@
+id: uc.memory.add-map-tracks
+title: Add map tracks
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/memory/_index.md
+  - type: useCase
+    ref: docs/wiki/features/memory/use-cases/uc.memory.add-map-tracks.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+acceptanceCriteria:
+  - id: uc.memory.add-map-tracks.seal-list-remove
+    statement: "A GPX route is sealed under the content key, listed on the Memory, and can be removed; the operator only holds ciphertext."
+    coverage:
+      backend:
+        integration:
+          - testName: addsListsAndRemovesTracks
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/track/TrackSliceTest.kt
+      web:
+        e2e:
+          - testName: "seals, lists and deletes a GPX route"
+            kind: positive
+            ref: frontend/src/features/memory/track/track.e2e.test.ts
+  - id: uc.memory.add-map-tracks.gpx-parse
+    statement: "The client parses a GPX file into a named track with points and optional elevation/time, falling back to route points, and rejects malformed or empty tracks."
+    coverage:
+      web:
+        unit:
+          - testName: "extracts the track name, points and optional elevation/time"
+            kind: positive
+            ref: frontend/src/features/memory/track/gpx.test.ts
+          - testName: "falls back to route points + a generic name"
+            kind: positive
+            ref: frontend/src/features/memory/track/gpx.test.ts
+          - testName: "throws on malformed XML or empty tracks"
+            kind: negative
+            ref: frontend/src/features/memory/track/gpx.test.ts
+      apple:
+        unit:
+          - testName: testExtractsTrackNamePointsAndOptionalEleTime
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/GpxTests.swift
+          - testName: testFallsBackToRoutePointsAndGenericName
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/GpxTests.swift
+          - testName: testReturnsNilOnMalformedOrEmpty
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/GpxTests.swift
+      android:
+        unit:
+          - testName: extractsTrackNamePointsAndOptionalEleTime
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/GpxTest.kt
+          - testName: fallsBackToRoutePointsAndGenericName
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/GpxTest.kt
+          - testName: returnsNullOnMalformedOrEmpty
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/GpxTest.kt
+  - id: uc.memory.add-map-tracks.stats
+    statement: "Track stats (distance, ascent/descent, duration) are derived from the points and formatted for display."
+    coverage:
+      web:
+        unit:
+          - testName: "computes distance from lat/lng (ascent/duration omitted without ele/time)"
+            kind: positive
+            ref: frontend/src/features/memory/track/trackStats.test.ts
+          - testName: "sums ascent and descent when elevations are present"
+            kind: positive
+            ref: frontend/src/features/memory/track/trackStats.test.ts
+          - testName: "derives duration from first/last timestamp"
+            kind: positive
+            ref: frontend/src/features/memory/track/trackStats.test.ts
+          - testName: "formats distance, duration and elevation"
+            kind: positive
+            ref: frontend/src/features/memory/track/trackStats.test.ts
+      apple:
+        unit:
+          - testName: testComputesDistanceWithoutEleOrTime
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/TrackStatsTests.swift
+          - testName: testSumsAscentAndDescentWithElevations
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/TrackStatsTests.swift
+          - testName: testDerivesDurationFromFirstAndLastTimestamp
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/TrackStatsTests.swift
+          - testName: testFormatsDistanceDurationAndElevation
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/TrackStatsTests.swift
+      android:
+        unit:
+          - testName: computesDistanceWithoutEleOrTime
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/TrackStatsTest.kt
+          - testName: sumsAscentAndDescentWithElevations
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/TrackStatsTest.kt
+          - testName: derivesDurationFromFirstAndLastTimestamp
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/TrackStatsTest.kt
+          - testName: formatsDistanceDurationAndElevation
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/TrackStatsTest.kt

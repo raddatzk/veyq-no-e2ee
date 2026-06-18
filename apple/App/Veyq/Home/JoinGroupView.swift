@@ -1,4 +1,5 @@
 import SwiftUI
+import VeyqCrypto
 
 /// Join a shared group from a pasted invite link. The link's secrets are parsed locally; a confirmation
 /// preview (tenant + role) is fetched from public metadata, then acceptMemberInvite adds the grant.

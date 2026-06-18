@@ -10,6 +10,6 @@ real-time multi-user editing.
 - **Decisions:** [AD-17/18/19/20](../../decisions/README.md) (collaboration transport, persistence, clients).
 
 ## Use-cases
-- ☐ `uc.journal.write` — write/edit the Markdown journal (solo: REST autosave)
-- ☐ `uc.journal.embed` — embed media / tracks / playlists in the journal
-- ☐ `uc.journal.live-coedit` — real-time collaborative editing
+- ★ [Write the journal](use-cases/uc.journal.write.md) — solo Markdown autosave (REST)
+- ★ [Embed media, tracks, chapters & playlists](use-cases/uc.journal.embed.md)
+- ★ [Co-edit the journal live](use-cases/uc.journal.live-coedit.md) — real-time collaboration

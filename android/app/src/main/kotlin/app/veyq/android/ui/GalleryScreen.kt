@@ -81,11 +81,16 @@ import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Browse
 import app.veyq.crypto.Buckets
 import app.veyq.crypto.Curate
+import app.veyq.crypto.Gpx
 import app.veyq.crypto.Groups
 import app.veyq.crypto.MemoryTree
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.DisposableEffect
 import app.veyq.crypto.Journal
+import app.veyq.crypto.JournalContentBlock
+import app.veyq.crypto.JournalEmbed
+import app.veyq.crypto.JournalEmbedKind
+import app.veyq.crypto.JournalEmbedParser
 import app.veyq.crypto.JournalLiveProvider
 import app.veyq.crypto.JournalPersistence
 import app.veyq.crypto.Login

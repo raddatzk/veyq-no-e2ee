@@ -1,0 +1,69 @@
+id: uc.memory.link-playlists
+title: Link external playlists
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/memory/_index.md
+  - type: useCase
+    ref: docs/wiki/features/memory/use-cases/uc.memory.link-playlists.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+acceptanceCriteria:
+  - id: uc.memory.link-playlists.lifecycle
+    statement: "Music links (URL + label) are attached to a Memory sealed as context, listed, re-ordered/featured and removed; the operator sees only the count and the featured pointer, never the URL or provider."
+    coverage:
+      backend:
+        integration:
+          - testName: playlistLifecycle
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/playlist/PlaylistSliceTest.kt
+    gaps:
+      - reason: "Provider detection is now unit-tested on web, iOS and Android and add/feature/remove is covered by the backend slice; only the native create/feature/remove UI flow has no native e2e."
+        followUp: "If desired, add an iOS/Android e2e for the playlist create -> feature -> remove flow against a live backend."
+  - id: uc.memory.link-playlists.provider-detection
+    statement: "The streaming provider is detected client-side from the URL host (Spotify/Apple Music/YouTube/SoundCloud/Deezer), falling back to OTHER for unknown or malformed URLs, with a label for every provider."
+    coverage:
+      web:
+        unit:
+          - testName: "detects Spotify, Apple Music, YouTube, SoundCloud and Deezer from the URL host"
+            kind: positive
+            ref: frontend/src/features/memory/playlist/playlist.test.ts
+          - testName: "falls back to OTHER for an unknown host"
+            kind: positive
+            ref: frontend/src/features/memory/playlist/playlist.test.ts
+          - testName: "returns OTHER for a malformed URL (never throws)"
+            kind: negative
+            ref: frontend/src/features/memory/playlist/playlist.test.ts
+          - testName: "has a label for every provider"
+            kind: positive
+            ref: frontend/src/features/memory/playlist/playlist.test.ts
+      apple:
+        unit:
+          - testName: testDetectsKnownProvidersFromHost
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PlaylistsTests.swift
+          - testName: testFallsBackToOtherForUnknownHost
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PlaylistsTests.swift
+          - testName: testReturnsOtherForMalformedUrl
+            kind: negative
+            ref: apple/Tests/VeyqCryptoTests/PlaylistsTests.swift
+          - testName: testHasLabelForEveryProvider
+            kind: positive
+            ref: apple/Tests/VeyqCryptoTests/PlaylistsTests.swift
+      android:
+        unit:
+          - testName: detectsKnownProvidersFromHost
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PlaylistsTest.kt
+          - testName: fallsBackToOtherForUnknownHost
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PlaylistsTest.kt
+          - testName: returnsOtherForMalformedUrl
+            kind: negative
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PlaylistsTest.kt
+          - testName: hasLabelForEveryProvider
+            kind: positive
+            ref: android/core/src/test/kotlin/app/veyq/crypto/PlaylistsTest.kt

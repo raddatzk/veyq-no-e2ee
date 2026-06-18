@@ -16,4 +16,4 @@ layer around key-directory changes.
 - ✅ `uc.keys.rotate-identity` — rotate the account identity key and rewrap owned grants.
 - ✅ `uc.keys.rotate-scope` — rotate a scope keypair after membership revocation (implemented as
   `uc.admin.invite-members-roles` scope rotation: re-grants active members + re-wraps the content key).
-- ☐ `uc.keys.verify-directory` — detect identity-key substitution via transparency/pinning.
+- `uc.keys.verify-directory` — detect identity-key substitution via transparency/pinning.

@@ -1,0 +1,59 @@
+id: uc.platform.rate-limiting
+title: Rate-limit abusive traffic
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/platform/_index.md
+  - type: useCase
+    ref: docs/wiki/features/platform/use-cases/uc.platform.rate-limiting.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/shared/security/RateLimiter.kt
+acceptanceCriteria:
+  - id: uc.platform.rate-limiting.window-and-budget
+    statement: "Each key gets a fixed-window request count and a byte budget; keys are independent and both reset after the window elapses."
+    coverage:
+      backend:
+        unit:
+          - testName: allowsUpToTheLimitThenBlocksWithinTheWindow
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+          - testName: keysAreIndependent
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+          - testName: theWindowResetsAfterItElapses
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+          - testName: byteBudgetTripsOnlyAfterTheBudgetIsExceeded
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+          - testName: byteBudgetKeysAreIndependentAndResetWithTheWindow
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+          - testName: nonPositiveByteCountsAreIgnored
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimiterTest.kt
+  - id: uc.platform.rate-limiting.client-key-behind-proxy
+    statement: "The limit key is the true client: the socket peer, or the rightmost non-proxy XFF hop only when the peer is a configured trusted proxy; an untrusted peer can never spoof it."
+    coverage:
+      backend:
+        unit:
+          - testName: "no trusted proxies — XFF is ignored, socket peer is the key"
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt
+          - testName: "untrusted peer — XFF ignored even if present"
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt
+          - testName: "trusted proxy peer — take the rightmost non-proxy hop"
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt
+          - testName: "trusted proxy peer but no usable XFF — fall back to the socket"
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt
+          - testName: "non-canonical CIDR (host bits set) still trusts the whole subnet"
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt
+          - testName: "exact-IP and IPv6 trusted-proxy specs"
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/shared/security/RateLimitFilterTest.kt

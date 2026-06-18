@@ -1,6 +1,5 @@
-package app.veyq.android.ui
+package app.veyq.crypto
 
-import app.veyq.crypto.Track
 import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
@@ -10,6 +9,8 @@ import javax.xml.parsers.DocumentBuilderFactory
  * rtept for route files) keeps its coordinates plus optional <ele> and <time> so track stats (distance always,
  * ascent/descent from elevation, duration from timestamps) can be derived. Name comes from the track/metadata
  * <name>, falling back to a generic label. Returns null on malformed XML or no usable points.
+ * Shared pure logic (javax.xml only) — kept in core so it is unit-tested alongside the other cross-platform
+ * conformance logic, byte-compatible with the web and iOS parsers.
  */
 object Gpx {
     fun parse(data: ByteArray): Pair<String, List<Track.Point>>? = runCatching {

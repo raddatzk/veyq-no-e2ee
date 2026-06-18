@@ -1,0 +1,28 @@
+id: uc.sharing.collect-uploads
+title: Collect uploads via an uploader link
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/sharing/_index.md
+  - type: useCase
+    ref: docs/wiki/features/sharing/use-cases/uc.sharing.collect-uploads.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+  - type: entryPoint
+    ref: backend/src/main/kotlin/com/veyq/app/features/memory/share/PublicShareContributeHandler.kt
+  - type: entryPoint
+    ref: frontend/src/features/memory/share/share.ts
+acceptanceCriteria:
+  - id: uc.sharing.collect-uploads.blind-upload
+    statement: "An UPLOADER guest can upload encrypted media through an upload-only link but cannot read the gallery (the share resolve omits the root and read endpoints are denied)."
+    coverage:
+      backend:
+        integration:
+          - testName: uploaderGuestUploadsButCannotRead
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt
+          - testName: uploaderGuestUploadsButCannotRead
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/share/ShareSliceTest.kt

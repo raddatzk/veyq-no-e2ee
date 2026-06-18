@@ -1,0 +1,24 @@
+{
+  "originHash" : "c4e9878bd0fc199685ebc7e2d97ca2fa1d614fc92b426f65a757754d15979175",
+  "pins" : [
+    {
+      "identity" : "swift-sodium",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jedisct1/swift-sodium",
+      "state" : {
+        "revision" : "cfd195c76882aa9b997560ca7cb95d72fbf5db00",
+        "version" : "0.11.0"
+      }
+    },
+    {
+      "identity" : "yswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/y-crdt/yswift",
+      "state" : {
+        "revision" : "8c25f088fcccfc3c428c37ac9206a297d031f1c5",
+        "version" : "0.2.1"
+      }
+    }
+  ],
+  "version" : 3
+}

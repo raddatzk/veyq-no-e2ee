@@ -37,7 +37,7 @@ acceptanceCriteria:
             ref: backend/src/test/kotlin/com/veyq/app/HealthResourceTest.kt
       web:
         unit:
-          - testName: renders the veyq heading
+          - testName: "a fresh instance boots into setup"
             kind: positive
             ref: frontend/src/App.test.ts
   - id: uc.admin.setup-server.first-owner
@@ -47,6 +47,12 @@ acceptanceCriteria:
         integration:
           - testName: coldRegistrationFlow
             kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+          - testName: rejectsBlankDisplayName
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
+          - testName: rejectsMalformedEmail
+            kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/admin/setupserver/SetupServerSliceTest.kt
       web:
         e2e:
@@ -90,6 +96,12 @@ acceptanceCriteria:
             kind: positive
             ref: frontend/src/shared/crypto/v1.conformance.test.ts
           - testName: asymmetric wrap round-trip (unwrap a recorded blob)
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts
+          - testName: "HKDF-SHA256 (RFC 5869 case 1)"
+            kind: positive
+            ref: frontend/src/shared/crypto/v1.conformance.test.ts
+          - testName: "kdfParams wire format (encode + decode round-trip)"
             kind: positive
             ref: frontend/src/shared/crypto/v1.conformance.test.ts
       android:

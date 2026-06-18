@@ -11,6 +11,6 @@ to face clusters. Participation is **self-managed** and drives relevance and pro
   (participation → responsibility), [AD-14](../../decisions/README.md) (on-device faces, deferred).
 
 ## Use-cases
-- ☐ `uc.people.manage-participants` — add/remove yourself or others as a participant; name them
-- ☐ `uc.people.link-user` — link a participant to a User account
-- ☐ `uc.people.tag-faces` — assign on-device face clusters to a participant (deferred)
+- `uc.people.manage-participants` — add/remove yourself or others as a participant; name them
+- `uc.people.link-user` — link a participant to a User account
+- `uc.people.tag-faces` — assign on-device face clusters to a participant (deferred)

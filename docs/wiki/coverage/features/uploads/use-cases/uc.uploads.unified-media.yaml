@@ -156,3 +156,48 @@ acceptanceCriteria:
           - testName: capsConcurrentOpenSessionsPerScope
             kind: negative
             ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobUploadLimitsSliceTest.kt
+  - id: uc.uploads.unified-media.geo-metadata
+    statement: "GPS location is parsed client-side from EXIF and sealed/round-tripped as media metadata; non-JPEG or EXIF-less bytes yield nothing."
+    coverage:
+      web:
+        unit:
+          - testName: "parses GPS lat/lng with hemisphere refs"
+            kind: positive
+            ref: frontend/src/features/uploads/exifGps.test.ts
+          - testName: "returns nothing for non-JPEG or EXIF-less bytes"
+            kind: negative
+            ref: frontend/src/features/uploads/exifGps.test.ts
+        e2e:
+          - testName: "seals + reads back GPS location"
+            kind: positive
+            ref: frontend/src/features/uploads/media/geo.e2e.test.ts
+    gaps:
+      - reason: "EXIF GPS extraction is unit-tested only on web (exifGps.ts), which hand-rolls a JPEG/TIFF parser because browsers have no EXIF API; iOS/Android delegate to the platform readers (ImageIO / androidx ExifInterface), so there is no shared pure parser to unit-test natively. The sealed GPS round-trip itself is covered cross-platform by the unified-media media e2e."
+        followUp: "None — architectural difference; revisit only if a shared native EXIF parser is introduced."
+  - id: uc.uploads.unified-media.update-metadata
+    statement: "Media metadata can be updated (e.g. toggling highlight) and is re-sealed under the content key."
+    coverage:
+      backend:
+        integration:
+          - testName: togglesHighlightAndReSealsMetadata
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/media/MediaUpdateSliceTest.kt
+  - id: uc.uploads.unified-media.blob-gc
+    statement: "A sweep reclaims only blobs that are unreferenced past the grace period; referenced blobs survive."
+    coverage:
+      backend:
+        integration:
+          - testName: reclaimsOnlyUnreferencedBlobsPastTheGrace
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/BlobGcSliceTest.kt
+  - id: uc.uploads.unified-media.presigned-direct
+    statement: "With presigned URLs the client uploads chunks direct-to-store and a resumed upload skips chunks already present in the store."
+    coverage:
+      backend:
+        integration:
+          - testName: directToStoreRoundTrip
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt
+          - testName: resumeSkipsChunksAlreadyInTheStore
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/uploads/blob/PresignedUploadE2ETest.kt

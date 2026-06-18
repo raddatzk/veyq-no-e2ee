@@ -1,0 +1,35 @@
+id: uc.memory.curate
+title: Curate a Memory
+status: implemented
+documents:
+  - type: feature
+    ref: docs/wiki/features/memory/_index.md
+  - type: useCase
+    ref: docs/wiki/features/memory/use-cases/uc.memory.curate.md
+  - type: crosscutting
+    ref: docs/wiki/crosscutting/security-model.md
+  - type: api
+    ref: docs/api/memory.openapi.yaml
+acceptanceCriteria:
+  - id: uc.memory.curate.structural
+    statement: "Curating nodes (rename, move, reorder, cover) holds the tree invariants — slug uniqueness per parent, no cross-scope moves, no cycles — accepting valid changes and rejecting invalid ones."
+    coverage:
+      backend:
+        integration:
+          - testName: curatesNodesWithStructuralChecks
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
+          - testName: curatesNodesWithStructuralChecks
+            kind: negative
+            ref: backend/src/test/kotlin/com/veyq/app/features/memory/curate/CurateSliceTest.kt
+  - id: uc.memory.curate.delete
+    statement: "Deleting a node removes its subtree recursively while sparing siblings, and deleting a single medium also removes its derivatives."
+    coverage:
+      backend:
+        integration:
+          - testName: deletesNodeSubtreeRecursivelyButSparesSiblings
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt
+          - testName: deletesSingleMediumAndItsDerivatives
+            kind: positive
+            ref: backend/src/test/kotlin/com/veyq/app/features/delete/DeleteSliceTest.kt

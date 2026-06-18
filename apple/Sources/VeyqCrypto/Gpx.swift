@@ -1,12 +1,13 @@
 import Foundation
-import VeyqCrypto
 
 /// Parse a GPX file's XML into a {name, points} route for sealing + map rendering. Each track-point (trkpt, or
 /// rtept for route files) keeps its coordinates plus optional <ele> and <time> so track stats (distance always,
 /// ascent/descent from elevation, duration from timestamps) can be derived. Name comes from the track/metadata
-/// <name>, falling back to a generic label.
-enum Gpx {
-    static func parse(_ data: Data) -> Track.Route? {
+/// <name>, falling back to a generic label. Returns nil on malformed XML or no usable points.
+/// Shared pure logic (Foundation XMLParser only) — kept in VeyqCrypto so it is unit-tested alongside the other
+/// cross-platform conformance logic, byte-compatible with the web and Android parsers.
+public enum Gpx {
+    public static func parse(_ data: Data) -> Track.Route? {
         let delegate = Delegate()
         let xml = XMLParser(data: data)
         xml.delegate = delegate

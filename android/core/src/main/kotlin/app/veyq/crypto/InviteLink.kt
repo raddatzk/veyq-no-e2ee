@@ -1,4 +1,4 @@
-package app.veyq.android.ui
+package app.veyq.crypto
 
 import java.net.URLDecoder
 
@@ -7,6 +7,8 @@ import java.net.URLDecoder
  * (`#invite=…&s=…&…`) so they never reach a server. Two modes share the plumbing:
  *  - pragmatic  → `k=<tempPrivKey>` (the temp key in the clear)
  *  - passphrase → `ek=<encTempKey>&ps=<salt>` (the temp key encrypted under an out-of-band passphrase)
+ * Shared pure logic (no crypto / UI deps) — kept in core so it is unit-tested alongside the other
+ * cross-platform conformance logic, byte-compatible with the web and iOS parsers.
  */
 object InviteLink {
     data class Parts(

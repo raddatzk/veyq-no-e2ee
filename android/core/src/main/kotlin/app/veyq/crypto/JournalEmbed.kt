@@ -1,8 +1,10 @@
-package app.veyq.android.ui
+package app.veyq.crypto
 
 // Journal rich-embed tokens — `::media:id1,id2 label`, `::track:id1,id2 label`, `::chapter:id label`,
 // `::playlist:id label`. Mirrors the web `journalEmbed.ts` wire format so journals render identically across
 // platforms. A token ends at a newline, end-of-text, or the next token, so several can sit back-to-back.
+// Shared pure logic (no UI deps) — kept in core so it is unit-tested alongside the other cross-platform
+// conformance logic, byte-compatible with the web and iOS parsers.
 
 enum class JournalEmbedKind { MEDIA, TRACK, CHAPTER, PLAYLIST }
 

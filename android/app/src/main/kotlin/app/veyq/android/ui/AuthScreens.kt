@@ -39,6 +39,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import app.veyq.crypto.EmergencyKit
 import app.veyq.crypto.Instance
+import app.veyq.crypto.InviteLink
 import app.veyq.crypto.Login
 import app.veyq.crypto.PasswordPolicy
 import app.veyq.crypto.Pwned
