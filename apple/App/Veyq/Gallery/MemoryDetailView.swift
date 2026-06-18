@@ -11,7 +11,12 @@ import VeyqCrypto
 final class GalleryStore: ObservableObject {
     // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
     // an explicit save. Both refs fall back to the original for media without that derivative.
-    struct Tile: Identifiable { let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?; let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String; var highlighted: Bool }
+    struct Tile: Identifiable {
+        let id: String; let image: UIImage; let aspectRatio: CGFloat; let takenAt: String; let lat: Double?; let lng: Double?
+        let preview: Media.BlobRef; let original: Media.BlobRef; let mimeType: String; var highlighted: Bool
+        let cameraMake: String?; let cameraModel: String?; let lens: String?
+        let width: Int?; let height: Int?; let fileSize: Int?; let exif: [String: String]?
+    }
 
     let apiBase: String
     let session: Login.UnlockedSession
@@ -48,7 +53,9 @@ final class GalleryStore: ObservableObject {
             guard let bytes = bytesByIndex[i], let img = UIImage(data: bytes) else { continue }
             let preview = m.derivatives.first(where: { $0.kind == "PREVIEW" })?.blob ?? m.original
             result.append(Tile(id: m.id, image: img, aspectRatio: JustifiedLayout.clampAspect(img.size.width, img.size.height),
-                               takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType, highlighted: m.highlighted))
+                               takenAt: meta.takenAt, lat: meta.lat, lng: meta.lng, preview: preview, original: m.original, mimeType: m.mimeType, highlighted: m.highlighted,
+                               cameraMake: meta.cameraMake, cameraModel: meta.cameraModel, lens: meta.lens,
+                               width: meta.width, height: meta.height, fileSize: meta.fileSize, exif: meta.exif))
         }
         tiles = result
         loading = false
@@ -100,41 +107,61 @@ final class GalleryStore: ObservableObject {
 
     func upload(_ datas: [Data]) async {
         uploading = true
-        let iso = ISO8601DateFormatter()
         for data in datas {
-            let exif = Self.exifGps(data)
+            let meta = Self.extractMeta(data)
             _ = try? await Media.uploadMedia(
                 apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId,
                 bytes: data, thumb: Self.thumbnail(data), preview: Self.preview(data),
-                takenAt: exif.takenAt ?? iso.string(from: Date()),
-                mimeType: "image/jpeg", lat: exif.lat, lng: exif.lng,
+                takenAt: meta.takenAt, mimeType: "image/jpeg", meta: meta,
             )
         }
         await load()
         uploading = false
     }
 
-    /// Pull GPS location + capture time from a JPEG's EXIF via ImageIO (sealed client-side as sealedMeta —
-    /// the server never sees either). Returns nils when absent.
-    static func exifGps(_ data: Data) -> (lat: Double?, lng: Double?, takenAt: String?) {
+    /// Pull capture time + GPS + a broad set of EXIF camera details from a JPEG via ImageIO, sealed client-side
+    /// as sealedMeta (operator-blind). Best-effort: fields absent in the file are simply omitted.
+    static func extractMeta(_ data: Data) -> Media.MediaMeta {
+        let fallback = ISO8601DateFormatter().string(from: Date())
         guard let src = CGImageSourceCreateWithData(data as CFData, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]
-        else { return (nil, nil, nil) }
+        else { return Media.MediaMeta(takenAt: fallback, fileSize: data.count) }
+        let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
+        let exifD = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+        let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any] ?? [:]
+
         var lat: Double?, lng: Double?
-        if let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any],
-           let rawLat = gps[kCGImagePropertyGPSLatitude] as? Double,
-           let rawLng = gps[kCGImagePropertyGPSLongitude] as? Double {
+        if let rawLat = gps[kCGImagePropertyGPSLatitude] as? Double, let rawLng = gps[kCGImagePropertyGPSLongitude] as? Double {
             lat = (gps[kCGImagePropertyGPSLatitudeRef] as? String) == "S" ? -rawLat : rawLat
             lng = (gps[kCGImagePropertyGPSLongitudeRef] as? String) == "W" ? -rawLng : rawLng
         }
-        var takenAt: String?
-        if let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any],
-           let s = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
-            // EXIF "yyyy:MM:dd HH:mm:ss" → ISO 8601
+        var takenAt = fallback
+        if let s = exifD[kCGImagePropertyExifDateTimeOriginal] as? String {
             let parser = DateFormatter(); parser.dateFormat = "yyyy:MM:dd HH:mm:ss"; parser.locale = Locale(identifier: "en_US_POSIX")
             if let date = parser.date(from: s) { takenAt = ISO8601DateFormatter().string(from: date) }
         }
-        return (lat, lng, takenAt)
+        func trim(_ n: Double) -> String { String(format: "%g", (n * 100).rounded() / 100) }
+        var exif: [String: String] = [:]
+        if let f = exifD[kCGImagePropertyExifFNumber] as? Double { exif["Aperture"] = "f/\(trim(f))" }
+        if let t = exifD[kCGImagePropertyExifExposureTime] as? Double, t > 0 { exif["Exposure"] = t < 1 ? "1/\(Int((1 / t).rounded())) s" : "\(trim(t)) s" }
+        if let iso = (exifD[kCGImagePropertyExifISOSpeedRatings] as? [Int])?.first { exif["ISO"] = "\(iso)" }
+        if let fl = exifD[kCGImagePropertyExifFocalLength] as? Double { exif["Focal length"] = "\(trim(fl)) mm" }
+        if let fl35 = exifD[kCGImagePropertyExifFocalLenIn35mmFilm] as? Int { exif["Focal length (35mm)"] = "\(fl35) mm" }
+        if let flash = exifD[kCGImagePropertyExifFlash] as? Int { exif["Flash"] = (flash & 1) != 0 ? "On" : "Off" }
+        if let sw = tiff[kCGImagePropertyTIFFSoftware] as? String, !sw.isEmpty { exif["Software"] = sw }
+        if let alt = gps[kCGImagePropertyGPSAltitude] as? Double {
+            let below = (gps[kCGImagePropertyGPSAltitudeRef] as? Int) == 1
+            exif["Altitude"] = "\(trim(below ? -alt : alt)) m"
+        }
+        return Media.MediaMeta(
+            takenAt: takenAt, lat: lat, lng: lng,
+            cameraMake: (tiff[kCGImagePropertyTIFFMake] as? String)?.trimmingCharacters(in: .whitespaces),
+            cameraModel: (tiff[kCGImagePropertyTIFFModel] as? String)?.trimmingCharacters(in: .whitespaces),
+            lens: (exifD[kCGImagePropertyExifLensModel] as? String)?.trimmingCharacters(in: .whitespaces),
+            width: (exifD[kCGImagePropertyExifPixelXDimension] as? Int) ?? (props[kCGImagePropertyPixelWidth] as? Int),
+            height: (exifD[kCGImagePropertyExifPixelYDimension] as? Int) ?? (props[kCGImagePropertyPixelHeight] as? Int),
+            fileSize: data.count, exif: exif.isEmpty ? nil : exif,
+        )
     }
 
     func setCover(_ mediaId: String) async {
@@ -533,9 +560,22 @@ struct MemoryDetailView: View {
             if let lat = tile.lat, let lng = tile.lng {
                 infoLine(T("info.location"), String(format: "%.5f, %.5f", lat, lng))
             }
+            if let model = tile.cameraModel {
+                infoLine(T("info.camera"), [tile.cameraMake, model].compactMap { $0 }.joined(separator: " "))
+            }
+            if let lens = tile.lens { infoLine(T("info.lens"), lens) }
+            if let w = tile.width, let h = tile.height { infoLine(T("info.dimensions"), "\(w)×\(h)") }
+            if let size = tile.fileSize { infoLine(T("info.fileSize"), formatBytes(size)) }
+            ForEach((tile.exif ?? [:]).sorted(by: { $0.key < $1.key }), id: \.key) { k, v in infoLine(k, v) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12).background(Color.white.opacity(0.08)).clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func formatBytes(_ n: Int) -> String {
+        if n < 1024 { return "\(n) B" }
+        if n < 1024 * 1024 { return "\(n / 1024) KB" }
+        return String(format: "%.1f MB", Double(n) / 1024 / 1024)
     }
 
     private func infoLine(_ label: String, _ value: String) -> some View {

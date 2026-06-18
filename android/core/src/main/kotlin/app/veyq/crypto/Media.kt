@@ -25,25 +25,44 @@ object Media {
     data class BlobRef(val blobId: String, val totalChunks: Int, val byteSize: Long)
     data class BlobTicket(val status: String, val blobId: String?, val uploadId: String?, val totalChunks: Int)
 
-    /** Per-media sensitive metadata sealed under the content key: capture time + optional GPS location. */
-    data class MediaMeta(val takenAt: String, val lat: Double?, val lng: Double?)
+    /** Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
+     *  best-effort set of EXIF camera details (operator-blind — sealed with everything else). */
+    data class MediaMeta(
+        val takenAt: String, val lat: Double?, val lng: Double?,
+        val cameraMake: String? = null, val cameraModel: String? = null, val lens: String? = null,
+        val width: Int? = null, val height: Int? = null, val fileSize: Int? = null,
+        val exif: Map<String, String>? = null,
+    )
 
-    /** Seal {takenAt, lat?, lng?} into a sealedMeta blob (nonce || AEAD) for the create request. */
-    fun sealMediaMeta(contentKey: ByteArray, takenAt: String, lat: Double?, lng: Double?): JSONObject {
-        val meta = JSONObject().put("takenAt", takenAt)
-        if (lat != null) meta.put("lat", lat)
-        if (lng != null) meta.put("lng", lng)
+    /** Seal a MediaMeta into a sealedMeta blob (nonce || AEAD) for the create request. */
+    fun sealMediaMeta(contentKey: ByteArray, meta: MediaMeta): JSONObject {
+        val o = JSONObject().put("takenAt", meta.takenAt)
+        meta.lat?.let { o.put("lat", it) }; meta.lng?.let { o.put("lng", it) }
+        meta.cameraMake?.let { o.put("cameraMake", it) }; meta.cameraModel?.let { o.put("cameraModel", it) }
+        meta.lens?.let { o.put("lens", it) }
+        meta.width?.let { o.put("width", it) }; meta.height?.let { o.put("height", it) }; meta.fileSize?.let { o.put("fileSize", it) }
+        meta.exif?.takeIf { it.isNotEmpty() }?.let { m -> o.put("exif", JSONObject().also { j -> m.forEach { (k, v) -> j.put(k, v) } }) }
         val nonce = V1.randomBytes(12)
-        val sealed = nonce + V1.aeadSeal(contentKey, nonce, meta.toString().toByteArray(Charsets.UTF_8), EMPTY)
+        val sealed = nonce + V1.aeadSeal(contentKey, nonce, o.toString().toByteArray(Charsets.UTF_8), EMPTY)
         return JSONObject().put("suiteId", "v1").put("bytes", enc.encodeToString(sealed))
     }
 
-    /** Decrypt a media item's sealedMeta back to {takenAt, lat?, lng?}. */
+    fun sealMediaMeta(contentKey: ByteArray, takenAt: String, lat: Double?, lng: Double?): JSONObject =
+        sealMediaMeta(contentKey, MediaMeta(takenAt, lat, lng))
+
+    /** Decrypt a media item's sealedMeta back to its fields (best-effort EXIF map included). */
     fun decodeMediaMeta(contentKey: ByteArray, media: JSONObject): MediaMeta {
         val sealed = dec.decode(media.getJSONObject("sealedMeta").getString("bytes"))
         val pt = V1.aeadOpen(contentKey, sealed.copyOfRange(0, 12), sealed.copyOfRange(12, sealed.size), EMPTY)
-        val obj = JSONObject(String(pt, Charsets.UTF_8))
-        return MediaMeta(obj.getString("takenAt"), if (obj.has("lat")) obj.getDouble("lat") else null, if (obj.has("lng")) obj.getDouble("lng") else null)
+        val o = JSONObject(String(pt, Charsets.UTF_8))
+        val exif = o.optJSONObject("exif")?.let { j -> j.keys().asSequence().associateWith { j.getString(it) } }
+        return MediaMeta(
+            o.getString("takenAt"),
+            if (o.has("lat")) o.getDouble("lat") else null, if (o.has("lng")) o.getDouble("lng") else null,
+            o.optString("cameraMake", null), o.optString("cameraModel", null), o.optString("lens", null),
+            if (o.has("width")) o.getInt("width") else null, if (o.has("height")) o.getInt("height") else null,
+            if (o.has("fileSize")) o.getInt("fileSize") else null, exif,
+        )
     }
 
     private fun send(uri: String, token: String, method: String, body: String? = null): HttpResponse<String> =
@@ -188,7 +207,7 @@ object Media {
      * client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
      * typed derivative — no special API.
      */
-    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, preview: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
+    fun uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: ByteArray, nodeId: String, bytes: ByteArray, thumb: ByteArray? = null, preview: ByteArray? = null, takenAt: String, mimeType: String, lat: Double? = null, lng: Double? = null, meta: MediaMeta? = null, chunkSize: Int = DEFAULT_CHUNK_SIZE): JSONObject {
         val original = uploadBlob(apiBase, session, scopeId, contentKey, bytes, chunkSize)
         val derivatives = mutableListOf<Pair<String, String>>()
         if (thumb != null) {
@@ -199,7 +218,7 @@ object Media {
             val p = uploadBlob(apiBase, session, scopeId, contentKey, preview, chunkSize)
             derivatives.add("PREVIEW" to p.blobId)
         }
-        val sealedMeta = sealMediaMeta(contentKey, takenAt, lat, lng)
+        val sealedMeta = sealMediaMeta(contentKey, meta ?: MediaMeta(takenAt, lat, lng))
         return createMedia(apiBase, session, scopeId, nodeId, original.blobId, sealedMeta, mimeType, derivatives)
     }
 

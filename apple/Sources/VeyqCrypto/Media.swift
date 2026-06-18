@@ -28,10 +28,20 @@ public enum Media {
         public let highlighted: Bool
         public let createdAt: String
     }
-    /// Per-media sensitive metadata sealed under the content key: capture time + optional GPS location.
+    /// Per-media sensitive metadata sealed under the content key: capture time, optional GPS location, and a
+    /// best-effort set of EXIF camera details (operator-blind — sealed with everything else).
     public struct MediaMeta: Codable, Sendable {
         public let takenAt: String; public let lat: Double?; public let lng: Double?
-        public init(takenAt: String, lat: Double? = nil, lng: Double? = nil) { self.takenAt = takenAt; self.lat = lat; self.lng = lng }
+        public let cameraMake: String?; public let cameraModel: String?; public let lens: String?
+        public let width: Int?; public let height: Int?; public let fileSize: Int?
+        public let exif: [String: String]?
+        public init(takenAt: String, lat: Double? = nil, lng: Double? = nil,
+                    cameraMake: String? = nil, cameraModel: String? = nil, lens: String? = nil,
+                    width: Int? = nil, height: Int? = nil, fileSize: Int? = nil, exif: [String: String]? = nil) {
+            self.takenAt = takenAt; self.lat = lat; self.lng = lng
+            self.cameraMake = cameraMake; self.cameraModel = cameraModel; self.lens = lens
+            self.width = width; self.height = height; self.fileSize = fileSize; self.exif = exif
+        }
     }
     struct MediaListDTO: Codable { let media: [MediaItem] }
     struct StartBlobRequest: Codable { let dedupToken: String; let totalChunks: Int; let byteSize: Int64; let suiteId: String }
@@ -193,7 +203,7 @@ public enum Media {
     /// The full client flow: upload the original bytes (chunked + deduped transparently) and any
     /// client-generated thumbnail through the SAME blob path, then attach them as a media. The thumbnail is a
     /// typed derivative — no special API.
-    public static func uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, bytes: Data, thumb: Data? = nil, preview: Data? = nil, takenAt: String, mimeType: String, lat: Double? = nil, lng: Double? = nil, chunkSize: Int = defaultChunkSize) async throws -> MediaItem {
+    public static func uploadMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, bytes: Data, thumb: Data? = nil, preview: Data? = nil, takenAt: String, mimeType: String, lat: Double? = nil, lng: Double? = nil, meta: MediaMeta? = nil, chunkSize: Int = defaultChunkSize) async throws -> MediaItem {
         let original = try await uploadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, bytes: bytes, chunkSize: chunkSize)
         var derivatives: [(kind: String, blobId: String)] = []
         if let thumb = thumb {
@@ -204,7 +214,8 @@ public enum Media {
             let p = try await uploadBlob(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, bytes: preview, chunkSize: chunkSize)
             derivatives.append((kind: "PREVIEW", blobId: p.blobId))
         }
-        let sealedMeta = try sealMediaMeta(contentKey: contentKey, meta: MediaMeta(takenAt: takenAt, lat: lat, lng: lng))
+        // Prefer the caller's rich meta (EXIF camera details) when supplied; else seal the basics.
+        let sealedMeta = try sealMediaMeta(contentKey: contentKey, meta: meta ?? MediaMeta(takenAt: takenAt, lat: lat, lng: lng))
         return try await createMedia(apiBase: apiBase, session: session, scopeId: scopeId, nodeId: nodeId, originalBlobId: original.blobId, sealedMeta: sealedMeta, mimeType: mimeType, derivatives: derivatives)
     }
 

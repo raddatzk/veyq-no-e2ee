@@ -106,7 +106,12 @@ class GalleryController(
 ) {
     // `image` is the thumbnail (grid). `preview` (≈2048px) backs the lightbox; `original` is only fetched on
     // an explicit download. Both refs fall back to the original for media without that derivative.
-    data class Tile(val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?, val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String, val highlighted: Boolean)
+    data class Tile(
+        val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?,
+        val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String, val highlighted: Boolean,
+        val cameraMake: String? = null, val cameraModel: String? = null, val lens: String? = null,
+        val width: Int? = null, val height: Int? = null, val fileSize: Int? = null, val exif: Map<String, String>? = null,
+    )
 
     /** A short label for live-presence (the session carries no display name yet — use the email local-part). */
     val displayName: String get() = session.email.substringBefore("@")
@@ -187,7 +192,9 @@ class GalleryController(
     suspend fun updateTakenAt(tile: Tile, iso: String) {
         runCatching {
             withContext(Dispatchers.IO) {
-                val sealed = Media.sealMediaMeta(contentKey, iso, tile.lat, tile.lng)
+                // Re-seal the new capture date while preserving the medium's existing GPS + EXIF camera details.
+                val meta = Media.MediaMeta(iso, tile.lat, tile.lng, tile.cameraMake, tile.cameraModel, tile.lens, tile.width, tile.height, tile.fileSize, tile.exif)
+                val sealed = Media.sealMediaMeta(contentKey, meta)
                 Media.updateMedia(apiBase, session, scopeId, nodeId, tile.id, sealedMeta = sealed)
             }
         }.onSuccess { load() }
@@ -240,10 +247,10 @@ class GalleryController(
     suspend fun upload(items: List<ByteArray>) {
         uploading = true
         for (data in items) {
-            val exif = exifGps(data)
+            val meta = extractMeta(data)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), preview(data), exif.takenAt ?: Instant.now().toString(), "image/jpeg", exif.lat, exif.lng)
+                    Media.uploadMedia(apiBase, session, scopeId, contentKey, nodeId, data, thumbnail(data), preview(data), meta.takenAt, "image/jpeg", meta = meta)
                 }
             }
         }
@@ -251,22 +258,35 @@ class GalleryController(
         uploading = false
     }
 
-    private data class Exif(val lat: Double?, val lng: Double?, val takenAt: String?)
-
-    /** Pull GPS + capture time from a JPEG's EXIF (sealed client-side — the server never sees either). */
-    private fun exifGps(data: ByteArray): Exif {
+    /** Pull capture time + GPS + a broad set of EXIF camera details from a JPEG (sealed client-side — the
+     *  server never sees any of it). Best-effort: fields absent in the file are simply omitted. */
+    private fun extractMeta(data: ByteArray): Media.MediaMeta {
+        val fallback = Instant.now().toString()
         return runCatching {
-            val exif = ExifInterface(java.io.ByteArrayInputStream(data))
-            val ll = exif.latLong
-            val raw = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-            val takenAt = raw?.let {
-                runCatching {
-                    val parser = java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US)
-                    parser.parse(it)?.toInstant()?.toString()
-                }.getOrNull()
-            }
-            Exif(ll?.get(0), ll?.get(1), takenAt)
-        }.getOrDefault(Exif(null, null, null))
+            val ex = ExifInterface(java.io.ByteArrayInputStream(data))
+            val ll = ex.latLong
+            val takenAt = ex.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)?.let {
+                runCatching { java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).parse(it)?.toInstant()?.toString() }.getOrNull()
+            } ?: fallback
+            fun s(tag: String) = ex.getAttribute(tag)?.trim()?.ifEmpty { null }
+            fun trim(n: Double) = (Math.round(n * 100) / 100.0).let { if (it == Math.floor(it)) it.toInt().toString() else it.toString() }
+            val exif = linkedMapOf<String, String>()
+            ex.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }?.let { exif["Aperture"] = "f/${trim(it)}" }
+            ex.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }?.let { exif["Exposure"] = if (it < 1) "1/${Math.round(1 / it)} s" else "${trim(it)} s" }
+            s(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { exif["ISO"] = it }
+            ex.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }?.let { exif["Focal length"] = "${trim(it)} mm" }
+            s(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM)?.let { exif["Focal length (35mm)"] = "$it mm" }
+            ex.getAttributeInt(ExifInterface.TAG_FLASH, -1).takeIf { it >= 0 }?.let { exif["Flash"] = if (it and 1 != 0) "On" else "Off" }
+            s(ExifInterface.TAG_SOFTWARE)?.let { exif["Software"] = it }
+            ex.getAltitude(Double.NaN).takeIf { !it.isNaN() }?.let { exif["Altitude"] = "${trim(it)} m" }
+            val w = ex.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0).takeIf { it > 0 } ?: ex.getAttributeInt(ExifInterface.TAG_PIXEL_X_DIMENSION, 0).takeIf { it > 0 }
+            val h = ex.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0).takeIf { it > 0 } ?: ex.getAttributeInt(ExifInterface.TAG_PIXEL_Y_DIMENSION, 0).takeIf { it > 0 }
+            Media.MediaMeta(
+                takenAt, ll?.get(0), ll?.get(1),
+                s(ExifInterface.TAG_MAKE), s(ExifInterface.TAG_MODEL), s(ExifInterface.TAG_LENS_MODEL),
+                w, h, data.size, exif.ifEmpty { null },
+            )
+        }.getOrDefault(Media.MediaMeta(fallback, null, null, fileSize = data.size))
     }
 
     /** Downscale to fit `maxDim` (longest edge) as JPEG at `quality`; null for non-images. */
@@ -308,7 +328,8 @@ class GalleryController(
                                 val bytes = runCatching { Media.downloadBlob(apiBase, session, scopeId, contentKey, derivativeRef(m, "THUMBNAIL")) }.getOrNull() ?: return@async null
                                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@async null
                                 Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()),
-                                    meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"), m.optBoolean("highlighted", false))
+                                    meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"), m.optBoolean("highlighted", false),
+                                    meta.cameraMake, meta.cameraModel, meta.lens, meta.width, meta.height, meta.fileSize, meta.exif)
                             }
                         }
                     }.awaitAll().filterNotNull()
@@ -532,6 +553,11 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                         InfoLine(L10n.t("info.takenAt"), DateBuckets.dayLabel(tile.takenAt.take(10)))
                         InfoLine(L10n.t("info.type"), tile.mimeType)
                         if (tile.lat != null && tile.lng != null) InfoLine(L10n.t("info.location"), String.format(java.util.Locale.US, "%.5f, %.5f", tile.lat, tile.lng))
+                        tile.cameraModel?.let { InfoLine(L10n.t("info.camera"), listOfNotNull(tile.cameraMake, it).joinToString(" ")) }
+                        tile.lens?.let { InfoLine(L10n.t("info.lens"), it) }
+                        if (tile.width != null && tile.height != null) InfoLine(L10n.t("info.dimensions"), "${tile.width}×${tile.height}")
+                        tile.fileSize?.let { InfoLine(L10n.t("info.fileSize"), formatBytes(it)) }
+                        tile.exif?.toSortedMap()?.forEach { (k, v) -> InfoLine(k, v) }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1168,6 +1194,12 @@ private fun InfoTabRow(label: String, value: String) {
         Text(label, color = Veyq.Muted, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Text(value, color = Veyq.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
+}
+
+private fun formatBytes(n: Int): String = when {
+    n < 1024 -> "$n B"
+    n < 1024 * 1024 -> "${n / 1024} KB"
+    else -> String.format(java.util.Locale.US, "%.1f MB", n / 1024.0 / 1024.0)
 }
 
 @Composable
