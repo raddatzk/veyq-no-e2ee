@@ -110,6 +110,19 @@ public enum Track {
         try ok(resp, "create track")
     }
 
+    /// Rename (re-seal) a track: re-seal {name, points} (new name, same points) and PATCH; the id is preserved.
+    public static func updateTrack(apiBase: String, session: Login.UnlockedSession, scopeId: String, contentKey: Data, nodeId: String, trackId: String, route: Route) async throws {
+        let nonce = V1.randomBytes(12)
+        let sealed = nonce + (try V1.aeadSeal(key: contentKey, nonce: nonce, plaintext: try JSONEncoder().encode(route), aad: Data()))
+        var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/nodes/\(nodeId)/tracks/\(trackId)")!)
+        r.httpMethod = "PATCH"
+        r.setValue("Bearer \(session.sessionToken)", forHTTPHeaderField: "Authorization")
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try JSONSerialization.data(withJSONObject: ["sealedContent": ["suiteId": "v1", "bytes": SetupServer.b64url(sealed)]])
+        let (_, resp) = try await URLSession.shared.data(for: r)
+        try ok(resp, "rename track")
+    }
+
     /// Remove a track.
     public static func deleteTrack(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, trackId: String) async throws {
         var r = URLRequest(url: URL(string: "\(apiBase)/api/scopes/\(scopeId)/nodes/\(nodeId)/tracks/\(trackId)")!)

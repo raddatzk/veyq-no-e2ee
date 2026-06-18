@@ -267,6 +267,11 @@ final class GalleryStore: ObservableObject {
         tracks.removeAll { $0.id == id }
     }
 
+    func renameTrack(_ track: Track.TrackItem, _ name: String) async {
+        guard (try? await Track.updateTrack(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId, trackId: track.id, route: Track.Route(name: name, points: track.points))) != nil else { return }
+        if let t = try? await Track.getTracks(apiBase: apiBase, session: session, scopeId: scopeId, contentKey: contentKey, nodeId: nodeId) { tracks = t }
+    }
+
     /// Child nodes (sub-folders/chapters/memories) shown as cover cards in the gallery tab + counted in Info.
     struct Child: Identifiable, Hashable {
         let node: MemoryTree.MemoryNode; let name: String; let cover: UIImage?
@@ -334,6 +339,10 @@ struct MemoryDetailView: View {
     @State private var creatingBucket = false
     @State private var renamingBucket: Buckets.Bucket?
     @State private var bucketNameInput = ""
+    @State private var hiddenTracks: Set<String> = []        // per-track map visibility
+    @State private var renamingTrack: Track.TrackItem?
+    @State private var trackNameInput = ""
+    @State private var lightboxZoom: CGFloat = 1              // pinch-zoom in the lightbox
     @State private var lightboxInfo = false          // info panel toggle in the lightbox
     @State private var editingDate = false           // capture-date editor toggle in the lightbox
     @State private var chapterNav: GalleryStore.Child?   // ::chapter embed navigation target
@@ -426,6 +435,11 @@ struct MemoryDetailView: View {
             Button(T("common.cancel"), role: .cancel) { renamingBucket = nil }
             Button(T("journal.save")) { if let b = renamingBucket { let n = bucketNameInput; if !n.isEmpty { Task { await store.renameBucket(b.id, n) } } }; renamingBucket = nil }
         }
+        .alert(T("track.renamePrompt"), isPresented: Binding(get: { renamingTrack != nil }, set: { if !$0 { renamingTrack = nil } })) {
+            TextField("", text: $trackNameInput)
+            Button(T("common.cancel"), role: .cancel) { renamingTrack = nil }
+            Button(T("journal.save")) { if let tr = renamingTrack { let n = trackNameInput; if !n.isEmpty { Task { await store.renameTrack(tr, n) } } }; renamingTrack = nil }
+        }
     }
 
     @ToolbarContentBuilder private var detailToolbar: some ToolbarContent {
@@ -472,6 +486,7 @@ struct MemoryDetailView: View {
             Text(name).font(.title2.bold()).foregroundStyle(VeyqStyle.text)
             Picker("", selection: $tab) {
                 Text(T("detail.gallery")).tag(0)
+                if !store.children.isEmpty { Text(T("detail.chapters")).tag(5) }
                 Text(T("detail.map")).tag(2)
                 Text(T("detail.journal")).tag(1)
                 Text(T("detail.contributions")).tag(4)
@@ -481,6 +496,8 @@ struct MemoryDetailView: View {
 
             if tab == 3 {
                 infoTab
+            } else if tab == 5 {
+                chaptersTab
             } else if tab == 4 {
                 contributionsTab
             } else if tab == 1 {
@@ -506,18 +523,22 @@ struct MemoryDetailView: View {
         if pts.isEmpty && store.tracks.isEmpty {
             Text(T("map.empty")).font(.footnote).foregroundStyle(VeyqStyle.muted)
         } else {
-            MemoryMapView(points: pts, tracks: store.tracks) { id in
+            MemoryMapView(points: pts, tracks: store.tracks.filter { !hiddenTracks.contains($0.id) }) { id in
                 if let tile = store.tiles.first(where: { $0.id == id }) { openLightbox(tile) }
             }
         }
         ForEach(store.tracks) { tr in
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 8) {
+                Button { toggleTrack(tr.id) } label: { Image(systemName: hiddenTracks.contains(tr.id) ? "eye.slash" : "eye") }.tint(VeyqStyle.muted)
                 TrackStatsRow(route: tr)
                 Spacer()
+                Button(T("common.rename")) { renamingTrack = tr; trackNameInput = tr.name }.tint(VeyqStyle.accent)
                 Button(T("track.delete")) { let id = tr.id; Task { await store.deleteTrack(id) } }.tint(VeyqStyle.danger)
             }
         }
     }
+
+    private func toggleTrack(_ id: String) { if hiddenTracks.contains(id) { hiddenTracks.remove(id) } else { hiddenTracks.insert(id) } }
 
     @ViewBuilder private func galleryTab(contentWidth: CGFloat) -> some View {
         HStack {
@@ -545,18 +566,6 @@ struct MemoryDetailView: View {
                 }
             }
         }
-        if !store.children.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(store.children) { child in
-                        NavigationLink {
-                            MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name, tenantId: store.tenantId)
-                        } label: { childCard(child) }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
         if store.loading {
             Text(T("detail.loadingGallery")).font(.footnote).foregroundStyle(VeyqStyle.muted)
         } else if displayTiles.isEmpty {
@@ -571,6 +580,29 @@ struct MemoryDetailView: View {
                     Text(DateBuckets.dayLabel(bucket.key)).font(.subheadline.weight(.semibold)).foregroundStyle(VeyqStyle.text)
                     gallery(bucket.items, width: contentWidth - 32)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder private var chaptersTab: some View {
+        VStack(spacing: 10) {
+            ForEach(store.children) { child in
+                NavigationLink {
+                    MemoryDetailView(apiBase: store.apiBase, session: store.session, scopeId: store.scopeId, contentKey: store.contentKey, node: child.node, name: child.name, tenantId: store.tenantId)
+                } label: {
+                    HStack(spacing: 10) {
+                        if let cover = child.cover {
+                            Image(uiImage: cover).resizable().scaledToFill().frame(width: 56, height: 56).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            Text(child.type == "CHAPTER" ? "📖" : child.type == "FOLDER" ? "🗂" : "🖼").font(.title).frame(width: 56, height: 56).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        Text(child.name).foregroundStyle(VeyqStyle.text)
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(VeyqStyle.muted)
+                    }
+                    .padding(8).background(VeyqStyle.surface).clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -646,6 +678,9 @@ struct MemoryDetailView: View {
             VStack(spacing: 16) {
                 ZStack {
                     Image(uiImage: lightboxImage ?? tile.image).resizable().scaledToFit()
+                        .scaleEffect(lightboxZoom)
+                        .gesture(MagnificationGesture().onChanged { lightboxZoom = max(1, $0) }.onEnded { _ in if lightboxZoom < 1.1 { withAnimation { lightboxZoom = 1 } } })
+                        .onTapGesture(count: 2) { withAnimation { lightboxZoom = lightboxZoom > 1 ? 1 : 2.5 } }
                     HStack {
                         Button { page(-1) } label: { Image(systemName: "chevron.left.circle.fill").font(.largeTitle) }
                             .tint(.white).opacity(lightboxIndex > 0 ? 0.9 : 0.2).disabled(lightboxIndex == 0)
@@ -736,6 +771,7 @@ struct MemoryDetailView: View {
         let next = lightboxIndex + delta
         guard orderedTiles.indices.contains(next) else { return }
         lightboxIndex = next
+        lightboxZoom = 1
         loadLightboxPreview()
     }
 
@@ -762,7 +798,7 @@ struct MemoryDetailView: View {
         }
     }
 
-    private func closeLightbox() { showLightbox = false; lightboxImage = nil; mediaDelArm = false; lightboxInfo = false; editingDate = false }
+    private func closeLightbox() { showLightbox = false; lightboxImage = nil; mediaDelArm = false; lightboxInfo = false; editingDate = false; lightboxZoom = 1 }
 
     /// Fetch THIS medium's full-resolution original and hand it to the share sheet (save to Files/Photos).
     private func saveOriginal(_ tile: GalleryStore.Tile) {
