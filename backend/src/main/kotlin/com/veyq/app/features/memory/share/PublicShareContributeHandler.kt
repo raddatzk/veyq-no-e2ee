@@ -10,10 +10,16 @@ import com.veyq.app.generated.model.MediaItem
 import com.veyq.app.generated.model.PutChunkRequest
 import com.veyq.app.generated.model.StartBlobRequest
 import com.veyq.app.platform.error.ApiException
+import com.veyq.app.shared.content.MediaBucket
+import com.veyq.app.shared.content.MediaBucketRepository
 import com.veyq.app.shared.content.NodeRepository
 import com.veyq.app.shared.content.Share
 import com.veyq.app.shared.content.ShareRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
+import java.time.Instant
+import java.util.Base64
+import java.util.UUID
 
 /**
  * uc.memory.share — guest contribution (unauthenticated, CONTRIBUTOR shares only). A guest holding a
@@ -27,7 +33,9 @@ class PublicShareContributeHandler(
     private val nodes: NodeRepository,
     private val blobUploads: BlobUploadHandler,
     private val media: MediaHandler,
+    private val buckets: MediaBucketRepository,
 ) {
+    private val dec = Base64.getUrlDecoder()
     // Every guest upload op is bound to THIS share's owner tag, so a guest who learns another guest's uploadId
     // (a second share on the same scope, or a co-guest of one CONTRIBUTOR link) can't read/overwrite/finalize it.
     fun startShareBlob(shareId: String, req: StartBlobRequest): BlobTicket =
@@ -48,12 +56,27 @@ class PublicShareContributeHandler(
         if (nodeId !in ids) throw ApiException(404, "NODE_NOT_FOUND", "Node not in this share")
         // A guest may only attach blobs THEY uploaded via this share — not arbitrary scope blobs whose id they
         // happen to know. (createMediaAs only checks the blob is in-scope, which is too permissive for guests.)
+        // Blob ownership is gated per-SHARE (the upload tag); media attribution is per-GUEST when the guest
+        // named themselves (ADR 0023) — so co-guests of one link still get distinct contribution buckets.
         val owner = "share:${share.id}"
         requireFromThisShare(share.scopeId, req.originalBlobId, owner)
         req.derivatives.orEmpty().forEach { requireFromThisShare(share.scopeId, it.blobId, owner) }
-        // Attribute the medium to this share's contribution bucket (ADR 0023). Per-guest naming (a
-        // "share:<id>:<contributorId>" key) lands in a follow-up; for now all of a share's uploads group here.
-        return media.createMediaAs(share.scopeId, nodeId, req, owner)
+        val contributorKey = req.contributorId?.takeIf { it.isNotBlank() }?.let { "share:${share.id}:$it" } ?: owner
+        req.contributorName?.let { ensureGuestPrimary(share.scopeId, nodeId, contributorKey, it) }
+        return media.createMediaAs(share.scopeId, nodeId, req, contributorKey)
+    }
+
+    /** Persist a guest's named primary contribution bucket on first contribution (idempotent). The name is
+     *  sealed by the guest under the share content key — the server stores ciphertext only. */
+    @Transactional
+    fun ensureGuestPrimary(scopeId: String, nodeId: String, ownerKey: String, sealedName: com.veyq.app.generated.model.Blob) {
+        if (buckets.findPrimary(nodeId, ownerKey) != null) return
+        buckets.persist(MediaBucket().apply {
+            id = UUID.randomUUID().toString(); this.scopeId = scopeId; this.nodeId = nodeId
+            this.ownerKey = ownerKey; parentBucketId = null
+            this.sealedName = dec.decode(sealedName.bytes); suiteId = sealedName.suiteId
+            isPrimary = true; createdAt = Instant.now()
+        })
     }
 
     private fun requireFromThisShare(scopeId: String, blobId: String, owner: String) {

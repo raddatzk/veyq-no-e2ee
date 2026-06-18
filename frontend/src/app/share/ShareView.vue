@@ -122,12 +122,26 @@ async function loadContent() {
 }
 const noticesHtml = computed(() => pendingNotices.value.map((n) => renderMarkdown(n.markdown)).join('<hr class="notice-sep">'))
 
+// A guest names themselves ONCE per share (stored locally + a stable id); all their uploads then group under
+// their own named, operator-blind contribution bucket. Declining leaves them in the shared guest bucket.
+function shareContributor(shareId: string): { id: string; name: string } | undefined {
+  const key = `veyq.share.contributor.${shareId}`
+  const stored = localStorage.getItem(key)
+  if (stored) return JSON.parse(stored)
+  const name = window.prompt(t('share.yourName'))?.trim()
+  if (!name) return undefined
+  const c = { id: crypto.randomUUID(), name }
+  localStorage.setItem(key, JSON.stringify(c))
+  return c
+}
+
 async function onFilesPicked(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
   if (!files.length || !ctx.value) return
   uploading.value = true
   try {
-    for (const file of files) await uploadShareMedia(ctx.value, await fileToNewMedia(file))
+    const contributor = shareContributor(ctx.value.shareId)
+    for (const file of files) await uploadShareMedia(ctx.value, await fileToNewMedia(file), contributor)
     await content.value?.reloadTiles()
   } finally {
     uploading.value = false

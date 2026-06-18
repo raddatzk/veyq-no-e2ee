@@ -2,7 +2,7 @@
 // Member (internal) memory view — a thin wrapper around the shared, tab-based <MemoryContent> (Legacy UI, same
 // as the guest share viewer). It supplies scope-authed loaders keyed by nodeId and the member-only actions
 // (upload, delete, set-cover, edit/live journal, GPX import, download, share) via named slots.
-import { defineAsyncComponent, ref } from 'vue'
+import { defineAsyncComponent, onMounted, ref } from 'vue'
 import { session } from '../session'
 const LiveJournalEditor = defineAsyncComponent(() => import('./LiveJournalEditor.vue'))
 import { t } from '../../i18n/i18n'
@@ -11,6 +11,7 @@ import { fileToNewMedia } from '../../features/uploads/clientMedia'
 import { deleteMedia, sealMediaMeta, updateMedia, uploadMedia } from '../../features/uploads/media/media'
 import { setCover } from '../../features/memory/curate/curate'
 import { listBuckets, createBucket, renameBucket, deleteBucket, bucketName, type Bucket } from '../../features/memory/buckets/buckets'
+import { listGroupMembers } from '../../features/spaces/groups/groupSpaces'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
@@ -160,10 +161,27 @@ async function onLiveClosed() {
 // ---- contribution buckets (ADR 0023) ----
 const ownerKey = `user:${session.unlocked!.user.id}`
 const loadBuckets = (nodeId: string) => listBuckets(session.apiBase, s(), props.active, nodeId)
-// Label a bucket: own primary → my display name; persisted (sub / guest primary) → its sealed name; else generic.
+// Group member directory (userId → display name). Display names are account-level + server-visible (like the
+// member-admin list), so resolving OTHER members' synthesized primary buckets client-side stays operator-blind
+// re: content — the server still never learns the (sealed) bucket names. Mirrors what Legacy got server-side.
+const memberNames = ref<Record<string, string>>({})
+onMounted(async () => {
+  const e = props.active.entry
+  if ((e.kind === 'GROUP' || e.kind === 'TENANT') && e.tenantId) {
+    try {
+      const members = await listGroupMembers(session.apiBase, s(), e.tenantId, props.active.scope.scopeId)
+      memberNames.value = Object.fromEntries(members.map((m) => [m.userId, m.displayName]))
+    } catch { /* directory optional — fall back to the generic label */ }
+  }
+})
+// Label a bucket: own primary → my name; persisted (sub / guest primary) → its sealed name; other member
+// primary → resolved from the directory; else generic (handled by MemoryContent's fallback).
 function bucketLabel(b: Bucket): string {
   if (b.primary && b.ownerKey === ownerKey) return session.unlocked!.user.displayName
-  return bucketName(props.active.contentKey, b)
+  const sealed = bucketName(props.active.contentKey, b)
+  if (sealed) return sealed
+  if (b.ownerKey.startsWith('user:')) return memberNames.value[b.ownerKey.slice(5)] ?? ''
+  return ''
 }
 const createBucketFn = (nodeId: string, name: string) => createBucket(session.apiBase, s(), props.active, nodeId, name).then(() => undefined)
 const renameBucketFn = (nodeId: string, bucketId: string, name: string) => renameBucket(session.apiBase, s(), props.active, nodeId, bucketId, name).then(() => undefined)

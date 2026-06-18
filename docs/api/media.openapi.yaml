@@ -429,6 +429,11 @@ components:
         mimeType: { type: string, x-field-extra-annotation: ['@field:jakarta.validation.constraints.Size(max = 255)'] }
         # Optional target bucket (ADR 0023). Omitted → the contributor's primary bucket.
         bucketId: { type: string }
+        # Share-guest self-naming (ADR 0023): a stable per-guest id + their sealed display name. The guest's
+        # uploads group under "share:<shareId>:<contributorId>" and persist a named primary bucket. Ignored for
+        # authenticated member uploads (attributed to "user:<id>").
+        contributorId: { type: string }
+        contributorName: { $ref: './common.openapi.yaml#/components/schemas/Blob' }
         derivatives:
           type: array
           items: { $ref: '#/components/schemas/MediaDerivativeInput' }

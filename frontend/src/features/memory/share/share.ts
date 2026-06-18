@@ -243,16 +243,29 @@ async function uploadShareBlob(ctx: ShareContext, bytes: Uint8Array): Promise<Bl
   return done.json()
 }
 
-/** Contribute a media (original + optional thumbnail) to the shared memory, sealed under the content key. */
-export async function uploadShareMedia(ctx: ShareContext, m: NewMedia): Promise<void> {
+/** Seal a guest's chosen display name under the share content key (operator-blind), like a bucket name. */
+export function sealShareName(ctx: ShareContext, name: string): { suiteId: string; bytes: string } {
+  const nonce = v1.randomBytes(12)
+  return { suiteId: 'v1', bytes: b64url(v1.concat(nonce, v1.aeadSeal(ctx.contentKey, nonce, v1.utf8(name), EMPTY))) }
+}
+
+/** Contribute a media (original + optional thumbnail) to the shared memory, sealed under the content key. When
+ *  the guest has named themselves, the uploads group under their own (named, operator-blind) contribution bucket. */
+export async function uploadShareMedia(ctx: ShareContext, m: NewMedia, contributor?: { id: string; name: string }): Promise<void> {
   const original = await uploadShareBlob(ctx, m.bytes)
   const derivatives: { kind: DerivativeKind; blobId: string }[] = []
   if (m.thumb) derivatives.push({ kind: 'THUMBNAIL', blobId: (await uploadShareBlob(ctx, m.thumb)).blobId })
   if (m.preview) derivatives.push({ kind: 'PREVIEW', blobId: (await uploadShareBlob(ctx, m.preview)).blobId })
-  const sealedMeta = sealMediaMeta(ctx.contentKey, { takenAt: m.takenAt, lat: m.lat, lng: m.lng })
+  const sealedMeta = sealMediaMeta(ctx.contentKey, {
+    takenAt: m.takenAt, lat: m.lat, lng: m.lng,
+    cameraMake: m.cameraMake, cameraModel: m.cameraModel, lens: m.lens, width: m.width, height: m.height, fileSize: m.fileSize, exif: m.exif,
+  })
   const res = await fetch(`${sp(ctx)}/nodes/${ctx.rootNodeId}/contributed-media`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives }),
+    body: JSON.stringify({
+      originalBlobId: original.blobId, sealedMeta, mimeType: m.mimeType, derivatives,
+      ...(contributor ? { contributorId: contributor.id, contributorName: sealShareName(ctx, contributor.name) } : {}),
+    }),
   })
   if (!res.ok) throw await apiError(res, 'contribute media')
 }
