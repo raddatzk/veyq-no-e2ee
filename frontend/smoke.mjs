@@ -7,6 +7,9 @@ const base = 'http://127.0.0.1:8081'
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 2 })
 page.on('pageerror', (e) => console.log('PAGE ERROR:', e.message))
+await page.addInitScript(() => {
+  Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true })
+})
 
 await page.goto(base, { waitUntil: 'networkidle' })
 await page.waitForSelector('text=Anmelden', { timeout: 15000 })
