@@ -35,6 +35,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -73,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import app.veyq.crypto.Browse
+import app.veyq.crypto.Buckets
 import app.veyq.crypto.Curate
 import app.veyq.crypto.Groups
 import app.veyq.crypto.MemoryTree
@@ -109,6 +112,7 @@ class GalleryController(
     data class Tile(
         val id: String, val image: ImageBitmap, val aspectRatio: Float, val takenAt: String, val lat: Double?, val lng: Double?,
         val preview: Media.BlobRef, val original: Media.BlobRef, val mimeType: String, val highlighted: Boolean,
+        val createdBy: String? = null, val bucketId: String? = null,
         val cameraMake: String? = null, val cameraModel: String? = null, val lens: String? = null,
         val width: Int? = null, val height: Int? = null, val fileSize: Int? = null, val exif: Map<String, String>? = null,
     )
@@ -232,6 +236,39 @@ class GalleryController(
         }.getOrNull()
     }
 
+    // ---- contribution buckets (ADR 0023) ----
+    var buckets by mutableStateOf<List<Buckets.Bucket>>(emptyList())
+    val ownerKey: String get() = "user:${session.userId}"
+
+    suspend fun loadBuckets() {
+        runCatching { withContext(Dispatchers.IO) { Buckets.list(apiBase, session, scopeId, nodeId) } }.onSuccess { buckets = it }
+    }
+    fun bucketLabel(b: Buckets.Bucket): String =
+        if (b.primary && b.ownerKey == ownerKey) session.displayName.ifEmpty { session.email.substringBefore("@") }
+        else Buckets.name(contentKey, b)
+    fun isOwnBucket(b: Buckets.Bucket) = b.ownerKey == ownerKey
+    /** A tile belongs to a bucket: sub-bucket matches bucketId; primary matches the contributor's un-bucketed media. */
+    fun tileInBucket(t: Tile, b: Buckets.Bucket): Boolean =
+        if (b.primary) t.createdBy == b.ownerKey && t.bucketId == null else t.bucketId == b.id
+    fun bucketCount(b: Buckets.Bucket) = tiles.count { tileInBucket(it, b) }
+
+    suspend fun createBucket(name: String) {
+        runCatching { withContext(Dispatchers.IO) { Buckets.create(apiBase, session, scopeId, contentKey, nodeId, name) } }
+        loadBuckets()
+    }
+    suspend fun renameBucket(id: String, name: String) {
+        runCatching { withContext(Dispatchers.IO) { Buckets.rename(apiBase, session, scopeId, contentKey, nodeId, id, name) } }
+        loadBuckets()
+    }
+    suspend fun deleteBucket(id: String) {
+        runCatching { withContext(Dispatchers.IO) { Buckets.delete(apiBase, session, scopeId, nodeId, id) } }
+        loadBuckets(); load()
+    }
+    suspend fun moveMedia(tile: Tile, bucketId: String) {
+        runCatching { withContext(Dispatchers.IO) { Media.updateMedia(apiBase, session, scopeId, nodeId, tile.id, bucketId = bucketId) } }
+        load(); loadBuckets()
+    }
+
     private fun childCover(childNodeId: String, coverMediaId: String?): ImageBitmap? {
         val media = runCatching { Media.listMedia(apiBase, session, scopeId, childNodeId) }.getOrNull() ?: return null
         val chosen = (coverMediaId?.let { cid -> media.firstOrNull { it.getString("id") == cid } }) ?: media.firstOrNull() ?: return null
@@ -329,6 +366,7 @@ class GalleryController(
                                 val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@async null
                                 Tile(m.getString("id"), bmp.asImageBitmap(), JustifiedLayout.clampAspect(bmp.width.toFloat(), bmp.height.toFloat()),
                                     meta.takenAt, meta.lat, meta.lng, derivativeRef(m, "PREVIEW"), blobRef(m.getJSONObject("original")), m.optString("mimeType", "image/jpeg"), m.optBoolean("highlighted", false),
+                                    m.optString("createdBy", null), m.optString("bucketId", null),
                                     meta.cameraMake, meta.cameraModel, meta.lens, meta.width, meta.height, meta.fileSize, meta.exif)
                             }
                         }
@@ -371,9 +409,14 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
     var lightboxInfo by remember { mutableStateOf(false) }
     var editingDate by remember { mutableStateOf(false) }
     var childNav by remember { mutableStateOf<GalleryController.Child?>(null) }
+    var selectedBucketId by remember { mutableStateOf<String?>(null) }
+    var cameraFilter by remember { mutableStateOf<String?>(null) }
+    var creatingBucket by remember { mutableStateOf(false) }
+    var renamingBucket by remember { mutableStateOf<Buckets.Bucket?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { controller.load(); controller.loadChildren() }
+    LaunchedEffect(Unit) { controller.load(); controller.loadChildren(); controller.loadBuckets() }
+    val selectedBucket = controller.buckets.firstOrNull { it.id == selectedBucketId }
     // When the lightbox opens on a tile, show its thumbnail instantly then swap in the higher-res preview.
     LaunchedEffect(lightboxTile?.id) {
         lightboxPreview = null
@@ -478,9 +521,33 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                 TabLabel(L10n.t("detail.gallery"), tab == 0) { tab = 0 }
                 TabLabel(L10n.t("detail.map"), tab == 2) { tab = 2 }
                 TabLabel(L10n.t("detail.journal"), tab == 1) { tab = 1 }
+                TabLabel(L10n.t("detail.contributions"), tab == 4) { tab = 4 }
                 TabLabel(L10n.t("detail.info"), tab == 3) { tab = 3 }
             }
-            if (tab == 3) {
+            if (tab == 4) {
+                LaunchedEffect(Unit) { controller.loadBuckets() }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (controller.buckets.isEmpty()) Text(L10n.t("contrib.empty"), color = Veyq.Muted, fontSize = 14.sp)
+                    controller.buckets.forEach { b ->
+                        val label = controller.bucketLabel(b).ifEmpty { L10n.t("contrib.member") }
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = if (b.primary) 0.dp else 16.dp).clip(RoundedCornerShape(8.dp)).background(Veyq.Surface).padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("${if (b.primary) "👤" else "📁"} $label", color = Veyq.Text, modifier = Modifier.weight(1f).clickable { selectedBucketId = b.id; cameraFilter = null; tab = 0 })
+                            Text("${controller.bucketCount(b)}", color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
+                            if (controller.isOwnBucket(b)) {
+                                if (b.primary) {
+                                    TextButton(onClick = { creatingBucket = true }) { Text("+", color = Veyq.Accent) }
+                                } else {
+                                    TextButton(onClick = { renamingBucket = b }) { Text("✎", color = Veyq.Accent) }
+                                    TextButton(onClick = { val id = b.id; scope.launch { controller.deleteBucket(id); if (selectedBucketId == id) selectedBucketId = null } }) { Text("🗑", color = Veyq.Danger) }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (tab == 3) {
                 LaunchedEffect(Unit) { controller.loadTracks(); controller.loadChildren() }
                 InfoTab(controller)
             } else if (tab == 1) {
@@ -502,12 +569,31 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                     }
                 }
             } else {
-                val displayTiles = if (showHighlightsOnly) controller.tiles.filter { it.highlighted } else controller.tiles
+                var displayTiles = controller.tiles
+                if (showHighlightsOnly) displayTiles = displayTiles.filter { it.highlighted }
+                selectedBucket?.let { b -> displayTiles = displayTiles.filter { controller.tileInBucket(it, b) } }
+                cameraFilter?.let { cam -> displayTiles = displayTiles.filter { listOfNotNull(it.cameraMake, it.cameraModel).joinToString(" ") == cam } }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("${displayTiles.size} ${L10n.t("detail.media")}", color = Veyq.Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     if (controller.tiles.any { it.highlighted }) {
                         TextButton(onClick = { showHighlightsOnly = !showHighlightsOnly }) {
                             Text((if (showHighlightsOnly) "★ " else "☆ ") + L10n.t("detail.highlights"), color = if (showHighlightsOnly) Veyq.Accent else Veyq.Muted, fontSize = 13.sp)
+                        }
+                    }
+                }
+                selectedBucket?.let { b ->
+                    val cams = controller.tiles.filter { controller.tileInBucket(it, b) }.mapNotNull { listOfNotNull(it.cameraMake, it.cameraModel).joinToString(" ").ifEmpty { null } }.distinct().sorted()
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { selectedBucketId = null; cameraFilter = null }) { Text("✕ ${controller.bucketLabel(b).ifEmpty { L10n.t("contrib.member") }}", color = Veyq.Accent, fontSize = 13.sp) }
+                        if (cams.isNotEmpty()) {
+                            var camMenu by remember(b.id) { mutableStateOf(false) }
+                            Box {
+                                TextButton(onClick = { camMenu = true }) { Text("📷 ${cameraFilter ?: L10n.t("contrib.allCameras")}", color = Veyq.Muted, fontSize = 13.sp) }
+                                DropdownMenu(expanded = camMenu, onDismissRequest = { camMenu = false }) {
+                                    DropdownMenuItem(text = { Text(L10n.t("contrib.allCameras")) }, onClick = { cameraFilter = null; camMenu = false })
+                                    cams.forEach { cam -> DropdownMenuItem(text = { Text(cam) }, onClick = { cameraFilter = cam; camMenu = false }) }
+                                }
+                            }
                         }
                     }
                 }
@@ -564,6 +650,17 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
                     TextButton(onClick = { scope.launch { controller.toggleHighlight(tile) } }) { Text(if (tile.highlighted) "★" else "☆", color = if (tile.highlighted) Veyq.Accent else Color.White, fontSize = 18.sp) }
                     TextButton(onClick = { lightboxInfo = !lightboxInfo }) { Text("ⓘ", color = Color.White, fontSize = 18.sp) }
                     TextButton(onClick = { editingDate = true }) { Text("📅", fontSize = 16.sp) }
+                    if (tile.createdBy == controller.ownerKey && controller.buckets.any { controller.isOwnBucket(it) }) {
+                        var moveMenu by remember(tile.id) { mutableStateOf(false) }
+                        Box {
+                            TextButton(onClick = { moveMenu = true }) { Text("🗂", fontSize = 16.sp) }
+                            DropdownMenu(expanded = moveMenu, onDismissRequest = { moveMenu = false }) {
+                                controller.buckets.filter { controller.isOwnBucket(it) }.forEach { b ->
+                                    DropdownMenuItem(text = { Text(if (b.primary) L10n.t("contrib.moveToPrimary") else controller.bucketLabel(b).ifEmpty { L10n.t("contrib.member") }) }, onClick = { moveMenu = false; scope.launch { controller.moveMedia(tile, b.id) } })
+                                }
+                            }
+                        }
+                    }
                     TextButton(onClick = { val id = tile.id; lightboxTile = null; scope.launch { controller.setCover(id) } }) { Text(L10n.t("cover.setAsCover"), color = Veyq.Accent) }
                     TextButton(enabled = !savingOriginal, onClick = { saveOriginal(tile) }) { Text(L10n.t("detail.download"), color = Color.White) }
                     if (!mediaDelArm) {
@@ -582,6 +679,9 @@ fun GalleryScreen(apiBase: String, session: Login.UnlockedSession, scopeId: Stri
             }
         }
     }
+
+    if (creatingBucket) BucketNameDialog(L10n.t("contrib.newBucket"), "", onDismiss = { creatingBucket = false }) { name -> creatingBucket = false; scope.launch { controller.createBucket(name) } }
+    renamingBucket?.let { b -> BucketNameDialog(L10n.t("common.rename"), controller.bucketLabel(b), onDismiss = { renamingBucket = null }) { name -> renamingBucket = null; scope.launch { controller.renameBucket(b.id, name) } } }
 
     if (showShareRole) {
         fun share(role: String) {
@@ -1194,6 +1294,28 @@ private fun InfoTabRow(label: String, value: String) {
         Text(label, color = Veyq.Muted, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Text(value, color = Veyq.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
+}
+
+@Composable
+private fun BucketNameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Veyq.Surface,
+        title = { Text(title, color = Veyq.Text) },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Veyq.Bg, unfocusedContainerColor = Veyq.Bg,
+                    focusedBorderColor = Veyq.Accent, unfocusedBorderColor = Veyq.Line,
+                    focusedTextColor = Veyq.Text, unfocusedTextColor = Veyq.Text,
+                ),
+            )
+        },
+        confirmButton = { TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(L10n.t("journal.save"), color = Veyq.Accent) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L10n.t("common.cancel"), color = Veyq.Muted) } },
+    )
 }
 
 private fun formatBytes(n: Int): String = when {

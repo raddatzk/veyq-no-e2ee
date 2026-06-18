@@ -226,10 +226,11 @@ object Media {
      * Patch a media item's server-visible highlight flag and/or its (re-sealed) sealedMeta. Both optional;
      * omitted fields are left unchanged. Backs the lightbox favourite toggle + capture-date edit.
      */
-    fun updateMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String, highlighted: Boolean? = null, sealedMeta: JSONObject? = null): JSONObject {
+    fun updateMedia(apiBase: String, session: Login.UnlockedSession, scopeId: String, nodeId: String, mediaId: String, highlighted: Boolean? = null, sealedMeta: JSONObject? = null, bucketId: String? = null): JSONObject {
         val json = JSONObject()
         if (highlighted != null) json.put("highlighted", highlighted)
         if (sealedMeta != null) json.put("sealedMeta", sealedMeta)
+        if (bucketId != null) json.put("bucketId", bucketId)
         val resp = send("$apiBase/api/scopes/$scopeId/nodes/$nodeId/media/$mediaId", session.sessionToken, "PATCH", json.toString())
         if (resp.statusCode() != 200) throw RuntimeException("update media failed: ${resp.statusCode()}")
         return JSONObject(resp.body())
