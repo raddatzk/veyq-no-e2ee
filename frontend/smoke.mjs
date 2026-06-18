@@ -2,7 +2,7 @@ import { chromium } from 'playwright'
 import { readFileSync } from 'node:fs'
 
 const { email, password, secretKey } = JSON.parse(readFileSync('/tmp/veyq-seed.json', 'utf8'))
-const base = 'http://127.0.0.1:8081'
+const base = process.env.VEYQ_WEB_BASE ?? 'http://127.0.0.1:8081'
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 2 })

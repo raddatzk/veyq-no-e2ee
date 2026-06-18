@@ -16,6 +16,7 @@ This directory is the **operating context for AI agents and contributors** worki
    security invariants, self-hostability, the trust chain, commit and config conventions.
 2. [`documentation-guide.md`](documentation-guide.md) — how to author and maintain the arc42 docs
    and the Cockburn-lite use-cases, and how the Wiki sync works.
+3. [`local-smoke.md`](local-smoke.md) — repeatable local web smoke seed + browser verification.
 
 ## Architecture & product (human docs)
 

@@ -75,6 +75,12 @@ interface ContentConfig {
     @WithName("max-sealed-bytes") @WithDefault("1048576") fun maxSealedBytes(): Int
 }
 
+/** `veyq.dev-tools.*` — local-only helpers for repeatable smoke data. Disabled outside dev/test. */
+@ConfigMapping(prefix = "veyq.dev-tools")
+interface DevToolsConfig {
+    @WithDefault("false") fun enabled(): Boolean
+}
+
 /**
  * `veyq.blob-store.*` — where the (already-encrypted) blob frames live. The server is decoupled from storage:
  * the only production backend is `s3` (an external S3-compatible store, or the bundled MinIO/Garage container).

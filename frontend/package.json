@@ -7,7 +7,10 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test && npm run build"
+    "check": "npm run typecheck && npm run test && npm run build",
+    "smoke:seed": "VEYQ_SMOKE_SEED=1 vitest run src/smokeSeed.test.ts --testTimeout 120000",
+    "smoke:ui": "node smoke.mjs",
+    "smoke:local": "npm run smoke:seed && npm run smoke:ui"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
