@@ -1,23 +1,121 @@
 /* Memory detail + justified gallery. Tiles are absolutely positioned from the computed layout so each
    full row is flush to the container width. */
-.detail-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.8rem;
+.memory-detail-header {
+  container: memory-detail-header / inline-size;
+  display: grid;
+  grid-template-columns: 164px minmax(0, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+  padding-bottom: 1.15rem;
   margin-bottom: 1.1rem;
-}
-.detail-title {
-  font-size: 1.4rem;
-  font-weight: 700;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--app-line);
 }
 
-.detail-share { margin-left: auto; padding: 0.45rem 0.9rem; }
-.detail-download { margin-left: 0.5rem; padding: 0.45rem 0.9rem; }
-.detail-upload { margin-left: 0.5rem; padding: 0.45rem 0.9rem; }
+.memory-detail-cover {
+  display: grid;
+  place-items: center;
+  width: 164px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--app-radius);
+  background: linear-gradient(135deg, var(--app-accent-soft), var(--app-control-bg));
+  color: var(--app-accent);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.memory-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memory-detail-cover-placeholder {
+  color: var(--app-accent);
+  font-size: 1.45rem;
+  letter-spacing: 0;
+}
+
+.memory-detail-heading {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.detail-nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+  min-width: 0;
+}
+
+.detail-back {
+  flex: 0 0 auto;
+}
+
+.memory-detail-title-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.memory-detail-title-copy {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.detail-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-detail-actions {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.memory-detail-actions .detail-share,
+.memory-detail-actions .detail-download,
+.memory-detail-actions .detail-upload {
+  margin-left: 0;
+}
+
+.memory-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+  color: var(--app-control-text);
+  font-size: 0.92rem;
+}
+
+.memory-detail-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.detail-share,
+.detail-download,
+.detail-upload {
+  padding: 0.45rem 0.9rem;
+}
 
 .share-view { min-height: 100vh; background: var(--app-bg); color: var(--app-text); }
 .share-head {
@@ -59,7 +157,6 @@
 .share-accept { margin-top: 1rem; }
 .detail-crumbs { flex-wrap: wrap; }
 .memory-children { margin: 0 0 1.2rem; }
-.detail-hero { display: block; width: 100%; max-height: 240px; object-fit: cover; border-radius: var(--app-radius); margin-bottom: 1rem; }
 .memory-info { max-width: 480px; display: flex; flex-direction: column; gap: 0.5rem; }
 .memory-info .info-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.85rem; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); background: var(--app-surface); }
 .memory-info .info-row span { color: var(--app-muted); }
@@ -371,3 +468,38 @@
 .live-journal-editor .cm-editor.cm-focused { outline: none; }
 .live-journal-editor .cm-gutters { background: var(--app-surface-muted); border: none; color: var(--app-muted); }
 .live-journal-editor .cm-content { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+
+@media (max-width: 720px) {
+  .memory-detail-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 1rem;
+  }
+
+  .memory-detail-cover-has-image {
+    width: 100%;
+    max-width: none;
+  }
+
+  .memory-detail-cover:not(.memory-detail-cover-has-image) {
+    display: none;
+  }
+
+  .memory-detail-heading {
+    width: 100%;
+  }
+
+  .memory-detail-title-row {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .memory-detail-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .detail-title {
+    font-size: 1.8rem;
+  }
+}
