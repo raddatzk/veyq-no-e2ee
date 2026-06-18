@@ -8,6 +8,7 @@ import type { UnlockedSession } from '../../account/login/login'
 import type { ActiveSpace } from '../../home/home'
 import { decodeNode, type MemoryNode } from '../createTree/memoryTree'
 import type { Track } from '../track/track'
+import type { Playlist } from '../playlist/playlist'
 import { chunkBytes, decodeMediaMeta, dedupTokenFor, sealMediaMeta, DEFAULT_CHUNK_SIZE, type BlobRef, type DerivativeKind, type MediaItem, type NewMedia } from '../../uploads/media/media'
 import { galleryDisplayAspectRatio } from '../../gallery/justifiedLayout'
 import type { GalleryTile } from '../../gallery/gallery'
@@ -155,6 +156,17 @@ export async function getShareTracks(ctx: ShareContext, nodeId: string): Promise
     const sealed = fromB64url(t.sealedContent.bytes)
     const route = JSON.parse(new TextDecoder().decode(v1.aeadOpen(ctx.contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY)))
     return { id: t.id, name: route.name, points: route.points }
+  })
+}
+
+/** A shared node's playlist links (read-only over a share). */
+export async function getSharePlaylists(ctx: ShareContext, nodeId: string): Promise<Playlist[]> {
+  const res = await fetch(`${ctx.apiBase}/api/public/shares/${ctx.shareId}/nodes/${nodeId}/playlists`)
+  if (!res.ok) throw await apiError(res, 'share playlists')
+  return (await res.json()).playlists.map((p: { id: string; featured: boolean; sealedContent: { bytes: string } }) => {
+    const sealed = fromB64url(p.sealedContent.bytes)
+    const pl = JSON.parse(new TextDecoder().decode(v1.aeadOpen(ctx.contentKey, sealed.slice(0, 12), sealed.slice(12), EMPTY)))
+    return { id: p.id, featured: p.featured, provider: pl.provider, url: pl.url, title: pl.title, note: pl.note } as Playlist
   })
 }
 

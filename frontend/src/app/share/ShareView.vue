@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import * as Y from 'yjs'
 import { session } from '../session'
 import { t } from '../../i18n/i18n'
-import { getShareJournal, getShareTracks, listShareNodes, loadShareOriginal, loadSharePreview, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
+import { getShareJournal, getSharePlaylists, getShareTracks, listShareNodes, loadShareOriginal, loadSharePreview, loadShareTiles, resolvePublicShare, SharePasswordRequired, uploadShareMedia, type ShareContext, type ShareNotice } from '../../features/memory/share/share'
 import { loadShareJournalDoc, subscribeShareJournal } from '../../features/memory/journalLive/shareJournalLive'
 import { decodeNode, type MemoryNode } from '../../features/memory/createTree/memoryTree'
 import { renderMarkdown } from '../../features/memory/journal/markdown'
@@ -43,6 +43,7 @@ const c = () => ctx.value!
 const loadTiles = (nodeId: string) => loadShareTiles(c(), nodeId)
 const loadJournalMarkdown = (nodeId: string) => getShareJournal(c(), nodeId)
 const loadTracks = (nodeId: string) => getShareTracks(c(), nodeId)
+const loadPlaylists = (nodeId: string) => getSharePlaylists(c(), nodeId)
 const loadChildNodes = async (nodeId: string) => childNodesOf(nodeId)
 const resolveChapterNames = async () => chapterMap()
 
@@ -197,6 +198,7 @@ async function onFilesPicked(event: Event) {
         :load-journal-markdown="loadJournalMarkdown"
         :live-journal="liveJournal"
         :load-tracks="loadTracks"
+        :load-playlists="loadPlaylists"
         :load-child-nodes="loadChildNodes"
         :resolve-chapter-names="resolveChapterNames"
         :load-preview="(tile) => loadSharePreview(c(), tile)"

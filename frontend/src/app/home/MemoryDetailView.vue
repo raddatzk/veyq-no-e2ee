@@ -12,6 +12,7 @@ import { deleteMedia, sealMediaMeta, updateMedia, uploadMedia } from '../../feat
 import { setCover } from '../../features/memory/curate/curate'
 import { listBuckets, createBucket, renameBucket, deleteBucket, bucketName, type Bucket } from '../../features/memory/buckets/buckets'
 import { listGroupMembers } from '../../features/spaces/groups/groupSpaces'
+import { listPlaylists, createPlaylist, deletePlaylist, setPlaylistFeatured } from '../../features/memory/playlist/playlist'
 import { getJournal } from '../../features/memory/journal/journal'
 import { saveJournalMarkdown } from '../../features/memory/journalLive/journalPersistence'
 import { parseJournalEmbeds } from '../../features/memory/journal/journalEmbed'
@@ -199,6 +200,12 @@ const deleteBucketFn = (nodeId: string, bucketId: string) => deleteBucket(sessio
 const moveMedia = async (mediaId: string, bucketId: string) => {
   await updateMedia(session.apiBase, s(), props.active.scope.scopeId, currentNodeId.value, mediaId, { bucketId })
 }
+
+// ---- playlists (ADR 0010) ----
+const loadPlaylists = (nodeId: string) => listPlaylists(session.apiBase, s(), props.active, nodeId)
+const addPlaylist = (nodeId: string, url: string, title: string) => createPlaylist(session.apiBase, s(), props.active, nodeId, url, title, '', false)
+const removePlaylist = (nodeId: string, playlistId: string) => deletePlaylist(session.apiBase, s(), props.active, nodeId, playlistId)
+const featurePlaylist = (nodeId: string, playlistId: string, featured: boolean) => setPlaylistFeatured(session.apiBase, s(), props.active, nodeId, playlistId, featured)
 </script>
 
 <template>
@@ -225,6 +232,10 @@ const moveMedia = async (mediaId: string, bucketId: string) => {
       :rename-bucket="renameBucketFn"
       :delete-bucket="deleteBucketFn"
       :move-media="moveMedia"
+      :load-playlists="loadPlaylists"
+      :add-playlist="addPlaylist"
+      :remove-playlist="removePlaylist"
+      :feature-playlist="featurePlaylist"
       :load-preview="(tile) => loadPreview(session.apiBase, s(), active, tile)"
       :load-original="(tile) => loadOriginal(session.apiBase, s(), active, tile)"
       :download-file-name="(tile, ext) => `${name}-${tile.id.slice(0, 8)}.${ext}`"

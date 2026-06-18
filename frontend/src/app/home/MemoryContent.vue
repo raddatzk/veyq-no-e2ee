@@ -11,6 +11,7 @@ import { t } from '../../i18n/i18n'
 import { useGallery } from '../../features/gallery/useGallery'
 import type { GalleryTile } from '../../features/gallery/gallery'
 import type { Bucket } from '../../features/memory/buckets/buckets'
+import { PROVIDER_LABEL, type Playlist } from '../../features/memory/playlist/playlist'
 import type { Track } from '../../features/memory/track/track'
 import { trackStats, formatDistance, formatDuration, formatElevation } from '../../features/memory/track/trackStats'
 import type { NodeType } from '../../features/memory/createTree/memoryTree'
@@ -47,10 +48,15 @@ const props = defineProps<{
   renameBucket?: (nodeId: string, bucketId: string, name: string) => Promise<void>
   deleteBucket?: (nodeId: string, bucketId: string) => Promise<void>
   moveMedia?: (mediaId: string, bucketId: string) => Promise<void>
+  // Playlists (ADR 0010). loadPlaylists enables the tab; the rest enable member editing (guest = read-only).
+  loadPlaylists?: (nodeId: string) => Promise<Playlist[]>
+  addPlaylist?: (nodeId: string, url: string, title: string) => Promise<void>
+  removePlaylist?: (nodeId: string, playlistId: string) => Promise<void>
+  featurePlaylist?: (nodeId: string, playlistId: string, featured: boolean) => Promise<void>
 }>()
 const emit = defineEmits<{ back: []; nodeChanged: [nodeId: string, name: string]; error: [message: string] }>()
 
-const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters'>('gallery')
+const tab = ref<'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters' | 'playlists'>('gallery')
 const currentNodeId = ref(props.rootNodeId)
 const currentName = ref(props.rootName)
 const crumbs = ref<{ id: string; name: string }[]>([{ id: props.rootNodeId, name: props.rootName }])
@@ -71,6 +77,8 @@ const contribBuckets = ref<Bucket[]>([])
 const bucketsLoaded = ref(false)
 const selectedBucketId = ref<string | null>(null)
 const cameraFilter = ref<string | null>(null)
+const playlists = ref<Playlist[]>([])
+const playlistsLoaded = ref(false)
 
 const lightboxInfo = ref(false)
 const lightboxImg = ref<HTMLImageElement | null>(null)
@@ -163,6 +171,27 @@ async function moveToBucket(tile: GalleryTile | null, bucketId: string) {
   if (!tile || !props.moveMedia) return
   try { await props.moveMedia(tile.id, bucketId); await loadContribBuckets(); await reloadTiles() } catch (e) { emit('error', (e as Error).message) }
 }
+
+const PLAYLIST_LABEL = PROVIDER_LABEL
+async function loadPlaylistsTab() {
+  if (!props.loadPlaylists) return
+  try { playlists.value = await props.loadPlaylists(currentNodeId.value); playlistsLoaded.value = true } catch (e) { emit('error', (e as Error).message) }
+}
+async function addPlaylist() {
+  if (!props.addPlaylist) return
+  const url = window.prompt(t('playlist.urlPrompt'))?.trim()
+  if (!url) return
+  const title = window.prompt(t('playlist.titlePrompt'))?.trim() ?? ''
+  try { await props.addPlaylist(currentNodeId.value, url, title); await loadPlaylistsTab() } catch (e) { emit('error', (e as Error).message) }
+}
+async function removePlaylist(p: Playlist) {
+  if (!props.removePlaylist || !window.confirm(t('playlist.deleteConfirm'))) return
+  try { await props.removePlaylist(currentNodeId.value, p.id); await loadPlaylistsTab() } catch (e) { emit('error', (e as Error).message) }
+}
+async function toggleFeatured(p: Playlist) {
+  if (!props.featurePlaylist) return
+  try { await props.featurePlaylist(currentNodeId.value, p.id, !p.featured); await loadPlaylistsTab() } catch (e) { emit('error', (e as Error).message) }
+}
 function revokeAllTiles() { allTiles.value.forEach((tl) => URL.revokeObjectURL(tl.url)); allTiles.value = [] }
 
 function revokeChildCovers() { for (const u of Object.values(childCovers.value)) URL.revokeObjectURL(u); childCovers.value = {} }
@@ -183,6 +212,8 @@ async function loadCurrent() {
   selectedBucketId.value = null
   cameraFilter.value = null
   contribBuckets.value = []
+  playlistsLoaded.value = false
+  playlists.value = []
   journalMarkdown.value = ''
   tracks.value = []
   revokeAllTiles()
@@ -196,6 +227,7 @@ async function loadCurrent() {
     loadChildCovers()
     observe()
     if (props.loadBuckets) await loadContribBuckets() // needed for the move-to-bucket control + counts
+    if (props.loadPlaylists) await loadPlaylistsTab() // for the tab + ::playlist embeds
     if (tab.value === 'journal') await ensureJournal()
     if (tab.value === 'map' || tab.value === 'info') await ensureTracks()
   } catch (e) {
@@ -228,12 +260,13 @@ async function ensureTracks() {
   tracksLoaded.value = true
 }
 
-async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters') {
+async function openTab(which: 'gallery' | 'map' | 'journal' | 'info' | 'contributions' | 'chapters' | 'playlists') {
   tab.value = which
   try {
     if (which === 'journal') await ensureJournal()
     if (which === 'map' || which === 'info') await ensureTracks() // info shows the track count
     if (which === 'contributions' && !bucketsLoaded.value) await loadContribBuckets()
+    if (which === 'playlists' && !playlistsLoaded.value) await loadPlaylistsTab()
   } catch (e) {
     emit('error', (e as Error).message)
   }
@@ -289,8 +322,22 @@ onBeforeUnmount(() => { stopLiveJournal(); revokeChildCovers(); revokeAllTiles()
       <button class="detail-tab" :class="{ active: tab === 'map' }" @click="openTab('map')">{{ t('detail.map') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'journal' }" @click="openTab('journal')">{{ t('detail.journal') }}</button>
       <button v-if="loadBuckets" class="detail-tab" :class="{ active: tab === 'contributions' }" @click="openTab('contributions')">{{ t('detail.contributions') }}</button>
+      <button v-if="loadPlaylists" class="detail-tab" :class="{ active: tab === 'playlists' }" @click="openTab('playlists')">{{ t('detail.playlists') }}</button>
       <button class="detail-tab" :class="{ active: tab === 'info' }" @click="openTab('info')">{{ t('detail.info') }}</button>
     </div>
+
+    <section v-if="tab === 'playlists'" class="memory-playlists">
+      <button v-if="addPlaylist" class="btn btn-primary" type="button" @click="addPlaylist">+ {{ t('playlist.add') }}</button>
+      <ul v-if="playlists.length" class="playlist-list">
+        <li v-for="p in playlists" :key="p.id" class="playlist-row">
+          <span class="playlist-provider">{{ PLAYLIST_LABEL[p.provider] }}</span>
+          <a class="playlist-title" :href="p.url" target="_blank" rel="noopener noreferrer">{{ p.title || p.url }}</a>
+          <button v-if="featurePlaylist" class="btn btn-ghost" type="button" :title="t('playlist.featured')" @click="toggleFeatured(p)">{{ p.featured ? '★' : '☆' }}</button>
+          <button v-if="removePlaylist" class="btn btn-ghost" type="button" style="color: var(--app-danger)" @click="removePlaylist(p)">{{ t('common.delete') }}</button>
+        </li>
+      </ul>
+      <div v-else class="home-empty">{{ t('playlist.empty') }}</div>
+    </section>
 
     <section v-if="tab === 'contributions'" class="memory-contributions">
       <ul class="bucket-list">
